@@ -31,26 +31,32 @@ Rebuild the SVS Accounting application from procedural PHP to Laravel 11. The ap
 
 ## Database Schema & Eloquent Models
 
-### 14 Models from 16 Tables
+### 14 Models + 2 Laravel Tables (16 total)
+
+14 application models map 1:1 to 14 tables. Laravel adds `password_reset_tokens` (Breeze) and `sessions`, bringing the total to 16. The original design stored `reset_token`/`reset_expires_at` on `users` — in Laravel, these are replaced by the `password_reset_tokens` table.
 
 | Model | Table | Soft Delete | Key Relationships |
 |---|---|---|---|
 | `User` | `users` | No | hasMany Depense, Recette, Don |
 | `CompteBancaire` | `comptes_bancaires` | No | hasMany Depense, Recette, Don, Cotisation |
 | `Categorie` | `categories` | No | hasMany SousCategorie |
-| `SousCategorie` | `sous_categories` | No | belongsTo Categorie, hasMany BudgetLine |
+| `SousCategorie` | `sous_categories` | No | belongsTo Categorie, hasMany BudgetLine, DepenseLigne, RecetteLigne |
 | `Operation` | `operations` | No | hasMany DepenseLigne, RecetteLigne, Don |
-| `Depense` | `depenses` | Yes | belongsTo User, CompteBancaire; hasMany DepenseLigne |
+| `Depense` | `depenses` | Yes | belongsTo User (`saisi_par`), CompteBancaire; hasMany DepenseLigne |
 | `DepenseLigne` | `depense_lignes` | Yes | belongsTo Depense, SousCategorie, Operation |
-| `Recette` | `recettes` | Yes | belongsTo User, CompteBancaire; hasMany RecetteLigne |
+| `Recette` | `recettes` | Yes | belongsTo User (`saisi_par`), CompteBancaire; hasMany RecetteLigne |
 | `RecetteLigne` | `recette_lignes` | Yes | belongsTo Recette, SousCategorie, Operation |
 | `Membre` | `membres` | No | hasMany Cotisation |
-| `Cotisation` | `cotisations` | Yes | belongsTo Membre, CompteBancaire |
+| `Cotisation` | `cotisations` | Yes | belongsTo Membre, CompteBancaire. Has `exercice` (INT), `mode_paiement`, `pointe` columns. |
 | `Donateur` | `donateurs` | No | hasMany Don |
-| `Don` | `dons` | Yes | belongsTo Donateur (nullable), User, CompteBancaire, Operation |
-| `BudgetLine` | `budget_lines` | No | belongsTo SousCategorie |
+| `Don` | `dons` | Yes | belongsTo Donateur (nullable), User (`saisi_par`), CompteBancaire, Operation. Has `seance` (INT NULL), `recu_emis` (boolean, for V2 fiscal receipts). |
+| `BudgetLine` | `budget_lines` | No | belongsTo SousCategorie. Has `exercice` (INT) — filtered by `WHERE exercice = ?`, not by date range. |
 
 Soft deletes apply to financial records only: depenses, depense_lignes, recettes, recette_lignes, dons, cotisations.
+
+### `saisi_par` Auto-population
+
+The `depenses`, `recettes`, and `dons` tables have a `saisi_par` FK to `users.id`. This is automatically set to `auth()->id()` in the corresponding service's create method.
 
 ### PHP Backed Enums
 
@@ -66,7 +72,8 @@ The financial year runs September 1 to August 31, identified by the start year (
 An `ExerciceService` provides:
 - `current()`: if `month >= 9` then `year`, else `year - 1`
 - `dateRange(int $exercice)`: returns start/end dates
-- `scopeForExercice(Builder $query, int $exercice)`: shared Eloquent scope filtering `WHERE date BETWEEN ...`
+- `scopeForExercice(Builder $query, int $exercice)`: Eloquent scope filtering `WHERE date BETWEEN ...` — used on models with a `date` column (depenses, recettes, dons, cotisations via `date_paiement`)
+- `BudgetLine` and `Cotisation` also have an `exercice` INT column filtered with a simple `WHERE exercice = ?` scope (not the date-range scope)
 
 ## Authentication & Middleware
 
@@ -85,7 +92,7 @@ An `ExerciceService` provides:
 | Controller | Routes | Notes |
 |---|---|---|
 | `MembreController` | `membres.*` | Index, create, store, show, edit, update, destroy. Cotisation handled on show page. |
-| `OperationController` | `operations.*` | Index, show (linked transactions summary), create, store, edit, update |
+| `OperationController` | `operations.*` | Index, show (linked depenses + recettes + dons summary with solde), create, store, edit, update |
 | `CategorieController` | `parametres/categories.*` | CRUD under parametres |
 | `SousCategorieController` | `parametres/sous-categories.*` | CRUD under parametres |
 | `CompteBancaireController` | `parametres/comptes-bancaires.*` | CRUD under parametres |
@@ -121,15 +128,17 @@ Controllers stay thin. Business logic lives in services:
 | Service | Responsibility |
 |---|---|
 | `ExerciceService` | Calculate current exercice, date ranges, list available exercices |
-| `DepenseService` | Create/update depense + lignes in DB transaction, validate lignes sum = montant_total |
+| `DepenseService` | Create/update depense + lignes in DB transaction, validate lignes sum = montant_total, set `saisi_par` |
 | `RecetteService` | Mirror of DepenseService |
-| `RapprochementService` | Toggle pointe on any transaction type, compute solde theorique for compte + periode |
+| `DonService` | Create/update don with donateur lookup/creation, link to operation/seance, set `saisi_par` |
+| `CotisationService` | Create/delete cotisation for a membre, link to compte bancaire |
+| `RapprochementService` | Toggle pointe on any of the 4 transaction types (depense, recette, don, cotisation). Compute solde theorique: `solde_initial + pointed_recettes + pointed_dons + pointed_cotisations - pointed_depenses` |
 | `RapportService` | Aggregate compte de resultat by code_cerfa, build seance pivot table, generate CSV |
 | `BudgetService` | Compute realise amounts per sous-categorie + exercice |
 
 ### Form Requests
 
-Dedicated `FormRequest` for each store/update: `StoreDepenseRequest`, `UpdateDepenseRequest`, `StoreMembreRequest`, etc. Nested validation for ligne arrays (e.g., `lignes.*.montant` must sum to `montant_total`).
+Dedicated `FormRequest` for controller-based routes: `StoreMembreRequest`, `StoreOperationRequest`, etc. For Livewire components (DepenseForm, RecetteForm, DonForm), validation is handled inside the component's `save()` method using Livewire's `$this->validate()`, including the sum constraint (`lignes.*.montant` must equal `montant_total`). The service layer then performs the DB write.
 
 ### DB Transactions
 
@@ -203,21 +212,30 @@ resources/views/
 
 ### Factories
 
-Every model gets a factory:
+Every model gets a factory. Notable ones with custom states or hooks:
 - `DepenseFactory` with `afterCreating` generating 1-3 `DepenseLigne` records
 - `RecetteFactory` — same pattern
 - `MembreFactory` with `withCotisation(exercice)` state
 - `OperationFactory` with `withSeances(n)` state
+- `DonFactory` with optional donateur and operation linking
+- `CotisationFactory` with exercice and mode_paiement
+- Standard factories for: `UserFactory` (Breeze default), `CompteBancaireFactory`, `CategorieFactory`, `SousCategorieFactory`, `DonateurFactory`, `BudgetLineFactory`
 
 ### Not Tested
 
 - Breeze auth internals (tested upstream)
 - Eloquent relationship definitions (covered implicitly by feature tests)
 
+## Migration Strategy
+
+This is a **greenfield rebuild** — the Laravel app is built from scratch on the `laravel-rewrite` branch. The existing procedural PHP code on `main` serves as reference only and will be replaced.
+
+If there is existing production data to migrate, a one-time migration script will be written after the Laravel app is functional. This is not part of the MVP build — it will be handled separately once the schema is finalized and tested.
+
 ## Out of Scope (V2)
 
-- PDF fiscal receipts (recus fiscaux)
+- PDF fiscal receipts (recus fiscaux) — `dons.recu_emis` column is included in the schema for future use
 - File attachments / justificatifs
 - Full CERFA export (bilan + compte de resultat)
 - Bank statement CSV import
-- Role-based access control
+- Role-based access control (not in original design, added as future consideration)
