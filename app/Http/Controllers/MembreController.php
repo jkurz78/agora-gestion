@@ -4,45 +4,76 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreMembreRequest;
+use App\Http\Requests\UpdateMembreRequest;
 use App\Models\Membre;
-use Illuminate\Http\Request;
+use App\Services\ExerciceService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
 final class MembreController extends Controller
 {
+    public function __construct(
+        private readonly ExerciceService $exerciceService,
+    ) {}
+
     public function index(): View
     {
-        return view('dashboard'); // Placeholder — will be built in Task 10
+        $exercice = $this->exerciceService->current();
+
+        $membres = Membre::with(['cotisations' => function ($query) use ($exercice) {
+            $query->forExercice($exercice);
+        }])->orderBy('nom')->get();
+
+        return view('membres.index', [
+            'membres' => $membres,
+            'exercice' => $exercice,
+            'exerciceLabel' => $this->exerciceService->label($exercice),
+        ]);
     }
 
     public function create(): View
     {
-        return view('dashboard');
+        return view('membres.create');
     }
 
-    public function store(Request $request)
+    public function store(StoreMembreRequest $request): RedirectResponse
     {
-        // Placeholder — will be built in Task 10
-        return redirect()->route('membres.index');
+        Membre::create($request->validated());
+
+        return redirect()->route('membres.index')
+            ->with('success', 'Membre ajouté avec succès.');
     }
 
     public function show(Membre $membre): View
     {
-        return view('dashboard');
+        $membre->load('cotisations.compte');
+
+        return view('membres.show', [
+            'membre' => $membre,
+        ]);
     }
 
     public function edit(Membre $membre): View
     {
-        return view('dashboard');
+        return view('membres.edit', [
+            'membre' => $membre,
+        ]);
     }
 
-    public function update(Request $request, Membre $membre)
+    public function update(UpdateMembreRequest $request, Membre $membre): RedirectResponse
     {
-        return redirect()->route('membres.index');
+        $membre->update($request->validated());
+
+        return redirect()->route('membres.show', $membre)
+            ->with('success', 'Membre mis à jour avec succès.');
     }
 
-    public function destroy(Membre $membre)
+    public function destroy(Membre $membre): RedirectResponse
     {
-        return redirect()->route('membres.index');
+        $membre->delete();
+
+        return redirect()->route('membres.index')
+            ->with('success', 'Membre supprimé avec succès.');
     }
 }
