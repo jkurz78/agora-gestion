@@ -44,6 +44,11 @@ final class Depense extends Model
         return $this->belongsTo(User::class, 'saisi_par');
     }
 
+    public function saisiPar(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'saisi_par');
+    }
+
     public function compte(): BelongsTo
     {
         return $this->belongsTo(CompteBancaire::class, 'compte_id');
