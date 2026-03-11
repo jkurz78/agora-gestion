@@ -19,8 +19,11 @@ final class DonList extends Component
     protected string $paginationTheme = 'bootstrap';
 
     public ?int $exercice = null;
+
     public string $donateur_search = '';
+
     public ?int $operation_id = null;
+
     public ?int $showDonateurId = null;
 
     public function mount(): void

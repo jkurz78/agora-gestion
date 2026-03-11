@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Enums\ModePaiement;
-use App\Enums\StatutOperation;
 use App\Enums\TypeCategorie;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;

@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\TypeCategorie;
 use App\Models\Categorie;
 use App\Models\Depense;
 use App\Models\DepenseLigne;
@@ -12,7 +11,7 @@ use App\Models\User;
 use App\Services\RapportService;
 
 beforeEach(function () {
-    $this->service = new RapportService();
+    $this->service = new RapportService;
     $this->user = User::factory()->create();
 
     $this->depenseCategorie = Categorie::factory()->depense()->create();

@@ -22,7 +22,7 @@ final class BudgetService
         $sousCategorie = SousCategorie::with('categorie')->findOrFail($sousCategorieId);
 
         $startDate = "{$exercice}-09-01";
-        $endDate = ($exercice + 1) . '-08-31';
+        $endDate = ($exercice + 1).'-08-31';
 
         if ($sousCategorie->categorie->type === TypeCategorie::Depense) {
             return (float) DepenseLigne::where('sous_categorie_id', $sousCategorieId)

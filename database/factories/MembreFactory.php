@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Enums\ModePaiement;
 use App\Enums\StatutMembre;
-use App\Models\CompteBancaire;
 use App\Models\Cotisation;
 use App\Models\Membre;
 use Illuminate\Database\Eloquent\Factories\Factory;

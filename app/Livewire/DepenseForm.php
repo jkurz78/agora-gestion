@@ -19,12 +19,19 @@ final class DepenseForm extends Component
     public ?int $depenseId = null;
 
     public string $date = '';
+
     public string $libelle = '';
+
     public string $montant_total = '';
+
     public string $mode_paiement = '';
+
     public ?string $beneficiaire = null;
+
     public ?string $reference = null;
+
     public ?int $compte_id = null;
+
     public ?string $notes = null;
 
     /** @var array<int, array{sous_categorie_id: string, operation_id: string, seance: string, montant: string, notes: string}> */

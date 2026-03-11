@@ -16,6 +16,7 @@ final class BudgetTable extends Component
     public int $exercice;
 
     public ?int $editingLineId = null;
+
     public string $editingMontant = '';
 
     public function mount(): void

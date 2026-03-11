@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\TypeCategorie;
 use App\Livewire\RecetteForm;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;

@@ -25,7 +25,7 @@ final class RapportSeances extends Component
 
         $headers = ['Sous-catégorie', 'Type'];
         for ($i = 1; $i <= $nbSeances; $i++) {
-            $headers[] = 'Séance ' . $i;
+            $headers[] = 'Séance '.$i;
         }
         $headers[] = 'Total';
 
@@ -43,7 +43,7 @@ final class RapportSeances extends Component
 
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
-        }, 'rapport_seances_' . $this->operation_id . '.csv', [
+        }, 'rapport_seances_'.$this->operation_id.'.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }

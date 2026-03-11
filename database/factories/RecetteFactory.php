@@ -8,7 +8,6 @@ use App\Enums\ModePaiement;
 use App\Models\CompteBancaire;
 use App\Models\Recette;
 use App\Models\RecetteLigne;
-use App\Models\SousCategorie;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 

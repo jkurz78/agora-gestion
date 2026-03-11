@@ -52,6 +52,6 @@ final class ExerciceService
      */
     public function label(int $exercice): string
     {
-        return $exercice . '-' . ($exercice + 1);
+        return $exercice.'-'.($exercice + 1);
     }
 }

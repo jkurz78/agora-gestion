@@ -8,7 +8,6 @@ use App\Enums\ModePaiement;
 use App\Models\CompteBancaire;
 use App\Models\Depense;
 use App\Models\DepenseLigne;
-use App\Models\SousCategorie;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 

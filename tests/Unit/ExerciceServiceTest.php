@@ -6,7 +6,7 @@ use App\Services\ExerciceService;
 use Carbon\CarbonImmutable;
 
 beforeEach(function () {
-    $this->service = new ExerciceService();
+    $this->service = new ExerciceService;
 });
 
 describe('current()', function () {

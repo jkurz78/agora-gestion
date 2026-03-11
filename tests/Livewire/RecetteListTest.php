@@ -1,11 +1,7 @@
 <?php
 
-use App\Enums\TypeCategorie;
 use App\Livewire\RecetteList;
-use App\Models\Categorie;
-use App\Models\CompteBancaire;
 use App\Models\Recette;
-use App\Models\SousCategorie;
 use App\Models\User;
 use Livewire\Livewire;
 

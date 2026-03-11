@@ -10,7 +10,7 @@ use App\Models\User;
 use App\Services\RapprochementService;
 
 beforeEach(function () {
-    $this->service = new RapprochementService();
+    $this->service = new RapprochementService;
     $this->user = User::factory()->create();
     $this->compte = CompteBancaire::factory()->create([
         'solde_initial' => 1000.00,

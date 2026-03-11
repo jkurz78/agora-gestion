@@ -69,7 +69,7 @@ final class Don extends Model
     {
         return $query->whereBetween('date', [
             "{$exercice}-09-01",
-            ($exercice + 1) . '-08-31',
+            ($exercice + 1).'-08-31',
         ]);
     }
 }

@@ -36,18 +36,18 @@ it('shows correct exercice', function () {
 
 it('displays solde general', function () {
     Recette::factory()->create([
-        'date' => $this->exercice . '-11-01',
+        'date' => $this->exercice.'-11-01',
         'montant_total' => 1000.00,
         'saisi_par' => $this->user->id,
     ]);
     Recette::factory()->create([
-        'date' => $this->exercice . '-12-01',
+        'date' => $this->exercice.'-12-01',
         'montant_total' => 500.00,
         'saisi_par' => $this->user->id,
     ]);
 
     Depense::factory()->create([
-        'date' => $this->exercice . '-10-15',
+        'date' => $this->exercice.'-10-15',
         'montant_total' => 300.00,
         'saisi_par' => $this->user->id,
     ]);

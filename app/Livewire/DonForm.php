@@ -18,18 +18,29 @@ final class DonForm extends Component
     public ?int $donId = null;
 
     public string $date = '';
+
     public string $montant = '';
+
     public string $mode_paiement = '';
+
     public ?string $objet = null;
+
     public ?int $donateur_id = null;
+
     public ?int $operation_id = null;
+
     public ?int $seance = null;
+
     public ?int $compte_id = null;
 
     public bool $creatingDonateur = false;
+
     public string $new_donateur_nom = '';
+
     public string $new_donateur_prenom = '';
+
     public ?string $new_donateur_email = null;
+
     public ?string $new_donateur_adresse = null;
 
     public bool $showForm = false;
@@ -91,7 +102,7 @@ final class DonForm extends Component
         if ($this->operation_id && $this->seance) {
             $operation = Operation::find($this->operation_id);
             if ($operation && $operation->nombre_seances && $this->seance > $operation->nombre_seances) {
-                $this->addError('seance', 'La séance doit être entre 1 et ' . $operation->nombre_seances . '.');
+                $this->addError('seance', 'La séance doit être entre 1 et '.$operation->nombre_seances.'.');
 
                 return;
             }

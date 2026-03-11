@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\TypeCategorie;
 use App\Models\Categorie;
 use App\Models\Depense;
 use App\Models\DepenseLigne;
@@ -11,7 +10,7 @@ use App\Models\User;
 use App\Services\BudgetService;
 
 beforeEach(function () {
-    $this->service = new BudgetService();
+    $this->service = new BudgetService;
     $this->user = User::factory()->create();
 });
 

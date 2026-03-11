@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\TypeCategorie;
 use App\Livewire\RapportCompteResultat;
 use App\Models\Categorie;
 use App\Models\Depense;

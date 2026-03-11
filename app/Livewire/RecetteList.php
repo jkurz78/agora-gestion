@@ -22,10 +22,15 @@ final class RecetteList extends Component
     protected string $paginationTheme = 'bootstrap';
 
     public ?int $exercice = null;
+
     public ?int $categorie_id = null;
+
     public ?int $sous_categorie_id = null;
+
     public ?int $operation_id = null;
+
     public ?int $compte_id = null;
+
     public ?string $pointe = null;
 
     public function mount(): void

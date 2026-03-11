@@ -17,9 +17,13 @@ final class CotisationForm extends Component
     public Membre $membre;
 
     public int $exercice;
+
     public string $montant = '';
+
     public string $date_paiement = '';
+
     public string $mode_paiement = '';
+
     public string $compte_id = '';
 
     public function mount(Membre $membre): void

@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Enums\TypeCategorie;
 use App\Models\DepenseLigne;
 use App\Models\RecetteLigne;
-use App\Models\SousCategorie;
 use Illuminate\Support\Facades\DB;
 
 final class RapportService
@@ -20,7 +18,7 @@ final class RapportService
     public function compteDeResultat(int $exercice, ?array $operationIds = null): array
     {
         $startDate = "{$exercice}-09-01";
-        $endDate = ($exercice + 1) . '-08-31';
+        $endDate = ($exercice + 1).'-08-31';
 
         // Charges (from depense_lignes)
         $chargesQuery = DepenseLigne::query()
@@ -108,7 +106,7 @@ final class RapportService
 
         $grouped = [];
         foreach ($depenseLignes as $line) {
-            $key = 'depense|' . $line->sous_categorie;
+            $key = 'depense|'.$line->sous_categorie;
             if (! isset($grouped[$key])) {
                 $grouped[$key] = [
                     'sous_categorie' => $line->sous_categorie,
@@ -136,7 +134,7 @@ final class RapportService
             ->get();
 
         foreach ($recetteLignes as $line) {
-            $key = 'recette|' . $line->sous_categorie;
+            $key = 'recette|'.$line->sous_categorie;
             if (! isset($grouped[$key])) {
                 $grouped[$key] = [
                     'sous_categorie' => $line->sous_categorie,

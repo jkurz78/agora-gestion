@@ -15,7 +15,9 @@ use Livewire\Component;
 final class Rapprochement extends Component
 {
     public ?int $compte_id = null;
+
     public ?string $date_debut = null;
+
     public ?string $date_fin = null;
 
     public function toggle(string $type, int $id): void
@@ -70,7 +72,7 @@ final class Rapprochement extends Component
                     'id' => $d->id,
                     'date' => $d->date,
                     'type' => 'don',
-                    'label' => $d->donateur ? $d->donateur->nom . ' ' . $d->donateur->prenom : ($d->objet ?? 'Don anonyme'),
+                    'label' => $d->donateur ? $d->donateur->nom.' '.$d->donateur->prenom : ($d->objet ?? 'Don anonyme'),
                     'montant' => (float) $d->montant,
                     'pointe' => $d->pointe,
                 ]);
@@ -85,7 +87,7 @@ final class Rapprochement extends Component
                     'id' => $c->id,
                     'date' => $c->date_paiement,
                     'type' => 'cotisation',
-                    'label' => $c->membre ? $c->membre->nom . ' ' . $c->membre->prenom : 'Cotisation',
+                    'label' => $c->membre ? $c->membre->nom.' '.$c->membre->prenom : 'Cotisation',
                     'montant' => (float) $c->montant,
                     'pointe' => $c->pointe,
                 ]);

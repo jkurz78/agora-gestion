@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\TypeCategorie;
 use App\Livewire\BudgetTable;
 use App\Models\BudgetLine;
 use App\Models\Categorie;

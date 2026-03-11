@@ -39,7 +39,7 @@ final class RapportCompteResultat extends Component
 
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
-        }, 'compte_resultat_' . $this->exercice . '.csv', [
+        }, 'compte_resultat_'.$this->exercice.'.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }
