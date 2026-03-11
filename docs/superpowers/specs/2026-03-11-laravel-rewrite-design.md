@@ -109,11 +109,11 @@ Parametres page uses tabs to group all settings controllers.
 | `DepenseList` | depenses index | Live filters (periode, categorie, operation, compte, pointe) |
 | `RecetteList` | recettes index | Same pattern |
 | `DonForm` | dons create/edit | Donateur search/create inline, seance selector |
-| `DonList` | dons index | Filtered list |
+| `DonList` | dons index | Filtered list, click donateur name to see fiche donateur (modal or inline) with full donation history |
 | `CotisationForm` | membre show | Quick inline cotisation entry |
 | `Rapprochement` | rapprochement | Toggle pointe across 4 transaction types, live solde theorique |
 | `Dashboard` | dashboard | KPIs, recent transactions, pending cotisations, exercice selector |
-| `BudgetTable` | budget | Inline edit prevu amounts, live prevu vs realise |
+| `BudgetTable` | budget | Add/edit/delete budget lines, inline edit prevu amounts, live prevu vs realise |
 | `RapportCompteResultat` | rapports | Exercice + operation filters, CERFA output, CSV export |
 | `RapportSeances` | rapports | Operation selector, pivot table, CSV export |
 
