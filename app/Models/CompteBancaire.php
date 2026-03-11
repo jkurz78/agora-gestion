@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+final class CompteBancaire extends Model
+{
+    use HasFactory;
+
+    protected $table = 'comptes_bancaires';
+
+    protected $fillable = [
+        'nom',
+        'iban',
+        'solde_initial',
+        'date_solde_initial',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'solde_initial' => 'decimal:2',
+            'date_solde_initial' => 'date',
+        ];
+    }
+
+    public function depenses(): HasMany
+    {
+        return $this->hasMany(Depense::class, 'compte_id');
+    }
+
+    public function recettes(): HasMany
+    {
+        return $this->hasMany(Recette::class, 'compte_id');
+    }
+
+    public function dons(): HasMany
+    {
+        return $this->hasMany(Don::class, 'compte_id');
+    }
+
+    public function cotisations(): HasMany
+    {
+        return $this->hasMany(Cotisation::class, 'compte_id');
+    }
+}

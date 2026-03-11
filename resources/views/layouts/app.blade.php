@@ -47,7 +47,7 @@
                 <ul class="navbar-nav">
                     <li class="nav-item">
                         <span class="nav-link text-light">
-                            <i class="bi bi-person-circle"></i> {{ auth()->user()->nom ?? auth()->user()->name }}
+                            <i class="bi bi-person-circle"></i> {{ auth()->user()->nom }}
                         </span>
                     </li>
                     <li class="nav-item">
