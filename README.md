@@ -1,66 +1,204 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SVS Comptabilite
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Application de comptabilite pour association loi 1901 (non-profit). Construite avec Laravel 11, Livewire 4, et Bootstrap 5.
 
-## About Laravel
+## Demarrage rapide
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### Prerequis
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- Docker & Docker Compose
+- Composer
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Installation
 
-## Learning Laravel
+```bash
+git clone <repo-url> && cd svs-accounting
+composer install
+cp .env.example .env
+php artisan key:generate
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Lancer avec Docker (Sail)
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```bash
+./vendor/bin/sail up -d
+./vendor/bin/sail artisan migrate:fresh --seed
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+L'app tourne sur **http://localhost**.
 
-## Laravel Sponsors
+### Lancer sans Docker
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+# Configurer .env avec une base MySQL ou SQLite locale
+php artisan migrate:fresh --seed
+composer run dev
+```
 
-### Premium Partners
+`composer run dev` lance en parallele : `artisan serve`, `queue:listen`, `pail` (logs), et `npm run dev`.
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+L'app tourne sur **http://localhost:8000**.
 
-## Contributing
+### Comptes dev
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Email | Mot de passe | Role |
+|-------|-------------|------|
+| `admin@svs.fr` | `password` | Admin (Marie Dupont) |
+| `jean@svs.fr` | `password` | Utilisateur (Jean Martin) |
 
-## Code of Conduct
+Le seeder cree aussi : 3 comptes bancaires, des categories/sous-categories, 2 operations avec seances, des depenses, recettes, membres, cotisations et dons.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Hot Reload
 
-## Security Vulnerabilities
+- **Livewire** gere le rechargement automatique des composants cote serveur. Les changements dans les classes Livewire (`app/Livewire/`) et leurs vues (`resources/views/livewire/`) sont pris en compte au prochain appel sans redemarrage.
+- **Blade** : les vues sont recompilees automatiquement a chaque requete en mode `APP_DEBUG=true`.
+- **Pas de build frontend** : Bootstrap et Bootstrap Icons sont charges via CDN. Pas de Vite, pas de `npm install` necessaire.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Exercice comptable
 
-## License
+L'exercice va du **1er septembre au 31 aout**. L'exercice 2025 = sept 2025 a aout 2026. Toutes les requetes utilisent le scope `forExercice(int $annee)`.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Tests
+
+```bash
+php artisan test                  # Tous les tests
+php artisan test --coverage       # Avec couverture
+./vendor/bin/pint --test          # Verifier le formatage PSR-12
+```
+
+Les tests utilisent **Pest PHP**. Il y a des tests Feature (auth, CRUD), Unit (services), et Livewire (composants).
+
+## Formatage
+
+```bash
+./vendor/bin/pint                 # Appliquer Laravel Pint (PSR-12)
+```
+
+---
+
+## Architecture
+
+### Structure
+
+```
+app/
+├── Enums/           # TypeCategorie, ModePaiement, StatutMembre, StatutOperation
+├── Http/
+│   ├── Controllers/ # CRUD simples (Membre, Operation, Parametres)
+│   └── Requests/    # Validation des formulaires
+├── Livewire/        # 12 composants reactifs (formulaires + listes)
+├── Models/          # 14 modeles Eloquent
+├── Services/        # Logique metier (8 services)
+└── View/Components/ # Composants Blade reutilisables
+
+database/
+├── migrations/      # 13 migrations domaine + 3 Laravel
+├── seeders/         # Donnees de dev realistes
+└── factories/       # 14 factories pour les tests
+
+resources/views/
+├── layouts/         # app.blade.php (navbar Bootstrap)
+├── livewire/        # Vues des composants Livewire
+└── [modules]/       # Vues par module (membres, operations, parametres...)
+```
+
+### Patterns principaux
+
+**Controllers minces, Services epais** : les controllers ne font que valider et deleguer aux services. Toute la logique metier vit dans `app/Services/`.
+
+```
+Requete → Controller (validation) → Service (logique + DB::transaction) → Response
+```
+
+**Livewire pour l'interactivite** : les formulaires dynamiques (lignes de depense, creation inline de donateur) et les listes avec recherche/filtre sont des composants Livewire full-page.
+
+```
+Route::view('/depenses', 'depenses.index')  →  <livewire:depense-list />
+                                                <livewire:depense-form />
+```
+
+**Events Livewire** : les composants communiquent par evenements (`depense-saved`, `edit-depense`).
+
+### Modeles & Relations
+
+```
+User ──hasMany──→ Depense, Recette, Don (via saisi_par)
+
+CompteBancaire ──hasMany──→ Depense, Recette, Cotisation, Don
+
+Categorie ──hasMany──→ SousCategorie ──hasMany──→ DepenseLigne, RecetteLigne, BudgetLine
+
+Operation ──hasMany──→ DepenseLigne, RecetteLigne, Don
+
+Depense ──hasMany──→ DepenseLigne (montant reparti par sous-categorie/operation/seance)
+Recette ──hasMany──→ RecetteLigne
+
+Membre ──hasMany──→ Cotisation
+Donateur ──hasMany──→ Don
+```
+
+### Enums
+
+| Enum | Valeurs |
+|------|---------|
+| `TypeCategorie` | `Depense`, `Recette` |
+| `ModePaiement` | `Virement`, `Cheque`, `Especes`, `Cb`, `Prelevement` |
+| `StatutMembre` | `Actif`, `Inactif` |
+| `StatutOperation` | `EnCours`, `Cloturee` |
+
+---
+
+## Guide pour le vibe coding
+
+Ce projet est concu pour etre developpe avec un assistant IA (Claude Code). Voici les regles a suivre.
+
+### Conventions obligatoires
+
+- **`declare(strict_types=1);`** en haut de chaque fichier PHP
+- **`final class`** sauf si l'heritage est explicitement necessaire
+- **Type hints** sur tous les parametres et retours de methode
+- **PHP 8.2+** : utiliser readonly, enums, typed properties
+- **PSR-12** : lancer `./vendor/bin/pint` avant chaque commit
+- **Locale `fr`** : labels, messages de validation, et Faker en francais
+
+### Creer une nouvelle fonctionnalite
+
+1. **Migration** : `php artisan make:migration create_xxx_table` — verifier avec `php artisan migrate:status`
+2. **Model** : `php artisan make:model Xxx` — ajouter relations, casts, scopes, fillable
+3. **Factory + Seeder** : pour les donnees de test
+4. **Service** : creer `app/Services/XxxService.php` — encapsuler la logique dans `DB::transaction()`
+5. **Livewire** : `php artisan make:livewire XxxForm` / `XxxList` — formulaire + liste
+6. **Vue Blade** : creer la page dans `resources/views/xxx/index.blade.php` avec les composants Livewire
+7. **Route** : ajouter dans `routes/web.php` sous le middleware `auth`
+8. **Tests** : ecrire les tests Pest (Feature + Livewire) — viser >85% de couverture
+
+### Regles d'architecture
+
+| Regle | Pourquoi |
+|-------|----------|
+| Pas de logique metier dans les controllers | Les controllers valident et delegent, c'est tout |
+| Pas de requetes SQL brutes | Utiliser Eloquent + scopes. N+1 = eager loading avec `::with()` |
+| Transactions pour les ecritures multi-tables | `DB::transaction()` dans les services |
+| SoftDeletes sur les modeles financiers | Depense, Recette, Don — ne jamais supprimer definitivement |
+| Scope `forExercice(int)` | Toute requete liee a une periode doit filtrer par exercice (sept-aout) |
+| Validation dans FormRequest | Pas de validation inline dans les controllers |
+| Enums PHP pour les types fixes | `ModePaiement`, `TypeCategorie`, etc. — pas de strings magiques |
+
+### Ajouter au frontend
+
+- **Bootstrap 5** via CDN — pas de build frontend
+- **Bootstrap Icons** pour les icones (`<i class="bi bi-xxx"></i>`)
+- **Livewire 4** pour l'interactivite — pas besoin de JavaScript custom
+- Si du JS custom est necessaire, l'ajouter inline avec `@push('scripts')` dans la vue
+
+### Commandes utiles
+
+```bash
+php artisan make:model Xxx -mf         # Model + migration + factory
+php artisan make:livewire XxxForm      # Composant Livewire
+php artisan make:request StoreXxxRequest  # Form request
+php artisan route:list --path=xxx      # Verifier les routes
+php artisan test --filter=Xxx          # Tests cibles
+php artisan migrate:fresh --seed       # Reset complet
+./vendor/bin/pint                      # Formatage PSR-12
+```
