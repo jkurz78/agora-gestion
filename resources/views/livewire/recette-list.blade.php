@@ -46,6 +46,12 @@
                         <option value="0">Non</option>
                     </select>
                 </div>
+                <div class="col-md-2">
+                    <label for="filter-payeur" class="form-label">Payeur</label>
+                    <input type="text" wire:model.live.debounce.300ms="payeur"
+                           id="filter-payeur"
+                           class="form-control form-control-sm" placeholder="Payeur...">
+                </div>
             </div>
         </div>
     </div>

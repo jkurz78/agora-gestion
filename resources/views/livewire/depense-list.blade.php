@@ -46,6 +46,12 @@
                         <option value="0">Non</option>
                     </select>
                 </div>
+                <div class="col-md-2">
+                    <label for="filter-beneficiaire" class="form-label">Bénéficiaire</label>
+                    <input type="text" wire:model.live.debounce.300ms="beneficiaire"
+                           id="filter-beneficiaire"
+                           class="form-control form-control-sm" placeholder="Bénéficiaire...">
+                </div>
             </div>
         </div>
     </div>

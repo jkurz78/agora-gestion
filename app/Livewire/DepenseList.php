@@ -33,6 +33,8 @@ final class DepenseList extends Component
 
     public ?string $pointe = null;
 
+    public ?string $beneficiaire = null;
+
     public function mount(): void
     {
         $this->exercice = app(ExerciceService::class)->current();
@@ -65,6 +67,11 @@ final class DepenseList extends Component
     }
 
     public function updatedPointe(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedBeneficiaire(): void
     {
         $this->resetPage();
     }
@@ -115,6 +122,10 @@ final class DepenseList extends Component
 
         if ($this->pointe !== null && $this->pointe !== '') {
             $query->where('pointe', $this->pointe === '1');
+        }
+
+        if ($this->beneficiaire) {
+            $query->where('beneficiaire', 'like', '%'.$this->beneficiaire.'%');
         }
 
         $exerciceService = app(ExerciceService::class);
