@@ -55,3 +55,16 @@ it('can delete a depense with soft delete', function () {
 
     $this->assertSoftDeleted('depenses', ['id' => $depense->id]);
 });
+
+it('displays reference column in depense list', function () {
+    Depense::factory()->create([
+        'libelle' => 'Achat fournitures',
+        'reference' => 'REF-2025-042',
+        'date' => '2025-10-15',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    Livewire::test(DepenseList::class)
+        ->assertSee('Référence')
+        ->assertSee('REF-2025-042');
+});

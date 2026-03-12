@@ -55,3 +55,16 @@ it('can delete a recette with soft delete', function () {
 
     $this->assertSoftDeleted('recettes', ['id' => $recette->id]);
 });
+
+it('displays reference column in recette list', function () {
+    Recette::factory()->create([
+        'libelle' => 'Cotisation membre',
+        'reference' => 'REF-REC-007',
+        'date' => '2025-10-15',
+        'saisi_par' => $this->user->id,
+    ]);
+
+    Livewire::test(RecetteList::class)
+        ->assertSee('Référence')
+        ->assertSee('REF-REC-007');
+});

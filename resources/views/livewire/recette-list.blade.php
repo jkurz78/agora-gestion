@@ -57,6 +57,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Libellé</th>
+                    <th>Référence</th>
                     <th class="text-end">Montant</th>
                     <th>Mode paiement</th>
                     <th>Payeur</th>
@@ -69,6 +70,7 @@
                     <tr>
                         <td>{{ $recette->date->format('d/m/Y') }}</td>
                         <td>{{ $recette->libelle }}</td>
+                        <td>{{ $recette->reference ?? '-' }}</td>
                         <td class="text-end">{{ number_format((float) $recette->montant_total, 2, ',', ' ') }} &euro;</td>
                         <td>{{ $recette->mode_paiement->label() }}</td>
                         <td>{{ $recette->payeur ?? '-' }}</td>
@@ -93,7 +95,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-muted text-center">Aucune recette trouvée.</td>
+                        <td colspan="8" class="text-muted text-center">Aucune recette trouvée.</td>
                     </tr>
                 @endforelse
             </tbody>
