@@ -33,12 +33,10 @@
                             @enderror
                         </div>
                         <div class="col-md-2">
-                            <label for="montant_total" class="form-label">Montant total <span class="text-danger">*</span></label>
-                            <input type="number" wire:model="montant_total" id="montant_total" step="0.01" min="0.01"
-                                   class="form-control @error('montant_total') is-invalid @enderror">
-                            @error('montant_total')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            <label class="form-label">Montant total</label>
+                            <div class="form-control bg-light fw-bold text-end">
+                                {{ number_format($this->montantTotal, 2, ',', ' ') }} €
+                            </div>
                         </div>
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
@@ -173,11 +171,6 @@
                                             $totalLignes = collect($lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0));
                                         @endphp
                                         {{ number_format($totalLignes, 2, ',', ' ') }} &euro;
-                                        @if ($montant_total !== '' && round($totalLignes, 2) !== round((float) $montant_total, 2))
-                                            <span class="text-danger ms-1" title="Ne correspond pas au montant total">
-                                                <i class="bi bi-exclamation-triangle"></i>
-                                            </span>
-                                        @endif
                                     </td>
                                     <td colspan="2"></td>
                                 </tr>
