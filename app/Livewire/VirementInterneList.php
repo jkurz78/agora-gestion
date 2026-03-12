@@ -12,7 +12,7 @@ use Livewire\Component;
 
 final class VirementInterneList extends Component
 {
-    public int $exercice;
+    public ?int $exercice = null;
 
     public function mount(): void
     {
@@ -31,7 +31,7 @@ final class VirementInterneList extends Component
     public function render()
     {
         $virements = VirementInterne::with(['compteSource', 'compteDestination', 'saisiPar'])
-            ->forExercice($this->exercice)
+            ->when($this->exercice, fn ($q) => $q->forExercice($this->exercice))
             ->orderByDesc('date')
             ->get();
 
