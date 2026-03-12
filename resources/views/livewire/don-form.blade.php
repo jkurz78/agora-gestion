@@ -1,0 +1,169 @@
+<div>
+    @if (! $showForm)
+        <div class="mb-3">
+            <button wire:click="$set('showForm', true)" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Nouveau don
+            </button>
+        </div>
+    @else
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">{{ $donId ? 'Modifier le don' : 'Nouveau don' }}</h5>
+                <button wire:click="resetForm" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Annuler
+                </button>
+            </div>
+            <div class="card-body">
+                <form wire:submit="save">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-2">
+                            <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
+                            <input type="date" wire:model="date" id="date"
+                                   class="form-control @error('date') is-invalid @enderror">
+                            @error('date')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-2">
+                            <label for="montant" class="form-label">Montant <span class="text-danger">*</span></label>
+                            <input type="number" wire:model="montant" id="montant" step="0.01" min="0.01"
+                                   class="form-control @error('montant') is-invalid @enderror">
+                            @error('montant')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-2">
+                            <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
+                            <select wire:model="mode_paiement" id="mode_paiement"
+                                    class="form-select @error('mode_paiement') is-invalid @enderror">
+                                <option value="">-- Choisir --</option>
+                                @foreach ($modesPaiement as $mode)
+                                    <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
+                                @endforeach
+                            </select>
+                            @error('mode_paiement')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-3">
+                            <label for="objet" class="form-label">Objet</label>
+                            <input type="text" wire:model="objet" id="objet" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="compte_id" class="form-label">Compte bancaire</label>
+                            <select wire:model="compte_id" id="compte_id" class="form-select">
+                                <option value="">-- Aucun --</option>
+                                @foreach ($comptes as $compte)
+                                    <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    {{-- Donateur section --}}
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-12">
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <h6 class="mb-0">Donateur</h6>
+                                <div class="form-check form-switch">
+                                    <input type="checkbox" wire:model.live="creatingDonateur" class="form-check-input"
+                                           id="toggle-create-donateur">
+                                    <label class="form-check-label" for="toggle-create-donateur">
+                                        Créer un donateur
+                                    </label>
+                                </div>
+                            </div>
+
+                            @if (! $creatingDonateur)
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <select wire:model="donateur_id" id="donateur_id"
+                                                class="form-select @error('donateur_id') is-invalid @enderror">
+                                            <option value="">-- Anonyme --</option>
+                                            @foreach ($donateurs as $donateur)
+                                                <option value="{{ $donateur->id }}">{{ $donateur->nom }} {{ $donateur->prenom }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('donateur_id')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                            @else
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label for="new_donateur_nom" class="form-label">Nom <span class="text-danger">*</span></label>
+                                        <input type="text" wire:model="new_donateur_nom" id="new_donateur_nom"
+                                               class="form-control @error('new_donateur_nom') is-invalid @enderror">
+                                        @error('new_donateur_nom')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="new_donateur_prenom" class="form-label">Prénom <span class="text-danger">*</span></label>
+                                        <input type="text" wire:model="new_donateur_prenom" id="new_donateur_prenom"
+                                               class="form-control @error('new_donateur_prenom') is-invalid @enderror">
+                                        @error('new_donateur_prenom')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="new_donateur_email" class="form-label">Email</label>
+                                        <input type="email" wire:model="new_donateur_email" id="new_donateur_email"
+                                               class="form-control">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label for="new_donateur_adresse" class="form-label">Adresse</label>
+                                        <input type="text" wire:model="new_donateur_adresse" id="new_donateur_adresse"
+                                               class="form-control">
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Operation / Seance --}}
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label for="operation_id" class="form-label">Opération</label>
+                            <select wire:model.live="operation_id" id="operation_id" class="form-select">
+                                <option value="">-- Aucune --</option>
+                                @foreach ($operations as $op)
+                                    <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        @php
+                            $selectedOp = $operation_id ? $operations->firstWhere('id', (int) $operation_id) : null;
+                            $nbSeances = $selectedOp?->nombre_seances;
+                        @endphp
+                        @if ($nbSeances)
+                            <div class="col-md-2">
+                                <label for="seance" class="form-label">Séance</label>
+                                <select wire:model="seance" id="seance"
+                                        class="form-select @error('seance') is-invalid @enderror">
+                                    <option value="">--</option>
+                                    @for ($s = 1; $s <= $nbSeances; $s++)
+                                        <option value="{{ $s }}">{{ $s }}</option>
+                                    @endfor
+                                </select>
+                                @error('seance')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <div class="ms-auto">
+                            <button type="button" wire:click="resetForm" class="btn btn-secondary">Annuler</button>
+                            <button type="submit" class="btn btn-success">
+                                {{ $donId ? 'Mettre à jour' : 'Enregistrer' }}
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+</div>

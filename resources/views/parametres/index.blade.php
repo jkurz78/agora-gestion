@@ -1,0 +1,347 @@
+<x-app-layout>
+    <h1 class="mb-4">Paramètres</h1>
+
+    {{-- Tab navigation --}}
+    <ul class="nav nav-tabs" id="parametresTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="categories-tab" data-bs-toggle="tab"
+                    data-bs-target="#categories-pane" type="button" role="tab"
+                    aria-controls="categories-pane" aria-selected="true">
+                <i class="bi bi-tags"></i> Catégories
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="sous-categories-tab" data-bs-toggle="tab"
+                    data-bs-target="#sous-categories-pane" type="button" role="tab"
+                    aria-controls="sous-categories-pane" aria-selected="false">
+                <i class="bi bi-tag"></i> Sous-catégories
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="comptes-tab" data-bs-toggle="tab"
+                    data-bs-target="#comptes-pane" type="button" role="tab"
+                    aria-controls="comptes-pane" aria-selected="false">
+                <i class="bi bi-bank"></i> Comptes bancaires
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="utilisateurs-tab" data-bs-toggle="tab"
+                    data-bs-target="#utilisateurs-pane" type="button" role="tab"
+                    aria-controls="utilisateurs-pane" aria-selected="false">
+                <i class="bi bi-people"></i> Utilisateurs
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content pt-3" id="parametresTabContent">
+
+        {{-- ========== Catégories ========== --}}
+        <div class="tab-pane fade show active" id="categories-pane" role="tabpanel" aria-labelledby="categories-tab">
+            <div class="mb-3">
+                <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#addCategorieForm">
+                    <i class="bi bi-plus-lg"></i> Ajouter une catégorie
+                </button>
+            </div>
+
+            <div class="collapse mb-3" id="addCategorieForm">
+                <div class="card card-body">
+                    <form action="{{ route('parametres.categories.store') }}" method="POST" class="row g-2 align-items-end">
+                        @csrf
+                        <div class="col-md-5">
+                            <label for="cat_nom" class="form-label">Nom</label>
+                            <input type="text" name="nom" id="cat_nom" class="form-control" required maxlength="100">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="cat_type" class="form-label">Type</label>
+                            <select name="type" id="cat_type" class="form-select" required>
+                                <option value="">-- Choisir --</option>
+                                @foreach (\App\Enums\TypeCategorie::cases() as $type)
+                                    <option value="{{ $type->value }}">{{ $type->label() }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-success w-100">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nom</th>
+                        <th>Type</th>
+                        <th>Sous-catégories</th>
+                        <th style="width: 180px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($categories as $categorie)
+                        <tr>
+                            <td>{{ $categorie->nom }}</td>
+                            <td>
+                                <span class="badge {{ $categorie->type === \App\Enums\TypeCategorie::Depense ? 'bg-danger' : 'bg-success' }}">
+                                    {{ $categorie->type->label() }}
+                                </span>
+                            </td>
+                            <td>{{ $categorie->sousCategories->count() }}</td>
+                            <td>
+                                <form action="{{ route('parametres.categories.update', $categorie) }}" method="POST" class="d-inline">
+                                    @csrf
+                                    @method('PUT')
+                                    <input type="hidden" name="nom" value="{{ $categorie->nom }}">
+                                    <input type="hidden" name="type" value="{{ $categorie->type->value }}">
+                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                            onclick="editCategorie(this, {{ $categorie->id }}, '{{ addslashes($categorie->nom) }}', '{{ $categorie->type->value }}')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                </form>
+                                <form action="{{ route('parametres.categories.destroy', $categorie) }}" method="POST" class="d-inline"
+                                      onsubmit="return confirm('Supprimer cette catégorie ?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="text-muted">Aucune catégorie enregistrée.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        {{-- ========== Sous-catégories ========== --}}
+        <div class="tab-pane fade" id="sous-categories-pane" role="tabpanel" aria-labelledby="sous-categories-tab">
+            <div class="mb-3">
+                <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#addSousCategorieForm">
+                    <i class="bi bi-plus-lg"></i> Ajouter une sous-catégorie
+                </button>
+            </div>
+
+            <div class="collapse mb-3" id="addSousCategorieForm">
+                <div class="card card-body">
+                    <form action="{{ route('parametres.sous-categories.store') }}" method="POST" class="row g-2 align-items-end">
+                        @csrf
+                        <div class="col-md-4">
+                            <label for="sc_categorie" class="form-label">Catégorie</label>
+                            <select name="categorie_id" id="sc_categorie" class="form-select" required>
+                                <option value="">-- Choisir --</option>
+                                @foreach ($categories as $cat)
+                                    <option value="{{ $cat->id }}">{{ $cat->nom }} ({{ $cat->type->label() }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="sc_nom" class="form-label">Nom</label>
+                            <input type="text" name="nom" id="sc_nom" class="form-control" required maxlength="100">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="sc_cerfa" class="form-label">Code CERFA</label>
+                            <input type="text" name="code_cerfa" id="sc_cerfa" class="form-control" maxlength="10">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-success w-100">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Catégorie</th>
+                        <th>Nom</th>
+                        <th>Code CERFA</th>
+                        <th style="width: 180px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @php
+                        $sousCategories = $categories->flatMap->sousCategories->sortBy('nom');
+                    @endphp
+                    @forelse ($sousCategories as $sc)
+                        <tr>
+                            <td>{{ $sc->categorie->nom }}</td>
+                            <td>{{ $sc->nom }}</td>
+                            <td>{{ $sc->code_cerfa ?? '—' }}</td>
+                            <td>
+                                <form action="{{ route('parametres.sous-categories.destroy', $sc) }}" method="POST" class="d-inline"
+                                      onsubmit="return confirm('Supprimer cette sous-catégorie ?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="text-muted">Aucune sous-catégorie enregistrée.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        {{-- ========== Comptes bancaires ========== --}}
+        <div class="tab-pane fade" id="comptes-pane" role="tabpanel" aria-labelledby="comptes-tab">
+            <div class="mb-3">
+                <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#addCompteForm">
+                    <i class="bi bi-plus-lg"></i> Ajouter un compte bancaire
+                </button>
+            </div>
+
+            <div class="collapse mb-3" id="addCompteForm">
+                <div class="card card-body">
+                    <form action="{{ route('parametres.comptes-bancaires.store') }}" method="POST" class="row g-2 align-items-end">
+                        @csrf
+                        <div class="col-md-3">
+                            <label for="cb_nom" class="form-label">Nom</label>
+                            <input type="text" name="nom" id="cb_nom" class="form-control" required maxlength="150">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="cb_iban" class="form-label">IBAN</label>
+                            <input type="text" name="iban" id="cb_iban" class="form-control" maxlength="34">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="cb_solde" class="form-label">Solde initial</label>
+                            <input type="number" name="solde_initial" id="cb_solde" class="form-control" required step="0.01">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="cb_date" class="form-label">Date solde</label>
+                            <input type="date" name="date_solde_initial" id="cb_date" class="form-control" required>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-success w-100">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nom</th>
+                        <th>IBAN</th>
+                        <th>Solde initial</th>
+                        <th>Date solde</th>
+                        <th style="width: 180px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($comptesBancaires as $compte)
+                        <tr>
+                            <td>{{ $compte->nom }}</td>
+                            <td>{{ $compte->iban ?? '—' }}</td>
+                            <td>{{ number_format((float) $compte->solde_initial, 2, ',', ' ') }} &euro;</td>
+                            <td>{{ $compte->date_solde_initial->format('d/m/Y') }}</td>
+                            <td>
+                                <form action="{{ route('parametres.comptes-bancaires.destroy', $compte) }}" method="POST" class="d-inline"
+                                      onsubmit="return confirm('Supprimer ce compte bancaire ?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="text-muted">Aucun compte bancaire enregistré.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        {{-- ========== Utilisateurs ========== --}}
+        <div class="tab-pane fade" id="utilisateurs-pane" role="tabpanel" aria-labelledby="utilisateurs-tab">
+            <div class="mb-3">
+                <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#addUserForm">
+                    <i class="bi bi-plus-lg"></i> Ajouter un utilisateur
+                </button>
+            </div>
+
+            <div class="collapse mb-3" id="addUserForm">
+                <div class="card card-body">
+                    <form action="{{ route('parametres.utilisateurs.store') }}" method="POST" class="row g-2 align-items-end">
+                        @csrf
+                        <div class="col-md-3">
+                            <label for="usr_nom" class="form-label">Nom</label>
+                            <input type="text" name="nom" id="usr_nom" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="usr_email" class="form-label">Email</label>
+                            <input type="email" name="email" id="usr_email" class="form-control" required>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="usr_password" class="form-label">Mot de passe</label>
+                            <input type="password" name="password" id="usr_password" class="form-control" required minlength="8">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="usr_password_confirm" class="form-label">Confirmer</label>
+                            <input type="password" name="password_confirmation" id="usr_password_confirm" class="form-control" required>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-success w-100">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nom</th>
+                        <th>Email</th>
+                        <th style="width: 120px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($utilisateurs as $user)
+                        <tr>
+                            <td>{{ $user->nom }}</td>
+                            <td>{{ $user->email }}</td>
+                            <td>
+                                <form action="{{ route('parametres.utilisateurs.destroy', $user) }}" method="POST" class="d-inline"
+                                      onsubmit="return confirm('Supprimer cet utilisateur ?')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="3" class="text-muted">Aucun utilisateur enregistré.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function editCategorie(btn, id, nom, type) {
+            const newNom = prompt('Nom de la catégorie :', nom);
+            if (newNom === null) return;
+            const form = btn.closest('form');
+            form.querySelector('input[name="nom"]').value = newNom;
+            form.submit();
+        }
+    </script>
+</x-app-layout>
