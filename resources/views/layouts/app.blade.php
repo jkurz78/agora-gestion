@@ -21,17 +21,16 @@
                 <ul class="navbar-nav me-auto">
                     @php
                         $navItems = [
-                            ['route' => 'dashboard', 'icon' => 'speedometer2', 'label' => 'Tableau de bord'],
-                            ['route' => 'depenses.index', 'icon' => 'arrow-down-circle', 'label' => 'Dépenses'],
-                            ['route' => 'recettes.index', 'icon' => 'arrow-up-circle', 'label' => 'Recettes'],
-                            ['route' => 'budget.index', 'icon' => 'piggy-bank', 'label' => 'Budget'],
-                            ['route' => 'membres.index', 'icon' => 'people', 'label' => 'Membres'],
-                            ['route' => 'dons.index', 'icon' => 'heart', 'label' => 'Dons'],
-                            ['route' => 'operations.index', 'icon' => 'calendar-event', 'label' => 'Opérations'],
-                            ['route' => 'rapprochement.index', 'icon' => 'bank', 'label' => 'Rapprochement'],
-                            ['route' => 'virements.index', 'icon' => 'arrow-left-right', 'label' => 'Virements'],
-                            ['route' => 'rapports.index', 'icon' => 'file-earmark-bar-graph', 'label' => 'Rapports'],
-                            ['route' => 'parametres.index', 'icon' => 'gear', 'label' => 'Paramètres'],
+                            ['route' => 'dashboard',           'icon' => 'speedometer2',           'label' => 'Tableau de bord'],
+                            ['route' => 'depenses.index',      'icon' => 'arrow-down-circle',      'label' => 'Dépenses'],
+                            ['route' => 'recettes.index',      'icon' => 'arrow-up-circle',        'label' => 'Recettes'],
+                            ['route' => 'virements.index',     'icon' => 'arrow-left-right',       'label' => 'Virements'],
+                            ['route' => 'budget.index',        'icon' => 'piggy-bank',             'label' => 'Budget'],
+                            ['route' => 'rapprochement.index', 'icon' => 'bank',                   'label' => 'Rapprochement'],
+                            ['route' => 'membres.index',       'icon' => 'people',                 'label' => 'Membres'],
+                            ['route' => 'dons.index',          'icon' => 'heart',                  'label' => 'Dons'],
+                            ['route' => 'rapports.index',      'icon' => 'file-earmark-bar-graph', 'label' => 'Rapports'],
+                            ['route' => 'parametres.index',    'icon' => 'gear',                   'label' => 'Paramètres'],
                         ];
                     @endphp
                     @foreach ($navItems as $item)
