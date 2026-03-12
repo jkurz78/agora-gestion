@@ -1,4 +1,5 @@
 <?php
+
 /**
  * One-time script to create the initial admin user.
  * Run from CLI: php accounting/sql/create_admin.php admin@svs.fr "YourPassword123"
@@ -14,10 +15,10 @@ if ($argc < 3) {
     exit(1);
 }
 
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__.'/../config/db.php';
 
-$nom      = 'Admin';
-$email    = trim($argv[1]);
+$nom = 'Admin';
+$email = trim($argv[1]);
 $password = $argv[2];
 
 if (strlen($password) < 8) {
