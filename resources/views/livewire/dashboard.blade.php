@@ -38,7 +38,7 @@
                     @else
                         <div class="row g-2 w-100">
                             @foreach ($comptesAvecSolde as $item)
-                                <div class="col">
+                                <div class="col" wire:key="compte-{{ $item['compte']->id }}">
                                     <div class="card text-center border-secondary h-100">
                                         <div class="card-body p-2">
                                             <div class="small text-muted text-truncate">{{ $item['compte']->nom }}</div>
