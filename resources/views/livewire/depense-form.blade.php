@@ -139,7 +139,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <input type="number" wire:model="lignes.{{ $index }}.montant"
+                                            <input type="number" wire:model.live="lignes.{{ $index }}.montant"
                                                    step="0.01" min="0.01"
                                                    class="form-control form-control-sm @error('lignes.' . $index . '.montant') is-invalid @enderror">
                                             @error('lignes.' . $index . '.montant')
@@ -167,10 +167,7 @@
                                 <tr>
                                     <td colspan="3" class="text-end fw-bold">Total lignes :</td>
                                     <td class="fw-bold">
-                                        @php
-                                            $totalLignes = collect($lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0));
-                                        @endphp
-                                        {{ number_format($totalLignes, 2, ',', ' ') }} &euro;
+                                        {{ number_format($this->montantTotal, 2, ',', ' ') }} &euro;
                                     </td>
                                     <td colspan="2"></td>
                                 </tr>
