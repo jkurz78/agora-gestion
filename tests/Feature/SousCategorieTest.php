@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Categorie;
+use App\Models\DepenseLigne;
 use App\Models\SousCategorie;
 use App\Models\User;
 
@@ -99,4 +100,24 @@ it('can destroy a sous-categorie', function () {
         ->assertRedirect(route('parametres.index'));
 
     $this->assertDatabaseMissing('sous_categories', ['id' => $sc->id]);
+});
+
+it('returns flash error when destroying a sous-categorie with linked lignes', function () {
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+
+    $depense = \App\Models\Depense::factory()->create([
+        'saisi_par' => $this->user->id,
+        'date' => '2025-10-15',
+    ]);
+    DepenseLigne::factory()->create([
+        'depense_id'        => $depense->id,
+        'sous_categorie_id' => $sc->id,
+    ]);
+
+    $this->actingAs($this->user)
+        ->delete(route('parametres.sous-categories.destroy', $sc))
+        ->assertRedirect(route('parametres.index'))
+        ->assertSessionHas('error');
+
+    $this->assertDatabaseHas('sous_categories', ['id' => $sc->id]);
 });

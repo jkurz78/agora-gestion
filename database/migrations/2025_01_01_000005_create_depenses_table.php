@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('mode_paiement', 20);
             $table->string('beneficiaire', 150)->nullable();
             $table->string('reference', 100)->nullable();
-            $table->foreignId('compte_id')->nullable()->constrained('comptes_bancaires')->nullOnDelete();
+            $table->foreignId('compte_id')->nullable()->constrained('comptes_bancaires');
             $table->boolean('pointe')->default(false);
             $table->text('notes')->nullable();
             $table->foreignId('saisi_par')->constrained('users');

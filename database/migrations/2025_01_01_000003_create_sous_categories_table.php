@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('sous_categories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('categorie_id')->constrained('categories')->cascadeOnDelete();
+            $table->foreignId('categorie_id')->constrained('categories');
             $table->string('nom', 100);
             $table->string('code_cerfa', 10)->nullable();
             $table->timestamps();
