@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
+use App\Models\Operation;
 use App\Models\User;
 use Illuminate\View\View;
 
@@ -17,6 +18,7 @@ final class ParametreController extends Controller
             'categories' => Categorie::with('sousCategories')->orderBy('nom')->get(),
             'comptesBancaires' => CompteBancaire::orderBy('nom')->get(),
             'utilisateurs' => User::orderBy('nom')->get(),
+            'operations' => Operation::orderBy('nom')->get(),
         ]);
     }
 }

@@ -31,6 +31,13 @@
                 <i class="bi bi-people"></i> Utilisateurs
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="operations-tab" data-bs-toggle="tab"
+                    data-bs-target="#operations-pane" type="button" role="tab"
+                    aria-controls="operations-pane" aria-selected="false">
+                <i class="bi bi-calendar-event"></i> Opérations
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content pt-3" id="parametresTabContent">
@@ -328,6 +335,83 @@
                     @empty
                         <tr>
                             <td colspan="3" class="text-muted">Aucun utilisateur enregistré.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        {{-- ========== Opérations ========== --}}
+        <div class="tab-pane fade" id="operations-pane" role="tabpanel" aria-labelledby="operations-tab">
+            <div class="mb-3">
+                <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#addOperationForm">
+                    <i class="bi bi-plus-lg"></i> Ajouter une opération
+                </button>
+            </div>
+
+            <div class="collapse mb-3" id="addOperationForm">
+                <div class="card card-body">
+                    <form action="{{ route('operations.store') }}" method="POST" class="row g-2 align-items-end">
+                        @csrf
+                        <input type="hidden" name="statut" value="en_cours">
+                        <div class="col-md-3">
+                            <label for="op_nom" class="form-label">Nom</label>
+                            <input type="text" name="nom" id="op_nom" class="form-control" required maxlength="150">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="op_description" class="form-label">Description</label>
+                            <input type="text" name="description" id="op_description" class="form-control" maxlength="255">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="op_date_debut" class="form-label">Date début</label>
+                            <input type="date" name="date_debut" id="op_date_debut" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="op_date_fin" class="form-label">Date fin</label>
+                            <input type="date" name="date_fin" id="op_date_fin" class="form-control">
+                        </div>
+                        <div class="col-md-1">
+                            <label for="op_seances" class="form-label">Séances</label>
+                            <input type="number" name="nombre_seances" id="op_seances" class="form-control" min="1">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="submit" class="btn btn-success w-100">Enregistrer</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Nom</th>
+                        <th>Description</th>
+                        <th>Date début</th>
+                        <th>Date fin</th>
+                        <th>Séances</th>
+                        <th>Statut</th>
+                        <th style="width: 100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($operations as $operation)
+                        <tr>
+                            <td>{{ $operation->nom }}</td>
+                            <td>{{ $operation->description ?? '—' }}</td>
+                            <td>{{ $operation->date_debut?->format('d/m/Y') ?? '—' }}</td>
+                            <td>{{ $operation->date_fin?->format('d/m/Y') ?? '—' }}</td>
+                            <td>{{ $operation->nombre_seances ?? '—' }}</td>
+                            <td>{{ $operation->statut->label() }}</td>
+                            <td>
+                                <a href="{{ route('operations.edit', $operation) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="text-muted">Aucune opération enregistrée.</td>
                         </tr>
                     @endforelse
                 </tbody>
