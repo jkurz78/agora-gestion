@@ -15,28 +15,26 @@
             </div>
             <div class="card-body">
                 <form wire:submit="save">
-                    <div class="row g-3 mb-3">
+                    <div class="row g-3 mb-4">
                         <div class="col-md-2">
                             <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
                             <input type="date" wire:model="date" id="date"
                                    class="form-control @error('date') is-invalid @enderror">
-                            @error('date')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="col-md-3">
-                            <label for="libelle" class="form-label">Libelle <span class="text-danger">*</span></label>
-                            <input type="text" wire:model="libelle" id="libelle"
-                                   class="form-control @error('libelle') is-invalid @enderror">
-                            @error('libelle')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Montant total</label>
-                            <div class="form-control bg-light fw-bold text-end">
-                                {{ number_format($this->montantTotal, 2, ',', ' ') }} €
-                            </div>
+                            <label for="reference" class="form-label">Référence</label>
+                            <input type="text" wire:model="reference" id="reference" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="libelle" class="form-label">Libellé <span class="text-danger">*</span></label>
+                            <input type="text" wire:model="libelle" id="libelle"
+                                   class="form-control @error('libelle') is-invalid @enderror">
+                            @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-md-2">
+                            <label for="payeur" class="form-label">Payeur</label>
+                            <input type="text" wire:model="payeur" id="payeur" class="form-control">
                         </div>
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
@@ -47,20 +45,7 @@
                                     <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
                                 @endforeach
                             </select>
-                            @error('mode_paiement')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="col-md-3">
-                            <label for="payeur" class="form-label">Payeur</label>
-                            <input type="text" wire:model="payeur" id="payeur" class="form-control">
-                        </div>
-                    </div>
-
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-2">
-                            <label for="reference" class="form-label">Référence</label>
-                            <input type="text" wire:model="reference" id="reference" class="form-control">
+                            @error('mode_paiement') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-3">
                             <label for="compte_id" class="form-label">Compte bancaire</label>
@@ -71,7 +56,13 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="col-md-7">
+                        <div class="col-md-2">
+                            <label class="form-label">Montant total</label>
+                            <div class="form-control bg-light fw-bold text-end">
+                                {{ number_format($this->montantTotal, 2, ',', ' ') }} €
+                            </div>
+                        </div>
+                        <div class="col-12">
                             <label for="notes" class="form-label">Notes</label>
                             <input type="text" wire:model="notes" id="notes" class="form-control">
                         </div>
