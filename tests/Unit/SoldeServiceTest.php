@@ -129,6 +129,28 @@ it('ignores soft-deleted depenses', function () {
     expect($this->service->solde($compte))->toBe(1000.0);
 });
 
+it('ignores soft-deleted virements', function () {
+    $source = CompteBancaire::factory()->create([
+        'solde_initial'      => 1000.00,
+        'date_solde_initial' => '2024-01-01',
+    ]);
+    $destination = CompteBancaire::factory()->create([
+        'solde_initial'      => 0.00,
+        'date_solde_initial' => '2024-01-01',
+    ]);
+    $virement = VirementInterne::factory()->create([
+        'compte_source_id'      => $source->id,
+        'compte_destination_id' => $destination->id,
+        'montant'               => 400.00,
+        'date'                  => '2024-03-01',
+        'saisi_par'             => $this->user->id,
+    ]);
+    $virement->delete();
+
+    expect($this->service->solde($source))->toBe(1000.0);
+    expect($this->service->solde($destination))->toBe(0.0);
+});
+
 it('handles null date_solde_initial by including all history', function () {
     $compte = CompteBancaire::factory()->create([
         'solde_initial'      => 100.00,
