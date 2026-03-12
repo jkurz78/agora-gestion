@@ -57,6 +57,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Libellé</th>
+                    <th>Référence</th>
                     <th class="text-end">Montant</th>
                     <th>Mode paiement</th>
                     <th>Bénéficiaire</th>
@@ -69,6 +70,7 @@
                     <tr>
                         <td>{{ $depense->date->format('d/m/Y') }}</td>
                         <td>{{ $depense->libelle }}</td>
+                        <td>{{ $depense->reference ?? '-' }}</td>
                         <td class="text-end">{{ number_format((float) $depense->montant_total, 2, ',', ' ') }} &euro;</td>
                         <td>{{ $depense->mode_paiement->label() }}</td>
                         <td>{{ $depense->beneficiaire ?? '-' }}</td>
@@ -93,7 +95,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-muted text-center">Aucune dépense trouvée.</td>
+                        <td colspan="8" class="text-muted text-center">Aucune dépense trouvée.</td>
                     </tr>
                 @endforelse
             </tbody>
