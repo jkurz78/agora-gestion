@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\StatutOperation;
 use App\Http\Requests\StoreOperationRequest;
 use App\Http\Requests\UpdateOperationRequest;
 use App\Models\Operation;
@@ -28,9 +29,13 @@ final class OperationController extends Controller
 
     public function store(StoreOperationRequest $request): RedirectResponse
     {
-        Operation::create($request->validated());
+        $data = $request->validated();
+        $data['statut'] = StatutOperation::EnCours;
+        Operation::create($data);
 
-        return redirect()->route('operations.index')
+        $redirectTo = $request->input('_redirect_back', route('operations.index'));
+
+        return redirect($redirectTo)
             ->with('success', 'Opération créée avec succès.');
     }
 
