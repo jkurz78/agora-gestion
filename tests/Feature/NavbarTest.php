@@ -18,6 +18,8 @@ it('navbar does not contain tableau de bord nav item link', function () {
 
     $response->assertSee('Dépenses');
     $response->assertSee('Recettes');
+    // 'Tableau de bord' apparaît aussi dans le <h1> du dashboard, donc on
+    // vérifie l'absence de l'icône speedometer2 qui était exclusive au nav-item supprimé
     $response->assertDontSee('bi-speedometer2', false);
 });
 
