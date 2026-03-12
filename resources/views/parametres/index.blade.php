@@ -432,4 +432,14 @@
             form.submit();
         }
     </script>
+
+    @if(session('activeTab') === 'comptes')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            bootstrap.Tab.getOrCreateInstance(
+                document.getElementById('comptes-tab')
+            ).show();
+        });
+    </script>
+    @endif
 </x-app-layout>

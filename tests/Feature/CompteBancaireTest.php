@@ -15,7 +15,8 @@ it('can store a compte bancaire', function () {
             'solde_initial' => 1500.50,
             'date_solde_initial' => '2024-01-01',
         ])
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.index'))
+        ->assertSessionHas('activeTab', 'comptes');
 
     $this->assertDatabaseHas('comptes_bancaires', [
         'nom' => 'Compte Courant',
@@ -95,7 +96,8 @@ it('can update a compte bancaire', function () {
             'solde_initial' => 2000,
             'date_solde_initial' => '2024-06-01',
         ])
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.index'))
+        ->assertSessionHas('activeTab', 'comptes');
 
     $this->assertDatabaseHas('comptes_bancaires', [
         'id' => $compte->id,
