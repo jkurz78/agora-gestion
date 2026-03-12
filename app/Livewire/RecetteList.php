@@ -33,6 +33,8 @@ final class RecetteList extends Component
 
     public ?string $pointe = null;
 
+    public ?string $payeur = null;
+
     public function mount(): void
     {
         $this->exercice = app(ExerciceService::class)->current();
@@ -65,6 +67,11 @@ final class RecetteList extends Component
     }
 
     public function updatedPointe(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPayeur(): void
     {
         $this->resetPage();
     }
@@ -115,6 +122,10 @@ final class RecetteList extends Component
 
         if ($this->pointe !== null && $this->pointe !== '') {
             $query->where('pointe', $this->pointe === '1');
+        }
+
+        if ($this->payeur) {
+            $query->where('payeur', 'like', '%'.$this->payeur.'%');
         }
 
         $exerciceService = app(ExerciceService::class);
