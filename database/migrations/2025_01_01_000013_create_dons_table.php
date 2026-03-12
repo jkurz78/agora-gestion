@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('objet', 255)->nullable();
             $table->foreignId('operation_id')->nullable()->constrained('operations')->nullOnDelete();
             $table->integer('seance')->nullable();
-            $table->foreignId('compte_id')->nullable()->constrained('comptes_bancaires')->nullOnDelete();
+            $table->foreignId('compte_id')->nullable()->constrained('comptes_bancaires');
             $table->boolean('pointe')->default(false);
             $table->boolean('recu_emis')->default(false);
             $table->foreignId('saisi_par')->constrained('users');
