@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Dashboard;
+use App\Models\CompteBancaire;
 use App\Models\Cotisation;
 use App\Models\Depense;
 use App\Models\Membre;
@@ -76,4 +77,16 @@ it('shows membres without cotisation', function () {
         ->assertSee('Martin')
         ->assertSee('Pierre')
         ->assertDontSee('Durand');
+});
+
+it('displays comptes bancaires with soldes', function () {
+    $compte = CompteBancaire::factory()->create([
+        'nom'                => 'Compte Principal',
+        'solde_initial'      => 1500.00,
+        'date_solde_initial' => '2024-01-01',
+    ]);
+
+    Livewire::test(Dashboard::class)
+        ->assertSee('Compte Principal')
+        ->assertSee('1 500,00');
 });
