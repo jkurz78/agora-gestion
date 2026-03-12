@@ -49,27 +49,17 @@ it('validates required fields', function () {
     Livewire::test(RecetteForm::class)
         ->set('showForm', true)
         ->call('save')
-        ->assertHasErrors(['date', 'libelle', 'montant_total', 'mode_paiement', 'lignes']);
+        ->assertHasErrors(['date', 'libelle', 'mode_paiement', 'lignes']);
 });
 
-it('validates lignes sum equals montant_total', function () {
-    Livewire::test(RecetteForm::class)
-        ->set('showForm', true)
-        ->set('date', '2025-10-15')
-        ->set('libelle', 'Test recette')
-        ->set('montant_total', '100.00')
-        ->set('mode_paiement', 'virement')
+it('computes montant_total from lignes sum', function () {
+    Livewire::actingAs(User::factory()->create())
+        ->test(RecetteForm::class)
         ->set('lignes', [
-            [
-                'sous_categorie_id' => (string) $this->sousCategorie->id,
-                'operation_id' => '',
-                'seance' => '',
-                'montant' => '50.00',
-                'notes' => '',
-            ],
+            ['sous_categorie_id' => '', 'operation_id' => '', 'seance' => '', 'montant' => '30.00', 'notes' => ''],
+            ['sous_categorie_id' => '', 'operation_id' => '', 'seance' => '', 'montant' => '20.50', 'notes' => ''],
         ])
-        ->call('save')
-        ->assertHasErrors('lignes');
+        ->assertSet('montantTotal', 50.50);
 });
 
 it('can save a new recette', function () {
@@ -77,7 +67,6 @@ it('can save a new recette', function () {
         ->set('showForm', true)
         ->set('date', '2025-10-15')
         ->set('libelle', 'Cotisation membre')
-        ->set('montant_total', '150.00')
         ->set('mode_paiement', 'cb')
         ->set('payeur', 'M. Dupont')
         ->set('compte_id', $this->compte->id)
@@ -159,7 +148,6 @@ it('can update a recette', function () {
     Livewire::test(RecetteForm::class)
         ->call('edit', $recette->id)
         ->set('libelle', 'Recette mise à jour')
-        ->set('montant_total', '75.00')
         ->set('lignes', [
             [
                 'sous_categorie_id' => (string) $this->sousCategorie->id,
