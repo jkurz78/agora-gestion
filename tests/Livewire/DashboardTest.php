@@ -24,7 +24,9 @@ it('renders for authenticated user', function () {
         ->assertSee('Dernières dépenses')
         ->assertSee('Dernières recettes')
         ->assertSee('Derniers dons')
-        ->assertSee('Membres sans cotisation');
+        ->assertSee('Membres sans cotisation')
+        ->assertSee('Comptes bancaires')
+        ->assertSee('Aucun compte bancaire configuré');
 });
 
 it('shows correct exercice', function () {
@@ -80,13 +82,14 @@ it('shows membres without cotisation', function () {
 });
 
 it('displays comptes bancaires with soldes', function () {
-    $compte = CompteBancaire::factory()->create([
+    CompteBancaire::factory()->create([
         'nom'                => 'Compte Principal',
         'solde_initial'      => 1500.00,
         'date_solde_initial' => '2024-01-01',
     ]);
 
     Livewire::test(Dashboard::class)
+        ->assertSee('Comptes bancaires')
         ->assertSee('Compte Principal')
         ->assertSee('1 500,00');
 });
