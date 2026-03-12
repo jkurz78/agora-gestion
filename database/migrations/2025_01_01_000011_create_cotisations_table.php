@@ -15,7 +15,7 @@ return new class extends Migration
             $table->decimal('montant', 10, 2);
             $table->date('date_paiement');
             $table->string('mode_paiement', 20);
-            $table->foreignId('compte_id')->nullable()->constrained('comptes_bancaires')->nullOnDelete();
+            $table->foreignId('compte_id')->nullable()->constrained('comptes_bancaires');
             $table->boolean('pointe')->default(false);
             $table->timestamps();
             $table->softDeletes();
