@@ -44,9 +44,17 @@ final class CategorieController extends Controller
 
     public function destroy(Categorie $category): RedirectResponse
     {
-        $category->delete();
+        try {
+            $category->delete();
 
-        return redirect()->route('parametres.index')
-            ->with('success', 'Catégorie supprimée avec succès.');
+            return redirect()->route('parametres.index')
+                ->with('success', 'Catégorie supprimée avec succès.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23000') {
+                return redirect()->route('parametres.index')
+                    ->with('error', 'Suppression impossible : cet élément est utilisé dans les données de l\'application.');
+            }
+            throw $e;
+        }
     }
 }

@@ -112,3 +112,19 @@ it('can destroy a compte bancaire', function () {
 
     $this->assertDatabaseMissing('comptes_bancaires', ['id' => $compte->id]);
 });
+
+it('returns flash error when destroying a compte bancaire with linked depenses', function () {
+    $compte = CompteBancaire::factory()->create();
+    \App\Models\Depense::factory()->create([
+        'compte_id' => $compte->id,
+        'saisi_par' => $this->user->id,
+        'date' => '2025-10-15',
+    ]);
+
+    $this->actingAs($this->user)
+        ->delete(route('parametres.comptes-bancaires.destroy', $compte))
+        ->assertRedirect(route('parametres.index'))
+        ->assertSessionHas('error');
+
+    $this->assertDatabaseHas('comptes_bancaires', ['id' => $compte->id]);
+});

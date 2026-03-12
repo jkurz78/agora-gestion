@@ -44,9 +44,19 @@ final class CompteBancaireController extends Controller
 
     public function destroy(CompteBancaire $comptesBancaire): RedirectResponse
     {
-        $comptesBancaire->delete();
+        try {
+            $comptesBancaire->delete();
 
-        return redirect()->route('parametres.index')
-            ->with('success', 'Compte bancaire supprimé avec succès.');
+            return redirect()->route('parametres.index')
+                ->with('success', 'Compte bancaire supprimé avec succès.')
+                ->with('activeTab', 'comptes');
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->getCode() === '23000') {
+                return redirect()->route('parametres.index')
+                    ->with('error', 'Suppression impossible : cet élément est utilisé dans les données de l\'application.')
+                    ->with('activeTab', 'comptes');
+            }
+            throw $e;
+        }
     }
 }

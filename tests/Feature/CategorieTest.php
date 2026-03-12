@@ -85,3 +85,15 @@ it('can destroy a categorie', function () {
 
     $this->assertDatabaseMissing('categories', ['id' => $categorie->id]);
 });
+
+it('returns flash error when destroying a categorie with sous-categories', function () {
+    $categorie = Categorie::factory()->create();
+    \App\Models\SousCategorie::factory()->create(['categorie_id' => $categorie->id]);
+
+    $this->actingAs($this->user)
+        ->delete(route('parametres.categories.destroy', $categorie))
+        ->assertRedirect(route('parametres.index'))
+        ->assertSessionHas('error');
+
+    $this->assertDatabaseHas('categories', ['id' => $categorie->id]);
+});
