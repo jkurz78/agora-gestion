@@ -30,3 +30,16 @@ it('page title is updated', function () {
 
     $response->assertSee('Soigner•Vivre•Sourire Comptabilité', false);
 });
+
+it('login page shows logo and new app name', function () {
+    $response = $this->get('/login');
+
+    $response->assertSee('Soigner•Vivre•Sourire');
+    $response->assertSee('images/logo.png', false);
+});
+
+it('login page title is updated', function () {
+    $response = $this->get('/login');
+
+    $response->assertSee('Soigner•Vivre•Sourire Comptabilité - Connexion', false);
+});
