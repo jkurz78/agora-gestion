@@ -9,6 +9,14 @@ use App\Models\VirementInterne;
 
 final class SoldeService
 {
+    /**
+     * Compute the current real balance of a bank account.
+     *
+     * Starts from solde_initial (at date_solde_initial) and adds all inflows
+     * (recettes, cotisations, virements received) and subtracts all outflows
+     * (depenses, dons, virements sent) since that date. Soft-deleted records
+     * are automatically excluded via Eloquent global scopes.
+     */
     public function solde(CompteBancaire $compte): float
     {
         $dateRef = $compte->date_solde_initial?->toDateString() ?? '1900-01-01';
