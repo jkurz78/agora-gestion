@@ -14,6 +14,8 @@ final class VirementInterne extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $table = 'virements_internes';
+
     protected $fillable = [
         'date',
         'montant',
