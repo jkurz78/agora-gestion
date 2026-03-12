@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'SVS Comptabilité' }}</title>
+    <title>{{ $title ?? 'Soigner•Vivre•Sourire Comptabilité' }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     @livewireStyles
@@ -13,7 +13,13 @@
     @auth
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ route('dashboard') }}">SVS Comptabilité</a>
+            <a class="navbar-brand d-flex align-items-center gap-2" href="{{ route('dashboard') }}">
+                <img src="{{ asset('images/logo.png') }}" alt="Soigner•Vivre•Sourire" height="45">
+                <span class="d-inline-block lh-sm">
+                    <span class="d-block">Soigner•Vivre•Sourire</span>
+                    <span class="d-block small opacity-75">Comptabilité</span>
+                </span>
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -21,7 +27,6 @@
                 <ul class="navbar-nav me-auto">
                     @php
                         $navItems = [
-                            ['route' => 'dashboard',           'icon' => 'speedometer2',           'label' => 'Tableau de bord'],
                             ['route' => 'depenses.index',      'icon' => 'arrow-down-circle',      'label' => 'Dépenses'],
                             ['route' => 'recettes.index',      'icon' => 'arrow-up-circle',        'label' => 'Recettes'],
                             ['route' => 'virements.index',     'icon' => 'arrow-left-right',       'label' => 'Virements'],
