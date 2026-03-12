@@ -29,6 +29,8 @@ final class VirementInterneService
 
     public function delete(VirementInterne $virement): void
     {
-        $virement->delete();
+        DB::transaction(function () use ($virement) {
+            $virement->delete();
+        });
     }
 }
