@@ -354,7 +354,7 @@
                 <div class="card card-body">
                     <form action="{{ route('operations.store') }}" method="POST" class="row g-2 align-items-end">
                         @csrf
-                        <input type="hidden" name="statut" value="en_cours">
+                        <input type="hidden" name="_redirect_back" value="{{ route('parametres.index') }}">
                         <div class="col-md-3">
                             <label for="op_nom" class="form-label">Nom</label>
                             <input type="text" name="nom" id="op_nom" class="form-control" required maxlength="150">
@@ -402,7 +402,11 @@
                             <td>{{ $operation->date_debut?->format('d/m/Y') ?? '—' }}</td>
                             <td>{{ $operation->date_fin?->format('d/m/Y') ?? '—' }}</td>
                             <td>{{ $operation->nombre_seances ?? '—' }}</td>
-                            <td>{{ $operation->statut->label() }}</td>
+                            <td>
+                                <span class="badge {{ $operation->statut === \App\Enums\StatutOperation::EnCours ? 'bg-primary' : 'bg-secondary' }}">
+                                    {{ $operation->statut->label() }}
+                                </span>
+                            </td>
                             <td>
                                 <a href="{{ route('operations.edit', $operation) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-pencil"></i>
