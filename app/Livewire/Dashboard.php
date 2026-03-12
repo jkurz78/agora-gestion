@@ -25,7 +25,7 @@ final class Dashboard extends Component
         $this->exercice = app(ExerciceService::class)->current();
     }
 
-    public function render()
+    public function render(): \Illuminate\Contracts\View\View
     {
         $exerciceService = app(ExerciceService::class);
         $budgetService = app(BudgetService::class);
