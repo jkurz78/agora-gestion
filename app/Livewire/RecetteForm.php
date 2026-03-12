@@ -42,6 +42,20 @@ final class RecetteForm extends Component
         return round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
     }
 
+    public function showNewForm(): void
+    {
+        $this->showForm = true;
+        $this->date = now()->format('Y-m-d');
+
+        $lastRecette = Recette::where('saisi_par', auth()->id())
+            ->whereNotNull('compte_id')
+            ->latest()
+            ->first();
+        $this->compte_id = $lastRecette?->compte_id;
+
+        $this->addLigne();
+    }
+
     public function addLigne(): void
     {
         $this->lignes[] = [
