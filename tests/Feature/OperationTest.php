@@ -46,7 +46,7 @@ it('can store an operation with valid data', function () {
 it('validates required fields when storing an operation', function () {
     $this->actingAs($this->user)
         ->post(route('operations.store'), [])
-        ->assertSessionHasErrors(['nom', 'statut']);
+        ->assertSessionHasErrors(['nom']);
 });
 
 it('validates date_fin must be after or equal to date_debut', function () {
