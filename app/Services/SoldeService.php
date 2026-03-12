@@ -21,6 +21,12 @@ final class SoldeService
     {
         $dateRef = $compte->date_solde_initial?->toDateString() ?? '1900-01-01';
 
+        // VirementInterne is queried statically (not via relation) because a transfer
+        // touches two accounts simultaneously (source and destination). There is no
+        // single hasMany relation that covers both roles on the same model.
+        // The resulting 6-query pattern per account is intentional and mirrors
+        // BudgetService::realise(). Soft-deleted records are excluded automatically
+        // by the global SoftDeletes scope on VirementInterne.
         $entrees =
             (float) $compte->recettes()->where('date', '>=', $dateRef)->sum('montant_total')
             + (float) $compte->cotisations()->where('date_paiement', '>=', $dateRef)->sum('montant')
