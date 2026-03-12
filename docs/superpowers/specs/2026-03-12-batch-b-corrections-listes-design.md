@@ -25,7 +25,7 @@ Cinq évolutions indépendantes regroupées en un batch :
 - **Tabs Bootstrap** : navigation côté client uniquement. Après un redirect, la page charge toujours avec l'onglet "Catégories" actif par défaut.
 - **DepenseList / RecetteList** : composants Livewire. Les champs `reference` (les deux) et `beneficiaire` (Depense) / `payeur` (Recette) existent déjà en base mais ne sont pas exposés dans les vues de liste.
 - **Suppression FK** : aucun `try/catch` dans les `destroy()` — une violation de contrainte remonte en exception non gérée.
-- **Flash messages** : composant `x-flash-message` existant, affiche uniquement le cas `success`. À étendre pour `error`.
+- **Flash messages** : composant `x-flash-message` gère déjà les cas `success` **et** `error` — aucune modification nécessaire sur ce fichier.
 
 ---
 
@@ -95,28 +95,45 @@ Ce mécanisme est extensible : pour activer un autre onglet, passer la valeur co
 
 ## #6 — Erreurs FK → message utilisateur
 
-**Composant `x-flash-message` :** étendu pour afficher les messages `error` :
-```blade
-@if(session('error'))
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        {{ session('error') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-@endif
-```
+**Composant `x-flash-message` :** déjà opérationnel pour `error` — aucune modification nécessaire.
 
 **Controllers concernés :** `CompteBancaireController`, `CategorieController`, `SousCategorieController`.
 
-Pattern identique dans chaque `destroy()` :
+Chaque controller garde son propre nom de paramètre typé (route-model binding) — ne pas utiliser le placeholder générique `Model $model`.
+
+Pattern à appliquer dans chaque `destroy()` (en conservant la signature existante) :
+
+`CompteBancaireController` (redirige vers `parametres.index` + `activeTab` pour le mécanisme #2) :
 ```php
-public function destroy(Model $model): RedirectResponse
+public function destroy(CompteBancaire $comptesBancaire): RedirectResponse
 {
     try {
-        $model->delete();
-        return redirect()->back()->with('success', 'Suppression effectuée.');
+        $comptesBancaire->delete();
+        return redirect()->route('parametres.index')
+            ->with('success', 'Compte bancaire supprimé avec succès.')
+            ->with('activeTab', 'comptes');
     } catch (\Illuminate\Database\QueryException $e) {
         if ($e->getCode() === '23000') {
-            return redirect()->back()
+            return redirect()->route('parametres.index')
+                ->with('error', 'Suppression impossible : cet élément est utilisé dans les données de l\'application.')
+                ->with('activeTab', 'comptes');
+        }
+        throw $e;
+    }
+}
+```
+
+`CategorieController` (redirige vers `parametres.index`) :
+```php
+public function destroy(Categorie $categorie): RedirectResponse
+{
+    try {
+        $categorie->delete();
+        return redirect()->route('parametres.index')
+            ->with('success', 'Catégorie supprimée avec succès.');
+    } catch (\Illuminate\Database\QueryException $e) {
+        if ($e->getCode() === '23000') {
+            return redirect()->route('parametres.index')
                 ->with('error', 'Suppression impossible : cet élément est utilisé dans les données de l\'application.');
         }
         throw $e;
@@ -124,9 +141,9 @@ public function destroy(Model $model): RedirectResponse
 }
 ```
 
-**Note :** Les autres codes d'erreur SQL (`$e->getCode() !== '23000'`) sont re-thrown pour ne pas masquer des erreurs inattendues.
+`SousCategorieController` : même pattern avec `SousCategorie $sousCategorie`.
 
-**Note `CompteBancaireController::destroy()` :** redirige aussi avec `->with('activeTab', 'comptes')` pour le mécanisme #2 (même en cas d'erreur).
+**Note :** Les codes d'erreur SQL autres que `23000` sont re-thrown pour ne pas masquer des erreurs inattendues.
 
 ---
 
@@ -199,7 +216,6 @@ Clause dans la query :
 | Action | Fichier |
 |--------|---------|
 | Modifier | `resources/views/parametres/index.blade.php` |
-| Modifier | `resources/views/components/flash-message.blade.php` |
 | Modifier | `app/Http/Controllers/CompteBancaireController.php` |
 | Modifier | `app/Http/Controllers/CategorieController.php` |
 | Modifier | `app/Http/Controllers/SousCategorieController.php` |
