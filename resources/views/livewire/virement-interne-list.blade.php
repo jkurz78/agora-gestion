@@ -29,7 +29,7 @@
                             <td class="text-center">
                                 <button wire:click="$dispatch('edit-virement', { id: {{ $virement->id }} })"
                                         class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i>
+                                    <i class="bi bi-pencil"></i> Modifier
                                 </button>
                                 <button wire:click="delete({{ $virement->id }})"
                                         wire:confirm="Supprimer ce virement ?"

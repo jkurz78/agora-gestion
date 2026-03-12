@@ -15,7 +15,7 @@
             </div>
             <div class="card-body">
                 <form wire:submit="save">
-                    <div class="row g-3 mb-3">
+                    <div class="row g-3 mb-4">
                         <div class="col-md-2">
                             <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
                             <input type="date" wire:model="date" id="date"
