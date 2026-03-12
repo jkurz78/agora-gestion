@@ -29,6 +29,7 @@
                             ['route' => 'dons.index', 'icon' => 'heart', 'label' => 'Dons'],
                             ['route' => 'operations.index', 'icon' => 'calendar-event', 'label' => 'Opérations'],
                             ['route' => 'rapprochement.index', 'icon' => 'bank', 'label' => 'Rapprochement'],
+                            ['route' => 'virements.index', 'icon' => 'arrow-left-right', 'label' => 'Virements'],
                             ['route' => 'rapports.index', 'icon' => 'file-earmark-bar-graph', 'label' => 'Rapports'],
                             ['route' => 'parametres.index', 'icon' => 'gear', 'label' => 'Paramètres'],
                         ];

@@ -21,6 +21,7 @@ Route::middleware('auth')->group(function () {
     Route::view('/dons', 'dons.index')->name('dons.index');
     Route::view('/budget', 'budget.index')->name('budget.index');
     Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
+    Route::view('/virements', 'virements.index')->name('virements.index');
     Route::view('/rapports', 'rapports.index')->name('rapports.index');
 
     // Resource controllers
