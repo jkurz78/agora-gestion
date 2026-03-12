@@ -20,7 +20,9 @@
                     <span class="d-block small opacity-75">Comptabilité</span>
                 </span>
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#navbarNav" aria-controls="navbarNav"
+                    aria-expanded="false" aria-label="Ouvrir la navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
@@ -58,7 +60,7 @@
                     <li class="nav-item">
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
-                            <button type="submit" class="nav-link btn btn-link text-light">
+                            <button type="submit" class="nav-link border-0 bg-transparent text-light px-0">
                                 <i class="bi bi-box-arrow-right"></i> Déconnexion
                             </button>
                         </form>
