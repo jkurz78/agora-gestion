@@ -125,10 +125,10 @@ public function destroy(CompteBancaire $comptesBancaire): RedirectResponse
 
 `CategorieController` (redirige vers `parametres.index`) :
 ```php
-public function destroy(Categorie $categorie): RedirectResponse
+public function destroy(Categorie $category): RedirectResponse
 {
     try {
-        $categorie->delete();
+        $category->delete();
         return redirect()->route('parametres.index')
             ->with('success', 'Catégorie supprimée avec succès.');
     } catch (\Illuminate\Database\QueryException $e) {
@@ -141,7 +141,7 @@ public function destroy(Categorie $categorie): RedirectResponse
 }
 ```
 
-`SousCategorieController` : même pattern avec `SousCategorie $sousCategorie`.
+`SousCategorieController` : même pattern avec `SousCategorie $sousCategory` (nom anglais, sans accent, comme dans le controller existant).
 
 **Note :** Les codes d'erreur SQL autres que `23000` sont re-thrown pour ne pas masquer des erreurs inattendues.
 
