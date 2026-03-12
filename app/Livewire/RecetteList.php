@@ -88,7 +88,7 @@ final class RecetteList extends Component
         // Livewire will re-render automatically
     }
 
-    public function render()
+    public function render(): \Illuminate\Contracts\View\View
     {
         $query = Recette::with(['lignes.sousCategorie.categorie', 'compte', 'saisiPar'])
             ->latest('date')
