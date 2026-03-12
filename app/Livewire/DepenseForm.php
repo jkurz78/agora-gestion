@@ -44,14 +44,17 @@ final class DepenseForm extends Component
 
     public function showNewForm(): void
     {
+        $this->reset(['depenseId', 'date', 'libelle', 'mode_paiement',
+            'beneficiaire', 'reference', 'compte_id', 'notes', 'lignes']);
+        $this->resetValidation();
+
         $this->showForm = true;
         $this->date = now()->format('Y-m-d');
 
-        $lastDepense = Depense::where('saisi_par', auth()->id())
+        $this->compte_id = Depense::where('saisi_par', auth()->id())
             ->whereNotNull('compte_id')
             ->latest()
-            ->first();
-        $this->compte_id = $lastDepense?->compte_id;
+            ->value('compte_id');
 
         $this->addLigne();
     }
