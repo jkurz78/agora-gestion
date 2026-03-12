@@ -22,8 +22,6 @@ final class DepenseForm extends Component
 
     public string $libelle = '';
 
-    public string $montant_total = '';
-
     public string $mode_paiement = '';
 
     public ?string $beneficiaire = null;
@@ -38,6 +36,11 @@ final class DepenseForm extends Component
     public array $lignes = [];
 
     public bool $showForm = false;
+
+    public function getMontantTotalProperty(): float
+    {
+        return round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
+    }
 
     public function addLigne(): void
     {
@@ -64,7 +67,6 @@ final class DepenseForm extends Component
         $this->depenseId = $depense->id;
         $this->date = $depense->date->format('Y-m-d');
         $this->libelle = $depense->libelle;
-        $this->montant_total = (string) $depense->montant_total;
         $this->mode_paiement = $depense->mode_paiement->value;
         $this->beneficiaire = $depense->beneficiaire;
         $this->reference = $depense->reference;
@@ -85,7 +87,7 @@ final class DepenseForm extends Component
     public function resetForm(): void
     {
         $this->reset([
-            'depenseId', 'date', 'libelle', 'montant_total', 'mode_paiement',
+            'depenseId', 'date', 'libelle', 'mode_paiement',
             'beneficiaire', 'reference', 'compte_id', 'notes', 'lignes', 'showForm',
         ]);
         $this->resetValidation();
@@ -96,7 +98,6 @@ final class DepenseForm extends Component
         $this->validate([
             'date' => ['required', 'date'],
             'libelle' => ['required', 'string', 'max:255'],
-            'montant_total' => ['required', 'numeric', 'min:0.01'],
             'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
             'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
             'lignes' => ['required', 'array', 'min:1'],
@@ -107,18 +108,10 @@ final class DepenseForm extends Component
             'lignes.*.notes' => ['nullable', 'string', 'max:255'],
         ]);
 
-        // Custom validation: sum of lignes must equal montant_total
-        $lignesSum = collect($this->lignes)->sum(fn ($l) => (float) $l['montant']);
-        if (round($lignesSum, 2) !== round((float) $this->montant_total, 2)) {
-            $this->addError('lignes', 'Le total des lignes doit être égal au montant total.');
-
-            return;
-        }
-
         $data = [
             'date' => $this->date,
             'libelle' => $this->libelle,
-            'montant_total' => $this->montant_total,
+            'montant_total' => $this->montantTotal,
             'mode_paiement' => $this->mode_paiement,
             'beneficiaire' => $this->beneficiaire ?: null,
             'reference' => $this->reference ?: null,
