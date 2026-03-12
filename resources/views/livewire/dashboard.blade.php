@@ -1,7 +1,19 @@
 <div>
-    {{-- Row 1: Solde général + Exercice selector --}}
+    {{-- Header: title + exercice selector --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Tableau de bord</h1>
+        <div style="min-width: 200px;">
+            <select wire:model.live="exercice" id="dashboard-exercice" class="form-select">
+                @foreach ($exercices as $ex)
+                    <option value="{{ $ex }}">{{ $exerciceService->label($ex) }}</option>
+                @endforeach
+            </select>
+        </div>
+    </div>
+
+    {{-- Row 1: Solde général + Comptes bancaires --}}
     <div class="row mb-4">
-        <div class="col-md-8">
+        <div class="col-md-4">
             <div class="card border-primary h-100">
                 <div class="card-body text-center">
                     <h5 class="card-title text-muted mb-1">Solde général</h5>
@@ -15,15 +27,30 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-8">
             <div class="card h-100">
-                <div class="card-body">
-                    <label for="dashboard-exercice" class="form-label">Exercice</label>
-                    <select wire:model.live="exercice" id="dashboard-exercice" class="form-select">
-                        @foreach ($exercices as $ex)
-                            <option value="{{ $ex }}">{{ $exerciceService->label($ex) }}</option>
-                        @endforeach
-                    </select>
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bank"></i> Comptes bancaires</h5>
+                </div>
+                <div class="card-body d-flex align-items-center">
+                    @if ($comptesAvecSolde->isEmpty())
+                        <p class="text-muted mb-0">Aucun compte bancaire configuré.</p>
+                    @else
+                        <div class="row g-2 w-100">
+                            @foreach ($comptesAvecSolde as $item)
+                                <div class="col">
+                                    <div class="card text-center border-secondary h-100">
+                                        <div class="card-body p-2">
+                                            <div class="small text-muted text-truncate">{{ $item['compte']->nom }}</div>
+                                            <div class="fw-bold {{ $item['solde'] >= 0 ? 'text-success' : 'text-danger' }}">
+                                                {{ number_format($item['solde'], 2, ',', ' ') }} &euro;
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Models\BudgetLine;
+use App\Models\CompteBancaire;
 use App\Models\Cotisation;
 use App\Models\Depense;
 use App\Models\Don;
@@ -12,6 +13,7 @@ use App\Models\Membre;
 use App\Models\Recette;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
+use App\Services\SoldeService;
 use Livewire\Component;
 
 final class Dashboard extends Component
@@ -72,6 +74,14 @@ final class Dashboard extends Component
             $q->where('exercice', $this->exercice);
         })->orderBy('nom')->get();
 
+        // Comptes bancaires avec soldes courants
+        $soldeService = app(SoldeService::class);
+        $comptesAvecSolde = CompteBancaire::orderBy('nom')->get()
+            ->map(fn (CompteBancaire $c) => [
+                'compte' => $c,
+                'solde'  => $soldeService->solde($c),
+            ]);
+
         return view('livewire.dashboard', [
             'exercices' => $exerciceService->available(),
             'exerciceService' => $exerciceService,
@@ -84,6 +94,7 @@ final class Dashboard extends Component
             'dernieresRecettes' => $dernieresRecettes,
             'derniersDons' => $derniersDons,
             'membresSansCotisation' => $membresSansCotisation,
+            'comptesAvecSolde' => $comptesAvecSolde,
         ]);
     }
 }
