@@ -44,14 +44,17 @@ final class RecetteForm extends Component
 
     public function showNewForm(): void
     {
+        $this->reset(['recetteId', 'date', 'libelle', 'mode_paiement',
+            'payeur', 'reference', 'compte_id', 'notes', 'lignes']);
+        $this->resetValidation();
+
         $this->showForm = true;
         $this->date = now()->format('Y-m-d');
 
-        $lastRecette = Recette::where('saisi_par', auth()->id())
+        $this->compte_id = Recette::where('saisi_par', auth()->id())
             ->whereNotNull('compte_id')
             ->latest()
-            ->first();
-        $this->compte_id = $lastRecette?->compte_id;
+            ->value('compte_id');
 
         $this->addLigne();
     }
