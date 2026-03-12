@@ -26,7 +26,8 @@ final class CompteBancaireController extends Controller
         CompteBancaire::create($request->validated());
 
         return redirect()->route('parametres.index')
-            ->with('success', 'Compte bancaire créé avec succès.');
+            ->with('success', 'Compte bancaire créé avec succès.')
+            ->with('activeTab', 'comptes');
     }
 
     public function edit(CompteBancaire $comptesBancaire): RedirectResponse
@@ -39,7 +40,8 @@ final class CompteBancaireController extends Controller
         $comptesBancaire->update($request->validated());
 
         return redirect()->route('parametres.index')
-            ->with('success', 'Compte bancaire mis à jour avec succès.');
+            ->with('success', 'Compte bancaire mis à jour avec succès.')
+            ->with('activeTab', 'comptes');
     }
 
     public function destroy(CompteBancaire $comptesBancaire): RedirectResponse
