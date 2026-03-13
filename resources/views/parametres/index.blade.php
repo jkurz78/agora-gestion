@@ -460,7 +460,7 @@
                 <div class="card card-body">
                     <form action="{{ route('operations.store') }}" method="POST" class="row g-2 align-items-end">
                         @csrf
-                        <input type="hidden" name="_redirect_back" value="{{ route('parametres.index') }}">
+                        <input type="hidden" name="_redirect_back" value="{{ route('parametres.categories.index') }}">
                         <div class="col-md-3">
                             <label for="op_nom" class="form-label">Nom</label>
                             <input type="text" name="nom" id="op_nom" class="form-control" required maxlength="150">

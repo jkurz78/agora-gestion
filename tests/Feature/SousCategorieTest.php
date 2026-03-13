@@ -17,7 +17,7 @@ it('can store a sous-categorie', function () {
             'nom' => 'Électricité',
             'code_cerfa' => '1234',
         ])
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.sous-categories.index'));
 
     $this->assertDatabaseHas('sous_categories', [
         'categorie_id' => $this->categorie->id,
@@ -66,7 +66,7 @@ it('can store a sous-categorie without code_cerfa', function () {
             'categorie_id' => $this->categorie->id,
             'nom' => 'Sans CERFA',
         ])
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.sous-categories.index'));
 
     $this->assertDatabaseHas('sous_categories', [
         'nom' => 'Sans CERFA',
@@ -83,7 +83,7 @@ it('can update a sous-categorie', function () {
             'nom' => 'Nom modifié',
             'code_cerfa' => '9999',
         ])
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.sous-categories.index'));
 
     $this->assertDatabaseHas('sous_categories', [
         'id' => $sc->id,
@@ -97,7 +97,7 @@ it('can destroy a sous-categorie', function () {
 
     $this->actingAs($this->user)
         ->delete(route('parametres.sous-categories.destroy', $sc))
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.sous-categories.index'));
 
     $this->assertDatabaseMissing('sous_categories', ['id' => $sc->id]);
 });
@@ -116,7 +116,7 @@ it('returns flash error when destroying a sous-categorie with linked lignes', fu
 
     $this->actingAs($this->user)
         ->delete(route('parametres.sous-categories.destroy', $sc))
-        ->assertRedirect(route('parametres.index'))
+        ->assertRedirect(route('parametres.sous-categories.index'))
         ->assertSessionHas('error');
 
     $this->assertDatabaseHas('sous_categories', ['id' => $sc->id]);

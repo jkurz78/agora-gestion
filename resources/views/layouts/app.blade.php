@@ -37,7 +37,7 @@
                             ['route' => 'membres.index',       'icon' => 'people',                 'label' => 'Membres'],
                             ['route' => 'dons.index',          'icon' => 'heart',                  'label' => 'Dons'],
                             ['route' => 'rapports.index',      'icon' => 'file-earmark-bar-graph', 'label' => 'Rapports'],
-                            ['route' => 'parametres.index',    'icon' => 'gear',                   'label' => 'Paramètres'],
+                            ['route' => 'parametres.categories.index', 'icon' => 'gear',                   'label' => 'Paramètres'],
                         ];
                     @endphp
                     @foreach ($navItems as $item)

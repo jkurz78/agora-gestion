@@ -8,7 +8,7 @@ beforeEach(function () {
 });
 
 it('requires authentication to access parametres', function () {
-    $this->get(route('parametres.index'))
+    $this->get(route('parametres.categories.index'))
         ->assertRedirect(route('login'));
 });
 
@@ -16,7 +16,7 @@ it('displays the parametres page with categories', function () {
     $categorie = Categorie::factory()->create();
 
     $this->actingAs($this->user)
-        ->get(route('parametres.index'))
+        ->get(route('parametres.categories.index'))
         ->assertOk()
         ->assertSee($categorie->nom);
 });
@@ -27,7 +27,7 @@ it('can store a categorie', function () {
             'nom' => 'Fournitures',
             'type' => 'depense',
         ])
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.categories.index'));
 
     $this->assertDatabaseHas('categories', [
         'nom' => 'Fournitures',
@@ -67,7 +67,7 @@ it('can update a categorie', function () {
             'nom' => 'Nouveau nom',
             'type' => 'recette',
         ])
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.categories.index'));
 
     $this->assertDatabaseHas('categories', [
         'id' => $categorie->id,
@@ -81,7 +81,7 @@ it('can destroy a categorie', function () {
 
     $this->actingAs($this->user)
         ->delete(route('parametres.categories.destroy', $categorie))
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.categories.index'));
 
     $this->assertDatabaseMissing('categories', ['id' => $categorie->id]);
 });
@@ -92,7 +92,7 @@ it('returns flash error when destroying a categorie with sous-categories', funct
 
     $this->actingAs($this->user)
         ->delete(route('parametres.categories.destroy', $categorie))
-        ->assertRedirect(route('parametres.index'))
+        ->assertRedirect(route('parametres.categories.index'))
         ->assertSessionHas('error');
 
     $this->assertDatabaseHas('categories', ['id' => $categorie->id]);
