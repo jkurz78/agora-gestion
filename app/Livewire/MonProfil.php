@@ -52,6 +52,10 @@ final class MonProfil extends Component
 
         $user->save();
 
+        if ($emailChanged && $user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail) {
+            $user->sendEmailVerificationNotification();
+        }
+
         $this->password = '';
         $this->password_confirmation = '';
 
