@@ -50,12 +50,18 @@ final class RapprochementDetail extends Component
         $service = app(RapprochementBancaireService::class);
         $compte = $this->rapprochement->compte;
         $rid = $this->rapprochement->id;
+        $dateFin = $this->rapprochement->date_fin;
 
         $transactions = collect();
 
         // Dépenses
         Depense::where('compte_id', $compte->id)
-            ->where(fn ($q) => $q->whereNull('rapprochement_id')->orWhere('rapprochement_id', $rid))
+            ->where(function ($q) use ($rid, $dateFin) {
+                $q->where(function ($inner) use ($dateFin) {
+                    $inner->whereNull('rapprochement_id')
+                          ->where('date', '<=', $dateFin);
+                })->orWhere('rapprochement_id', $rid);
+            })
             ->get()
             ->each(function (Depense $d) use (&$transactions, $rid) {
                 $transactions->push([
@@ -71,7 +77,12 @@ final class RapprochementDetail extends Component
 
         // Recettes
         Recette::where('compte_id', $compte->id)
-            ->where(fn ($q) => $q->whereNull('rapprochement_id')->orWhere('rapprochement_id', $rid))
+            ->where(function ($q) use ($rid, $dateFin) {
+                $q->where(function ($inner) use ($dateFin) {
+                    $inner->whereNull('rapprochement_id')
+                          ->where('date', '<=', $dateFin);
+                })->orWhere('rapprochement_id', $rid);
+            })
             ->get()
             ->each(function (Recette $r) use (&$transactions, $rid) {
                 $transactions->push([
@@ -87,7 +98,12 @@ final class RapprochementDetail extends Component
 
         // Dons
         Don::where('compte_id', $compte->id)
-            ->where(fn ($q) => $q->whereNull('rapprochement_id')->orWhere('rapprochement_id', $rid))
+            ->where(function ($q) use ($rid, $dateFin) {
+                $q->where(function ($inner) use ($dateFin) {
+                    $inner->whereNull('rapprochement_id')
+                          ->where('date', '<=', $dateFin);
+                })->orWhere('rapprochement_id', $rid);
+            })
             ->with('donateur')
             ->get()
             ->each(function (Don $d) use (&$transactions, $rid) {
@@ -106,7 +122,12 @@ final class RapprochementDetail extends Component
 
         // Cotisations
         Cotisation::where('compte_id', $compte->id)
-            ->where(fn ($q) => $q->whereNull('rapprochement_id')->orWhere('rapprochement_id', $rid))
+            ->where(function ($q) use ($rid, $dateFin) {
+                $q->where(function ($inner) use ($dateFin) {
+                    $inner->whereNull('rapprochement_id')
+                          ->where('date_paiement', '<=', $dateFin);
+                })->orWhere('rapprochement_id', $rid);
+            })
             ->with('membre')
             ->get()
             ->each(function (Cotisation $c) use (&$transactions, $rid) {
@@ -123,7 +144,12 @@ final class RapprochementDetail extends Component
 
         // Virements sortants (source = ce compte)
         VirementInterne::where('compte_source_id', $compte->id)
-            ->where(fn ($q) => $q->whereNull('rapprochement_source_id')->orWhere('rapprochement_source_id', $rid))
+            ->where(function ($q) use ($rid, $dateFin) {
+                $q->where(function ($inner) use ($dateFin) {
+                    $inner->whereNull('rapprochement_source_id')
+                          ->where('date', '<=', $dateFin);
+                })->orWhere('rapprochement_source_id', $rid);
+            })
             ->with('compteDestination')
             ->get()
             ->each(function (VirementInterne $v) use (&$transactions, $rid) {
@@ -140,7 +166,12 @@ final class RapprochementDetail extends Component
 
         // Virements entrants (destination = ce compte)
         VirementInterne::where('compte_destination_id', $compte->id)
-            ->where(fn ($q) => $q->whereNull('rapprochement_destination_id')->orWhere('rapprochement_destination_id', $rid))
+            ->where(function ($q) use ($rid, $dateFin) {
+                $q->where(function ($inner) use ($dateFin) {
+                    $inner->whereNull('rapprochement_destination_id')
+                          ->where('date', '<=', $dateFin);
+                })->orWhere('rapprochement_destination_id', $rid);
+            })
             ->with('compteSource')
             ->get()
             ->each(function (VirementInterne $v) use (&$transactions, $rid) {

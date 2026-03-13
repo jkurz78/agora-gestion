@@ -116,6 +116,21 @@ final class RecetteForm extends Component
 
     public function save(): void
     {
+        if ($this->recetteId) {
+            $existing = Recette::with('lignes')->findOrFail($this->recetteId);
+            if ($existing->isLockedByRapprochement()) {
+                // Re-freeze the locked fields from the DB, ignoring user input
+                $this->date = $existing->date->format('Y-m-d');
+                $this->compte_id = $existing->compte_id;
+                // Re-freeze ligne montants
+                foreach ($existing->lignes as $i => $ligne) {
+                    if (isset($this->lignes[$i])) {
+                        $this->lignes[$i]['montant'] = (string) $ligne->montant;
+                    }
+                }
+            }
+        }
+
         $this->validate([
             'date' => ['required', 'date'],
             'libelle' => ['required', 'string', 'max:255'],

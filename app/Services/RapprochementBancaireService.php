@@ -94,6 +94,26 @@ final class RapprochementBancaireService
             throw new RuntimeException("Impossible de modifier un rapprochement verrouillé.");
         }
 
+        // Verify account ownership before modifying
+        if (str_starts_with($type, 'virement')) {
+            $virement = VirementInterne::findOrFail($id);
+            $expectedField = $type === 'virement_source' ? 'compte_source_id' : 'compte_destination_id';
+            if ((int) $virement->{$expectedField} !== (int) $rapprochement->compte_id) {
+                throw new \InvalidArgumentException("La transaction n'appartient pas au compte de ce rapprochement.");
+            }
+        } else {
+            $model = match ($type) {
+                'depense' => Depense::findOrFail($id),
+                'recette' => Recette::findOrFail($id),
+                'don' => Don::findOrFail($id),
+                'cotisation' => Cotisation::findOrFail($id),
+                default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
+            };
+            if ((int) $model->compte_id !== (int) $rapprochement->compte_id) {
+                throw new \InvalidArgumentException("La transaction n'appartient pas au compte de ce rapprochement.");
+            }
+        }
+
         DB::transaction(function () use ($rapprochement, $type, $id) {
             if (str_starts_with($type, 'virement')) {
                 $this->toggleVirement($rapprochement, $type, $id);
