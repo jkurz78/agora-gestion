@@ -8,9 +8,14 @@ use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Services\RapprochementBancaireService;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 final class RapprochementList extends Component
 {
+    use WithPagination;
+
+    protected string $paginationTheme = 'bootstrap';
+
     public ?int $compte_id = null;
 
     public bool $showCreateForm = false;
@@ -25,6 +30,7 @@ final class RapprochementList extends Component
         $this->date_fin = '';
         $this->solde_fin = '';
         $this->resetValidation();
+        $this->resetPage();
     }
 
     public function create(): void
@@ -59,10 +65,13 @@ final class RapprochementList extends Component
         $soldeOuverture = null;
 
         if ($this->compte_id) {
+            $aEnCours = RapprochementBancaire::where('compte_id', $this->compte_id)
+                ->whereNull('verrouille_at')
+                ->exists();
+
             $rapprochements = RapprochementBancaire::where('compte_id', $this->compte_id)
                 ->orderByDesc('date_fin')
-                ->get();
-            $aEnCours = $rapprochements->contains(fn ($r) => $r->isEnCours());
+                ->paginate(20);
 
             if (! $aEnCours) {
                 $compte = CompteBancaire::find($this->compte_id);

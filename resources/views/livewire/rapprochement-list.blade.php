@@ -110,6 +110,9 @@
                     </tbody>
                 </table>
             </div>
+            <div class="mt-3">
+                {{ $rapprochements->links() }}
+            </div>
         @endif
     @else
         <div class="alert alert-info">
