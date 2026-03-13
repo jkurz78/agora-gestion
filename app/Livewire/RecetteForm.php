@@ -189,6 +189,9 @@ final class RecetteForm extends Component
             'sousCategories' => $sousCategories,
             'operations' => Operation::where('statut', StatutOperation::EnCours)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
+            'recette_numero_piece' => $this->recetteId
+                ? Recette::select('id', 'numero_piece')->find($this->recetteId)?->numero_piece
+                : null,
         ]);
     }
 }

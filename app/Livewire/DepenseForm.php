@@ -189,6 +189,9 @@ final class DepenseForm extends Component
             'sousCategories' => $sousCategories,
             'operations' => Operation::where('statut', StatutOperation::EnCours)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
+            'depense_numero_piece' => $this->depenseId
+                ? Depense::select('id', 'numero_piece')->find($this->depenseId)?->numero_piece
+                : null,
         ]);
     }
 }
