@@ -68,7 +68,7 @@ it('can save a new recette', function () {
         ->set('date', '2025-10-15')
         ->set('libelle', 'Cotisation membre')
         ->set('mode_paiement', 'cb')
-        ->set('payeur', 'M. Dupont')
+        ->set('tiers', 'M. Dupont')
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [
             [
@@ -94,7 +94,7 @@ it('can save a new recette', function () {
         'libelle' => 'Cotisation membre',
         'montant_total' => '150.00',
         'mode_paiement' => 'cb',
-        'payeur' => 'M. Dupont',
+        'tiers' => 'M. Dupont',
         'saisi_par' => $this->user->id,
     ]);
 

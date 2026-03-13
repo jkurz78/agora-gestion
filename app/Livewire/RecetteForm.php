@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutOperation;
 use App\Enums\TypeCategorie;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
@@ -24,7 +25,7 @@ final class RecetteForm extends Component
 
     public string $mode_paiement = '';
 
-    public ?string $payeur = null;
+    public ?string $tiers = null;
 
     public ?string $reference = null;
 
@@ -47,7 +48,7 @@ final class RecetteForm extends Component
     public function showNewForm(): void
     {
         $this->reset(['recetteId', 'date', 'libelle', 'mode_paiement',
-            'payeur', 'reference', 'compte_id', 'notes', 'lignes']);
+            'tiers', 'reference', 'compte_id', 'notes', 'lignes']);
         $this->isLocked = false;
         $this->resetValidation();
 
@@ -88,7 +89,7 @@ final class RecetteForm extends Component
         $this->date = $recette->date->format('Y-m-d');
         $this->libelle = $recette->libelle;
         $this->mode_paiement = $recette->mode_paiement->value;
-        $this->payeur = $recette->payeur;
+        $this->tiers = $recette->tiers;
         $this->reference = $recette->reference;
         $this->compte_id = $recette->compte_id;
         $this->notes = $recette->notes;
@@ -109,7 +110,7 @@ final class RecetteForm extends Component
     {
         $this->reset([
             'recetteId', 'date', 'libelle', 'mode_paiement',
-            'payeur', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
+            'tiers', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
         ]);
         $this->resetValidation();
     }
@@ -149,7 +150,7 @@ final class RecetteForm extends Component
             'libelle' => $this->libelle,
             'montant_total' => $this->montantTotal,
             'mode_paiement' => $this->mode_paiement,
-            'payeur' => $this->payeur ?: null,
+            'tiers' => $this->tiers ?: null,
             'reference' => $this->reference ?: null,
             'compte_id' => $this->compte_id,
             'notes' => $this->notes ?: null,
@@ -186,7 +187,7 @@ final class RecetteForm extends Component
         return view('livewire.recette-form', [
             'comptes' => CompteBancaire::where('actif_recettes_depenses', true)->orderBy('nom')->get(),
             'sousCategories' => $sousCategories,
-            'operations' => Operation::where('statut', \App\Enums\StatutOperation::EnCours)->orderBy('nom')->get(),
+            'operations' => Operation::where('statut', StatutOperation::EnCours)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
         ]);
     }

@@ -69,22 +69,22 @@ it('displays reference column in recette list', function () {
         ->assertSee('REF-REC-007');
 });
 
-it('filters recettes by payeur', function () {
+it('filters recettes by tiers', function () {
     Recette::factory()->create([
         'libelle' => 'Recette Gamma',
-        'payeur' => 'Gamma SARL',
+        'tiers' => 'Gamma SARL',
         'date' => '2025-10-15',
         'saisi_par' => $this->user->id,
     ]);
     Recette::factory()->create([
         'libelle' => 'Recette Delta',
-        'payeur' => 'Delta Inc',
+        'tiers' => 'Delta Inc',
         'date' => '2025-10-15',
         'saisi_par' => $this->user->id,
     ]);
 
     Livewire::test(RecetteList::class)
-        ->set('payeur', 'Gamma')
+        ->set('tiers', 'Gamma')
         ->assertSee('Recette Gamma')
         ->assertDontSee('Recette Delta');
 });

@@ -40,8 +40,8 @@
                             @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
-                            <label for="beneficiaire" class="form-label">Bénéficiaire</label>
-                            <input type="text" wire:model="beneficiaire" id="beneficiaire" class="form-control">
+                            <label for="tiers" class="form-label">Tiers</label>
+                            <input type="text" wire:model="tiers" id="tiers" class="form-control">
                         </div>
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>

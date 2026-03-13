@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutOperation;
 use App\Enums\TypeCategorie;
 use App\Models\CompteBancaire;
 use App\Models\Depense;
@@ -24,7 +25,7 @@ final class DepenseForm extends Component
 
     public string $mode_paiement = '';
 
-    public ?string $beneficiaire = null;
+    public ?string $tiers = null;
 
     public ?string $reference = null;
 
@@ -47,7 +48,7 @@ final class DepenseForm extends Component
     public function showNewForm(): void
     {
         $this->reset(['depenseId', 'date', 'libelle', 'mode_paiement',
-            'beneficiaire', 'reference', 'compte_id', 'notes', 'lignes']);
+            'tiers', 'reference', 'compte_id', 'notes', 'lignes']);
         $this->isLocked = false;
         $this->resetValidation();
 
@@ -88,7 +89,7 @@ final class DepenseForm extends Component
         $this->date = $depense->date->format('Y-m-d');
         $this->libelle = $depense->libelle;
         $this->mode_paiement = $depense->mode_paiement->value;
-        $this->beneficiaire = $depense->beneficiaire;
+        $this->tiers = $depense->tiers;
         $this->reference = $depense->reference;
         $this->compte_id = $depense->compte_id;
         $this->notes = $depense->notes;
@@ -109,7 +110,7 @@ final class DepenseForm extends Component
     {
         $this->reset([
             'depenseId', 'date', 'libelle', 'mode_paiement',
-            'beneficiaire', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
+            'tiers', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
         ]);
         $this->resetValidation();
     }
@@ -149,7 +150,7 @@ final class DepenseForm extends Component
             'libelle' => $this->libelle,
             'montant_total' => $this->montantTotal,
             'mode_paiement' => $this->mode_paiement,
-            'beneficiaire' => $this->beneficiaire ?: null,
+            'tiers' => $this->tiers ?: null,
             'reference' => $this->reference ?: null,
             'compte_id' => $this->compte_id,
             'notes' => $this->notes ?: null,
@@ -186,7 +187,7 @@ final class DepenseForm extends Component
         return view('livewire.depense-form', [
             'comptes' => CompteBancaire::where('actif_recettes_depenses', true)->orderBy('nom')->get(),
             'sousCategories' => $sousCategories,
-            'operations' => Operation::where('statut', \App\Enums\StatutOperation::EnCours)->orderBy('nom')->get(),
+            'operations' => Operation::where('statut', StatutOperation::EnCours)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
         ]);
     }

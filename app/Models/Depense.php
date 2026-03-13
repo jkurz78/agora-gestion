@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\ModePaiement;
-use App\Models\RapprochementBancaire;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +21,7 @@ final class Depense extends Model
         'libelle',
         'montant_total',
         'mode_paiement',
-        'beneficiaire',
+        'tiers',
         'reference',
         'compte_id',
         'pointe',
