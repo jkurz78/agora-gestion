@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
     })->name('rapprochement.detail');
     Route::view('/virements', 'virements.index')->name('virements.index');
     Route::view('/rapports', 'rapports.index')->name('rapports.index');
+    Route::view('/profil', 'profil.index')->name('profil.index');
 
     // Resource controllers
     Route::resource('membres', MembreController::class);
