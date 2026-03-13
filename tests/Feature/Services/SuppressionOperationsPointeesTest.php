@@ -133,3 +133,44 @@ test('VirementInterneService::delete lève une exception si le virement est poin
     expect(fn () => app(VirementInterneService::class)->delete($virement))
         ->toThrow(RuntimeException::class, 'pointé');
 });
+
+test('RecetteService::delete réussit si la recette n\'est pas pointée', function () {
+    $recette = Recette::factory()->create(['compte_id' => $this->compte->id]);
+
+    app(RecetteService::class)->delete($recette);
+
+    expect(Recette::withTrashed()->find($recette->id)->deleted_at)->not->toBeNull();
+});
+
+test('DonService::delete réussit si le don n\'est pas pointé', function () {
+    $don = Don::factory()->create(['compte_id' => $this->compte->id]);
+
+    app(DonService::class)->delete($don);
+
+    expect(Don::withTrashed()->find($don->id)->deleted_at)->not->toBeNull();
+});
+
+test('CotisationService::delete réussit si la cotisation n\'est pas pointée', function () {
+    $membre = Membre::factory()->create();
+    $cotisation = Cotisation::factory()->create([
+        'membre_id' => $membre->id,
+        'compte_id' => $this->compte->id,
+    ]);
+
+    app(CotisationService::class)->delete($cotisation);
+
+    expect(Cotisation::withTrashed()->find($cotisation->id)->deleted_at)->not->toBeNull();
+});
+
+test('VirementInterneService::delete réussit si le virement n\'est pas pointé', function () {
+    $compteDestination = CompteBancaire::factory()->create();
+    $virement = VirementInterne::factory()->create([
+        'compte_source_id' => $this->compte->id,
+        'compte_destination_id' => $compteDestination->id,
+        'saisi_par' => $this->user->id,
+    ]);
+
+    app(VirementInterneService::class)->delete($virement);
+
+    expect(VirementInterne::withTrashed()->find($virement->id)->deleted_at)->not->toBeNull();
+});
