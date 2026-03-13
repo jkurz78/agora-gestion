@@ -65,7 +65,7 @@ it('displays reference column in recette list', function () {
     ]);
 
     Livewire::test(RecetteList::class)
-        ->assertSee('Référence')
+        ->assertSee('Réf.')
         ->assertSee('REF-REC-007');
 });
 

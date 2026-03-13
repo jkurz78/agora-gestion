@@ -65,7 +65,7 @@ it('displays reference column in depense list', function () {
     ]);
 
     Livewire::test(DepenseList::class)
-        ->assertSee('Référence')
+        ->assertSee('Réf.')
         ->assertSee('REF-2025-042');
 });
 
