@@ -26,6 +26,7 @@ final class RapprochementBancaireService
         $dernier = RapprochementBancaire::where('compte_id', $compte->id)
             ->where('statut', StatutRapprochement::Verrouille)
             ->orderByDesc('date_fin')
+            ->orderByDesc('id')
             ->first();
 
         return $dernier ? (float) $dernier->solde_fin : (float) $compte->solde_initial;
@@ -104,6 +105,7 @@ final class RapprochementBancaireService
                 'recette' => Recette::findOrFail($id),
                 'don' => Don::findOrFail($id),
                 'cotisation' => Cotisation::findOrFail($id),
+                default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
 
             if ((int) $model->rapprochement_id === $rapprochement->id) {
@@ -117,6 +119,8 @@ final class RapprochementBancaireService
         });
     }
 
+    // VirementInterne n'a pas de champ 'pointe' — le pointage est indiqué
+    // par rapprochement_source_id / rapprochement_destination_id.
     private function toggleVirement(RapprochementBancaire $rapprochement, string $type, int $id): void
     {
         $virement = VirementInterne::findOrFail($id);
@@ -135,7 +139,7 @@ final class RapprochementBancaireService
      */
     public function verrouiller(RapprochementBancaire $rapprochement): void
     {
-        if ($this->calculerEcart($rapprochement) !== 0.0) {
+        if ((int) round($this->calculerEcart($rapprochement) * 100) !== 0) {
             throw new RuntimeException("Le rapprochement ne peut être verrouillé que si l'écart est nul.");
         }
 
