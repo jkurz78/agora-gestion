@@ -380,6 +380,15 @@
                     @endforelse
                 </tbody>
             </table>
+
+            @if ($errors->hasAny(['nom', 'email', 'password']))
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    var el = document.getElementById('addUserForm');
+                    if (el) { new bootstrap.Collapse(el, { toggle: false }).show(); }
+                });
+            </script>
+            @endif
         </div>
 
         {{-- ========== Opérations ========== --}}

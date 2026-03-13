@@ -7,7 +7,6 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 
 final class UserController extends Controller
@@ -23,7 +22,7 @@ final class UserController extends Controller
         User::create([
             'nom' => $validated['nom'],
             'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
+            'password' => $validated['password'],
         ]);
 
         return redirect()->route('parametres.index', ['#utilisateurs-pane'])
@@ -42,7 +41,7 @@ final class UserController extends Controller
         $utilisateur->email = $validated['email'];
 
         if (! empty($validated['password'])) {
-            $utilisateur->password = Hash::make($validated['password']);
+            $utilisateur->password = $validated['password'];
         }
 
         $utilisateur->save();
