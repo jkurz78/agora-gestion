@@ -6,14 +6,18 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreSousCategorieRequest;
 use App\Http\Requests\UpdateSousCategorieRequest;
+use App\Models\Categorie;
 use App\Models\SousCategorie;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 final class SousCategorieController extends Controller
 {
-    public function index(): RedirectResponse
+    public function index(): View
     {
-        return redirect()->route('parametres.sous-categories.index');
+        return view('parametres.sous-categories.index', [
+            'categories' => Categorie::with('sousCategories')->orderBy('nom')->get(),
+        ]);
     }
 
     public function create(): RedirectResponse
