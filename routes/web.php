@@ -25,6 +25,9 @@ Route::middleware('auth')->group(function () {
         return view('rapprochement.detail', compact('rapprochement'));
     })->name('rapprochement.detail');
     Route::view('/virements', 'virements.index')->name('virements.index');
+    Route::get('comptes-bancaires/transactions', function () {
+        return view('comptes-bancaires.transactions');
+    })->name('comptes-bancaires.transactions');
     Route::view('/rapports', 'rapports.index')->name('rapports.index');
     Route::view('/profil', 'profil.index')->name('profil.index');
 
