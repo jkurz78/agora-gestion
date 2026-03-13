@@ -54,10 +54,10 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <label for="filter-payeur" class="form-label">Payeur</label>
-                    <input type="text" wire:model.live.debounce.300ms="payeur"
-                           id="filter-payeur"
-                           class="form-control form-control-sm" placeholder="Payeur...">
+                    <label for="filter-tiers" class="form-label">Tiers</label>
+                    <input type="text" wire:model.live.debounce.300ms="tiers"
+                           id="filter-tiers"
+                           class="form-control form-control-sm" placeholder="Tiers...">
                 </div>
             </div>
         </div>
@@ -71,7 +71,7 @@
                     <th>Date</th>
                     <th>Réf.</th>
                     <th>Libellé</th>
-                    <th>Payeur</th>
+                    <th>Tiers</th>
                     <th>Mode</th>
                     <th class="text-end">Montant</th>
                     <th></th>
@@ -83,7 +83,7 @@
                         <td class="text-nowrap">{{ $recette->date->format('d/m/Y') }}</td>
                         <td class="text-muted small">{{ $recette->reference ?? '—' }}</td>
                         <td>{{ $recette->libelle }}</td>
-                        <td>{{ $recette->payeur ?? '—' }}</td>
+                        <td>{{ $recette->tiers ?? '—' }}</td>
                         <td><span class="badge bg-secondary">{{ $recette->mode_paiement->label() }}</span></td>
                         <td class="text-end text-success fw-semibold text-nowrap">
                             {{ number_format((float) $recette->montant_total, 2, ',', ' ') }} €

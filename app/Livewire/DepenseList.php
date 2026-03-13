@@ -11,6 +11,7 @@ use App\Models\Depense;
 use App\Models\Operation;
 use App\Services\DepenseService;
 use App\Services\ExerciceService;
+use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -33,7 +34,7 @@ final class DepenseList extends Component
 
     public ?string $pointe = null;
 
-    public ?string $beneficiaire = null;
+    public ?string $tiers = null;
 
     public function mount(): void
     {
@@ -71,7 +72,7 @@ final class DepenseList extends Component
         $this->resetPage();
     }
 
-    public function updatedBeneficiaire(): void
+    public function updatedTiers(): void
     {
         $this->resetPage();
     }
@@ -92,7 +93,7 @@ final class DepenseList extends Component
         // Livewire will re-render automatically
     }
 
-    public function render(): \Illuminate\Contracts\View\View
+    public function render(): View
     {
         $query = Depense::with(['lignes.sousCategorie.categorie', 'compte', 'saisiPar'])
             ->latest('date')
@@ -128,8 +129,8 @@ final class DepenseList extends Component
             $query->where('pointe', $this->pointe === '1');
         }
 
-        if ($this->beneficiaire) {
-            $query->where('beneficiaire', 'like', '%'.$this->beneficiaire.'%');
+        if ($this->tiers) {
+            $query->where('tiers', 'like', '%'.$this->tiers.'%');
         }
 
         $exerciceService = app(ExerciceService::class);

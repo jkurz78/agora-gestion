@@ -68,7 +68,7 @@ it('can save a new depense', function () {
         ->set('date', '2025-10-15')
         ->set('libelle', 'Achat fournitures')
         ->set('mode_paiement', 'cb')
-        ->set('beneficiaire', 'Fournisseur XYZ')
+        ->set('tiers', 'Fournisseur XYZ')
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [
             [
@@ -94,7 +94,7 @@ it('can save a new depense', function () {
         'libelle' => 'Achat fournitures',
         'montant_total' => '150.00',
         'mode_paiement' => 'cb',
-        'beneficiaire' => 'Fournisseur XYZ',
+        'tiers' => 'Fournisseur XYZ',
         'saisi_par' => $this->user->id,
     ]);
 

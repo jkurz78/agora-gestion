@@ -69,22 +69,22 @@ it('displays reference column in depense list', function () {
         ->assertSee('REF-2025-042');
 });
 
-it('filters depenses by beneficiaire', function () {
+it('filters depenses by tiers', function () {
     Depense::factory()->create([
         'libelle' => 'Dépense Alpha',
-        'beneficiaire' => 'Alpha Corp',
+        'tiers' => 'Alpha Corp',
         'date' => '2025-10-15',
         'saisi_par' => $this->user->id,
     ]);
     Depense::factory()->create([
         'libelle' => 'Dépense Beta',
-        'beneficiaire' => 'Beta SA',
+        'tiers' => 'Beta SA',
         'date' => '2025-10-15',
         'saisi_par' => $this->user->id,
     ]);
 
     Livewire::test(DepenseList::class)
-        ->set('beneficiaire', 'Alpha')
+        ->set('tiers', 'Alpha')
         ->assertSee('Dépense Alpha')
         ->assertDontSee('Dépense Beta');
 });
