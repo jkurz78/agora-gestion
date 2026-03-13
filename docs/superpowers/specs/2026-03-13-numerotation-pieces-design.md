@@ -110,25 +110,24 @@ final class NumeroPieceService
     {
         $exercice = $this->exerciceFromDate($date);
 
+        // Upsert : crée la ligne si elle n'existe pas, sinon l'incrémente.
+        // Puis verrouille avec SELECT FOR UPDATE pour éviter les doublons sous concurrence.
+        DB::table('sequences')->upsert(
+            ['exercice' => $exercice, 'dernier_numero' => 0],
+            ['exercice'],
+            [],  // rien à mettre à jour si déjà existant
+        );
+
         $sequence = DB::table('sequences')
             ->where('exercice', $exercice)
             ->lockForUpdate()
             ->first();
 
-        if ($sequence === null) {
-            DB::table('sequences')->insert([
-                'exercice'        => $exercice,
-                'dernier_numero'  => 1,
-                'created_at'      => now(),
-                'updated_at'      => now(),
-            ]);
-            $numero = 1;
-        } else {
-            $numero = $sequence->dernier_numero + 1;
-            DB::table('sequences')
-                ->where('exercice', $exercice)
-                ->update(['dernier_numero' => $numero, 'updated_at' => now()]);
-        }
+        $numero = $sequence->dernier_numero + 1;
+
+        DB::table('sequences')
+            ->where('exercice', $exercice)
+            ->update(['dernier_numero' => $numero, 'updated_at' => now()]);
 
         return $exercice . ':' . str_pad((string) $numero, 5, '0', STR_PAD_LEFT);
     }
@@ -147,8 +146,8 @@ final class NumeroPieceService
 **Intégration dans les services existants :**
 
 ```php
-// Exemple dans RecetteService::store()
-public function store(array $data): Recette
+// Exemple dans RecetteService::create()
+public function create(array $data): Recette
 {
     return DB::transaction(function () use ($data): Recette {
         $date = Carbon::parse($data['date']);
@@ -158,7 +157,9 @@ public function store(array $data): Recette
 }
 ```
 
-Le `assign()` est toujours appelé **à l'intérieur** du `DB::transaction()` existant, ce qui garantit qu'un numéro assigné mais dont la transaction DB échoue est annulé (rollback sur la table `sequences` aussi).
+Le `assign()` est toujours appelé **à l'intérieur** d'un `DB::transaction()`, ce qui garantit qu'un numéro assigné mais dont la transaction DB échoue est annulé (rollback sur la table `sequences` aussi).
+
+**Cas particulier — `CotisationService::create()`** : ce service ne wrappait pas encore de `DB::transaction()`. Il faudra en ajouter un pour que le `assign()` soit correctement rollbacké en cas d'échec.
 
 ---
 
@@ -166,7 +167,7 @@ Le `assign()` est toujours appelé **à l'intérieur** du `DB::transaction()` ex
 
 ### Vue transactions par compte (`transaction-compte-list.blade.php`)
 
-Colonne `N° pièce` ajoutée en **première position** du tableau (avant `Date`). Le UNION ALL dans `TransactionCompteService` inclut `r.numero_piece` (alias `numero_piece`) dans chaque branche SELECT.
+Colonne `N° pièce` ajoutée en **première position** du tableau (avant `Date`). Le UNION ALL dans `TransactionCompteService` inclut `numero_piece` dans **chacune des 6 branches SELECT** : recettes (`r.numero_piece`), dépenses (`d.numero_piece`), dons (`dn.numero_piece`), cotisations (`c.numero_piece`), virements sortants (`vi.numero_piece`) **et** virements entrants (`vi.numero_piece`). Les deux branches virement référencent la même colonne de la table `virements_internes` — le même numéro apparaît donc dans les deux lignes, ce qui est correct (c'est la même pièce).
 
 ### Liste recettes (`recette-list.blade.php`)
 
@@ -188,7 +189,7 @@ Quand `$recetteId` / `$depenseId` est non null (mode édition), afficher au-dess
 @endif
 ```
 
-Dons et cotisations : pas de formulaire dédié modifié — le numéro est visible via la vue transactions par compte uniquement.
+Dons et cotisations : pas de formulaire dédié modifié — le numéro est visible via la vue transactions par compte uniquement. Les listes dédiées `don-list` et `virement-interne-list` n'affichent pas non plus le numéro pour garder la portée minimale ; la vue transactions par compte est le point d'entrée privilégié pour la traçabilité numérique.
 
 ---
 
@@ -202,18 +203,20 @@ La table `sequences` ne sait pas que des numéros ont été supprimés : elle ma
 
 ## Tests
 
+Tous les tests utilisent `RefreshDatabase` pour repartir d'une base propre à chaque test.
+
 ### `NumeroPieceServiceTest`
 
+- `exerciceFromDate()` : date en septembre → exercice `{year}-{year+1}` ; date en août → exercice `{year-1}-{year}`
 - `assign()` sur une date de septembre 2025 retourne `2025-2026:00001`
-- `assign()` sur une date de février 2026 retourne `2025-2026:00002` (même exercice)
-- `assign()` sur une date de septembre 2026 retourne `2026-2027:00001` (nouvel exercice)
-- `exerciceFromDate()` : mois 9 → exercice courant, mois 8 → exercice précédent
-- Deux appels consécutifs donnent des numéros différents (pas de doublon)
+- `assign()` sur une date de février 2026 (2ème appel, même exercice) retourne `2025-2026:00002`
+- `assign()` sur une date de septembre 2026 retourne `2026-2027:00001` (nouvel exercice, séquence indépendante)
+- Deux appels consécutifs dans le même test donnent deux numéros distincts
 
 ### Tests services
 
-- `RecetteService::store()` assigne un `numero_piece` non null
-- Idem pour `DepenseService`, `DonService`, `CotisationService`, `VirementInterneService`
+- `RecetteService::create()` assigne un `numero_piece` non null
+- Idem pour `DepenseService::create()`, `DonService::create()`, `CotisationService::create()`, `VirementInterneService::create()`
 
 ### Tests Livewire
 
