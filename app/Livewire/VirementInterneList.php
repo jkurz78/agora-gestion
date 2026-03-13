@@ -35,7 +35,11 @@ final class VirementInterneList extends Component
     public function delete(int $id): void
     {
         $virement = VirementInterne::findOrFail($id);
-        app(VirementInterneService::class)->delete($virement);
+        try {
+            app(VirementInterneService::class)->delete($virement);
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
     }
 
     public function render(): \Illuminate\View\View
