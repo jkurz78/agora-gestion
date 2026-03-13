@@ -28,6 +28,7 @@ final class Depense extends Model
         'notes',
         'saisi_par',
         'rapprochement_id',
+        'numero_piece',
     ];
 
     protected function casts(): array

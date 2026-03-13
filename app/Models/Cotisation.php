@@ -24,6 +24,7 @@ final class Cotisation extends Model
         'compte_id',
         'pointe',
         'rapprochement_id',
+        'numero_piece',
     ];
 
     protected function casts(): array

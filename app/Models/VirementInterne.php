@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Models\RapprochementBancaire;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +26,7 @@ final class VirementInterne extends Model
         'saisi_par',
         'rapprochement_source_id',
         'rapprochement_destination_id',
+        'numero_piece',
     ];
 
     protected function casts(): array
