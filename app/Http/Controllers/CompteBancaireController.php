@@ -8,12 +8,15 @@ use App\Http\Requests\StoreCompteBancaireRequest;
 use App\Http\Requests\UpdateCompteBancaireRequest;
 use App\Models\CompteBancaire;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 final class CompteBancaireController extends Controller
 {
-    public function index(): RedirectResponse
+    public function index(): View
     {
-        return redirect()->route('parametres.comptes-bancaires.index');
+        return view('parametres.comptes-bancaires.index', [
+            'comptesBancaires' => CompteBancaire::orderBy('nom')->get(),
+        ]);
     }
 
     public function create(): RedirectResponse
@@ -26,8 +29,7 @@ final class CompteBancaireController extends Controller
         CompteBancaire::create($request->validated());
 
         return redirect()->route('parametres.comptes-bancaires.index')
-            ->with('success', 'Compte bancaire créé avec succès.')
-            ->with('activeTab', 'comptes');
+            ->with('success', 'Compte bancaire créé avec succès.');
     }
 
     public function edit(CompteBancaire $comptesBancaire): RedirectResponse
@@ -40,8 +42,7 @@ final class CompteBancaireController extends Controller
         $comptesBancaire->update($request->validated());
 
         return redirect()->route('parametres.comptes-bancaires.index')
-            ->with('success', 'Compte bancaire mis à jour avec succès.')
-            ->with('activeTab', 'comptes');
+            ->with('success', 'Compte bancaire mis à jour avec succès.');
     }
 
     public function destroy(CompteBancaire $comptesBancaire): RedirectResponse
@@ -50,13 +51,11 @@ final class CompteBancaireController extends Controller
             $comptesBancaire->delete();
 
             return redirect()->route('parametres.comptes-bancaires.index')
-                ->with('success', 'Compte bancaire supprimé avec succès.')
-                ->with('activeTab', 'comptes');
+                ->with('success', 'Compte bancaire supprimé avec succès.');
         } catch (\Illuminate\Database\QueryException $e) {
             if ($e->getCode() === '23000') {
                 return redirect()->route('parametres.comptes-bancaires.index')
-                    ->with('error', 'Suppression impossible : cet élément est utilisé dans les données de l\'application.')
-                    ->with('activeTab', 'comptes');
+                    ->with('error', 'Suppression impossible : cet élément est utilisé dans les données de l\'application.');
             }
             throw $e;
         }
