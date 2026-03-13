@@ -37,6 +37,10 @@ final class DepenseService
 
     public function delete(Depense $depense): void
     {
+        if ($depense->rapprochement_id !== null) {
+            throw new \RuntimeException("Cette dépense est pointée dans un rapprochement et ne peut pas être supprimée.");
+        }
+
         DB::transaction(function () use ($depense) {
             $depense->lignes()->delete();
             $depense->delete();

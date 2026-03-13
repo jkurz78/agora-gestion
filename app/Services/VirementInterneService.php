@@ -29,6 +29,10 @@ final class VirementInterneService
 
     public function delete(VirementInterne $virement): void
     {
+        if ($virement->rapprochement_source_id !== null || $virement->rapprochement_destination_id !== null) {
+            throw new \RuntimeException("Ce virement est pointé dans un rapprochement et ne peut pas être supprimé.");
+        }
+
         DB::transaction(function () use ($virement) {
             $virement->delete();
         });
