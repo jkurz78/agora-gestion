@@ -25,7 +25,7 @@ final class UserController extends Controller
             'password' => $validated['password'],
         ]);
 
-        return redirect()->route('parametres.index', ['#utilisateurs-pane'])
+        return redirect()->route('parametres.utilisateurs.index')
             ->with('success', 'Utilisateur créé.');
     }
 
@@ -46,20 +46,20 @@ final class UserController extends Controller
 
         $utilisateur->save();
 
-        return redirect()->route('parametres.index', ['#utilisateurs-pane'])
+        return redirect()->route('parametres.utilisateurs.index')
             ->with('success', 'Utilisateur mis à jour.');
     }
 
     public function destroy(User $utilisateur): RedirectResponse
     {
         if ($utilisateur->id === auth()->id()) {
-            return redirect()->route('parametres.index')
+            return redirect()->route('parametres.utilisateurs.index')
                 ->with('error', 'Vous ne pouvez pas supprimer votre propre compte.');
         }
 
         $utilisateur->delete();
 
-        return redirect()->route('parametres.index', ['#utilisateurs-pane'])
+        return redirect()->route('parametres.utilisateurs.index')
             ->with('success', 'Utilisateur supprimé.');
     }
 }

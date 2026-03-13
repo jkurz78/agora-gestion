@@ -14,7 +14,7 @@ it('can store a new user', function () {
             'password' => 'motdepasse1',
             'password_confirmation' => 'motdepasse1',
         ])
-        ->assertRedirectContains(route('parametres.index'));
+        ->assertRedirectContains(route('parametres.utilisateurs.index'));
 
     $this->assertDatabaseHas('users', [
         'nom' => 'Jean Dupont',
@@ -79,7 +79,7 @@ it('can destroy a user', function () {
 
     $this->actingAs($this->user)
         ->delete(route('parametres.utilisateurs.destroy', $userToDelete))
-        ->assertRedirectContains(route('parametres.index'));
+        ->assertRedirectContains(route('parametres.utilisateurs.index'));
 
     $this->assertDatabaseMissing('users', ['id' => $userToDelete->id]);
 });

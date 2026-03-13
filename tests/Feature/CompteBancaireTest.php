@@ -15,7 +15,7 @@ it('can store a compte bancaire', function () {
             'solde_initial' => 1500.50,
             'date_solde_initial' => '2024-01-01',
         ])
-        ->assertRedirect(route('parametres.index'))
+        ->assertRedirect(route('parametres.comptes-bancaires.index'))
         ->assertSessionHas('activeTab', 'comptes');
 
     $this->assertDatabaseHas('comptes_bancaires', [
@@ -78,7 +78,7 @@ it('can store a compte bancaire without iban', function () {
             'solde_initial' => 0,
             'date_solde_initial' => '2024-01-01',
         ])
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.comptes-bancaires.index'));
 
     $this->assertDatabaseHas('comptes_bancaires', [
         'nom' => 'Caisse',
@@ -96,7 +96,7 @@ it('can update a compte bancaire', function () {
             'solde_initial' => 2000,
             'date_solde_initial' => '2024-06-01',
         ])
-        ->assertRedirect(route('parametres.index'))
+        ->assertRedirect(route('parametres.comptes-bancaires.index'))
         ->assertSessionHas('activeTab', 'comptes');
 
     $this->assertDatabaseHas('comptes_bancaires', [
@@ -110,7 +110,7 @@ it('can destroy a compte bancaire', function () {
 
     $this->actingAs($this->user)
         ->delete(route('parametres.comptes-bancaires.destroy', $compte))
-        ->assertRedirect(route('parametres.index'));
+        ->assertRedirect(route('parametres.comptes-bancaires.index'));
 
     $this->assertDatabaseMissing('comptes_bancaires', ['id' => $compte->id]);
 });
@@ -125,7 +125,7 @@ it('returns flash error when destroying a compte bancaire with linked depenses',
 
     $this->actingAs($this->user)
         ->delete(route('parametres.comptes-bancaires.destroy', $compte))
-        ->assertRedirect(route('parametres.index'))
+        ->assertRedirect(route('parametres.comptes-bancaires.index'))
         ->assertSessionHas('error');
 
     $this->assertDatabaseHas('comptes_bancaires', ['id' => $compte->id]);
