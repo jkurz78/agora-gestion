@@ -130,3 +130,90 @@ it('returns flash error when destroying a compte bancaire with linked depenses',
 
     $this->assertDatabaseHas('comptes_bancaires', ['id' => $compte->id]);
 });
+
+it('defaults actif_recettes_depenses and actif_dons_cotisations to true', function () {
+    $compte = CompteBancaire::factory()->create();
+
+    expect($compte->actif_recettes_depenses)->toBeTrue();
+    expect($compte->actif_dons_cotisations)->toBeTrue();
+});
+
+it('can store a compte bancaire with actif flags', function () {
+    $this->actingAs($this->user)
+        ->post(route('parametres.comptes-bancaires.store'), [
+            'nom' => 'Caisse',
+            'solde_initial' => 0,
+            'date_solde_initial' => '2024-01-01',
+            'actif_recettes_depenses' => '1',
+            'actif_dons_cotisations' => '0',
+        ])
+        ->assertRedirect(route('parametres.comptes-bancaires.index'))
+        ->assertSessionHas('success');
+
+    $this->assertDatabaseHas('comptes_bancaires', [
+        'nom' => 'Caisse',
+        'actif_recettes_depenses' => true,
+        'actif_dons_cotisations' => false,
+    ]);
+});
+
+it('treats missing actif checkbox as false when storing', function () {
+    $this->actingAs($this->user)
+        ->post(route('parametres.comptes-bancaires.store'), [
+            'nom' => 'Caisse sans flags',
+            'solde_initial' => 0,
+            'date_solde_initial' => '2024-01-01',
+        ])
+        ->assertRedirect(route('parametres.comptes-bancaires.index'));
+
+    $this->assertDatabaseHas('comptes_bancaires', [
+        'nom' => 'Caisse sans flags',
+        'actif_recettes_depenses' => false,
+        'actif_dons_cotisations' => false,
+    ]);
+});
+
+it('can update actif flags on a compte bancaire', function () {
+    $compte = CompteBancaire::factory()->create([
+        'actif_recettes_depenses' => true,
+        'actif_dons_cotisations' => true,
+    ]);
+
+    $this->actingAs($this->user)
+        ->put(route('parametres.comptes-bancaires.update', $compte), [
+            'nom' => $compte->nom,
+            'solde_initial' => $compte->solde_initial,
+            'date_solde_initial' => $compte->date_solde_initial->format('Y-m-d'),
+            'actif_recettes_depenses' => '0',
+            'actif_dons_cotisations' => '1',
+        ])
+        ->assertRedirect(route('parametres.comptes-bancaires.index'))
+        ->assertSessionHas('success');
+
+    $this->assertDatabaseHas('comptes_bancaires', [
+        'id' => $compte->id,
+        'actif_recettes_depenses' => false,
+        'actif_dons_cotisations' => true,
+    ]);
+});
+
+it('treats missing actif checkbox as false when updating', function () {
+    $compte = CompteBancaire::factory()->create([
+        'actif_recettes_depenses' => true,
+        'actif_dons_cotisations' => true,
+    ]);
+
+    $this->actingAs($this->user)
+        ->put(route('parametres.comptes-bancaires.update', $compte), [
+            'nom' => $compte->nom,
+            'solde_initial' => $compte->solde_initial,
+            'date_solde_initial' => $compte->date_solde_initial->format('Y-m-d'),
+        ])
+        ->assertRedirect(route('parametres.comptes-bancaires.index'));
+
+    $this->assertDatabaseHas('comptes_bancaires', [
+        'id' => $compte->id,
+        'actif_recettes_depenses' => false,
+        'actif_dons_cotisations' => false,
+    ]);
+});

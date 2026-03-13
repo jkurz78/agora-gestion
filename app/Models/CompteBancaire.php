@@ -19,6 +19,8 @@ final class CompteBancaire extends Model
         'iban',
         'solde_initial',
         'date_solde_initial',
+        'actif_recettes_depenses',
+        'actif_dons_cotisations',
     ];
 
     protected function casts(): array
@@ -26,6 +28,8 @@ final class CompteBancaire extends Model
         return [
             'solde_initial' => 'decimal:2',
             'date_solde_initial' => 'date',
+            'actif_recettes_depenses' => 'boolean',
+            'actif_dons_cotisations' => 'boolean',
         ];
     }
 

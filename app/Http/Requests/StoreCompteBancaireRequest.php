@@ -13,6 +13,14 @@ final class StoreCompteBancaireRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'actif_recettes_depenses' => $this->boolean('actif_recettes_depenses'),
+            'actif_dons_cotisations' => $this->boolean('actif_dons_cotisations'),
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -23,6 +31,8 @@ final class StoreCompteBancaireRequest extends FormRequest
             'iban' => ['nullable', 'string', 'max:34'],
             'solde_initial' => ['required', 'numeric'],
             'date_solde_initial' => ['required', 'date'],
+            'actif_recettes_depenses' => ['boolean'],
+            'actif_dons_cotisations' => ['boolean'],
         ];
     }
 }
