@@ -184,7 +184,7 @@ final class DepenseForm extends Component
             ->get();
 
         return view('livewire.depense-form', [
-            'comptes' => CompteBancaire::orderBy('nom')->get(),
+            'comptes' => CompteBancaire::where('actif_recettes_depenses', true)->orderBy('nom')->get(),
             'sousCategories' => $sousCategories,
             'operations' => Operation::where('statut', \App\Enums\StatutOperation::EnCours)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
