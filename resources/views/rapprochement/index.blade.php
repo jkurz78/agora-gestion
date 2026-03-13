@@ -1,4 +1,4 @@
 <x-app-layout>
-    <h1 class="mb-4">Rapprochement bancaire</h1>
-    <livewire:rapprochement />
+    <h1 class="mb-4">Rapprochements bancaires</h1>
+    <livewire:rapprochement-list />
 </x-app-layout>
