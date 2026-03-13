@@ -155,6 +155,76 @@ final class RapprochementBancaireService
     }
 
     /**
+     * Supprime un rapprochement "en cours" et dépointe toutes ses opérations.
+     * Lève RuntimeException si le rapprochement est verrouillé.
+     */
+    public function supprimer(RapprochementBancaire $rapprochement): void
+    {
+        if ($rapprochement->isVerrouille()) {
+            throw new RuntimeException("Impossible de supprimer un rapprochement verrouillé.");
+        }
+
+        DB::transaction(function () use ($rapprochement) {
+            $id = $rapprochement->id;
+
+            Depense::where('rapprochement_id', $id)
+                ->update(['rapprochement_id' => null, 'pointe' => false]);
+
+            Recette::where('rapprochement_id', $id)
+                ->update(['rapprochement_id' => null, 'pointe' => false]);
+
+            Don::where('rapprochement_id', $id)
+                ->update(['rapprochement_id' => null, 'pointe' => false]);
+
+            Cotisation::where('rapprochement_id', $id)
+                ->update(['rapprochement_id' => null, 'pointe' => false]);
+
+            VirementInterne::where('rapprochement_source_id', $id)
+                ->update(['rapprochement_source_id' => null]);
+
+            VirementInterne::where('rapprochement_destination_id', $id)
+                ->update(['rapprochement_destination_id' => null]);
+
+            $rapprochement->delete();
+        });
+    }
+
+    /**
+     * Déverrouille le rapprochement s'il est le dernier verrouillé du compte
+     * et qu'aucun rapprochement en cours n'existe sur ce compte.
+     */
+    public function deverrouiller(RapprochementBancaire $rapprochement): void
+    {
+        if (! $rapprochement->isVerrouille()) {
+            throw new RuntimeException("Ce rapprochement n'est pas verrouillé.");
+        }
+
+        $enCours = RapprochementBancaire::where('compte_id', $rapprochement->compte_id)
+            ->where('statut', StatutRapprochement::EnCours)
+            ->exists();
+
+        if ($enCours) {
+            throw new RuntimeException("Impossible de déverrouiller : un rapprochement est en cours sur ce compte.");
+        }
+
+        $dernierVerrouille = RapprochementBancaire::where('compte_id', $rapprochement->compte_id)
+            ->where('statut', StatutRapprochement::Verrouille)
+            ->orderByDesc('date_fin')
+            ->orderByDesc('id')
+            ->value('id');
+
+        if ($dernierVerrouille !== $rapprochement->id) {
+            throw new RuntimeException("Seul le dernier rapprochement verrouillé peut être déverrouillé.");
+        }
+
+        DB::transaction(function () use ($rapprochement) {
+            $rapprochement->statut = StatutRapprochement::EnCours;
+            $rapprochement->verrouille_at = null;
+            $rapprochement->save();
+        });
+    }
+
+    /**
      * Verrouille le rapprochement. L'écart doit être 0.
      */
     public function verrouiller(RapprochementBancaire $rapprochement): void
