@@ -38,7 +38,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::resource('sous-categories', SousCategorieController::class)->except(['show']);
         Route::resource('comptes-bancaires', CompteBancaireController::class)->except(['show']);
-        Route::resource('utilisateurs', UserController::class)->only(['store', 'destroy']);
+        Route::resource('utilisateurs', UserController::class)->only(['store', 'update', 'destroy']);
     });
 });
 
