@@ -9,14 +9,24 @@ use App\Services\ExerciceService;
 use App\Services\VirementInterneService;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 final class VirementInterneList extends Component
 {
+    use WithPagination;
+
+    protected string $paginationTheme = 'bootstrap';
+
     public ?int $exercice = null;
 
     public function mount(): void
     {
         $this->exercice = app(ExerciceService::class)->current();
+    }
+
+    public function updatedExercice(): void
+    {
+        $this->resetPage();
     }
 
     #[On('virement-saved')]
@@ -33,7 +43,7 @@ final class VirementInterneList extends Component
         $virements = VirementInterne::with(['compteSource', 'compteDestination', 'saisiPar'])
             ->when($this->exercice, fn ($q) => $q->forExercice($this->exercice))
             ->orderByDesc('date')
-            ->get();
+            ->paginate(20);
 
         return view('livewire.virement-interne-list', [
             'virements' => $virements,
