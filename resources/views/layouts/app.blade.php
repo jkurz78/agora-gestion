@@ -53,17 +53,28 @@
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <span class="nav-link text-light">
-                            <i class="bi bi-person-circle"></i> {{ auth()->user()->nom }}
-                        </span>
-                    </li>
-                    <li class="nav-item">
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button type="submit" class="nav-link border-0 bg-transparent text-light px-0">
-                                <i class="bi bi-box-arrow-right"></i> Déconnexion
+                        <div class="dropdown">
+                            <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button"
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-person-circle"></i> {{ auth()->user()->nom }}
                             </button>
-                        </form>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" href="{{ route('profil.index') }}">
+                                        <i class="bi bi-person"></i> Mon profil
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form method="POST" action="{{ route('logout') }}">
+                                        @csrf
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <i class="bi bi-box-arrow-right"></i> Déconnexion
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
                     </li>
                 </ul>
             </div>
