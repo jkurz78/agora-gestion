@@ -58,50 +58,46 @@
 
     {{-- Depenses table --}}
     <div class="table-responsive">
-        <table class="table table-striped table-hover">
+        <table class="table table-sm table-striped table-hover">
             <thead class="table-dark">
                 <tr>
                     <th>Date</th>
+                    <th>Réf.</th>
                     <th>Libellé</th>
-                    <th>Référence</th>
-                    <th class="text-end">Montant</th>
-                    <th>Mode paiement</th>
                     <th>Bénéficiaire</th>
-                    <th>Pointé</th>
-                    <th style="width: 140px;">Actions</th>
+                    <th>Mode</th>
+                    <th class="text-end">Montant</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($depenses as $depense)
-                    <tr>
-                        <td>{{ $depense->date->format('d/m/Y') }}</td>
+                    <tr wire:key="depense-{{ $depense->id }}">
+                        <td class="text-nowrap">{{ $depense->date->format('d/m/Y') }}</td>
+                        <td class="text-muted small">{{ $depense->reference ?? '—' }}</td>
                         <td>{{ $depense->libelle }}</td>
-                        <td>{{ $depense->reference ?? '-' }}</td>
-                        <td class="text-end">{{ number_format((float) $depense->montant_total, 2, ',', ' ') }} &euro;</td>
-                        <td>{{ $depense->mode_paiement->label() }}</td>
-                        <td>{{ $depense->beneficiaire ?? '-' }}</td>
-                        <td>
-                            @if ($depense->pointe)
-                                <span class="badge bg-success">Oui</span>
-                            @else
-                                <span class="badge bg-secondary">Non</span>
-                            @endif
+                        <td>{{ $depense->beneficiaire ?? '—' }}</td>
+                        <td><span class="badge bg-secondary">{{ $depense->mode_paiement->label() }}</span></td>
+                        <td class="text-end text-danger fw-semibold text-nowrap">
+                            {{ number_format((float) $depense->montant_total, 2, ',', ' ') }} €
                         </td>
                         <td>
-                            <button wire:click="$dispatch('edit-depense', { id: {{ $depense->id }} })"
-                                    class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-pencil"></i> Modifier
-                            </button>
-                            <button wire:click="delete({{ $depense->id }})"
-                                    wire:confirm="Supprimer cette dépense ?"
-                                    class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                            <div class="d-flex gap-1 justify-content-end">
+                                <button wire:click="$dispatch('edit-depense', { id: {{ $depense->id }} })"
+                                        class="btn btn-sm btn-outline-primary" title="Modifier">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button wire:click="delete({{ $depense->id }})"
+                                        wire:confirm="Supprimer cette dépense ?"
+                                        class="btn btn-sm btn-outline-danger" title="Supprimer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-muted text-center">Aucune dépense trouvée.</td>
+                        <td colspan="7" class="text-muted text-center">Aucune dépense trouvée.</td>
                     </tr>
                 @endforelse
             </tbody>
