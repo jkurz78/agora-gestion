@@ -79,7 +79,11 @@ final class DepenseList extends Component
     public function delete(int $id): void
     {
         $depense = Depense::findOrFail($id);
-        app(DepenseService::class)->delete($depense);
+        try {
+            app(DepenseService::class)->delete($depense);
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
     }
 
     #[On('depense-saved')]

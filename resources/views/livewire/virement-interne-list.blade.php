@@ -1,4 +1,11 @@
 <div>
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     @if ($virements->isEmpty())
         <p class="text-muted">Aucun virement enregistré pour cet exercice.</p>
     @else
@@ -31,11 +38,18 @@
                                         class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-pencil"></i> Modifier
                                 </button>
-                                <button wire:click="delete({{ $virement->id }})"
-                                        wire:confirm="Supprimer ce virement ?"
-                                        class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                @if ($virement->rapprochement_source_id !== null || $virement->rapprochement_destination_id !== null)
+                                    <button class="btn btn-sm btn-outline-danger" disabled
+                                            title="Dépointez ce virement avant de le supprimer.">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @else
+                                    <button wire:click="delete({{ $virement->id }})"
+                                            wire:confirm="Supprimer ce virement ?"
+                                            class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @endif
                             </td>
                         </tr>
                     @endforeach

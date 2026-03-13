@@ -1,4 +1,11 @@
 <div>
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     <div class="card mb-4">
         <div class="card-header">
             <h5 class="mb-0">Cotisations</h5>
@@ -30,11 +37,18 @@
                                 @endif
                             </td>
                             <td>
-                                <button wire:click="delete({{ $cotisation->id }})"
-                                        wire:confirm="Supprimer cette cotisation ?"
-                                        class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                @if ($cotisation->pointe)
+                                    <button class="btn btn-sm btn-outline-danger" disabled
+                                            title="Dépointez cette cotisation avant de la supprimer.">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @else
+                                    <button wire:click="delete({{ $cotisation->id }})"
+                                            wire:confirm="Supprimer cette cotisation ?"
+                                            class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @endif
                             </td>
                         </tr>
                     @empty

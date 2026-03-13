@@ -60,7 +60,13 @@ final class CotisationForm extends Component
     {
         $cotisation = Cotisation::findOrFail($id);
 
-        app(CotisationService::class)->delete($cotisation);
+        try {
+            app(CotisationService::class)->delete($cotisation);
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return;
+        }
 
         $this->membre->load('cotisations.compte');
     }

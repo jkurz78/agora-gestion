@@ -79,7 +79,11 @@ final class RecetteList extends Component
     public function delete(int $id): void
     {
         $recette = Recette::findOrFail($id);
-        app(RecetteService::class)->delete($recette);
+        try {
+            app(RecetteService::class)->delete($recette);
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
     }
 
     #[On('recette-saved')]

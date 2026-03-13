@@ -1,4 +1,11 @@
 <div>
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     {{-- Filter row --}}
     <div class="card mb-4">
         <div class="card-body">
@@ -87,11 +94,18 @@
                                         class="btn btn-sm btn-outline-primary" title="Modifier">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <button wire:click="delete({{ $recette->id }})"
-                                        wire:confirm="Supprimer cette recette ?"
-                                        class="btn btn-sm btn-outline-danger" title="Supprimer">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                @if ($recette->pointe)
+                                    <button class="btn btn-sm btn-outline-danger" disabled
+                                            title="Dépointez cette recette avant de la supprimer.">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @else
+                                    <button wire:click="delete({{ $recette->id }})"
+                                            wire:confirm="Supprimer cette recette ?"
+                                            class="btn btn-sm btn-outline-danger" title="Supprimer">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @endif
                             </div>
                         </td>
                     </tr>

@@ -54,7 +54,11 @@ final class DonList extends Component
     public function delete(int $id): void
     {
         $don = Don::findOrFail($id);
-        app(DonService::class)->delete($don);
+        try {
+            app(DonService::class)->delete($don);
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
     }
 
     #[On('don-saved')]
