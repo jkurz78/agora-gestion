@@ -8,6 +8,7 @@ use App\Http\Controllers\OperationController;
 use App\Http\Controllers\ParametreController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
+use App\Models\RapprochementBancaire;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -21,6 +22,9 @@ Route::middleware('auth')->group(function () {
     Route::view('/dons', 'dons.index')->name('dons.index');
     Route::view('/budget', 'budget.index')->name('budget.index');
     Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
+    Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
+        return view('rapprochement.detail', compact('rapprochement'));
+    })->name('rapprochement.detail');
     Route::view('/virements', 'virements.index')->name('virements.index');
     Route::view('/rapports', 'rapports.index')->name('rapports.index');
 
