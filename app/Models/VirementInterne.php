@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\RapprochementBancaire;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +25,8 @@ final class VirementInterne extends Model
         'reference',
         'notes',
         'saisi_par',
+        'rapprochement_source_id',
+        'rapprochement_destination_id',
     ];
 
     protected function casts(): array
@@ -47,6 +50,26 @@ final class VirementInterne extends Model
     public function saisiPar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'saisi_par');
+    }
+
+    public function rapprochementSource(): BelongsTo
+    {
+        return $this->belongsTo(RapprochementBancaire::class, 'rapprochement_source_id');
+    }
+
+    public function rapprochementDestination(): BelongsTo
+    {
+        return $this->belongsTo(RapprochementBancaire::class, 'rapprochement_destination_id');
+    }
+
+    public function isLockedByRapprochement(): bool
+    {
+        $lockedBySource = $this->rapprochement_source_id !== null
+            && $this->rapprochementSource?->isVerrouille() === true;
+        $lockedByDestination = $this->rapprochement_destination_id !== null
+            && $this->rapprochementDestination?->isVerrouille() === true;
+
+        return $lockedBySource || $lockedByDestination;
     }
 
     /**
