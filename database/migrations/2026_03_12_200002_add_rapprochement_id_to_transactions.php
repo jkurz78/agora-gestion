@@ -10,8 +10,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        foreach (['depenses', 'recettes', 'dons', 'cotisations'] as $table) {
-            Schema::table($table, function (Blueprint $table) {
+        foreach (['depenses', 'recettes', 'dons', 'cotisations'] as $tableName) {
+            Schema::table($tableName, function (Blueprint $table) {
                 $table->foreignId('rapprochement_id')
                     ->nullable()
                     ->after('pointe')
