@@ -108,7 +108,7 @@ final class TransactionCompteList extends Component
     private function deleteDon(int $id): void
     {
         $don = Don::find($id);
-        if (! $don) {
+        if (! $don || $don->isLockedByRapprochement()) {
             return;
         }
         app(DonService::class)->delete($don);
@@ -117,7 +117,7 @@ final class TransactionCompteList extends Component
     private function deleteCotisation(int $id): void
     {
         $cotisation = Cotisation::find($id);
-        if (! $cotisation) {
+        if (! $cotisation || $cotisation->isLockedByRapprochement()) {
             return;
         }
         app(CotisationService::class)->delete($cotisation);
