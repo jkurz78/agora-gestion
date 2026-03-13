@@ -32,6 +32,7 @@
                             ['route' => 'depenses.index',      'icon' => 'arrow-down-circle',      'label' => 'Dépenses'],
                             ['route' => 'recettes.index',      'icon' => 'arrow-up-circle',        'label' => 'Recettes'],
                             ['route' => 'virements.index',     'icon' => 'arrow-left-right',       'label' => 'Virements'],
+                            ['route' => 'comptes-bancaires.transactions', 'icon' => 'list-ul',     'label' => 'Transactions'],
                             ['route' => 'budget.index',        'icon' => 'piggy-bank',             'label' => 'Budget'],
                             ['route' => 'rapprochement.index', 'icon' => 'bank',                   'label' => 'Rapprochement'],
                             ['route' => 'membres.index',       'icon' => 'people',                 'label' => 'Membres'],
