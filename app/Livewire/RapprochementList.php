@@ -30,6 +30,7 @@ final class RapprochementList extends Component
     public function create(): void
     {
         $this->validate([
+            'compte_id' => ['required', 'exists:comptes_bancaires,id'],
             'date_fin' => ['required', 'date'],
             'solde_fin' => ['required', 'numeric'],
         ]);

@@ -198,7 +198,8 @@
                         @endif
                         <div class="ms-auto">
                             <button type="button" wire:click="resetForm" class="btn btn-secondary">Annuler</button>
-                            <button type="submit" class="btn btn-success">
+                            <button type="submit" class="btn btn-success"
+                                    @if ($isLocked) title="Certains champs sont verrouillés et ne pourront pas être modifiés." @endif>
                                 {{ $recetteId ? 'Mettre à jour' : 'Enregistrer' }}
                             </button>
                         </div>
