@@ -16,6 +16,10 @@ final class CotisationService
 
     public function delete(Cotisation $cotisation): void
     {
+        if ($cotisation->rapprochement_id !== null) {
+            throw new \RuntimeException("Cette cotisation est pointée dans un rapprochement et ne peut pas être supprimée.");
+        }
+
         $cotisation->delete();
     }
 }

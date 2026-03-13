@@ -33,6 +33,10 @@ final class DonService
 
     public function delete(Don $don): void
     {
+        if ($don->rapprochement_id !== null) {
+            throw new \RuntimeException("Ce don est pointé dans un rapprochement et ne peut pas être supprimé.");
+        }
+
         $don->delete();
     }
 }

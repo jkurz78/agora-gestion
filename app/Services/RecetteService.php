@@ -37,6 +37,10 @@ final class RecetteService
 
     public function delete(Recette $recette): void
     {
+        if ($recette->rapprochement_id !== null) {
+            throw new \RuntimeException("Cette recette est pointée dans un rapprochement et ne peut pas être supprimée.");
+        }
+
         DB::transaction(function () use ($recette) {
             $recette->lignes()->delete();
             $recette->delete();
