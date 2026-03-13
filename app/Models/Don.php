@@ -30,6 +30,7 @@ final class Don extends Model
         'recu_emis',
         'saisi_par',
         'rapprochement_id',
+        'numero_piece',
     ];
 
     protected function casts(): array
