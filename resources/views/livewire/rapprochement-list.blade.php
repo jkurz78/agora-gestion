@@ -86,7 +86,7 @@
                     </thead>
                     <tbody>
                         @foreach ($rapprochements as $rapprochement)
-                            <tr>
+                            <tr wire:key="rapprochement-{{ $rapprochement->id }}"
                                 <td>{{ $rapprochement->date_fin->format('d/m/Y') }}</td>
                                 <td class="text-end">{{ number_format((float) $rapprochement->solde_ouverture, 2, ',', ' ') }} €</td>
                                 <td class="text-end">{{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €</td>
