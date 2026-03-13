@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Don;
 use App\Models\Donateur;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 final class DonService
@@ -19,6 +20,7 @@ final class DonService
             }
 
             $data['saisi_par'] = auth()->id();
+            $data['numero_piece'] = app(NumeroPieceService::class)->assign(Carbon::parse($data['date']));
 
             return Don::create($data);
         });
@@ -34,7 +36,7 @@ final class DonService
     public function delete(Don $don): void
     {
         if ($don->rapprochement_id !== null) {
-            throw new \RuntimeException("Ce don est pointé dans un rapprochement et ne peut pas être supprimé.");
+            throw new \RuntimeException('Ce don est pointé dans un rapprochement et ne peut pas être supprimé.');
         }
 
         $don->delete();
