@@ -147,7 +147,7 @@ final class DonForm extends Component
         return view('livewire.don-form', [
             'donateurs' => Donateur::orderBy('nom')->orderBy('prenom')->get(),
             'operations' => Operation::orderBy('nom')->get(),
-            'comptes' => CompteBancaire::orderBy('nom')->get(),
+            'comptes' => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
         ]);
     }

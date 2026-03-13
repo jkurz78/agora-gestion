@@ -77,7 +77,7 @@ final class CotisationForm extends Component
 
         return view('livewire.cotisation-form', [
             'cotisations' => $this->membre->cotisations()->with('compte')->latest()->get(),
-            'comptes' => CompteBancaire::orderBy('nom')->get(),
+            'comptes' => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
             'exercices' => $exerciceService->available(),
             'exerciceService' => $exerciceService,
