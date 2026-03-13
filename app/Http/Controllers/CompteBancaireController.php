@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreCompteBancaireRequest;
 use App\Http\Requests\UpdateCompteBancaireRequest;
 use App\Models\CompteBancaire;
+use App\Models\VirementInterne;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -47,17 +48,37 @@ final class CompteBancaireController extends Controller
 
     public function destroy(CompteBancaire $comptesBancaire): RedirectResponse
     {
-        try {
-            $comptesBancaire->delete();
+        // Vérifier les transactions actives et archivées (soft-deleted)
+        $actives = $comptesBancaire->recettes()->count()
+            + $comptesBancaire->depenses()->count()
+            + $comptesBancaire->dons()->count()
+            + $comptesBancaire->cotisations()->count()
+            + VirementInterne::where('compte_source_id', $comptesBancaire->id)
+                ->orWhere('compte_destination_id', $comptesBancaire->id)
+                ->count();
 
+        $archivees = $comptesBancaire->recettes()->onlyTrashed()->count()
+            + $comptesBancaire->depenses()->onlyTrashed()->count()
+            + $comptesBancaire->dons()->onlyTrashed()->count()
+            + $comptesBancaire->cotisations()->onlyTrashed()->count()
+            + VirementInterne::onlyTrashed()
+                ->where(fn ($q) => $q->where('compte_source_id', $comptesBancaire->id)
+                    ->orWhere('compte_destination_id', $comptesBancaire->id))
+                ->count();
+
+        if ($actives > 0) {
             return redirect()->route('parametres.comptes-bancaires.index')
-                ->with('success', 'Compte bancaire supprimé avec succès.');
-        } catch (\Illuminate\Database\QueryException $e) {
-            if ($e->getCode() === '23000') {
-                return redirect()->route('parametres.comptes-bancaires.index')
-                    ->with('error', 'Suppression impossible : cet élément est utilisé dans les données de l\'application.');
-            }
-            throw $e;
+                ->with('error', "Suppression impossible : ce compte a {$actives} transaction(s) active(s).");
         }
+
+        if ($archivees > 0) {
+            return redirect()->route('parametres.comptes-bancaires.index')
+                ->with('error', "Suppression impossible : ce compte a {$archivees} transaction(s) archivée(s) (supprimées mais conservées pour la traçabilité). Purgez-les d'abord si nécessaire.");
+        }
+
+        $comptesBancaire->delete();
+
+        return redirect()->route('parametres.comptes-bancaires.index')
+            ->with('success', 'Compte bancaire supprimé avec succès.');
     }
 }
