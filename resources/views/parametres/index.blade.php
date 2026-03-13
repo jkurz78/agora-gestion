@@ -274,32 +274,38 @@
 
         {{-- ========== Utilisateurs ========== --}}
         <div class="tab-pane fade" id="utilisateurs-pane" role="tabpanel" aria-labelledby="utilisateurs-tab">
+            {{-- Formulaire d'ajout --}}
             <div class="mb-3">
-                <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
-                        data-bs-target="#addUserForm">
+                <button class="btn btn-primary btn-sm" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#addUserForm">
                     <i class="bi bi-plus-lg"></i> Ajouter un utilisateur
                 </button>
             </div>
-
             <div class="collapse mb-3" id="addUserForm">
                 <div class="card card-body">
                     <form action="{{ route('parametres.utilisateurs.store') }}" method="POST" class="row g-2 align-items-end">
                         @csrf
                         <div class="col-md-3">
-                            <label for="usr_nom" class="form-label">Nom</label>
-                            <input type="text" name="nom" id="usr_nom" class="form-control" required>
+                            <label class="form-label">Nom</label>
+                            <input type="text" name="nom" class="form-control @error('nom') is-invalid @enderror"
+                                   value="{{ old('nom') }}" required maxlength="100">
+                            @error('nom') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-3">
-                            <label for="usr_email" class="form-label">Email</label>
-                            <input type="email" name="email" id="usr_email" class="form-control" required>
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control @error('email') is-invalid @enderror"
+                                   value="{{ old('email') }}" required maxlength="150">
+                            @error('email') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
-                            <label for="usr_password" class="form-label">Mot de passe</label>
-                            <input type="password" name="password" id="usr_password" class="form-control" required minlength="8">
+                            <label class="form-label">Mot de passe</label>
+                            <input type="password" name="password" class="form-control @error('password') is-invalid @enderror"
+                                   required>
+                            @error('password') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
-                            <label for="usr_password_confirm" class="form-label">Confirmer</label>
-                            <input type="password" name="password_confirmation" id="usr_password_confirm" class="form-control" required>
+                            <label class="form-label">Confirmer</label>
+                            <input type="password" name="password_confirmation" class="form-control" required>
                         </div>
                         <div class="col-md-2">
                             <button type="submit" class="btn btn-success w-100">Enregistrer</button>
@@ -308,34 +314,69 @@
                 </div>
             </div>
 
-            <table class="table table-striped table-hover">
+            {{-- Table des utilisateurs --}}
+            <table class="table table-sm table-striped table-hover">
                 <thead class="table-dark">
-                    <tr>
-                        <th>Nom</th>
-                        <th>Email</th>
-                        <th style="width: 120px;">Actions</th>
-                    </tr>
+                    <tr><th>Nom</th><th>Email</th><th style="width:100px;"></th></tr>
                 </thead>
                 <tbody>
-                    @forelse ($utilisateurs as $user)
+                    @forelse ($utilisateurs as $utilisateur)
                         <tr>
-                            <td>{{ $user->nom }}</td>
-                            <td>{{ $user->email }}</td>
+                            <td>{{ $utilisateur->nom }}</td>
+                            <td>{{ $utilisateur->email }}</td>
                             <td>
-                                <form action="{{ route('parametres.utilisateurs.destroy', $user) }}" method="POST" class="d-inline"
-                                      onsubmit="return confirm('Supprimer cet utilisateur ?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="bi bi-trash"></i>
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-sm btn-outline-primary"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#editUser{{ $utilisateur->id }}"
+                                            title="Modifier">
+                                        <i class="bi bi-pencil"></i>
                                     </button>
+                                    @if ($utilisateur->id !== auth()->id())
+                                        <form method="POST"
+                                              action="{{ route('parametres.utilisateurs.destroy', $utilisateur) }}"
+                                              onsubmit="return confirm('Supprimer cet utilisateur ?')">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                        {{-- Formulaire d'édition en collapse --}}
+                        <tr class="collapse" id="editUser{{ $utilisateur->id }}">
+                            <td colspan="3" class="bg-light">
+                                <form action="{{ route('parametres.utilisateurs.update', $utilisateur) }}"
+                                      method="POST" class="row g-2 align-items-end p-2">
+                                    @csrf @method('PUT')
+                                    <div class="col-md-3">
+                                        <label class="form-label">Nom</label>
+                                        <input type="text" name="nom" class="form-control"
+                                               value="{{ $utilisateur->nom }}" required maxlength="100">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" name="email" class="form-control"
+                                               value="{{ $utilisateur->email }}" required maxlength="150">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Nouveau mdp <span class="text-muted">(opt.)</span></label>
+                                        <input type="password" name="password" class="form-control">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">Confirmer</label>
+                                        <input type="password" name="password_confirmation" class="form-control">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="submit" class="btn btn-success w-100">Mettre à jour</button>
+                                    </div>
                                 </form>
                             </td>
                         </tr>
                     @empty
-                        <tr>
-                            <td colspan="3" class="text-muted">Aucun utilisateur enregistré.</td>
-                        </tr>
+                        <tr><td colspan="3" class="text-muted">Aucun utilisateur.</td></tr>
                     @endforelse
                 </tbody>
             </table>

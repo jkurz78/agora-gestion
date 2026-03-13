@@ -4,25 +4,63 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreUserRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 
 final class UserController extends Controller
 {
-    public function store(StoreUserRequest $request): RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
-        User::create($request->validated());
+        $validated = $request->validate([
+            'nom' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:150', 'unique:users,email'],
+            'password' => ['required', 'confirmed', Password::defaults()],
+        ]);
 
-        return redirect()->route('parametres.index')
-            ->with('success', 'Utilisateur créé avec succès.');
+        User::create([
+            'nom' => $validated['nom'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        return redirect()->route('parametres.index', ['#utilisateurs-pane'])
+            ->with('success', 'Utilisateur créé.');
+    }
+
+    public function update(Request $request, User $utilisateur): RedirectResponse
+    {
+        $validated = $request->validate([
+            'nom' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:150', "unique:users,email,{$utilisateur->id}"],
+            'password' => ['nullable', 'confirmed', Password::defaults()],
+        ]);
+
+        $utilisateur->nom = $validated['nom'];
+        $utilisateur->email = $validated['email'];
+
+        if (! empty($validated['password'])) {
+            $utilisateur->password = Hash::make($validated['password']);
+        }
+
+        $utilisateur->save();
+
+        return redirect()->route('parametres.index', ['#utilisateurs-pane'])
+            ->with('success', 'Utilisateur mis à jour.');
     }
 
     public function destroy(User $utilisateur): RedirectResponse
     {
+        if ($utilisateur->id === auth()->id()) {
+            return redirect()->route('parametres.index')
+                ->with('error', 'Vous ne pouvez pas supprimer votre propre compte.');
+        }
+
         $utilisateur->delete();
 
-        return redirect()->route('parametres.index')
-            ->with('success', 'Utilisateur supprimé avec succès.');
+        return redirect()->route('parametres.index', ['#utilisateurs-pane'])
+            ->with('success', 'Utilisateur supprimé.');
     }
 }
