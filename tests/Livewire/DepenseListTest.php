@@ -88,3 +88,17 @@ it('filters depenses by tiers', function () {
         ->assertSee('Dépense Alpha')
         ->assertDontSee('Dépense Beta');
 });
+
+it('affiche la colonne N° dans la liste des dépenses', function () {
+    $compte = \App\Models\CompteBancaire::factory()->create();
+    Depense::factory()->create([
+        'numero_piece' => '2025-2026:00001',
+        'compte_id'    => $compte->id,
+        'saisi_par'    => $this->user->id,
+        'date'         => '2025-10-01',
+    ]);
+
+    Livewire::test(DepenseList::class)
+        ->assertSee('N°')
+        ->assertSee('2025-2026:00001');
+});

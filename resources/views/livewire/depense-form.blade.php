@@ -13,6 +13,14 @@
                     <i class="bi bi-x-lg"></i> Annuler
                 </button>
             </div>
+            @if ($depenseId)
+                @php $depenseModel = \App\Models\Depense::find($depenseId); @endphp
+                @if ($depenseModel?->numero_piece)
+                    <div class="px-3 pt-2 text-muted small">
+                        N° pièce : <strong>{{ $depenseModel->numero_piece }}</strong>
+                    </div>
+                @endif
+            @endif
             <div class="card-body">
                 <form wire:submit="save">
                     <div class="row g-3 mb-4">

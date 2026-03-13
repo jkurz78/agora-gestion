@@ -32,6 +32,7 @@
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-dark">
                     <tr>
+                        <th>N° pièce</th>
                         <th>
                             <a href="#" wire:click.prevent="sortBy('date')" class="text-white text-decoration-none">
                                 Date
@@ -76,6 +77,7 @@
                 <tbody>
                     @forelse ($transactions as $tx)
                         <tr>
+                            <td class="text-muted small">{{ $tx->numero_piece ?? '—' }}</td>
                             <td>{{ \Carbon\Carbon::parse($tx->date)->format('d/m/Y') }}</td>
                             <td>{{ $tx->type_label }}</td>
                             <td>{{ $tx->tiers ?? '—' }}</td>
@@ -112,7 +114,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $showSolde ? 9 : 8 }}" class="text-center text-muted">
+                            <td colspan="{{ $showSolde ? 10 : 9 }}" class="text-center text-muted">
                                 Aucune transaction trouvée.
                             </td>
                         </tr>

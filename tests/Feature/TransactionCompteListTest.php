@@ -139,3 +139,17 @@ it('reset la pagination quand le compte change', function () {
     // La page doit être revenue à 1 (pas d'erreur de pagination)
     $component->assertSet('compteId', $autreCompte->id);
 });
+
+it('affiche la colonne N° pièce dans les transactions du compte', function () {
+    Recette::factory()->create([
+        'numero_piece' => '2025-2026:00042',
+        'compte_id'    => $this->compte->id,
+        'saisi_par'    => $this->user->id,
+        'date'         => '2025-10-01',
+    ]);
+
+    Livewire::test(TransactionCompteList::class)
+        ->set('compteId', $this->compte->id)
+        ->assertSee('N° pièce')
+        ->assertSee('2025-2026:00042');
+});

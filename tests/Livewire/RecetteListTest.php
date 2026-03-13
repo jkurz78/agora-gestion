@@ -88,3 +88,17 @@ it('filters recettes by tiers', function () {
         ->assertSee('Recette Gamma')
         ->assertDontSee('Recette Delta');
 });
+
+it('affiche la colonne N° dans la liste des recettes', function () {
+    $compte = \App\Models\CompteBancaire::factory()->create();
+    Recette::factory()->create([
+        'numero_piece' => '2025-2026:00001',
+        'compte_id'    => $compte->id,
+        'saisi_par'    => $this->user->id,
+        'date'         => '2025-10-01',
+    ]);
+
+    Livewire::test(RecetteList::class)
+        ->assertSee('N°')
+        ->assertSee('2025-2026:00001');
+});

@@ -128,6 +128,18 @@ it('can load existing recette for editing', function () {
         ->assertCount('lignes', 1);
 });
 
+it('affiche le numero_piece en mode édition', function () {
+    $recette = Recette::factory()->create([
+        'numero_piece' => '2025-2026:00007',
+        'compte_id'    => $this->compte->id,
+        'saisi_par'    => $this->user->id,
+    ]);
+
+    Livewire::test(RecetteForm::class)
+        ->call('edit', $recette->id)
+        ->assertSee('2025-2026:00007');
+});
+
 it('can update a recette', function () {
     $recette = Recette::factory()->create([
         'libelle' => 'Ancienne recette',

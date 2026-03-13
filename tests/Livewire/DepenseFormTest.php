@@ -128,6 +128,18 @@ it('can load existing depense for editing', function () {
         ->assertCount('lignes', 1);
 });
 
+it('affiche le numero_piece en mode édition', function () {
+    $depense = Depense::factory()->create([
+        'numero_piece' => '2025-2026:00008',
+        'compte_id'    => $this->compte->id,
+        'saisi_par'    => $this->user->id,
+    ]);
+
+    Livewire::test(DepenseForm::class)
+        ->call('edit', $depense->id)
+        ->assertSee('2025-2026:00008');
+});
+
 it('can update a depense', function () {
     $depense = Depense::factory()->create([
         'libelle' => 'Ancienne dépense',

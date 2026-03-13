@@ -68,6 +68,7 @@
         <table class="table table-sm table-striped table-hover">
             <thead class="table-dark">
                 <tr>
+                    <th>N°</th>
                     <th>Date</th>
                     <th>Réf.</th>
                     <th>Libellé</th>
@@ -80,6 +81,7 @@
             <tbody>
                 @forelse ($recettes as $recette)
                     <tr wire:key="recette-{{ $recette->id }}">
+                        <td class="text-muted small">{{ $recette->numero_piece ?? '—' }}</td>
                         <td class="text-nowrap">{{ $recette->date->format('d/m/Y') }}</td>
                         <td class="text-muted small">{{ $recette->reference ?? '—' }}</td>
                         <td>{{ $recette->libelle }}</td>
@@ -111,7 +113,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-muted text-center">Aucune recette trouvée.</td>
+                        <td colspan="8" class="text-muted text-center">Aucune recette trouvée.</td>
                     </tr>
                 @endforelse
             </tbody>
