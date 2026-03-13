@@ -14,7 +14,7 @@ return new class extends Migration
 
         foreach ($tables as $table) {
             Schema::table($table, function (Blueprint $blueprint): void {
-                $blueprint->string('numero_piece', 20)->nullable()->unique()->after('id');
+                $blueprint->string('numero_piece', 20)->nullable()->unique()->after('id'); // unique par table ; l'unicité globale est garantie par la table sequences
             });
         }
     }
