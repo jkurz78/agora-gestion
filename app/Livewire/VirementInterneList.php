@@ -38,7 +38,7 @@ final class VirementInterneList extends Component
         app(VirementInterneService::class)->delete($virement);
     }
 
-    public function render()
+    public function render(): \Illuminate\View\View
     {
         $virements = VirementInterne::with(['compteSource', 'compteDestination', 'saisiPar'])
             ->when($this->exercice, fn ($q) => $q->forExercice($this->exercice))
