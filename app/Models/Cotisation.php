@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\ModePaiement;
+use App\Models\RapprochementBancaire;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +24,7 @@ final class Cotisation extends Model
         'mode_paiement',
         'compte_id',
         'pointe',
+        'rapprochement_id',
     ];
 
     protected function casts(): array
@@ -43,6 +45,11 @@ final class Cotisation extends Model
     public function compte(): BelongsTo
     {
         return $this->belongsTo(CompteBancaire::class, 'compte_id');
+    }
+
+    public function rapprochement(): BelongsTo
+    {
+        return $this->belongsTo(RapprochementBancaire::class, 'rapprochement_id');
     }
 
     /**

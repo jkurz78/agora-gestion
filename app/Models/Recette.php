@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\ModePaiement;
+use App\Models\RapprochementBancaire;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +28,7 @@ final class Recette extends Model
         'pointe',
         'notes',
         'saisi_par',
+        'rapprochement_id',
     ];
 
     protected function casts(): array
@@ -52,6 +54,17 @@ final class Recette extends Model
     public function compte(): BelongsTo
     {
         return $this->belongsTo(CompteBancaire::class, 'compte_id');
+    }
+
+    public function rapprochement(): BelongsTo
+    {
+        return $this->belongsTo(RapprochementBancaire::class, 'rapprochement_id');
+    }
+
+    public function isLockedByRapprochement(): bool
+    {
+        return $this->rapprochement_id !== null
+            && $this->rapprochement?->isVerrouille() === true;
     }
 
     public function lignes(): HasMany

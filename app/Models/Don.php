@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\ModePaiement;
+use App\Models\RapprochementBancaire;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,7 @@ final class Don extends Model
         'pointe',
         'recu_emis',
         'saisi_par',
+        'rapprochement_id',
     ];
 
     protected function casts(): array
@@ -60,6 +62,11 @@ final class Don extends Model
     public function operation(): BelongsTo
     {
         return $this->belongsTo(Operation::class);
+    }
+
+    public function rapprochement(): BelongsTo
+    {
+        return $this->belongsTo(RapprochementBancaire::class, 'rapprochement_id');
     }
 
     /**
