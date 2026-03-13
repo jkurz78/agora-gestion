@@ -5,7 +5,6 @@ use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MembreController;
 use App\Http\Controllers\OperationController;
-use App\Http\Controllers\ParametreController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
 use App\Models\RapprochementBancaire;
@@ -34,12 +33,11 @@ Route::middleware('auth')->group(function () {
     Route::resource('operations', OperationController::class)->except(['destroy']);
 
     // Parametres
-    Route::get('/parametres', [ParametreController::class, 'index'])->name('parametres.index');
     Route::prefix('parametres')->name('parametres.')->group(function () {
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::resource('sous-categories', SousCategorieController::class)->except(['show']);
         Route::resource('comptes-bancaires', CompteBancaireController::class)->except(['show']);
-        Route::resource('utilisateurs', UserController::class)->only(['store', 'update', 'destroy']);
+        Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 });
 
