@@ -17,10 +17,17 @@
                 <form wire:submit="save">
                     <div class="row g-3 mb-4">
                         <div class="col-md-2">
-                            <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
-                            <input type="date" wire:model="date" id="date"
-                                   class="form-control @error('date') is-invalid @enderror">
-                            @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <label for="date" class="form-label">
+                                Date <span class="text-danger">*</span>
+                                @if ($isLocked) <i class="bi bi-lock text-warning" title="Champ verrouillé par un rapprochement"></i> @endif
+                            </label>
+                            @if ($isLocked)
+                                <input type="text" value="{{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}" class="form-control bg-light" disabled>
+                            @else
+                                <input type="date" wire:model="date" id="date"
+                                       class="form-control @error('date') is-invalid @enderror">
+                                @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            @endif
                         </div>
                         <div class="col-md-2">
                             <label for="reference" class="form-label">Référence</label>
@@ -48,16 +55,27 @@
                             @error('mode_paiement') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-3">
-                            <label for="compte_id" class="form-label">Compte bancaire</label>
-                            <select wire:model="compte_id" id="compte_id" class="form-select">
-                                <option value="">-- Aucun --</option>
-                                @foreach ($comptes as $compte)
-                                    <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
-                                @endforeach
-                            </select>
+                            <label for="compte_id" class="form-label">
+                                Compte bancaire
+                                @if ($isLocked) <i class="bi bi-lock text-warning" title="Champ verrouillé par un rapprochement"></i> @endif
+                            </label>
+                            @if ($isLocked)
+                                <input type="text" value="{{ $comptes->firstWhere('id', $compte_id)?->nom ?? '—' }}"
+                                       class="form-control bg-light" disabled>
+                            @else
+                                <select wire:model="compte_id" id="compte_id" class="form-select">
+                                    <option value="">-- Aucun --</option>
+                                    @foreach ($comptes as $compte)
+                                        <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+                                    @endforeach
+                                </select>
+                            @endif
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Montant total</label>
+                            <label class="form-label">
+                                Montant total
+                                @if ($isLocked) <i class="bi bi-lock text-warning" title="Champ verrouillé par un rapprochement"></i> @endif
+                            </label>
                             <div class="form-control bg-light fw-bold text-end">
                                 {{ number_format($this->montantTotal, 2, ',', ' ') }} €
                             </div>
@@ -130,22 +148,28 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <input type="number" wire:model.live="lignes.{{ $index }}.montant"
-                                                   step="0.01" min="0.01"
-                                                   class="form-control form-control-sm @error('lignes.' . $index . '.montant') is-invalid @enderror">
-                                            @error('lignes.' . $index . '.montant')
-                                                <div class="invalid-feedback">{{ $message }}</div>
-                                            @enderror
+                                            @if ($isLocked)
+                                                <span class="form-control-plaintext">{{ number_format((float) ($ligne['montant'] ?? 0), 2, ',', ' ') }} €</span>
+                                            @else
+                                                <input type="number" wire:model.live="lignes.{{ $index }}.montant"
+                                                       step="0.01" min="0.01"
+                                                       class="form-control form-control-sm @error('lignes.' . $index . '.montant') is-invalid @enderror">
+                                                @error('lignes.' . $index . '.montant')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            @endif
                                         </td>
                                         <td>
                                             <input type="text" wire:model="lignes.{{ $index }}.notes"
                                                    class="form-control form-control-sm">
                                         </td>
                                         <td class="text-center">
-                                            <button type="button" wire:click="removeLigne({{ $index }})"
-                                                    class="btn btn-sm btn-outline-danger">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
+                                            @if (! $isLocked)
+                                                <button type="button" wire:click="removeLigne({{ $index }})"
+                                                        class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty
@@ -167,9 +191,11 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-plus-lg"></i> Ajouter une ligne
-                        </button>
+                        @if (! $isLocked)
+                            <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-plus-lg"></i> Ajouter une ligne
+                            </button>
+                        @endif
                         <div class="ms-auto">
                             <button type="button" wire:click="resetForm" class="btn btn-secondary">Annuler</button>
                             <button type="submit" class="btn btn-success">

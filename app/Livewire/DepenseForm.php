@@ -37,6 +37,8 @@ final class DepenseForm extends Component
 
     public bool $showForm = false;
 
+    public bool $isLocked = false;
+
     public function getMontantTotalProperty(): float
     {
         return round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
@@ -46,6 +48,7 @@ final class DepenseForm extends Component
     {
         $this->reset(['depenseId', 'date', 'libelle', 'mode_paiement',
             'beneficiaire', 'reference', 'compte_id', 'notes', 'lignes']);
+        $this->isLocked = false;
         $this->resetValidation();
 
         $this->showForm = true;
@@ -98,6 +101,7 @@ final class DepenseForm extends Component
             'notes' => (string) ($ligne->notes ?? ''),
         ])->toArray();
 
+        $this->isLocked = $depense->isLockedByRapprochement();
         $this->showForm = true;
     }
 
@@ -105,7 +109,7 @@ final class DepenseForm extends Component
     {
         $this->reset([
             'depenseId', 'date', 'libelle', 'mode_paiement',
-            'beneficiaire', 'reference', 'compte_id', 'notes', 'lignes', 'showForm',
+            'beneficiaire', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
         ]);
         $this->resetValidation();
     }
