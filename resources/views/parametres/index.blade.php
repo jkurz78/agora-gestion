@@ -44,11 +44,19 @@
 
         {{-- ========== Catégories ========== --}}
         <div class="tab-pane fade show active" id="categories-pane" role="tabpanel" aria-labelledby="categories-tab">
-            <div class="mb-3">
+            <div class="mb-3 d-flex gap-2 align-items-center flex-wrap">
                 <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
                         data-bs-target="#addCategorieForm">
                     <i class="bi bi-plus-lg"></i> Ajouter une catégorie
                 </button>
+                <div class="btn-group btn-group-sm ms-auto" role="group" aria-label="Filtre catégories">
+                    <input type="radio" class="btn-check" name="catFilter" id="catAll" value="all" checked autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="catAll">Tout</label>
+                    <input type="radio" class="btn-check" name="catFilter" id="catRecette" value="recette" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="catRecette">Recettes</label>
+                    <input type="radio" class="btn-check" name="catFilter" id="catDepense" value="depense" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="catDepense">Dépenses</label>
+                </div>
             </div>
 
             <div class="collapse mb-3" id="addCategorieForm">
@@ -86,7 +94,7 @@
                 </thead>
                 <tbody>
                     @forelse ($categories as $categorie)
-                        <tr>
+                        <tr data-type="{{ $categorie->type->value }}">
                             <td>{{ $categorie->nom }}</td>
                             <td>
                                 <span class="badge {{ $categorie->type === \App\Enums\TypeCategorie::Depense ? 'bg-danger' : 'bg-success' }}">
@@ -122,15 +130,39 @@
                     @endforelse
                 </tbody>
             </table>
+            <script>
+            document.querySelectorAll('input[name="catFilter"]').forEach(function(radio) {
+                radio.addEventListener('change', function() {
+                    const val = this.value;
+                    document.querySelectorAll('#categories-pane tr[data-type]').forEach(function(row) {
+                        row.style.display = (val === 'all' || row.dataset.type === val) ? '' : 'none';
+                    });
+                });
+            });
+            </script>
         </div>
 
         {{-- ========== Sous-catégories ========== --}}
         <div class="tab-pane fade" id="sous-categories-pane" role="tabpanel" aria-labelledby="sous-categories-tab">
-            <div class="mb-3">
+            <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
                 <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
                         data-bs-target="#addSousCategorieForm">
                     <i class="bi bi-plus-lg"></i> Ajouter une sous-catégorie
                 </button>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Filtre type">
+                    <input type="radio" class="btn-check" name="scTypeFilter" id="scAll" value="all" checked autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="scAll">Tout</label>
+                    <input type="radio" class="btn-check" name="scTypeFilter" id="scRecette" value="recette" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="scRecette">Recettes</label>
+                    <input type="radio" class="btn-check" name="scTypeFilter" id="scDepense" value="depense" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="scDepense">Dépenses</label>
+                </div>
+                <select id="scCatFilter" class="form-select form-select-sm" style="width:auto;">
+                    <option value="">— Toutes les catégories —</option>
+                    @foreach ($categories as $cat)
+                        <option value="{{ $cat->id }}">{{ $cat->nom }}</option>
+                    @endforeach
+                </select>
             </div>
 
             <div class="collapse mb-3" id="addSousCategorieForm">
@@ -175,7 +207,7 @@
                         $sousCategories = $categories->flatMap->sousCategories->sortBy('nom');
                     @endphp
                     @forelse ($sousCategories as $sc)
-                        <tr>
+                        <tr data-type="{{ $sc->categorie->type->value }}" data-categorie="{{ $sc->categorie_id }}">
                             <td>{{ $sc->categorie->nom }}</td>
                             <td>{{ $sc->nom }}</td>
                             <td>{{ $sc->code_cerfa ?? '—' }}</td>
@@ -197,6 +229,22 @@
                     @endforelse
                 </tbody>
             </table>
+            <script>
+            function filterSousCategories() {
+                var typeVal = document.querySelector('input[name="scTypeFilter"]:checked').value;
+                var catVal = document.getElementById('scCatFilter').value;
+                document.querySelectorAll('#sous-categories-pane tr[data-type]').forEach(function(row) {
+                    var typeOk = typeVal === 'all' || row.dataset.type === typeVal;
+                    var catOk = catVal === '' || row.dataset.categorie === catVal;
+                    row.style.display = (typeOk && catOk) ? '' : 'none';
+                });
+            }
+            document.querySelectorAll('input[name="scTypeFilter"]').forEach(function(r) {
+                r.addEventListener('change', filterSousCategories);
+            });
+            var scCatFilter = document.getElementById('scCatFilter');
+            if (scCatFilter) { scCatFilter.addEventListener('change', filterSousCategories); }
+            </script>
         </div>
 
         {{-- ========== Comptes bancaires ========== --}}
@@ -393,11 +441,19 @@
 
         {{-- ========== Opérations ========== --}}
         <div class="tab-pane fade" id="operations-pane" role="tabpanel" aria-labelledby="operations-tab">
-            <div class="mb-3">
+            <div class="mb-3 d-flex gap-2 align-items-center flex-wrap">
                 <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
                         data-bs-target="#addOperationForm">
                     <i class="bi bi-plus-lg"></i> Ajouter une opération
                 </button>
+                <div class="btn-group btn-group-sm ms-auto" role="group" aria-label="Filtre opérations">
+                    <input type="radio" class="btn-check" name="opFilter" id="opAll" value="all" checked autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="opAll">Tout</label>
+                    <input type="radio" class="btn-check" name="opFilter" id="opEnCours" value="en_cours" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="opEnCours">En cours</label>
+                    <input type="radio" class="btn-check" name="opFilter" id="opCloture" value="cloturee" autocomplete="off">
+                    <label class="btn btn-outline-secondary" for="opCloture">Clôturées</label>
+                </div>
             </div>
 
             <div class="collapse mb-3" id="addOperationForm">
@@ -446,7 +502,7 @@
                 </thead>
                 <tbody>
                     @forelse ($operations as $operation)
-                        <tr>
+                        <tr data-statut="{{ $operation->statut->value }}">
                             <td>{{ $operation->nom }}</td>
                             <td>{{ $operation->description ?? '—' }}</td>
                             <td>{{ $operation->date_debut?->format('d/m/Y') ?? '—' }}</td>
@@ -470,6 +526,16 @@
                     @endforelse
                 </tbody>
             </table>
+            <script>
+            document.querySelectorAll('input[name="opFilter"]').forEach(function(radio) {
+                radio.addEventListener('change', function() {
+                    const val = this.value;
+                    document.querySelectorAll('#operations-pane tr[data-statut]').forEach(function(row) {
+                        row.style.display = (val === 'all' || row.dataset.statut === val) ? '' : 'none';
+                    });
+                });
+            });
+            </script>
         </div>
     </div>
 
