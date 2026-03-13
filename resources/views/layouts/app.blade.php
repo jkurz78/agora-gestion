@@ -37,7 +37,6 @@
                             ['route' => 'membres.index',       'icon' => 'people',                 'label' => 'Membres'],
                             ['route' => 'dons.index',          'icon' => 'heart',                  'label' => 'Dons'],
                             ['route' => 'rapports.index',      'icon' => 'file-earmark-bar-graph', 'label' => 'Rapports'],
-                            ['route' => 'parametres.categories.index', 'icon' => 'gear',                   'label' => 'Paramètres'],
                         ];
                     @endphp
                     @foreach ($navItems as $item)
@@ -50,6 +49,48 @@
                             </li>
                         @endif
                     @endforeach
+
+                    {{-- Dropdown Paramètres --}}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('parametres.*') || request()->routeIs('operations.*') ? 'active' : '' }}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear"></i> Paramètres
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('parametres.categories.*') ? 'active' : '' }}"
+                                   href="{{ route('parametres.categories.index') }}">
+                                    <i class="bi bi-tags"></i> Catégories
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('parametres.sous-categories.*') ? 'active' : '' }}"
+                                   href="{{ route('parametres.sous-categories.index') }}">
+                                    <i class="bi bi-tag"></i> Sous-catégories
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('operations.*') ? 'active' : '' }}"
+                                   href="{{ route('operations.index') }}">
+                                    <i class="bi bi-calendar-event"></i> Opérations
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('parametres.comptes-bancaires.*') ? 'active' : '' }}"
+                                   href="{{ route('parametres.comptes-bancaires.index') }}">
+                                    <i class="bi bi-bank"></i> Comptes bancaires
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('parametres.utilisateurs.*') ? 'active' : '' }}"
+                                   href="{{ route('parametres.utilisateurs.index') }}">
+                                    <i class="bi bi-people"></i> Utilisateurs
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item">
