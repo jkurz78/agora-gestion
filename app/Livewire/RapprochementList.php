@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Services\RapprochementBancaireService;
@@ -31,6 +32,28 @@ final class RapprochementList extends Component
         $this->solde_fin = '';
         $this->resetValidation();
         $this->resetPage();
+    }
+
+    public function supprimer(int $id): void
+    {
+        $rapprochement = RapprochementBancaire::findOrFail($id);
+        try {
+            app(RapprochementBancaireService::class)->supprimer($rapprochement);
+            session()->flash('success', 'Rapprochement supprimé.');
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function deverrouiller(int $id): void
+    {
+        $rapprochement = RapprochementBancaire::findOrFail($id);
+        try {
+            app(RapprochementBancaireService::class)->deverrouiller($rapprochement);
+            session()->flash('success', 'Rapprochement déverrouillé.');
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
     }
 
     public function create(): void
@@ -82,11 +105,21 @@ final class RapprochementList extends Component
             }
         }
 
+        $dernierVerrouilleId = null;
+        if ($this->compte_id && ! $aEnCours) {
+            $dernierVerrouilleId = RapprochementBancaire::where('compte_id', $this->compte_id)
+                ->where('statut', StatutRapprochement::Verrouille)
+                ->orderByDesc('date_fin')
+                ->orderByDesc('id')
+                ->value('id');
+        }
+
         return view('livewire.rapprochement-list', [
             'comptes' => $comptes,
             'rapprochements' => $rapprochements,
             'aEnCours' => $aEnCours,
             'soldeOuverture' => $soldeOuverture,
+            'dernierVerrouilleId' => $dernierVerrouilleId,
         ]);
     }
 }
