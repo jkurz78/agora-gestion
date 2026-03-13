@@ -8,9 +8,17 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\View\View;
 
 final class UserController extends Controller
 {
+    public function index(): View
+    {
+        return view('parametres.utilisateurs.index', [
+            'utilisateurs' => User::orderBy('nom')->get(),
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
