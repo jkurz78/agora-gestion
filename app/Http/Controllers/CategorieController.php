@@ -8,12 +8,15 @@ use App\Http\Requests\StoreCategorieRequest;
 use App\Http\Requests\UpdateCategorieRequest;
 use App\Models\Categorie;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\View\View;
 
 final class CategorieController extends Controller
 {
-    public function index(): RedirectResponse
+    public function index(): View
     {
-        return redirect()->route('parametres.categories.index');
+        return view('parametres.categories.index', [
+            'categories' => Categorie::with('sousCategories')->orderBy('nom')->get(),
+        ]);
     }
 
     public function create(): RedirectResponse
