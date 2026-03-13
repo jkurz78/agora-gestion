@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
 use App\Models\Depense;
+use App\Models\Don;
+use App\Models\Membre;
 use App\Models\RapprochementBancaire;
 use App\Models\Recette;
 use App\Models\User;
@@ -133,5 +135,122 @@ test('toggleTransaction lève une exception si rapprochement verrouillé', funct
     $depense = Depense::factory()->create(['compte_id' => $this->compte->id]);
 
     expect(fn () => $this->service->toggleTransaction($rapprochement, 'depense', $depense->id))
+        ->toThrow(RuntimeException::class);
+});
+
+test('supprimer supprime un rapprochement en cours et dépointe les opérations', function () {
+    $rapprochement = $this->service->create($this->compte, '2025-10-31', 1000.00);
+    $depense = Depense::factory()->create([
+        'compte_id' => $this->compte->id,
+        'rapprochement_id' => $rapprochement->id,
+        'pointe' => true,
+    ]);
+    $recette = Recette::factory()->create([
+        'compte_id' => $this->compte->id,
+        'rapprochement_id' => $rapprochement->id,
+        'pointe' => true,
+    ]);
+
+    $this->service->supprimer($rapprochement);
+
+    expect(RapprochementBancaire::find($rapprochement->id))->toBeNull()
+        ->and($depense->fresh()->rapprochement_id)->toBeNull()
+        ->and($depense->fresh()->pointe)->toBeFalse()
+        ->and($recette->fresh()->rapprochement_id)->toBeNull()
+        ->and($recette->fresh()->pointe)->toBeFalse();
+});
+
+test('supprimer lève une exception si le rapprochement est verrouillé', function () {
+    $rapprochement = RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'saisi_par' => $this->user->id,
+    ]);
+
+    expect(fn () => $this->service->supprimer($rapprochement))
+        ->toThrow(RuntimeException::class);
+});
+
+test('supprimer dépointe aussi les dons et cotisations', function () {
+    $rapprochement = $this->service->create($this->compte, '2025-10-31', 1000.00);
+    $don = Don::factory()->create([
+        'compte_id' => $this->compte->id,
+        'rapprochement_id' => $rapprochement->id,
+        'pointe' => true,
+    ]);
+    $membre = Membre::factory()->create();
+    $cotisation = \App\Models\Cotisation::factory()->create([
+        'membre_id' => $membre->id,
+        'compte_id' => $this->compte->id,
+        'rapprochement_id' => $rapprochement->id,
+        'pointe' => true,
+    ]);
+
+    $this->service->supprimer($rapprochement);
+
+    expect($don->fresh()->rapprochement_id)->toBeNull()
+        ->and($don->fresh()->pointe)->toBeFalse()
+        ->and($cotisation->fresh()->rapprochement_id)->toBeNull()
+        ->and($cotisation->fresh()->pointe)->toBeFalse();
+});
+
+test('deverrouiller déverrouille le dernier rapprochement si aucun en cours', function () {
+    $rapprochement = RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'verrouille_at' => now(),
+        'saisi_par' => $this->user->id,
+        'date_fin' => '2025-10-31',
+    ]);
+
+    $this->service->deverrouiller($rapprochement);
+
+    expect($rapprochement->fresh()->statut)->toBe(StatutRapprochement::EnCours)
+        ->and($rapprochement->fresh()->verrouille_at)->toBeNull();
+});
+
+test('deverrouiller lève une exception si un rapprochement est en cours sur ce compte', function () {
+    RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::EnCours,
+        'saisi_par' => $this->user->id,
+        'date_fin' => '2025-11-30',
+    ]);
+    $verrouille = RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'verrouille_at' => now(),
+        'saisi_par' => $this->user->id,
+        'date_fin' => '2025-10-31',
+    ]);
+
+    expect(fn () => $this->service->deverrouiller($verrouille))
+        ->toThrow(RuntimeException::class);
+});
+
+test('deverrouiller lève une exception si ce n\'est pas le dernier verrouillé', function () {
+    $premier = RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'verrouille_at' => now()->subDay(),
+        'saisi_par' => $this->user->id,
+        'date_fin' => '2025-09-30',
+    ]);
+    RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'verrouille_at' => now(),
+        'saisi_par' => $this->user->id,
+        'date_fin' => '2025-10-31',
+    ]);
+
+    expect(fn () => $this->service->deverrouiller($premier))
+        ->toThrow(RuntimeException::class);
+});
+
+test('deverrouiller lève une exception si le rapprochement est en cours', function () {
+    $rapprochement = $this->service->create($this->compte, '2025-10-31', 1000.00);
+
+    expect(fn () => $this->service->deverrouiller($rapprochement))
         ->toThrow(RuntimeException::class);
 });
