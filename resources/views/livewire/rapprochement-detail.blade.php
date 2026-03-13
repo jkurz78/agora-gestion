@@ -73,6 +73,11 @@
             <a href="{{ route('rapprochement.index') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-floppy"></i> Enregistrer et quitter
             </a>
+            <button wire:click="supprimer"
+                    wire:confirm="Supprimer ce rapprochement ? Toutes les écritures pointées seront dépointées."
+                    class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Supprimer
+            </button>
             @if ($ecart == 0)
                 <button wire:click="verrouiller"
                         wire:confirm="Verrouiller ce rapprochement ? Cette action est irréversible. Les champs Date, Montant et Compte bancaire des écritures pointées ne pourront plus être modifiés."

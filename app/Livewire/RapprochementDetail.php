@@ -33,6 +33,16 @@ final class RapprochementDetail extends Component
         }
     }
 
+    public function supprimer(): void
+    {
+        try {
+            app(RapprochementBancaireService::class)->supprimer($this->rapprochement);
+            $this->redirect(route('rapprochement.index'));
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
     public function verrouiller(): void
     {
         try {

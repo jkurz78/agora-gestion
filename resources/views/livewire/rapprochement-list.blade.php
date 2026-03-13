@@ -1,4 +1,17 @@
 <div>
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     {{-- Sélection du compte --}}
     <div class="card mb-4">
         <div class="card-body">
@@ -86,7 +99,7 @@
                     </thead>
                     <tbody>
                         @foreach ($rapprochements as $rapprochement)
-                            <tr wire:key="rapprochement-{{ $rapprochement->id }}"
+                            <tr wire:key="rapprochement-{{ $rapprochement->id }}">
                                 <td>{{ $rapprochement->date_fin->format('d/m/Y') }}</td>
                                 <td class="text-end">{{ number_format((float) $rapprochement->solde_ouverture, 2, ',', ' ') }} €</td>
                                 <td class="text-end">{{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €</td>
@@ -99,11 +112,26 @@
                                 </td>
                                 <td>{{ $rapprochement->verrouille_at?->format('d/m/Y H:i') ?? '—' }}</td>
                                 <td>
-                                    <a href="{{ route('rapprochement.detail', $rapprochement) }}"
-                                       class="btn btn-sm btn-outline-primary">
-                                        <i class="bi bi-eye"></i>
-                                        {{ $rapprochement->isEnCours() ? 'Continuer' : 'Consulter' }}
-                                    </a>
+                                    <div class="d-flex gap-1">
+                                        <a href="{{ route('rapprochement.detail', $rapprochement) }}"
+                                           class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                            {{ $rapprochement->isEnCours() ? 'Continuer' : 'Consulter' }}
+                                        </a>
+                                        @if ($rapprochement->isEnCours())
+                                            <button wire:click="supprimer({{ $rapprochement->id }})"
+                                                    wire:confirm="Supprimer ce rapprochement ? Toutes les écritures pointées seront dépointées."
+                                                    class="btn btn-sm btn-outline-danger" title="Supprimer">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        @elseif ($rapprochement->id === $dernierVerrouilleId)
+                                            <button wire:click="deverrouiller({{ $rapprochement->id }})"
+                                                    wire:confirm="Déverrouiller ce rapprochement ? Il repassera en statut 'En cours'."
+                                                    class="btn btn-sm btn-outline-warning" title="Déverrouiller">
+                                                <i class="bi bi-unlock"></i>
+                                            </button>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
