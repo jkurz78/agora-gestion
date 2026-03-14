@@ -182,3 +182,60 @@ it('can update a depense', function () {
     // Old lignes replaced
     expect(DepenseLigne::where('depense_id', $depense->id)->count())->toBe(1);
 });
+
+it('rejette une date avant le début de l\'exercice', function () {
+    $user = \App\Models\User::factory()->create();
+    session(['exercice_actif' => 2025]); // 2025-09-01 → 2026-08-31
+    $compte = \App\Models\CompteBancaire::factory()->create();
+    $cat = \App\Models\Categorie::factory()->create(['type' => \App\Enums\TypeCategorie::Depense]);
+    $sc  = \App\Models\SousCategorie::factory()->create(['categorie_id' => $cat->id]);
+
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\DepenseForm::class)
+        ->call('showNewForm')
+        ->set('date', '2025-08-31')
+        ->set('libelle', 'Test')
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $compte->id)
+        ->set('lignes', [['sous_categorie_id' => $sc->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
+        ->call('save')
+        ->assertHasErrors(['date']);
+});
+
+it('rejette une date après la fin de l\'exercice', function () {
+    $user = \App\Models\User::factory()->create();
+    session(['exercice_actif' => 2025]);
+    $compte = \App\Models\CompteBancaire::factory()->create();
+    $cat = \App\Models\Categorie::factory()->create(['type' => \App\Enums\TypeCategorie::Depense]);
+    $sc  = \App\Models\SousCategorie::factory()->create(['categorie_id' => $cat->id]);
+
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\DepenseForm::class)
+        ->call('showNewForm')
+        ->set('date', '2026-09-01')
+        ->set('libelle', 'Test')
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $compte->id)
+        ->set('lignes', [['sous_categorie_id' => $sc->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
+        ->call('save')
+        ->assertHasErrors(['date']);
+});
+
+it('accepte une date dans l\'exercice', function () {
+    $user = \App\Models\User::factory()->create();
+    session(['exercice_actif' => 2025]);
+    $compte = \App\Models\CompteBancaire::factory()->create();
+    $cat = \App\Models\Categorie::factory()->create(['type' => \App\Enums\TypeCategorie::Depense]);
+    $sc  = \App\Models\SousCategorie::factory()->create(['categorie_id' => $cat->id]);
+
+    Livewire::actingAs($user)
+        ->test(\App\Livewire\DepenseForm::class)
+        ->call('showNewForm')
+        ->set('date', '2025-10-01')
+        ->set('libelle', 'Test')
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $compte->id)
+        ->set('lignes', [['sous_categorie_id' => $sc->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
+        ->call('save')
+        ->assertHasNoErrors(['date']);
+});
