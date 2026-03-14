@@ -165,6 +165,14 @@
                         </ul>
                     </li>
 
+                    {{-- Tiers --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('tiers.*') ? 'active fw-semibold' : '' }}"
+                           href="{{ route('tiers.index') }}">
+                            Tiers
+                        </a>
+                    </li>
+
                     {{-- Liens directs --}}
                     @php
                         $navItems = [
