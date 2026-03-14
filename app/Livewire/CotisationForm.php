@@ -16,8 +16,6 @@ final class CotisationForm extends Component
 {
     public Membre $membre;
 
-    public int $exercice;
-
     public string $montant = '';
 
     public string $date_paiement = '';
@@ -29,22 +27,19 @@ final class CotisationForm extends Component
     public function mount(Membre $membre): void
     {
         $this->membre = $membre;
-
-        $exerciceService = app(ExerciceService::class);
-        $this->exercice = $exerciceService->current();
         $this->date_paiement = now()->format('Y-m-d');
     }
 
     public function save(): void
     {
         $validated = $this->validate([
-            'exercice' => ['required', 'integer'],
             'montant' => ['required', 'numeric', 'min:0.01'],
             'date_paiement' => ['required', 'date'],
             'mode_paiement' => ['required', 'string'],
             'compte_id' => ['nullable'],
         ]);
 
+        $validated['exercice'] = app(ExerciceService::class)->current();
         // Convert empty string to null for compte_id
         $validated['compte_id'] = $validated['compte_id'] !== '' ? (int) $validated['compte_id'] : null;
 
@@ -73,14 +68,10 @@ final class CotisationForm extends Component
 
     public function render()
     {
-        $exerciceService = app(ExerciceService::class);
-
         return view('livewire.cotisation-form', [
             'cotisations' => $this->membre->cotisations()->with('compte')->latest()->get(),
             'comptes' => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
-            'exercices' => $exerciceService->available(),
-            'exerciceService' => $exerciceService,
         ]);
     }
 }

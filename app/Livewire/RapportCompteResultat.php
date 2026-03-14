@@ -11,21 +11,15 @@ use Livewire\Component;
 
 final class RapportCompteResultat extends Component
 {
-    public int $exercice;
-
     /** @var array<int, int> */
     public array $selectedOperationIds = [];
-
-    public function mount(): void
-    {
-        $this->exercice = app(ExerciceService::class)->current();
-    }
 
     public function exportCsv()
     {
         $rapportService = app(RapportService::class);
+        $exercice = app(ExerciceService::class)->current();
         $operationIds = array_filter($this->selectedOperationIds) ?: null;
-        $data = $rapportService->compteDeResultat($this->exercice, $operationIds);
+        $data = $rapportService->compteDeResultat($exercice, $operationIds);
 
         $rows = [];
         foreach ($data['charges'] as $charge) {
@@ -39,24 +33,22 @@ final class RapportCompteResultat extends Component
 
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
-        }, 'compte_resultat_'.$this->exercice.'.csv', [
+        }, 'compte_resultat_'.$exercice.'.csv', [
             'Content-Type' => 'text/csv',
         ]);
     }
 
     public function render()
     {
-        $exerciceService = app(ExerciceService::class);
+        $exercice = app(ExerciceService::class)->current();
         $rapportService = app(RapportService::class);
 
         $operationIds = array_filter($this->selectedOperationIds) ?: null;
-        $data = $rapportService->compteDeResultat($this->exercice, $operationIds);
+        $data = $rapportService->compteDeResultat($exercice, $operationIds);
 
         return view('livewire.rapport-compte-resultat', [
             'charges' => $data['charges'],
             'produits' => $data['produits'],
-            'exercices' => $exerciceService->available(),
-            'exerciceService' => $exerciceService,
             'operations' => Operation::orderBy('nom')->get(),
         ]);
     }

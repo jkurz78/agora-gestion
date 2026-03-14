@@ -13,27 +13,15 @@ use Livewire\Component;
 
 final class BudgetTable extends Component
 {
-    public int $exercice;
-
     public ?int $editingLineId = null;
 
     public string $editingMontant = '';
-
-    public function mount(): void
-    {
-        $this->exercice = app(ExerciceService::class)->current();
-    }
-
-    public function updatedExercice(): void
-    {
-        $this->cancelEdit();
-    }
 
     public function addLine(int $sousCategorieId): void
     {
         BudgetLine::create([
             'sous_categorie_id' => $sousCategorieId,
-            'exercice' => $this->exercice,
+            'exercice' => app(ExerciceService::class)->current(),
             'montant_prevu' => 0,
         ]);
     }
@@ -71,7 +59,7 @@ final class BudgetTable extends Component
     public function render()
     {
         $budgetService = app(BudgetService::class);
-        $exerciceService = app(ExerciceService::class);
+        $exercice = app(ExerciceService::class)->current();
 
         $depenseCategories = Categorie::where('type', TypeCategorie::Depense)
             ->with(['sousCategories' => fn ($q) => $q->orderBy('nom')])
@@ -83,7 +71,7 @@ final class BudgetTable extends Component
             ->orderBy('nom')
             ->get();
 
-        $budgetLines = BudgetLine::forExercice($this->exercice)->get()->keyBy('sous_categorie_id');
+        $budgetLines = BudgetLine::forExercice($exercice)->get()->keyBy('sous_categorie_id');
 
         // Compute réalisé for each sous-catégorie that has a budget line
         $realiseData = [];
@@ -91,7 +79,7 @@ final class BudgetTable extends Component
             ->merge($recetteCategories->flatMap->sousCategories);
 
         foreach ($allSousCategories as $sc) {
-            $realiseData[$sc->id] = $budgetService->realise($sc->id, $this->exercice);
+            $realiseData[$sc->id] = $budgetService->realise($sc->id, $exercice);
         }
 
         return view('livewire.budget-table', [
@@ -99,8 +87,6 @@ final class BudgetTable extends Component
             'recetteCategories' => $recetteCategories,
             'budgetLines' => $budgetLines,
             'realiseData' => $realiseData,
-            'exercices' => $exerciceService->available(),
-            'exerciceService' => $exerciceService,
         ]);
     }
 }

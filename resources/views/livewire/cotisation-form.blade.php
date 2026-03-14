@@ -25,7 +25,7 @@
                 <tbody>
                     @forelse ($cotisations as $cotisation)
                         <tr>
-                            <td>{{ $exerciceService->label($cotisation->exercice) }}</td>
+                            <td>{{ $cotisation->exercice }}-{{ $cotisation->exercice + 1 }}</td>
                             <td>{{ number_format((float) $cotisation->montant, 2, ',', ' ') }} &euro;</td>
                             <td>{{ $cotisation->date_paiement->format('d/m/Y') }}</td>
                             <td>{{ $cotisation->mode_paiement->label() }}</td>
@@ -68,17 +68,6 @@
         <div class="card-body">
             <form wire:submit="save">
                 <div class="row g-3">
-                    <div class="col-md-2">
-                        <label for="exercice" class="form-label">Exercice <span class="text-danger">*</span></label>
-                        <select wire:model="exercice" id="exercice" class="form-select @error('exercice') is-invalid @enderror">
-                            @foreach ($exercices as $ex)
-                                <option value="{{ $ex }}">{{ $exerciceService->label($ex) }}</option>
-                            @endforeach
-                        </select>
-                        @error('exercice')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
                     <div class="col-md-2">
                         <label for="montant" class="form-label">Montant <span class="text-danger">*</span></label>
                         <input type="number" wire:model="montant" id="montant" step="0.01" min="0.01"

@@ -10,7 +10,6 @@ use App\Models\CompteBancaire;
 use App\Models\Depense;
 use App\Models\Operation;
 use App\Services\DepenseService;
-use App\Services\ExerciceService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -21,8 +20,6 @@ final class DepenseList extends Component
     use WithPagination;
 
     protected string $paginationTheme = 'bootstrap';
-
-    public ?int $exercice = null;
 
     public ?int $categorie_id = null;
 
@@ -35,16 +32,6 @@ final class DepenseList extends Component
     public ?string $pointe = null;
 
     public ?string $tiers = null;
-
-    public function mount(): void
-    {
-        $this->exercice = app(ExerciceService::class)->current();
-    }
-
-    public function updatedExercice(): void
-    {
-        $this->resetPage();
-    }
 
     public function updatedCategorieId(): void
     {
@@ -95,13 +82,12 @@ final class DepenseList extends Component
 
     public function render(): View
     {
+        $exercice = app(ExerciceService::class)->current();
+
         $query = Depense::with(['lignes.sousCategorie.categorie', 'compte', 'saisiPar'])
+            ->forExercice($exercice)
             ->latest('date')
             ->latest('id');
-
-        if ($this->exercice) {
-            $query->forExercice($this->exercice);
-        }
 
         if ($this->categorie_id) {
             $query->whereHas('lignes.sousCategorie', function ($q) {
@@ -133,15 +119,11 @@ final class DepenseList extends Component
             $query->where('tiers', 'like', '%'.$this->tiers.'%');
         }
 
-        $exerciceService = app(ExerciceService::class);
-
         return view('livewire.depense-list', [
             'depenses' => $query->paginate(15),
             'categories' => Categorie::where('type', TypeCategorie::Depense)->orderBy('nom')->get(),
             'operations' => Operation::orderBy('nom')->get(),
             'comptes' => CompteBancaire::orderBy('nom')->get(),
-            'exercices' => $exerciceService->available(),
-            'exerciceService' => $exerciceService,
         ]);
     }
 }

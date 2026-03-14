@@ -18,60 +18,54 @@ use Livewire\Component;
 
 final class Dashboard extends Component
 {
-    public int $exercice;
-
-    public function mount(): void
-    {
-        $this->exercice = app(ExerciceService::class)->current();
-    }
-
     public function render(): \Illuminate\Contracts\View\View
     {
         $exerciceService = app(ExerciceService::class);
         $budgetService = app(BudgetService::class);
+        $exercice = $exerciceService->current();
 
-        $range = $exerciceService->dateRange($this->exercice);
+        $range = $exerciceService->dateRange($exercice);
         $startDate = $range['start']->toDateString();
         $endDate = $range['end']->toDateString();
 
         // Solde général
-        $totalRecettes = (float) Recette::forExercice($this->exercice)->sum('montant_total');
-        $totalDepenses = (float) Depense::forExercice($this->exercice)->sum('montant_total');
+        $totalRecettes = (float) Recette::forExercice($exercice)->sum('montant_total');
+        $totalDepenses = (float) Depense::forExercice($exercice)->sum('montant_total');
         $soldeGeneral = $totalRecettes - $totalDepenses;
 
         // Budget résumé
-        $budgetLines = BudgetLine::forExercice($this->exercice)
+        $budgetLines = BudgetLine::forExercice($exercice)
             ->with('sousCategorie.categorie')
             ->get();
 
         $totalPrevu = (float) $budgetLines->sum('montant_prevu');
         $totalRealise = 0.0;
         foreach ($budgetLines as $line) {
-            $totalRealise += $budgetService->realise($line->sous_categorie_id, $this->exercice);
+            $totalRealise += $budgetService->realise($line->sous_categorie_id, $exercice);
         }
 
         // Dernières dépenses
-        $dernieresDepenses = Depense::forExercice($this->exercice)
+        $dernieresDepenses = Depense::forExercice($exercice)
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
         // Dernières recettes
-        $dernieresRecettes = Recette::forExercice($this->exercice)
+        $dernieresRecettes = Recette::forExercice($exercice)
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
         // Derniers dons
-        $derniersDons = Don::forExercice($this->exercice)
+        $derniersDons = Don::forExercice($exercice)
             ->with('donateur')
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
         // Membres sans cotisation pour l'exercice courant
-        $membresSansCotisation = Membre::whereDoesntHave('cotisations', function ($q) {
-            $q->where('exercice', $this->exercice);
+        $membresSansCotisation = Membre::whereDoesntHave('cotisations', function ($q) use ($exercice) {
+            $q->where('exercice', $exercice);
         })->orderBy('nom')->get();
 
         // Comptes bancaires avec soldes courants
@@ -83,8 +77,6 @@ final class Dashboard extends Component
             ]);
 
         return view('livewire.dashboard', [
-            'exercices' => $exerciceService->available(),
-            'exerciceService' => $exerciceService,
             'soldeGeneral' => $soldeGeneral,
             'totalRecettes' => $totalRecettes,
             'totalDepenses' => $totalDepenses,
