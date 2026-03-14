@@ -28,6 +28,11 @@ final class TiersAutocomplete extends Component
     // For inline creation modal
     public bool $showCreateModal = false;
 
+    /** @var array{id: int, label: string, type: string}|null */
+    public ?array $existingTiers = null;
+
+    public bool $showActivateModal = false;
+
     public string $newNom = '';
 
     public string $newType = 'entreprise';
@@ -102,13 +107,62 @@ final class TiersAutocomplete extends Component
         $this->search = '';
         $this->open = false;
         $this->results = [];
+        $this->existingTiers = null;
+        $this->showActivateModal = false;
     }
 
     public function openCreateModal(): void
     {
-        $this->newNom = $this->search;
-        $this->showCreateModal = true;
-        $this->open = false;
+        // Search ALL tiers (ignoring filter) for a name match
+        $search = $this->search;
+        $existing = Tiers::where(function ($q) use ($search): void {
+            $q->where('nom', 'like', '%' . $search . '%')
+                ->orWhere('prenom', 'like', '%' . $search . '%');
+        })->first();
+
+        // Check if the found tiers is excluded by the current filter
+        $excludedByFilter = $existing && match ($this->filtre) {
+            'depenses' => ! $existing->pour_depenses,
+            'recettes', 'dons' => ! $existing->pour_recettes,
+            default => false,
+        };
+
+        if ($excludedByFilter) {
+            $this->existingTiers = [
+                'id'    => $existing->id,
+                'label' => $existing->displayName(),
+                'type'  => $existing->type,
+            ];
+            $this->showActivateModal = true;
+            $this->open = false;
+        } else {
+            $this->newNom = $this->search;
+            $this->showCreateModal = true;
+            $this->open = false;
+        }
+    }
+
+    public function activateTiers(): void
+    {
+        if ($this->existingTiers === null) {
+            return;
+        }
+
+        $tiers = Tiers::findOrFail($this->existingTiers['id']);
+
+        $updates = match ($this->filtre) {
+            'depenses'        => ['pour_depenses' => true],
+            'recettes', 'dons' => ['pour_recettes' => true],
+            default           => [],
+        };
+
+        if (! empty($updates)) {
+            $tiers->update($updates);
+        }
+
+        $this->selectTiers($tiers->id);
+        $this->showActivateModal = false;
+        $this->existingTiers = null;
     }
 
     public function confirmCreate(): void
