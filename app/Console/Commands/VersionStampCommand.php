@@ -43,6 +43,10 @@ final class VersionStampCommand extends Command
     public static function writeVersionFile(array $data): void
     {
         $content = "<?php\nreturn " . var_export($data, true) . ";\n";
-        file_put_contents(config_path('version.php'), $content);
+        $result = file_put_contents(config_path('version.php'), $content);
+
+        if ($result === false) {
+            throw new \RuntimeException('Could not write ' . config_path('version.php'));
+        }
     }
 }
