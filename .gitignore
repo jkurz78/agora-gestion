@@ -23,3 +23,13 @@ yarn-error.log
 /.zed
 /database/database.sqlite
 .worktrees/
+
+# OS
+.DS_Store
+**/.DS_Store
+
+# Superpowers
+.superpowers/
+
+# Public assets non versionnés
+public/proto-*.html
