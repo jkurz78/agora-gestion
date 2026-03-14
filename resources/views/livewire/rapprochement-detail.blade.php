@@ -24,9 +24,14 @@
                 <span class="badge bg-warning text-dark ms-2"><i class="bi bi-pencil"></i> En cours</span>
             @endif
         </div>
-        <a href="{{ route('rapprochement.index') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left"></i> Retour
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{{ route('rapprochement.pdf', $rapprochement) }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-file-pdf"></i> Télécharger PDF
+            </a>
+            <a href="{{ route('rapprochement.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i> Retour
+            </a>
+        </div>
     </div>
 
     {{-- Bandeau de soldes --}}
