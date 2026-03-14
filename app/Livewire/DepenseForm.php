@@ -134,9 +134,9 @@ final class DepenseForm extends Component
         }
 
         $exerciceService = app(ExerciceService::class);
-        $range     = $exerciceService->dateRange($exerciceService->current());
+        $range = $exerciceService->dateRange($exerciceService->current());
         $dateDebut = $range['start']->toDateString();
-        $dateFin   = $range['end']->toDateString();
+        $dateFin = $range['end']->toDateString();
 
         $this->validate(
             [
@@ -152,8 +152,8 @@ final class DepenseForm extends Component
                 'lignes.*.notes' => ['nullable', 'string', 'max:255'],
             ],
             [
-                'date.after_or_equal'  => 'La date doit être dans l\'exercice en cours (à partir du '.date('d/m/Y', strtotime($dateDebut)).').',
-                'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.date('d/m/Y', strtotime($dateFin)).').',
+                'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
+                'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
             ]
         );
 

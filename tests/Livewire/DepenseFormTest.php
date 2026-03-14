@@ -18,6 +18,12 @@ beforeEach(function () {
         'categorie_id' => $this->categorie->id,
     ]);
     $this->compte = CompteBancaire::factory()->create();
+
+    session(['exercice_actif' => 2025]);
+});
+
+afterEach(function () {
+    session()->forget('exercice_actif');
 });
 
 it('renders the form component', function () {
@@ -131,8 +137,8 @@ it('can load existing depense for editing', function () {
 it('affiche le numero_piece en mode édition', function () {
     $depense = Depense::factory()->create([
         'numero_piece' => '2025-2026:00008',
-        'compte_id'    => $this->compte->id,
-        'saisi_par'    => $this->user->id,
+        'compte_id' => $this->compte->id,
+        'saisi_par' => $this->user->id,
     ]);
 
     Livewire::test(DepenseForm::class)
@@ -184,58 +190,38 @@ it('can update a depense', function () {
 });
 
 it('rejette une date avant le début de l\'exercice', function () {
-    $user = \App\Models\User::factory()->create();
-    session(['exercice_actif' => 2025]); // 2025-09-01 → 2026-08-31
-    $compte = \App\Models\CompteBancaire::factory()->create();
-    $cat = \App\Models\Categorie::factory()->create(['type' => \App\Enums\TypeCategorie::Depense]);
-    $sc  = \App\Models\SousCategorie::factory()->create(['categorie_id' => $cat->id]);
-
-    Livewire::actingAs($user)
-        ->test(\App\Livewire\DepenseForm::class)
+    // exercice 2025 : 2025-09-01 → 2026-08-31
+    Livewire::test(DepenseForm::class)
         ->call('showNewForm')
         ->set('date', '2025-08-31')
         ->set('libelle', 'Test')
         ->set('mode_paiement', 'virement')
-        ->set('compte_id', $compte->id)
-        ->set('lignes', [['sous_categorie_id' => $sc->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
+        ->set('compte_id', $this->compte->id)
+        ->set('lignes', [['sous_categorie_id' => $this->sousCategorie->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
         ->call('save')
         ->assertHasErrors(['date']);
 });
 
 it('rejette une date après la fin de l\'exercice', function () {
-    $user = \App\Models\User::factory()->create();
-    session(['exercice_actif' => 2025]);
-    $compte = \App\Models\CompteBancaire::factory()->create();
-    $cat = \App\Models\Categorie::factory()->create(['type' => \App\Enums\TypeCategorie::Depense]);
-    $sc  = \App\Models\SousCategorie::factory()->create(['categorie_id' => $cat->id]);
-
-    Livewire::actingAs($user)
-        ->test(\App\Livewire\DepenseForm::class)
+    Livewire::test(DepenseForm::class)
         ->call('showNewForm')
         ->set('date', '2026-09-01')
         ->set('libelle', 'Test')
         ->set('mode_paiement', 'virement')
-        ->set('compte_id', $compte->id)
-        ->set('lignes', [['sous_categorie_id' => $sc->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
+        ->set('compte_id', $this->compte->id)
+        ->set('lignes', [['sous_categorie_id' => $this->sousCategorie->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
         ->call('save')
         ->assertHasErrors(['date']);
 });
 
 it('accepte une date dans l\'exercice', function () {
-    $user = \App\Models\User::factory()->create();
-    session(['exercice_actif' => 2025]);
-    $compte = \App\Models\CompteBancaire::factory()->create();
-    $cat = \App\Models\Categorie::factory()->create(['type' => \App\Enums\TypeCategorie::Depense]);
-    $sc  = \App\Models\SousCategorie::factory()->create(['categorie_id' => $cat->id]);
-
-    Livewire::actingAs($user)
-        ->test(\App\Livewire\DepenseForm::class)
+    Livewire::test(DepenseForm::class)
         ->call('showNewForm')
         ->set('date', '2025-10-01')
         ->set('libelle', 'Test')
         ->set('mode_paiement', 'virement')
-        ->set('compte_id', $compte->id)
-        ->set('lignes', [['sous_categorie_id' => $sc->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
+        ->set('compte_id', $this->compte->id)
+        ->set('lignes', [['sous_categorie_id' => $this->sousCategorie->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
         ->call('save')
         ->assertHasNoErrors(['date']);
 });
