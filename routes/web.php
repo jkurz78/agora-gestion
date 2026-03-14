@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::view('/depenses', 'depenses.index')->name('depenses.index');
     Route::view('/recettes', 'recettes.index')->name('recettes.index');
     Route::view('/dons', 'dons.index')->name('dons.index');
+    Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
     Route::view('/tiers', 'tiers.index')->name('tiers.index');
     Route::view('/budget', 'budget.index')->name('budget.index');
     Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
