@@ -59,6 +59,13 @@
                         </a>
                         <ul class="dropdown-menu">
                             <li>
+                                <a class="dropdown-item {{ request()->routeIs('parametres.association') ? 'active' : '' }}"
+                                   href="{{ route('parametres.association') }}">
+                                    <i class="bi bi-building"></i> Association
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
                                 <a class="dropdown-item {{ request()->routeIs('parametres.categories.*') ? 'active' : '' }}"
                                    href="{{ route('parametres.categories.index') }}">
                                     <i class="bi bi-tags"></i> Catégories
