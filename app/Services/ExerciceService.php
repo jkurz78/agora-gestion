@@ -58,4 +58,24 @@ final class ExerciceService
     {
         return $exercice.'-'.($exercice + 1);
     }
+
+    /**
+     * Return the best default date for a new entry in the active exercice.
+     * Returns today if in range, dateFin if past, dateDebut if future.
+     */
+    public function defaultDate(): string
+    {
+        $range = $this->dateRange($this->current());
+        $today = CarbonImmutable::today();
+
+        if ($today->lt($range['start'])) {
+            return $range['start']->toDateString();
+        }
+
+        if ($today->gt($range['end'])) {
+            return $range['end']->toDateString();
+        }
+
+        return $today->toDateString();
+    }
 }
