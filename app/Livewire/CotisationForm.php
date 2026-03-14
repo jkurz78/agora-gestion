@@ -6,7 +6,6 @@ namespace App\Livewire;
 
 use App\Enums\ModePaiement;
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
 use App\Models\Tiers;
 use App\Services\CotisationService;
 use App\Services\ExerciceService;
@@ -14,7 +13,7 @@ use Livewire\Component;
 
 final class CotisationForm extends Component
 {
-    public Tiers $tiers;
+    public ?int $tiers_id = null;
 
     public string $montant = '';
 
@@ -22,12 +21,21 @@ final class CotisationForm extends Component
 
     public string $mode_paiement = '';
 
-    public string $compte_id = '';
+    public ?int $compte_id = null;
 
-    public function mount(Tiers $tiers): void
+    public bool $showForm = false;
+
+    public function showNewForm(): void
     {
-        $this->tiers = $tiers;
+        $this->resetForm();
         $this->date_paiement = app(ExerciceService::class)->defaultDate();
+        $this->showForm = true;
+    }
+
+    public function resetForm(): void
+    {
+        $this->reset(['tiers_id', 'montant', 'date_paiement', 'mode_paiement', 'compte_id', 'showForm']);
+        $this->resetValidation();
     }
 
     public function save(): void
@@ -38,47 +46,37 @@ final class CotisationForm extends Component
         $dateFin = $range['end']->toDateString();
 
         $validated = $this->validate([
-            'montant' => ['required', 'numeric', 'min:0.01'],
-            'date_paiement' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
+            'tiers_id'      => ['required', 'exists:tiers,id'],
+            'montant'       => ['required', 'numeric', 'min:0.01'],
+            'date_paiement' => ['required', 'date', 'after_or_equal:' . $dateDebut, 'before_or_equal:' . $dateFin],
             'mode_paiement' => ['required', 'string'],
-            'compte_id' => ['nullable'],
+            'compte_id'     => ['nullable', 'exists:comptes_bancaires,id'],
         ], [
-            'date_paiement.after_or_equal' => 'La date de paiement doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
-            'date_paiement.before_or_equal' => 'La date de paiement doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
+            'tiers_id.required'           => 'Veuillez sélectionner un tiers.',
+            'date_paiement.after_or_equal'  => 'La date doit être dans l\'exercice en cours (à partir du ' . $range['start']->format('d/m/Y') . ').',
+            'date_paiement.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au ' . $range['end']->format('d/m/Y') . ').',
         ]);
 
-        $validated['exercice'] = app(ExerciceService::class)->current();
-        // Convert empty string to null for compte_id
-        $validated['compte_id'] = $validated['compte_id'] !== '' ? (int) $validated['compte_id'] : null;
+        $tiers = Tiers::findOrFail($validated['tiers_id']);
 
-        app(CotisationService::class)->create($this->tiers, $validated);
+        $data = [
+            'montant'       => $validated['montant'],
+            'date_paiement' => $validated['date_paiement'],
+            'mode_paiement' => $validated['mode_paiement'],
+            'compte_id'     => $validated['compte_id'],
+            'exercice'      => $exerciceService->current(),
+        ];
 
-        $this->reset(['montant', 'mode_paiement', 'compte_id']);
-        $this->date_paiement = app(ExerciceService::class)->defaultDate();
+        app(CotisationService::class)->create($tiers, $data);
 
-        $this->tiers->load('cotisations.compte');
+        $this->dispatch('cotisation-saved');
+        $this->resetForm();
     }
 
-    public function delete(int $id): void
-    {
-        $cotisation = Cotisation::findOrFail($id);
-
-        try {
-            app(CotisationService::class)->delete($cotisation);
-        } catch (\RuntimeException $e) {
-            session()->flash('error', $e->getMessage());
-
-            return;
-        }
-
-        $this->tiers->load('cotisations.compte');
-    }
-
-    public function render()
+    public function render(): \Illuminate\View\View
     {
         return view('livewire.cotisation-form', [
-            'cotisations' => $this->tiers->cotisations()->with('compte')->latest()->get(),
-            'comptes' => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
+            'comptes'       => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
         ]);
     }
