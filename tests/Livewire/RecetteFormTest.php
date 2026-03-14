@@ -18,6 +18,12 @@ beforeEach(function () {
         'categorie_id' => $this->categorie->id,
     ]);
     $this->compte = CompteBancaire::factory()->create();
+
+    session(['exercice_actif' => 2025]);
+});
+
+afterEach(function () {
+    session()->forget('exercice_actif');
 });
 
 it('renders the form component', function () {
@@ -104,6 +110,7 @@ it('can save a new recette', function () {
 
 it('can load existing recette for editing', function () {
     $recette = Recette::factory()->create([
+        'date' => '2025-11-10',
         'libelle' => 'Recette existante',
         'montant_total' => 200.00,
         'mode_paiement' => 'cheque',
@@ -130,9 +137,10 @@ it('can load existing recette for editing', function () {
 
 it('affiche le numero_piece en mode édition', function () {
     $recette = Recette::factory()->create([
+        'date' => '2025-12-01',
         'numero_piece' => '2025-2026:00007',
-        'compte_id'    => $this->compte->id,
-        'saisi_par'    => $this->user->id,
+        'compte_id' => $this->compte->id,
+        'saisi_par' => $this->user->id,
     ]);
 
     Livewire::test(RecetteForm::class)
@@ -142,6 +150,7 @@ it('affiche le numero_piece en mode édition', function () {
 
 it('can update a recette', function () {
     $recette = Recette::factory()->create([
+        'date' => '2025-10-15',
         'libelle' => 'Ancienne recette',
         'montant_total' => 100.00,
         'mode_paiement' => 'especes',
@@ -181,4 +190,41 @@ it('can update a recette', function () {
 
     // Old lignes replaced
     expect(RecetteLigne::where('recette_id', $recette->id)->count())->toBe(1);
+});
+
+it('rejette une date avant le début de l\'exercice', function () {
+    // exercice 2025 : 2025-09-01 → 2026-08-31
+    Livewire::test(RecetteForm::class)
+        ->call('showNewForm')
+        ->set('date', '2025-08-31')
+        ->set('libelle', 'Test')
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $this->compte->id)
+        ->set('lignes', [['sous_categorie_id' => $this->sousCategorie->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
+        ->call('save')
+        ->assertHasErrors(['date']);
+});
+
+it('rejette une date après la fin de l\'exercice', function () {
+    Livewire::test(RecetteForm::class)
+        ->call('showNewForm')
+        ->set('date', '2026-09-01')
+        ->set('libelle', 'Test')
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $this->compte->id)
+        ->set('lignes', [['sous_categorie_id' => $this->sousCategorie->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
+        ->call('save')
+        ->assertHasErrors(['date']);
+});
+
+it('accepte une date dans l\'exercice', function () {
+    Livewire::test(RecetteForm::class)
+        ->call('showNewForm')
+        ->set('date', '2025-10-01')
+        ->set('libelle', 'Test')
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $this->compte->id)
+        ->set('lignes', [['sous_categorie_id' => $this->sousCategorie->id, 'operation_id' => '', 'seance' => '', 'montant' => '100.00', 'notes' => '']])
+        ->call('save')
+        ->assertHasNoErrors(['date']);
 });

@@ -11,6 +11,7 @@ use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Recette;
 use App\Models\SousCategorie;
+use App\Services\ExerciceService;
 use App\Services\RecetteService;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -53,7 +54,7 @@ final class RecetteForm extends Component
         $this->resetValidation();
 
         $this->showForm = true;
-        $this->date = now()->format('Y-m-d');
+        $this->date = app(ExerciceService::class)->defaultDate();
 
         $this->compte_id = Recette::where('saisi_par', auth()->id())
             ->whereNotNull('compte_id')
@@ -132,18 +133,29 @@ final class RecetteForm extends Component
             }
         }
 
-        $this->validate([
-            'date' => ['required', 'date'],
-            'libelle' => ['required', 'string', 'max:255'],
-            'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
-            'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
-            'lignes' => ['required', 'array', 'min:1'],
-            'lignes.*.sous_categorie_id' => ['required', 'exists:sous_categories,id'],
-            'lignes.*.montant' => ['required', 'numeric', 'min:0.01'],
-            'lignes.*.operation_id' => ['nullable'],
-            'lignes.*.seance' => ['nullable', 'integer', 'min:1'],
-            'lignes.*.notes' => ['nullable', 'string', 'max:255'],
-        ]);
+        $exerciceService = app(ExerciceService::class);
+        $range = $exerciceService->dateRange($exerciceService->current());
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
+
+        $this->validate(
+            [
+                'date' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
+                'libelle' => ['required', 'string', 'max:255'],
+                'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
+                'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
+                'lignes' => ['required', 'array', 'min:1'],
+                'lignes.*.sous_categorie_id' => ['required', 'exists:sous_categories,id'],
+                'lignes.*.montant' => ['required', 'numeric', 'min:0.01'],
+                'lignes.*.operation_id' => ['nullable'],
+                'lignes.*.seance' => ['nullable', 'integer', 'min:1'],
+                'lignes.*.notes' => ['nullable', 'string', 'max:255'],
+            ],
+            [
+                'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
+                'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
+            ]
+        );
 
         $data = [
             'date' => $this->date,
