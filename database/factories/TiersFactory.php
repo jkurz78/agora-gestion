@@ -5,10 +5,13 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Tiers;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 final class TiersFactory extends Factory
 {
+    protected $model = Tiers::class;
+
     public function definition(): array
     {
         $type = fake()->randomElement(['entreprise', 'particulier']);

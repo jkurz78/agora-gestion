@@ -25,3 +25,13 @@ it('factory creates a valid tiers', function () {
     expect($tiers->nom)->not->toBeEmpty();
     expect($tiers->type)->toBeIn(['entreprise', 'particulier']);
 });
+
+it('pourDepenses state sets pour_depenses to true', function () {
+    $tiers = Tiers::factory()->pourDepenses()->make();
+    expect($tiers->pour_depenses)->toBeTrue();
+});
+
+it('pourRecettes state sets pour_recettes to true', function () {
+    $tiers = Tiers::factory()->pourRecettes()->make();
+    expect($tiers->pour_recettes)->toBeTrue();
+});
