@@ -80,7 +80,7 @@
                             <td class="text-muted small">{{ $tx->numero_piece ?? '—' }}</td>
                             <td>{{ \Carbon\Carbon::parse($tx->date)->format('d/m/Y') }}</td>
                             <td>{{ $tx->type_label }}</td>
-                            <td>{{ $tx->tiers?->displayName() ?? '—' }}</td>
+                            <td>{{ $tx->tiers ?: '—' }}</td>
                             <td>{{ $tx->libelle ?? '—' }}</td>
                             <td>{{ $tx->reference ?? '' }}</td>
                             <td class="text-end {{ $tx->montant >= 0 ? 'text-success' : 'text-danger' }} fw-semibold">
