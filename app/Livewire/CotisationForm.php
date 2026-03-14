@@ -27,16 +27,24 @@ final class CotisationForm extends Component
     public function mount(Membre $membre): void
     {
         $this->membre = $membre;
-        $this->date_paiement = now()->format('Y-m-d');
+        $this->date_paiement = app(ExerciceService::class)->defaultDate();
     }
 
     public function save(): void
     {
+        $exerciceService = app(ExerciceService::class);
+        $range = $exerciceService->dateRange($exerciceService->current());
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
+
         $validated = $this->validate([
             'montant' => ['required', 'numeric', 'min:0.01'],
-            'date_paiement' => ['required', 'date'],
+            'date_paiement' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
             'mode_paiement' => ['required', 'string'],
             'compte_id' => ['nullable'],
+        ], [
+            'date_paiement.after_or_equal' => 'La date de paiement doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
+            'date_paiement.before_or_equal' => 'La date de paiement doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
         ]);
 
         $validated['exercice'] = app(ExerciceService::class)->current();
@@ -46,7 +54,7 @@ final class CotisationForm extends Component
         app(CotisationService::class)->create($this->membre, $validated);
 
         $this->reset(['montant', 'mode_paiement', 'compte_id']);
-        $this->date_paiement = now()->format('Y-m-d');
+        $this->date_paiement = app(ExerciceService::class)->defaultDate();
 
         $this->membre->load('cotisations.compte');
     }
