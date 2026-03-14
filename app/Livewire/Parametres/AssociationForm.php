@@ -58,16 +58,17 @@ final class AssociationForm extends Component
         ];
 
         if ($this->logo !== null) {
-            if ($this->logo_path !== null && Storage::disk('public')->exists($this->logo_path)) {
-                Storage::disk('public')->delete($this->logo_path);
-            }
-
             $extension = $this->logo->extension();
             $path      = Storage::disk('public')->putFileAs('association', $this->logo, 'logo.'.$extension);
 
             if ($path === false) {
                 $this->addError('logo', 'Impossible de sauvegarder le logo.');
                 return;
+            }
+
+            // Delete old file only after new file is successfully written
+            if ($this->logo_path !== null && $this->logo_path !== $path && Storage::disk('public')->exists($this->logo_path)) {
+                Storage::disk('public')->delete($this->logo_path);
             }
 
             $data['logo_path'] = $path;
