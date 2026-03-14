@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Models\CompteBancaire;
 use App\Models\VirementInterne;
+use App\Services\ExerciceService;
 use App\Services\VirementInterneService;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -34,7 +35,7 @@ final class VirementInterneForm extends Component
             'compte_destination_id', 'reference', 'notes']);
         $this->resetValidation();
         $this->showForm = true;
-        $this->date = now()->format('Y-m-d');
+        $this->date = app(ExerciceService::class)->defaultDate();
     }
 
     #[On('edit-virement')]
@@ -64,8 +65,13 @@ final class VirementInterneForm extends Component
 
     public function save(): void
     {
+        $exerciceService = app(ExerciceService::class);
+        $range = $exerciceService->dateRange($exerciceService->current());
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
+
         $this->validate([
-            'date' => ['required', 'date'],
+            'date' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
             'montant' => ['required', 'numeric', 'min:0.01'],
             'compte_source_id' => ['required', 'exists:comptes_bancaires,id'],
             'compte_destination_id' => [
@@ -75,6 +81,9 @@ final class VirementInterneForm extends Component
             ],
             'reference' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:255'],
+        ], [
+            'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
+            'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
         ]);
 
         $data = [
