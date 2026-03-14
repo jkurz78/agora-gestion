@@ -9,7 +9,6 @@ use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Recette;
-use App\Services\ExerciceService;
 use App\Services\RecetteService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
@@ -22,8 +21,6 @@ final class RecetteList extends Component
 
     protected string $paginationTheme = 'bootstrap';
 
-    public ?int $exercice = null;
-
     public ?int $categorie_id = null;
 
     public ?int $sous_categorie_id = null;
@@ -35,16 +32,6 @@ final class RecetteList extends Component
     public ?string $pointe = null;
 
     public ?string $tiers = null;
-
-    public function mount(): void
-    {
-        $this->exercice = app(ExerciceService::class)->current();
-    }
-
-    public function updatedExercice(): void
-    {
-        $this->resetPage();
-    }
 
     public function updatedCategorieId(): void
     {
@@ -95,13 +82,12 @@ final class RecetteList extends Component
 
     public function render(): View
     {
+        $exercice = app(ExerciceService::class)->current();
+
         $query = Recette::with(['lignes.sousCategorie.categorie', 'compte', 'saisiPar'])
+            ->forExercice($exercice)
             ->latest('date')
             ->latest('id');
-
-        if ($this->exercice) {
-            $query->forExercice($this->exercice);
-        }
 
         if ($this->categorie_id) {
             $query->whereHas('lignes.sousCategorie', function ($q) {
@@ -133,15 +119,11 @@ final class RecetteList extends Component
             $query->where('tiers', 'like', '%'.$this->tiers.'%');
         }
 
-        $exerciceService = app(ExerciceService::class);
-
         return view('livewire.recette-list', [
             'recettes' => $query->paginate(15),
             'categories' => Categorie::where('type', TypeCategorie::Recette)->orderBy('nom')->get(),
             'operations' => Operation::orderBy('nom')->get(),
             'comptes' => CompteBancaire::orderBy('nom')->get(),
-            'exercices' => $exerciceService->available(),
-            'exerciceService' => $exerciceService,
         ]);
     }
 }

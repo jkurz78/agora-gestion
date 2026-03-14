@@ -1,15 +1,7 @@
 <div>
-    {{-- Header: title + exercice selector --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    {{-- Header --}}
+    <div class="mb-4">
         <h1 class="mb-0">Tableau de bord</h1>
-        <div style="min-width: 200px;">
-            <label for="dashboard-exercice" class="visually-hidden">Exercice</label>
-            <select wire:model.live="exercice" id="dashboard-exercice" class="form-select">
-                @foreach ($exercices as $ex)
-                    <option value="{{ $ex }}">{{ $exerciceService->label($ex) }}</option>
-                @endforeach
-            </select>
-        </div>
     </div>
 
     {{-- Row 1: Solde général + Comptes bancaires --}}

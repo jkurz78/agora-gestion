@@ -1,20 +1,4 @@
 <div>
-    {{-- Exercice selector --}}
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <label for="filter-exercice" class="form-label">Exercice</label>
-                    <select wire:model.live="exercice" id="filter-exercice" class="form-select form-select-sm">
-                        @foreach ($exercices as $ex)
-                            <option value="{{ $ex }}">{{ $exerciceService->label($ex) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-        </div>
-    </div>
-
     @php
         $totalChargesPrevu = 0;
         $totalChargesRealise = 0;

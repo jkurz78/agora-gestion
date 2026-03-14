@@ -3,14 +3,6 @@
     <div class="card mb-4">
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-3">
-                    <label for="filter-exercice" class="form-label">Exercice</label>
-                    <select wire:model.live="exercice" id="filter-exercice" class="form-select form-select-sm">
-                        @foreach ($exercices as $ex)
-                            <option value="{{ $ex }}">{{ $exerciceService->label($ex) }}</option>
-                        @endforeach
-                    </select>
-                </div>
                 <div class="col-md-6">
                     <label class="form-label">Filtrer par opérations</label>
                     <div class="d-flex flex-wrap gap-2">

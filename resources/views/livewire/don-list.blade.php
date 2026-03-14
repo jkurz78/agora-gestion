@@ -10,14 +10,6 @@
     <div class="card mb-4">
         <div class="card-body">
             <div class="row g-3">
-                <div class="col-md-2">
-                    <label for="filter-exercice" class="form-label">Exercice</label>
-                    <select wire:model.live="exercice" id="filter-exercice" class="form-select form-select-sm">
-                        @foreach ($exercices as $ex)
-                            <option value="{{ $ex }}">{{ $exerciceService->label($ex) }}</option>
-                        @endforeach
-                    </select>
-                </div>
                 <div class="col-md-3">
                     <label for="filter-donateur" class="form-label">Donateur</label>
                     <input type="text" wire:model.live.debounce.300ms="donateur_search" id="filter-donateur"

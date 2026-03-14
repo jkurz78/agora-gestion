@@ -11,14 +11,6 @@
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-2">
-                    <label for="filter-exercice" class="form-label">Exercice</label>
-                    <select wire:model.live="exercice" id="filter-exercice" class="form-select form-select-sm">
-                        @foreach ($exercices as $ex)
-                            <option value="{{ $ex }}">{{ $exerciceService->label($ex) }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-2">
                     <label for="filter-categorie" class="form-label">Catégorie</label>
                     <select wire:model.live="categorie_id" id="filter-categorie" class="form-select form-select-sm">
                         <option value="">Toutes</option>

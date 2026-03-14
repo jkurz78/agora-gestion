@@ -7,7 +7,6 @@ namespace App\Livewire;
 use App\Models\Don;
 use App\Models\Operation;
 use App\Services\DonService;
-use App\Services\ExerciceService;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -18,23 +17,11 @@ final class DonList extends Component
 
     protected string $paginationTheme = 'bootstrap';
 
-    public ?int $exercice = null;
-
     public string $donateur_search = '';
 
     public ?int $operation_id = null;
 
     public ?int $showDonateurId = null;
-
-    public function mount(): void
-    {
-        $this->exercice = app(ExerciceService::class)->current();
-    }
-
-    public function updatedExercice(): void
-    {
-        $this->resetPage();
-    }
 
     public function updatedDonateurSearch(): void
     {
@@ -69,13 +56,12 @@ final class DonList extends Component
 
     public function render()
     {
+        $exercice = app(ExerciceService::class)->current();
+
         $query = Don::with(['donateur', 'operation', 'compte'])
+            ->forExercice($exercice)
             ->latest('date')
             ->latest('id');
-
-        if ($this->exercice) {
-            $query->forExercice($this->exercice);
-        }
 
         if ($this->donateur_search !== '') {
             $search = $this->donateur_search;
@@ -96,13 +82,9 @@ final class DonList extends Component
                 ->get();
         }
 
-        $exerciceService = app(ExerciceService::class);
-
         return view('livewire.don-list', [
             'dons' => $query->paginate(15),
             'operations' => Operation::orderBy('nom')->get(),
-            'exercices' => $exerciceService->available(),
-            'exerciceService' => $exerciceService,
             'donateurDons' => $donateurDons,
         ]);
     }
