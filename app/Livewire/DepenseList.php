@@ -10,6 +10,7 @@ use App\Models\CompteBancaire;
 use App\Models\Depense;
 use App\Models\Operation;
 use App\Services\DepenseService;
+use App\Services\ExerciceService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;

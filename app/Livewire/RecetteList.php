@@ -9,6 +9,7 @@ use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Recette;
+use App\Services\ExerciceService;
 use App\Services\RecetteService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
