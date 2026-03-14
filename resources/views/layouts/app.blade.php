@@ -1,10 +1,17 @@
+@php
+    $association   = \App\Models\Association::find(1);
+    $nomAsso       = $association?->nom ?? 'Soigner•Vivre•Sourire';
+    $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
+        ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
+        : asset('images/logo.png');
+@endphp
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'Soigner•Vivre•Sourire Comptabilité' }}</title>
+    <title>{{ $title ?? $nomAsso.' Comptabilité' }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     @livewireStyles
@@ -14,9 +21,9 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center gap-2" href="{{ route('dashboard') }}">
-                <img src="{{ asset('images/logo.png') }}" alt="Soigner•Vivre•Sourire" height="45">
+                <img src="{{ $logoAsset }}" alt="{{ $nomAsso }}" height="45">
                 <span class="d-inline-block lh-sm">
-                    <span class="d-block">Soigner•Vivre•Sourire</span>
+                    <span class="d-block">{{ $nomAsso }}</span>
                     <span class="d-block small opacity-75">Comptabilité</span>
                 </span>
             </a>
