@@ -1,4 +1,4 @@
-<div class="position-relative">
+<div class="position-relative" x-data="{ highlighted: -1 }">
     @if($tiersId)
         {{-- Selected state --}}
         <div class="d-flex align-items-center gap-2 px-3 py-2 border rounded" style="background:#f0e8f5;border-color:#c9a8d8!important">
@@ -14,6 +14,27 @@
             placeholder="Tapez pour rechercher un tiers…"
             wire:model.live.debounce.300ms="search"
             autocomplete="off"
+            x-on:input="highlighted = -1"
+            x-on:keydown.down.prevent="
+                let items = $root.querySelectorAll('[data-nav-item]');
+                if (items.length > 0) {
+                    highlighted = Math.min(highlighted + 1, items.length - 1);
+                    items[highlighted]?.scrollIntoView({ block: 'nearest' });
+                }
+            "
+            x-on:keydown.up.prevent="
+                let items = $root.querySelectorAll('[data-nav-item]');
+                highlighted = Math.max(highlighted - 1, -1);
+                if (highlighted >= 0) items[highlighted]?.scrollIntoView({ block: 'nearest' });
+            "
+            x-on:keydown.enter.prevent="
+                let items = $root.querySelectorAll('[data-nav-item]');
+                if (highlighted >= 0 && items[highlighted]) {
+                    items[highlighted].click();
+                    highlighted = -1;
+                }
+            "
+            x-on:keydown.escape="$wire.set('open', false); highlighted = -1"
         >
 
         @if($open && (count($results) > 0 || strlen($search) > 0))
@@ -21,10 +42,12 @@
                 @foreach($results as $item)
                     <div
                         class="px-3 py-2 d-flex align-items-center gap-2"
+                        data-nav-item
                         style="cursor:pointer"
                         wire:click="selectTiers({{ $item['id'] }})"
-                        onmouseover="this.style.background='#f0e8f5'"
-                        onmouseout="this.style.background=''"
+                        x-on:mouseover="highlighted = {{ $loop->index }}"
+                        x-on:mouseout="highlighted = -1"
+                        :style="highlighted === {{ $loop->index }} ? 'background:#f0e8f5' : ''"
                     >
                         <span>{{ ($item['type'] ?? '') === 'entreprise' ? '🏢' : '👤' }}</span>
                         <span>{{ $item['label'] }}</span>
@@ -34,10 +57,12 @@
                 @if(strlen($search) > 0)
                     <div
                         class="px-3 py-2 border-top fw-medium"
+                        data-nav-item
                         style="cursor:pointer;color:#722281"
                         wire:click="openCreateModal"
-                        onmouseover="this.style.background='#f9f0fc'"
-                        onmouseout="this.style.background=''"
+                        x-on:mouseover="highlighted = {{ count($results) }}"
+                        x-on:mouseout="highlighted = -1"
+                        :style="highlighted === {{ count($results) }} ? 'background:#f9f0fc' : ''"
                     >
                         + Créer "{{ $search }}"
                     </div>
