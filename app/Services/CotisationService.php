@@ -5,20 +5,22 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Cotisation;
-use App\Models\Membre;
+use App\Models\Tiers;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 final class CotisationService
 {
-    public function create(Membre $membre, array $data): Cotisation
+    public function create(Tiers $tiers, array $data): Cotisation
     {
-        return DB::transaction(function () use ($membre, $data) {
+        return DB::transaction(function () use ($tiers, $data) {
             $data['numero_piece'] = app(NumeroPieceService::class)->assign(
                 Carbon::parse($data['date_paiement'])
             );
 
-            return $membre->cotisations()->create($data);
+            $data['tiers_id'] = $tiers->id;
+
+            return Cotisation::create($data);
         });
     }
 

@@ -6,8 +6,8 @@ use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
 use App\Models\Depense;
 use App\Models\Don;
-use App\Models\Membre;
 use App\Models\RapprochementBancaire;
+use App\Models\Tiers;
 use App\Models\Recette;
 use App\Models\User;
 use App\Services\RapprochementBancaireService;
@@ -178,9 +178,9 @@ test('supprimer dépointe aussi les dons et cotisations', function () {
         'rapprochement_id' => $rapprochement->id,
         'pointe' => true,
     ]);
-    $membre = Membre::factory()->create();
+    $tiers = Tiers::factory()->membre()->create();
     $cotisation = \App\Models\Cotisation::factory()->create([
-        'membre_id' => $membre->id,
+        'tiers_id' => $tiers->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
         'pointe' => true,

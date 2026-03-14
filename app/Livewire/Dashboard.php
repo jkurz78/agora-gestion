@@ -9,16 +9,17 @@ use App\Models\CompteBancaire;
 use App\Models\Cotisation;
 use App\Models\Depense;
 use App\Models\Don;
-use App\Models\Membre;
 use App\Models\Recette;
+use App\Models\Tiers;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
 use App\Services\SoldeService;
+use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 final class Dashboard extends Component
 {
-    public function render(): \Illuminate\Contracts\View\View
+    public function render(): View
     {
         $exerciceService = app(ExerciceService::class);
         $budgetService = app(BudgetService::class);
@@ -58,13 +59,13 @@ final class Dashboard extends Component
 
         // Derniers dons
         $derniersDons = Don::forExercice($exercice)
-            ->with('donateur')
+            ->with('tiers')
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
         // Membres sans cotisation pour l'exercice courant
-        $membresSansCotisation = Membre::whereDoesntHave('cotisations', function ($q) use ($exercice) {
+        $membresSansCotisation = Tiers::membres()->whereDoesntHave('cotisations', function ($q) use ($exercice) {
             $q->where('exercice', $exercice);
         })->orderBy('nom')->get();
 
@@ -73,7 +74,7 @@ final class Dashboard extends Component
         $comptesAvecSolde = CompteBancaire::orderBy('nom')->get()
             ->map(fn (CompteBancaire $c) => [
                 'compte' => $c,
-                'solde'  => $soldeService->solde($c),
+                'solde' => $soldeService->solde($c),
             ]);
 
         return view('livewire.dashboard', [

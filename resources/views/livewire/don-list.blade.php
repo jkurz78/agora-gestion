@@ -11,8 +11,8 @@
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-3">
-                    <label for="filter-donateur" class="form-label">Donateur</label>
-                    <input type="text" wire:model.live.debounce.300ms="donateur_search" id="filter-donateur"
+                    <label for="filter-tiers" class="form-label">Donateur</label>
+                    <input type="text" wire:model.live.debounce.300ms="tiers_search" id="filter-tiers"
                            class="form-control form-control-sm" placeholder="Rechercher un donateur...">
                 </div>
                 <div class="col-md-3">
@@ -48,10 +48,10 @@
                     <tr>
                         <td>{{ $don->date->format('d/m/Y') }}</td>
                         <td>
-                            @if ($don->donateur)
-                                <a href="#" wire:click.prevent="toggleDonateurHistory({{ $don->donateur->id }})"
+                            @if ($don->tiers)
+                                <a href="#" wire:click.prevent="toggleTiersHistory({{ $don->tiers->id }})"
                                    class="text-decoration-none">
-                                    {{ $don->donateur->nom }} {{ $don->donateur->prenom }}
+                                    {{ $don->tiers->displayName() }}
                                 </a>
                             @else
                                 <span class="text-muted fst-italic">Anonyme</span>
@@ -88,11 +88,11 @@
                         </td>
                     </tr>
 
-                    {{-- Donateur history inline --}}
-                    @if ($don->donateur && $showDonateurId === $don->donateur->id)
+                    {{-- Tiers history inline --}}
+                    @if ($don->tiers && $showTiersId === $don->tiers->id)
                         <tr>
                             <td colspan="8" class="bg-light p-3">
-                                <h6 class="mb-2">Historique des dons de {{ $don->donateur->nom }} {{ $don->donateur->prenom }}</h6>
+                                <h6 class="mb-2">Historique des dons de {{ $don->tiers->displayName() }}</h6>
                                 <table class="table table-sm table-bordered mb-0">
                                     <thead>
                                         <tr>
@@ -103,7 +103,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach ($donateurDons as $histDon)
+                                        @foreach ($tiersDons as $histDon)
                                             <tr>
                                                 <td>{{ $histDon->date->format('d/m/Y') }}</td>
                                                 <td class="text-end">{{ number_format((float) $histDon->montant, 2, ',', ' ') }} &euro;</td>

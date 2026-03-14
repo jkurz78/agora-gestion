@@ -117,7 +117,10 @@ final class RecetteList extends Component
         }
 
         if ($this->tiers) {
-            $query->where('tiers', 'like', '%'.$this->tiers.'%');
+            $tiersSearch = $this->tiers;
+            $query->whereHas('tiers', function ($q) use ($tiersSearch): void {
+                $q->whereRaw("TRIM(CONCAT(COALESCE(prenom,''), ' ', COALESCE(nom,''))) LIKE ?", ["%{$tiersSearch}%"]);
+            });
         }
 
         return view('livewire.recette-list', [

@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreMembreRequest;
 use App\Http\Requests\UpdateMembreRequest;
-use App\Models\Membre;
+use App\Models\Tiers;
 use App\Services\ExerciceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -21,7 +21,7 @@ final class MembreController extends Controller
     {
         $exercice = $this->exerciceService->current();
 
-        $membres = Membre::with(['cotisations' => function ($query) use ($exercice) {
+        $membres = Tiers::membres()->with(['cotisations' => function ($query) use ($exercice) {
             $query->forExercice($exercice);
         }])->orderBy('nom')->get();
 
@@ -39,13 +39,13 @@ final class MembreController extends Controller
 
     public function store(StoreMembreRequest $request): RedirectResponse
     {
-        Membre::create($request->validated());
+        Tiers::create($request->validated());
 
         return redirect()->route('membres.index')
             ->with('success', 'Membre ajouté avec succès.');
     }
 
-    public function show(Membre $membre): View
+    public function show(Tiers $membre): View
     {
         $membre->load('cotisations.compte');
 
@@ -54,14 +54,14 @@ final class MembreController extends Controller
         ]);
     }
 
-    public function edit(Membre $membre): View
+    public function edit(Tiers $membre): View
     {
         return view('membres.edit', [
             'membre' => $membre,
         ]);
     }
 
-    public function update(UpdateMembreRequest $request, Membre $membre): RedirectResponse
+    public function update(UpdateMembreRequest $request, Tiers $membre): RedirectResponse
     {
         $membre->update($request->validated());
 
@@ -69,7 +69,7 @@ final class MembreController extends Controller
             ->with('success', 'Membre mis à jour avec succès.');
     }
 
-    public function destroy(Membre $membre): RedirectResponse
+    public function destroy(Tiers $membre): RedirectResponse
     {
         $membre->delete();
 

@@ -2,7 +2,7 @@
 
 use App\Livewire\DonList;
 use App\Models\Don;
-use App\Models\Donateur;
+use App\Models\Tiers;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -17,13 +17,14 @@ afterEach(function () {
 });
 
 it('renders with dons', function () {
-    $donateur = Donateur::factory()->create([
+    $tiers = Tiers::factory()->pourRecettes()->create([
         'nom' => 'Dupont',
         'prenom' => 'Marie',
+        'type' => 'particulier',
     ]);
 
     Don::factory()->create([
-        'donateur_id' => $donateur->id,
+        'tiers_id' => $tiers->id,
         'date' => '2025-10-15',
         'montant' => 100.00,
         'saisi_par' => $this->user->id,
@@ -31,7 +32,7 @@ it('renders with dons', function () {
 
     Livewire::test(DonList::class)
         ->assertOk()
-        ->assertSee('Dupont Marie');
+        ->assertSee('Marie Dupont');
 });
 
 it('filters by exercice', function () {

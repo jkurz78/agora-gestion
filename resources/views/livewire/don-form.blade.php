@@ -60,65 +60,12 @@
                         </div>
                     </div>
 
-                    {{-- Donateur section --}}
+                    {{-- Tiers (donateur) section --}}
                     <div class="row g-3 mb-3">
-                        <div class="col-md-12">
-                            <div class="d-flex align-items-center gap-3 mb-2">
-                                <h6 class="mb-0">Donateur</h6>
-                                <div class="form-check form-switch">
-                                    <input type="checkbox" wire:model.live="creatingDonateur" class="form-check-input"
-                                           id="toggle-create-donateur">
-                                    <label class="form-check-label" for="toggle-create-donateur">
-                                        Créer un donateur
-                                    </label>
-                                </div>
-                            </div>
-
-                            @if (! $creatingDonateur)
-                                <div class="row g-3">
-                                    <div class="col-md-4">
-                                        <select wire:model="donateur_id" id="donateur_id"
-                                                class="form-select @error('donateur_id') is-invalid @enderror">
-                                            <option value="">-- Anonyme --</option>
-                                            @foreach ($donateurs as $donateur)
-                                                <option value="{{ $donateur->id }}">{{ $donateur->nom }} {{ $donateur->prenom }}</option>
-                                            @endforeach
-                                        </select>
-                                        @error('donateur_id')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                </div>
-                            @else
-                                <div class="row g-3">
-                                    <div class="col-md-3">
-                                        <label for="new_donateur_nom" class="form-label">Nom <span class="text-danger">*</span></label>
-                                        <input type="text" wire:model="new_donateur_nom" id="new_donateur_nom"
-                                               class="form-control @error('new_donateur_nom') is-invalid @enderror">
-                                        @error('new_donateur_nom')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label for="new_donateur_prenom" class="form-label">Prénom <span class="text-danger">*</span></label>
-                                        <input type="text" wire:model="new_donateur_prenom" id="new_donateur_prenom"
-                                               class="form-control @error('new_donateur_prenom') is-invalid @enderror">
-                                        @error('new_donateur_prenom')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label for="new_donateur_email" class="form-label">Email</label>
-                                        <input type="email" wire:model="new_donateur_email" id="new_donateur_email"
-                                               class="form-control">
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label for="new_donateur_adresse" class="form-label">Adresse</label>
-                                        <input type="text" wire:model="new_donateur_adresse" id="new_donateur_adresse"
-                                               class="form-control">
-                                    </div>
-                                </div>
-                            @endif
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Tiers (donateur)</label>
+                            <livewire:tiers-autocomplete wire:model="tiers_id" filtre="dons" :key="'don-tiers-'.($donId ?? 'new')" />
+                            @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
                     </div>
 

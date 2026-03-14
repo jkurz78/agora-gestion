@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 use App\Models\CompteBancaire;
 use App\Models\Cotisation;
-use App\Models\Don;
-use App\Models\Donateur;
 use App\Models\Depense;
-use App\Models\Membre;
+use App\Models\Don;
 use App\Models\Recette;
+use App\Models\Tiers;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\TransactionCompteService;
@@ -74,10 +73,10 @@ it('retourne une depense avec montant negatif', function () {
 });
 
 it('retourne un don avec le nom du donateur comme tiers', function () {
-    $donateur = Donateur::factory()->create(['prenom' => 'Marie', 'nom' => 'Dupont']);
+    $tiers = Tiers::factory()->pourRecettes()->create(['prenom' => 'Marie', 'nom' => 'Dupont', 'type' => 'particulier']);
     Don::factory()->create([
         'compte_id' => $this->compte->id,
-        'donateur_id' => $donateur->id,
+        'tiers_id' => $tiers->id,
         'montant' => 50.00,
         'date' => '2025-10-03',
         'saisi_par' => $this->user->id,
@@ -103,10 +102,10 @@ it('retourne un don avec le nom du donateur comme tiers', function () {
 });
 
 it('retourne une cotisation avec le nom du membre comme tiers', function () {
-    $membre = Membre::factory()->create(['prenom' => 'Jean', 'nom' => 'Martin']);
+    $tiers = Tiers::factory()->membre()->create(['prenom' => 'Jean', 'nom' => 'Martin']);
     Cotisation::factory()->create([
         'compte_id' => $this->compte->id,
-        'membre_id' => $membre->id,
+        'tiers_id' => $tiers->id,
         'montant' => 80.00,
         'date_paiement' => '2025-10-04',
     ]);
@@ -215,16 +214,29 @@ it('filtre par date : seules les transactions dans la plage apparaissent', funct
 });
 
 it('filtre par tiers : seules les transactions correspondantes apparaissent', function () {
+    $tiersTartempion = \App\Models\Tiers::factory()->create([
+        'type' => 'entreprise',
+        'nom' => 'Association Tartempion',
+        'prenom' => null,
+        'pour_recettes' => true,
+    ]);
+    $tiersLyon = \App\Models\Tiers::factory()->create([
+        'type' => 'entreprise',
+        'nom' => 'Mairie de Lyon',
+        'prenom' => null,
+        'pour_recettes' => true,
+    ]);
+
     Recette::factory()->create([
         'compte_id' => $this->compte->id,
-        'tiers' => 'Association Tartempion',
+        'tiers_id' => $tiersTartempion->id,
         'montant_total' => 100.00,
         'date' => '2025-10-10',
         'saisi_par' => $this->user->id,
     ]);
     Recette::factory()->create([
         'compte_id' => $this->compte->id,
-        'tiers' => 'Mairie de Lyon',
+        'tiers_id' => $tiersLyon->id,
         'montant_total' => 200.00,
         'date' => '2025-10-11',
         'saisi_par' => $this->user->id,
@@ -291,7 +303,7 @@ it('soldeAvantPage sur page 2 est égal à solde_initial + somme des 15 premièr
         Recette::factory()->create([
             'compte_id' => $this->compte->id,
             'montant_total' => 10.00,
-            'date' => '2025-10-' . str_pad((string) $i, 2, '0', STR_PAD_LEFT),
+            'date' => '2025-10-'.str_pad((string) $i, 2, '0', STR_PAD_LEFT),
             'saisi_par' => $this->user->id,
         ]);
     }

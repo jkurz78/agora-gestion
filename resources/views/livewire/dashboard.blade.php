@@ -170,7 +170,7 @@
                                 @forelse ($derniersDons as $don)
                                     <tr>
                                         <td>{{ $don->date->format('d/m/Y') }}</td>
-                                        <td>{{ $don->donateur ? $don->donateur->nom . ' ' . $don->donateur->prenom : 'Anonyme' }}</td>
+                                        <td>{{ $don->tiers ? $don->tiers->displayName() : 'Anonyme' }}</td>
                                         <td class="text-end">{{ number_format((float) $don->montant, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty
@@ -204,7 +204,7 @@
                                     <tr>
                                         <td>{{ $membre->nom }}</td>
                                         <td>{{ $membre->prenom }}</td>
-                                        <td>{{ $membre->statut->value }}</td>
+                                        <td>{{ ucfirst($membre->statut_membre ?? '—') }}</td>
                                     </tr>
                                 @empty
                                     <tr>

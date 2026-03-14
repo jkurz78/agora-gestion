@@ -153,7 +153,7 @@ final class TransactionCompteList extends Component
             return route('membres.index');
         }
 
-        return route('membres.index').'?membre='.$cotisation->membre_id.'&edit='.$id;
+        return route('membres.index').'?membre='.$cotisation->tiers_id.'&edit='.$id;
     }
 
     public function render(): mixed

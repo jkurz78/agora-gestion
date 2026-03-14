@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Laravel Sail",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "-f", "/Users/jurgen/Library/CloudStorage/SynologyDrive-home/dev/svs-accounting/compose.yaml", "--project-directory", "/Users/jurgen/Library/CloudStorage/SynologyDrive-home/dev/svs-accounting", "up"],
+      "port": 80
+    }
+  ]
+}

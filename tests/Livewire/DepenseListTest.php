@@ -74,15 +74,18 @@ it('displays reference column in depense list', function () {
 });
 
 it('filters depenses by tiers', function () {
+    $tiersAlpha = \App\Models\Tiers::factory()->create(['nom' => 'Alpha Corp', 'pour_depenses' => true]);
+    $tiersBeta = \App\Models\Tiers::factory()->create(['nom' => 'Beta SA', 'pour_depenses' => true]);
+
     Depense::factory()->create([
         'libelle' => 'Dépense Alpha',
-        'tiers' => 'Alpha Corp',
+        'tiers_id' => $tiersAlpha->id,
         'date' => '2025-10-15',
         'saisi_par' => $this->user->id,
     ]);
     Depense::factory()->create([
         'libelle' => 'Dépense Beta',
-        'tiers' => 'Beta SA',
+        'tiers_id' => $tiersBeta->id,
         'date' => '2025-10-15',
         'saisi_par' => $this->user->id,
     ]);

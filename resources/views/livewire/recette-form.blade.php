@@ -45,8 +45,9 @@
                             @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
-                            <label for="tiers" class="form-label">Tiers</label>
-                            <input type="text" wire:model="tiers" id="tiers" class="form-control">
+                            <label class="form-label">Tiers</label>
+                            <livewire:tiers-autocomplete wire:model="tiers_id" filtre="recettes" :key="'recette-tiers-'.($recetteId ?? 'new')" />
+                            @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>

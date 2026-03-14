@@ -36,9 +36,22 @@ it('shows transactions when compte is selected', function () {
 });
 
 it('filtre par tiers', function () {
+    $tiersFondation = \App\Models\Tiers::factory()->create([
+        'type' => 'entreprise',
+        'nom' => 'Fondation ABC',
+        'prenom' => null,
+        'pour_recettes' => true,
+    ]);
+    $tiersMairie = \App\Models\Tiers::factory()->create([
+        'type' => 'entreprise',
+        'nom' => 'Mairie XYZ',
+        'prenom' => null,
+        'pour_recettes' => true,
+    ]);
+
     Recette::factory()->create([
         'compte_id' => $this->compte->id,
-        'tiers' => 'Fondation ABC',
+        'tiers_id' => $tiersFondation->id,
         'libelle' => 'Subvention',
         'montant_total' => 500.00,
         'date' => '2025-10-01',
@@ -46,7 +59,7 @@ it('filtre par tiers', function () {
     ]);
     Recette::factory()->create([
         'compte_id' => $this->compte->id,
-        'tiers' => 'Mairie XYZ',
+        'tiers_id' => $tiersMairie->id,
         'libelle' => 'Autre recette',
         'montant_total' => 100.00,
         'date' => '2025-10-02',

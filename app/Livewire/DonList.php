@@ -18,13 +18,13 @@ final class DonList extends Component
 
     protected string $paginationTheme = 'bootstrap';
 
-    public string $donateur_search = '';
+    public string $tiers_search = '';
 
     public ?int $operation_id = null;
 
-    public ?int $showDonateurId = null;
+    public ?int $showTiersId = null;
 
-    public function updatedDonateurSearch(): void
+    public function updatedTiersSearch(): void
     {
         $this->resetPage();
     }
@@ -34,9 +34,9 @@ final class DonList extends Component
         $this->resetPage();
     }
 
-    public function toggleDonateurHistory(int $donateurId): void
+    public function toggleTiersHistory(int $tiersId): void
     {
-        $this->showDonateurId = $this->showDonateurId === $donateurId ? null : $donateurId;
+        $this->showTiersId = $this->showTiersId === $tiersId ? null : $tiersId;
     }
 
     public function delete(int $id): void
@@ -59,14 +59,14 @@ final class DonList extends Component
     {
         $exercice = app(ExerciceService::class)->current();
 
-        $query = Don::with(['donateur', 'operation', 'compte'])
+        $query = Don::with(['tiers', 'operation', 'compte'])
             ->forExercice($exercice)
             ->latest('date')
             ->latest('id');
 
-        if ($this->donateur_search !== '') {
-            $search = $this->donateur_search;
-            $query->whereHas('donateur', function ($q) use ($search) {
+        if ($this->tiers_search !== '') {
+            $search = $this->tiers_search;
+            $query->whereHas('tiers', function ($q) use ($search) {
                 $q->where('nom', 'like', "%{$search}%")
                     ->orWhere('prenom', 'like', "%{$search}%");
             });
@@ -76,9 +76,9 @@ final class DonList extends Component
             $query->where('operation_id', $this->operation_id);
         }
 
-        $donateurDons = collect();
-        if ($this->showDonateurId) {
-            $donateurDons = Don::where('donateur_id', $this->showDonateurId)
+        $tiersDons = collect();
+        if ($this->showTiersId) {
+            $tiersDons = Don::where('tiers_id', $this->showTiersId)
                 ->latest('date')
                 ->get();
         }
@@ -86,7 +86,7 @@ final class DonList extends Component
         return view('livewire.don-list', [
             'dons' => $query->paginate(15),
             'operations' => Operation::orderBy('nom')->get(),
-            'donateurDons' => $donateurDons,
+            'tiersDons' => $tiersDons,
         ]);
     }
 }

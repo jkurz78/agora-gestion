@@ -42,18 +42,18 @@
 
                         <dt class="col-sm-4">Statut</dt>
                         <dd class="col-sm-8">
-                            <span class="badge {{ $membre->statut === \App\Enums\StatutMembre::Actif ? 'bg-success' : 'bg-secondary' }}">
-                                {{ $membre->statut->label() }}
+                            <span class="badge {{ $membre->statut_membre === 'actif' ? 'bg-success' : 'bg-secondary' }}">
+                                {{ ucfirst($membre->statut_membre ?? '—') }}
                             </span>
                         </dd>
 
                         <dt class="col-sm-4">Notes</dt>
-                        <dd class="col-sm-8">{{ $membre->notes ?? '—' }}</dd>
+                        <dd class="col-sm-8">{{ $membre->notes_membre ?? '—' }}</dd>
                     </dl>
                 </div>
             </div>
         </div>
     </div>
 
-    <livewire:cotisation-form :membre="$membre" />
+    <livewire:cotisation-form :tiers="$membre" />
 </x-app-layout>

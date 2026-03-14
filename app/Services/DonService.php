@@ -5,20 +5,14 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Don;
-use App\Models\Donateur;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 final class DonService
 {
-    public function create(array $data, ?array $newDonateur = null): Don
+    public function create(array $data): Don
     {
-        return DB::transaction(function () use ($data, $newDonateur) {
-            if ($newDonateur) {
-                $donateur = Donateur::create($newDonateur);
-                $data['donateur_id'] = $donateur->id;
-            }
-
+        return DB::transaction(function () use ($data) {
             $data['saisi_par'] = auth()->id();
             $data['numero_piece'] = app(NumeroPieceService::class)->assign(Carbon::parse($data['date']));
 

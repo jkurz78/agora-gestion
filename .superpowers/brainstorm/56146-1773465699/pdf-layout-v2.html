@@ -1,0 +1,133 @@
+<h2>Mise en page PDF — avec logo</h2>
+<p class="subtitle">Logo à gauche, titre du document à droite. Cliquez pour valider.</p>
+
+<div class="cards" style="max-width: 720px; margin: 0 auto;">
+  <div class="card" data-choice="layout-v2" onclick="toggleSelect(this)" style="cursor:pointer; padding: 0; overflow: hidden;">
+    <div class="card-body" style="padding: 0;">
+
+      <div style="background: white; border: 1px solid #ddd; font-family: serif; font-size: 12px; color: #222; padding: 24px 32px; min-height: 520px;">
+
+        <!-- En-tête avec logo -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #333; padding-bottom: 14px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <!-- Logo placeholder -->
+            <div style="width: 56px; height: 56px; background: #e8e8e8; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #888; text-align: center; line-height: 1.3;">
+              logo.png<br>56×56
+            </div>
+            <div>
+              <div style="font-size: 15px; font-weight: bold; margin-bottom: 2px;">Association SVS</div>
+              <div style="color: #555; font-size: 10px;">12 rue des Lilas, 75001 Paris</div>
+              <div style="color: #555; font-size: 10px;">contact@svs.fr — 01 23 45 67 89</div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 13px; font-weight: bold; color: #333; text-transform: uppercase; letter-spacing: 0.5px;">Rapprochement bancaire</div>
+            <div style="font-size: 10px; color: #777; margin-top: 3px;">Généré le 14/03/2026</div>
+          </div>
+        </div>
+
+        <!-- Infos rapprochement -->
+        <div style="background: #f5f5f5; border-radius: 4px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between;">
+          <div>
+            <div style="color: #777; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;">Compte</div>
+            <strong style="font-size: 12px;">Compte Courant BNP</strong>
+          </div>
+          <div>
+            <div style="color: #777; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;">Date de relevé</div>
+            <strong style="font-size: 12px;">28/02/2026</strong>
+          </div>
+          <div>
+            <div style="color: #777; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;">Statut</div>
+            <strong style="font-size: 12px;">✓ Verrouillé</strong>
+          </div>
+          <div>
+            <div style="color: #777; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px;">Saisi par</div>
+            <strong style="font-size: 12px;">Admin</strong>
+          </div>
+        </div>
+
+        <!-- Bandeau soldes -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <div style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 7px 10px; text-align: center;">
+            <div style="font-size: 9px; color: #777; text-transform: uppercase;">Solde ouverture</div>
+            <div style="font-weight: bold; font-size: 12px; margin-top: 2px;">12 500,00 €</div>
+          </div>
+          <div style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 7px 10px; text-align: center;">
+            <div style="font-size: 9px; color: #777; text-transform: uppercase;">Solde relevé</div>
+            <div style="font-weight: bold; font-size: 12px; margin-top: 2px;">11 830,00 €</div>
+          </div>
+          <div style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 7px 10px; text-align: center;">
+            <div style="font-size: 9px; color: #777; text-transform: uppercase;">Solde pointé</div>
+            <div style="font-weight: bold; font-size: 12px; margin-top: 2px;">11 830,00 €</div>
+          </div>
+          <div style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 7px 10px; text-align: center; border-color: #198754;">
+            <div style="font-size: 9px; color: #777; text-transform: uppercase;">Écart</div>
+            <div style="font-weight: bold; font-size: 12px; margin-top: 2px; color: #198754;">0,00 €</div>
+          </div>
+        </div>
+
+        <!-- Tableau transactions pointées -->
+        <div style="font-weight: bold; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; color: #444;">
+          Transactions pointées (3)
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 10.5px;">
+          <thead>
+            <tr style="background: #333; color: white;">
+              <th style="padding: 5px 7px; text-align: left; font-weight: 600;">Date</th>
+              <th style="padding: 5px 7px; text-align: left; font-weight: 600;">Type</th>
+              <th style="padding: 5px 7px; text-align: left; font-weight: 600;">Libellé</th>
+              <th style="padding: 5px 7px; text-align: left; font-weight: 600;">Réf.</th>
+              <th style="padding: 5px 7px; text-align: right; font-weight: 600;">Débit</th>
+              <th style="padding: 5px 7px; text-align: right; font-weight: 600;">Crédit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: #f9f9f9;">
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee;">05/02/2026</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee;">Dépense</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee;">Achat fournitures bureau</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee; color: #888;">FA-2026-042</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee; text-align: right; color: #dc3545;">320,00 €</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee; text-align: right;"></td>
+            </tr>
+            <tr>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee;">12/02/2026</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee;">Recette</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee;">Subvention mairie</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee; color: #888;">—</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee; text-align: right;"></td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee; text-align: right; color: #198754;">1 500,00 €</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee;">20/02/2026</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee;">Don</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee;">Martin Dupont</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee; color: #888;">—</td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee; text-align: right;"></td>
+              <td style="padding: 4px 7px; border-bottom: 1px solid #eee; text-align: right; color: #198754;">150,00 €</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr style="font-weight: bold; background: #eee;">
+              <td colspan="4" style="padding: 5px 7px; text-align: right;">Totaux</td>
+              <td style="padding: 5px 7px; text-align: right; color: #dc3545;">320,00 €</td>
+              <td style="padding: 5px 7px; text-align: right; color: #198754;">1 650,00 €</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <!-- Pied de page -->
+        <div style="margin-top: 20px; padding-top: 8px; border-top: 1px solid #ddd; color: #999; font-size: 9px; display: flex; justify-content: space-between;">
+          <span>SVS Accounting — Document généré automatiquement</span>
+          <span>Page 1</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="text-align:center; margin-top: 14px; color: #666; font-size: 13px;">
+  Le logo sera lu depuis <code>public/images/logo.png</code> et intégré en base64 dans le PDF.<br>
+  Cliquez pour valider ou dites-moi ce que vous souhaitez ajuster.
+</p>
