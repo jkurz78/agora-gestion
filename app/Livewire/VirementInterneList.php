@@ -17,18 +17,6 @@ final class VirementInterneList extends Component
 
     protected string $paginationTheme = 'bootstrap';
 
-    public ?int $exercice = null;
-
-    public function mount(): void
-    {
-        $this->exercice = app(ExerciceService::class)->current();
-    }
-
-    public function updatedExercice(): void
-    {
-        $this->resetPage();
-    }
-
     #[On('virement-saved')]
     public function refresh(): void {}
 
@@ -44,8 +32,10 @@ final class VirementInterneList extends Component
 
     public function render(): \Illuminate\View\View
     {
+        $exercice = app(ExerciceService::class)->current();
+
         $virements = VirementInterne::with(['compteSource', 'compteDestination', 'saisiPar'])
-            ->when($this->exercice, fn ($q) => $q->forExercice($this->exercice))
+            ->forExercice($exercice)
             ->orderByDesc('date')
             ->paginate(20);
 
