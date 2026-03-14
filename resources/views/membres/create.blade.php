@@ -16,9 +16,9 @@
                         @enderror
                     </div>
                     <div class="col-md-6">
-                        <label for="prenom" class="form-label">Prénom <span class="text-danger">*</span></label>
+                        <label for="prenom" class="form-label">Prénom</label>
                         <input type="text" name="prenom" id="prenom" class="form-control @error('prenom') is-invalid @enderror"
-                               value="{{ old('prenom') }}" required maxlength="100">
+                               value="{{ old('prenom') }}" maxlength="100">
                         @error('prenom')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -64,25 +64,22 @@
                         @enderror
                     </div>
                     <div class="col-md-6">
-                        <label for="statut" class="form-label">Statut <span class="text-danger">*</span></label>
-                        <select name="statut" id="statut" class="form-select @error('statut') is-invalid @enderror" required>
-                            @foreach (\App\Enums\StatutMembre::cases() as $statut)
-                                <option value="{{ $statut->value }}" {{ old('statut', 'actif') === $statut->value ? 'selected' : '' }}>
-                                    {{ $statut->label() }}
-                                </option>
-                            @endforeach
+                        <label for="statut_membre" class="form-label">Statut <span class="text-danger">*</span></label>
+                        <select name="statut_membre" id="statut_membre" class="form-select @error('statut_membre') is-invalid @enderror" required>
+                            <option value="actif" {{ old('statut_membre', 'actif') === 'actif' ? 'selected' : '' }}>Actif</option>
+                            <option value="inactif" {{ old('statut_membre', 'actif') === 'inactif' ? 'selected' : '' }}>Inactif</option>
                         </select>
-                        @error('statut')
+                        @error('statut_membre')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <label for="notes" class="form-label">Notes</label>
-                    <textarea name="notes" id="notes" class="form-control @error('notes') is-invalid @enderror"
-                              rows="2">{{ old('notes') }}</textarea>
-                    @error('notes')
+                    <label for="notes_membre" class="form-label">Notes</label>
+                    <textarea name="notes_membre" id="notes_membre" class="form-control @error('notes_membre') is-invalid @enderror"
+                              rows="2">{{ old('notes_membre') }}</textarea>
+                    @error('notes_membre')
                         <div class="invalid-feedback">{{ $message }}</div>
                     @enderror
                 </div>

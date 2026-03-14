@@ -3,7 +3,7 @@
 use App\Livewire\DonForm;
 use App\Models\CompteBancaire;
 use App\Models\Don;
-use App\Models\Donateur;
+use App\Models\Tiers;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -26,10 +26,11 @@ it('renders the form component', function () {
         ->assertSee('Nouveau don');
 });
 
-it('can save a don with existing donateur', function () {
-    $donateur = Donateur::factory()->create([
+it('can save a don with existing tiers', function () {
+    $tiers = Tiers::factory()->pourRecettes()->create([
         'nom' => 'Dupont',
         'prenom' => 'Jean',
+        'type' => 'particulier',
     ]);
 
     Livewire::test(DonForm::class)
@@ -37,7 +38,7 @@ it('can save a don with existing donateur', function () {
         ->set('date', '2025-10-15')
         ->set('montant', '100.00')
         ->set('mode_paiement', 'virement')
-        ->set('donateur_id', $donateur->id)
+        ->set('tiers_id', $tiers->id)
         ->set('compte_id', $this->compte->id)
         ->call('save')
         ->assertHasNoErrors()
@@ -46,7 +47,7 @@ it('can save a don with existing donateur', function () {
     $this->assertDatabaseHas('dons', [
         'montant' => '100.00',
         'mode_paiement' => 'virement',
-        'donateur_id' => $donateur->id,
+        'tiers_id' => $tiers->id,
         'saisi_par' => $this->user->id,
     ]);
 });
@@ -64,35 +65,7 @@ it('can save an anonymous don', function () {
     $this->assertDatabaseHas('dons', [
         'montant' => '50.00',
         'mode_paiement' => 'especes',
-        'donateur_id' => null,
-        'saisi_par' => $this->user->id,
-    ]);
-});
-
-it('can save a don with new donateur (inline creation)', function () {
-    Livewire::test(DonForm::class)
-        ->set('showForm', true)
-        ->set('date', '2025-10-15')
-        ->set('montant', '200.00')
-        ->set('mode_paiement', 'cheque')
-        ->set('creatingDonateur', true)
-        ->set('new_donateur_nom', 'Martin')
-        ->set('new_donateur_prenom', 'Sophie')
-        ->set('new_donateur_email', 'sophie@example.com')
-        ->call('save')
-        ->assertHasNoErrors()
-        ->assertDispatched('don-saved');
-
-    $this->assertDatabaseHas('donateurs', [
-        'nom' => 'Martin',
-        'prenom' => 'Sophie',
-        'email' => 'sophie@example.com',
-    ]);
-
-    $donateur = Donateur::where('nom', 'Martin')->first();
-    $this->assertDatabaseHas('dons', [
-        'montant' => '200.00',
-        'donateur_id' => $donateur->id,
+        'tiers_id' => null,
         'saisi_par' => $this->user->id,
     ]);
 });
@@ -104,21 +77,10 @@ it('validates required fields', function () {
         ->assertHasErrors(['date', 'montant', 'mode_paiement']);
 });
 
-it('validates new donateur required fields when creating', function () {
-    Livewire::test(DonForm::class)
-        ->set('showForm', true)
-        ->set('date', '2025-10-15')
-        ->set('montant', '100.00')
-        ->set('mode_paiement', 'virement')
-        ->set('creatingDonateur', true)
-        ->call('save')
-        ->assertHasErrors(['new_donateur_nom', 'new_donateur_prenom']);
-});
-
 it('can load existing don for editing', function () {
-    $donateur = Donateur::factory()->create();
+    $tiers = Tiers::factory()->pourRecettes()->create();
     $don = Don::factory()->create([
-        'donateur_id' => $donateur->id,
+        'tiers_id' => $tiers->id,
         'montant' => 150.00,
         'mode_paiement' => 'cb',
         'objet' => 'Don annuel',

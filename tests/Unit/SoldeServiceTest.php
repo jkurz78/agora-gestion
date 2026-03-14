@@ -4,8 +4,8 @@ use App\Models\CompteBancaire;
 use App\Models\Cotisation;
 use App\Models\Depense;
 use App\Models\Don;
-use App\Models\Membre;
 use App\Models\Recette;
+use App\Models\Tiers;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\SoldeService;
@@ -66,12 +66,12 @@ it('adds cotisations (date_paiement) since date_solde_initial', function () {
         'solde_initial'      => 0.00,
         'date_solde_initial' => '2024-01-01',
     ]);
-    $membre = Membre::factory()->create();
+    $tiers = Tiers::factory()->membre()->create();
     Cotisation::factory()->create([
         'compte_id'     => $compte->id,
         'montant'       => 50.00,
         'date_paiement' => '2024-02-01',
-        'membre_id'     => $membre->id,
+        'tiers_id'      => $tiers->id,
     ]);
 
     expect($this->service->solde($compte))->toBe(50.0);

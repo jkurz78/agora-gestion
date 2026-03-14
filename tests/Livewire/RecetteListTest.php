@@ -74,15 +74,18 @@ it('displays reference column in recette list', function () {
 });
 
 it('filters recettes by tiers', function () {
+    $tiersGamma = \App\Models\Tiers::factory()->create(['nom' => 'Gamma SARL', 'pour_recettes' => true]);
+    $tiersDelta = \App\Models\Tiers::factory()->create(['nom' => 'Delta Inc', 'pour_recettes' => true]);
+
     Recette::factory()->create([
         'libelle' => 'Recette Gamma',
-        'tiers' => 'Gamma SARL',
+        'tiers_id' => $tiersGamma->id,
         'date' => '2025-10-15',
         'saisi_par' => $this->user->id,
     ]);
     Recette::factory()->create([
         'libelle' => 'Recette Delta',
-        'tiers' => 'Delta Inc',
+        'tiers_id' => $tiersDelta->id,
         'date' => '2025-10-15',
         'saisi_par' => $this->user->id,
     ]);

@@ -4,8 +4,8 @@ use App\Livewire\Dashboard;
 use App\Models\CompteBancaire;
 use App\Models\Cotisation;
 use App\Models\Depense;
-use App\Models\Membre;
 use App\Models\Recette;
+use App\Models\Tiers;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -58,16 +58,16 @@ it('displays solde general', function () {
 });
 
 it('shows membres without cotisation', function () {
-    $membreWithCotisation = Membre::factory()->create([
+    $tiersWithCotisation = Tiers::factory()->membre()->create([
         'nom' => 'Durand',
         'prenom' => 'Marie',
     ]);
     Cotisation::factory()->create([
-        'membre_id' => $membreWithCotisation->id,
+        'tiers_id' => $tiersWithCotisation->id,
         'exercice' => $this->exercice,
     ]);
 
-    $membreSansCotisation = Membre::factory()->create([
+    $tiersSansCotisation = Tiers::factory()->membre()->create([
         'nom' => 'Martin',
         'prenom' => 'Pierre',
     ]);

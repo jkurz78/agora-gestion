@@ -26,8 +26,8 @@
                             <td>{{ $membre->prenom }}</td>
                             <td>{{ $membre->email ?? '—' }}</td>
                             <td>
-                                <span class="badge {{ $membre->statut === \App\Enums\StatutMembre::Actif ? 'bg-success' : 'bg-secondary' }}">
-                                    {{ $membre->statut->label() }}
+                                <span class="badge {{ $membre->statut_membre === 'actif' ? 'bg-success' : 'bg-secondary' }}">
+                                    {{ ucfirst($membre->statut_membre ?? '—') }}
                                 </span>
                             </td>
                             <td>

@@ -6,8 +6,8 @@ use App\Enums\StatutRapprochement;
 use App\Models\Cotisation;
 use App\Models\Depense;
 use App\Models\Don;
-use App\Models\Membre;
 use App\Models\CompteBancaire;
+use App\Models\Tiers;
 use App\Models\RapprochementBancaire;
 use App\Models\Recette;
 use App\Models\User;
@@ -86,9 +86,9 @@ test('CotisationService::delete lève une exception si la cotisation est pointé
         'statut' => StatutRapprochement::EnCours,
         'saisi_par' => $this->user->id,
     ]);
-    $membre = Membre::factory()->create();
+    $tiers = Tiers::factory()->membre()->create();
     $cotisation = Cotisation::factory()->create([
-        'membre_id' => $membre->id,
+        'tiers_id' => $tiers->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
         'pointe' => true,
@@ -151,9 +151,9 @@ test('DonService::delete réussit si le don n\'est pas pointé', function () {
 });
 
 test('CotisationService::delete réussit si la cotisation n\'est pas pointée', function () {
-    $membre = Membre::factory()->create();
+    $tiers = Tiers::factory()->membre()->create();
     $cotisation = Cotisation::factory()->create([
-        'membre_id' => $membre->id,
+        'tiers_id' => $tiers->id,
         'compte_id' => $this->compte->id,
     ]);
 

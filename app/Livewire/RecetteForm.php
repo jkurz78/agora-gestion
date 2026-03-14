@@ -26,7 +26,7 @@ final class RecetteForm extends Component
 
     public string $mode_paiement = '';
 
-    public ?string $tiers = null;
+    public ?int $tiers_id = null;
 
     public ?string $reference = null;
 
@@ -49,7 +49,7 @@ final class RecetteForm extends Component
     public function showNewForm(): void
     {
         $this->reset(['recetteId', 'date', 'libelle', 'mode_paiement',
-            'tiers', 'reference', 'compte_id', 'notes', 'lignes']);
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes']);
         $this->isLocked = false;
         $this->resetValidation();
 
@@ -90,7 +90,7 @@ final class RecetteForm extends Component
         $this->date = $recette->date->format('Y-m-d');
         $this->libelle = $recette->libelle;
         $this->mode_paiement = $recette->mode_paiement->value;
-        $this->tiers = $recette->tiers;
+        $this->tiers_id = $recette->tiers_id;
         $this->reference = $recette->reference;
         $this->compte_id = $recette->compte_id;
         $this->notes = $recette->notes;
@@ -111,7 +111,7 @@ final class RecetteForm extends Component
     {
         $this->reset([
             'recetteId', 'date', 'libelle', 'mode_paiement',
-            'tiers', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
         ]);
         $this->resetValidation();
     }
@@ -143,6 +143,7 @@ final class RecetteForm extends Component
                 'date' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
                 'libelle' => ['required', 'string', 'max:255'],
                 'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
+                'tiers_id' => ['nullable', 'exists:tiers,id'],
                 'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
                 'lignes' => ['required', 'array', 'min:1'],
                 'lignes.*.sous_categorie_id' => ['required', 'exists:sous_categories,id'],
@@ -162,7 +163,7 @@ final class RecetteForm extends Component
             'libelle' => $this->libelle,
             'montant_total' => $this->montantTotal,
             'mode_paiement' => $this->mode_paiement,
-            'tiers' => $this->tiers ?: null,
+            'tiers_id' => $this->tiers_id,
             'reference' => $this->reference ?: null,
             'compte_id' => $this->compte_id,
             'notes' => $this->notes ?: null,

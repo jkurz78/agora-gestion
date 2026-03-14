@@ -1,0 +1,127 @@
+<h2>Mise en page du PDF — Rapprochement bancaire</h2>
+<p class="subtitle">Voici la structure du document PDF généré. Cliquez pour sélectionner si ça vous convient.</p>
+
+<div class="cards" style="max-width: 700px; margin: 0 auto;">
+  <div class="card" data-choice="layout" onclick="toggleSelect(this)" style="cursor:pointer; padding: 0; overflow: hidden;">
+    <div class="card-body" style="padding: 0;">
+
+      <!-- Mockup PDF -->
+      <div style="background: white; border: 1px solid #ddd; font-family: serif; font-size: 12px; color: #222; padding: 24px 32px; min-height: 500px;">
+
+        <!-- En-tête association -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 16px;">
+          <div>
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 2px;">Association SVS</div>
+            <div style="color: #555; font-size: 11px;">12 rue des Lilas, 75001 Paris</div>
+            <div style="color: #555; font-size: 11px;">contact@svs.fr</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 14px; font-weight: bold; color: #333;">RAPPROCHEMENT BANCAIRE</div>
+            <div style="font-size: 11px; color: #555; margin-top: 2px;">Généré le 14/03/2026</div>
+          </div>
+        </div>
+
+        <!-- Infos rapprochement -->
+        <div style="background: #f5f5f5; border-radius: 4px; padding: 10px 14px; margin-bottom: 16px; display: flex; justify-content: space-between;">
+          <div>
+            <span style="color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Compte</span><br>
+            <strong>Compte Courant BNP</strong>
+          </div>
+          <div>
+            <span style="color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Date de relevé</span><br>
+            <strong>28/02/2026</strong>
+          </div>
+          <div>
+            <span style="color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Statut</span><br>
+            <strong>✓ Verrouillé</strong>
+          </div>
+          <div>
+            <span style="color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Saisi par</span><br>
+            <strong>Admin</strong>
+          </div>
+        </div>
+
+        <!-- Bandeau soldes -->
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <div style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 8px 10px; text-align: center;">
+            <div style="font-size: 10px; color: #777; text-transform: uppercase;">Solde ouverture</div>
+            <div style="font-weight: bold; font-size: 13px;">12 500,00 €</div>
+          </div>
+          <div style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 8px 10px; text-align: center;">
+            <div style="font-size: 10px; color: #777; text-transform: uppercase;">Solde relevé</div>
+            <div style="font-weight: bold; font-size: 13px;">11 830,00 €</div>
+          </div>
+          <div style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 8px 10px; text-align: center;">
+            <div style="font-size: 10px; color: #777; text-transform: uppercase;">Solde pointé</div>
+            <div style="font-weight: bold; font-size: 13px;">11 830,00 €</div>
+          </div>
+          <div style="flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 8px 10px; text-align: center; border-color: #198754;">
+            <div style="font-size: 10px; color: #777; text-transform: uppercase;">Écart</div>
+            <div style="font-weight: bold; font-size: 13px; color: #198754;">0,00 €</div>
+          </div>
+        </div>
+
+        <!-- Titre tableau -->
+        <div style="font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; color: #444;">
+          Transactions pointées (3)
+        </div>
+
+        <!-- Tableau -->
+        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+          <thead>
+            <tr style="background: #333; color: white;">
+              <th style="padding: 6px 8px; text-align: left;">Date</th>
+              <th style="padding: 6px 8px; text-align: left;">Type</th>
+              <th style="padding: 6px 8px; text-align: left;">Libellé</th>
+              <th style="padding: 6px 8px; text-align: left;">Réf.</th>
+              <th style="padding: 6px 8px; text-align: right;">Débit</th>
+              <th style="padding: 6px 8px; text-align: right;">Crédit</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background: #f9f9f9;">
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee;">05/02/2026</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee;">Dépense</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee;">Achat fournitures bureau</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee; color: #777;">FA-2026-042</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee; text-align: right; color: #dc3545;">320,00 €</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee; text-align: right;"></td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee;">12/02/2026</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee;">Recette</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee;">Subvention mairie</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee; color: #777;">—</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee; text-align: right;"></td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee; text-align: right; color: #198754;">1 500,00 €</td>
+            </tr>
+            <tr style="background: #f9f9f9;">
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee;">20/02/2026</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee;">Don</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee;">Martin Dupont</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee; color: #777;">—</td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee; text-align: right;"></td>
+              <td style="padding: 5px 8px; border-bottom: 1px solid #eee; text-align: right; color: #198754;">150,00 €</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr style="font-weight: bold; background: #eee;">
+              <td colspan="4" style="padding: 6px 8px; text-align: right;">Totaux</td>
+              <td style="padding: 6px 8px; text-align: right; color: #dc3545;">320,00 €</td>
+              <td style="padding: 6px 8px; text-align: right; color: #198754;">1 650,00 €</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <!-- Pied de page -->
+        <div style="margin-top: 24px; padding-top: 10px; border-top: 1px solid #ddd; color: #888; font-size: 10px; display: flex; justify-content: space-between;">
+          <span>SVS Accounting — Document généré automatiquement</span>
+          <span>Page 1</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="text-align:center; margin-top: 16px; color: #666; font-size: 14px;">Cliquez sur le document pour le sélectionner, ou dites-moi ce que vous souhaitez modifier.</p>

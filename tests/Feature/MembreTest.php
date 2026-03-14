@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Membre;
+use App\Models\Tiers;
 use App\Models\User;
 
 beforeEach(function () {
@@ -13,13 +13,13 @@ it('requires authentication to access membres index', function () {
 });
 
 it('can list membres', function () {
-    $membre = Membre::factory()->create();
+    $tiers = Tiers::factory()->membre()->create();
 
     $this->actingAs($this->user)
         ->get(route('membres.index'))
         ->assertOk()
-        ->assertSee($membre->nom)
-        ->assertSee($membre->prenom);
+        ->assertSee($tiers->nom)
+        ->assertSee($tiers->prenom);
 });
 
 it('can create a membre with valid data', function () {
@@ -32,11 +32,11 @@ it('can create a membre with valid data', function () {
             'adresse' => '1 rue de Paris',
             'date_adhesion' => '2025-01-15',
             'statut' => 'actif',
-            'notes' => 'Test notes',
+            'notes_membre' => 'Test notes',
         ])
         ->assertRedirect(route('membres.index'));
 
-    $this->assertDatabaseHas('membres', [
+    $this->assertDatabaseHas('tiers', [
         'nom' => 'Dupont',
         'prenom' => 'Jean',
         'email' => 'jean@example.com',
@@ -46,43 +46,43 @@ it('can create a membre with valid data', function () {
 it('validates required fields when creating a membre', function () {
     $this->actingAs($this->user)
         ->post(route('membres.store'), [])
-        ->assertSessionHasErrors(['nom', 'prenom', 'statut']);
+        ->assertSessionHasErrors(['nom']);
 });
 
 it('can view membre show page', function () {
-    $membre = Membre::factory()->create();
+    $tiers = Tiers::factory()->membre()->create();
 
     $this->actingAs($this->user)
-        ->get(route('membres.show', $membre))
+        ->get(route('membres.show', $tiers))
         ->assertOk()
-        ->assertSee($membre->nom)
-        ->assertSee($membre->prenom);
+        ->assertSee($tiers->nom)
+        ->assertSee($tiers->prenom);
 });
 
 it('can update a membre', function () {
-    $membre = Membre::factory()->create(['nom' => 'Ancien']);
+    $tiers = Tiers::factory()->membre()->create(['nom' => 'Ancien']);
 
     $this->actingAs($this->user)
-        ->put(route('membres.update', $membre), [
+        ->put(route('membres.update', $tiers), [
             'nom' => 'Nouveau',
             'prenom' => 'Prénom',
             'statut' => 'inactif',
         ])
-        ->assertRedirect(route('membres.show', $membre));
+        ->assertRedirect(route('membres.show', $tiers));
 
-    $this->assertDatabaseHas('membres', [
-        'id' => $membre->id,
+    $this->assertDatabaseHas('tiers', [
+        'id' => $tiers->id,
         'nom' => 'Nouveau',
-        'statut' => 'inactif',
+        'statut_membre' => 'inactif',
     ]);
 });
 
 it('can delete a membre', function () {
-    $membre = Membre::factory()->create();
+    $tiers = Tiers::factory()->membre()->create();
 
     $this->actingAs($this->user)
-        ->delete(route('membres.destroy', $membre))
+        ->delete(route('membres.destroy', $tiers))
         ->assertRedirect(route('membres.index'));
 
-    $this->assertDatabaseMissing('membres', ['id' => $membre->id]);
+    $this->assertDatabaseMissing('tiers', ['id' => $tiers->id]);
 });

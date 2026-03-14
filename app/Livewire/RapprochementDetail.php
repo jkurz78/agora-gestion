@@ -11,6 +11,7 @@ use App\Models\RapprochementBancaire;
 use App\Models\Recette;
 use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
+use Illuminate\View\View;
 use Livewire\Component;
 
 final class RapprochementDetail extends Component
@@ -55,7 +56,7 @@ final class RapprochementDetail extends Component
         }
     }
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         $service = app(RapprochementBancaireService::class);
         $compte = $this->rapprochement->compte;
@@ -69,7 +70,7 @@ final class RapprochementDetail extends Component
             ->where(function ($q) use ($rid, $dateFin) {
                 $q->where(function ($inner) use ($dateFin) {
                     $inner->whereNull('rapprochement_id')
-                          ->where('date', '<=', $dateFin);
+                        ->where('date', '<=', $dateFin);
                 })->orWhere('rapprochement_id', $rid);
             })
             ->get()
@@ -90,7 +91,7 @@ final class RapprochementDetail extends Component
             ->where(function ($q) use ($rid, $dateFin) {
                 $q->where(function ($inner) use ($dateFin) {
                     $inner->whereNull('rapprochement_id')
-                          ->where('date', '<=', $dateFin);
+                        ->where('date', '<=', $dateFin);
                 })->orWhere('rapprochement_id', $rid);
             })
             ->get()
@@ -111,18 +112,18 @@ final class RapprochementDetail extends Component
             ->where(function ($q) use ($rid, $dateFin) {
                 $q->where(function ($inner) use ($dateFin) {
                     $inner->whereNull('rapprochement_id')
-                          ->where('date', '<=', $dateFin);
+                        ->where('date', '<=', $dateFin);
                 })->orWhere('rapprochement_id', $rid);
             })
-            ->with('donateur')
+            ->with('tiers')
             ->get()
             ->each(function (Don $d) use (&$transactions, $rid) {
                 $transactions->push([
                     'id' => $d->id,
                     'type' => 'don',
                     'date' => $d->date,
-                    'label' => $d->donateur
-                        ? $d->donateur->nom.' '.$d->donateur->prenom
+                    'label' => $d->tiers
+                        ? $d->tiers->displayName()
                         : ($d->objet ?? 'Don anonyme'),
                     'reference' => null,
                     'montant_signe' => (float) $d->montant,
@@ -135,7 +136,7 @@ final class RapprochementDetail extends Component
             ->where(function ($q) use ($rid, $dateFin) {
                 $q->where(function ($inner) use ($dateFin) {
                     $inner->whereNull('rapprochement_id')
-                          ->where('date_paiement', '<=', $dateFin);
+                        ->where('date_paiement', '<=', $dateFin);
                 })->orWhere('rapprochement_id', $rid);
             })
             ->with('membre')
@@ -157,7 +158,7 @@ final class RapprochementDetail extends Component
             ->where(function ($q) use ($rid, $dateFin) {
                 $q->where(function ($inner) use ($dateFin) {
                     $inner->whereNull('rapprochement_source_id')
-                          ->where('date', '<=', $dateFin);
+                        ->where('date', '<=', $dateFin);
                 })->orWhere('rapprochement_source_id', $rid);
             })
             ->with('compteDestination')
@@ -179,7 +180,7 @@ final class RapprochementDetail extends Component
             ->where(function ($q) use ($rid, $dateFin) {
                 $q->where(function ($inner) use ($dateFin) {
                     $inner->whereNull('rapprochement_destination_id')
-                          ->where('date', '<=', $dateFin);
+                        ->where('date', '<=', $dateFin);
                 })->orWhere('rapprochement_destination_id', $rid);
             })
             ->with('compteSource')

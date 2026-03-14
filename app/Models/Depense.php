@@ -21,7 +21,7 @@ final class Depense extends Model
         'libelle',
         'montant_total',
         'mode_paiement',
-        'tiers',
+        'tiers_id',
         'reference',
         'compte_id',
         'pointe',
@@ -38,10 +38,16 @@ final class Depense extends Model
             'montant_total' => 'decimal:2',
             'mode_paiement' => ModePaiement::class,
             'pointe' => 'boolean',
+            'tiers_id' => 'integer',
             'compte_id' => 'integer',
             'saisi_par' => 'integer',
             'rapprochement_id' => 'integer',
         ];
+    }
+
+    public function tiers(): BelongsTo
+    {
+        return $this->belongsTo(Tiers::class);
     }
 
     public function user(): BelongsTo

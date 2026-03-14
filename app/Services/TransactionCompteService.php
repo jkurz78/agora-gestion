@@ -69,23 +69,25 @@ final class TransactionCompteService
         $tiersLike = $searchTiers ? "%{$searchTiers}%" : null;
 
         $recettes = DB::table('recettes as r')
-            ->selectRaw("r.id, 'recette' as source_type, r.date, 'Recette' as type_label, r.tiers, r.libelle, r.reference, r.montant_total as montant, r.mode_paiement, r.pointe, r.numero_piece")
+            ->leftJoin('tiers as tr', 'tr.id', '=', 'r.tiers_id')
+            ->selectRaw("r.id, 'recette' as source_type, r.date, 'Recette' as type_label, TRIM(CONCAT(COALESCE(`tr`.prenom,''), ' ', COALESCE(`tr`.nom,''))) as tiers, r.libelle, r.reference, r.montant_total as montant, r.mode_paiement, r.pointe, r.numero_piece")
             ->where('r.compte_id', $id)
             ->whereNull('r.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('r.date', '>=', $dateDebut))
             ->when($dateFin, fn (Builder $q) => $q->where('r.date', '<=', $dateFin))
-            ->when($tiersLike, fn (Builder $q) => $q->where('r.tiers', 'like', $tiersLike));
+            ->when($tiersLike, fn (Builder $q) => $q->whereRaw("TRIM(CONCAT(COALESCE(`tr`.prenom,''), ' ', COALESCE(`tr`.nom,''))) LIKE ?", [$tiersLike]));
 
         $depenses = DB::table('depenses as d')
-            ->selectRaw("d.id, 'depense' as source_type, d.date, 'Dépense' as type_label, d.tiers, d.libelle, d.reference, -(d.montant_total) as montant, d.mode_paiement, d.pointe, d.numero_piece")
+            ->leftJoin('tiers as td', 'td.id', '=', 'd.tiers_id')
+            ->selectRaw("d.id, 'depense' as source_type, d.date, 'Dépense' as type_label, TRIM(CONCAT(COALESCE(`td`.prenom,''), ' ', COALESCE(`td`.nom,''))) as tiers, d.libelle, d.reference, -(d.montant_total) as montant, d.mode_paiement, d.pointe, d.numero_piece")
             ->where('d.compte_id', $id)
             ->whereNull('d.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('d.date', '>=', $dateDebut))
             ->when($dateFin, fn (Builder $q) => $q->where('d.date', '<=', $dateFin))
-            ->when($tiersLike, fn (Builder $q) => $q->where('d.tiers', 'like', $tiersLike));
+            ->when($tiersLike, fn (Builder $q) => $q->whereRaw("TRIM(CONCAT(COALESCE(`td`.prenom,''), ' ', COALESCE(`td`.nom,''))) LIKE ?", [$tiersLike]));
 
         $dons = DB::table('dons as dn')
-            ->leftJoin('donateurs as do', 'do.id', '=', 'dn.donateur_id')
+            ->leftJoin('tiers as do', 'do.id', '=', 'dn.tiers_id')
             ->selectRaw("dn.id, 'don' as source_type, dn.date, 'Don' as type_label, TRIM(CONCAT(COALESCE(`do`.prenom,''), ' ', COALESCE(`do`.nom,''))) as tiers, dn.objet as libelle, NULL as reference, dn.montant, dn.mode_paiement, dn.pointe, dn.numero_piece")
             ->where('dn.compte_id', $id)
             ->whereNull('dn.deleted_at')
@@ -94,13 +96,13 @@ final class TransactionCompteService
             ->when($tiersLike, fn (Builder $q) => $q->whereRaw("TRIM(CONCAT(COALESCE(`do`.prenom,''), ' ', COALESCE(`do`.nom,''))) LIKE ?", [$tiersLike]));
 
         $cotisations = DB::table('cotisations as c')
-            ->leftJoin('membres as m', 'm.id', '=', 'c.membre_id')
-            ->selectRaw("c.id, 'cotisation' as source_type, c.date_paiement as date, 'Cotisation' as type_label, TRIM(CONCAT(COALESCE(m.prenom,''), ' ', COALESCE(m.nom,''))) as tiers, CONCAT('Cotisation ', c.exercice) as libelle, NULL as reference, c.montant, c.mode_paiement, c.pointe, c.numero_piece")
+            ->leftJoin('tiers as t', 't.id', '=', 'c.tiers_id')
+            ->selectRaw("c.id, 'cotisation' as source_type, c.date_paiement as date, 'Cotisation' as type_label, TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) as tiers, CONCAT('Cotisation ', c.exercice) as libelle, NULL as reference, c.montant, c.mode_paiement, c.pointe, c.numero_piece")
             ->where('c.compte_id', $id)
             ->whereNull('c.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('c.date_paiement', '>=', $dateDebut))
             ->when($dateFin, fn (Builder $q) => $q->where('c.date_paiement', '<=', $dateFin))
-            ->when($tiersLike, fn (Builder $q) => $q->whereRaw("TRIM(CONCAT(COALESCE(m.prenom,''), ' ', COALESCE(m.nom,''))) LIKE ?", [$tiersLike]));
+            ->when($tiersLike, fn (Builder $q) => $q->whereRaw("TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) LIKE ?", [$tiersLike]));
 
         $virementsSource = DB::table('virements_internes as vi')
             ->join('comptes_bancaires as cb', 'cb.id', '=', 'vi.compte_destination_id')

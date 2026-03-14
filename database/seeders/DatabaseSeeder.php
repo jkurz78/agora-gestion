@@ -7,13 +7,13 @@ namespace Database\Seeders;
 use App\Enums\TypeCategorie;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
+use App\Models\Cotisation;
 use App\Models\Depense;
 use App\Models\Don;
-use App\Models\Donateur;
-use App\Models\Membre;
 use App\Models\Operation;
 use App\Models\Recette;
 use App\Models\SousCategorie;
+use App\Models\Tiers;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -127,13 +127,19 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Some membres with cotisations
-        Membre::factory()->count(5)->withCotisation(2025)->create();
-        Membre::factory()->count(3)->create();
+        $membresAvecCotisation = Tiers::factory()->membre()->count(5)->create();
+        foreach ($membresAvecCotisation as $membre) {
+            Cotisation::factory()->create([
+                'tiers_id' => $membre->id,
+                'exercice' => 2025,
+            ]);
+        }
+        Tiers::factory()->membre()->count(3)->create();
 
-        // Some donateurs and dons
-        $donateur = Donateur::factory()->create();
+        // Some tiers (donateurs) and dons
+        $tiers = Tiers::factory()->pourRecettes()->create();
         Don::factory()->count(2)->create([
-            'donateur_id' => $donateur->id,
+            'tiers_id' => $tiers->id,
             'saisi_par' => $user->id,
             'compte_id' => $compteCourant->id,
         ]);

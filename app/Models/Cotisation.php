@@ -16,7 +16,7 @@ final class Cotisation extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'membre_id',
+        'tiers_id',
         'exercice',
         'montant',
         'date_paiement',
@@ -36,14 +36,14 @@ final class Cotisation extends Model
             'pointe' => 'boolean',
             'compte_id' => 'integer',
             'exercice' => 'integer',
-            'membre_id' => 'integer',
+            'tiers_id' => 'integer',
             'rapprochement_id' => 'integer',
         ];
     }
 
-    public function membre(): BelongsTo
+    public function tiers(): BelongsTo
     {
-        return $this->belongsTo(Membre::class);
+        return $this->belongsTo(Tiers::class);
     }
 
     public function compte(): BelongsTo

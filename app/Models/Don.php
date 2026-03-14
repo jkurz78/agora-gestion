@@ -18,7 +18,7 @@ final class Don extends Model
     protected $table = 'dons';
 
     protected $fillable = [
-        'donateur_id',
+        'tiers_id',
         'date',
         'montant',
         'mode_paiement',
@@ -42,7 +42,7 @@ final class Don extends Model
             'pointe' => 'boolean',
             'recu_emis' => 'boolean',
             'compte_id' => 'integer',
-            'donateur_id' => 'integer',
+            'tiers_id' => 'integer',
             'operation_id' => 'integer',
             'seance' => 'integer',
             'saisi_par' => 'integer',
@@ -50,9 +50,9 @@ final class Don extends Model
         ];
     }
 
-    public function donateur(): BelongsTo
+    public function tiers(): BelongsTo
     {
-        return $this->belongsTo(Donateur::class);
+        return $this->belongsTo(Tiers::class);
     }
 
     public function user(): BelongsTo
