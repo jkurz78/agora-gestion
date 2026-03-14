@@ -4,6 +4,9 @@
     $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
         ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
         : asset('images/logo.png');
+    $exerciceLabel = app(\App\Services\ExerciceService::class)->label(
+        app(\App\Services\ExerciceService::class)->current()
+    );
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -234,7 +237,12 @@
                     </li>
                 </ul>
 
-                <ul class="navbar-nav">
+                <ul class="navbar-nav align-items-center gap-2">
+                    <li class="nav-item">
+                        <span class="badge rounded-pill" style="background-color: rgba(255,255,255,0.18); color:#fff; font-size:.8rem; font-weight:500; padding:.4em .85em; border: 1px solid rgba(255,255,255,0.35);">
+                            <i class="bi bi-calendar3"></i> Exercice {{ $exerciceLabel }}
+                        </span>
+                    </li>
                     <li class="nav-item">
                         <div class="dropdown">
                             <button class="btn btn-user btn-sm dropdown-toggle" type="button"
