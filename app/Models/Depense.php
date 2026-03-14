@@ -38,6 +38,7 @@ final class Depense extends Model
             'montant_total' => 'decimal:2',
             'mode_paiement' => ModePaiement::class,
             'pointe' => 'boolean',
+            'compte_id' => 'integer',
         ];
     }
 

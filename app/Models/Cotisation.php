@@ -34,6 +34,7 @@ final class Cotisation extends Model
             'date_paiement' => 'date',
             'mode_paiement' => ModePaiement::class,
             'pointe' => 'boolean',
+            'compte_id' => 'integer',
         ];
     }
 

@@ -41,6 +41,10 @@ final class Don extends Model
             'mode_paiement' => ModePaiement::class,
             'pointe' => 'boolean',
             'recu_emis' => 'boolean',
+            'compte_id' => 'integer',
+            'donateur_id' => 'integer',
+            'operation_id' => 'integer',
+            'seance' => 'integer',
         ];
     }
 
