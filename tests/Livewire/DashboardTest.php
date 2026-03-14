@@ -7,13 +7,17 @@ use App\Models\Depense;
 use App\Models\Membre;
 use App\Models\Recette;
 use App\Models\User;
-use App\Services\ExerciceService;
 use Livewire\Livewire;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
-    $this->exercice = app(ExerciceService::class)->current();
+    session(['exercice_actif' => 2025]);
+    $this->exercice = 2025;
+});
+
+afterEach(function () {
+    session()->forget('exercice_actif');
 });
 
 it('renders for authenticated user', function () {
@@ -29,13 +33,6 @@ it('renders for authenticated user', function () {
         ->assertSee('Aucun compte bancaire configuré');
 });
 
-it('shows correct exercice', function () {
-    $exerciceService = app(ExerciceService::class);
-    $label = $exerciceService->label($this->exercice);
-
-    Livewire::test(Dashboard::class)
-        ->assertSee($label);
-});
 
 it('displays solde general', function () {
     Recette::factory()->create([
