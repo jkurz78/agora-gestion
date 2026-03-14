@@ -1,0 +1,83 @@
+{{-- resources/views/livewire/tiers-list.blade.php --}}
+<div>
+    @if (session('error'))
+        <div class="alert alert-danger">{{ session('error') }}</div>
+    @endif
+
+    {{-- Filtres --}}
+    <div class="row g-2 mb-3">
+        <div class="col-md-6">
+            <input
+                type="text"
+                wire:model.live.debounce.300ms="search"
+                class="form-control"
+                placeholder="Rechercher un tiers..."
+            >
+        </div>
+        <div class="col-md-4">
+            <select wire:model.live="filtre" class="form-select">
+                <option value="">Tous les tiers</option>
+                <option value="depenses">Utilisables en depenses</option>
+                <option value="recettes">Utilisables en recettes</option>
+            </select>
+        </div>
+    </div>
+
+    {{-- Tableau --}}
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Nom</th>
+                    <th>Type</th>
+                    <th>Email</th>
+                    <th>Telephone</th>
+                    <th class="text-center">Depenses</th>
+                    <th class="text-center">Recettes</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($tiersList as $tiers)
+                    <tr>
+                        <td class="fw-semibold">{{ $tiers->displayName() }}</td>
+                        <td>
+                            <span class="badge bg-secondary">
+                                {{ $tiers->type === 'entreprise' ? 'Entreprise' : 'Particulier' }}
+                            </span>
+                        </td>
+                        <td>{{ $tiers->email ?? '-' }}</td>
+                        <td>{{ $tiers->telephone ?? '-' }}</td>
+                        <td class="text-center">
+                            @if ($tiers->pour_depenses)
+                                <span class="badge bg-danger">Oui</span>
+                            @endif
+                        </td>
+                        <td class="text-center">
+                            @if ($tiers->pour_recettes)
+                                <span class="badge bg-success">Oui</span>
+                            @endif
+                        </td>
+                        <td class="text-end">
+                            <button
+                                class="btn btn-sm btn-outline-primary me-1"
+                                wire:click="$dispatch('edit-tiers', { id: {{ $tiers->id }} })"
+                            >Modifier</button>
+                            <button
+                                class="btn btn-sm btn-outline-danger"
+                                wire:click="delete({{ $tiers->id }})"
+                                wire:confirm="Supprimer ce tiers ?"
+                            >Supprimer</button>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">Aucun tiers.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    {{ $tiersList->links() }}
+</div>
