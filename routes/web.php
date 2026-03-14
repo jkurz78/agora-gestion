@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
 
     // Parametres
     Route::prefix('parametres')->name('parametres.')->group(function () {
+        Route::view('/association', 'parametres.association')->name('association');
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::resource('sous-categories', SousCategorieController::class)->except(['show']);
         Route::resource('comptes-bancaires', CompteBancaireController::class)->except(['show']);
