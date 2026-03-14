@@ -136,6 +136,7 @@ it('can load existing don for editing', function () {
 
 it('can update an existing don', function () {
     $don = Don::factory()->create([
+        'date' => '2025-10-15',
         'montant' => 100.00,
         'mode_paiement' => 'especes',
         'objet' => 'Ancien objet',

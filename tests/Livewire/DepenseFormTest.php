@@ -149,6 +149,7 @@ it('affiche le numero_piece en mode édition', function () {
 it('can update a depense', function () {
     $depense = Depense::factory()->create([
         'libelle' => 'Ancienne dépense',
+        'date' => '2025-10-15',
         'montant_total' => 100.00,
         'mode_paiement' => 'especes',
         'saisi_par' => $this->user->id,

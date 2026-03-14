@@ -13,6 +13,11 @@ use Livewire\Livewire;
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
+    session(['exercice_actif' => 2025]);
+});
+
+afterEach(function () {
+    session()->forget('exercice_actif');
 });
 
 it('renders with exercice', function () {
@@ -61,7 +66,6 @@ it('shows charges and produits', function () {
     ]);
 
     Livewire::test(RapportCompteResultat::class)
-        ->set('exercice', 2025)
         ->assertSee('Fournitures bureau')
         ->assertSee('250,00')
         ->assertSee('Cotisations membres')

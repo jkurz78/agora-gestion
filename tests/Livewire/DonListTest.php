@@ -9,6 +9,11 @@ use Livewire\Livewire;
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
+    session(['exercice_actif' => 2025]);
+});
+
+afterEach(function () {
+    session()->forget('exercice_actif');
 });
 
 it('renders with dons', function () {
@@ -43,7 +48,6 @@ it('filters by exercice', function () {
     ]);
 
     Livewire::test(DonList::class)
-        ->set('exercice', 2025)
         ->assertSee('Dans exercice')
         ->assertDontSee('Hors exercice');
 });

@@ -29,7 +29,6 @@ it('can add a cotisation', function () {
 
     Livewire::actingAs($this->user)
         ->test(CotisationForm::class, ['membre' => $this->membre])
-        ->set('exercice', 2025)
         ->set('montant', '50.00')
         ->set('date_paiement', '2025-10-01')
         ->set('mode_paiement', 'virement')
