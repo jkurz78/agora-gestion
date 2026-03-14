@@ -98,7 +98,7 @@
 
                     {{-- Dropdown Transactions --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('depenses.*') || request()->routeIs('recettes.*') || request()->routeIs('virements.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('depenses.*') || request()->routeIs('recettes.*') || request()->routeIs('virements.*') || request()->routeIs('dons.*') || request()->routeIs('cotisations.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-arrow-down-up"></i> Transactions
                         </a>
@@ -124,6 +124,23 @@
                                 <a class="dropdown-item {{ request()->routeIs('virements.*') ? 'active' : '' }}"
                                    href="{{ route('virements.index') }}">
                                     <i class="bi bi-arrow-left-right"></i> Virements
+                                </a>
+                            </li>
+                            @endif
+                            <li><hr class="dropdown-divider"></li>
+                            @if (Route::has('dons.index'))
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('dons.*') ? 'active' : '' }}"
+                                   href="{{ route('dons.index') }}">
+                                    <i class="bi bi-heart"></i> Dons
+                                </a>
+                            </li>
+                            @endif
+                            @if (Route::has('cotisations.index'))
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('cotisations.*') ? 'active' : '' }}"
+                                   href="{{ route('cotisations.index') }}">
+                                    <i class="bi bi-person-check"></i> Cotisations
                                 </a>
                             </li>
                             @endif
@@ -178,7 +195,6 @@
                         $navItems = [
                             ['route' => 'budget.index',   'icon' => 'piggy-bank',             'label' => 'Budget'],
                             ['route' => 'membres.index',  'icon' => 'people',                 'label' => 'Membres'],
-                            ['route' => 'dons.index',     'icon' => 'heart',                  'label' => 'Dons'],
                             ['route' => 'rapports.index', 'icon' => 'file-earmark-bar-graph', 'label' => 'Rapports'],
                         ];
                     @endphp
