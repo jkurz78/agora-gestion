@@ -186,7 +186,7 @@
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('tiers.*') ? 'active fw-semibold' : '' }}"
                            href="{{ route('tiers.index') }}">
-                            Tiers
+                            <i class="bi bi-building-add"></i> Tiers
                         </a>
                     </li>
 

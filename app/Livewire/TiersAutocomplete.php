@@ -23,6 +23,8 @@ final class TiersAutocomplete extends Component
 
     public ?string $selectedLabel = null;
 
+    public ?string $selectedType = null;
+
     // For inline creation modal
     public bool $showCreateModal = false;
 
@@ -42,6 +44,7 @@ final class TiersAutocomplete extends Component
         if ($this->tiersId !== null) {
             $tiers = Tiers::find($this->tiersId);
             $this->selectedLabel = $tiers?->displayName();
+            $this->selectedType = $tiers?->type;
         }
     }
 
@@ -69,9 +72,10 @@ final class TiersAutocomplete extends Component
         }
 
         $this->results = $query->limit(8)->get()->map(fn (Tiers $t): array => [
-            'id' => $t->id,
+            'id'    => $t->id,
             'label' => $t->type === 'entreprise' ? $t->nom : trim($t->prenom.' '.$t->nom),
-            'sub' => '',
+            'type'  => $t->type,
+            'sub'   => '',
         ])->toArray();
 
         $this->open = true;
@@ -84,6 +88,7 @@ final class TiersAutocomplete extends Component
         $this->selectedLabel = $tiers->type === 'entreprise'
             ? $tiers->nom
             : trim($tiers->prenom.' '.$tiers->nom);
+        $this->selectedType = $tiers->type;
         $this->search = '';
         $this->open = false;
         $this->results = [];
@@ -93,6 +98,7 @@ final class TiersAutocomplete extends Component
     {
         $this->tiersId = null;
         $this->selectedLabel = null;
+        $this->selectedType = null;
         $this->search = '';
         $this->open = false;
         $this->results = [];
