@@ -5,6 +5,7 @@ use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MembreController;
 use App\Http\Controllers\OperationController;
+use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
 use App\Models\RapprochementBancaire;
@@ -24,6 +25,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
         return view('rapprochement.detail', compact('rapprochement'));
     })->name('rapprochement.detail');
+    Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
+        ->name('rapprochement.pdf');
     Route::view('/virements', 'virements.index')->name('virements.index');
     Route::get('comptes-bancaires/transactions', function () {
         return view('comptes-bancaires.transactions');
