@@ -62,8 +62,14 @@ final class AssociationForm extends Component
                 Storage::disk('public')->delete($this->logo_path);
             }
 
-            $extension         = $this->logo->extension();
-            $path              = Storage::disk('public')->putFileAs('association', $this->logo, 'logo.'.$extension);
+            $extension = $this->logo->extension();
+            $path      = Storage::disk('public')->putFileAs('association', $this->logo, 'logo.'.$extension);
+
+            if ($path === false) {
+                $this->addError('logo', 'Impossible de sauvegarder le logo.');
+                return;
+            }
+
             $data['logo_path'] = $path;
             $this->logo_path   = $path;
             $this->logo        = null;
