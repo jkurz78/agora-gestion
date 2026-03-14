@@ -77,7 +77,7 @@
                         <td class="text-nowrap">{{ $depense->date->format('d/m/Y') }}</td>
                         <td class="text-muted small">{{ $depense->reference ?? '—' }}</td>
                         <td>{{ $depense->libelle }}</td>
-                        <td>{{ $depense->tiers?->displayName() ?? '—' }}</td>
+                        <td>@if($depense->tiers){{ $depense->tiers->type === 'entreprise' ? '🏢' : '👤' }} {{ $depense->tiers->displayName() }}@else—@endif</td>
                         <td><span class="badge bg-secondary">{{ $depense->mode_paiement->label() }}</span></td>
                         <td class="text-end text-danger fw-semibold text-nowrap">
                             {{ number_format((float) $depense->montant_total, 2, ',', ' ') }} €

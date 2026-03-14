@@ -77,7 +77,7 @@
                         <td class="text-nowrap">{{ $recette->date->format('d/m/Y') }}</td>
                         <td class="text-muted small">{{ $recette->reference ?? '—' }}</td>
                         <td>{{ $recette->libelle }}</td>
-                        <td>{{ $recette->tiers?->displayName() ?? '—' }}</td>
+                        <td>@if($recette->tiers){{ $recette->tiers->type === 'entreprise' ? '🏢' : '👤' }} {{ $recette->tiers->displayName() }}@else—@endif</td>
                         <td><span class="badge bg-secondary">{{ $recette->mode_paiement->label() }}</span></td>
                         <td class="text-end text-success fw-semibold text-nowrap">
                             {{ number_format((float) $recette->montant_total, 2, ',', ' ') }} €

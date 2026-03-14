@@ -51,7 +51,7 @@
                             @if ($don->tiers)
                                 <a href="#" wire:click.prevent="toggleTiersHistory({{ $don->tiers->id }})"
                                    class="text-decoration-none">
-                                    {{ $don->tiers->displayName() }}
+                                    {{ $don->tiers->type === 'entreprise' ? '🏢' : '👤' }} {{ $don->tiers->displayName() }}
                                 </a>
                             @else
                                 <span class="text-muted fst-italic">Anonyme</span>
