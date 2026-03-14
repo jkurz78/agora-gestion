@@ -12,6 +12,12 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     $this->compte = CompteBancaire::factory()->create();
+
+    session(['exercice_actif' => 2025]);
+});
+
+afterEach(function () {
+    session()->forget('exercice_actif');
 });
 
 it('renders the form component', function () {
@@ -150,4 +156,14 @@ it('can update an existing don', function () {
         'montant' => '250.00',
         'objet' => 'Nouvel objet',
     ]);
+});
+
+it('rejette une date hors exercice', function () {
+    Livewire::test(DonForm::class)
+        ->call('showNewForm')
+        ->set('date', '2025-08-01')
+        ->set('montant', '100.00')
+        ->set('mode_paiement', 'virement')
+        ->call('save')
+        ->assertHasErrors(['date']);
 });
