@@ -36,3 +36,22 @@ it('AppServiceProvider::boot() ne régénère pas config/version.php si le fichi
 
     expect(filemtime(config_path('version.php')))->toBe($mtime);
 });
+
+it('le footer version est présent dans les pages authentifiées', function (): void {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response->assertStatus(200);
+    // Vérifier le marqueur unique du footer : "SVS Accounting &middot;" (entité HTML)
+    $response->assertSee('SVS Accounting &middot;', false);
+});
+
+it('le footer version est absent des pages guest (login)', function (): void {
+    $response = $this->get('/login');
+
+    // La page login utilise guest.blade.php, pas app.blade.php
+    // Elle ne doit PAS contenir "SVS Accounting &middot;" (spécifique au footer)
+    $response->assertStatus(200);
+    $response->assertDontSee('SVS Accounting &middot;', false);
+});

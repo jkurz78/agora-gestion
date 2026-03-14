@@ -33,3 +33,6 @@ yarn-error.log
 
 # Public assets non versionnés
 public/proto-*.html
+
+# Version générée localement
+/config/version.php
