@@ -2,6 +2,7 @@
     @if($tiersId)
         {{-- Selected state --}}
         <div class="d-flex align-items-center gap-2 px-3 py-2 border rounded" style="background:#f0e8f5;border-color:#c9a8d8!important">
+            <span class="text-muted">{{ $selectedType === 'entreprise' ? '🏢' : '👤' }}</span>
             <span class="fw-medium">{{ $selectedLabel }}</span>
             <button type="button" class="btn-close btn-close-sm ms-auto" wire:click="clearTiers" aria-label="Effacer"></button>
         </div>
@@ -19,13 +20,14 @@
             <div class="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-sm" style="z-index:1000;max-height:240px;overflow-y:auto">
                 @foreach($results as $item)
                     <div
-                        class="px-3 py-2 cursor-pointer"
+                        class="px-3 py-2 d-flex align-items-center gap-2"
                         style="cursor:pointer"
                         wire:click="selectTiers({{ $item['id'] }})"
                         onmouseover="this.style.background='#f0e8f5'"
                         onmouseout="this.style.background=''"
                     >
-                        {{ $item['label'] }}
+                        <span>{{ ($item['type'] ?? '') === 'entreprise' ? '🏢' : '👤' }}</span>
+                        <span>{{ $item['label'] }}</span>
                     </div>
                 @endforeach
 

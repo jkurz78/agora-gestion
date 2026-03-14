@@ -62,12 +62,14 @@
                             <button
                                 class="btn btn-sm btn-outline-primary me-1"
                                 wire:click="$dispatch('edit-tiers', { id: {{ $tiers->id }} })"
-                            >Modifier</button>
+                                title="Modifier"
+                            ><i class="bi bi-pencil"></i></button>
                             <button
                                 class="btn btn-sm btn-outline-danger"
                                 wire:click="delete({{ $tiers->id }})"
                                 wire:confirm="Supprimer ce tiers ?"
-                            >Supprimer</button>
+                                title="Supprimer"
+                            ><i class="bi bi-trash"></i></button>
                         </td>
                     </tr>
                 @empty
