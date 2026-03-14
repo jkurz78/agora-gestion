@@ -39,6 +39,8 @@ final class Depense extends Model
             'mode_paiement' => ModePaiement::class,
             'pointe' => 'boolean',
             'compte_id' => 'integer',
+            'saisi_par' => 'integer',
+            'rapprochement_id' => 'integer',
         ];
     }
 

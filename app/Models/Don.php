@@ -45,6 +45,8 @@ final class Don extends Model
             'donateur_id' => 'integer',
             'operation_id' => 'integer',
             'seance' => 'integer',
+            'saisi_par' => 'integer',
+            'rapprochement_id' => 'integer',
         ];
     }
 

@@ -28,6 +28,7 @@ final class Operation extends Model
             'statut' => StatutOperation::class,
             'date_debut' => 'date',
             'date_fin' => 'date',
+            'nombre_seances' => 'integer',
         ];
     }
 

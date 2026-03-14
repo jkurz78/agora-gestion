@@ -26,6 +26,8 @@ final class BudgetLine extends Model
     {
         return [
             'montant_prevu' => 'decimal:2',
+            'exercice' => 'integer',
+            'sous_categorie_id' => 'integer',
         ];
     }
 

@@ -21,6 +21,13 @@ final class SousCategorie extends Model
         'code_cerfa',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'categorie_id' => 'integer',
+        ];
+    }
+
     public function categorie(): BelongsTo
     {
         return $this->belongsTo(Categorie::class);

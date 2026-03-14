@@ -30,6 +30,10 @@ final class DepenseLigne extends Model
     {
         return [
             'montant' => 'decimal:2',
+            'depense_id' => 'integer',
+            'sous_categorie_id' => 'integer',
+            'operation_id' => 'integer',
+            'seance' => 'integer',
         ];
     }
 

@@ -35,6 +35,9 @@ final class Cotisation extends Model
             'mode_paiement' => ModePaiement::class,
             'pointe' => 'boolean',
             'compte_id' => 'integer',
+            'exercice' => 'integer',
+            'membre_id' => 'integer',
+            'rapprochement_id' => 'integer',
         ];
     }
 

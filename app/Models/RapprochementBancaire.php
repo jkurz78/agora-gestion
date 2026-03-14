@@ -34,6 +34,8 @@ final class RapprochementBancaire extends Model
             'solde_fin' => 'decimal:2',
             'statut' => StatutRapprochement::class,
             'verrouille_at' => 'datetime',
+            'compte_id' => 'integer',
+            'saisi_par' => 'integer',
         ];
     }
 

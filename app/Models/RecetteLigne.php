@@ -30,6 +30,10 @@ final class RecetteLigne extends Model
     {
         return [
             'montant' => 'decimal:2',
+            'recette_id' => 'integer',
+            'sous_categorie_id' => 'integer',
+            'operation_id' => 'integer',
+            'seance' => 'integer',
         ];
     }
 
