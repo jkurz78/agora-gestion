@@ -46,6 +46,28 @@
         @endif
     @endif
 
+    {{-- Activate existing tiers modal --}}
+    @if($showActivateModal && $existingTiers)
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background:rgba(0,0,0,.4);z-index:2000" wire:click.self="$set('showActivateModal', false)">
+            <div class="bg-white rounded p-4" style="width:420px;max-width:95vw">
+                <h6 class="fw-bold mb-3" style="color:#722281">Tiers existant</h6>
+
+                <p class="mb-3">
+                    <span>{{ $existingTiers['type'] === 'entreprise' ? '🏢' : '👤' }}</span>
+                    <strong>{{ $existingTiers['label'] }}</strong>
+                    existe déjà mais n'est pas activé pour ce contexte.
+                </p>
+
+                <p class="text-muted small mb-4">Voulez-vous l'activer et le sélectionner ?</p>
+
+                <div class="d-flex gap-2 justify-content-end">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showActivateModal', false)">Annuler</button>
+                    <button type="button" class="btn btn-sm text-white" style="background:#722281" wire:click="activateTiers">Activer et sélectionner</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Create modal --}}
     @if($showCreateModal)
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background:rgba(0,0,0,.4);z-index:2000" wire:click.self="$set('showCreateModal', false)">
