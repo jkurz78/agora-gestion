@@ -14,6 +14,10 @@ final class ExerciceService
      */
     public function current(): int
     {
+        if (session()->has('exercice_actif')) {
+            return (int) session('exercice_actif');
+        }
+
         $now = CarbonImmutable::now();
 
         return $now->month >= 9 ? $now->year : $now->year - 1;

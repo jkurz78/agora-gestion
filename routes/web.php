@@ -34,6 +34,17 @@ Route::middleware('auth')->group(function () {
     Route::view('/rapports', 'rapports.index')->name('rapports.index');
     Route::view('/profil', 'profil.index')->name('profil.index');
 
+    // Changer d'exercice
+    Route::post('/exercice/changer', function (\Illuminate\Http\Request $request) {
+        $annee = (int) $request->input('annee');
+        $available = app(\App\Services\ExerciceService::class)->available(10);
+        if (in_array($annee, $available, true)) {
+            session(['exercice_actif' => $annee]);
+        }
+
+        return redirect()->back();
+    })->name('exercice.changer');
+
     // Resource controllers
     Route::resource('membres', MembreController::class);
     Route::resource('operations', OperationController::class)->except(['destroy']);
