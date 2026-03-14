@@ -10,6 +10,7 @@ use App\Models\Don;
 use App\Models\Donateur;
 use App\Models\Operation;
 use App\Services\DonService;
+use App\Services\ExerciceService;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -75,10 +76,22 @@ final class DonForm extends Component
         $this->resetValidation();
     }
 
+    public function showNewForm(): void
+    {
+        $this->resetForm();
+        $this->date = app(ExerciceService::class)->defaultDate();
+        $this->showForm = true;
+    }
+
     public function save(): void
     {
+        $exerciceService = app(ExerciceService::class);
+        $range = $exerciceService->dateRange($exerciceService->current());
+        $dateDebut = $range['start']->toDateString();
+        $dateFin = $range['end']->toDateString();
+
         $rules = [
-            'date' => ['required', 'date'],
+            'date' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
             'montant' => ['required', 'numeric', 'min:0.01'],
             'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
             'objet' => ['nullable', 'string', 'max:255'],
@@ -96,7 +109,10 @@ final class DonForm extends Component
             $rules['donateur_id'] = ['nullable', 'exists:donateurs,id'];
         }
 
-        $this->validate($rules);
+        $this->validate($rules, [
+            'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
+            'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
+        ]);
 
         // Validate seance against operation nombre_seances
         if ($this->operation_id && $this->seance) {

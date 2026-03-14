@@ -1,7 +1,7 @@
 <div>
     @if (! $showForm)
         <div class="mb-3">
-            <button wire:click="$set('showForm', true)" class="btn btn-primary">
+            <button wire:click="showNewForm" class="btn btn-primary">
                 <i class="bi bi-plus-lg"></i> Nouveau don
             </button>
         </div>
