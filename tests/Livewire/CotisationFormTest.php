@@ -10,6 +10,11 @@ use Livewire\Livewire;
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->membre = Membre::factory()->create();
+    session(['exercice_actif' => 2025]);
+});
+
+afterEach(function () {
+    session()->forget('exercice_actif');
 });
 
 it('renders for a membre', function () {
@@ -61,4 +66,24 @@ it('can delete a cotisation via soft delete', function () {
         ->assertHasNoErrors();
 
     $this->assertSoftDeleted('cotisations', ['id' => $cotisation->id]);
+});
+
+it('rejette une date_paiement avant le début de l\'exercice', function () {
+    Livewire::actingAs($this->user)
+        ->test(CotisationForm::class, ['membre' => $this->membre])
+        ->set('date_paiement', '2025-08-31')
+        ->set('montant', '50')
+        ->set('mode_paiement', 'virement')
+        ->call('save')
+        ->assertHasErrors(['date_paiement']);
+});
+
+it('rejette une date_paiement après la fin de l\'exercice', function () {
+    Livewire::actingAs($this->user)
+        ->test(CotisationForm::class, ['membre' => $this->membre])
+        ->set('date_paiement', '2026-09-01')
+        ->set('montant', '50')
+        ->set('mode_paiement', 'virement')
+        ->call('save')
+        ->assertHasErrors(['date_paiement']);
 });
