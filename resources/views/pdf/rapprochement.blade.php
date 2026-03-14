@@ -149,9 +149,7 @@
         .tx-table thead th.text-end {
             text-align: right;
         }
-        .tx-table tbody tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
+        .even { background-color: #f9f9f9; }
         .tx-table tbody td {
             padding: 5px 8px;
             border-bottom: 1px solid #dee2e6;
@@ -302,8 +300,8 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach ($transactions as $tx)
-                    <tr>
+                @forelse ($transactions as $i => $tx)
+                    <tr class="{{ $i % 2 === 1 ? 'even' : '' }}">
                         <td>{{ \Carbon\Carbon::parse($tx['date'])->format('d/m/Y') }}</td>
                         <td>{{ $tx['type'] }}</td>
                         <td>{{ $tx['label'] }}</td>
@@ -319,7 +317,8 @@
                             @endif
                         </td>
                     </tr>
-                @endforeach
+                @empty
+                @endforelse
             </tbody>
             <tfoot>
                 <tr>

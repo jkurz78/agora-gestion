@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutRapprochement;
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Depense;
@@ -22,6 +23,7 @@ beforeEach(function () {
         'solde_ouverture' => 1000.00,
         'solde_fin'       => 1200.00,
         'saisi_par'       => $this->user->id,
+        'statut'          => StatutRapprochement::Verrouille,
     ]);
 });
 

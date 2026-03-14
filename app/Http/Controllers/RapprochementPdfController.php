@@ -12,96 +12,19 @@ use App\Models\RapprochementBancaire;
 use App\Models\Recette;
 use App\Models\VirementInterne;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
 final class RapprochementPdfController extends Controller
 {
-    public function __invoke(Request $request, RapprochementBancaire $rapprochement): Response
+    public function __invoke(RapprochementBancaire $rapprochement): Response
     {
         $rapprochement->load(['compte', 'saisiPar']);
         $compte = $rapprochement->compte;
 
         $rid = $rapprochement->id;
 
-        // Collect all pointed transactions for this rapprochement
-        $transactions = collect();
-
-        // Dépenses (debit)
-        Depense::where('rapprochement_id', $rid)->get()
-            ->each(function (Depense $d) use ($transactions): void {
-                $transactions->push([
-                    'date' => $d->date,
-                    'type' => 'Dépense',
-                    'label' => $d->libelle,
-                    'reference' => $d->reference ?? '',
-                    'montant_signe' => -(float) $d->montant_total,
-                ]);
-            });
-
-        // Recettes (credit)
-        Recette::where('rapprochement_id', $rid)->get()
-            ->each(function (Recette $r) use ($transactions): void {
-                $transactions->push([
-                    'date' => $r->date,
-                    'type' => 'Recette',
-                    'label' => $r->libelle,
-                    'reference' => $r->reference ?? '',
-                    'montant_signe' => (float) $r->montant_total,
-                ]);
-            });
-
-        // Dons (credit)
-        Don::where('rapprochement_id', $rid)->get()
-            ->each(function (Don $d) use ($transactions): void {
-                $transactions->push([
-                    'date' => $d->date,
-                    'type' => 'Don',
-                    'label' => $d->objet ?? 'Don',
-                    'reference' => '',
-                    'montant_signe' => (float) $d->montant,
-                ]);
-            });
-
-        // Cotisations (credit)
-        Cotisation::where('rapprochement_id', $rid)->get()
-            ->each(function (Cotisation $c) use ($transactions): void {
-                $transactions->push([
-                    'date' => $c->date_paiement,
-                    'type' => 'Cotisation',
-                    'label' => 'Cotisation exercice '.$c->exercice,
-                    'reference' => '',
-                    'montant_signe' => (float) $c->montant,
-                ]);
-            });
-
-        // Virements source (debit — money leaving this account)
-        VirementInterne::where('rapprochement_source_id', $rid)->get()
-            ->each(function (VirementInterne $v) use ($transactions): void {
-                $transactions->push([
-                    'date' => $v->date,
-                    'type' => 'Virement sortant',
-                    'label' => 'Virement interne',
-                    'reference' => $v->reference ?? '',
-                    'montant_signe' => -(float) $v->montant,
-                ]);
-            });
-
-        // Virements destination (credit — money arriving on this account)
-        VirementInterne::where('rapprochement_destination_id', $rid)->get()
-            ->each(function (VirementInterne $v) use ($transactions): void {
-                $transactions->push([
-                    'date' => $v->date,
-                    'type' => 'Virement entrant',
-                    'label' => 'Virement interne',
-                    'reference' => $v->reference ?? '',
-                    'montant_signe' => (float) $v->montant,
-                ]);
-            });
-
-        // Sort by date ascending
-        $transactions = $transactions->sortBy('date')->values();
+        $transactions = $this->collectTransactions($compte->id, $rid);
 
         $totalDebit = abs($transactions->where('montant_signe', '<', 0)->sum('montant_signe'));
         $totalCredit = $transactions->where('montant_signe', '>', 0)->sum('montant_signe');
@@ -135,5 +58,96 @@ final class RapprochementPdfController extends Controller
         $filename = 'rapprochement-'.$rapprochement->id.'.pdf';
 
         return Pdf::loadView('pdf.rapprochement', $data)->download($filename);
+    }
+
+    private function collectTransactions(int $compteId, int $rid): \Illuminate\Support\Collection
+    {
+        $transactions = collect();
+
+        Depense::where('compte_id', $compteId)
+            ->where('rapprochement_id', $rid)
+            ->get()
+            ->each(function (Depense $d) use (&$transactions) {
+                $transactions->push([
+                    'date'          => $d->date,
+                    'type'          => 'Dépense',
+                    'label'         => $d->libelle,
+                    'reference'     => $d->reference ?? null,
+                    'montant_signe' => -(float) $d->montant_total,
+                ]);
+            });
+
+        Recette::where('compte_id', $compteId)
+            ->where('rapprochement_id', $rid)
+            ->get()
+            ->each(function (Recette $r) use (&$transactions) {
+                $transactions->push([
+                    'date'          => $r->date,
+                    'type'          => 'Recette',
+                    'label'         => $r->libelle,
+                    'reference'     => $r->reference ?? null,
+                    'montant_signe' => (float) $r->montant_total,
+                ]);
+            });
+
+        Don::where('compte_id', $compteId)
+            ->where('rapprochement_id', $rid)
+            ->with('donateur')
+            ->get()
+            ->each(function (Don $d) use (&$transactions) {
+                $transactions->push([
+                    'date'          => $d->date,
+                    'type'          => 'Don',
+                    'label'         => $d->donateur
+                        ? $d->donateur->nom.' '.$d->donateur->prenom
+                        : ($d->objet ?? 'Don anonyme'),
+                    'reference'     => null,
+                    'montant_signe' => (float) $d->montant,
+                ]);
+            });
+
+        Cotisation::where('compte_id', $compteId)
+            ->where('rapprochement_id', $rid)
+            ->with('membre')
+            ->get()
+            ->each(function (Cotisation $c) use (&$transactions) {
+                $transactions->push([
+                    'date'          => $c->date_paiement,
+                    'type'          => 'Cotisation',
+                    'label'         => $c->membre ? $c->membre->nom.' '.$c->membre->prenom : 'Cotisation',
+                    'reference'     => null,
+                    'montant_signe' => (float) $c->montant,
+                ]);
+            });
+
+        VirementInterne::where('compte_source_id', $compteId)
+            ->where('rapprochement_source_id', $rid)
+            ->with('compteDestination')
+            ->get()
+            ->each(function (VirementInterne $v) use (&$transactions) {
+                $transactions->push([
+                    'date'          => $v->date,
+                    'type'          => 'Virement sortant',
+                    'label'         => 'Virement vers '.$v->compteDestination->nom,
+                    'reference'     => $v->reference ?? null,
+                    'montant_signe' => -(float) $v->montant,
+                ]);
+            });
+
+        VirementInterne::where('compte_destination_id', $compteId)
+            ->where('rapprochement_destination_id', $rid)
+            ->with('compteSource')
+            ->get()
+            ->each(function (VirementInterne $v) use (&$transactions) {
+                $transactions->push([
+                    'date'          => $v->date,
+                    'type'          => 'Virement entrant',
+                    'label'         => 'Virement depuis '.$v->compteSource->nom,
+                    'reference'     => $v->reference ?? null,
+                    'montant_signe' => (float) $v->montant,
+                ]);
+            });
+
+        return $transactions->sortBy('date')->values();
     }
 }
