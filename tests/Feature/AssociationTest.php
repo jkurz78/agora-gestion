@@ -1,36 +1,29 @@
 <?php
-// tests/Feature/AssociationTest.php
+declare(strict_types=1);
 
 use App\Models\Association;
-use App\Models\User;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
-use Livewire\Livewire;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-beforeEach(function () {
-    $this->user = User::factory()->create();
-});
+uses(RefreshDatabase::class);
 
 it('creates association row with id=1 when none exists', function () {
-    Association::updateOrCreate(['id' => 1], [
-        'nom' => 'Mon Association',
-        'adresse' => '1 rue de Paris',
-        'code_postal' => '75001',
-        'ville' => 'Paris',
-        'email' => 'contact@asso.fr',
-        'telephone' => '0123456789',
-    ]);
+    $association = Association::find(1) ?? new Association();
+    $association->id = 1;
+    $association->fill(['nom' => 'SVS Test', 'ville' => 'Paris'])->save();
 
-    $this->assertDatabaseHas('association', [
-        'id' => 1,
-        'nom' => 'Mon Association',
-    ]);
+    expect(Association::count())->toBe(1)
+        ->and(Association::find(1)?->nom)->toBe('SVS Test');
 });
 
 it('updates existing association without creating duplicate', function () {
-    Association::updateOrCreate(['id' => 1], ['nom' => 'V1']);
-    Association::updateOrCreate(['id' => 1], ['nom' => 'V2']);
+    $assoc = Association::find(1) ?? new Association();
+    $assoc->id = 1;
+    $assoc->fill(['nom' => 'Initial', 'ville' => 'Paris'])->save();
+
+    $assoc2 = Association::find(1) ?? new Association();
+    $assoc2->id = 1;
+    $assoc2->fill(['nom' => 'Mis à jour', 'ville' => 'Lyon'])->save();
 
     expect(Association::count())->toBe(1)
-        ->and(Association::find(1)->nom)->toBe('V2');
+        ->and(Association::find(1)?->nom)->toBe('Mis à jour');
 });

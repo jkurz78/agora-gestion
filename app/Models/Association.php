@@ -11,7 +11,6 @@ final class Association extends Model
     protected $table = 'association';
 
     protected $fillable = [
-        'id',
         'nom',
         'adresse',
         'code_postal',
