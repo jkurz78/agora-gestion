@@ -34,6 +34,11 @@ final class VirementInterne extends Model
         return [
             'date' => 'date',
             'montant' => 'decimal:2',
+            'compte_source_id' => 'integer',
+            'compte_destination_id' => 'integer',
+            'saisi_par' => 'integer',
+            'rapprochement_source_id' => 'integer',
+            'rapprochement_destination_id' => 'integer',
         ];
     }
 
