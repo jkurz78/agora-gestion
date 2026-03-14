@@ -88,7 +88,7 @@ final class AssociationForm extends Component
     {
         $logoUrl = null;
         if ($this->logo_path !== null && Storage::disk('public')->exists($this->logo_path)) {
-            $logoUrl = Storage::url($this->logo_path);
+            $logoUrl = Storage::disk('public')->url($this->logo_path);
         }
 
         return view('livewire.parametres.association-form', ['logoUrl' => $logoUrl]);
