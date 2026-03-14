@@ -4,9 +4,10 @@
     $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
         ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
         : asset('images/logo.png');
-    $exerciceLabel = app(\App\Services\ExerciceService::class)->label(
-        app(\App\Services\ExerciceService::class)->current()
-    );
+    $exerciceService = app(\App\Services\ExerciceService::class);
+    $exerciceActif   = $exerciceService->current();
+    $exerciceLabel   = $exerciceService->label($exerciceActif);
+    $exercicesDispos = $exerciceService->available(6);
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -238,10 +239,31 @@
                 </ul>
 
                 <ul class="navbar-nav align-items-center gap-2">
-                    <li class="nav-item">
-                        <span class="badge rounded-pill" style="background-color: rgba(255,255,255,0.18); color:#fff; font-size:.8rem; font-weight:500; padding:.4em .85em; border: 1px solid rgba(255,255,255,0.35);">
+                    <li class="nav-item dropdown">
+                        <button class="badge rounded-pill dropdown-toggle border-0"
+                                style="background-color: rgba(255,255,255,0.18); color:#fff; font-size:.8rem; font-weight:500; padding:.4em .85em; border: 1px solid rgba(255,255,255,0.35) !important; cursor:pointer;"
+                                data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-calendar3"></i> Exercice {{ $exerciceLabel }}
-                        </span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Changer d'exercice</h6></li>
+                            @foreach ($exercicesDispos as $annee)
+                                <li>
+                                    <form method="POST" action="{{ route('exercice.changer') }}">
+                                        @csrf
+                                        <input type="hidden" name="annee" value="{{ $annee }}">
+                                        <button type="submit"
+                                                class="dropdown-item {{ $annee === $exerciceActif ? 'active' : '' }}">
+                                            <i class="bi bi-calendar3"></i>
+                                            {{ $exerciceService->label($annee) }}
+                                            @if ($annee === $exerciceActif)
+                                                <i class="bi bi-check2 float-end mt-1"></i>
+                                            @endif
+                                        </button>
+                                    </form>
+                                </li>
+                            @endforeach
+                        </ul>
                     </li>
                     <li class="nav-item">
                         <div class="dropdown">
