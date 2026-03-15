@@ -16,7 +16,7 @@ final class CsvImportController extends Controller
         if ($type === 'depense') {
             $rows = [
                 '2024-09-15;FAC-001;Fournitures;100.00;virement;Compte principal;Achat papeterie;MAISON DUPONT;',
-                '2024-09-15;FAC-001;Communication;50.00;;;;; ',
+                '2024-09-15;FAC-001;Communication;50.00;;;;;',
                 '2024-09-20;CHQ-042;Déplacements;75.00;cheque;Compte principal;Frais déplacement;;AG 2024',
             ];
         } else {

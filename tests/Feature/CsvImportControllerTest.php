@@ -26,6 +26,7 @@ it('télécharge le template recette', function () {
         ->get(route('recettes.import.template'));
 
     $response->assertStatus(200);
+    $response->assertHeader('Content-Type', 'text/csv;charset=UTF-8');
     $response->assertDownload('modele-recette.csv');
 });
 
