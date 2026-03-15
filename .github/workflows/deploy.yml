@@ -32,7 +32,7 @@ jobs:
 
       - name: Deploy to production
         run: |
-          curl --fail -v --http1.1 \
+          curl --fail -s --http1.1 \
             -X POST \
-            -H "Authorization: Bearer ${{ secrets.DEPLOY_SECRET }}" \
-            "${{ secrets.DEPLOY_URL }}" || true
+            -d "token=${{ secrets.DEPLOY_SECRET }}" \
+            "${{ secrets.DEPLOY_URL }}"
