@@ -68,6 +68,21 @@ function runCommand(string $cmd, string $logFile): bool
     return $retCode === 0;
 }
 
+// ─── Répondre immédiatement au client ────────────────────────────────────────
+// Le déploiement tourne en arrière-plan après la fermeture de la connexion.
+ignore_user_abort(true);
+
+http_response_code(200);
+header('Content-Type: application/json');
+echo json_encode(['status' => 'ok']);
+
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+} else {
+    ob_end_flush();
+    flush();
+}
+
 // ─── Déploiement ─────────────────────────────────────────────────────────────
 file_put_contents($logFile, "\n" . str_repeat('=', 60) . "\n" . '[' . date('Y-m-d H:i:s') . "] Déploiement démarré\n", FILE_APPEND);
 
@@ -84,15 +99,8 @@ $commands = [
 foreach ($commands as $cmd) {
     if (!runCommand($cmd, $logFile)) {
         file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] ÉCHEC — déploiement interrompu\n", FILE_APPEND);
-        http_response_code(500);
-        header('Content-Type: application/json');
-        echo json_encode(['status' => 'error']);
         exit;
     }
 }
 
 file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] Déploiement terminé avec succès\n", FILE_APPEND);
-
-http_response_code(200);
-header('Content-Type: application/json');
-echo json_encode(['status' => 'ok']);
