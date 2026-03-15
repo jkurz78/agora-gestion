@@ -22,7 +22,7 @@
     {{-- Tableau --}}
     <div class="table-responsive">
         <table class="table table-sm table-striped table-hover">
-            <thead class="table-dark" style="--bs-table-bg:#2c3a50;--bs-table-border-color:#3a4d63">
+            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
                     <th>Nom</th>
                     <th>Dernière cotisation</th>

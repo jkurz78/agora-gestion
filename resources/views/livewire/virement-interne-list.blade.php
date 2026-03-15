@@ -11,7 +11,7 @@
     @else
         <div class="table-responsive">
             <table class="table table-striped table-hover align-middle">
-                <thead class="table-dark" style="--bs-table-bg:#2c3a50;--bs-table-border-color:#3a4d63">
+                <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                     <tr>
                         <th>Date</th>
                         <th>Référence</th>
