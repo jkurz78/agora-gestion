@@ -113,20 +113,14 @@
                             <tbody>
                                 @forelse ($lignes as $index => $ligne)
                                     <tr wire:key="ligne-{{ $index }}">
-                                        <td>
-                                            <select wire:model="lignes.{{ $index }}.sous_categorie_id"
-                                                    class="form-select form-select-sm @error('lignes.' . $index . '.sous_categorie_id') is-invalid @enderror">
-                                                <option value="">-- Choisir --</option>
-                                                @foreach ($sousCategories->groupBy('categorie.nom') as $catNom => $sousCats)
-                                                    <optgroup label="{{ $catNom }}">
-                                                        @foreach ($sousCats as $sc)
-                                                            <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
-                                                        @endforeach
-                                                    </optgroup>
-                                                @endforeach
-                                            </select>
+                                        <td style="min-width:220px">
+                                            <livewire:sous-categorie-autocomplete
+                                                :key="'sc-rec-'.$index"
+                                                wire:model="lignes.{{ $index }}.sous_categorie_id"
+                                                filtre="recette"
+                                            />
                                             @error('lignes.' . $index . '.sous_categorie_id')
-                                                <div class="invalid-feedback">{{ $message }}</div>
+                                                <div class="text-danger small mt-1">{{ $message }}</div>
                                             @enderror
                                         </td>
                                         <td>
