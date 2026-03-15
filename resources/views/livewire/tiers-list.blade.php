@@ -59,6 +59,11 @@
                             @endif
                         </td>
                         <td class="text-end">
+                            <a href="{{ route('tiers.transactions', $tiers->id) }}"
+                               class="btn btn-sm btn-outline-secondary me-1"
+                               title="Transactions">
+                                <i class="bi bi-clock-history"></i>
+                            </a>
                             <button
                                 class="btn btn-sm btn-outline-primary me-1"
                                 wire:click="$dispatch('edit-tiers', { id: {{ $tiers->id }} })"
