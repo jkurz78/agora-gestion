@@ -1,7 +1,9 @@
 <div>
-    <button wire:click="togglePanel" type="button" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-upload"></i> Importer
-    </button>
+    <div class="mb-3">
+        <button wire:click="togglePanel" type="button" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-upload"></i> Importer
+        </button>
+    </div>
 
     @if ($showPanel)
         <div class="position-fixed top-0 start-0 w-100 h-100"
