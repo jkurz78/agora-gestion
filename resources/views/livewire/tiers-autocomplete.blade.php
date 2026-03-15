@@ -103,28 +103,28 @@
                     <label class="form-label fw-semibold">Type</label>
                     <div class="d-flex gap-3">
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" wire:model.live="newType" value="entreprise" id="tc_entreprise">
-                            <label class="form-check-label" for="tc_entreprise">Entreprise</label>
-                        </div>
-                        <div class="form-check">
                             <input class="form-check-input" type="radio" wire:model.live="newType" value="particulier" id="tc_particulier">
                             <label class="form-check-label" for="tc_particulier">Particulier</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" wire:model.live="newType" value="entreprise" id="tc_entreprise">
+                            <label class="form-check-label" for="tc_entreprise">Entreprise</label>
                         </div>
                     </div>
                 </div>
 
                 <div class="row g-2 mb-3">
+                    <div class="{{ $newType === 'particulier' ? 'col-6' : 'col-12' }}">
+                        <label class="form-label fw-semibold">Nom <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" wire:model="newNom">
+                        @error('newNom') <div class="text-danger small">{{ $message }}</div> @enderror
+                    </div>
                     @if($newType === 'particulier')
                     <div class="col-6">
                         <label class="form-label fw-semibold">Prénom</label>
                         <input type="text" class="form-control" wire:model="newPrenom">
                     </div>
                     @endif
-                    <div class="{{ $newType === 'particulier' ? 'col-6' : 'col-12' }}">
-                        <label class="form-label fw-semibold">Nom <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" wire:model="newNom">
-                        @error('newNom') <div class="text-danger small">{{ $message }}</div> @enderror
-                    </div>
                 </div>
 
                 <div class="mb-3">

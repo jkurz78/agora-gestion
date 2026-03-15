@@ -37,7 +37,7 @@ final class TiersAutocomplete extends Component
 
     public string $newPrenom = '';
 
-    public string $newType = 'entreprise';
+    public string $newType = 'particulier';
 
     public bool $newPourDepenses = true;
 
@@ -152,7 +152,9 @@ final class TiersAutocomplete extends Component
             $this->showActivateModal = true;
             $this->open = false;
         } else {
-            $this->newNom = $this->search;
+            $parts = explode(' ', trim($this->search), 2);
+            $this->newNom    = $parts[0] ?? '';
+            $this->newPrenom = $parts[1] ?? '';
             $this->showCreateModal = true;
             $this->open = false;
         }
