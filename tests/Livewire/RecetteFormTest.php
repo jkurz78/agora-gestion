@@ -55,7 +55,7 @@ it('validates required fields', function () {
     Livewire::test(RecetteForm::class)
         ->set('showForm', true)
         ->call('save')
-        ->assertHasErrors(['date', 'libelle', 'mode_paiement', 'lignes']);
+        ->assertHasErrors(['date', 'reference', 'mode_paiement', 'lignes']);
 });
 
 it('computes montant_total from lignes sum', function () {
@@ -73,6 +73,7 @@ it('can save a new recette', function () {
         ->set('showForm', true)
         ->set('date', '2025-10-15')
         ->set('libelle', 'Cotisation membre')
+        ->set('reference', 'REC-001')
         ->set('mode_paiement', 'cb')
         ->set('compte_id', $this->compte->id)
         ->set('lignes', [

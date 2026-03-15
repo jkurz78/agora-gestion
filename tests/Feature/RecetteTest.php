@@ -13,6 +13,7 @@ it('create assigne un numero_piece non null', function () {
         'montant_total' => 100,
         'mode_paiement' => 'virement',
         'compte_id'     => $compte->id,
+        'reference'     => 'REC-001',
     ], []);
 
     expect($recette->numero_piece)->not->toBeNull();
