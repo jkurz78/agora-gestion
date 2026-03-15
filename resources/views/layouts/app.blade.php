@@ -319,7 +319,7 @@
     </nav>
     @endauth
 
-    <div class="container-fluid px-4">
+    <div class="container-fluid px-4 pb-5 mb-3">
         <x-flash-message />
         {{ $slot }}
     </div>
@@ -327,7 +327,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     @livewireScripts
 
-    <footer class="text-center text-muted small py-3 mt-4 border-top">
+    <footer class="text-center small py-2" style="position:fixed;bottom:0;left:0;right:0;background-color:#722281;color:rgba(255,255,255,0.85);z-index:1030;">
         &copy; {{ config('version.year', date('Y')) }} Jürgen Kurz &middot; SVS Accounting &middot; {{ config('version.tag', 'dev') }} &middot; {{ config('version.date', '') }}
     </footer>
 </body>
