@@ -14,9 +14,10 @@ it('télécharge le template dépense', function () {
     $response->assertHeader('Content-Type', 'text/csv;charset=UTF-8');
     $response->assertDownload('modele-depense.csv');
 
-    // Check header row is present
+    // Check header row and example data are present
     expect($response->getContent())
-        ->toContain('date;reference;sous_categorie');
+        ->toContain('date;reference;sous_categorie')
+        ->toContain('FAC-001');
 });
 
 it('télécharge le template recette', function () {
@@ -28,6 +29,10 @@ it('télécharge le template recette', function () {
     $response->assertStatus(200);
     $response->assertHeader('Content-Type', 'text/csv;charset=UTF-8');
     $response->assertDownload('modele-recette.csv');
+
+    expect($response->getContent())
+        ->toContain('date;reference;sous_categorie')
+        ->toContain('SUB-001');
 });
 
 it('redirige les invités vers login', function () {
