@@ -1,6 +1,6 @@
 <div>
     <div class="mb-3">
-        <button wire:click="togglePanel" type="button" class="btn btn-outline-secondary btn-sm">
+        <button wire:click="togglePanel" type="button" class="btn btn-outline-secondary">
             <i class="bi bi-upload"></i> Importer
         </button>
     </div>
