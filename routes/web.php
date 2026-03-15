@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
+use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OperationController;
 use App\Http\Controllers\RapprochementPdfController;
@@ -51,6 +52,15 @@ Route::middleware('auth')->group(function () {
 
         return redirect()->back();
     })->name('exercice.changer');
+
+    // CSV import templates
+    Route::get('/depenses/import/template', [CsvImportController::class, 'template'])
+        ->defaults('type', 'depense')
+        ->name('depenses.import.template');
+
+    Route::get('/recettes/import/template', [CsvImportController::class, 'template'])
+        ->defaults('type', 'recette')
+        ->name('recettes.import.template');
 
     // Resource controllers
     Route::resource('operations', OperationController::class)->except(['destroy']);

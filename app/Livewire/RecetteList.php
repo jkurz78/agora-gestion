@@ -81,6 +81,12 @@ final class RecetteList extends Component
         // Livewire will re-render automatically
     }
 
+    #[On('csv-imported')]
+    public function refreshList(): void
+    {
+        // Livewire re-renders automatically after this method runs
+    }
+
     public function render(): View
     {
         $exercice = app(ExerciceService::class)->current();
