@@ -13,8 +13,10 @@ class CategoriesSeeder extends Seeder
 {
     public function run(): void
     {
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0');
         SousCategorie::truncate();
         Categorie::truncate();
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
         $data = [
             // ─── RECETTES ───────────────────────────────────────────────
