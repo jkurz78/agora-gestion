@@ -50,10 +50,10 @@
                     </th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="color:#555">
                 @forelse($transactions as $tx)
                     <tr>
-                        <td class="text-nowrap">{{ \Carbon\Carbon::parse($tx->date)->format('d/m/Y') }}</td>
+                        <td class="text-nowrap small">{{ \Carbon\Carbon::parse($tx->date)->format('d/m/Y') }}</td>
                         <td>
                             @php
                                 $badgeClass = match($tx->source_type) {
@@ -73,8 +73,8 @@
                             @endphp
                             <span class="badge {{ $badgeClass }}">{{ $label }}</span>
                         </td>
-                        <td>{{ $tx->libelle }}</td>
-                        <td>{{ $tx->compte ?? '—' }}</td>
+                        <td class="small">{{ $tx->libelle }}</td>
+                        <td class="small text-muted">{{ $tx->compte ?? '—' }}</td>
                         <td class="text-end text-nowrap fw-semibold @if(in_array($tx->source_type, ['recette','don'])) text-success @else text-danger @endif">
                             {{ number_format((float) $tx->montant, 2, ',', ' ') }} €
                         </td>

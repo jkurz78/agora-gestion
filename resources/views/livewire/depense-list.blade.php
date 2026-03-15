@@ -70,33 +70,36 @@
                     <th></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="color:#555">
                 @forelse ($depenses as $depense)
                     <tr wire:key="depense-{{ $depense->id }}">
                         <td class="text-muted small">{{ $depense->numero_piece ?? '—' }}</td>
-                        <td class="text-nowrap">{{ $depense->date->format('d/m/Y') }}</td>
+                        <td class="text-nowrap small">{{ $depense->date->format('d/m/Y') }}</td>
                         <td class="text-muted small">{{ $depense->reference ?? '—' }}</td>
                         <td>{{ $depense->libelle }}</td>
-                        <td>@if($depense->tiers)<span style="font-size:.75rem">{{ $depense->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $depense->tiers->displayName() }}@else—@endif</td>
-                        <td><span class="badge bg-secondary">{{ $depense->mode_paiement->label() }}</span></td>
+                        <td class="small">@if($depense->tiers)<span style="font-size:.7rem">{{ $depense->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $depense->tiers->displayName() }}@else—@endif</td>
+                        <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $depense->mode_paiement->label() }}</span></td>
                         <td class="text-end text-danger fw-semibold text-nowrap">
                             {{ number_format((float) $depense->montant_total, 2, ',', ' ') }} €
                         </td>
                         <td>
                             <div class="d-flex gap-1 justify-content-end">
                                 <button wire:click="$dispatch('edit-depense', { id: {{ $depense->id }} })"
-                                        class="btn btn-sm btn-outline-primary" title="Modifier">
+                                        class="btn btn-sm btn-outline-primary" title="Modifier"
+                                        style="padding:.15rem .35rem;font-size:.75rem">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 @if ($depense->pointe)
                                     <button class="btn btn-sm btn-outline-danger" disabled
-                                            title="Dépointez cette dépense avant de la supprimer.">
+                                            title="Dépointez cette dépense avant de la supprimer."
+                                            style="padding:.15rem .35rem;font-size:.75rem">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 @else
                                     <button wire:click="delete({{ $depense->id }})"
                                             wire:confirm="Supprimer cette dépense ?"
-                                            class="btn btn-sm btn-outline-danger" title="Supprimer">
+                                            class="btn btn-sm btn-outline-danger" title="Supprimer"
+                                            style="padding:.15rem .35rem;font-size:.75rem">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 @endif
