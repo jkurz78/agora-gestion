@@ -193,7 +193,7 @@ final class CsvImportService
                 $lignesCreated += count($group['lignes']);
             } catch (\Exception $e) {
                 return new CsvImportResult(false, errors: [[
-                    'line'    => $group['firstLine'],
+                    'line'    => 0,
                     'message' => 'Erreur lors de l\'insertion : ' . $e->getMessage(),
                 ]]);
             }
