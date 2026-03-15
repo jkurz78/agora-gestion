@@ -100,12 +100,6 @@
                 <h6 class="fw-bold mb-3" style="color:#722281">Créer un nouveau tiers</h6>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Nom <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" wire:model="newNom">
-                    @error('newNom') <div class="text-danger small">{{ $message }}</div> @enderror
-                </div>
-
-                <div class="mb-3">
                     <label class="form-label fw-semibold">Type</label>
                     <div class="d-flex gap-3">
                         <div class="form-check">
@@ -119,12 +113,19 @@
                     </div>
                 </div>
 
-                @if($newType === 'particulier')
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Prénom</label>
-                    <input type="text" class="form-control" wire:model="newPrenom">
+                <div class="row g-2 mb-3">
+                    @if($newType === 'particulier')
+                    <div class="col-6">
+                        <label class="form-label fw-semibold">Prénom</label>
+                        <input type="text" class="form-control" wire:model="newPrenom">
+                    </div>
+                    @endif
+                    <div class="{{ $newType === 'particulier' ? 'col-6' : 'col-12' }}">
+                        <label class="form-label fw-semibold">Nom <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" wire:model="newNom">
+                        @error('newNom') <div class="text-danger small">{{ $message }}</div> @enderror
+                    </div>
                 </div>
-                @endif
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Utilisable pour</label>
