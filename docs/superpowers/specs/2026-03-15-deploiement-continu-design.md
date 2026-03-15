@@ -16,15 +16,17 @@ push main
    ▼
 GitHub Actions (.github/workflows/deploy.yml)
    ├── checkout + composer install
-   ├── php artisan test (PHP 8.4)
+   ├── php artisan test (PHP 8.4, SQLite :memory:)
    │     ├── échec → workflow s'arrête, prod intacte
    │     └── succès ↓
-   └── POST https://***DEPLOY_SUBDOMAIN***/deploy.php
+   └── curl --fail POST https://***DEPLOY_SUBDOMAIN***/deploy.php
               Authorization: Bearer <DEPLOY_SECRET>
                     │
                     ▼
               O2Switch (public/deploy.php)
-                    ├── vérifie méthode POST + token
+                    ├── supprime les erreurs PHP (display_errors Off)
+                    ├── vérifie méthode POST + token via hash_equals()
+                    ├── php artisan optimize:clear
                     ├── git pull origin main
                     ├── composer install --no-dev --optimize-autoloader
                     ├── php artisan migrate --force
@@ -34,29 +36,67 @@ GitHub Actions (.github/workflows/deploy.yml)
                     └── log dans deploy.log (hors public/)
 ```
 
+**Risque connu :** pas de mode maintenance (`php artisan down/up`) autour du déploiement. Il existe une fenêtre entre `git pull` et `php artisan migrate --force` pendant laquelle le nouveau code tourne sur l'ancien schéma. Pour cette application (données financières), ce risque est accepté en première version — le mode maintenance peut être ajouté ultérieurement.
+
 ---
 
-## Fichiers à créer
+## Fichiers à créer ou modifier
 
-| Fichier | Emplacement | Description |
-|---------|-------------|-------------|
-| `deploy.yml` | `.github/workflows/deploy.yml` | Workflow GitHub Actions |
-| `deploy.php` | `public/deploy.php` | Script de déploiement sur O2Switch |
+| Fichier | Action | Description |
+|---------|--------|-------------|
+| `phpunit.xml` | Modifier | Ajouter `DB_CONNECTION=sqlite` + `DB_DATABASE=:memory:` |
+| `.github/workflows/deploy.yml` | Créer | Workflow GitHub Actions |
+| `public/deploy.php` | Créer | Script de déploiement sur O2Switch |
 
-### `deploy.php` ne doit pas être commité tel quel en production
+---
 
-`deploy.php` est commité dans le repo (il est dans `public/`) mais il lit `DEPLOY_SECRET` depuis les variables d'environnement du serveur (`.env`) — le secret n'est jamais dans le code.
+## Modification de phpunit.xml
+
+Ajouter dans le bloc `<php>` :
+
+```xml
+<env name="DB_CONNECTION" value="sqlite"/>
+<env name="DB_DATABASE" value=":memory:"/>
+```
+
+Cela garantit que tous les tests (local et CI) utilisent SQLite en mémoire, sans dépendance à MySQL.
 
 ---
 
 ## Sécurité de deploy.php
 
+- Désactive immédiatement `display_errors` pour éviter toute fuite d'information en cas d'erreur PHP avant l'auth check
 - N'accepte que les requêtes **POST**
-- Vérifie le header `Authorization: Bearer <token>` contre `$_ENV['DEPLOY_SECRET']` (lu depuis le `.env` via la fonction d'environnement Laravel ou `getenv()`)
+- Lit `DEPLOY_SECRET` depuis le `.env` via un mini-parseur dotenv maison (Laravel n'est pas bootstrappé dans ce script — `env()` n'est pas disponible)
+- Compare le token avec `hash_equals()` (protection contre les timing attacks) — jamais avec `===` ou `strcmp()`
 - Toute requête invalide → réponse `403 Forbidden` immédiate, aucune commande exécutée
 - Les sorties des commandes shell sont loguées dans `../deploy.log` (un niveau au-dessus de `public/`, inaccessible via HTTP)
 - En cas d'échec d'une commande shell → arrêt immédiat + réponse `500`
 - En cas de succès → réponse `200` JSON `{"status": "ok"}`
+
+### Lecture du .env dans deploy.php
+
+```php
+<?php
+ini_set('display_errors', '0');
+error_reporting(0);
+
+// Lecture manuelle du .env (Laravel non bootstrappé)
+$envFile = __DIR__ . '/../.env';
+$env = [];
+if (file_exists($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        if (str_starts_with(trim($line), '#')) continue;
+        if (str_contains($line, '=')) {
+            [$key, $value] = explode('=', $line, 2);
+            $env[trim($key)] = trim($value, " \t\n\r\0\x0B\"'");
+        }
+    }
+}
+
+$secret = $env['DEPLOY_SECRET'] ?? '';
+// ...
+```
 
 ---
 
@@ -64,7 +104,8 @@ GitHub Actions (.github/workflows/deploy.yml)
 
 - **Racine app :** `~/public_html/***DEPLOY_SUBDOMAIN***/`
 - **Document root :** `~/public_html/***DEPLOY_SUBDOMAIN***/public/`
-- **PHP :** `/usr/local/bin/php` (version 8.4)
+- **PHP :** `/usr/local/bin/php` (version 8.4, confirmé via `which php`)
+- **Composer :** à confirmer via `which composer` — probablement `/usr/local/bin/composer`
 - **deploy.log :** `~/public_html/***DEPLOY_SUBDOMAIN***/deploy.log`
 
 ---
@@ -74,43 +115,90 @@ GitHub Actions (.github/workflows/deploy.yml)
 | Secret | Valeur |
 |--------|--------|
 | `DEPLOY_URL` | `https://***DEPLOY_SUBDOMAIN***/deploy.php` |
-| `DEPLOY_SECRET` | Token aléatoire (`openssl rand -hex 32`) |
+| `DEPLOY_SECRET` | Token aléatoire généré par `openssl rand -hex 32` |
 
 ---
 
 ## Workflow GitHub Actions
 
 - **Déclencheur :** `push` sur `main` uniquement
-- **PHP :** 8.4 (correspond à la production)
-- **Extensions PHP :** celles requises par Laravel (pdo, mbstring, xml, curl, zip…)
-- **Base de données de test :** SQLite en mémoire (`:memory:`) pour isoler les tests du pipeline
+- **PHP :** 8.4
+- **Extensions PHP :** `pdo, pdo_sqlite, mbstring, xml, dom, curl, zip, intl, bcmath`
+- **Base de données de test :** SQLite `:memory:` (via `phpunit.xml`)
 - **Étapes :**
   1. `actions/checkout@v4`
-  2. `shivammathur/setup-php@v2` avec PHP 8.4
+  2. `shivammathur/setup-php@v2` avec PHP 8.4 et les extensions listées
   3. `composer install --no-interaction --prefer-dist`
-  4. Copier `.env.example` → `.env`, générer `APP_KEY`
+  4. Copier `.env.example` → `.env`, générer `APP_KEY` via `php artisan key:generate`
   5. `php artisan test`
-  6. Si succès : `curl -X POST -H "Authorization: Bearer $DEPLOY_SECRET" $DEPLOY_URL`
+  6. Si succès : `curl --fail -s -X POST -H "Authorization: Bearer ${{ secrets.DEPLOY_SECRET }}" ${{ secrets.DEPLOY_URL }}`
+
+Le flag `--fail` sur `curl` est obligatoire : sans lui, un `500` retourné par `deploy.php` serait ignoré et le workflow afficherait un succès alors que le déploiement a échoué.
 
 ---
 
-## Étapes manuelles préalables (une seule fois)
+## Étapes manuelles préalables (une seule fois, dans l'ordre)
 
-Ces étapes sont à effectuer manuellement avant que le pipeline soit opérationnel :
+1. **Générer le token** sur la machine locale :
+   ```bash
+   openssl rand -hex 32
+   ```
+   Conserver la valeur — elle sera utilisée aux étapes 2 et 4.
 
-1. **Générer un token** : `openssl rand -hex 32` → stocker dans GitHub Secrets (`DEPLOY_SECRET`) et dans le `.env` O2Switch (`DEPLOY_SECRET=...`)
-2. **Configurer GitHub Secrets** : `DEPLOY_URL` + `DEPLOY_SECRET` dans Settings → Secrets and variables → Actions
-3. **Remplacer le FTP par git sur O2Switch** :
-   - Générer une paire de clés SSH sur O2Switch : `ssh-keygen -t ed25519 -C "deploy@o2switch"`
-   - Ajouter la clé publique dans GitHub → Settings → Deploy keys (lecture seule)
-   - Cloner le repo : `cd ~/public_html/***DEPLOY_SUBDOMAIN*** && git clone git@github.com:Feucherolles/svs-accounting.git .`
-4. **Ajouter `DEPLOY_SECRET`** dans le `.env` de production sur O2Switch
+2. **Configurer les GitHub Secrets** dans Settings → Secrets and variables → Actions :
+   - `DEPLOY_SECRET` = le token généré à l'étape 1
+   - `DEPLOY_URL` = `https://***DEPLOY_SUBDOMAIN***/deploy.php`
+
+3. **Configurer la clé SSH deploy key sur O2Switch** (pour que O2Switch puisse faire `git pull` vers GitHub) :
+   - Dans le terminal SSH cPanel :
+     ```bash
+     ssh-keygen -t ed25519 -C "deploy@o2switch" -f ~/.ssh/id_ed25519_github
+     cat ~/.ssh/id_ed25519_github.pub
+     ```
+   - Copier la clé publique → GitHub repo → Settings → Deploy keys → Add deploy key (lecture seule)
+   - Créer `~/.ssh/config` sur O2Switch :
+     ```
+     Host github.com
+         IdentityFile ~/.ssh/id_ed25519_github
+         StrictHostKeyChecking no
+     ```
+
+4. **Cloner le repo sur O2Switch** (remplace le FTP) :
+   ```bash
+   cd ~/public_html/***DEPLOY_SUBDOMAIN***
+   # Sauvegarder le .env existant si nécessaire
+   git clone git@github.com:Feucherolles/svs-accounting.git .
+   ```
+
+5. **Ajouter `DEPLOY_SECRET` dans le `.env` de production** sur O2Switch :
+   ```
+   DEPLOY_SECRET=<le token de l'étape 1>
+   ```
+   ⚠️ Cette étape doit être faite **avant tout push sur `main`** — sans ce token, `deploy.php` retournera `403` pour toutes les requêtes.
+
+6. **Vérifier les permissions** de `storage/` et `bootstrap/cache/` :
+   ```bash
+   chmod -R 775 storage bootstrap/cache
+   ```
+
+7. **Confirmer le chemin de composer** :
+   ```bash
+   which composer
+   ```
+   Mettre à jour `deploy.php` avec le chemin absolu si différent de `/usr/local/bin/composer`.
+
+8. **Tester le script manuellement** avant le premier push :
+   ```bash
+   curl -X POST -H "Authorization: Bearer <SECRET>" https://***DEPLOY_SUBDOMAIN***/deploy.php
+   ```
+   Vérifier la réponse `200` et le contenu de `deploy.log`.
 
 ---
 
 ## Ce qui est hors périmètre
 
-- Notifications Slack/email en cas d'échec du déploiement
+- Mode maintenance (`php artisan down/up`) — risque connu, ajout ultérieur
+- Notifications en cas d'échec du déploiement
 - Rollback automatique
 - Déploiement blue/green
-- Gestion du mode maintenance (`php artisan down/up`) — peut être ajouté ultérieurement
+- Rate-limiting ou restriction IP sur `deploy.php`
