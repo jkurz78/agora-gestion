@@ -328,7 +328,7 @@
     @livewireScripts
 
     <footer class="text-center text-muted small py-3 mt-4 border-top">
-        SVS Accounting &middot; {{ config('version.tag', 'dev') }} &middot; {{ config('version.date', '') }}
+        &copy; {{ config('version.year', date('Y')) }} Jürgen Kurz &middot; SVS Accounting &middot; {{ config('version.tag', 'dev') }} &middot; {{ config('version.date', '') }}
     </footer>
 </body>
 </html>
