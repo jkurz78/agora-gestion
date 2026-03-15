@@ -6,112 +6,103 @@ namespace Database\Seeders;
 
 use App\Enums\TypeCategorie;
 use App\Models\Categorie;
+use App\Models\SousCategorie;
 use Illuminate\Database\Seeder;
 
 class CategoriesSeeder extends Seeder
 {
     public function run(): void
     {
+        SousCategorie::truncate();
+        Categorie::truncate();
+
         $data = [
             // ─── RECETTES ───────────────────────────────────────────────
             [
-                'nom'  => 'Cotisations et dons',
+                'nom'  => '70 - Ventes et prestations',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Cotisations des membres',        'code_cerfa' => '75A'],
-                    ['nom' => 'Dons manuels',                   'code_cerfa' => '75B'],
-                    ['nom' => 'Mécénat d\'entreprises',         'code_cerfa' => '75C'],
-                    ['nom' => 'Legs et donations',              'code_cerfa' => '75D'],
+                    ['nom' => 'Formations',              'code_cerfa' => '706A'],
+                    ['nom' => 'Parcours thérapeutiques', 'code_cerfa' => '706B'],
+                    ['nom' => 'Ventes de produits',      'code_cerfa' => '707'],
                 ],
             ],
             [
-                'nom'  => 'Subventions',
+                'nom'  => '74 - Subventions',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Subventions de l\'État',                  'code_cerfa' => '74A'],
-                    ['nom' => 'Subventions régionales',                  'code_cerfa' => '74B'],
-                    ['nom' => 'Subventions départementales',             'code_cerfa' => '74C'],
-                    ['nom' => 'Subventions communales',                  'code_cerfa' => '74D'],
-                    ['nom' => 'Subventions européennes',                 'code_cerfa' => '74E'],
-                    ['nom' => 'Subventions d\'autres organismes publics','code_cerfa' => '74F'],
+                    ['nom' => 'Subvention État Ministère des Sports', 'code_cerfa' => '741'],
                 ],
             ],
             [
-                'nom'  => 'Prestations et ventes',
+                'nom'  => '75 - Cotisations et dons',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Ventes de prestations de services', 'code_cerfa' => '70A'],
-                    ['nom' => 'Ventes de produits',                'code_cerfa' => '70B'],
-                    ['nom' => 'Droits d\'entrée et billetterie',   'code_cerfa' => '70C'],
-                    ['nom' => 'Formations',                        'code_cerfa' => '70D'],
-                    ['nom' => 'Publications et ventes diverses',   'code_cerfa' => '70E'],
+                    ['nom' => 'Cotisations', 'code_cerfa' => '751'],
+                    ['nom' => 'Dons manuels', 'code_cerfa' => '754'],
+                    ['nom' => 'Mécénat',      'code_cerfa' => '756'],
                 ],
             ],
             [
-                'nom'  => 'Autres produits',
+                'nom'  => '76 - Produits financiers',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Produits financiers (intérêts)',  'code_cerfa' => '76A'],
-                    ['nom' => 'Produits exceptionnels',          'code_cerfa' => '77A'],
-                    ['nom' => 'Remboursements et récupérations', 'code_cerfa' => '79A'],
-                    ['nom' => 'Recettes diverses',               'code_cerfa' => '75Z'],
+                    ['nom' => 'Intérêts', 'code_cerfa' => '761'],
+                ],
+            ],
+            [
+                'nom'  => '77 - Produits exceptionnels',
+                'type' => TypeCategorie::Recette,
+                'sous' => [
+                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771'],
                 ],
             ],
 
             // ─── DÉPENSES ───────────────────────────────────────────────
             [
-                'nom'  => 'Charges de personnel',
+                'nom'  => '60 - Achats',
                 'type' => TypeCategorie::Depense,
                 'sous' => [
-                    ['nom' => 'Salaires et traitements bruts',       'code_cerfa' => '641'],
-                    ['nom' => 'Charges sociales patronales',         'code_cerfa' => '645'],
-                    ['nom' => 'Indemnités bénévoles et remboursements', 'code_cerfa' => '647'],
-                    ['nom' => 'Autres charges de personnel',         'code_cerfa' => '648'],
+                    ['nom' => 'Fournitures',      'code_cerfa' => '606'],
+                    ['nom' => 'Petits équipements', 'code_cerfa' => '606B'],
+                    ['nom' => 'Achats divers',     'code_cerfa' => '609'],
                 ],
             ],
             [
-                'nom'  => 'Charges de fonctionnement',
+                'nom'  => '61 - Charges de fonctionnement',
                 'type' => TypeCategorie::Depense,
                 'sous' => [
-                    ['nom' => 'Loyer et charges locatives',          'code_cerfa' => '613'],
-                    ['nom' => 'Eau, gaz, électricité',               'code_cerfa' => '606'],
-                    ['nom' => 'Téléphone et internet',               'code_cerfa' => '626'],
-                    ['nom' => 'Fournitures de bureau',               'code_cerfa' => '606B'],
-                    ['nom' => 'Matériels et équipements',            'code_cerfa' => '615'],
-                    ['nom' => 'Entretien et réparations',            'code_cerfa' => '615B'],
-                    ['nom' => 'Assurances',                          'code_cerfa' => '616'],
+                    ['nom' => 'Location salle',                     'code_cerfa' => '613A'],
+                    ['nom' => 'Location lieu (centre équestre)',     'code_cerfa' => '613B'],
+                    ['nom' => 'Location lieu (salle d\'armes)',      'code_cerfa' => '613C'],
                 ],
             ],
             [
-                'nom'  => 'Charges d\'activité',
+                'nom'  => '62 - Autres services extérieurs',
                 'type' => TypeCategorie::Depense,
                 'sous' => [
-                    ['nom' => 'Achats pour les activités',              'code_cerfa' => '601'],
-                    ['nom' => 'Frais d\'événements et manifestations',  'code_cerfa' => '604'],
-                    ['nom' => 'Frais de déplacement et transport',      'code_cerfa' => '625'],
-                    ['nom' => 'Frais d\'hébergement et restauration',   'code_cerfa' => '625B'],
-                    ['nom' => 'Prestations de services extérieurs',     'code_cerfa' => '611'],
+                    ['nom' => 'Bilan pré-thérapeutique',  'code_cerfa' => '611A'],
+                    ['nom' => 'Animation / Encadrement',  'code_cerfa' => '611B'],
+                    ['nom' => 'Supervision',              'code_cerfa' => '611C'],
+                    ['nom' => 'Sessions inter-ateliers',  'code_cerfa' => '611D'],
+                    ['nom' => 'Honoraires juridiques',    'code_cerfa' => '622'],
+                    ['nom' => 'Frais de déplacements',    'code_cerfa' => '625'],
+                    ['nom' => 'Locations de logiciels',   'code_cerfa' => '628A'],
+                    ['nom' => 'Hébergement internet',     'code_cerfa' => '628B'],
+                    ['nom' => 'Développement logiciel',   'code_cerfa' => '628C'],
                 ],
             ],
             [
-                'nom'  => 'Charges administratives',
+                'nom'  => '66 - Charges financières',
                 'type' => TypeCategorie::Depense,
                 'sous' => [
-                    ['nom' => 'Honoraires (comptable, avocat…)', 'code_cerfa' => '622'],
-                    ['nom' => 'Frais bancaires',                 'code_cerfa' => '627'],
-                    ['nom' => 'Communication et publicité',      'code_cerfa' => '623'],
-                    ['nom' => 'Frais postaux',                   'code_cerfa' => '626B'],
-                    ['nom' => 'Documentation et abonnements',    'code_cerfa' => '628'],
-                    ['nom' => 'Impôts et taxes',                 'code_cerfa' => '63'],
+                    ['nom' => 'Frais bancaires', 'code_cerfa' => '627'],
                 ],
             ],
             [
-                'nom'  => 'Charges exceptionnelles',
+                'nom'  => '67 - Charges exceptionnelles',
                 'type' => TypeCategorie::Depense,
-                'sous' => [
-                    ['nom' => 'Charges exceptionnelles diverses', 'code_cerfa' => '671'],
-                    ['nom' => 'Dotations aux amortissements',     'code_cerfa' => '681'],
-                ],
+                'sous' => [],
             ],
         ];
 
