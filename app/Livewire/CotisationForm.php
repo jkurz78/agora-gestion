@@ -9,6 +9,7 @@ use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Services\CotisationService;
 use App\Services\ExerciceService;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 final class CotisationForm extends Component
@@ -36,6 +37,17 @@ final class CotisationForm extends Component
     {
         $this->reset(['tiers_id', 'montant', 'date_paiement', 'mode_paiement', 'compte_id', 'showForm']);
         $this->resetValidation();
+    }
+
+    #[On('open-cotisation-for-tiers')]
+    public function openForTiers(?int $tiersId = null): void
+    {
+        $this->resetForm();
+        $this->date_paiement = app(ExerciceService::class)->defaultDate();
+        $this->showForm = true;
+        if ($tiersId !== null) {
+            $this->tiers_id = $tiersId;
+        }
     }
 
     public function save(): void
