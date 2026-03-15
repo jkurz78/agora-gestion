@@ -75,7 +75,7 @@
                         </td>
                         <td class="small">{{ $tx->libelle }}</td>
                         <td class="small text-muted">{{ $tx->compte ?? '—' }}</td>
-                        <td class="text-end text-nowrap fw-semibold @if(in_array($tx->source_type, ['recette','don'])) text-success @else text-danger @endif">
+                        <td class="text-end text-nowrap fw-semibold small @if(in_array($tx->source_type, ['recette','don'])) text-success @else text-danger @endif">
                             {{ number_format((float) $tx->montant, 2, ',', ' ') }} €
                         </td>
                     </tr>
