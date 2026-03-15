@@ -28,12 +28,15 @@ final class VersionStampCommand extends Command
      */
     public static function readGitVersion(): array
     {
-        exec('git describe --tags --always 2>/dev/null', $tagOutput, $tagCode);
-        exec("git log -1 --format=%cd --date=format:'%Y-%m-%d' 2>/dev/null", $dateOutput, $dateCode);
+        exec('git rev-list --count HEAD 2>/dev/null', $countOutput, $countCode);
+        exec('git rev-parse --short HEAD 2>/dev/null', $shaOutput, $shaCode);
+
+        $build = ($countCode === 0 && isset($countOutput[0])) ? trim($countOutput[0]) : '0';
+        $sha   = ($shaCode === 0 && isset($shaOutput[0])) ? trim($shaOutput[0]) : 'unknown';
 
         return [
-            'tag'  => ($tagCode === 0 && isset($tagOutput[0])) ? trim($tagOutput[0]) : 'unknown',
-            'date' => ($dateCode === 0 && isset($dateOutput[0])) ? trim($dateOutput[0]) : 'unknown',
+            'tag'  => 'v1.0.' . $build,
+            'date' => $sha,
         ];
     }
 
