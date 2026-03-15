@@ -15,12 +15,12 @@ return new class extends Migration
 
         Schema::table('depenses', function (Blueprint $table) {
             $table->string('libelle', 255)->nullable()->change();
-            $table->string('reference', 100)->nullable(false)->default('')->change();
+            $table->string('reference', 100)->nullable(false)->change();
         });
 
         Schema::table('recettes', function (Blueprint $table) {
             $table->string('libelle', 255)->nullable()->change();
-            $table->string('reference', 100)->nullable(false)->default('')->change();
+            $table->string('reference', 100)->nullable(false)->change();
         });
     }
 
