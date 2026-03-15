@@ -175,7 +175,7 @@ final class CsvImportService
         foreach ($groups as $key => $group) {
             [$date, $reference] = explode('|', $key, 2);
             $exists = $modelClass::withoutTrashed()
-                ->where('date', $date)
+                ->whereDate('date', $date)
                 ->where('reference', $reference)
                 ->exists();
             if ($exists) {
