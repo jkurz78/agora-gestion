@@ -1,5 +1,5 @@
 <div>
-    <h5 class="mb-3">{{ $tiers->nom }}</h5>
+    <h5 class="mb-3">{{ $tiers->displayName() }}</h5>
 
     {{-- Filtres --}}
     <div class="card mb-4">

@@ -14,6 +14,8 @@ final class TiersTransactions extends Component
 {
     use WithPagination;
 
+    protected string $paginationTheme = 'bootstrap';
+
     public int $tiersId;
 
     public string $typeFilter = '';
