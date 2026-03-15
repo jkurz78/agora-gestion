@@ -25,7 +25,7 @@ class RecetteFactory extends Factory
             'libelle' => fake()->sentence(4),
             'montant_total' => fake()->randomFloat(2, 10, 5000),
             'mode_paiement' => fake()->randomElement(ModePaiement::cases()),
-            'reference' => fake()->optional()->numerify('REF-####'),
+            'reference' => fake()->numerify('REF-####'),
             'compte_id' => CompteBancaire::factory(),
             'pointe' => fake()->boolean(20),
             'notes' => fake()->optional()->sentence(),
