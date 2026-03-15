@@ -32,12 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $expectedSecret = $env['DEPLOY_SECRET'] ?? '';
-$authHeader     = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-$providedSecret = '';
-
-if (str_starts_with($authHeader, 'Bearer ')) {
-    $providedSecret = substr($authHeader, 7);
-}
+$providedSecret = $_POST['token'] ?? '';
 
 // hash_equals() est obligatoire pour éviter les timing attacks
 if ($expectedSecret === '' || !hash_equals($expectedSecret, $providedSecret)) {
