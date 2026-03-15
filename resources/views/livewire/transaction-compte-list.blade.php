@@ -74,16 +74,16 @@
                         <th>Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody style="color:#555">
                     @forelse ($transactions as $tx)
                         <tr>
                             <td class="text-muted small">{{ $tx->numero_piece ?? '—' }}</td>
-                            <td>{{ \Carbon\Carbon::parse($tx->date)->format('d/m/Y') }}</td>
-                            <td>{{ $tx->type_label }}</td>
-                            <td>{{ $tx->tiers ?: '—' }}</td>
-                            <td>{{ $tx->libelle ?? '—' }}</td>
-                            <td>{{ $tx->reference ?? '' }}</td>
-                            <td class="text-end {{ $tx->montant >= 0 ? 'text-success' : 'text-danger' }} fw-semibold">
+                            <td class="small text-nowrap">{{ \Carbon\Carbon::parse($tx->date)->format('d/m/Y') }}</td>
+                            <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $tx->type_label }}</span></td>
+                            <td class="small">{{ $tx->tiers ?: '—' }}</td>
+                            <td class="small">{{ $tx->libelle ?? '—' }}</td>
+                            <td class="text-muted small">{{ $tx->reference ?? '' }}</td>
+                            <td class="text-end {{ $tx->montant >= 0 ? 'text-success' : 'text-danger' }} fw-semibold small text-nowrap">
                                 {{ number_format((float) $tx->montant, 2, ',', ' ') }} €
                             </td>
                             <td class="text-center">
@@ -92,24 +92,28 @@
                                 @endif
                             </td>
                             @if ($showSolde)
-                                <td class="text-end">
+                                <td class="text-end small text-muted">
                                     {{ isset($tx->solde_courant) ? number_format((float) $tx->solde_courant, 2, ',', ' ') . ' €' : '' }}
                                 </td>
                             @endif
                             <td>
-                                <button type="button"
-                                        wire:click="redirectToEdit('{{ $tx->source_type }}', {{ $tx->id }})"
-                                        class="btn btn-sm btn-outline-primary me-1"
-                                        title="Modifier">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button type="button"
-                                        wire:click="deleteTransaction('{{ $tx->source_type }}', {{ $tx->id }})"
-                                        wire:confirm="Supprimer cette transaction ?"
-                                        class="btn btn-sm btn-outline-danger"
-                                        title="Supprimer">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                <div class="d-flex gap-1">
+                                    <button type="button"
+                                            wire:click="redirectToEdit('{{ $tx->source_type }}', {{ $tx->id }})"
+                                            class="btn btn-sm btn-outline-primary"
+                                            title="Modifier"
+                                            style="padding:.15rem .35rem;font-size:.75rem">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button"
+                                            wire:click="deleteTransaction('{{ $tx->source_type }}', {{ $tx->id }})"
+                                            wire:confirm="Supprimer cette transaction ?"
+                                            class="btn btn-sm btn-outline-danger"
+                                            title="Supprimer"
+                                            style="padding:.15rem .35rem;font-size:.75rem">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     @empty
