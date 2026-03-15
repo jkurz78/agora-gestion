@@ -189,7 +189,7 @@ Le flag `--fail` sur `curl` est obligatoire : sans lui, un `500` retourné par `
 
 8. **Tester le script manuellement** avant le premier push :
    ```bash
-   curl -X POST -H "Authorization: Bearer <SECRET>" https://***DEPLOY_SUBDOMAIN***/deploy.php
+   curl --fail -v -X POST -H "Authorization: Bearer <SECRET>" https://***DEPLOY_SUBDOMAIN***/deploy.php
    ```
    Vérifier la réponse `200` et le contenu de `deploy.log`.
 
