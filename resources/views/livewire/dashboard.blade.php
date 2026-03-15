@@ -196,7 +196,6 @@
                                 <tr>
                                     <th>Nom</th>
                                     <th>Prénom</th>
-                                    <th>Statut</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -204,11 +203,10 @@
                                     <tr>
                                         <td>{{ $membre->nom }}</td>
                                         <td>{{ $membre->prenom }}</td>
-                                        <td>{{ ucfirst($membre->statut_membre ?? '—') }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="3" class="text-muted text-center">Tous les membres ont cotisé.</td>
+                                        <td colspan="2" class="text-muted text-center">Tous les membres ont cotisé.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
