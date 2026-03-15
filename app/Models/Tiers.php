@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,9 +21,6 @@ final class Tiers extends Model
         'adresse',
         'pour_depenses',
         'pour_recettes',
-        'date_adhesion',
-        'statut_membre',
-        'notes_membre',
     ];
 
     protected function casts(): array
@@ -32,9 +28,6 @@ final class Tiers extends Model
         return [
             'pour_depenses' => 'boolean',
             'pour_recettes' => 'boolean',
-            'date_adhesion' => 'date',
-            'statut_membre' => 'string',
-            'notes_membre' => 'string',
         ];
     }
 
@@ -67,11 +60,4 @@ final class Tiers extends Model
         return $this->hasMany(Recette::class);
     }
 
-    /**
-     * @param  Builder<Tiers>  $query
-     */
-    public function scopeMembres(Builder $query): Builder
-    {
-        return $query->whereNotNull('statut_membre');
-    }
 }

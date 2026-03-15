@@ -43,10 +43,8 @@ final class TiersFactory extends Factory
     public function membre(): static
     {
         return $this->state([
-            'type' => 'particulier',
-            'prenom' => fake()->firstName(),
-            'date_adhesion' => fake()->dateTimeBetween('-3 years', 'now')->format('Y-m-d'),
-            'statut_membre' => 'actif',
+            'type'          => 'particulier',
+            'prenom'        => fake()->firstName(),
             'pour_depenses' => false,
             'pour_recettes' => false,
         ]);

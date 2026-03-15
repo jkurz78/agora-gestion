@@ -3,7 +3,6 @@
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\MembreController;
 use App\Http\Controllers\OperationController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\SousCategorieController;
@@ -53,7 +52,6 @@ Route::middleware('auth')->group(function () {
     })->name('exercice.changer');
 
     // Resource controllers
-    Route::resource('membres', MembreController::class);
     Route::resource('operations', OperationController::class)->except(['destroy']);
 
     // Parametres
