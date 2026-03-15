@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  test-and-deploy:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,10 +29,3 @@ jobs:
 
       - name: Run tests
         run: php artisan test --no-ansi
-
-      - name: Deploy to production
-        run: |
-          curl --fail -s --http1.1 \
-            -X POST \
-            -d "token=${{ secrets.DEPLOY_SECRET }}" \
-            "${{ secrets.DEPLOY_URL }}"
