@@ -79,7 +79,7 @@
                         <td class="small">{{ $depense->libelle }}</td>
                         <td class="small">@if($depense->tiers)<span style="font-size:.7rem">{{ $depense->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $depense->tiers->displayName() }}@else—@endif</td>
                         <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $depense->mode_paiement->label() }}</span></td>
-                        <td class="text-end text-danger fw-semibold text-nowrap">
+                        <td class="text-end text-danger fw-semibold text-nowrap small">
                             {{ number_format((float) $depense->montant_total, 2, ',', ' ') }} €
                         </td>
                         <td>
