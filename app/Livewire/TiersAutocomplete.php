@@ -35,6 +35,8 @@ final class TiersAutocomplete extends Component
 
     public string $newNom = '';
 
+    public string $newPrenom = '';
+
     public string $newType = 'entreprise';
 
     public bool $newPourDepenses = true;
@@ -188,6 +190,7 @@ final class TiersAutocomplete extends Component
 
         $tiers = app(TiersService::class)->create([
             'nom' => $this->newNom,
+            'prenom' => $this->newType === 'particulier' ? $this->newPrenom : null,
             'type' => $this->newType,
             'pour_depenses' => $this->newPourDepenses,
             'pour_recettes' => $this->newPourRecettes,
@@ -196,6 +199,7 @@ final class TiersAutocomplete extends Component
         $this->selectTiers($tiers->id);
         $this->showCreateModal = false;
         $this->newNom = '';
+        $this->newPrenom = '';
     }
 
     public function render(): View

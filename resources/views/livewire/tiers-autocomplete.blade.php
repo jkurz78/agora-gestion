@@ -109,15 +109,22 @@
                     <label class="form-label fw-semibold">Type</label>
                     <div class="d-flex gap-3">
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" wire:model="newType" value="entreprise" id="tc_entreprise">
+                            <input class="form-check-input" type="radio" wire:model.live="newType" value="entreprise" id="tc_entreprise">
                             <label class="form-check-label" for="tc_entreprise">Entreprise</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" wire:model="newType" value="particulier" id="tc_particulier">
+                            <input class="form-check-input" type="radio" wire:model.live="newType" value="particulier" id="tc_particulier">
                             <label class="form-check-label" for="tc_particulier">Particulier</label>
                         </div>
                     </div>
                 </div>
+
+                @if($newType === 'particulier')
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Prénom</label>
+                    <input type="text" class="form-control" wire:model="newPrenom">
+                </div>
+                @endif
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Utilisable pour</label>
