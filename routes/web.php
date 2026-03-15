@@ -22,6 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::view('/recettes', 'recettes.index')->name('recettes.index');
     Route::view('/dons', 'dons.index')->name('dons.index');
     Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
+    Route::view('/membres', 'membres.index')->name('membres.index');
     Route::view('/tiers', 'tiers.index')->name('tiers.index');
     Route::get('/tiers/{tiers}/transactions', function (\App\Models\Tiers $tiers) {
         return view('tiers.transactions', compact('tiers'));
