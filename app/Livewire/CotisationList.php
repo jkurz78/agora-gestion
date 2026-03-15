@@ -1,0 +1,62 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire;
+
+use App\Models\Cotisation;
+use App\Services\CotisationService;
+use App\Services\ExerciceService;
+use Livewire\Attributes\On;
+use Livewire\Component;
+use Livewire\WithPagination;
+
+final class CotisationList extends Component
+{
+    use WithPagination;
+
+    protected string $paginationTheme = 'bootstrap';
+
+    public string $tiers_search = '';
+
+    public function updatedTiersSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function delete(int $id): void
+    {
+        $cotisation = Cotisation::findOrFail($id);
+
+        try {
+            app(CotisationService::class)->delete($cotisation);
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    #[On('cotisation-saved')]
+    public function onCotisationSaved(): void {}
+
+    public function render(): \Illuminate\View\View
+    {
+        $exercice = app(ExerciceService::class)->current();
+
+        $query = Cotisation::with(['tiers', 'compte'])
+            ->where('exercice', $exercice)
+            ->latest('date_paiement')
+            ->latest('id');
+
+        if ($this->tiers_search !== '') {
+            $search = $this->tiers_search;
+            $query->whereHas('tiers', function ($q) use ($search): void {
+                $q->where('nom', 'like', "%{$search}%")
+                    ->orWhere('prenom', 'like', "%{$search}%");
+            });
+        }
+
+        return view('livewire.cotisation-list', [
+            'cotisations' => $query->paginate(15),
+        ]);
+    }
+}
