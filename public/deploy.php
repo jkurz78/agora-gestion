@@ -48,7 +48,7 @@ if ($expectedSecret === '' || !hash_equals($expectedSecret, $providedSecret)) {
 $appDir  = __DIR__ . '/..';
 $logFile = $appDir . '/deploy.log';
 $php     = '/usr/local/bin/php';
-$composer = '/opt/cpanel/composer/bin/composer';
+$composer = 'HOME=/home/***CPANEL_USER*** /opt/cpanel/composer/bin/composer';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function runCommand(string $cmd, string $logFile): bool
