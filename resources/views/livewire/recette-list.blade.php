@@ -70,33 +70,36 @@
                     <th></th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="color:#555">
                 @forelse ($recettes as $recette)
                     <tr wire:key="recette-{{ $recette->id }}">
                         <td class="text-muted small">{{ $recette->numero_piece ?? '—' }}</td>
-                        <td class="text-nowrap">{{ $recette->date->format('d/m/Y') }}</td>
+                        <td class="text-nowrap small">{{ $recette->date->format('d/m/Y') }}</td>
                         <td class="text-muted small">{{ $recette->reference ?? '—' }}</td>
                         <td>{{ $recette->libelle }}</td>
-                        <td>@if($recette->tiers)<span style="font-size:.75rem">{{ $recette->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $recette->tiers->displayName() }}@else—@endif</td>
-                        <td><span class="badge bg-secondary">{{ $recette->mode_paiement->label() }}</span></td>
+                        <td class="small">@if($recette->tiers)<span style="font-size:.7rem">{{ $recette->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $recette->tiers->displayName() }}@else—@endif</td>
+                        <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $recette->mode_paiement->label() }}</span></td>
                         <td class="text-end text-success fw-semibold text-nowrap">
                             {{ number_format((float) $recette->montant_total, 2, ',', ' ') }} €
                         </td>
                         <td>
                             <div class="d-flex gap-1 justify-content-end">
                                 <button wire:click="$dispatch('edit-recette', { id: {{ $recette->id }} })"
-                                        class="btn btn-sm btn-outline-primary" title="Modifier">
+                                        class="btn btn-sm btn-outline-primary" title="Modifier"
+                                        style="padding:.15rem .35rem;font-size:.75rem">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 @if ($recette->pointe)
                                     <button class="btn btn-sm btn-outline-danger" disabled
-                                            title="Dépointez cette recette avant de la supprimer.">
+                                            title="Dépointez cette recette avant de la supprimer."
+                                            style="padding:.15rem .35rem;font-size:.75rem">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 @else
                                     <button wire:click="delete({{ $recette->id }})"
                                             wire:confirm="Supprimer cette recette ?"
-                                            class="btn btn-sm btn-outline-danger" title="Supprimer">
+                                            class="btn btn-sm btn-outline-danger" title="Supprimer"
+                                            style="padding:.15rem .35rem;font-size:.75rem">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 @endif
