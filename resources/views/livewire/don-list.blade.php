@@ -43,24 +43,24 @@
                     <th style="width: 140px;">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="color:#555">
                 @forelse ($dons as $don)
                     <tr>
-                        <td>{{ $don->date->format('d/m/Y') }}</td>
-                        <td>
+                        <td class="small text-nowrap">{{ $don->date->format('d/m/Y') }}</td>
+                        <td class="small">
                             @if ($don->tiers)
                                 <a href="#" wire:click.prevent="toggleTiersHistory({{ $don->tiers->id }})"
-                                   class="text-decoration-none">
-                                    <span style="font-size:.75rem">{{ $don->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $don->tiers->displayName() }}
+                                   class="text-decoration-none" style="color:#555">
+                                    <span style="font-size:.7rem">{{ $don->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $don->tiers->displayName() }}
                                 </a>
                             @else
                                 <span class="text-muted fst-italic">Anonyme</span>
                             @endif
                         </td>
-                        <td class="text-end">{{ number_format((float) $don->montant, 2, ',', ' ') }} &euro;</td>
-                        <td>{{ $don->mode_paiement->label() }}</td>
-                        <td>{{ $don->objet ?? '-' }}</td>
-                        <td>{{ $don->operation?->nom ?? '-' }}</td>
+                        <td class="text-end fw-semibold small text-nowrap">{{ number_format((float) $don->montant, 2, ',', ' ') }} &euro;</td>
+                        <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $don->mode_paiement->label() }}</span></td>
+                        <td class="small">{{ $don->objet ?? '-' }}</td>
+                        <td class="small text-muted">{{ $don->operation?->nom ?? '-' }}</td>
                         <td>
                             @if ($don->pointe)
                                 <span class="badge bg-success">Oui</span>
@@ -69,22 +69,27 @@
                             @endif
                         </td>
                         <td>
-                            <button wire:click="$dispatch('edit-don', { id: {{ $don->id }} })"
-                                    class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-pencil"></i> Modifier
-                            </button>
-                            @if ($don->pointe)
-                                <button class="btn btn-sm btn-outline-danger" disabled
-                                        title="Dépointez ce don avant de le supprimer.">
-                                    <i class="bi bi-trash"></i>
+                            <div class="d-flex gap-1 justify-content-end">
+                                <button wire:click="$dispatch('edit-don', { id: {{ $don->id }} })"
+                                        class="btn btn-sm btn-outline-primary" title="Modifier"
+                                        style="padding:.15rem .35rem;font-size:.75rem">
+                                    <i class="bi bi-pencil"></i>
                                 </button>
-                            @else
-                                <button wire:click="delete({{ $don->id }})"
-                                        wire:confirm="Supprimer ce don ?"
-                                        class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            @endif
+                                @if ($don->pointe)
+                                    <button class="btn btn-sm btn-outline-danger" disabled
+                                            title="Dépointez ce don avant de le supprimer."
+                                            style="padding:.15rem .35rem;font-size:.75rem">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @else
+                                    <button wire:click="delete({{ $don->id }})"
+                                            wire:confirm="Supprimer ce don ?"
+                                            class="btn btn-sm btn-outline-danger" title="Supprimer"
+                                            style="padding:.15rem .35rem;font-size:.75rem">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @endif
+                            </div>
                         </td>
                     </tr>
 

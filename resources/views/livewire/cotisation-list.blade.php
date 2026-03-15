@@ -33,15 +33,15 @@
                     <th style="width: 80px;">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="color:#555">
                 @forelse ($cotisations as $cotisation)
                     <tr>
                         <td class="text-muted small">{{ $cotisation->exercice }}-{{ $cotisation->exercice + 1 }}</td>
-                        <td>@if($cotisation->tiers)<span style="font-size:.75rem">{{ $cotisation->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $cotisation->tiers->displayName() }}@else—@endif</td>
-                        <td>{{ $cotisation->date_paiement->format('d/m/Y') }}</td>
-                        <td class="text-end">{{ number_format((float) $cotisation->montant, 2, ',', ' ') }} &euro;</td>
-                        <td>{{ $cotisation->mode_paiement->label() }}</td>
-                        <td>{{ $cotisation->compte?->nom ?? '—' }}</td>
+                        <td class="small">@if($cotisation->tiers)<span style="font-size:.7rem">{{ $cotisation->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $cotisation->tiers->displayName() }}@else—@endif</td>
+                        <td class="small text-nowrap">{{ $cotisation->date_paiement->format('d/m/Y') }}</td>
+                        <td class="text-end fw-semibold small text-nowrap">{{ number_format((float) $cotisation->montant, 2, ',', ' ') }} &euro;</td>
+                        <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $cotisation->mode_paiement->label() }}</span></td>
+                        <td class="small text-muted">{{ $cotisation->compte?->nom ?? '—' }}</td>
                         <td>
                             @if ($cotisation->pointe)
                                 <span class="badge bg-success">Oui</span>
@@ -50,18 +50,22 @@
                             @endif
                         </td>
                         <td>
-                            @if ($cotisation->pointe)
-                                <button class="btn btn-sm btn-outline-danger" disabled
-                                        title="Dépointez cette cotisation avant de la supprimer.">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            @else
-                                <button wire:click="delete({{ $cotisation->id }})"
-                                        wire:confirm="Supprimer cette cotisation ?"
-                                        class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            @endif
+                            <div class="d-flex gap-1 justify-content-end">
+                                @if ($cotisation->pointe)
+                                    <button class="btn btn-sm btn-outline-danger" disabled
+                                            title="Dépointez cette cotisation avant de la supprimer."
+                                            style="padding:.15rem .35rem;font-size:.75rem">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @else
+                                    <button wire:click="delete({{ $cotisation->id }})"
+                                            wire:confirm="Supprimer cette cotisation ?"
+                                            class="btn btn-sm btn-outline-danger" title="Supprimer"
+                                            style="padding:.15rem .35rem;font-size:.75rem">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty
