@@ -112,28 +112,28 @@
                     <th class="text-center">Pointé</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="color:#555">
                 @forelse ($transactions as $tx)
                     <tr class="{{ $tx['pointe'] ? 'table-success' : '' }}">
-                        <td class="text-nowrap">{{ $tx['date']->format('d/m/Y') }}</td>
+                        <td class="text-nowrap small">{{ $tx['date']->format('d/m/Y') }}</td>
                         <td>
                             @switch($tx['type'])
-                                @case('depense') <span class="badge bg-danger">Dépense</span> @break
-                                @case('recette') <span class="badge bg-success">Recette</span> @break
-                                @case('don') <span class="badge bg-info text-dark">Don</span> @break
-                                @case('cotisation') <span class="badge bg-warning text-dark">Cotisation</span> @break
-                                @case('virement_source') <span class="badge bg-secondary">Virement ↑</span> @break
-                                @case('virement_destination') <span class="badge bg-secondary">Virement ↓</span> @break
+                                @case('depense') <span class="badge bg-danger" style="font-size:.7rem">Dépense</span> @break
+                                @case('recette') <span class="badge bg-success" style="font-size:.7rem">Recette</span> @break
+                                @case('don') <span class="badge bg-info text-dark" style="font-size:.7rem">Don</span> @break
+                                @case('cotisation') <span class="badge bg-warning text-dark" style="font-size:.7rem">Cotisation</span> @break
+                                @case('virement_source') <span class="badge bg-secondary" style="font-size:.7rem">Virement ↑</span> @break
+                                @case('virement_destination') <span class="badge bg-secondary" style="font-size:.7rem">Virement ↓</span> @break
                             @endswitch
                         </td>
-                        <td>{{ $tx['label'] }}</td>
+                        <td class="small">{{ $tx['label'] }}</td>
                         <td class="text-muted small">{{ $tx['reference'] ?? '—' }}</td>
-                        <td class="text-end text-danger">
+                        <td class="text-end text-danger fw-semibold small text-nowrap">
                             @if ($tx['montant_signe'] < 0)
                                 {{ number_format(abs($tx['montant_signe']), 2, ',', ' ') }} €
                             @endif
                         </td>
-                        <td class="text-end text-success">
+                        <td class="text-end text-success fw-semibold small text-nowrap">
                             @if ($tx['montant_signe'] > 0)
                                 {{ number_format($tx['montant_signe'], 2, ',', ' ') }} €
                             @endif
