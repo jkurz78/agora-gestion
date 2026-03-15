@@ -6,6 +6,8 @@
             </button>
         </div>
     @else
+        <div class="position-fixed top-0 start-0 w-100 h-100" style="background:rgba(0,0,0,.5);z-index:1040;overflow-y:auto" wire:click.self="resetForm">
+        <div class="container py-4">
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">{{ $virementId ? 'Modifier le virement' : 'Nouveau virement interne' }}</h5>
@@ -67,6 +69,8 @@
                     </div>
                 </form>
             </div>
+        </div>
+        </div>
         </div>
     @endif
 </div>
