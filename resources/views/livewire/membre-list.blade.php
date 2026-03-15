@@ -39,9 +39,9 @@
                     <tr>
                         <td>
                             @if($membre->type === 'entreprise')
-                                <i class="bi bi-building text-muted me-1"></i>
+                                <i class="bi bi-building text-muted me-1" style="font-size:.75rem"></i>
                             @else
-                                <i class="bi bi-person text-muted me-1"></i>
+                                <i class="bi bi-person text-muted me-1" style="font-size:.75rem"></i>
                             @endif
                             {{ $membre->displayName() }}
                         </td>
