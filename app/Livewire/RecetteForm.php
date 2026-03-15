@@ -22,7 +22,7 @@ final class RecetteForm extends Component
 
     public string $date = '';
 
-    public string $libelle = '';
+    public ?string $libelle = null;
 
     public string $mode_paiement = '';
 
@@ -141,7 +141,8 @@ final class RecetteForm extends Component
         $this->validate(
             [
                 'date' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
-                'libelle' => ['required', 'string', 'max:255'],
+                'libelle'   => ['nullable', 'string', 'max:255'],
+                'reference' => ['required', 'string', 'max:100'],
                 'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
                 'tiers_id' => ['nullable', 'exists:tiers,id'],
                 'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
@@ -164,7 +165,7 @@ final class RecetteForm extends Component
             'montant_total' => $this->montantTotal,
             'mode_paiement' => $this->mode_paiement,
             'tiers_id' => $this->tiers_id,
-            'reference' => $this->reference ?: null,
+            'reference' => $this->reference,
             'compte_id' => $this->compte_id,
             'notes' => $this->notes ?: null,
         ];
