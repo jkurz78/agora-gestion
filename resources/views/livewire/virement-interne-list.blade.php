@@ -33,23 +33,28 @@
                             <td class="text-end">{{ number_format((float) $virement->montant, 2, ',', ' ') }} €</td>
                             <td>{{ $virement->notes ?? '—' }}</td>
                             <td>{{ $virement->saisiPar->nom }}</td>
-                            <td class="text-center">
-                                <button wire:click="$dispatch('edit-virement', { id: {{ $virement->id }} })"
-                                        class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i> Modifier
-                                </button>
-                                @if ($virement->rapprochement_source_id !== null || $virement->rapprochement_destination_id !== null)
-                                    <button class="btn btn-sm btn-outline-danger" disabled
-                                            title="Dépointez ce virement avant de le supprimer.">
-                                        <i class="bi bi-trash"></i>
+                            <td>
+                                <div class="d-flex gap-1 justify-content-end">
+                                    <button wire:click="$dispatch('edit-virement', { id: {{ $virement->id }} })"
+                                            class="btn btn-sm btn-outline-primary" title="Modifier"
+                                            style="padding:.15rem .35rem;font-size:.75rem">
+                                        <i class="bi bi-pencil"></i>
                                     </button>
-                                @else
-                                    <button wire:click="delete({{ $virement->id }})"
-                                            wire:confirm="Supprimer ce virement ?"
-                                            class="btn btn-sm btn-outline-danger">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                @endif
+                                    @if ($virement->rapprochement_source_id !== null || $virement->rapprochement_destination_id !== null)
+                                        <button class="btn btn-sm btn-outline-danger" disabled
+                                                title="Dépointez ce virement avant de le supprimer."
+                                                style="padding:.15rem .35rem;font-size:.75rem">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    @else
+                                        <button wire:click="delete({{ $virement->id }})"
+                                                wire:confirm="Supprimer ce virement ?"
+                                                class="btn btn-sm btn-outline-danger" title="Supprimer"
+                                                style="padding:.15rem .35rem;font-size:.75rem">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @endforeach
