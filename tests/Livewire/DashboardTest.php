@@ -71,6 +71,11 @@ it('shows membres without cotisation', function () {
         'nom' => 'Martin',
         'prenom' => 'Pierre',
     ]);
+    // Martin a une cotisation d'un exercice précédent (il est "membre") mais pas pour l'exercice courant
+    Cotisation::factory()->create([
+        'tiers_id' => $tiersSansCotisation->id,
+        'exercice' => $this->exercice - 1,
+    ]);
 
     Livewire::test(Dashboard::class)
         ->assertSee('Martin')

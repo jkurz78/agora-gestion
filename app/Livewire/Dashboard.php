@@ -65,7 +65,7 @@ final class Dashboard extends Component
             ->get();
 
         // Membres sans cotisation pour l'exercice courant
-        $membresSansCotisation = Tiers::membres()->whereDoesntHave('cotisations', function ($q) use ($exercice) {
+        $membresSansCotisation = Tiers::whereHas('cotisations')->whereDoesntHave('cotisations', function ($q) use ($exercice) {
             $q->where('exercice', $exercice);
         })->orderBy('nom')->get();
 
