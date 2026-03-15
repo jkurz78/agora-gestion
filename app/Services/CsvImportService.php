@@ -29,6 +29,7 @@ final class CsvImportService
     private const EXPECTED_HEADERS = [
         'date', 'reference', 'sous_categorie', 'montant_ligne',
         'mode_paiement', 'compte', 'libelle', 'tiers', 'operation',
+        'seance', 'notes',
     ];
 
     /** @return string[] */
@@ -109,9 +110,19 @@ final class CsvImportService
             $sc           = $sousCategories[$scNom];
             $montant      = trim($row[3]);
             $operationNom = Str::lower(trim($row[8] ?? ''));
-            $operationId  = $operationNom !== '' && isset($operations[$operationNom])
-                ? $operations[$operationNom]->id
-                : null;
+            $operation    = $operationNom !== '' ? ($operations[$operationNom] ?? null) : null;
+            $operationId  = $operation?->id;
+
+            // Valider séance par rapport au nombre de séances de l'opération
+            $seanceRaw = trim($row[9] ?? '');
+            $seance    = null;
+            if ($seanceRaw !== '') {
+                $seance = (int) $seanceRaw;
+                if ($operation !== null && $operation->nombre_seances !== null && $seance > $operation->nombre_seances) {
+                    $errors[] = ['line' => $csvLine, 'message' => "Colonne seance : valeur {$seance} dépasse le nombre de séances de l'opération ({$operation->nombre_seances})."];
+                    continue;
+                }
+            }
 
             if (!isset($groups[$groupKey])) {
                 // Première ligne de ce groupe : mode_paiement et compte sont obligatoires
@@ -161,10 +172,13 @@ final class CsvImportService
                 $groupOrder[] = $groupKey;
             }
 
+            $notesRaw = trim($row[10] ?? '');
             $groups[$groupKey]['lignes'][] = [
                 'sous_categorie_id' => $sc->id,
                 'montant'           => (float) $montant,
                 'operation_id'      => $operationId,
+                'seance'            => $seance,
+                'notes'             => $notesRaw !== '' ? $notesRaw : null,
             ];
             $groups[$groupKey]['data']['montant_total'] =
                 round($groups[$groupKey]['data']['montant_total'] + (float) $montant, 2);
@@ -331,6 +345,12 @@ final class CsvImportService
         $opNom = Str::lower(trim($row[8] ?? ''));
         if ($opNom !== '' && !isset($operations[$opNom])) {
             $errors[] = ['line' => $csvLine, 'message' => "Colonne operation : \"{$row[8]}\" inconnue."];
+        }
+
+        // seance (col 9) — optionnel, entier positif
+        $seanceRaw = trim($row[9] ?? '');
+        if ($seanceRaw !== '' && (!ctype_digit($seanceRaw) || (int) $seanceRaw < 1)) {
+            $errors[] = ['line' => $csvLine, 'message' => "Colonne seance : \"{$seanceRaw}\" invalide (doit être un entier >= 1)."];
         }
 
         return $errors;
