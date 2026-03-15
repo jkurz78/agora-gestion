@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+final class Tiers extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'type',
+        'nom',
+        'prenom',
+        'email',
+        'telephone',
+        'adresse',
+        'pour_depenses',
+        'pour_recettes',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'pour_depenses' => 'boolean',
+            'pour_recettes' => 'boolean',
+        ];
+    }
+
+    public function displayName(): string
+    {
+        if ($this->type === 'entreprise') {
+            return $this->nom;
+        }
+
+        return trim(($this->prenom ? $this->prenom.' ' : '').$this->nom);
+    }
+
+    public function dons(): HasMany
+    {
+        return $this->hasMany(Don::class);
+    }
+
+    public function cotisations(): HasMany
+    {
+        return $this->hasMany(Cotisation::class);
+    }
+
+    public function depenses(): HasMany
+    {
+        return $this->hasMany(Depense::class);
+    }
+
+    public function recettes(): HasMany
+    {
+        return $this->hasMany(Recette::class);
+    }
+
+}
