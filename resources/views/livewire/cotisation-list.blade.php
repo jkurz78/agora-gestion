@@ -37,7 +37,7 @@
                 @forelse ($cotisations as $cotisation)
                     <tr>
                         <td class="text-muted small">{{ $cotisation->exercice }}-{{ $cotisation->exercice + 1 }}</td>
-                        <td>@if($cotisation->tiers){{ $cotisation->tiers->type === 'entreprise' ? '🏢' : '👤' }} {{ $cotisation->tiers->displayName() }}@else—@endif</td>
+                        <td>@if($cotisation->tiers)<span style="font-size:.75rem">{{ $cotisation->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $cotisation->tiers->displayName() }}@else—@endif</td>
                         <td>{{ $cotisation->date_paiement->format('d/m/Y') }}</td>
                         <td class="text-end">{{ number_format((float) $cotisation->montant, 2, ',', ' ') }} &euro;</td>
                         <td>{{ $cotisation->mode_paiement->label() }}</td>

@@ -2,7 +2,7 @@
     @if($tiersId)
         {{-- Selected state --}}
         <div class="d-flex align-items-center gap-2 px-3 py-2 border rounded" style="background:#f0e8f5;border-color:#c9a8d8!important">
-            <span class="text-muted">{{ $selectedType === 'entreprise' ? '🏢' : '👤' }}</span>
+            <span class="text-muted" style="font-size:.75rem">{{ $selectedType === 'entreprise' ? '🏢' : '👤' }}</span>
             <span class="fw-medium">{{ $selectedLabel }}</span>
             <button type="button" class="btn-close btn-close-sm ms-auto" wire:click="clearTiers" aria-label="Effacer"></button>
         </div>
@@ -49,7 +49,7 @@
                         x-on:mouseout="highlighted = -1"
                         :style="highlighted === {{ $loop->index }} ? 'background:#f0e8f5' : ''"
                     >
-                        <span>{{ ($item['type'] ?? '') === 'entreprise' ? '🏢' : '👤' }}</span>
+                        <span style="font-size:.75rem">{{ ($item['type'] ?? '') === 'entreprise' ? '🏢' : '👤' }}</span>
                         <span>{{ $item['label'] }}</span>
                     </div>
                 @endforeach
@@ -78,7 +78,7 @@
                 <h6 class="fw-bold mb-3" style="color:#722281">Tiers existant</h6>
 
                 <p class="mb-3">
-                    <span>{{ $existingTiers['type'] === 'entreprise' ? '🏢' : '👤' }}</span>
+                    <span style="font-size:.75rem">{{ $existingTiers['type'] === 'entreprise' ? '🏢' : '👤' }}</span>
                     <strong>{{ $existingTiers['label'] }}</strong>
                     existe déjà mais n'est pas activé pour ce contexte.
                 </p>
