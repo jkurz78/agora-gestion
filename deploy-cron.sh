@@ -7,6 +7,7 @@ APPDIR="/home/***CPANEL_USER***/public_html/***DEPLOY_SUBDOMAIN***"
 LOGFILE="${APPDIR}/deploy.log"
 PHP="/usr/local/bin/php"
 COMPOSER="HOME=/home/***CPANEL_USER*** /opt/cpanel/composer/bin/composer"
+MAILTO="***DEPLOY_EMAIL***"
 
 cd "$APPDIR" || exit 1
 
@@ -21,9 +22,12 @@ if [ "$LOCAL" = "$REMOTE" ]; then
 fi
 
 # Nouveau commit détecté — déploiement
+DEPLOY_START=$(date '+%Y-%m-%d %H:%M:%S')
+SECTION_START=$(wc -l < "$LOGFILE")
+
 echo "" >> "$LOGFILE"
 echo "============================================================" >> "$LOGFILE"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Déploiement démarré (${LOCAL:0:7} → ${REMOTE:0:7})" >> "$LOGFILE"
+echo "[${DEPLOY_START}] Déploiement démarré (${LOCAL:0:7} → ${REMOTE:0:7})" >> "$LOGFILE"
 
 run_cmd() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] \$ $1" >> "$LOGFILE"
@@ -32,6 +36,10 @@ run_cmd() {
     echo "Exit code: $code" >> "$LOGFILE"
     if [ $code -ne 0 ]; then
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] ÉCHEC — déploiement interrompu" >> "$LOGFILE"
+        # Envoyer mail d'échec
+        tail -n +"$SECTION_START" "$LOGFILE" | mail \
+            -s "[SVS Accounting] ❌ Déploiement ÉCHOUÉ — $(date '+%d/%m/%Y %H:%M')" \
+            "$MAILTO"
         exit 1
     fi
 }
@@ -45,3 +53,8 @@ run_cmd "$PHP artisan route:cache"
 run_cmd "$PHP artisan view:cache"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Déploiement terminé avec succès" >> "$LOGFILE"
+
+# Envoyer mail de succès
+tail -n +"$SECTION_START" "$LOGFILE" | mail \
+    -s "[SVS Accounting] ✅ Déploiement réussi — $(date '+%d/%m/%Y %H:%M')" \
+    "$MAILTO"
