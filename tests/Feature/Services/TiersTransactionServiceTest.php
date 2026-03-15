@@ -78,3 +78,30 @@ it('trie par montant desc', function (): void {
 
     expect((float) $result->items()[0]->montant)->toBeGreaterThan((float) $result->items()[1]->montant);
 });
+
+it('inclut les recettes du tiers', function (): void {
+    Recette::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma recette']);
+
+    $result = $this->service->paginate($this->tiers, '', '', '', '', 'date', 'desc');
+
+    expect($result->total())->toBe(1)
+        ->and($result->items()[0]->source_type)->toBe('recette');
+});
+
+it('inclut les cotisations du tiers', function (): void {
+    Cotisation::factory()->create(['tiers_id' => $this->tiers->id, 'exercice' => 2025]);
+
+    $result = $this->service->paginate($this->tiers, '', '', '', '', 'date', 'desc');
+
+    expect($result->total())->toBe(1)
+        ->and($result->items()[0]->source_type)->toBe('cotisation');
+});
+
+it('filtre par date fin', function (): void {
+    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-10-01']);
+    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-12-01']);
+
+    $result = $this->service->paginate($this->tiers, '', '', '2025-11-01', '', 'date', 'desc');
+
+    expect($result->total())->toBe(1);
+});
