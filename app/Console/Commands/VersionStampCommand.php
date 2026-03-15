@@ -37,6 +37,7 @@ final class VersionStampCommand extends Command
         return [
             'tag'  => 'v1.0.' . $build,
             'date' => $sha,
+            'year' => date('Y'),
         ];
     }
 
