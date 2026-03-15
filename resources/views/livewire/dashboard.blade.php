@@ -96,12 +96,12 @@
                                     <th class="text-end">Montant</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody style="color:#555">
                                 @forelse ($dernieresDepenses as $dep)
                                     <tr>
-                                        <td>{{ $dep->date->format('d/m/Y') }}</td>
-                                        <td>{{ $dep->libelle }}</td>
-                                        <td class="text-end">{{ number_format((float) $dep->montant_total, 2, ',', ' ') }} &euro;</td>
+                                        <td class="small text-nowrap">{{ $dep->date->format('d/m/Y') }}</td>
+                                        <td class="small">{{ $dep->libelle }}</td>
+                                        <td class="text-end small fw-semibold text-danger text-nowrap">{{ number_format((float) $dep->montant_total, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -129,12 +129,12 @@
                                     <th class="text-end">Montant</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody style="color:#555">
                                 @forelse ($dernieresRecettes as $rec)
                                     <tr>
-                                        <td>{{ $rec->date->format('d/m/Y') }}</td>
-                                        <td>{{ $rec->libelle }}</td>
-                                        <td class="text-end">{{ number_format((float) $rec->montant_total, 2, ',', ' ') }} &euro;</td>
+                                        <td class="small text-nowrap">{{ $rec->date->format('d/m/Y') }}</td>
+                                        <td class="small">{{ $rec->libelle }}</td>
+                                        <td class="text-end small fw-semibold text-success text-nowrap">{{ number_format((float) $rec->montant_total, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -166,12 +166,12 @@
                                     <th class="text-end">Montant</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody style="color:#555">
                                 @forelse ($derniersDons as $don)
                                     <tr>
-                                        <td>{{ $don->date->format('d/m/Y') }}</td>
-                                        <td>{{ $don->tiers ? $don->tiers->displayName() : 'Anonyme' }}</td>
-                                        <td class="text-end">{{ number_format((float) $don->montant, 2, ',', ' ') }} &euro;</td>
+                                        <td class="small text-nowrap">{{ $don->date->format('d/m/Y') }}</td>
+                                        <td class="small">{{ $don->tiers ? $don->tiers->displayName() : 'Anonyme' }}</td>
+                                        <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $don->montant, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -198,11 +198,11 @@
                                     <th>Prénom</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody style="color:#555">
                                 @forelse ($membresSansCotisation as $membre)
                                     <tr>
-                                        <td>{{ $membre->nom }}</td>
-                                        <td>{{ $membre->prenom }}</td>
+                                        <td class="small">{{ $membre->nom }}</td>
+                                        <td class="small">{{ $membre->prenom }}</td>
                                     </tr>
                                 @empty
                                     <tr>

@@ -97,20 +97,20 @@
                             <th></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody style="color:#555">
                         @foreach ($rapprochements as $rapprochement)
                             <tr wire:key="rapprochement-{{ $rapprochement->id }}">
-                                <td>{{ $rapprochement->date_fin->format('d/m/Y') }}</td>
-                                <td class="text-end">{{ number_format((float) $rapprochement->solde_ouverture, 2, ',', ' ') }} €</td>
-                                <td class="text-end">{{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €</td>
+                                <td class="small text-nowrap">{{ $rapprochement->date_fin->format('d/m/Y') }}</td>
+                                <td class="text-end fw-semibold small text-nowrap">{{ number_format((float) $rapprochement->solde_ouverture, 2, ',', ' ') }} €</td>
+                                <td class="text-end fw-semibold small text-nowrap">{{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €</td>
                                 <td>
                                     @if ($rapprochement->isVerrouille())
-                                        <span class="badge bg-secondary"><i class="bi bi-lock"></i> Verrouillé</span>
+                                        <span class="badge bg-secondary" style="font-size:.7rem"><i class="bi bi-lock"></i> Verrouillé</span>
                                     @else
-                                        <span class="badge bg-warning text-dark"><i class="bi bi-pencil"></i> En cours</span>
+                                        <span class="badge bg-warning text-dark" style="font-size:.7rem"><i class="bi bi-pencil"></i> En cours</span>
                                     @endif
                                 </td>
-                                <td>{{ $rapprochement->verrouille_at?->format('d/m/Y H:i') ?? '—' }}</td>
+                                <td class="small text-muted text-nowrap">{{ $rapprochement->verrouille_at?->format('d/m/Y H:i') ?? '—' }}</td>
                                 <td>
                                     <div class="d-flex gap-1">
                                         <a href="{{ route('rapprochement.detail', $rapprochement) }}"

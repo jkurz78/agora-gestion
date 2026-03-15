@@ -33,27 +33,27 @@
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="color:#555">
                 @forelse($membres as $membre)
                     @php $cot = $membre->derniereCotisation; @endphp
                     <tr>
-                        <td>
+                        <td class="small">
                             @if($membre->type === 'entreprise')
-                                <i class="bi bi-building text-muted me-1" style="font-size:.75rem"></i>
+                                <i class="bi bi-building text-muted me-1" style="font-size:.7rem"></i>
                             @else
-                                <i class="bi bi-person text-muted me-1" style="font-size:.75rem"></i>
+                                <i class="bi bi-person text-muted me-1" style="font-size:.7rem"></i>
                             @endif
                             {{ $membre->displayName() }}
                         </td>
-                        <td class="text-nowrap">
+                        <td class="small text-nowrap">
                             @if($cot)
                                 {{ $cot->date_paiement->format('d/m/Y') }}
-                                <span class="text-muted small">({{ $cot->exercice }})</span>
+                                <span class="text-muted">({{ $cot->exercice }})</span>
                             @else
                                 <span class="text-muted">—</span>
                             @endif
                         </td>
-                        <td class="text-nowrap">
+                        <td class="small fw-semibold text-nowrap">
                             @if($cot)
                                 {{ number_format((float) $cot->montant, 2, ',', ' ') }} €
                             @else
@@ -62,13 +62,13 @@
                         </td>
                         <td>
                             @if($cot)
-                                <span class="badge bg-secondary">{{ $cot->mode_paiement->label() }}</span>
+                                <span class="badge bg-secondary" style="font-size:.7rem">{{ $cot->mode_paiement->label() }}</span>
                             @else
                                 —
                             @endif
                         </td>
-                        <td>{{ $cot?->compte?->nom ?? '—' }}</td>
-                        <td>
+                        <td class="small text-muted">{{ $cot?->compte?->nom ?? '—' }}</td>
+                        <td class="small">
                             @if($cot)
                                 {{ $cot->pointe ? '✓' : '—' }}
                             @else
@@ -79,7 +79,8 @@
                             <button
                                 wire:click="$dispatch('open-cotisation-for-tiers', { tiersId: {{ $membre->id }} })"
                                 class="btn btn-sm btn-outline-primary"
-                                title="Nouvelle cotisation">
+                                title="Nouvelle cotisation"
+                                style="padding:.15rem .35rem;font-size:.75rem">
                                 <i class="bi bi-plus-circle"></i>
                             </button>
                         </td>
