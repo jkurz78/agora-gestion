@@ -71,7 +71,7 @@ Résultat : 2 transactions créées, la première avec 2 lignes comptables (mont
 ### Migration sur `depenses` et `recettes`
 
 - `libelle` : `NOT NULL` → `nullable`
-- `reference` : `nullable` → `NOT NULL` (les enregistrements existants sans référence reçoivent `'—'` comme valeur de migration avant la contrainte)
+- `reference` : `nullable` → `NOT NULL` (les enregistrements existants sans référence reçoivent `'IMPORT-MIGRATION-{id}'` comme valeur avant la contrainte, pour éviter les faux positifs de doublon)
 
 ### Formulaires `DepenseForm` et `RecetteForm`
 
@@ -103,7 +103,7 @@ Note : `saisi_par` est résolu via `auth()->id()` à l'intérieur de `DepenseSer
 
 La stratégie est :
 1. **Phase 1 — Validation exhaustive** : parser tout le fichier, collecter toutes les erreurs. Si une seule erreur → retourner `CsvImportResult` sans aucune insertion.
-2. **Phase 2 — Insertion** : uniquement si phase 1 sans erreur. Appeler `DepenseService::create()` (ou `RecetteService`) pour chaque groupe. Chaque appel gère sa propre transaction. La validation préalable garantit qu'aucune insertion ne peut échouer.
+2. **Phase 2 — Insertion** : uniquement si phase 1 sans erreur. Appeler `DepenseService::create()` (ou `RecetteService`) pour chaque groupe. Chaque appel gère sa propre transaction. La validation préalable minimise le risque d'échec, mais une modification concurrente entre les deux phases (ex. : suppression d'un compte bancaire) peut provoquer un échec partiel. Dans ce cas, les transactions déjà committées sont conservées en base et `CsvImportResult` retourne `success = false` avec le message d'erreur de l'insertion ayant échoué — l'utilisateur est invité à relancer l'import après correction.
 
 **Étapes de la phase 1 :**
 1. Détection BOM, décodage UTF-8
@@ -146,7 +146,7 @@ Composant unique paramétré par `string $type` (`depense` ou `recette`).
 **Comportement :**
 - Validation locale Livewire : fichier présent, extension `.csv`, taille max 2 Mo
 - Appel `CsvImportService::import($file, $this->type)`
-- En succès : `$dispatch('csv-imported')` pour rafraîchir la liste parente, affiche message vert
+- En succès : `$dispatch('csv-imported')` pour rafraîchir la liste parente (écoutée par `depense-list` ou `recette-list` via `#[On('csv-imported')]`), affiche message vert
 - En erreur : affiche le tableau d'erreurs sans fermer le panneau
 
 **Configuration Sail :** vérifier que `upload_max_filesize` et `post_max_size` dans `php.ini` sont ≥ 2 Mo (valeur par défaut Sail = 8 Mo, pas de changement requis).
@@ -224,7 +224,7 @@ Route::get('/recettes/import/template', [CsvImportController::class, 'template']
 | `montant_ligne` | Numérique, décimale autorisée, > 0 |
 | `mode_paiement` | Valeur dans `['virement','cheque','especes','cb','prelevement']` |
 | `compte` | Nom existant dans `comptes_bancaires` avec `actif_recettes_depenses = true`. Insensible à la casse. |
-| `tiers` | Si renseigné : `displayName()` existant dans `tiers` avec flag `pour_depenses`/`pour_recettes`. Insensible à la casse. Homonyme → rejet. |
+| `tiers` | Si renseigné : `displayName()` existant dans `tiers` avec flag `pour_depenses`/`pour_recettes`. Insensible à la casse. Homonyme → rejet. Tiers trouvé mais sans le flag requis → message explicite : `"Le tiers \"X\" existe mais n'est pas autorisé pour les {dépenses|recettes}."` |
 | `operation` | Si renseignée : nom existant dans `operations`. Insensible à la casse. |
 | **Doublon intra-fichier** | `date` + `reference` apparaissant plusieurs fois dans le même CSV → rejet dès le parsing |
 | **Doublon en base** | `date` + `reference` déjà présents en base (hors soft-deleted, même exercice comptable) → rejet |
