@@ -24,6 +24,9 @@ Route::middleware('auth')->group(function () {
     Route::view('/dons', 'dons.index')->name('dons.index');
     Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
     Route::view('/tiers', 'tiers.index')->name('tiers.index');
+    Route::get('/tiers/{tiers}/transactions', function (\App\Models\Tiers $tiers) {
+        return view('tiers.transactions', compact('tiers'));
+    })->name('tiers.transactions');
     Route::view('/budget', 'budget.index')->name('budget.index');
     Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
     Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
