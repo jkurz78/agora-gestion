@@ -14,7 +14,7 @@ use Livewire\Component;
 final class SousCategorieAutocomplete extends Component
 {
     #[Modelable]
-    public ?int $sousCategorieId = null;
+    public int|string|null $sousCategorieId = null;
 
     public string $filtre = 'tous'; // 'depense' | 'recette' | 'tous'
 
@@ -41,11 +41,22 @@ final class SousCategorieAutocomplete extends Component
 
     public function mount(): void
     {
-        if ($this->sousCategorieId !== null) {
-            $sc = SousCategorie::with('categorie')->find($this->sousCategorieId);
+        // Normalise: empty string from lignes array → null
+        $id = ($this->sousCategorieId !== '' && $this->sousCategorieId !== null)
+            ? (int) $this->sousCategorieId
+            : null;
+        $this->sousCategorieId = $id;
+
+        if ($id !== null) {
+            $sc = SousCategorie::with('categorie')->find($id);
             $this->selectedLabel = $sc?->nom;
             $this->selectedCategorieLabel = $sc?->categorie?->nom;
         }
+    }
+
+    public function updatedSousCategorieId(mixed $value): void
+    {
+        $this->sousCategorieId = ($value !== '' && $value !== null) ? (int) $value : null;
     }
 
     public function updatedSearch(): void
