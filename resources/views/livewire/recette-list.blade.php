@@ -76,7 +76,7 @@
                         <td class="text-muted small">{{ $recette->numero_piece ?? '—' }}</td>
                         <td class="text-nowrap small">{{ $recette->date->format('d/m/Y') }}</td>
                         <td class="text-muted small">{{ $recette->reference ?? '—' }}</td>
-                        <td>{{ $recette->libelle }}</td>
+                        <td class="small">{{ $recette->libelle }}</td>
                         <td class="small">@if($recette->tiers)<span style="font-size:.7rem">{{ $recette->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $recette->tiers->displayName() }}@else—@endif</td>
                         <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $recette->mode_paiement->label() }}</span></td>
                         <td class="text-end text-success fw-semibold text-nowrap">
