@@ -5,6 +5,7 @@ declare(strict_types=1);
 // Supprimer toute sortie d'erreur PHP avant l'auth check
 ini_set('display_errors', '0');
 error_reporting(0);
+set_time_limit(0);
 
 // ─── Lecture manuelle du .env ────────────────────────────────────────────────
 // Laravel n'est pas bootstrappé ici — env() et getenv() ne lisent pas le .env.
