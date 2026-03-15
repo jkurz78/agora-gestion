@@ -70,7 +70,7 @@ final class TransactionCompteService
 
         $recettes = DB::table('recettes as r')
             ->leftJoin('tiers as tr', 'tr.id', '=', 'r.tiers_id')
-            ->selectRaw("r.id, 'recette' as source_type, r.date, 'Recette' as type_label, TRIM(CONCAT(COALESCE(`tr`.prenom,''), ' ', COALESCE(`tr`.nom,''))) as tiers, r.libelle, r.reference, r.montant_total as montant, r.mode_paiement, r.pointe, r.numero_piece")
+            ->selectRaw("r.id, 'recette' as source_type, r.date, 'Recette' as type_label, TRIM(CONCAT(COALESCE(`tr`.prenom,''), ' ', COALESCE(`tr`.nom,''))) as tiers, `tr`.type as tiers_type, r.libelle, r.reference, r.montant_total as montant, r.mode_paiement, r.pointe, r.numero_piece")
             ->where('r.compte_id', $id)
             ->whereNull('r.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('r.date', '>=', $dateDebut))
@@ -79,7 +79,7 @@ final class TransactionCompteService
 
         $depenses = DB::table('depenses as d')
             ->leftJoin('tiers as td', 'td.id', '=', 'd.tiers_id')
-            ->selectRaw("d.id, 'depense' as source_type, d.date, 'Dépense' as type_label, TRIM(CONCAT(COALESCE(`td`.prenom,''), ' ', COALESCE(`td`.nom,''))) as tiers, d.libelle, d.reference, -(d.montant_total) as montant, d.mode_paiement, d.pointe, d.numero_piece")
+            ->selectRaw("d.id, 'depense' as source_type, d.date, 'Dépense' as type_label, TRIM(CONCAT(COALESCE(`td`.prenom,''), ' ', COALESCE(`td`.nom,''))) as tiers, `td`.type as tiers_type, d.libelle, d.reference, -(d.montant_total) as montant, d.mode_paiement, d.pointe, d.numero_piece")
             ->where('d.compte_id', $id)
             ->whereNull('d.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('d.date', '>=', $dateDebut))
@@ -88,7 +88,7 @@ final class TransactionCompteService
 
         $dons = DB::table('dons as dn')
             ->leftJoin('tiers as do', 'do.id', '=', 'dn.tiers_id')
-            ->selectRaw("dn.id, 'don' as source_type, dn.date, 'Don' as type_label, TRIM(CONCAT(COALESCE(`do`.prenom,''), ' ', COALESCE(`do`.nom,''))) as tiers, dn.objet as libelle, NULL as reference, dn.montant, dn.mode_paiement, dn.pointe, dn.numero_piece")
+            ->selectRaw("dn.id, 'don' as source_type, dn.date, 'Don' as type_label, TRIM(CONCAT(COALESCE(`do`.prenom,''), ' ', COALESCE(`do`.nom,''))) as tiers, `do`.type as tiers_type, dn.objet as libelle, NULL as reference, dn.montant, dn.mode_paiement, dn.pointe, dn.numero_piece")
             ->where('dn.compte_id', $id)
             ->whereNull('dn.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('dn.date', '>=', $dateDebut))
@@ -97,7 +97,7 @@ final class TransactionCompteService
 
         $cotisations = DB::table('cotisations as c')
             ->leftJoin('tiers as t', 't.id', '=', 'c.tiers_id')
-            ->selectRaw("c.id, 'cotisation' as source_type, c.date_paiement as date, 'Cotisation' as type_label, TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) as tiers, CONCAT('Cotisation ', c.exercice) as libelle, NULL as reference, c.montant, c.mode_paiement, c.pointe, c.numero_piece")
+            ->selectRaw("c.id, 'cotisation' as source_type, c.date_paiement as date, 'Cotisation' as type_label, TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) as tiers, t.type as tiers_type, CONCAT('Cotisation ', c.exercice) as libelle, NULL as reference, c.montant, c.mode_paiement, c.pointe, c.numero_piece")
             ->where('c.compte_id', $id)
             ->whereNull('c.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('c.date_paiement', '>=', $dateDebut))
@@ -106,7 +106,7 @@ final class TransactionCompteService
 
         $virementsSource = DB::table('virements_internes as vi')
             ->join('comptes_bancaires as cb', 'cb.id', '=', 'vi.compte_destination_id')
-            ->selectRaw("vi.id, 'virement_sortant' as source_type, vi.date, 'Virement sortant' as type_label, cb.nom as tiers, CONCAT('Virement vers ', cb.nom) as libelle, vi.reference, -(vi.montant) as montant, NULL as mode_paiement, NULL as pointe, vi.numero_piece")
+            ->selectRaw("vi.id, 'virement_sortant' as source_type, vi.date, 'Virement sortant' as type_label, cb.nom as tiers, NULL as tiers_type, CONCAT('Virement vers ', cb.nom) as libelle, vi.reference, -(vi.montant) as montant, NULL as mode_paiement, NULL as pointe, vi.numero_piece")
             ->where('vi.compte_source_id', $id)
             ->whereNull('vi.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('vi.date', '>=', $dateDebut))
@@ -115,7 +115,7 @@ final class TransactionCompteService
 
         $virementsDestination = DB::table('virements_internes as vi')
             ->join('comptes_bancaires as cb', 'cb.id', '=', 'vi.compte_source_id')
-            ->selectRaw("vi.id, 'virement_entrant' as source_type, vi.date, 'Virement entrant' as type_label, cb.nom as tiers, CONCAT('Virement depuis ', cb.nom) as libelle, vi.reference, vi.montant, NULL as mode_paiement, NULL as pointe, vi.numero_piece")
+            ->selectRaw("vi.id, 'virement_entrant' as source_type, vi.date, 'Virement entrant' as type_label, cb.nom as tiers, NULL as tiers_type, CONCAT('Virement depuis ', cb.nom) as libelle, vi.reference, vi.montant, NULL as mode_paiement, NULL as pointe, vi.numero_piece")
             ->where('vi.compte_destination_id', $id)
             ->whereNull('vi.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('vi.date', '>=', $dateDebut))

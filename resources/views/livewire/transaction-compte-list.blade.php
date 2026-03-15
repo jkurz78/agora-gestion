@@ -80,7 +80,7 @@
                             <td class="text-muted small">{{ $tx->numero_piece ?? '—' }}</td>
                             <td class="small text-nowrap">{{ \Carbon\Carbon::parse($tx->date)->format('d/m/Y') }}</td>
                             <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $tx->type_label }}</span></td>
-                            <td class="small">{{ $tx->tiers ?: '—' }}</td>
+                            <td class="small">@if($tx->tiers)<span style="font-size:.7rem">{{ $tx->tiers_type === 'entreprise' ? '🏢' : ($tx->tiers_type ? '👤' : '🏦') }}</span> {{ $tx->tiers }}@else—@endif</td>
                             <td class="small">{{ $tx->libelle ?? '—' }}</td>
                             <td class="text-muted small">{{ $tx->reference ?? '' }}</td>
                             <td class="text-end {{ $tx->montant >= 0 ? 'text-success' : 'text-danger' }} fw-semibold small text-nowrap">
