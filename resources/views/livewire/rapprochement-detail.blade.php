@@ -101,7 +101,7 @@
     {{-- Table des transactions --}}
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle">
-            <thead class="table-dark">
+            <thead class="table-dark" style="--bs-table-bg:#2c3a50;--bs-table-border-color:#3a4d63">
                 <tr>
                     <th>Date</th>
                     <th>Type</th>
