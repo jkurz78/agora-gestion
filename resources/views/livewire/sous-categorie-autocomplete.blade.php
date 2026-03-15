@@ -55,8 +55,8 @@
         @if($open && (count($results) > 0 || strlen($search) > 0))
             <div
                 x-init="updateDropPos()"
-                style="position:absolute;z-index:9999;max-height:280px;overflow-y:auto;background:white;border:1px solid #dee2e6;border-top:none;border-radius:0 0 .375rem .375rem;box-shadow:0 .25rem .5rem rgba(0,0,0,.1)"
-                :style="`top:${dropTop}px;left:${dropLeft}px;width:${dropWidth}px;position:fixed`"
+                style="max-height:280px;overflow-y:auto;background:white;border:1px solid #dee2e6;border-top:none;border-radius:0 0 .375rem .375rem;box-shadow:0 .25rem .5rem rgba(0,0,0,.1)"
+                :style="{ position: 'fixed', top: dropTop+'px', left: dropLeft+'px', width: dropWidth+'px', zIndex: 9999 }"
             >
                 @php $navIndex = 0; @endphp
 
