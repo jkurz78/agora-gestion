@@ -40,7 +40,7 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-hover mb-0">
-                    <thead class="table-dark" style="--bs-table-bg:#2c3a50;--bs-table-border-color:#3a4d63">
+                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Code CERFA</th>
                             <th>Libellé</th>
@@ -79,7 +79,7 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-hover mb-0">
-                    <thead class="table-dark" style="--bs-table-bg:#2c3a50;--bs-table-border-color:#3a4d63">
+                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Code CERFA</th>
                             <th>Libellé</th>
