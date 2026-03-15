@@ -104,7 +104,7 @@ it('rejette un CSV avec un en-tete manquant', function () {
     );
 
     expect($result->success)->toBeFalse()
-        ->and($result->errors[0]['message'])->toContain('en-tête');
+        ->and($result->errors[0]['message'])->toContain('En-tête');
 });
 
 it('rejette une date invalide avec le bon numero de ligne', function () {
