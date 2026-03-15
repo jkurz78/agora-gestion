@@ -71,7 +71,7 @@
                                     default      => $tx->source_type,
                                 };
                             @endphp
-                            <span class="badge {{ $badgeClass }}">{{ $label }}</span>
+                            <span class="badge {{ $badgeClass }}" style="font-size:.7rem">{{ $label }}</span>
                         </td>
                         <td class="small">{{ $tx->libelle }}</td>
                         <td class="small text-muted">{{ $tx->compte ?? '—' }}</td>
