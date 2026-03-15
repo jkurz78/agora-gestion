@@ -68,39 +68,23 @@ function runCommand(string $cmd, string $logFile): bool
     return $retCode === 0;
 }
 
-// ─── Répondre immédiatement au client ────────────────────────────────────────
-// Le déploiement tourne en arrière-plan après la fermeture de la connexion.
-ignore_user_abort(true);
+// ─── Déploiement en arrière-plan ─────────────────────────────────────────────
+file_put_contents($logFile, "\n" . str_repeat('=', 60) . "\n" . '[' . date('Y-m-d H:i:s') . "] Déploiement démarré\n", FILE_APPEND);
+
+$script = implode(' && ', [
+    "cd {$appDir} && {$php} artisan optimize:clear",
+    "{$composer} install --no-dev --optimize-autoloader --no-interaction",
+    "git pull origin main",
+    "{$php} artisan migrate --force",
+    "{$php} artisan config:cache",
+    "{$php} artisan route:cache",
+    "{$php} artisan view:cache",
+    "echo '[' \$(date '+%Y-%m-%d %H:%M:%S') '] Déploiement terminé avec succès'",
+]);
+
+exec('cd ' . escapeshellarg($appDir) . ' && nohup bash -c ' . escapeshellarg($script) . ' >> ' . escapeshellarg($logFile) . ' 2>&1 &');
 
 http_response_code(200);
 header('Content-Type: application/json');
 echo json_encode(['status' => 'ok']);
-
-if (function_exists('fastcgi_finish_request')) {
-    fastcgi_finish_request();
-} else {
-    ob_end_flush();
-    flush();
-}
-
-// ─── Déploiement ─────────────────────────────────────────────────────────────
-file_put_contents($logFile, "\n" . str_repeat('=', 60) . "\n" . '[' . date('Y-m-d H:i:s') . "] Déploiement démarré\n", FILE_APPEND);
-
-$commands = [
-    "cd {$appDir} && {$php} artisan optimize:clear",
-    "cd {$appDir} && git pull origin main",
-    "cd {$appDir} && {$composer} install --no-dev --optimize-autoloader --no-interaction",
-    "cd {$appDir} && {$php} artisan migrate --force",
-    "cd {$appDir} && {$php} artisan config:cache",
-    "cd {$appDir} && {$php} artisan route:cache",
-    "cd {$appDir} && {$php} artisan view:cache",
-];
-
-foreach ($commands as $cmd) {
-    if (!runCommand($cmd, $logFile)) {
-        file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] ÉCHEC — déploiement interrompu\n", FILE_APPEND);
-        exit;
-    }
-}
-
-file_put_contents($logFile, '[' . date('Y-m-d H:i:s') . "] Déploiement terminé avec succès\n", FILE_APPEND);
+exit;
