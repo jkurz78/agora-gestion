@@ -53,6 +53,20 @@ final class TiersAutocomplete extends Component
         }
     }
 
+    public function updatedTiersId(mixed $value): void
+    {
+        $id = ($value !== '' && $value !== null) ? (int) $value : null;
+        $this->tiersId = $id;
+        if ($id !== null) {
+            $tiers = Tiers::find($id);
+            $this->selectedLabel = $tiers?->displayName();
+            $this->selectedType  = $tiers?->type;
+        } else {
+            $this->selectedLabel = null;
+            $this->selectedType  = null;
+        }
+    }
+
     public function updatedSearch(): void
     {
         $this->doSearch();
