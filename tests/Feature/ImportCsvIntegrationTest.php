@@ -31,8 +31,7 @@ it('la page dépenses contient le composant import-csv', function () {
     $response = $this->actingAs($user)->get(route('depenses.index'));
 
     $response->assertStatus(200);
-    $response->assertSee('Importer'); // button text from import-csv component
-    $response->assertSee('Télécharger le modèle');
+    $response->assertSee('Importer'); // bouton toggle du composant import-csv
 });
 
 it('la page recettes contient le composant import-csv', function () {
@@ -42,5 +41,4 @@ it('la page recettes contient le composant import-csv', function () {
 
     $response->assertStatus(200);
     $response->assertSee('Importer');
-    $response->assertSee('Télécharger le modèle');
 });

@@ -40,9 +40,15 @@
                                accept=".csv">
                         @error('csvFile') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="bi bi-upload"></i> Lancer l'import
-                    </button>
+                    <div class="d-flex gap-2 align-items-center">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-upload"></i> Lancer l'import
+                        </button>
+                        <a href="{{ route($type === 'depense' ? 'depenses.import.template' : 'recettes.import.template') }}"
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-download"></i> Télécharger le modèle
+                        </a>
+                    </div>
                 </form>
             </div>
         </div>
