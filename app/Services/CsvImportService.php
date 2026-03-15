@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\ModePaiement;
 use App\Enums\TypeCategorie;
 use App\Models\CompteBancaire;
 use App\Models\Depense;
@@ -15,6 +16,14 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
+/**
+ * Service d'import CSV pour les dépenses et recettes.
+ *
+ * Phase 1 : validation exhaustive sans écriture en base.
+ * Phase 2 : insertion via DepenseService/RecetteService sans transaction globale
+ *            (incompatible avec le SELECT FOR UPDATE de NumeroPieceService).
+ *            En cas d'échec partiel, les transactions déjà committées sont conservées.
+ */
 final class CsvImportService
 {
     private const EXPECTED_HEADERS = [
@@ -22,7 +31,11 @@ final class CsvImportService
         'mode_paiement', 'compte', 'libelle', 'tiers', 'operation',
     ];
 
-    private const MODES_PAIEMENT = ['virement', 'cheque', 'especes', 'cb', 'prelevement'];
+    /** @return string[] */
+    private static function modesValides(): array
+    {
+        return array_column(ModePaiement::cases(), 'value');
+    }
 
     public function import(UploadedFile $file, string $type): CsvImportResult
     {
@@ -110,8 +123,8 @@ final class CsvImportService
                     continue;
                 }
 
-                if (!in_array($mode, self::MODES_PAIEMENT, true)) {
-                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne mode_paiement : valeur "' . $mode . '" invalide. Valeurs acceptées : ' . implode(', ', self::MODES_PAIEMENT) . '.'];
+                if (!in_array($mode, self::modesValides(), true)) {
+                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne mode_paiement : valeur "' . $mode . '" invalide. Valeurs acceptées : ' . implode(', ', self::modesValides()) . '.'];
                     continue;
                 }
 
@@ -150,7 +163,7 @@ final class CsvImportService
 
             $groups[$groupKey]['lignes'][] = [
                 'sous_categorie_id' => $sc->id,
-                'montant'           => $montant,
+                'montant'           => (float) $montant,
                 'operation_id'      => $operationId,
             ];
             $groups[$groupKey]['data']['montant_total'] =
@@ -245,7 +258,7 @@ final class CsvImportService
         $normalized = array_map(fn ($h) => Str::lower(trim($h)), $row);
         $missing    = array_diff(self::EXPECTED_HEADERS, $normalized);
         if (!empty($missing)) {
-            return 'en-tête invalide. Colonnes manquantes : ' . implode(', ', $missing) . '.';
+            return 'En-tête invalide. Colonnes manquantes : ' . implode(', ', $missing) . '.';
         }
 
         return null;
