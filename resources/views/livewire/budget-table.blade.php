@@ -14,7 +14,7 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-hover mb-0">
-                    <thead class="table-dark">
+                    <thead class="table-dark" style="--bs-table-bg:#2c3a50;--bs-table-border-color:#3a4d63">
                         <tr>
                             <th>Sous-catégorie</th>
                             <th class="text-end">Prévu</th>
@@ -110,7 +110,7 @@
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-striped table-hover mb-0">
-                    <thead class="table-dark">
+                    <thead class="table-dark" style="--bs-table-bg:#2c3a50;--bs-table-border-color:#3a4d63">
                         <tr>
                             <th>Sous-catégorie</th>
                             <th class="text-end">Prévu</th>
