@@ -205,9 +205,12 @@ final class CsvImportService
                 $transactionsCreated++;
                 $lignesCreated += count($group['lignes']);
             } catch (\Exception $e) {
+                $alreadyInserted = $transactionsCreated > 0
+                    ? "{$transactionsCreated} transaction(s) déjà insérée(s) avant l'erreur (ne les re-soumettez pas). "
+                    : '';
                 return new CsvImportResult(false, errors: [[
                     'line'    => 0,
-                    'message' => 'Erreur lors de l\'insertion : ' . $e->getMessage(),
+                    'message' => $alreadyInserted . 'Erreur lors de l\'insertion : ' . $e->getMessage(),
                 ]]);
             }
         }
