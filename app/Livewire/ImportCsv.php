@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Services\CsvImportService;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -14,6 +15,8 @@ final class ImportCsv extends Component
 {
     use WithFileUploads;
 
+    // #[Locked] prevents client-side tampering via wire:model
+    #[Locked]
     public string $type = '';
 
     public bool $showPanel = false;

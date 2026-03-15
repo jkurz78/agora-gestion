@@ -35,8 +35,10 @@
 
                 <form wire:submit="import">
                     <div class="mb-3">
-                        <input type="file" wire:model="csvFile" class="form-control" accept=".csv">
-                        @error('csvFile') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+                        <input type="file" wire:model="csvFile"
+                               class="form-control @error('csvFile') is-invalid @enderror"
+                               accept=".csv">
+                        @error('csvFile') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <button type="submit" class="btn btn-primary btn-sm">
                         <i class="bi bi-upload"></i> Lancer l'import
