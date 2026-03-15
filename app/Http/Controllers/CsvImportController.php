@@ -10,6 +10,10 @@ final class CsvImportController extends Controller
 {
     public function template(string $type): Response
     {
+        if (!in_array($type, ['depense', 'recette'], true)) {
+            abort(404);
+        }
+
         $headers_csv = 'date;reference;sous_categorie;montant_ligne;mode_paiement;compte;libelle;tiers;operation';
 
         // 3 example rows based on type
