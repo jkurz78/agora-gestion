@@ -1,107 +1,90 @@
 <div>
-    {{-- Filter --}}
-    <div class="card mb-4">
+    {{-- Filtre opérations --}}
+    <div class="card mb-3">
         <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label for="filter-operation" class="form-label">Opération</label>
-                    <select wire:model.live="operation_id" id="filter-operation" class="form-select form-select-sm">
-                        <option value="">-- Sélectionner une opération --</option>
-                        @foreach ($operations as $op)
-                            <option value="{{ $op->id }}">{{ $op->nom }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                @if ($operation_id)
-                    <div class="col-md-3 d-flex align-items-end">
-                        <button wire:click="exportCsv" class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-download"></i> Exporter CSV
-                        </button>
+            <div class="d-flex flex-wrap gap-3 align-items-center">
+                @foreach ($operations as $op)
+                    <div class="form-check">
+                        <input type="checkbox" wire:model.live="selectedOperationIds"
+                               value="{{ $op->id }}" id="ops-{{ $op->id }}" class="form-check-input">
+                        <label for="ops-{{ $op->id }}" class="form-check-label">{{ $op->nom }}</label>
                     </div>
-                @endif
+                @endforeach
+                <button wire:click="exportCsv" class="btn btn-outline-secondary btn-sm ms-auto"
+                        {{ $hasSelection ? '' : 'disabled' }}>
+                    <i class="bi bi-download"></i> Exporter CSV
+                </button>
             </div>
         </div>
     </div>
 
-    @if ($operation && count($data) > 0)
-        @php
-            $nbSeances = $operation->nombre_seances ?? 0;
-            $depenseRows = collect($data)->where('type', 'depense');
-            $recetteRows = collect($data)->where('type', 'recette');
-        @endphp
-
-        <div class="table-responsive">
-            <table class="table table-striped table-hover table-bordered">
-                <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                    <tr>
-                        <th>Sous-catégorie</th>
-                        @for ($i = 1; $i <= $nbSeances; $i++)
-                            <th class="text-end">Séance {{ $i }}</th>
-                        @endfor
-                        <th class="text-end">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{-- Charges --}}
-                    <tr class="table-secondary">
-                        <td colspan="{{ $nbSeances + 2 }}" class="fw-bold">Charges</td>
-                    </tr>
-                    @foreach ($depenseRows as $row)
-                        <tr>
-                            <td class="ps-4">{{ $row['sous_categorie'] }}</td>
-                            @for ($i = 1; $i <= $nbSeances; $i++)
-                                <td class="text-end">{{ number_format($row['seances'][$i] ?? 0, 2, ',', ' ') }} &euro;</td>
-                            @endfor
-                            <td class="text-end fw-bold">{{ number_format($row['total'], 2, ',', ' ') }} &euro;</td>
-                        </tr>
-                    @endforeach
-
-                    {{-- Produits --}}
-                    <tr class="table-secondary">
-                        <td colspan="{{ $nbSeances + 2 }}" class="fw-bold">Produits</td>
-                    </tr>
-                    @foreach ($recetteRows as $row)
-                        <tr>
-                            <td class="ps-4">{{ $row['sous_categorie'] }}</td>
-                            @for ($i = 1; $i <= $nbSeances; $i++)
-                                <td class="text-end">{{ number_format($row['seances'][$i] ?? 0, 2, ',', ' ') }} &euro;</td>
-                            @endfor
-                            <td class="text-end fw-bold">{{ number_format($row['total'], 2, ',', ' ') }} &euro;</td>
-                        </tr>
-                    @endforeach
-
-                    {{-- Solde per séance --}}
-                    <tr class="table-primary fw-bold">
-                        <td>Solde</td>
-                        @for ($i = 1; $i <= $nbSeances; $i++)
-                            @php
-                                $seanceRecettes = $recetteRows->sum(fn ($r) => $r['seances'][$i] ?? 0);
-                                $seanceDepenses = $depenseRows->sum(fn ($r) => $r['seances'][$i] ?? 0);
-                                $solde = $seanceRecettes - $seanceDepenses;
-                            @endphp
-                            <td class="text-end {{ $solde >= 0 ? 'text-success' : 'text-danger' }}">
-                                {{ number_format($solde, 2, ',', ' ') }} &euro;
-                            </td>
-                        @endfor
-                        @php
-                            $totalRecettes = $recetteRows->sum('total');
-                            $totalDepenses = $depenseRows->sum('total');
-                            $totalSolde = $totalRecettes - $totalDepenses;
-                        @endphp
-                        <td class="text-end {{ $totalSolde >= 0 ? 'text-success' : 'text-danger' }}">
-                            {{ number_format($totalSolde, 2, ',', ' ') }} &euro;
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    @elseif ($operation_id)
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> Aucune donnée par séance pour cette opération.
-        </div>
+    @if (! $hasSelection)
+        <p class="text-muted text-center py-4">Sélectionnez au moins une opération pour afficher le rapport.</p>
     @else
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> Sélectionnez une opération avec des séances.
+        @php $nbCols = count($seances) + 3; @endphp
+
+        @foreach ([['data' => $charges, 'label' => 'DÉPENSES', 'total' => $totalChargesN],
+                   ['data' => $produits, 'label' => 'RECETTES', 'total' => $totalProduitsN]] as $section)
+        <div class="card mb-3 border-0 shadow-sm">
+            <div class="card-body p-0">
+                <table class="table mb-0" style="font-size:13px;border-collapse:collapse;width:100%;">
+                    <tbody>
+                        {{-- En-tête colonnes --}}
+                        <tr style="background:#3d5473;color:#fff;">
+                            <td style="width:20px;"></td>
+                            <td></td>
+                            @foreach ($seances as $s)
+                                <td class="text-end" style="width:90px;font-size:12px;font-weight:400;opacity:.85;">Séance {{ $s }}</td>
+                            @endforeach
+                            <td class="text-end" style="width:100px;font-size:12px;font-weight:400;opacity:.85;">Total</td>
+                        </tr>
+                        <tr style="background:#3d5473;color:#fff;font-weight:700;font-size:14px;">
+                            <td colspan="{{ $nbCols }}" style="padding:4px 12px 10px;">{{ $section['label'] }}</td>
+                        </tr>
+
+                        @foreach ($section['data'] as $cat)
+                            @php
+                                $scVisibles = collect($cat['sous_categories'])->filter(fn($sc) => $sc['total'] > 0);
+                            @endphp
+                            @if (! $scVisibles->isEmpty())
+                            <tr style="background:#dce6f0;">
+                                <td></td>
+                                <td style="font-weight:600;color:#1e3a5f;padding:7px 12px;">{{ $cat['label'] }}</td>
+                                @foreach ($seances as $s)
+                                    <td class="text-end fw-semibold" style="padding:7px 12px;">{{ number_format($cat['seances'][$s] ?? 0, 2, ',', ' ') }} &euro;</td>
+                                @endforeach
+                                <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($cat['total'], 2, ',', ' ') }} &euro;</td>
+                            </tr>
+                            @foreach ($scVisibles as $sc)
+                            <tr style="background:#f7f9fc;">
+                                <td></td>
+                                <td style="padding:5px 12px 5px 32px;color:#444;">{{ $sc['label'] }}</td>
+                                @foreach ($seances as $s)
+                                    <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['seances'][$s] ?? 0, 2, ',', ' ') }} &euro;</td>
+                                @endforeach
+                                <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['total'], 2, ',', ' ') }} &euro;</td>
+                            </tr>
+                            @endforeach
+                            @endif
+                        @endforeach
+
+                        <tr style="background:#5a7fa8;color:#fff;font-weight:700;font-size:14px;">
+                            <td colspan="2" style="padding:9px 12px;">TOTAL {{ $section['label'] }}</td>
+                            @foreach ($seances as $s)
+                                <td class="text-end" style="padding:9px 12px;color:#d0e4f7;">—</td>
+                            @endforeach
+                            <td class="text-end" style="padding:9px 12px;">{{ number_format($section['total'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        @endforeach
+
+        <div class="rounded p-4 d-flex justify-content-between align-items-center mt-2"
+             style="background:{{ $resultatNet >= 0 ? '#198754' : '#dc3545' }};color:#fff;font-size:1.1rem;font-weight:700;">
+            <span>{{ $resultatNet >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }}</span>
+            <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} &euro;</span>
         </div>
     @endif
 </div>

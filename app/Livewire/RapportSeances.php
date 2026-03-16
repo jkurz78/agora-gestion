@@ -5,68 +5,84 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Models\Operation;
+use App\Services\ExerciceService;
 use App\Services\RapportService;
 use Livewire\Component;
 
 final class RapportSeances extends Component
 {
-    public ?int $operation_id = null;
+    /** @var array<int, int> */
+    public array $selectedOperationIds = [];
 
-    public function exportCsv()
+    public function exportCsv(): mixed
     {
-        if (! $this->operation_id) {
-            return;
+        if (empty($this->selectedOperationIds)) {
+            return null;
         }
 
-        $rapportService = app(RapportService::class);
-        $data = $rapportService->rapportSeances($this->operation_id);
-        $operation = Operation::findOrFail($this->operation_id);
-        $nbSeances = $operation->nombre_seances ?? 0;
+        $exercice = app(ExerciceService::class)->current();
+        $data = app(RapportService::class)->rapportSeances($exercice, $this->selectedOperationIds);
 
-        $headers = ['Sous-catégorie', 'Type'];
-        for ($i = 1; $i <= $nbSeances; $i++) {
-            $headers[] = 'Séance '.$i;
+        $seances = $data['seances'];
+        $headers = ['Type', 'Catégorie', 'Sous-catégorie'];
+        foreach ($seances as $s) {
+            $headers[] = 'Séance '.$s;
         }
         $headers[] = 'Total';
 
         $rows = [];
-        foreach ($data as $row) {
-            $csvRow = [$row['sous_categorie'], $row['type']];
-            for ($i = 1; $i <= $nbSeances; $i++) {
-                $csvRow[] = number_format($row['seances'][$i] ?? 0, 2, ',', '');
+        foreach ([['data' => $data['charges'], 'type' => 'Charge'], ['data' => $data['produits'], 'type' => 'Produit']] as $section) {
+            foreach ($section['data'] as $cat) {
+                foreach ($cat['sous_categories'] as $sc) {
+                    $row = [$section['type'], $cat['label'], $sc['label']];
+                    foreach ($seances as $s) {
+                        $row[] = number_format($sc['seances'][$s] ?? 0.0, 2, ',', '');
+                    }
+                    $row[] = number_format($sc['total'], 2, ',', '');
+                    $rows[] = $row;
+                }
             }
-            $csvRow[] = number_format($row['total'], 2, ',', '');
-            $rows[] = $csvRow;
         }
 
-        $csv = $rapportService->toCsv($rows, $headers);
+        $csv = app(RapportService::class)->toCsv($rows, $headers);
 
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
-        }, 'rapport_seances_'.$this->operation_id.'.csv', [
-            'Content-Type' => 'text/csv',
-        ]);
+        }, 'rapport_seances_'.$exercice.'.csv', ['Content-Type' => 'text/csv']);
     }
 
-    public function render()
+    public function render(): mixed
     {
         $operations = Operation::whereNotNull('nombre_seances')
             ->where('nombre_seances', '>', 0)
             ->orderBy('nom')
             ->get();
 
-        $data = [];
-        $operation = null;
-        if ($this->operation_id) {
-            $rapportService = app(RapportService::class);
-            $data = $rapportService->rapportSeances($this->operation_id);
-            $operation = Operation::find($this->operation_id);
+        $seances = [];
+        $charges = [];
+        $produits = [];
+        $totalChargesN = 0.0;
+        $totalProduitsN = 0.0;
+
+        if (! empty($this->selectedOperationIds)) {
+            $exercice = app(ExerciceService::class)->current();
+            $data = app(RapportService::class)->rapportSeances($exercice, $this->selectedOperationIds);
+            $seances = $data['seances'];
+            $charges = $data['charges'];
+            $produits = $data['produits'];
+            $totalChargesN = collect($charges)->sum('total');
+            $totalProduitsN = collect($produits)->sum('total');
         }
 
         return view('livewire.rapport-seances', [
             'operations' => $operations,
-            'data' => $data,
-            'operation' => $operation,
+            'seances' => $seances,
+            'charges' => $charges,
+            'produits' => $produits,
+            'totalChargesN' => $totalChargesN,
+            'totalProduitsN' => $totalProduitsN,
+            'resultatNet' => $totalProduitsN - $totalChargesN,
+            'hasSelection' => ! empty($this->selectedOperationIds),
         ]);
     }
 }
