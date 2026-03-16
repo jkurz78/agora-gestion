@@ -24,6 +24,15 @@
                         @endforeach
                     </select>
                 </div>
+                <div class="col-md-3">
+                    <label for="filter-nature" class="form-label">Nature du don</label>
+                    <select wire:model.live="sous_categorie_id" id="filter-nature" class="form-select form-select-sm">
+                        <option value="">Toutes</option>
+                        @foreach ($naturesdon as $sc)
+                            <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -35,6 +44,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Donateur</th>
+                    <th>Nature du don</th>
                     <th class="text-end">Montant</th>
                     <th>Mode paiement</th>
                     <th>Objet</th>
@@ -57,6 +67,7 @@
                                 <span class="text-muted fst-italic">Anonyme</span>
                             @endif
                         </td>
+                        <td class="small text-muted">{{ $don->sousCategorie?->nom ?? '—' }}</td>
                         <td class="text-end fw-semibold small text-nowrap">{{ number_format((float) $don->montant, 2, ',', ' ') }} &euro;</td>
                         <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $don->mode_paiement->label() }}</span></td>
                         <td class="small">{{ $don->objet ?? '-' }}</td>
@@ -96,7 +107,7 @@
                     {{-- Tiers history inline --}}
                     @if ($don->tiers && $showTiersId === $don->tiers->id)
                         <tr>
-                            <td colspan="8" class="bg-light p-3">
+                            <td colspan="9" class="bg-light p-3">
                                 <h6 class="mb-2">Historique des dons de {{ $don->tiers->displayName() }}</h6>
                                 <table class="table table-sm table-bordered mb-0">
                                     <thead>
@@ -123,7 +134,7 @@
                     @endif
                 @empty
                     <tr>
-                        <td colspan="8" class="text-muted text-center">Aucun don trouvé.</td>
+                        <td colspan="9" class="text-muted text-center">Aucun don trouvé.</td>
                     </tr>
                 @endforelse
             </tbody>

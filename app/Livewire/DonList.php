@@ -22,6 +22,8 @@ final class DonList extends Component
 
     public ?int $operation_id = null;
 
+    public ?int $sous_categorie_id = null;
+
     public ?int $showTiersId = null;
 
     public function updatedTiersSearch(): void
@@ -30,6 +32,11 @@ final class DonList extends Component
     }
 
     public function updatedOperationId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSousCategorieId(): void
     {
         $this->resetPage();
     }
@@ -59,7 +66,7 @@ final class DonList extends Component
     {
         $exercice = app(ExerciceService::class)->current();
 
-        $query = Don::with(['tiers', 'operation', 'compte'])
+        $query = Don::with(['tiers', 'operation', 'compte', 'sousCategorie'])
             ->forExercice($exercice)
             ->latest('date')
             ->latest('id');
@@ -76,6 +83,10 @@ final class DonList extends Component
             $query->where('operation_id', $this->operation_id);
         }
 
+        if ($this->sous_categorie_id) {
+            $query->where('sous_categorie_id', $this->sous_categorie_id);
+        }
+
         $tiersDons = collect();
         if ($this->showTiersId) {
             $tiersDons = Don::where('tiers_id', $this->showTiersId)
@@ -84,9 +95,10 @@ final class DonList extends Component
         }
 
         return view('livewire.don-list', [
-            'dons' => $query->paginate(15),
+            'dons'       => $query->paginate(15),
             'operations' => Operation::orderBy('nom')->get(),
-            'tiersDons' => $tiersDons,
+            'naturesdon' => \App\Models\SousCategorie::where('pour_dons', true)->orderBy('nom')->get(),
+            'tiersDons'  => $tiersDons,
         ]);
     }
 }
