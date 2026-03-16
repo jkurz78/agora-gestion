@@ -3,6 +3,7 @@
 use App\Livewire\DonForm;
 use App\Models\CompteBancaire;
 use App\Models\Don;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use Livewire\Livewire;
@@ -12,6 +13,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
 
     $this->compte = CompteBancaire::factory()->create();
+    $this->sousCategorie = SousCategorie::factory()->pourDons()->create(['nom' => 'Dons manuels']);
 
     session(['exercice_actif' => 2025]);
 });
@@ -39,6 +41,7 @@ it('can save a don with existing tiers', function () {
         ->set('montant', '100.00')
         ->set('mode_paiement', 'virement')
         ->set('tiers_id', $tiers->id)
+        ->set('sous_categorie_id', $this->sousCategorie->id)
         ->set('compte_id', $this->compte->id)
         ->call('save')
         ->assertHasNoErrors()
@@ -58,6 +61,7 @@ it('can save an anonymous don', function () {
         ->set('date', '2025-10-15')
         ->set('montant', '50.00')
         ->set('mode_paiement', 'especes')
+        ->set('sous_categorie_id', $this->sousCategorie->id)
         ->call('save')
         ->assertHasNoErrors()
         ->assertDispatched('don-saved');
@@ -74,7 +78,7 @@ it('validates required fields', function () {
     Livewire::test(DonForm::class)
         ->set('showForm', true)
         ->call('save')
-        ->assertHasErrors(['date', 'montant', 'mode_paiement']);
+        ->assertHasErrors(['date', 'montant', 'mode_paiement', 'sous_categorie_id']);
 });
 
 it('can load existing don for editing', function () {
@@ -102,6 +106,7 @@ it('can update an existing don', function () {
         'montant' => 100.00,
         'mode_paiement' => 'especes',
         'objet' => 'Ancien objet',
+        'sous_categorie_id' => $this->sousCategorie->id,
         'saisi_par' => $this->user->id,
         'compte_id' => $this->compte->id,
     ]);
@@ -127,6 +132,7 @@ it('rejette une date hors exercice', function () {
         ->set('date', '2025-08-01')
         ->set('montant', '100.00')
         ->set('mode_paiement', 'virement')
+        ->set('sous_categorie_id', $this->sousCategorie->id)
         ->call('save')
         ->assertHasErrors(['date']);
 });

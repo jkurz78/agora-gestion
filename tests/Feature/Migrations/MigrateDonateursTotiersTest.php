@@ -36,6 +36,15 @@ it('migrates a donateur row to tiers and links the don', function () {
         'updated_at' => now(),
     ]);
 
+    // Create a sous_categorie for the don
+    $catId = DB::table('categories')->insertGetId([
+        'nom' => 'Produits', 'type' => 'recette', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $sousCatId = DB::table('sous_categories')->insertGetId([
+        'categorie_id' => $catId, 'nom' => 'Dons manuels', 'pour_dons' => 1,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
     // Simulate migration logic: create tiers from donateur, then link don via tiers_id
     $donateur = DB::table('donateurs')->find($donateurId);
     $tiersId = DB::table('tiers')->insertGetId([
@@ -53,6 +62,7 @@ it('migrates a donateur row to tiers and links the don', function () {
 
     $donId = DB::table('dons')->insertGetId([
         'tiers_id' => $tiersId,
+        'sous_categorie_id' => $sousCatId,
         'date' => '2025-10-01',
         'montant' => 100,
         'mode_paiement' => 'especes',
