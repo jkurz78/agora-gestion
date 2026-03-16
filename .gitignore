@@ -37,4 +37,3 @@ public/proto-*.html
 
 # Version générée localement
 /config/version.php
-.claude/
