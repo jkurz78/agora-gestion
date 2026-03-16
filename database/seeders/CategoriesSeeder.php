@@ -40,9 +40,9 @@ class CategoriesSeeder extends Seeder
                 'nom'  => '75 - Cotisations et dons',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Cotisations', 'code_cerfa' => '751'],
-                    ['nom' => 'Dons manuels', 'code_cerfa' => '754'],
-                    ['nom' => 'Mécénat',      'code_cerfa' => '756'],
+                    ['nom' => 'Cotisations',  'code_cerfa' => '751', 'pour_cotisations' => true],
+                    ['nom' => 'Dons manuels', 'code_cerfa' => '754', 'pour_dons' => true],
+                    ['nom' => 'Mécénat',      'code_cerfa' => '756', 'pour_dons' => true],
                 ],
             ],
             [
@@ -56,7 +56,7 @@ class CategoriesSeeder extends Seeder
                 'nom'  => '77 - Produits exceptionnels',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771'],
+                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771', 'pour_dons' => true],
                 ],
             ],
 
