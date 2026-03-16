@@ -10,6 +10,13 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="cr-operations-tab" data-bs-toggle="tab"
+                    data-bs-target="#cr-operations" type="button" role="tab"
+                    aria-controls="cr-operations" aria-selected="false">
+                Compte de résultat par opération(s)
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link" id="rapport-seances-tab" data-bs-toggle="tab"
                     data-bs-target="#rapport-seances" type="button" role="tab"
                     aria-controls="rapport-seances" aria-selected="false">
@@ -22,6 +29,10 @@
         <div class="tab-pane fade show active" id="compte-resultat" role="tabpanel"
              aria-labelledby="compte-resultat-tab">
             <livewire:rapport-compte-resultat />
+        </div>
+        <div class="tab-pane fade" id="cr-operations" role="tabpanel"
+             aria-labelledby="cr-operations-tab">
+            <livewire:rapport-compte-resultat-operations />
         </div>
         <div class="tab-pane fade" id="rapport-seances" role="tabpanel"
              aria-labelledby="rapport-seances-tab">
