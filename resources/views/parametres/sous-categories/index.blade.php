@@ -56,7 +56,19 @@
                     <label for="sc_cerfa" class="form-label">Code CERFA</label>
                     <input type="text" name="code_cerfa" id="sc_cerfa" class="form-control" maxlength="10">
                 </div>
-                <div class="col-md-2">
+                <div class="col-auto d-flex flex-column justify-content-end gap-1">
+                    <div class="form-check">
+                        <input type="hidden" name="pour_dons" value="0">
+                        <input type="checkbox" name="pour_dons" id="sc_pour_dons" value="1" class="form-check-input">
+                        <label class="form-check-label" for="sc_pour_dons">Dons</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="hidden" name="pour_cotisations" value="0">
+                        <input type="checkbox" name="pour_cotisations" id="sc_pour_cotisations" value="1" class="form-check-input">
+                        <label class="form-check-label" for="sc_pour_cotisations">Cotisations</label>
+                    </div>
+                </div>
+                <div class="col-md-1">
                     <button type="submit" class="btn btn-success w-100">Enregistrer</button>
                 </div>
             </form>
