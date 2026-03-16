@@ -14,6 +14,14 @@
                     <input type="text" wire:model.live.debounce.300ms="tiers_search"
                            class="form-control form-control-sm" placeholder="Rechercher un membre...">
                 </div>
+                <div class="col-md-3">
+                    <select wire:model.live="sous_categorie_id" class="form-select form-select-sm">
+                        <option value="">Tous les postes</option>
+                        @foreach ($postescotisation as $sc)
+                            <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
         </div>
     </div>
@@ -25,6 +33,7 @@
                 <tr>
                     <th>Exercice</th>
                     <th>Membre</th>
+                    <th>Poste comptable</th>
                     <th>Date paiement</th>
                     <th class="text-end">Montant</th>
                     <th>Mode paiement</th>
@@ -38,6 +47,7 @@
                     <tr>
                         <td class="text-muted small">{{ $cotisation->exercice }}-{{ $cotisation->exercice + 1 }}</td>
                         <td class="small">@if($cotisation->tiers)<span style="font-size:.7rem">{{ $cotisation->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $cotisation->tiers->displayName() }}@else—@endif</td>
+                        <td class="small text-muted">{{ $cotisation->sousCategorie?->nom ?? '—' }}</td>
                         <td class="small text-nowrap">{{ $cotisation->date_paiement->format('d/m/Y') }}</td>
                         <td class="text-end fw-semibold small text-nowrap">{{ number_format((float) $cotisation->montant, 2, ',', ' ') }} &euro;</td>
                         <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $cotisation->mode_paiement->label() }}</span></td>
@@ -70,7 +80,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-muted text-center py-3">Aucune cotisation pour cet exercice.</td>
+                        <td colspan="9" class="text-muted text-center py-3">Aucune cotisation pour cet exercice.</td>
                     </tr>
                 @endforelse
             </tbody>
