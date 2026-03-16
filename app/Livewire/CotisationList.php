@@ -19,7 +19,14 @@ final class CotisationList extends Component
 
     public string $tiers_search = '';
 
+    public ?int $sous_categorie_id = null;
+
     public function updatedTiersSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSousCategorieId(): void
     {
         $this->resetPage();
     }
@@ -42,7 +49,7 @@ final class CotisationList extends Component
     {
         $exercice = app(ExerciceService::class)->current();
 
-        $query = Cotisation::with(['tiers', 'compte'])
+        $query = Cotisation::with(['tiers', 'compte', 'sousCategorie'])
             ->where('exercice', $exercice)
             ->latest('date_paiement')
             ->latest('id');
@@ -55,8 +62,13 @@ final class CotisationList extends Component
             });
         }
 
+        if ($this->sous_categorie_id) {
+            $query->where('sous_categorie_id', $this->sous_categorie_id);
+        }
+
         return view('livewire.cotisation-list', [
-            'cotisations' => $query->paginate(15),
+            'cotisations'      => $query->paginate(15),
+            'postescotisation' => \App\Models\SousCategorie::where('pour_cotisations', true)->orderBy('nom')->get(),
         ]);
     }
 }

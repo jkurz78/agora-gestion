@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\ModePaiement;
 use App\Models\CompteBancaire;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\CotisationService;
 use App\Services\ExerciceService;
@@ -15,6 +16,8 @@ use Livewire\Component;
 final class CotisationForm extends Component
 {
     public ?int $tiers_id = null;
+
+    public ?int $sous_categorie_id = null;
 
     public string $montant = '';
 
@@ -35,7 +38,7 @@ final class CotisationForm extends Component
 
     public function resetForm(): void
     {
-        $this->reset(['tiers_id', 'montant', 'date_paiement', 'mode_paiement', 'compte_id', 'showForm']);
+        $this->reset(['tiers_id', 'sous_categorie_id', 'montant', 'date_paiement', 'mode_paiement', 'compte_id', 'showForm']);
         $this->resetValidation();
     }
 
@@ -58,11 +61,12 @@ final class CotisationForm extends Component
         $dateFin = $range['end']->toDateString();
 
         $validated = $this->validate([
-            'tiers_id'      => ['required', 'exists:tiers,id'],
-            'montant'       => ['required', 'numeric', 'min:0.01'],
-            'date_paiement' => ['required', 'date', 'after_or_equal:' . $dateDebut, 'before_or_equal:' . $dateFin],
-            'mode_paiement' => ['required', 'string'],
-            'compte_id'     => ['nullable', 'exists:comptes_bancaires,id'],
+            'tiers_id'         => ['required', 'exists:tiers,id'],
+            'sous_categorie_id' => ['required', 'exists:sous_categories,id'],
+            'montant'          => ['required', 'numeric', 'min:0.01'],
+            'date_paiement'    => ['required', 'date', 'after_or_equal:' . $dateDebut, 'before_or_equal:' . $dateFin],
+            'mode_paiement'    => ['required', 'string'],
+            'compte_id'        => ['nullable', 'exists:comptes_bancaires,id'],
         ], [
             'tiers_id.required'           => 'Veuillez sélectionner un tiers.',
             'date_paiement.after_or_equal'  => 'La date doit être dans l\'exercice en cours (à partir du ' . $range['start']->format('d/m/Y') . ').',
@@ -72,11 +76,12 @@ final class CotisationForm extends Component
         $tiers = Tiers::findOrFail($validated['tiers_id']);
 
         $data = [
-            'montant'       => $validated['montant'],
-            'date_paiement' => $validated['date_paiement'],
-            'mode_paiement' => $validated['mode_paiement'],
-            'compte_id'     => $validated['compte_id'],
-            'exercice'      => $exerciceService->current(),
+            'sous_categorie_id' => $validated['sous_categorie_id'],
+            'montant'           => $validated['montant'],
+            'date_paiement'     => $validated['date_paiement'],
+            'mode_paiement'     => $validated['mode_paiement'],
+            'compte_id'         => $validated['compte_id'],
+            'exercice'          => $exerciceService->current(),
         ];
 
         app(CotisationService::class)->create($tiers, $data);
@@ -88,8 +93,9 @@ final class CotisationForm extends Component
     public function render(): \Illuminate\View\View
     {
         return view('livewire.cotisation-form', [
-            'comptes'       => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
-            'modesPaiement' => ModePaiement::cases(),
+            'postescotisation' => SousCategorie::where('pour_cotisations', true)->orderBy('nom')->get(),
+            'comptes'          => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
+            'modesPaiement'    => ModePaiement::cases(),
         ]);
     }
 }
