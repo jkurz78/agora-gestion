@@ -4,52 +4,72 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
-use App\Models\Operation;
 use App\Services\ExerciceService;
 use App\Services\RapportService;
 use Livewire\Component;
 
 final class RapportCompteResultat extends Component
 {
-    /** @var array<int, int> */
-    public array $selectedOperationIds = [];
-
-    public function exportCsv()
+    public function exportCsv(): mixed
     {
-        $rapportService = app(RapportService::class);
         $exercice = app(ExerciceService::class)->current();
-        $operationIds = array_filter($this->selectedOperationIds) ?: null;
-        $data = $rapportService->compteDeResultat($exercice, $operationIds);
+        $data = app(RapportService::class)->compteDeResultat($exercice);
 
         $rows = [];
-        foreach ($data['charges'] as $charge) {
-            $rows[] = ['Charge', $charge['code_cerfa'] ?? '', $charge['label'], number_format($charge['montant'], 2, ',', '')];
+        foreach ($data['charges'] as $cat) {
+            foreach ($cat['sous_categories'] as $sc) {
+                $rows[] = [
+                    'Charge',
+                    $cat['label'],
+                    $sc['label'],
+                    $sc['montant_n1'] !== null ? number_format((float) $sc['montant_n1'], 2, ',', '') : '',
+                    number_format((float) $sc['montant_n'], 2, ',', ''),
+                    $sc['budget'] !== null ? number_format((float) $sc['budget'], 2, ',', '') : '',
+                    $sc['budget'] !== null ? number_format((float) $sc['montant_n'] - (float) $sc['budget'], 2, ',', '') : '',
+                ];
+            }
         }
-        foreach ($data['produits'] as $produit) {
-            $rows[] = ['Produit', $produit['code_cerfa'] ?? '', $produit['label'], number_format($produit['montant'], 2, ',', '')];
+        foreach ($data['produits'] as $cat) {
+            foreach ($cat['sous_categories'] as $sc) {
+                $rows[] = [
+                    'Produit',
+                    $cat['label'],
+                    $sc['label'],
+                    $sc['montant_n1'] !== null ? number_format((float) $sc['montant_n1'], 2, ',', '') : '',
+                    number_format((float) $sc['montant_n'], 2, ',', ''),
+                    $sc['budget'] !== null ? number_format((float) $sc['budget'], 2, ',', '') : '',
+                    $sc['budget'] !== null ? number_format((float) $sc['montant_n'] - (float) $sc['budget'], 2, ',', '') : '',
+                ];
+            }
         }
 
-        $csv = $rapportService->toCsv($rows, ['Type', 'Code CERFA', 'Libellé', 'Montant']);
+        $csv = app(RapportService::class)->toCsv($rows, ['Type', 'Catégorie', 'Sous-catégorie', 'N-1', 'N', 'Budget', 'Écart']);
 
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
-        }, 'compte_resultat_'.$exercice.'.csv', [
-            'Content-Type' => 'text/csv',
-        ]);
+        }, 'compte_resultat_'.$exercice.'.csv', ['Content-Type' => 'text/csv']);
     }
 
-    public function render()
+    public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();
-        $rapportService = app(RapportService::class);
+        $data = app(RapportService::class)->compteDeResultat($exercice);
 
-        $operationIds = array_filter($this->selectedOperationIds) ?: null;
-        $data = $rapportService->compteDeResultat($exercice, $operationIds);
+        $labelN = $exercice.'–'.($exercice + 1);
+        $labelN1 = ($exercice - 1).'–'.$exercice;
+
+        $totalChargesN = collect($data['charges'])->sum('montant_n');
+        $totalProduitsN = collect($data['produits'])->sum('montant_n');
+        $resultatNet = $totalProduitsN - $totalChargesN;
 
         return view('livewire.rapport-compte-resultat', [
             'charges' => $data['charges'],
             'produits' => $data['produits'],
-            'operations' => Operation::orderBy('nom')->get(),
+            'labelN' => $labelN,
+            'labelN1' => $labelN1,
+            'totalChargesN' => $totalChargesN,
+            'totalProduitsN' => $totalProduitsN,
+            'resultatNet' => $resultatNet,
         ]);
     }
 }
