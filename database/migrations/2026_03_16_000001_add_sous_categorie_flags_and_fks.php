@@ -22,6 +22,7 @@ return new class extends Migration
         Schema::table('dons', function (Blueprint $table): void {
             if (! Schema::hasColumn('dons', 'sous_categorie_id')) {
                 $table->foreignId('sous_categorie_id')
+                    ->nullable()
                     ->after('tiers_id')
                     ->constrained('sous_categories');
             }
@@ -30,6 +31,7 @@ return new class extends Migration
         Schema::table('cotisations', function (Blueprint $table): void {
             if (! Schema::hasColumn('cotisations', 'sous_categorie_id')) {
                 $table->foreignId('sous_categorie_id')
+                    ->nullable()
                     ->after('tiers_id')
                     ->constrained('sous_categories');
             }
