@@ -254,21 +254,22 @@ final class RapportService
      */
     private function fetchProduitsSeancesRows(string $start, string $end, array $operationIds): Collection
     {
-        /** @var array<string, array{categorie_id: int, categorie_nom: string, sous_categorie_id: int, sous_categorie_nom: string, seance: int, montant: float}> */
+        /** @var array<int, array<int, array{categorie_id: int, categorie_nom: string, sous_categorie_id: int, sous_categorie_nom: string, seance: int, montant: float}>> */
         $map = [];
 
         $accumuler = function (Collection $rows) use (&$map): void {
             foreach ($rows as $row) {
-                $key = $row->sous_categorie_id.'_'.$row->seance;
-                if (isset($map[$key])) {
-                    $map[$key]['montant'] += (float) $row->montant;
+                $scId = (int) $row->sous_categorie_id;
+                $seance = (int) $row->seance;
+                if (isset($map[$scId][$seance])) {
+                    $map[$scId][$seance]['montant'] += (float) $row->montant;
                 } else {
-                    $map[$key] = [
+                    $map[$scId][$seance] = [
                         'categorie_id' => (int) $row->categorie_id,
                         'categorie_nom' => $row->categorie_nom,
-                        'sous_categorie_id' => (int) $row->sous_categorie_id,
+                        'sous_categorie_id' => $scId,
                         'sous_categorie_nom' => $row->sous_categorie_nom,
-                        'seance' => (int) $row->seance,
+                        'seance' => $seance,
                         'montant' => (float) $row->montant,
                     ];
                 }
@@ -301,7 +302,14 @@ final class RapportService
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'dons.seance')
             ->get());
 
-        return collect(array_values($map))->map(fn ($row) => (object) $row);
+        $flat = [];
+        foreach ($map as $seanceMap) {
+            foreach ($seanceMap as $entry) {
+                $flat[] = $entry;
+            }
+        }
+
+        return collect($flat)->map(fn ($row) => (object) $row);
     }
 
     /**
