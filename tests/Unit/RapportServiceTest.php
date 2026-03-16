@@ -1,183 +1,245 @@
 <?php
 
+use App\Models\BudgetLine;
 use App\Models\Categorie;
+use App\Models\Cotisation;
 use App\Models\Depense;
 use App\Models\DepenseLigne;
+use App\Models\Don;
 use App\Models\Operation;
 use App\Models\Recette;
 use App\Models\RecetteLigne;
 use App\Models\SousCategorie;
+use App\Models\Tiers;
 use App\Models\User;
 use App\Services\RapportService;
 
 beforeEach(function () {
     $this->service = new RapportService;
     $this->user = User::factory()->create();
-
-    $this->depenseCategorie = Categorie::factory()->depense()->create();
-    $this->recetteCategorie = Categorie::factory()->recette()->create();
+    $this->depenseCat = Categorie::factory()->depense()->create(['nom' => 'Achats']);
+    $this->recetteCat = Categorie::factory()->recette()->create(['nom' => 'Cotisations']);
 });
 
-it('aggregates compte de resultat by code_cerfa', function () {
-    $sc1 = SousCategorie::factory()->create([
-        'categorie_id' => $this->depenseCategorie->id,
+// ── compteDeResultat ──────────────────────────────────────────────────────────
+
+it('compteDeResultat retourne la hiérarchie catégorie/sous-catégorie pour N', function () {
+    $sc = SousCategorie::factory()->create([
+        'categorie_id' => $this->depenseCat->id,
         'nom' => 'Fournitures',
-        'code_cerfa' => '60',
     ]);
-    $sc2 = SousCategorie::factory()->create([
-        'categorie_id' => $this->recetteCategorie->id,
-        'nom' => 'Adhésions',
-        'code_cerfa' => '75',
-    ]);
-
-    // Depense in exercice 2025
-    $depense = Depense::factory()->create([
-        'date' => '2025-11-15',
-        'saisi_par' => $this->user->id,
-    ]);
+    $depense = Depense::factory()->create(['date' => '2025-11-15', 'saisi_par' => $this->user->id]);
     $depense->lignes()->forceDelete();
-    DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
-        'sous_categorie_id' => $sc1->id,
-        'montant' => 150.00,
-    ]);
-    DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
-        'sous_categorie_id' => $sc1->id,
-        'montant' => 50.00,
-    ]);
-
-    // Recette in exercice 2025
-    $recette = Recette::factory()->create([
-        'date' => '2025-12-01',
-        'saisi_par' => $this->user->id,
-    ]);
-    $recette->lignes()->forceDelete();
-    RecetteLigne::factory()->create([
-        'recette_id' => $recette->id,
-        'sous_categorie_id' => $sc2->id,
-        'montant' => 500.00,
-    ]);
+    DepenseLigne::factory()->create(['depense_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'montant' => 150.00]);
+    DepenseLigne::factory()->create(['depense_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'montant' => 50.00]);
 
     $result = $this->service->compteDeResultat(2025);
 
     expect($result['charges'])->toHaveCount(1);
-    expect($result['charges'][0]['code_cerfa'])->toBe('60');
-    expect($result['charges'][0]['label'])->toBe('Fournitures');
-    expect($result['charges'][0]['montant'])->toBe(200.0);
+    $cat = $result['charges'][0];
+    expect($cat['label'])->toBe('Achats');
+    expect($cat['montant_n'])->toBe(200.0);
+    expect($cat['montant_n1'])->toBeNull();
+    expect($cat['budget'])->toBeNull();
+    expect($cat['sous_categories'])->toHaveCount(1);
+    expect($cat['sous_categories'][0]['label'])->toBe('Fournitures');
+    expect($cat['sous_categories'][0]['montant_n'])->toBe(200.0);
+});
+
+it('compteDeResultat inclut montant_n1 depuis exercice précédent', function () {
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Location']);
+
+    // N-1 : exercice 2024 (sept 2024 - août 2025)
+    $depenseN1 = Depense::factory()->create(['date' => '2024-10-01', 'saisi_par' => $this->user->id]);
+    $depenseN1->lignes()->forceDelete();
+    DepenseLigne::factory()->create(['depense_id' => $depenseN1->id, 'sous_categorie_id' => $sc->id, 'montant' => 300.00]);
+
+    // N : exercice 2025 (sept 2025 - août 2026)
+    $depenseN = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $depenseN->lignes()->forceDelete();
+    DepenseLigne::factory()->create(['depense_id' => $depenseN->id, 'sous_categorie_id' => $sc->id, 'montant' => 350.00]);
+
+    $result = $this->service->compteDeResultat(2025);
+
+    expect($result['charges'][0]['montant_n'])->toBe(350.0);
+    expect($result['charges'][0]['montant_n1'])->toBe(300.0);
+    expect($result['charges'][0]['sous_categories'][0]['montant_n1'])->toBe(300.0);
+});
+
+it('compteDeResultat inclut le budget depuis budget_lines', function () {
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Salle']);
+    BudgetLine::factory()->create(['sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
+
+    $depense = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $depense->lignes()->forceDelete();
+    DepenseLigne::factory()->create(['depense_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'montant' => 800.00]);
+
+    $result = $this->service->compteDeResultat(2025);
+
+    expect($result['charges'][0]['budget'])->toBe(1000.0);
+    expect($result['charges'][0]['sous_categories'][0]['budget'])->toBe(1000.0);
+});
+
+it('compteDeResultat inclut les dons dans les produits', function () {
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Dons manuels']);
+    $tiers = Tiers::factory()->create();
+    Don::factory()->create([
+        'sous_categorie_id' => $sc->id,
+        'date' => '2025-11-01',
+        'montant' => 500.00,
+        'tiers_id' => $tiers->id,
+        'saisi_par' => $this->user->id,
+    ]);
+
+    $result = $this->service->compteDeResultat(2025);
 
     expect($result['produits'])->toHaveCount(1);
-    expect($result['produits'][0]['code_cerfa'])->toBe('75');
-    expect($result['produits'][0]['montant'])->toBe(500.0);
+    expect($result['produits'][0]['sous_categories'][0]['montant_n'])->toBe(500.0);
 });
 
-it('filters compte de resultat by operations', function () {
-    $operation = Operation::factory()->create();
-    $sc = SousCategorie::factory()->create([
-        'categorie_id' => $this->depenseCategorie->id,
-        'nom' => 'Frais transport',
-    ]);
-
-    $depense = Depense::factory()->create([
-        'date' => '2025-10-01',
-        'saisi_par' => $this->user->id,
-    ]);
-    $depense->lignes()->forceDelete();
-
-    // With operation
-    DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
+it('compteDeResultat inclut les cotisations dans les produits', function () {
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions']);
+    $tiers = Tiers::factory()->create();
+    Cotisation::factory()->create([
         'sous_categorie_id' => $sc->id,
-        'operation_id' => $operation->id,
-        'montant' => 100.00,
-    ]);
-
-    // Without operation
-    DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
-        'sous_categorie_id' => $sc->id,
-        'operation_id' => null,
+        'exercice' => 2025,
         'montant' => 200.00,
+        'tiers_id' => $tiers->id,
     ]);
 
-    // Filter by operation
-    $result = $this->service->compteDeResultat(2025, [$operation->id]);
+    $result = $this->service->compteDeResultat(2025);
 
-    expect($result['charges'])->toHaveCount(1);
-    expect($result['charges'][0]['montant'])->toBe(100.0);
+    expect($result['produits'][0]['sous_categories'][0]['montant_n'])->toBe(200.0);
 });
 
-it('builds rapport seances pivot table', function () {
-    $operation = Operation::factory()->withSeances(3)->create();
+it('compteDeResultat trie catégories et sous-catégories par nom', function () {
+    $catB = Categorie::factory()->depense()->create(['nom' => 'Zèbre']);
+    $catA = Categorie::factory()->depense()->create(['nom' => 'Alpha']);
+    $sc2 = SousCategorie::factory()->create(['categorie_id' => $catA->id, 'nom' => 'Zzz']);
+    $sc1 = SousCategorie::factory()->create(['categorie_id' => $catA->id, 'nom' => 'Aaa']);
 
-    $scDepense = SousCategorie::factory()->create([
-        'categorie_id' => $this->depenseCategorie->id,
-        'nom' => 'Location salle',
-    ]);
-    $scRecette = SousCategorie::factory()->create([
-        'categorie_id' => $this->recetteCategorie->id,
-        'nom' => 'Inscriptions',
-    ]);
+    foreach ([$catA, $catB] as $cat) {
+        $sc = $cat->id === $catA->id ? $sc1 : SousCategorie::factory()->create(['categorie_id' => $catB->id, 'nom' => 'Mid']);
+        $d = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+        $d->lignes()->forceDelete();
+        DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 10.00]);
+    }
+    // Also add sc2 data
+    $d2 = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $d2->lignes()->forceDelete();
+    DepenseLigne::factory()->create(['depense_id' => $d2->id, 'sous_categorie_id' => $sc2->id, 'montant' => 10.00]);
 
-    $depense = Depense::factory()->create([
-        'date' => '2025-10-01',
-        'saisi_par' => $this->user->id,
-    ]);
+    $result = $this->service->compteDeResultat(2025);
+
+    $chargeLabels = collect($result['charges'])->pluck('label')->toArray();
+    // Verify Alpha before Zèbre
+    $alphaIdx = array_search('Alpha', $chargeLabels);
+    $zebreIdx = array_search('Zèbre', $chargeLabels);
+    expect($alphaIdx)->toBeLessThan($zebreIdx);
+
+    // Sous-catégories de Alpha triées : Aaa avant Zzz
+    $alphaEntry = collect($result['charges'])->firstWhere('label', 'Alpha');
+    expect($alphaEntry['sous_categories'][0]['label'])->toBe('Aaa');
+    expect($alphaEntry['sous_categories'][1]['label'])->toBe('Zzz');
+});
+
+// ── compteDeResultatOperations ────────────────────────────────────────────────
+
+it('compteDeResultatOperations filtre par opérations et exclut les cotisations', function () {
+    $op = Operation::factory()->create();
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Transport']);
+
+    $depense = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $depense->lignes()->forceDelete();
 
-    DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
-        'sous_categorie_id' => $scDepense->id,
-        'operation_id' => $operation->id,
-        'seance' => 1,
-        'montant' => 100.00,
-    ]);
-    DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
-        'sous_categorie_id' => $scDepense->id,
-        'operation_id' => $operation->id,
-        'seance' => 2,
-        'montant' => 150.00,
-    ]);
+    DepenseLigne::factory()->create(['depense_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 100.00]);
+    DepenseLigne::factory()->create(['depense_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => null, 'montant' => 200.00]);
 
-    $recette = Recette::factory()->create([
-        'date' => '2025-10-01',
-        'saisi_par' => $this->user->id,
-    ]);
-    $recette->lignes()->forceDelete();
-    RecetteLigne::factory()->create([
-        'recette_id' => $recette->id,
-        'sous_categorie_id' => $scRecette->id,
-        'operation_id' => $operation->id,
-        'seance' => 1,
-        'montant' => 300.00,
-    ]);
+    // Cotisation (doit être exclue)
+    $scCot = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions']);
+    $tiers = Tiers::factory()->create();
+    Cotisation::factory()->create(['sous_categorie_id' => $scCot->id, 'exercice' => 2025, 'montant' => 500.00, 'tiers_id' => $tiers->id]);
 
-    $result = $this->service->rapportSeances($operation->id);
+    $result = $this->service->compteDeResultatOperations(2025, [$op->id]);
 
-    expect($result)->toHaveCount(2);
-
-    $depenseRow = collect($result)->firstWhere('type', 'depense');
-    expect($depenseRow['sous_categorie'])->toBe('Location salle');
-    expect($depenseRow['seances'][1])->toBe(100.0);
-    expect($depenseRow['seances'][2])->toBe(150.0);
-    expect($depenseRow['total'])->toBe(250.0);
-
-    $recetteRow = collect($result)->firstWhere('type', 'recette');
-    expect($recetteRow['sous_categorie'])->toBe('Inscriptions');
-    expect($recetteRow['seances'][1])->toBe(300.0);
-    expect($recetteRow['total'])->toBe(300.0);
+    expect($result['charges'][0]['montant'])->toBe(100.0);
+    expect($result['produits'])->toHaveCount(0); // pas de recettes ni dons pour cette op
 });
 
-it('generates valid CSV output', function () {
-    $rows = [
-        ['A', 'B', '100,00'],
-        ['C', 'D', '200,00'],
-    ];
+it('compteDeResultatOperations retourne structure sans montant_n1 ni budget', function () {
+    $op = Operation::factory()->create();
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Salle']);
+    BudgetLine::factory()->create(['sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 999.00]);
 
-    $csv = $this->service->toCsv($rows, ['Col1', 'Col2', 'Montant']);
+    $depense = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $depense->lignes()->forceDelete();
+    DepenseLigne::factory()->create(['depense_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 100.00]);
 
-    expect($csv)->toContain('Col1;Col2;Montant');
-    expect($csv)->toContain('A;B;');
-    expect($csv)->toContain('C;D;');
+    $result = $this->service->compteDeResultatOperations(2025, [$op->id]);
+
+    $sc0 = $result['charges'][0]['sous_categories'][0];
+    expect($sc0)->not->toHaveKey('montant_n1');
+    expect($sc0)->not->toHaveKey('budget');
+    expect($sc0['montant'])->toBe(100.0);
+});
+
+// ── rapportSeances ────────────────────────────────────────────────────────────
+
+it('rapportSeances retourne hiérarchie catégorie/sous-catégorie avec colonnes séances', function () {
+    $op = Operation::factory()->withSeances(2)->create();
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Location']);
+
+    $depense = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $depense->lignes()->forceDelete();
+    DepenseLigne::factory()->create(['depense_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
+    DepenseLigne::factory()->create(['depense_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 2, 'montant' => 150.00]);
+
+    $result = $this->service->rapportSeances(2025, [$op->id]);
+
+    expect($result['seances'])->toBe([1, 2]);
+    expect($result['charges'])->toHaveCount(1);
+    $cat = $result['charges'][0];
+    expect($cat['label'])->toBe('Achats');
+    expect($cat['total'])->toBe(250.0);
+    $sc0 = $cat['sous_categories'][0];
+    expect($sc0['seances'][1])->toBe(100.0);
+    expect($sc0['seances'][2])->toBe(150.0);
+    expect($sc0['total'])->toBe(250.0);
+});
+
+it('rapportSeances agrège plusieurs opérations par numéro de séance', function () {
+    $op1 = Operation::factory()->withSeances(2)->create();
+    $op2 = Operation::factory()->withSeances(2)->create();
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Salle']);
+
+    foreach ([$op1, $op2] as $op) {
+        $d = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+        $d->lignes()->forceDelete();
+        DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
+    }
+
+    $result = $this->service->rapportSeances(2025, [$op1->id, $op2->id]);
+
+    expect($result['charges'][0]['sous_categories'][0]['seances'][1])->toBe(200.0);
+});
+
+it('rapportSeances exclut lignes sans seance', function () {
+    $op = Operation::factory()->withSeances(1)->create();
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Divers']);
+
+    $depense = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $depense->lignes()->forceDelete();
+    DepenseLigne::factory()->create(['depense_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => null, 'montant' => 500.00]);
+
+    $result = $this->service->rapportSeances(2025, [$op->id]);
+
+    expect($result['charges'])->toHaveCount(0);
+});
+
+// ── toCsv ─────────────────────────────────────────────────────────────────────
+
+it('génère un CSV valide avec séparateur point-virgule', function () {
+    $csv = $this->service->toCsv([['Charge', 'Cat', 'Sous-cat', '100,00']], ['Type', 'Catégorie', 'Sous-catégorie', 'Montant']);
+    expect($csv)->toContain('Type;Catégorie;Sous-catégorie;Montant');
+    expect($csv)->toContain('Charge;Cat;Sous-cat;');
 });
