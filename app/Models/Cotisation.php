@@ -17,6 +17,7 @@ final class Cotisation extends Model
 
     protected $fillable = [
         'tiers_id',
+        'sous_categorie_id',
         'exercice',
         'montant',
         'date_paiement',
@@ -37,6 +38,7 @@ final class Cotisation extends Model
             'compte_id' => 'integer',
             'exercice' => 'integer',
             'tiers_id' => 'integer',
+            'sous_categorie_id' => 'integer',
             'rapprochement_id' => 'integer',
         ];
     }
@@ -44,6 +46,11 @@ final class Cotisation extends Model
     public function tiers(): BelongsTo
     {
         return $this->belongsTo(Tiers::class);
+    }
+
+    public function sousCategorie(): BelongsTo
+    {
+        return $this->belongsTo(SousCategorie::class);
     }
 
     public function compte(): BelongsTo

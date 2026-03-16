@@ -19,12 +19,16 @@ final class SousCategorie extends Model
         'categorie_id',
         'nom',
         'code_cerfa',
+        'pour_dons',
+        'pour_cotisations',
     ];
 
     protected function casts(): array
     {
         return [
-            'categorie_id' => 'integer',
+            'categorie_id'     => 'integer',
+            'pour_dons'        => 'boolean',
+            'pour_cotisations' => 'boolean',
         ];
     }
 
