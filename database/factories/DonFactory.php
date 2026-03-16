@@ -7,6 +7,7 @@ namespace Database\Factories;
 use App\Enums\ModePaiement;
 use App\Models\CompteBancaire;
 use App\Models\Don;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -22,6 +23,7 @@ class DonFactory extends Factory
     {
         return [
             'tiers_id' => Tiers::factory()->pourRecettes(),
+            'sous_categorie_id' => SousCategorie::factory()->pourDons(),
             'date' => fake()->dateTimeBetween('-1 year', 'now'),
             'montant' => fake()->randomFloat(2, 10, 5000),
             'mode_paiement' => fake()->randomElement(ModePaiement::cases()),

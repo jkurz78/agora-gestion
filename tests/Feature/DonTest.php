@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\CompteBancaire;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\DonService;
@@ -11,12 +12,15 @@ it('create assigne un numero_piece non null', function () {
     $compte = CompteBancaire::factory()->create();
     $tiers = Tiers::factory()->pourRecettes()->create();
 
+    $sousCategorie = SousCategorie::factory()->pourDons()->create();
+
     $don = app(DonService::class)->create([
         'date' => '2025-10-01',
         'montant' => 50,
         'mode_paiement' => 'especes',
         'compte_id' => $compte->id,
         'tiers_id' => $tiers->id,
+        'sous_categorie_id' => $sousCategorie->id,
     ]);
 
     expect($don->numero_piece)->not->toBeNull();
