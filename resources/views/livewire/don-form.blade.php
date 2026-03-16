@@ -18,6 +18,19 @@
             <div class="card-body">
                 <form wire:submit="save">
                     <div class="row g-3 mb-3">
+                        <div class="col-md-3">
+                            <label for="sous_categorie_id" class="form-label">Nature du don <span class="text-danger">*</span></label>
+                            <select wire:model="sous_categorie_id" id="sous_categorie_id"
+                                    class="form-select @error('sous_categorie_id') is-invalid @enderror">
+                                <option value="">-- Choisir --</option>
+                                @foreach ($naturesdon as $sc)
+                                    <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
+                                @endforeach
+                            </select>
+                            @error('sous_categorie_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
                         <div class="col-md-2">
                             <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
                             <input type="date" wire:model="date" id="date"

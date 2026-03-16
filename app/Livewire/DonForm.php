@@ -27,6 +27,8 @@ final class DonForm extends Component
 
     public ?int $tiers_id = null;
 
+    public ?int $sous_categorie_id = null;
+
     public ?int $operation_id = null;
 
     public ?int $seance = null;
@@ -46,6 +48,7 @@ final class DonForm extends Component
         $this->mode_paiement = $don->mode_paiement->value;
         $this->objet = $don->objet;
         $this->tiers_id = $don->tiers_id;
+        $this->sous_categorie_id = $don->sous_categorie_id;
         $this->operation_id = $don->operation_id;
         $this->seance = $don->seance;
         $this->compte_id = $don->compte_id;
@@ -57,7 +60,7 @@ final class DonForm extends Component
     {
         $this->reset([
             'donId', 'date', 'montant', 'mode_paiement', 'objet',
-            'tiers_id', 'operation_id', 'seance', 'compte_id', 'showForm',
+            'tiers_id', 'sous_categorie_id', 'operation_id', 'seance', 'compte_id', 'showForm',
         ]);
         $this->resetValidation();
     }
@@ -66,6 +69,7 @@ final class DonForm extends Component
     {
         $this->resetForm();
         $this->date = app(ExerciceService::class)->defaultDate();
+        $this->sous_categorie_id = Don::where('saisi_par', auth()->id())->latest()->value('sous_categorie_id');
         $this->showForm = true;
     }
 
@@ -81,6 +85,7 @@ final class DonForm extends Component
             'montant' => ['required', 'numeric', 'min:0.01'],
             'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
             'objet' => ['nullable', 'string', 'max:255'],
+            'sous_categorie_id' => ['required', 'exists:sous_categories,id'],
             'tiers_id' => ['nullable', 'exists:tiers,id'],
             'operation_id' => ['nullable'],
             'seance' => ['nullable', 'integer', 'min:1'],
@@ -107,6 +112,7 @@ final class DonForm extends Component
             'montant' => $this->montant,
             'mode_paiement' => $this->mode_paiement,
             'objet' => $this->objet ?: null,
+            'sous_categorie_id' => $this->sous_categorie_id,
             'tiers_id' => $this->tiers_id,
             'operation_id' => $this->operation_id,
             'seance' => $this->seance,
@@ -129,8 +135,9 @@ final class DonForm extends Component
     public function render()
     {
         return view('livewire.don-form', [
-            'operations' => Operation::orderBy('nom')->get(),
-            'comptes' => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
+            'naturesdon'   => \App\Models\SousCategorie::where('pour_dons', true)->orderBy('nom')->get(),
+            'operations'   => Operation::orderBy('nom')->get(),
+            'comptes'      => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
         ]);
     }
