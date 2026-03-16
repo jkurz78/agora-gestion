@@ -69,32 +69,99 @@
                 <th>Catégorie</th>
                 <th>Nom</th>
                 <th>Code CERFA</th>
-                <th style="width: 180px;">Actions</th>
+                <th class="text-center">Dons</th>
+                <th class="text-center">Cotisations</th>
+                <th style="width: 120px;">Actions</th>
             </tr>
         </thead>
         <tbody>
-            @php
-                $sousCategories = $categories->flatMap->sousCategories->sortBy('nom');
-            @endphp
             @forelse ($sousCategories as $sc)
                 <tr data-type="{{ $sc->categorie->type->value }}" data-categorie="{{ $sc->categorie_id }}">
-                    <td>{{ $sc->categorie->nom }}</td>
-                    <td>{{ $sc->nom }}</td>
-                    <td>{{ $sc->code_cerfa ?? '—' }}</td>
-                    <td>
-                        <form action="{{ route('parametres.sous-categories.destroy', $sc) }}" method="POST" class="d-inline"
-                              onsubmit="return confirm('Supprimer cette sous-catégorie ?')">
+                    @if (request('edit') == $sc->id)
+                        {{-- Inline edit row --}}
+                        <form action="{{ route('parametres.sous-categories.update', $sc) }}" method="POST"
+                              id="edit-form-{{ $sc->id }}">
                             @csrf
-                            @method('DELETE')
-                            <button type="submit" class="btn btn-sm btn-outline-danger">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                            @method('PUT')
                         </form>
-                    </td>
+                        <td>
+                            <select name="categorie_id" form="edit-form-{{ $sc->id }}"
+                                    class="form-select form-select-sm">
+                                @foreach ($categories as $cat)
+                                    <option value="{{ $cat->id }}" @selected($cat->id === $sc->categorie_id)>
+                                        {{ $cat->nom }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </td>
+                        <td>
+                            <input type="text" name="nom" form="edit-form-{{ $sc->id }}"
+                                   value="{{ old('nom', $sc->nom) }}" class="form-control form-control-sm" required maxlength="100">
+                        </td>
+                        <td>
+                            <input type="text" name="code_cerfa" form="edit-form-{{ $sc->id }}"
+                                   value="{{ old('code_cerfa', $sc->code_cerfa) }}" class="form-control form-control-sm" maxlength="10">
+                        </td>
+                        <td colspan="2"></td>
+                        <td>
+                            <button type="submit" form="edit-form-{{ $sc->id }}" class="btn btn-sm btn-success"
+                                    style="padding:.15rem .4rem;font-size:.75rem">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                            <a href="{{ route('parametres.sous-categories.index') }}" class="btn btn-sm btn-outline-secondary"
+                               style="padding:.15rem .4rem;font-size:.75rem">
+                                <i class="bi bi-x-lg"></i>
+                            </a>
+                        </td>
+                    @else
+                        <td>{{ $sc->categorie->nom }}</td>
+                        <td>{{ $sc->nom }}</td>
+                        <td>{{ $sc->code_cerfa ?? '—' }}</td>
+                        <td class="text-center">
+                            <form action="{{ route('parametres.sous-categories.toggle-flag', $sc) }}" method="POST" class="d-inline">
+                                @csrf
+                                <input type="hidden" name="flag" value="pour_dons">
+                                <button type="submit"
+                                        class="btn btn-sm {{ $sc->pour_dons ? 'btn-success' : 'btn-outline-secondary' }}"
+                                        style="padding:.15rem .4rem;font-size:.7rem"
+                                        title="{{ $sc->pour_dons ? 'Désactiver pour les dons' : 'Activer pour les dons' }}">
+                                    {{ $sc->pour_dons ? '✓' : '–' }}
+                                </button>
+                            </form>
+                        </td>
+                        <td class="text-center">
+                            <form action="{{ route('parametres.sous-categories.toggle-flag', $sc) }}" method="POST" class="d-inline">
+                                @csrf
+                                <input type="hidden" name="flag" value="pour_cotisations">
+                                <button type="submit"
+                                        class="btn btn-sm {{ $sc->pour_cotisations ? 'btn-success' : 'btn-outline-secondary' }}"
+                                        style="padding:.15rem .4rem;font-size:.7rem"
+                                        title="{{ $sc->pour_cotisations ? 'Désactiver pour les cotisations' : 'Activer pour les cotisations' }}">
+                                    {{ $sc->pour_cotisations ? '✓' : '–' }}
+                                </button>
+                            </form>
+                        </td>
+                        <td>
+                            <a href="{{ route('parametres.sous-categories.index') }}?edit={{ $sc->id }}"
+                               class="btn btn-sm btn-outline-primary"
+                               style="padding:.15rem .35rem;font-size:.75rem" title="Modifier">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form action="{{ route('parametres.sous-categories.destroy', $sc) }}" method="POST" class="d-inline"
+                                  onsubmit="return confirm('Supprimer cette sous-catégorie ?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        style="padding:.15rem .35rem;font-size:.75rem">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    @endif
                 </tr>
             @empty
                 <tr>
-                    <td colspan="4" class="text-muted">Aucune sous-catégorie enregistrée.</td>
+                    <td colspan="6" class="text-muted">Aucune sous-catégorie enregistrée.</td>
                 </tr>
             @endforelse
         </tbody>
@@ -115,5 +182,6 @@
     });
     var scCatFilter = document.getElementById('scCatFilter');
     if (scCatFilter) { scCatFilter.addEventListener('change', filterSousCategories); }
-    </script>
+
+</script>
 </x-app-layout>

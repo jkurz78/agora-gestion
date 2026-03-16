@@ -19,9 +19,11 @@ final class UpdateSousCategorieRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'categorie_id' => ['required', 'exists:categories,id'],
-            'nom' => ['required', 'string', 'max:100'],
-            'code_cerfa' => ['nullable', 'string', 'max:10'],
+            'categorie_id'     => ['required', 'exists:categories,id'],
+            'nom'              => ['required', 'string', 'max:100'],
+            'code_cerfa'       => ['nullable', 'string', 'max:10'],
+            'pour_dons'        => ['sometimes', 'boolean'],
+            'pour_cotisations' => ['sometimes', 'boolean'],
         ];
     }
 }
