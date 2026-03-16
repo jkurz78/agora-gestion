@@ -29,7 +29,7 @@
     @php
         // Helper : barre + % pour une ligne
         $renderBar = function(?float $montantN, ?float $budget): string {
-            if ($budget === null || $budget <= 0) return '<span class="text-muted">—</span>';
+            if ($budget === null || $budget <= 0 || $montantN === null) return '<span class="text-muted">—</span>';
             $pct     = $montantN / $budget * 100;
             $pctCap  = min($pct, 100);
             $color   = $pct > 100 ? '#dc3545' : ($pct > 90 ? '#fd7e14' : '#198754');
@@ -37,7 +37,7 @@
                  . '<div class="budget-label">' . number_format($pct, 0) . ' %</div>';
         };
         $renderEcart = function(?float $montantN, ?float $budget, bool $isCharge): string {
-            if ($budget === null) return '<span class="text-muted">—</span>';
+            if ($budget === null || $montantN === null) return '<span class="text-muted">—</span>';
             $ecart = $montantN - $budget;
             if ($ecart == 0) return '<span class="cr-zero">0,00 €</span>';
             $isNeg = ($isCharge && $ecart < 0) || (!$isCharge && $ecart > 0);

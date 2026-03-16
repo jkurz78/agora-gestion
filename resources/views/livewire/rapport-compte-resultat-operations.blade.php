@@ -30,7 +30,7 @@
                         <tr style="background:#3d5473;color:#fff;">
                             <td style="width:20px;"></td>
                             <td></td>
-                            <td class="text-end fw-400" style="width:130px;font-size:12px;opacity:.85;">Montant</td>
+                            <td class="text-end" style="width:130px;font-size:12px;opacity:.85;">Montant</td>
                         </tr>
                         <tr style="background:#3d5473;color:#fff;font-weight:700;font-size:14px;">
                             <td colspan="3" style="padding:4px 12px 10px;">{{ $section['label'] }}</td>
