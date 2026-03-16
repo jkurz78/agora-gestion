@@ -8,219 +8,88 @@ use App\Models\Cotisation;
 use App\Models\DepenseLigne;
 use App\Models\Don;
 use App\Models\RecetteLigne;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class RapportService
 {
+    // ── Public API ────────────────────────────────────────────────────────────
+
     /**
-     * Compte de résultat: charges and produits aggregated by code_cerfa.
+     * Compte de résultat complet : hiérarchie catégorie/sous-catégorie avec N-1 et budget.
+     * Pas de filtre opération.
      *
-     * @return array{charges: list<array{code_cerfa: string|null, label: string, montant: float}>, produits: list<array{code_cerfa: string|null, label: string, montant: float}>}
+     * @return array{charges: list<array>, produits: list<array>}
      */
-    public function compteDeResultat(int $exercice, ?array $operationIds = null): array
+    public function compteDeResultat(int $exercice): array
     {
-        $startDate = "{$exercice}-09-01";
-        $endDate = ($exercice + 1).'-08-31';
+        [$startN, $endN] = $this->exerciceDates($exercice);
+        [$startN1, $endN1] = $this->exerciceDates($exercice - 1);
 
-        // Charges (from depense_lignes)
-        $chargesQuery = DepenseLigne::query()
-            ->join('sous_categories', 'depense_lignes.sous_categorie_id', '=', 'sous_categories.id')
-            ->join('depenses', 'depense_lignes.depense_id', '=', 'depenses.id')
-            ->whereNull('depense_lignes.deleted_at')
-            ->whereNull('depenses.deleted_at')
-            ->whereBetween('depenses.date', [$startDate, $endDate]);
+        $chargesN = $this->fetchDepenseRows($startN, $endN);
+        $chargesN1 = $this->fetchDepenseRows($startN1, $endN1);
 
-        if ($operationIds) {
-            $chargesQuery->whereIn('depense_lignes.operation_id', $operationIds);
-        }
+        $produitsN = $this->fetchProduitsRows($startN, $endN, $exercice);
+        $produitsN1 = $this->fetchProduitsRows($startN1, $endN1, $exercice - 1);
 
-        $charges = $chargesQuery
-            ->select(
-                'sous_categories.code_cerfa',
-                'sous_categories.nom as label',
-                DB::raw('SUM(depense_lignes.montant) as montant')
-            )
-            ->groupBy('sous_categories.id', 'sous_categories.code_cerfa', 'sous_categories.nom')
-            ->orderBy('sous_categories.code_cerfa')
-            ->orderBy('sous_categories.nom')
-            ->get()
-            ->map(fn ($row) => [
-                'code_cerfa' => $row->code_cerfa,
-                'label' => $row->label,
-                'montant' => (float) $row->montant,
-            ])
-            ->toArray();
+        $budgetMap = $this->fetchBudgetMap($exercice);
 
-        // Produits (from recette_lignes)
-        $produitsQuery = RecetteLigne::query()
-            ->join('sous_categories', 'recette_lignes.sous_categorie_id', '=', 'sous_categories.id')
-            ->join('recettes', 'recette_lignes.recette_id', '=', 'recettes.id')
-            ->whereNull('recette_lignes.deleted_at')
-            ->whereNull('recettes.deleted_at')
-            ->whereBetween('recettes.date', [$startDate, $endDate]);
-
-        if ($operationIds) {
-            $produitsQuery->whereIn('recette_lignes.operation_id', $operationIds);
-        }
-
-        // Index produits by sous_categorie id for merging
-        $produitsMap = [];
-        $produitsQuery
-            ->select(
-                'sous_categories.id as sc_id',
-                'sous_categories.code_cerfa',
-                'sous_categories.nom as label',
-                DB::raw('SUM(recette_lignes.montant) as montant')
-            )
-            ->groupBy('sous_categories.id', 'sous_categories.code_cerfa', 'sous_categories.nom')
-            ->get()
-            ->each(function ($row) use (&$produitsMap): void {
-                $produitsMap[$row->sc_id] = [
-                    'code_cerfa' => $row->code_cerfa,
-                    'label' => $row->label,
-                    'montant' => (float) $row->montant,
-                ];
-            });
-
-        // Dons (have operation_id — apply filter if provided)
-        $donsQuery = Don::query()
-            ->join('sous_categories', 'dons.sous_categorie_id', '=', 'sous_categories.id')
-            ->whereNull('dons.deleted_at')
-            ->whereBetween('dons.date', [$startDate, $endDate]);
-
-        if ($operationIds) {
-            $donsQuery->whereIn('dons.operation_id', $operationIds);
-        }
-
-        $donsQuery
-            ->select(
-                'sous_categories.id as sc_id',
-                'sous_categories.code_cerfa',
-                'sous_categories.nom as label',
-                DB::raw('SUM(dons.montant) as montant')
-            )
-            ->groupBy('sous_categories.id', 'sous_categories.code_cerfa', 'sous_categories.nom')
-            ->get()
-            ->each(function ($row) use (&$produitsMap): void {
-                if (isset($produitsMap[$row->sc_id])) {
-                    $produitsMap[$row->sc_id]['montant'] += (float) $row->montant;
-                } else {
-                    $produitsMap[$row->sc_id] = [
-                        'code_cerfa' => $row->code_cerfa,
-                        'label' => $row->label,
-                        'montant' => (float) $row->montant,
-                    ];
-                }
-            });
-
-        // Cotisations (no operation_id — never filtered by operation)
-        Cotisation::query()
-            ->join('sous_categories', 'cotisations.sous_categorie_id', '=', 'sous_categories.id')
-            ->whereNull('cotisations.deleted_at')
-            ->where('cotisations.exercice', $exercice)
-            ->select(
-                'sous_categories.id as sc_id',
-                'sous_categories.code_cerfa',
-                'sous_categories.nom as label',
-                DB::raw('SUM(cotisations.montant) as montant')
-            )
-            ->groupBy('sous_categories.id', 'sous_categories.code_cerfa', 'sous_categories.nom')
-            ->get()
-            ->each(function ($row) use (&$produitsMap): void {
-                if (isset($produitsMap[$row->sc_id])) {
-                    $produitsMap[$row->sc_id]['montant'] += (float) $row->montant;
-                } else {
-                    $produitsMap[$row->sc_id] = [
-                        'code_cerfa' => $row->code_cerfa,
-                        'label' => $row->label,
-                        'montant' => (float) $row->montant,
-                    ];
-                }
-            });
-
-        // Sort by code_cerfa then label
-        usort($produitsMap, function (array $a, array $b): int {
-            $cmpCode = strcmp((string) ($a['code_cerfa'] ?? ''), (string) ($b['code_cerfa'] ?? ''));
-
-            return $cmpCode !== 0 ? $cmpCode : strcmp($a['label'], $b['label']);
-        });
-
-        $produits = array_values($produitsMap);
-
-        return ['charges' => $charges, 'produits' => $produits];
+        return [
+            'charges' => $this->buildHierarchyFull($chargesN, $chargesN1, $budgetMap),
+            'produits' => $this->buildHierarchyFull($produitsN, $produitsN1, $budgetMap),
+        ];
     }
 
     /**
-     * Rapport par séances for a given operation.
+     * Compte de résultat filtré par opérations. Pas de N-1 ni budget. Cotisations exclues.
      *
-     * @return list<array{sous_categorie: string, type: string, seances: array<int, float>, total: float}>
+     * @param  array<int>  $operationIds
+     * @return array{charges: list<array>, produits: list<array>}
      */
-    public function rapportSeances(int $operationId): array
+    public function compteDeResultatOperations(int $exercice, array $operationIds): array
     {
-        $rows = [];
+        [$start, $end] = $this->exerciceDates($exercice);
 
-        // Depense lignes with séances
-        $depenseLignes = DepenseLigne::query()
-            ->join('sous_categories', 'depense_lignes.sous_categorie_id', '=', 'sous_categories.id')
-            ->whereNull('depense_lignes.deleted_at')
-            ->where('depense_lignes.operation_id', $operationId)
-            ->whereNotNull('depense_lignes.seance')
-            ->select(
-                'sous_categories.nom as sous_categorie',
-                'depense_lignes.seance',
-                DB::raw('SUM(depense_lignes.montant) as montant')
-            )
-            ->groupBy('sous_categories.id', 'sous_categories.nom', 'depense_lignes.seance')
-            ->get();
+        $charges = $this->fetchDepenseRows($start, $end, $operationIds);
+        $produits = $this->fetchProduitsRows($start, $end, $exercice, $operationIds);
 
-        $grouped = [];
-        foreach ($depenseLignes as $line) {
-            $key = 'depense|'.$line->sous_categorie;
-            if (! isset($grouped[$key])) {
-                $grouped[$key] = [
-                    'sous_categorie' => $line->sous_categorie,
-                    'type' => 'depense',
-                    'seances' => [],
-                    'total' => 0.0,
-                ];
-            }
-            $grouped[$key]['seances'][(int) $line->seance] = (float) $line->montant;
-            $grouped[$key]['total'] += (float) $line->montant;
-        }
-
-        // Recette lignes with séances
-        $recetteLignes = RecetteLigne::query()
-            ->join('sous_categories', 'recette_lignes.sous_categorie_id', '=', 'sous_categories.id')
-            ->whereNull('recette_lignes.deleted_at')
-            ->where('recette_lignes.operation_id', $operationId)
-            ->whereNotNull('recette_lignes.seance')
-            ->select(
-                'sous_categories.nom as sous_categorie',
-                'recette_lignes.seance',
-                DB::raw('SUM(recette_lignes.montant) as montant')
-            )
-            ->groupBy('sous_categories.id', 'sous_categories.nom', 'recette_lignes.seance')
-            ->get();
-
-        foreach ($recetteLignes as $line) {
-            $key = 'recette|'.$line->sous_categorie;
-            if (! isset($grouped[$key])) {
-                $grouped[$key] = [
-                    'sous_categorie' => $line->sous_categorie,
-                    'type' => 'recette',
-                    'seances' => [],
-                    'total' => 0.0,
-                ];
-            }
-            $grouped[$key]['seances'][(int) $line->seance] = (float) $line->montant;
-            $grouped[$key]['total'] += (float) $line->montant;
-        }
-
-        return array_values($grouped);
+        return [
+            'charges' => $this->buildHierarchySimple($charges),
+            'produits' => $this->buildHierarchySimple($produits),
+        ];
     }
 
     /**
-     * Generate CSV string with semicolon separator (French convention).
+     * Rapport par séances : hiérarchie catégorie/sous-catégorie avec une colonne par séance.
+     *
+     * @param  array<int>  $operationIds
+     * @return array{seances: list<int>, charges: list<array>, produits: list<array>}
+     */
+    public function rapportSeances(int $exercice, array $operationIds): array
+    {
+        [$start, $end] = $this->exerciceDates($exercice);
+
+        $chargeRows = $this->fetchDepenseSeancesRows($start, $end, $operationIds);
+        $produitsRows = $this->fetchProduitsSeancesRows($start, $end, $operationIds);
+
+        $allSeances = collect($chargeRows)
+            ->merge($produitsRows)
+            ->pluck('seance')
+            ->unique()
+            ->sort()
+            ->values()
+            ->map(fn ($s) => (int) $s)
+            ->all();
+
+        return [
+            'seances' => $allSeances,
+            'charges' => $this->buildHierarchySeances($chargeRows, $allSeances),
+            'produits' => $this->buildHierarchySeances($produitsRows, $allSeances),
+        ];
+    }
+
+    /**
+     * Génère un CSV avec séparateur point-virgule (convention française).
      *
      * @param  list<array<string, mixed>>  $rows
      * @param  list<string>  $headers
@@ -229,15 +98,432 @@ final class RapportService
     {
         $output = fopen('php://temp', 'r+');
         fputcsv($output, $headers, ';');
-
         foreach ($rows as $row) {
             fputcsv($output, $row, ';');
         }
-
         rewind($output);
         $csv = stream_get_contents($output);
         fclose($output);
 
         return $csv;
+    }
+
+    // ── Private helpers — requêtes SQL ────────────────────────────────────────
+
+    /** @return array{string, string} */
+    private function exerciceDates(int $exercice): array
+    {
+        return ["{$exercice}-09-01", ($exercice + 1).'-08-31'];
+    }
+
+    /**
+     * Agrégation des dépenses par (catégorie, sous-catégorie).
+     *
+     * @param  array<int>|null  $operationIds  null = pas de filtre
+     * @return Collection<int, object>
+     */
+    private function fetchDepenseRows(string $start, string $end, ?array $operationIds = null): Collection
+    {
+        $q = DepenseLigne::query()
+            ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
+            ->whereNull('depense_lignes.deleted_at')
+            ->whereNull('d.deleted_at')
+            ->whereBetween('d.date', [$start, $end])
+            ->select([
+                'c.id as categorie_id',
+                'c.nom as categorie_nom',
+                'sc.id as sous_categorie_id',
+                'sc.nom as sous_categorie_nom',
+                DB::raw('SUM(depense_lignes.montant) as montant'),
+            ])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+
+        if ($operationIds !== null) {
+            $q->whereIn('depense_lignes.operation_id', $operationIds);
+        }
+
+        return $q->get();
+    }
+
+    /**
+     * Agrégation des produits (recettes + dons + cotisations si pas de filtre opération).
+     *
+     * @param  array<int>|null  $operationIds  null = pas de filtre, cotisations incluses
+     * @return Collection<int, object>
+     */
+    private function fetchProduitsRows(string $start, string $end, int $exercice, ?array $operationIds = null): Collection
+    {
+        // Map intermédiaire keyed by sous_categorie_id
+        /** @var array<int, array{categorie_id: int, categorie_nom: string, sous_categorie_id: int, sous_categorie_nom: string, montant: float}> */
+        $map = [];
+
+        $accumuler = function (Collection $rows) use (&$map): void {
+            foreach ($rows as $row) {
+                $scId = (int) $row->sous_categorie_id;
+                if (isset($map[$scId])) {
+                    $map[$scId]['montant'] += (float) $row->montant;
+                } else {
+                    $map[$scId] = [
+                        'categorie_id' => (int) $row->categorie_id,
+                        'categorie_nom' => $row->categorie_nom,
+                        'sous_categorie_id' => $scId,
+                        'sous_categorie_nom' => $row->sous_categorie_nom,
+                        'montant' => (float) $row->montant,
+                    ];
+                }
+            }
+        };
+
+        // Recettes
+        $rq = RecetteLigne::query()
+            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
+            ->whereNull('recette_lignes.deleted_at')
+            ->whereNull('r.deleted_at')
+            ->whereBetween('r.date', [$start, $end])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(recette_lignes.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+        if ($operationIds !== null) {
+            $rq->whereIn('recette_lignes.operation_id', $operationIds);
+        }
+        $accumuler($rq->get());
+
+        // Dons (sous_categorie_id nullable → INNER JOIN exclut ceux sans sous-catégorie)
+        $dq = Don::query()
+            ->join('sous_categories as sc', 'dons.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->whereNull('dons.deleted_at')
+            ->whereBetween('dons.date', [$start, $end])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(dons.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+        if ($operationIds !== null) {
+            $dq->whereIn('dons.operation_id', $operationIds);
+        }
+        $accumuler($dq->get());
+
+        // Cotisations — uniquement sans filtre opération (elles n'ont pas d'operation_id)
+        if ($operationIds === null) {
+            $cq = Cotisation::query()
+                ->join('sous_categories as sc', 'cotisations.sous_categorie_id', '=', 'sc.id')
+                ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+                ->whereNull('cotisations.deleted_at')
+                ->where('cotisations.exercice', $exercice)
+                ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(cotisations.montant) as montant')])
+                ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+            $accumuler($cq->get());
+        }
+
+        return collect(array_values($map))->map(fn ($row) => (object) $row);
+    }
+
+    /**
+     * Agrégation des dépenses par (catégorie, sous-catégorie, séance).
+     *
+     * @param  array<int>  $operationIds
+     * @return Collection<int, object>
+     */
+    private function fetchDepenseSeancesRows(string $start, string $end, array $operationIds): Collection
+    {
+        return DepenseLigne::query()
+            ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
+            ->whereNull('depense_lignes.deleted_at')
+            ->whereNull('d.deleted_at')
+            ->whereBetween('d.date', [$start, $end])
+            ->whereNotNull('depense_lignes.seance')
+            ->whereIn('depense_lignes.operation_id', $operationIds)
+            ->select([
+                'c.id as categorie_id', 'c.nom as categorie_nom',
+                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
+                'depense_lignes.seance',
+                DB::raw('SUM(depense_lignes.montant) as montant'),
+            ])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'depense_lignes.seance')
+            ->get();
+    }
+
+    /**
+     * Agrégation des produits par séance (recettes + dons ; cotisations exclues).
+     *
+     * @param  array<int>  $operationIds
+     * @return Collection<int, object>
+     */
+    private function fetchProduitsSeancesRows(string $start, string $end, array $operationIds): Collection
+    {
+        /** @var array<string, array{categorie_id: int, categorie_nom: string, sous_categorie_id: int, sous_categorie_nom: string, seance: int, montant: float}> */
+        $map = [];
+
+        $accumuler = function (Collection $rows) use (&$map): void {
+            foreach ($rows as $row) {
+                $key = $row->sous_categorie_id.'_'.$row->seance;
+                if (isset($map[$key])) {
+                    $map[$key]['montant'] += (float) $row->montant;
+                } else {
+                    $map[$key] = [
+                        'categorie_id' => (int) $row->categorie_id,
+                        'categorie_nom' => $row->categorie_nom,
+                        'sous_categorie_id' => (int) $row->sous_categorie_id,
+                        'sous_categorie_nom' => $row->sous_categorie_nom,
+                        'seance' => (int) $row->seance,
+                        'montant' => (float) $row->montant,
+                    ];
+                }
+            }
+        };
+
+        // Recettes par séance
+        $accumuler(RecetteLigne::query()
+            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
+            ->whereNull('recette_lignes.deleted_at')
+            ->whereNull('r.deleted_at')
+            ->whereBetween('r.date', [$start, $end])
+            ->whereNotNull('recette_lignes.seance')
+            ->whereIn('recette_lignes.operation_id', $operationIds)
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'recette_lignes.seance', DB::raw('SUM(recette_lignes.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'recette_lignes.seance')
+            ->get());
+
+        // Dons par séance
+        $accumuler(Don::query()
+            ->join('sous_categories as sc', 'dons.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->whereNull('dons.deleted_at')
+            ->whereBetween('dons.date', [$start, $end])
+            ->whereNotNull('dons.seance')
+            ->whereIn('dons.operation_id', $operationIds)
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'dons.seance', DB::raw('SUM(dons.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'dons.seance')
+            ->get());
+
+        return collect(array_values($map))->map(fn ($row) => (object) $row);
+    }
+
+    /**
+     * Budget alloué par sous-catégorie pour un exercice.
+     *
+     * @return array<int, float> [sous_categorie_id => montant_prevu]
+     */
+    private function fetchBudgetMap(int $exercice): array
+    {
+        return DB::table('budget_lines')
+            ->where('exercice', $exercice)
+            ->select('sous_categorie_id', DB::raw('SUM(montant_prevu) as budget'))
+            ->groupBy('sous_categorie_id')
+            ->get()
+            ->keyBy('sous_categorie_id')
+            ->map(fn ($row) => (float) $row->budget)
+            ->all();
+    }
+
+    // ── Private helpers — construction de la hiérarchie ───────────────────────
+
+    /**
+     * Construit la hiérarchie complète avec montant_n, montant_n1, budget (onglet 1).
+     *
+     * @param  Collection<int, object>  $flatN  Rows exercice N
+     * @param  Collection<int, object>  $flatN1  Rows exercice N-1
+     * @param  array<int, float>  $budgetMap
+     * @return list<array>
+     */
+    private function buildHierarchyFull(Collection $flatN, Collection $flatN1, array $budgetMap): array
+    {
+        // Map intermédiaire keyed by sous_categorie_id
+        /** @var array<int, array> */
+        $map = [];
+
+        foreach ($flatN as $row) {
+            $scId = (int) $row->sous_categorie_id;
+            $map[$scId] = [
+                'categorie_id' => (int) $row->categorie_id,
+                'categorie_nom' => $row->categorie_nom,
+                'sous_categorie_nom' => $row->sous_categorie_nom,
+                'montant_n' => (float) $row->montant,
+                'montant_n1' => null,
+                'budget' => $budgetMap[$scId] ?? null,
+            ];
+        }
+
+        foreach ($flatN1 as $row) {
+            $scId = (int) $row->sous_categorie_id;
+            if (isset($map[$scId])) {
+                $map[$scId]['montant_n1'] = (float) $row->montant;
+            } else {
+                // Sous-cat présente en N-1 mais pas en N
+                $map[$scId] = [
+                    'categorie_id' => (int) $row->categorie_id,
+                    'categorie_nom' => $row->categorie_nom,
+                    'sous_categorie_nom' => $row->sous_categorie_nom,
+                    'montant_n' => 0.0,
+                    'montant_n1' => (float) $row->montant,
+                    'budget' => $budgetMap[$scId] ?? null,
+                ];
+            }
+        }
+
+        return $this->groupByCategorie($map, true);
+    }
+
+    /**
+     * Construit la hiérarchie simple avec montant uniquement (onglet 2).
+     *
+     * @param  Collection<int, object>  $flat
+     * @return list<array>
+     */
+    private function buildHierarchySimple(Collection $flat): array
+    {
+        $map = [];
+        foreach ($flat as $row) {
+            $scId = (int) $row->sous_categorie_id;
+            $map[$scId] = [
+                'categorie_id' => (int) $row->categorie_id,
+                'categorie_nom' => $row->categorie_nom,
+                'sous_categorie_nom' => $row->sous_categorie_nom,
+                'montant' => (float) $row->montant,
+            ];
+        }
+
+        return $this->groupByCategorie($map, false);
+    }
+
+    /**
+     * Construit la hiérarchie avec colonnes séances (onglet 3).
+     *
+     * @param  Collection<int, object>  $flat
+     * @param  list<int>  $allSeances
+     * @return list<array>
+     */
+    private function buildHierarchySeances(Collection $flat, array $allSeances): array
+    {
+        // Map keyed by sous_categorie_id
+        /** @var array<int, array> */
+        $map = [];
+
+        foreach ($flat as $row) {
+            $scId = (int) $row->sous_categorie_id;
+            $seance = (int) $row->seance;
+
+            if (! isset($map[$scId])) {
+                $map[$scId] = [
+                    'categorie_id' => (int) $row->categorie_id,
+                    'categorie_nom' => $row->categorie_nom,
+                    'sous_categorie_nom' => $row->sous_categorie_nom,
+                    'seances' => [],
+                    'total' => 0.0,
+                ];
+            }
+            $map[$scId]['seances'][$seance] = ($map[$scId]['seances'][$seance] ?? 0.0) + (float) $row->montant;
+            $map[$scId]['total'] += (float) $row->montant;
+        }
+
+        // Group by catégorie
+        /** @var array<int, array> */
+        $categories = [];
+        foreach ($map as $scId => $sc) {
+            $catId = $sc['categorie_id'];
+            if (! isset($categories[$catId])) {
+                $categories[$catId] = [
+                    'categorie_id' => $catId,
+                    'label' => $sc['categorie_nom'],
+                    'seances' => array_fill_keys($allSeances, 0.0),
+                    'total' => 0.0,
+                    'sous_categories' => [],
+                ];
+            }
+
+            // Pad sous-catégorie séances avec 0.0 pour séances manquantes
+            $scSeances = [];
+            foreach ($allSeances as $s) {
+                $scSeances[$s] = $sc['seances'][$s] ?? 0.0;
+            }
+
+            foreach ($allSeances as $s) {
+                $categories[$catId]['seances'][$s] += $scSeances[$s];
+            }
+            $categories[$catId]['total'] += $sc['total'];
+
+            $categories[$catId]['sous_categories'][] = [
+                'sous_categorie_id' => $scId,
+                'label' => $sc['sous_categorie_nom'],
+                'seances' => $scSeances,
+                'total' => $sc['total'],
+            ];
+        }
+
+        usort($categories, fn ($a, $b) => strcmp($a['label'], $b['label']));
+        foreach ($categories as &$cat) {
+            usort($cat['sous_categories'], fn ($a, $b) => strcmp($a['label'], $b['label']));
+        }
+
+        return array_values($categories);
+    }
+
+    /**
+     * Regroupe la map plate en hiérarchie catégorie → sous-catégories.
+     *
+     * @param  array<int, array>  $map  Keyed by sous_categorie_id
+     * @param  bool  $withN1Budget  Inclure montant_n1 et budget dans le retour
+     * @return list<array>
+     */
+    private function groupByCategorie(array $map, bool $withN1Budget): array
+    {
+        /** @var array<int, array> */
+        $categories = [];
+
+        foreach ($map as $scId => $sc) {
+            $catId = $sc['categorie_id'];
+
+            if (! isset($categories[$catId])) {
+                $cat = [
+                    'categorie_id' => $catId,
+                    'label' => $sc['categorie_nom'],
+                    'sous_categories' => [],
+                ];
+                if ($withN1Budget) {
+                    $cat['montant_n'] = 0.0;
+                    $cat['montant_n1'] = null;
+                    $cat['budget'] = null;
+                } else {
+                    $cat['montant'] = 0.0;
+                }
+                $categories[$catId] = $cat;
+            }
+
+            if ($withN1Budget) {
+                $categories[$catId]['montant_n'] += $sc['montant_n'];
+                if ($sc['montant_n1'] !== null) {
+                    $categories[$catId]['montant_n1'] = ($categories[$catId]['montant_n1'] ?? 0.0) + $sc['montant_n1'];
+                }
+                if ($sc['budget'] !== null) {
+                    $categories[$catId]['budget'] = ($categories[$catId]['budget'] ?? 0.0) + $sc['budget'];
+                }
+                $categories[$catId]['sous_categories'][] = [
+                    'sous_categorie_id' => $scId,
+                    'label' => $sc['sous_categorie_nom'],
+                    'montant_n' => $sc['montant_n'],
+                    'montant_n1' => $sc['montant_n1'],
+                    'budget' => $sc['budget'],
+                ];
+            } else {
+                $categories[$catId]['montant'] += $sc['montant'];
+                $categories[$catId]['sous_categories'][] = [
+                    'sous_categorie_id' => $scId,
+                    'label' => $sc['sous_categorie_nom'],
+                    'montant' => $sc['montant'],
+                ];
+            }
+        }
+
+        usort($categories, fn ($a, $b) => strcmp($a['label'], $b['label']));
+        foreach ($categories as &$cat) {
+            usort($cat['sous_categories'], fn ($a, $b) => strcmp($a['label'], $b['label']));
+        }
+
+        return array_values($categories);
     }
 }
