@@ -70,6 +70,7 @@ Route::middleware('auth')->group(function () {
         Route::view('/association', 'parametres.association')->name('association');
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::resource('sous-categories', SousCategorieController::class)->except(['show']);
+        Route::post('sous-categories/{sousCategory}/toggle-flag', [SousCategorieController::class, 'toggleFlag'])->name('sous-categories.toggle-flag');
         Route::resource('comptes-bancaires', CompteBancaireController::class)->except(['show']);
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });

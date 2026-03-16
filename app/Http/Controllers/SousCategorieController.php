@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateSousCategorieRequest;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 final class SousCategorieController extends Controller
@@ -16,7 +17,8 @@ final class SousCategorieController extends Controller
     public function index(): View
     {
         return view('parametres.sous-categories.index', [
-            'categories' => Categorie::with('sousCategories')->orderBy('nom')->get(),
+            'categories'     => Categorie::with('sousCategories.categorie')->orderBy('nom')->get(),
+            'sousCategories' => SousCategorie::with('categorie')->orderBy('nom')->get(),
         ]);
     }
 
@@ -44,6 +46,18 @@ final class SousCategorieController extends Controller
 
         return redirect()->route('parametres.sous-categories.index')
             ->with('success', 'Sous-catégorie mise à jour avec succès.');
+    }
+
+    public function toggleFlag(Request $request, SousCategorie $sousCategory): RedirectResponse
+    {
+        $flag = $request->input('flag');
+        if (! in_array($flag, ['pour_dons', 'pour_cotisations'], true)) {
+            abort(422);
+        }
+
+        $sousCategory->update([$flag => ! $sousCategory->$flag]);
+
+        return back()->with('success', 'Sous-catégorie mise à jour.');
     }
 
     public function destroy(SousCategorie $sousCategory): RedirectResponse
