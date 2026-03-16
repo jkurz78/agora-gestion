@@ -43,10 +43,11 @@ final class ExerciceService
      */
     public function available(int $count = 5): array
     {
-        $current = $this->current();
+        $now = CarbonImmutable::now();
+        $realCurrent = $now->month >= 9 ? $now->year : $now->year - 1;
 
         return array_map(
-            fn (int $i): int => $current - $i,
+            fn (int $i): int => $realCurrent - $i,
             range(0, $count - 1),
         );
     }
