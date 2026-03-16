@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Models\Cotisation;
+use App\Models\SousCategorie;
 use App\Services\CotisationService;
 use App\Services\ExerciceService;
+use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -45,7 +47,7 @@ final class CotisationList extends Component
     #[On('cotisation-saved')]
     public function onCotisationSaved(): void {}
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         $exercice = app(ExerciceService::class)->current();
 
@@ -67,8 +69,8 @@ final class CotisationList extends Component
         }
 
         return view('livewire.cotisation-list', [
-            'cotisations'      => $query->paginate(15),
-            'postescotisation' => \App\Models\SousCategorie::where('pour_cotisations', true)->orderBy('nom')->get(),
+            'cotisations' => $query->paginate(15),
+            'postescotisation' => SousCategorie::where('pour_cotisations', true)->orderBy('nom')->get(),
         ]);
     }
 }

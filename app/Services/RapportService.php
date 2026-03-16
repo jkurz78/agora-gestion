@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Cotisation;
 use App\Models\DepenseLigne;
+use App\Models\Don;
 use App\Models\RecetteLigne;
 use Illuminate\Support\Facades\DB;
 
@@ -61,22 +63,89 @@ final class RapportService
             $produitsQuery->whereIn('recette_lignes.operation_id', $operationIds);
         }
 
-        $produits = $produitsQuery
+        // Index produits by sous_categorie id for merging
+        $produitsMap = [];
+        $produitsQuery
             ->select(
+                'sous_categories.id as sc_id',
                 'sous_categories.code_cerfa',
                 'sous_categories.nom as label',
                 DB::raw('SUM(recette_lignes.montant) as montant')
             )
             ->groupBy('sous_categories.id', 'sous_categories.code_cerfa', 'sous_categories.nom')
-            ->orderBy('sous_categories.code_cerfa')
-            ->orderBy('sous_categories.nom')
             ->get()
-            ->map(fn ($row) => [
-                'code_cerfa' => $row->code_cerfa,
-                'label' => $row->label,
-                'montant' => (float) $row->montant,
-            ])
-            ->toArray();
+            ->each(function ($row) use (&$produitsMap): void {
+                $produitsMap[$row->sc_id] = [
+                    'code_cerfa' => $row->code_cerfa,
+                    'label' => $row->label,
+                    'montant' => (float) $row->montant,
+                ];
+            });
+
+        // Dons (have operation_id — apply filter if provided)
+        $donsQuery = Don::query()
+            ->join('sous_categories', 'dons.sous_categorie_id', '=', 'sous_categories.id')
+            ->whereNull('dons.deleted_at')
+            ->whereBetween('dons.date', [$startDate, $endDate]);
+
+        if ($operationIds) {
+            $donsQuery->whereIn('dons.operation_id', $operationIds);
+        }
+
+        $donsQuery
+            ->select(
+                'sous_categories.id as sc_id',
+                'sous_categories.code_cerfa',
+                'sous_categories.nom as label',
+                DB::raw('SUM(dons.montant) as montant')
+            )
+            ->groupBy('sous_categories.id', 'sous_categories.code_cerfa', 'sous_categories.nom')
+            ->get()
+            ->each(function ($row) use (&$produitsMap): void {
+                if (isset($produitsMap[$row->sc_id])) {
+                    $produitsMap[$row->sc_id]['montant'] += (float) $row->montant;
+                } else {
+                    $produitsMap[$row->sc_id] = [
+                        'code_cerfa' => $row->code_cerfa,
+                        'label' => $row->label,
+                        'montant' => (float) $row->montant,
+                    ];
+                }
+            });
+
+        // Cotisations (no operation_id — never filtered by operation)
+        Cotisation::query()
+            ->join('sous_categories', 'cotisations.sous_categorie_id', '=', 'sous_categories.id')
+            ->whereNull('cotisations.deleted_at')
+            ->where('cotisations.exercice', $exercice)
+            ->select(
+                'sous_categories.id as sc_id',
+                'sous_categories.code_cerfa',
+                'sous_categories.nom as label',
+                DB::raw('SUM(cotisations.montant) as montant')
+            )
+            ->groupBy('sous_categories.id', 'sous_categories.code_cerfa', 'sous_categories.nom')
+            ->get()
+            ->each(function ($row) use (&$produitsMap): void {
+                if (isset($produitsMap[$row->sc_id])) {
+                    $produitsMap[$row->sc_id]['montant'] += (float) $row->montant;
+                } else {
+                    $produitsMap[$row->sc_id] = [
+                        'code_cerfa' => $row->code_cerfa,
+                        'label' => $row->label,
+                        'montant' => (float) $row->montant,
+                    ];
+                }
+            });
+
+        // Sort by code_cerfa then label
+        usort($produitsMap, function (array $a, array $b): int {
+            $cmpCode = strcmp((string) ($a['code_cerfa'] ?? ''), (string) ($b['code_cerfa'] ?? ''));
+
+            return $cmpCode !== 0 ? $cmpCode : strcmp($a['label'], $b['label']);
+        });
+
+        $produits = array_values($produitsMap);
 
         return ['charges' => $charges, 'produits' => $produits];
     }
