@@ -102,7 +102,16 @@
                             <input type="text" name="code_cerfa" form="edit-form-{{ $sc->id }}"
                                    value="{{ old('code_cerfa', $sc->code_cerfa) }}" class="form-control form-control-sm" maxlength="10">
                         </td>
-                        <td colspan="2"></td>
+                        <td class="text-center">
+                            <input type="hidden" name="pour_dons" form="edit-form-{{ $sc->id }}" value="0">
+                            <input type="checkbox" name="pour_dons" form="edit-form-{{ $sc->id }}" value="1"
+                                   class="form-check-input" @checked(old('pour_dons', $sc->pour_dons))>
+                        </td>
+                        <td class="text-center">
+                            <input type="hidden" name="pour_cotisations" form="edit-form-{{ $sc->id }}" value="0">
+                            <input type="checkbox" name="pour_cotisations" form="edit-form-{{ $sc->id }}" value="1"
+                                   class="form-check-input" @checked(old('pour_cotisations', $sc->pour_cotisations))>
+                        </td>
                         <td>
                             <button type="submit" form="edit-form-{{ $sc->id }}" class="btn btn-sm btn-success"
                                     style="padding:.15rem .4rem;font-size:.75rem">
