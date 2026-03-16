@@ -1,5 +1,5 @@
 <div>
-    {{-- Filtre opérations --}}
+    {{-- Filtre operations --}}
     <div class="card mb-3">
         <div class="card-body">
             <div class="d-flex flex-wrap gap-3 align-items-center">
@@ -19,9 +19,9 @@
     </div>
 
     @if (! $hasSelection)
-        <p class="text-muted text-center py-4">Sélectionnez au moins une opération pour afficher le rapport.</p>
+        <p class="text-muted text-center py-4">S&eacute;lectionnez au moins une op&eacute;ration pour afficher le rapport.</p>
     @else
-        @foreach ([['data' => $charges, 'label' => 'DÉPENSES', 'total' => $totalChargesN],
+        @foreach ([['data' => $charges, 'label' => 'DEPENSES', 'total' => $totalChargesN],
                    ['data' => $produits, 'label' => 'RECETTES', 'total' => $totalProduitsN]] as $section)
         <div class="card mb-3 border-0 shadow-sm">
             <div class="card-body p-0">
@@ -44,13 +44,13 @@
                             <tr style="background:#dce6f0;">
                                 <td></td>
                                 <td style="font-weight:600;color:#1e3a5f;padding:7px 12px;">{{ $cat['label'] }}</td>
-                                <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($cat['montant'], 2, ',', ' ') }} €</td>
+                                <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($cat['montant'], 2, ',', ' ') }} &euro;</td>
                             </tr>
                             @foreach ($scVisibles as $sc)
                             <tr style="background:#f7f9fc;">
                                 <td></td>
                                 <td style="padding:5px 12px 5px 32px;color:#444;">{{ $sc['label'] }}</td>
-                                <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['montant'], 2, ',', ' ') }} €</td>
+                                <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['montant'], 2, ',', ' ') }} &euro;</td>
                             </tr>
                             @endforeach
                             @endif
@@ -58,7 +58,7 @@
 
                         <tr style="background:#5a7fa8;color:#fff;font-weight:700;font-size:14px;">
                             <td colspan="2" style="padding:9px 12px;">TOTAL {{ $section['label'] }}</td>
-                            <td class="text-end" style="padding:9px 12px;">{{ number_format($section['total'], 2, ',', ' ') }} €</td>
+                            <td class="text-end" style="padding:9px 12px;">{{ number_format($section['total'], 2, ',', ' ') }} &euro;</td>
                         </tr>
                     </tbody>
                 </table>
@@ -68,8 +68,8 @@
 
         <div class="rounded p-4 d-flex justify-content-between align-items-center mt-2"
              style="background:{{ $resultatNet >= 0 ? '#198754' : '#dc3545' }};color:#fff;font-size:1.1rem;font-weight:700;">
-            <span>{{ $resultatNet >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }}</span>
-            <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} €</span>
+            <span>{{ $resultatNet >= 0 ? 'EXC&Eacute;DENT' : 'D&Eacute;FICIT' }}</span>
+            <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} &euro;</span>
         </div>
     @endif
 </div>

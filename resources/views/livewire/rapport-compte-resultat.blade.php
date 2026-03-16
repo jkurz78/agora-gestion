@@ -29,7 +29,7 @@
     @php
         // Helper : barre + % pour une ligne
         $renderBar = function(?float $montantN, ?float $budget): string {
-            if ($budget === null || $budget <= 0 || $montantN === null) return '<span class="text-muted">—</span>';
+            if ($budget === null || $budget <= 0 || $montantN === null) return '<span class="text-muted">&mdash;</span>';
             $pct     = $montantN / $budget * 100;
             $pctCap  = min($pct, 100);
             $color   = $pct > 100 ? '#dc3545' : ($pct > 90 ? '#fd7e14' : '#198754');
@@ -37,31 +37,31 @@
                  . '<div class="budget-label">' . number_format($pct, 0) . ' %</div>';
         };
         $renderEcart = function(?float $montantN, ?float $budget, bool $isCharge): string {
-            if ($budget === null || $montantN === null) return '<span class="text-muted">—</span>';
+            if ($budget === null || $montantN === null) return '<span class="text-muted">&mdash;</span>';
             $ecart = $montantN - $budget;
-            if ($ecart == 0) return '<span class="cr-zero">0,00 €</span>';
+            if ($ecart == 0) return '<span class="cr-zero">0,00 &euro;</span>';
             $isNeg = ($isCharge && $ecart < 0) || (!$isCharge && $ecart > 0);
             $cls = $isNeg ? 'cr-pos' : 'cr-neg';
             $sign = $ecart > 0 ? '+' : '';
-            return '<span class="' . $cls . '">' . $sign . number_format($ecart, 2, ',', ' ') . ' €</span>';
+            return '<span class="' . $cls . '">' . $sign . number_format($ecart, 2, ',', ' ') . ' &euro;</span>';
         };
-        $fmt = fn(?float $v): string => $v !== null ? number_format($v, 2, ',', ' ') . ' €' : '—';
+        $fmt = fn(?float $v): string => $v !== null ? number_format($v, 2, ',', ' ') . ' &euro;' : '&mdash;';
     @endphp
 
-    @foreach ([['data' => $charges, 'label' => 'DÉPENSES', 'isCharge' => true, 'total' => $totalChargesN],
+    @foreach ([['data' => $charges, 'label' => 'DEPENSES', 'isCharge' => true, 'total' => $totalChargesN],
                ['data' => $produits, 'label' => 'RECETTES', 'isCharge' => false, 'total' => $totalProduitsN]] as $section)
     <div class="card mb-3 border-0 shadow-sm">
         <div class="card-body p-0">
             <table class="table mb-0" style="font-size:13px;border-collapse:collapse;width:100%;">
                 <tbody>
-                    {{-- En-tête colonnes --}}
+                    {{-- En-tete colonnes --}}
                     <tr class="cr-section-header">
                         <td style="width:20px;"></td>
                         <td></td>
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN1 }}</td>
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">{{ $labelN }}</td>
                         <td class="text-end" style="width:115px;font-weight:400;font-size:12px;opacity:.85;">Budget</td>
-                        <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">Écart</td>
+                        <td class="text-end" style="width:90px;font-weight:400;font-size:12px;opacity:.85;">&Eacute;cart</td>
                         <td class="text-center" style="width:130px;font-weight:400;font-size:12px;opacity:.85;">Conso. budget</td>
                     </tr>
                     {{-- Titre section --}}
@@ -71,7 +71,7 @@
 
                     @foreach ($section['data'] as $cat)
                         @php
-                            // Règle d'affichage : sous-cat visible si montant_n > 0, ou N-1 > 0, ou budget défini
+                            // Regle d'affichage : sous-cat visible si montant_n > 0, ou N-1 > 0, ou budget defini
                             $scVisibles = collect($cat['sous_categories'])->filter(function($sc) {
                                 return $sc['montant_n'] > 0
                                     || ($sc['montant_n1'] !== null && $sc['montant_n1'] > 0)
@@ -105,10 +105,10 @@
                     {{-- Total --}}
                     <tr class="cr-total">
                         <td colspan="2">TOTAL {{ $section['label'] }}</td>
-                        <td class="text-end" style="color:#d0e4f7;">—</td>
-                        <td class="text-end">{{ number_format($section['total'], 2, ',', ' ') }} €</td>
-                        <td class="text-end">—</td>
-                        <td class="text-end">—</td>
+                        <td class="text-end" style="color:#d0e4f7;">&mdash;</td>
+                        <td class="text-end">{{ number_format($section['total'], 2, ',', ' ') }} &euro;</td>
+                        <td class="text-end">&mdash;</td>
+                        <td class="text-end">&mdash;</td>
                         <td></td>
                     </tr>
                 </tbody>
@@ -117,10 +117,18 @@
     </div>
     @endforeach
 
-    {{-- Résultat net --}}
+    {{-- Resultat net --}}
+    @if ($resultatNet >= 0)
     <div class="rounded p-4 d-flex justify-content-between align-items-center mt-2"
-         style="background:{{ $resultatNet >= 0 ? '#198754' : '#dc3545' }};color:#fff;font-size:1.1rem;font-weight:700;">
-        <span>{{ $resultatNet >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }}</span>
-        <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} €</span>
+         style="background:#198754;color:#fff;font-size:1.1rem;font-weight:700;">
+        <span>EXC&Eacute;DENT</span>
+        <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} &euro;</span>
     </div>
+    @else
+    <div class="rounded p-4 d-flex justify-content-between align-items-center mt-2"
+         style="background:#dc3545;color:#fff;font-size:1.1rem;font-weight:700;">
+        <span>D&Eacute;FICIT</span>
+        <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} &euro;</span>
+    </div>
+    @endif
 </div>

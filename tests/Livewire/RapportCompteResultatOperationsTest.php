@@ -30,7 +30,7 @@ it('se rend avec la liste des opérations', function () {
 
 it('affiche un message si aucune opération sélectionnée', function () {
     Livewire::test(RapportCompteResultatOperations::class)
-        ->assertSee('Sélectionnez au moins une opération');
+        ->assertSeeHtml('S&eacute;lectionnez au moins une op&eacute;ration');
 });
 
 it('affiche les données filtrées par opération', function () {
