@@ -1,308 +1,392 @@
-# Spec : Refonte du rapport Compte de résultat
+# Spec : Refonte de la page Rapports (3 onglets)
 
 **Date :** 2026-03-16
-**Statut :** Approuvé
+**Statut :** En révision
 
 ---
 
-## Contexte
+## Périmètre
 
-Le rapport Compte de résultat existant agrège les charges et produits par sous-catégorie dans deux tableaux plats. Il manque la hiérarchie catégorie/sous-catégorie, la comparaison avec l'exercice précédent, le suivi budgétaire et un indicateur visuel de consommation.
+Refonte complète de la page `/rapports` qui passe de 2 à 3 onglets :
+
+| Onglet | Composant Livewire | Statut |
+|--------|-------------------|--------|
+| Compte de résultat | `RapportCompteResultat` | Refonte |
+| Compte de résultat par opération(s) | `RapportCompteResultatOperations` | Nouveau |
+| Rapport par séances | `RapportSeances` | Refonte |
 
 ---
 
-## Structure visuelle
+## Ruptures avec l'existant
 
-Le rapport est organisé en deux sections verticales séparées : **Dépenses** puis **Recettes**, suivies d'une ligne de résultat.
+- **`code_cerfa`** : le rapport actuel groupe par `code_cerfa`. La refonte groupe par `categorie` / `sous_categorie`. Le `code_cerfa` disparaît de toutes les vues et de tous les CSV.
+- **Rapport par séances** : l'existant détermine les colonnes depuis `$operation->nombre_seances`. La refonte utilise les numéros de séances effectivement présents dans les données (`DISTINCT seance`). Une séance sans transaction n'apparaît plus comme colonne.
+- **Rapport par séances** : la ligne "Solde" (produits − dépenses par séance) de l'existant est supprimée. Le rapport se termine par la case EXCÉDENT/DÉFICIT commune.
 
-### En-tête de section
+---
 
-Chaque section (DÉPENSES / RECETTES) occupe **deux lignes** dans un bloc bleu `#3d5473` :
+## Structure commune aux trois rapports
 
-```
-┌──────────────────────┬──────────┬──────────┬──────────┬────────┬──────────────┐
-│                      │ 2023-24  │ 2024-25  │  Budget  │ Écart  │ Conso. budget│  ← ligne 1 : labels colonnes
-│  DÉPENSES            │          │          │          │        │              │  ← ligne 2 : titre section
-└──────────────────────┴──────────┴──────────┴──────────┴────────┴──────────────┘
-```
+Les trois rapports partagent **exactement la même ossature de lignes** :
 
-### Lignes de données
+### Sections
 
-- **Catégorie** (fond `#dce6f0`, texte `#1e3a5f`, gras) : nom catégorie + 5 colonnes chiffrées
-- **Sous-catégorie** (fond `#f7f9fc`, indentation 32 px) : nom sous-catégorie + 5 colonnes chiffrées
+1. Section **DÉPENSES** : en-tête bleu `#3d5473` + lignes catégories/sous-catégories + ligne TOTAL DÉPENSES
+2. Section **RECETTES** : même structure
+3. **Résultat final** : `<div>` séparé, vert (EXCÉDENT) ou rouge (DÉFICIT), montant exercice en cours uniquement
+
+### Types de lignes
+
+- **En-tête de section** (fond `#3d5473`, texte blanc) : deux lignes TR — ligne 1 : labels colonnes, ligne 2 : titre DÉPENSES ou RECETTES
+- **Catégorie** (fond `#dce6f0`, texte `#1e3a5f`, gras) : somme de ses sous-catégories
+- **Sous-catégorie** (fond `#f7f9fc`, indentation 32 px)
 - **Total** (fond `#5a7fa8`, texte blanc, gras) : une ligne par section
 
-### Résultat final
+### Règles d'affichage des lignes (partagées)
 
-Élément `<div>` séparé (hors table), pleine largeur :
+**Onglet 1** (avec N-1 et budget) — une sous-catégorie est affichée si :
+- `montant_n > 0`, ou
+- `montant_n1 > 0` (activité l'an passé), ou
+- `budget > 0` (budget prévu mais rien dépensé)
+→ masquée uniquement si `montant_n = 0` ET `montant_n1 = null` ET `budget = null`
 
-- Fond vert `#198754` + libellé **EXCÉDENT** si recettes ≥ dépenses
-- Fond rouge `#dc3545` + libellé **DÉFICIT** si recettes < dépenses
-- Affiche uniquement le montant de l'exercice en cours (pas de N-1, budget, ou écart)
+**Onglets 2 et 3** (sans N-1 ni budget) — une sous-catégorie est affichée si :
+- `montant > 0` (onglet 2) ou `total > 0` (onglet 3)
+→ toutes les lignes à zéro sont masquées
+
+Si toutes les sous-catégories d'une catégorie sont masquées → catégorie masquée aussi.
 
 ---
 
-## Colonnes (5 colonnes de données)
+## Onglet 1 — Compte de résultat
+
+### Filtre
+Aucun filtre opération. Exercice courant via `ExerciceService::current()`.
+
+### Colonnes (5 colonnes de données)
 
 | # | Colonne | Largeur | Description |
 |---|---------|---------|-------------|
-| 1 | N-1 | 115 px | Montant exercice précédent, couleur atténuée (`#9ab0c8` sous-cat, `#6b8aaa` cat). `—` si première année (aucun enregistrement trouvé pour N-1). |
+| 1 | N-1 | 115 px | Montant exercice précédent, atténué (`#9ab0c8`/`#6b8aaa`). `—` si première année. |
 | 2 | N | 115 px | Montant exercice en cours |
-| 3 | Budget | 115 px | Budget alloué. `—` si aucun `budget_lines` trouvé. |
-| 4 | Écart | 90 px | `N − Budget`. Positif = rouge, négatif = vert, zéro = gris. `—` si pas de budget. |
+| 3 | Budget | 115 px | Budget alloué. `—` si aucune `budget_line`. |
+| 4 | Écart | 90 px | `N − Budget`. Rouge si dépassement charges / manque recettes. Vert si économie / surplus. `—` si pas de budget. |
 | 5 | Conso. budget | 120 px | Barre horizontale (voir ci-dessous). `—` si pas de budget. |
 
----
+### Barre de consommation budget
 
-## Barre de consommation budget
-
-Barre HTML pure (aucun JS), hauteur 10 px, calculée en PHP dans la vue :
+Barre HTML pure (pas de JS), hauteur 10 px :
 
 ```php
-$pct = $budget > 0 ? ($montantN / $budget * 100) : null;
+$pct = ($budget !== null && $budget > 0) ? ($montantN / $budget * 100) : null;
 ```
 
-- `null` (budget absent) → afficher `—`, pas de barre
-- `0 – 90 %` → fond vert `#198754`
-- `90 – 100 %` → fond orange `#fd7e14`
-- `> 100 %` → fond rouge `#dc3545`, barre pleine + débordement visuel
-- Pourcentage affiché en petit sous la barre (ex. `108 %`)
+- `null` → `—`, pas de barre
+- `0–90 %` → vert `#198754`
+- `90–100 %` → orange `#fd7e14`
+- `> 100 %` → rouge `#dc3545`, débordement visuel
+- Pourcentage affiché sous la barre
 
----
+### Service : `RapportService::compteDeResultat(int $exercice): array`
 
-## Sources de données et requêtes
+**Pas d'`$operationIds`** — ce rapport ne filtre jamais par opération.
 
-### Principe général
+#### Sources de données
 
-Le service construit séparément deux tableaux (`charges`, `produits`) en agrégeant par `(categorie_id, sous_categorie_id)`, pour les exercices N et N-1.
-
-### Dépenses (charges)
-
+**Dépenses :**
 ```sql
-SELECT
-    c.id        AS categorie_id,
-    c.nom       AS categorie_nom,
-    sc.id       AS sous_categorie_id,
-    sc.nom      AS sous_categorie_nom,
-    SUM(dl.montant) AS montant
+SELECT c.id, c.nom, sc.id, sc.nom, SUM(dl.montant)
 FROM depense_lignes dl
 JOIN sous_categories sc ON sc.id = dl.sous_categorie_id
 JOIN categories c       ON c.id  = sc.categorie_id
 JOIN depenses d         ON d.id  = dl.depense_id
-WHERE dl.deleted_at IS NULL
-  AND d.deleted_at  IS NULL
+WHERE dl.deleted_at IS NULL AND d.deleted_at IS NULL
   AND d.date BETWEEN :start AND :end
-  [AND dl.operation_id IN (:ids)]   -- filtre optionnel
-GROUP BY c.id, c.nom, sc.id, sc.nom
-ORDER BY c.nom, sc.nom
+GROUP BY c.id, c.nom, sc.id, sc.nom ORDER BY c.nom, sc.nom
 ```
+Exécutée deux fois : exercice N et exercice N-1.
 
-Exécutée deux fois : une pour N (`start=YYYY-09-01`, `end=YYYY+1-08-31`) et une pour N-1.
+**Recettes :** même structure sur `recette_lignes` / `recettes`.
 
-### Recettes (produits)
-
-Même structure que Dépenses, sur `recette_lignes` / `recettes`, filtre `operation_id` optionnel.
-
-### Dons (ajoutés aux produits)
-
+**Dons :**
 ```sql
-SELECT
-    c.id        AS categorie_id,
-    c.nom       AS categorie_nom,
-    sc.id       AS sous_categorie_id,
-    sc.nom      AS sous_categorie_nom,
-    SUM(dons.montant) AS montant
+SELECT c.id, c.nom, sc.id, sc.nom, SUM(dons.montant)
 FROM dons
 JOIN sous_categories sc ON sc.id = dons.sous_categorie_id
 JOIN categories c       ON c.id  = sc.categorie_id
-WHERE dons.deleted_at IS NULL
-  AND dons.date BETWEEN :start AND :end
-  [AND dons.operation_id IN (:ids)]   -- filtre optionnel
+WHERE dons.deleted_at IS NULL AND dons.date BETWEEN :start AND :end
 GROUP BY c.id, c.nom, sc.id, sc.nom
 ```
+Exécutée pour N et N-1. Dons sans `sous_categorie_id` ignorés.
 
-Les dons sans `sous_categorie_id` (nullable) sont ignorés du rapport.
-
-### Cotisations (ajoutées aux produits)
-
+**Cotisations :**
 ```sql
-SELECT
-    c.id        AS categorie_id,
-    c.nom       AS categorie_nom,
-    sc.id       AS sous_categorie_id,
-    sc.nom      AS sous_categorie_nom,
-    SUM(cotisations.montant) AS montant
+SELECT c.id, c.nom, sc.id, sc.nom, SUM(cotisations.montant)
 FROM cotisations
 JOIN sous_categories sc ON sc.id = cotisations.sous_categorie_id
 JOIN categories c       ON c.id  = sc.categorie_id
-WHERE cotisations.deleted_at IS NULL
-  AND cotisations.exercice = :exercice
+WHERE cotisations.deleted_at IS NULL AND cotisations.exercice = :exercice
 GROUP BY c.id, c.nom, sc.id, sc.nom
 ```
+Exécutée pour N et N-1 (avec `exercice = :exercice - 1` pour N-1). Jamais filtrées par opération.
 
-**Les cotisations ne sont jamais filtrées par `operation_id`** (elles n'ont pas ce champ).
-
-### Budget
-
+**Budget :**
 ```sql
-SELECT
-    sc.id                  AS sous_categorie_id,
-    SUM(bl.montant_prevu)  AS budget
+SELECT sc.id, SUM(bl.montant_prevu)
 FROM budget_lines bl
 JOIN sous_categories sc ON sc.id = bl.sous_categorie_id
 WHERE bl.exercice = :exercice
 GROUP BY sc.id
 ```
+Tableau indexé par `sous_categorie_id → float|null` (`null` si aucune ligne).
 
-Retourne un tableau indexé par `sous_categorie_id → float`. Si une sous-catégorie n'a pas de `budget_line`, sa valeur dans ce tableau est absente → le service stocke `null` (pas `0.0`) pour distinguer "pas de budget" de "budget à zéro".
+#### Algorithme
 
----
+1. Calculer `$startN/$endN` et `$startN1/$endN1`
+2. Exécuter les 4 requêtes pour N, les 4 pour N-1, charger le budget
+3. Construire un tableau plat intermédiaire, keyed par `sous_categorie_id` :
+   ```php
+   $map[$sc_id] = [
+     'categorie_id' => int, 'categorie_nom' => string,
+     'sous_categorie_nom' => string,
+     'montant_n'  => float,       // accumulé depuis dépenses/recettes/dons/cotisations N
+     'montant_n1' => float|null,  // idem N-1, null si aucune donnée
+     'budget'     => float|null,
+   ];
+   ```
+   La fusion recettes + dons + cotisations se fait ici, en sommant dans `$map[$sc_id]['montant_n']`.
+4. Grouper `$map` par `categorie_id` pour construire la hiérarchie finale
+5. Trier catégories par nom, sous-catégories par nom
+6. Totaux catégorie = somme des sous-catégories ; `budget` catégorie = somme budgets (`null` si toutes nulles)
 
-## Service `RapportService::compteDeResultat()`
-
-### Signature
-
-```php
-public function compteDeResultat(int $exercice, ?array $operationIds = null): array
-```
-
-### Algorithme
-
-1. Calculer `$startN`, `$endN`, `$startN1`, `$endN1` (dates exercice N et N-1)
-2. Exécuter les 4 requêtes d'agrégation pour **N** : dépenses, recettes, dons, cotisations
-3. Exécuter les 4 mêmes requêtes pour **N-1** : dépenses, recettes, dons, cotisations (même structure, mêmes joins — le filtre `operation_id` s'applique aussi à N-1 si fourni ; cotisations non filtrées par operation)
-4. Charger le tableau budget par `sous_categorie_id` (exercice N uniquement, pas de budget N-1)
-5. Fusionner recettes + dons + cotisations dans les produits pour N, idem pour N-1 (accumulation par `sous_categorie_id`)
-6. Construire la structure hiérarchique :
-   - Grouper par `categorie_id`
-   - Pour chaque catégorie, lister ses sous-catégories avec `montant_n`, `montant_n1`, `budget`
-   - `montant_n1 = null` si aucune ligne trouvée pour cet exercice N-1 (première année ou sous-cat absente en N-1)
-   - `budget = null` si aucune `budget_line` trouvée pour cette sous-catégorie
-   - `montant_n` de la catégorie = somme de ses sous-catégories pour N
-   - `montant_n1` de la catégorie = somme de ses sous-catégories pour N-1 (`null` si toutes les sous-cats ont `null`)
-   - `budget` de la catégorie = somme des budgets de ses sous-catégories (`null` si aucune n'a de budget)
-7. Trier les catégories par `nom`, les sous-catégories par `nom`
-
-### Structure de retour
+#### Structure de retour
 
 ```php
 [
   'charges' => [
     [
-      'categorie_id'    => int,
-      'label'           => string,           // nom catégorie
-      'montant_n'       => float,            // somme des sous-catégories pour N
-      'montant_n1'      => float|null,       // somme N-1, null si aucune donnée N-1
-      'budget'          => float|null,       // somme budgets sous-cat, null si aucun budget
+      'categorie_id' => int,
+      'label'        => string,
+      'montant_n'    => float,
+      'montant_n1'   => float|null,
+      'budget'       => float|null,
       'sous_categories' => [
         [
           'sous_categorie_id' => int,
-          'label'             => string,
-          'montant_n'         => float,
-          'montant_n1'        => float|null, // null = aucune donnée N-1 pour cette sous-cat
-          'budget'            => float|null, // null = aucune budget_line pour cette sous-cat
+          'label'      => string,
+          'montant_n'  => float,
+          'montant_n1' => float|null,
+          'budget'     => float|null,
         ],
-        // ...
       ],
     ],
-    // ...
   ],
   'produits' => [ /* même structure */ ],
 ]
 ```
 
----
+### Vue Blade
 
-## Vue Blade
+Labels d'années dynamiques : `$labelN = "$exercice–" . ($exercice+1)`.
 
-La vue reçoit `$charges`, `$produits`, `$operations` (pour le filtre).
-
-### Calculs dans la vue
-
-Pour chaque ligne (catégorie ou sous-catégorie) :
-
+Calculs dans la vue :
 ```php
 $ecart = ($budget !== null) ? ($montantN - $budget) : null;
 $pct   = ($budget !== null && $budget > 0) ? ($montantN / $budget * 100) : null;
 ```
 
-Couleur de l'écart :
-- `$ecart > 0` dans les charges → rouge (dépassement)
-- `$ecart < 0` dans les charges → vert (économie)
-- `$ecart > 0` dans les produits → vert (mieux que prévu)
-- `$ecart < 0` dans les produits → rouge (manque)
-- `$ecart === 0` ou `null` → gris
+Convention signe écart : charges → positif = rouge ; produits → positif = vert (intentionnellement inversé).
 
-Totaux calculés dans le bloc `@php` de la vue :
+### Export CSV
 
-```php
-$totalChargesN  = collect($charges)->sum('montant_n');
-$totalProduitsN = collect($produits)->sum('montant_n');
-$resultatNet    = $totalProduitsN - $totalChargesN;
-```
-
-Règles d'affichage des lignes de sous-catégorie :
-- `montant_n > 0` → toujours affichée
-- `montant_n = 0` et `montant_n1 > 0` → affichée (activité l'an passé, utile pour la comparaison)
-- `montant_n = 0` et `montant_n1 = null` et `budget > 0` → affichée (budget prévu mais rien dépensé)
-- `montant_n = 0` et `montant_n1 = null` et `budget = null` → masquée (ligne fantôme)
-
-Si toutes les sous-catégories d'une catégorie sont masquées, la ligne catégorie est masquée elle aussi.
-
-### En-têtes de colonnes
-
-Les libellés d'années dans les en-têtes de section sont générés dynamiquement :
-
-```php
-$labelN  = $exercice . '–' . ($exercice + 1);
-$labelN1 = ($exercice - 1) . '–' . $exercice;
-```
-
----
-
-## Export CSV
-
-La méthode `exportCsv()` du composant Livewire est conservée avec la même signature et le même mécanisme `response()->streamDownload()`. Seul le contenu change.
-
-Une ligne par sous-catégorie (les lignes de catégorie et les totaux ne sont pas exportés).
+`response()->streamDownload()` conservé. Une ligne par sous-catégorie (pas de lignes catégorie ni totaux).
 
 Colonnes : `Type` | `Catégorie` | `Sous-catégorie` | `N-1` | `N` | `Budget` | `Écart`
 
-- `Type` : `Charge` ou `Produit`
-- Montants `null` → cellule vide dans le CSV
-- Séparateur `;` (convention française, existant conservé)
-- Le filtre d'affichage (lignes fantômes) **ne s'applique pas** au CSV : toutes les sous-catégories ayant au moins un montant ou un budget sont exportées
+- Montants `null` → cellule vide
+- Format des montants : `number_format($x, 2, ',', '')` (virgule décimale, pas de séparateur milliers)
+- Le filtre d'affichage (fantômes) **ne s'applique pas** au CSV : toutes les sous-catégories avec au moins un montant ou un budget sont exportées
 
-Génération des lignes dans le composant :
+---
+
+## Onglet 2 — Compte de résultat par opération(s)
+
+### Fichiers
+
+- `app/Livewire/RapportCompteResultatOperations.php`
+- `resources/views/livewire/rapport-compte-resultat-operations.blade.php`
+
+### Filtre
+
+Checkboxes multi-sélection sur les opérations (même pattern que l'onglet 1 actuel). Si aucune opération sélectionnée → rapport vide (message "Sélectionnez au moins une opération") et bouton CSV désactivé (`disabled`). Même comportement pour l'onglet 3.
+
+### Colonnes (1 colonne de données)
+
+| # | Colonne | Largeur | Description |
+|---|---------|---------|-------------|
+| 1 | Montant | 130 px | Montant exercice en cours pour les opérations sélectionnées |
+
+Pas de N-1, pas de Budget, pas d'Écart, pas de barre.
+
+### Service : `RapportService::compteDeResultatOperations(int $exercice, array $operationIds): array`
+
+Nouvelle méthode. Même structure de retour que `compteDeResultat()` mais sans `montant_n1` et sans `budget` dans les items.
+
+#### Sources de données
+
+**Dépenses :** même requête que l'onglet 1 pour N, avec `AND dl.operation_id IN (:ids)` obligatoire. Les lignes avec `operation_id IS NULL` sont implicitement exclues par la clause `IN`.
+
+**Recettes :** même requête que l'onglet 1 pour N, avec `AND rl.operation_id IN (:ids)`.
+
+**Dons :** même requête que l'onglet 1 pour N, avec `AND dons.operation_id IN (:ids)`.
+
+**Cotisations :** **exclues** — elles n'ont pas de `operation_id`, leur inclusion fausserait le rapport par opération.
+
+#### Structure de retour
 
 ```php
-foreach ($data['charges'] as $cat) {
-    foreach ($cat['sous_categories'] as $sc) {
-        $rows[] = [
-            'Charge',
-            $cat['label'],
-            $sc['label'],
-            $sc['montant_n1'] !== null ? number_format($sc['montant_n1'], 2, ',', '') : '',
-            number_format($sc['montant_n'], 2, ',', ''),
-            $sc['budget'] !== null ? number_format($sc['budget'], 2, ',', '') : '',
-            $sc['budget'] !== null ? number_format($sc['montant_n'] - $sc['budget'], 2, ',', '') : '',
-        ];
-    }
-}
-// idem pour $data['produits'] avec type 'Produit'
+[
+  'charges' => [
+    [
+      'categorie_id' => int,
+      'label'        => string,
+      'montant'      => float,
+      'sous_categories' => [
+        ['sous_categorie_id' => int, 'label' => string, 'montant' => float],
+      ],
+    ],
+  ],
+  'produits' => [ /* même structure */ ],
+]
+```
+
+### Export CSV
+
+Colonnes : `Type` | `Catégorie` | `Sous-catégorie` | `Montant`
+
+---
+
+## Onglet 3 — Rapport par séances
+
+### Filtre
+
+Checkboxes multi-sélection sur les opérations ayant `nombre_seances > 0`. Si aucune opération sélectionnée → rapport vide.
+
+### Colonnes (dynamiques)
+
+Une colonne par numéro de séance trouvé dans les données + colonne Total :
+
+```
+Séance 1 | Séance 2 | Séance 3 | ... | Total
+```
+
+Les numéros de séances sont déterminés par `DISTINCT seance` sur les données filtrées, triés par ordre croissant. Avec plusieurs opérations sélectionnées, les séances de même numéro sont agrégées (l'utilisateur est responsable de sélectionner des opérations cohérentes).
+
+### Service : `RapportService::rapportSeances(int $exercice, array $operationIds): array`
+
+Signature modifiée : `operation_id: int` → `operationIds: array`.
+
+#### Sources de données
+
+**Dépenses par séance :**
+```sql
+SELECT c.id, c.nom, sc.id, sc.nom, dl.seance, SUM(dl.montant)
+FROM depense_lignes dl
+JOIN sous_categories sc ON sc.id = dl.sous_categorie_id
+JOIN categories c       ON c.id  = sc.categorie_id
+JOIN depenses d         ON d.id  = dl.depense_id
+WHERE dl.deleted_at IS NULL AND d.deleted_at IS NULL
+  AND dl.seance IS NOT NULL
+  AND dl.operation_id IN (:ids)
+  AND d.date BETWEEN :start AND :end
+GROUP BY c.id, c.nom, sc.id, sc.nom, dl.seance
+```
+
+**Recettes par séance :** même structure sur `recette_lignes` / `recettes`.
+
+**Dons par séance :**
+```sql
+SELECT c.id, c.nom, sc.id, sc.nom, dons.seance, SUM(dons.montant)
+FROM dons
+JOIN sous_categories sc ON sc.id = dons.sous_categorie_id
+JOIN categories c       ON c.id  = sc.categorie_id
+WHERE dons.deleted_at IS NULL AND dons.seance IS NOT NULL
+  AND dons.operation_id IN (:ids)
+  AND dons.date BETWEEN :start AND :end
+GROUP BY c.id, c.nom, sc.id, sc.nom, dons.seance
+```
+
+Dons fusionnés dans les produits. Cotisations exclues (pas de séance).
+
+#### Algorithme
+
+1. Exécuter les 3 requêtes
+2. Accumuler dans une map `[categorie_id][sous_categorie_id][seance] => montant`
+3. Collecter `$allSeances = DISTINCT séances trouvées, triées ASC`
+4. Construire la hiérarchie : pour chaque catégorie → sous-catégories, avec `seances[n] => float` (0.0 si absente) et `total => sum`
+5. Calculer `total` catégorie = somme des totaux sous-catégories
+
+#### Structure de retour
+
+```php
+[
+  'seances'  => [1, 2, 3, ...],   // liste ordonnée des numéros de séances
+  'charges'  => [
+    [
+      'categorie_id' => int,
+      'label'        => string,
+      'seances'      => [1 => float, 2 => float, ...],
+      'total'        => float,
+      'sous_categories' => [
+        [
+          'sous_categorie_id' => int,
+          'label'   => string,
+          'seances' => [1 => float, 2 => float, ...],
+          'total'   => float,
+        ],
+      ],
+    ],
+  ],
+  'produits' => [ /* même structure */ ],
+]
+```
+
+### Export CSV
+
+Colonnes : `Type` | `Catégorie` | `Sous-catégorie` | `Séance 1` | `Séance 2` | ... | `Total`
+
+---
+
+## Navigation — `resources/views/rapports/index.blade.php`
+
+Trois onglets Bootstrap dans l'ordre :
+
+```html
+<ul class="nav nav-tabs mb-4">
+  <li>Compte de résultat</li>           <!-- livewire:rapport-compte-resultat -->
+  <li>Compte de résultat par opération(s)</li>  <!-- livewire:rapport-compte-resultat-operations -->
+  <li>Rapport par séances</li>          <!-- livewire:rapport-seances -->
+</ul>
 ```
 
 ---
 
 ## Ce qui ne change pas
 
-- Filtre par opération (checkboxes en haut de page)
-- Sélection de l'exercice : `ExerciceService::current()`, pas de sélecteur côté utilisateur
-- Style général : Bootstrap 5, `table-dark` avec `#3d5473`
-- `declare(strict_types=1)` + `final class`
-- Pas de JS côté client pour les barres (HTML/CSS pur)
+- Route `/rapports` existante, pas de nouvelle route
+- `ExerciceService::current()` pour l'exercice (pas de sélecteur utilisateur)
+- Style Bootstrap 5, `#3d5473` / `#5a7fa8`
+- `declare(strict_types=1)` + `final class` + PSR-12
+- Séparateur CSV `;`
+- `response()->streamDownload()` pour tous les exports
+
+---
 
 ## Notes d'implémentation
 
-- **Convention de signe des écarts :** Pour les charges, un écart positif (N > Budget) signifie un dépassement → rouge. Pour les produits, un écart positif signifie une recette supérieure au budget → vert. La logique est intentionnellement inversée entre les deux sections.
-- **En-tête de section :** Les labels de colonnes sont en ligne 1, le titre DÉPENSES/RECETTES en ligne 2 — ordre intentionnel pour l'alignement visuel avec les données.
+- **Convention signe écart (onglet 1) :** charges → positif = rouge ; produits → positif = vert.
+- **En-tête de section :** labels colonnes en ligne 1, titre DÉPENSES/RECETTES en ligne 2.
+- **Cotisations exclues des onglets 2 et 3** : pas de `operation_id` ni de `seance`.
+- **Rapport par séances multi-opérations :** les séances de même numéro sont sommées ; c'est à l'utilisateur de choisir des opérations cohérentes. Les lignes avec `operation_id IS NULL` sont implicitement exclues par la clause `IN`.
+- **Barre de consommation budget (onglet 1) :** la barre est cappée à 100 % de largeur en CSS (`max-width: 100%`) ; la couleur rouge indique le dépassement. Un léger débordement visuel (pseudo-élément) peut être ajouté pour signaler visuellement `> 100 %`.
+- **Première année (onglet 1) :** `montant_n1 = null` quand aucune donnée n'existe pour N-1 dans la base, quelle qu'en soit la raison (première année ou sous-cat inexistante en N-1). Pas de notion d'année de fondation codée en dur.
