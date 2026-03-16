@@ -75,12 +75,12 @@
         </div>
     </div>
 
-    <table class="table table-striped table-hover">
-        <thead class="table-dark">
+    <table class="table table-striped table-hover" id="scTable">
+        <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
             <tr>
-                <th>Catégorie</th>
-                <th>Nom</th>
-                <th>Code CERFA</th>
+                <th data-col="0" style="cursor:pointer;user-select:none;">Catégorie <i class="bi bi-arrow-down-up text-secondary" id="sortIcon0"></i></th>
+                <th data-col="1" style="cursor:pointer;user-select:none;">Nom <i class="bi bi-arrow-down-up text-secondary" id="sortIcon1"></i></th>
+                <th data-col="2" style="cursor:pointer;user-select:none;">Code CERFA <i class="bi bi-arrow-down-up text-secondary" id="sortIcon2"></i></th>
                 <th class="text-center">Dons</th>
                 <th class="text-center">Cotisations</th>
                 <th style="width: 120px;">Actions</th>
@@ -204,5 +204,40 @@
     var scCatFilter = document.getElementById('scCatFilter');
     if (scCatFilter) { scCatFilter.addEventListener('change', filterSousCategories); }
 
+    // Tri par colonne
+    var sortState = { col: null, dir: 'asc' };
+    var iconClasses = { asc: 'bi-arrow-up', desc: 'bi-arrow-down', none: 'bi-arrow-down-up text-secondary' };
+
+    document.querySelectorAll('#scTable thead th[data-col]').forEach(function(th) {
+        th.addEventListener('click', function() {
+            var col = parseInt(this.dataset.col);
+            if (sortState.col === col) {
+                sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.col = col;
+                sortState.dir = 'asc';
+            }
+            // Mettre à jour les icônes
+            [0, 1, 2].forEach(function(i) {
+                var icon = document.getElementById('sortIcon' + i);
+                if (i === sortState.col) {
+                    icon.className = 'bi ' + iconClasses[sortState.dir];
+                } else {
+                    icon.className = 'bi ' + iconClasses.none;
+                }
+            });
+            // Trier les lignes
+            var tbody = document.querySelector('#scTable tbody');
+            var rows = Array.from(tbody.querySelectorAll('tr[data-type]'));
+            rows.sort(function(a, b) {
+                var aText = (a.cells[sortState.col] ? a.cells[sortState.col].textContent.trim() : '').toLowerCase();
+                var bText = (b.cells[sortState.col] ? b.cells[sortState.col].textContent.trim() : '').toLowerCase();
+                if (aText < bText) return sortState.dir === 'asc' ? -1 : 1;
+                if (aText > bText) return sortState.dir === 'asc' ? 1 : -1;
+                return 0;
+            });
+            rows.forEach(function(row) { tbody.appendChild(row); });
+        });
+    });
 </script>
 </x-app-layout>
