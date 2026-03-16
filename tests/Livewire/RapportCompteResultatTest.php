@@ -24,7 +24,7 @@ afterEach(function () {
 it('se rend sans erreur', function () {
     Livewire::test(RapportCompteResultat::class)
         ->assertOk()
-        ->assertSee('DÉPENSES')
+        ->assertSee('DEPENSES')
         ->assertSee('RECETTES')
         ->assertSee('Exporter CSV');
 });
@@ -56,7 +56,7 @@ it('affiche EXCÉDENT quand recettes > dépenses', function () {
     $r->lignes()->forceDelete();
     RecetteLigne::factory()->create(['recette_id' => $r->id, 'sous_categorie_id' => $scR->id, 'montant' => 500.00]);
 
-    Livewire::test(RapportCompteResultat::class)->assertSee('EXCÉDENT');
+    Livewire::test(RapportCompteResultat::class)->assertSeeHtml('EXC&Eacute;DENT');
 });
 
 it('affiche DÉFICIT quand dépenses > recettes', function () {
@@ -66,7 +66,7 @@ it('affiche DÉFICIT quand dépenses > recettes', function () {
     $d->lignes()->forceDelete();
     DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 5000.00]);
 
-    Livewire::test(RapportCompteResultat::class)->assertSee('DÉFICIT');
+    Livewire::test(RapportCompteResultat::class)->assertSeeHtml('D&Eacute;FICIT');
 });
 
 it('affiche la barre de budget quand un budget existe', function () {
