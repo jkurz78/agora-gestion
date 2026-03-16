@@ -8,6 +8,7 @@ use App\Http\Requests\StoreSousCategorieRequest;
 use App\Http\Requests\UpdateSousCategorieRequest;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,7 +18,7 @@ final class SousCategorieController extends Controller
     public function index(): View
     {
         return view('parametres.sous-categories.index', [
-            'categories'     => Categorie::with('sousCategories.categorie')->orderBy('nom')->get(),
+            'categories' => Categorie::with('sousCategories.categorie')->orderBy('nom')->get(),
             'sousCategories' => SousCategorie::with('categorie')->orderBy('nom')->get(),
         ]);
     }
@@ -67,7 +68,7 @@ final class SousCategorieController extends Controller
 
             return redirect()->route('parametres.sous-categories.index')
                 ->with('success', 'Sous-catégorie supprimée avec succès.');
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             if ($e->getCode() === '23000') {
                 return redirect()->route('parametres.sous-categories.index')
                     ->with('error', 'Suppression impossible : cet élément est utilisé dans les données de l\'application.');
