@@ -5,6 +5,8 @@ use App\Models\Categorie;
 use App\Models\Depense;
 use App\Models\DepenseLigne;
 use App\Models\Operation;
+use App\Models\Recette;
+use App\Models\RecetteLigne;
 use App\Models\SousCategorie;
 use App\Models\User;
 use Livewire\Livewire;
@@ -12,50 +14,60 @@ use Livewire\Livewire;
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
+    session(['exercice_actif' => 2025]);
 });
 
-it('renders with operation selector', function () {
-    $operation = Operation::factory()->withSeances(3)->create(['nom' => 'Festival été']);
-
-    Livewire::test(RapportSeances::class)
-        ->assertOk()
-        ->assertSee('Festival été')
-        ->assertSee('Opération');
+afterEach(function () {
+    session()->forget('exercice_actif');
 });
 
-it('shows pivot table when operation selected', function () {
-    $operation = Operation::factory()->withSeances(2)->create();
-    $depenseCat = Categorie::factory()->depense()->create();
-    $sc = SousCategorie::factory()->create([
-        'categorie_id' => $depenseCat->id,
-        'nom' => 'Location salle',
-    ]);
-
-    $depense = Depense::factory()->create([
-        'date' => '2025-10-01',
-        'saisi_par' => $this->user->id,
-    ]);
-    $depense->lignes()->forceDelete();
-    DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
-        'sous_categorie_id' => $sc->id,
-        'operation_id' => $operation->id,
-        'seance' => 1,
-        'montant' => 100.00,
-    ]);
-    DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
-        'sous_categorie_id' => $sc->id,
-        'operation_id' => $operation->id,
-        'seance' => 2,
-        'montant' => 150.00,
-    ]);
+it('se rend avec la liste des opérations ayant des séances', function () {
+    $opAvec    = Operation::factory()->withSeances(2)->create(['nom' => 'Festival']);
+    $opSans    = Operation::factory()->create(['nombre_seances' => null, 'nom' => 'Invisible']);
 
     Livewire::test(RapportSeances::class)
-        ->set('operation_id', $operation->id)
+        ->assertSee('Festival')
+        ->assertDontSee('Invisible');
+});
+
+it('affiche un message si aucune opération sélectionnée', function () {
+    Livewire::test(RapportSeances::class)
+        ->assertSee('Sélectionnez au moins une opération');
+});
+
+it('affiche les colonnes séances et le total', function () {
+    $op  = Operation::factory()->withSeances(2)->create();
+    $cat = Categorie::factory()->depense()->create(['nom' => 'Charges']);
+    $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Location salle']);
+
+    $d = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
+    DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 2, 'montant' => 150.00]);
+
+    Livewire::test(RapportSeances::class)
+        ->set('selectedOperationIds', [$op->id])
         ->assertSee('Location salle')
         ->assertSee('Séance 1')
         ->assertSee('Séance 2')
         ->assertSee('100,00')
-        ->assertSee('150,00');
+        ->assertSee('150,00')
+        ->assertSee('250,00'); // total
+});
+
+it('agrège les séances de même numéro sur plusieurs opérations', function () {
+    $op1 = Operation::factory()->withSeances(1)->create();
+    $op2 = Operation::factory()->withSeances(1)->create();
+    $cat = Categorie::factory()->depense()->create();
+    $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Salle']);
+
+    foreach ([$op1, $op2] as $op) {
+        $d = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+        $d->lignes()->forceDelete();
+        DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
+    }
+
+    Livewire::test(RapportSeances::class)
+        ->set('selectedOperationIds', [$op1->id, $op2->id])
+        ->assertSee('200,00'); // séance 1 agrégée
 });
