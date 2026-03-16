@@ -82,9 +82,9 @@
                         <tr class="cr-cat">
                             <td></td>
                             <td>{{ $cat['label'] }}</td>
-                            <td class="text-end cr-n1">{{ $fmt($cat['montant_n1']) }}</td>
-                            <td class="text-end">{{ $fmt($cat['montant_n']) }}</td>
-                            <td class="text-end">{{ $fmt($cat['budget']) }}</td>
+                            <td class="text-end cr-n1">{!! $fmt($cat['montant_n1']) !!}</td>
+                            <td class="text-end">{!! $fmt($cat['montant_n']) !!}</td>
+                            <td class="text-end">{!! $fmt($cat['budget']) !!}</td>
                             <td class="text-end">{!! $renderEcart($cat['montant_n'], $cat['budget'], $section['isCharge']) !!}</td>
                             <td class="text-center">{!! $renderBar($cat['montant_n'], $cat['budget']) !!}</td>
                         </tr>
@@ -92,9 +92,9 @@
                             <tr class="cr-sub">
                                 <td></td>
                                 <td style="padding-left:32px;">{{ $sc['label'] }}</td>
-                                <td class="text-end cr-n1">{{ $fmt($sc['montant_n1']) }}</td>
-                                <td class="text-end">{{ $fmt($sc['montant_n']) }}</td>
-                                <td class="text-end">{{ $fmt($sc['budget']) }}</td>
+                                <td class="text-end cr-n1">{!! $fmt($sc['montant_n1']) !!}</td>
+                                <td class="text-end">{!! $fmt($sc['montant_n']) !!}</td>
+                                <td class="text-end">{!! $fmt($sc['budget']) !!}</td>
                                 <td class="text-end">{!! $renderEcart($sc['montant_n'], $sc['budget'], $section['isCharge']) !!}</td>
                                 <td class="text-center">{!! $renderBar($sc['montant_n'], $sc['budget']) !!}</td>
                             </tr>
