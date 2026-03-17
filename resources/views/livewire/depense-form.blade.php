@@ -203,14 +203,11 @@
                     </div>
 
                     @if ($ventilationLigneId)
-                        @php
-                            $ligneSrc = \App\Models\DepenseLigne::with('sousCategorie')->find($ventilationLigneId);
-                        @endphp
-                        @if ($ligneSrc)
+                        @if ($ligneSrcVentilation)
                         <div class="border border-primary border-2 rounded p-3 mb-3" style="background:#f0f7ff">
                             <div class="fw-bold text-primary mb-2">
                                 <i class="bi bi-scissors"></i>
-                                Ventilation — {{ $ligneSrc->sousCategorie->nom }} ({{ number_format($ligneSrc->montant, 2, ',', ' ') }} €)
+                                Ventilation — {{ $ligneSrcVentilation->sousCategorie->nom }} ({{ number_format($ligneSrcVentilation->montant, 2, ',', ' ') }} €)
                             </div>
 
                             <table class="table table-sm mb-2">
@@ -267,7 +264,7 @@
                             </table>
 
                             @php
-                                $resteEn100 = (int) round((float) $ligneSrc->montant * 100)
+                                $resteEn100 = (int) round((float) $ligneSrcVentilation->montant * 100)
                                             - (int) round(collect($affectations)->sum(fn($a) => (float)($a['montant'] ?? 0)) * 100);
                                 $reste = $resteEn100 / 100;
                             @endphp

@@ -58,7 +58,8 @@ final class DepenseForm extends Component
     public function showNewForm(): void
     {
         $this->reset(['depenseId', 'date', 'libelle', 'mode_paiement',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes']);
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
+            'ventilationLigneId', 'affectations']);
         $this->isLocked = false;
         $this->resetValidation();
 
@@ -93,6 +94,11 @@ final class DepenseForm extends Component
 
     public function ouvrirVentilation(int $ligneId): void
     {
+        $allowedIds = collect($this->lignes)->pluck('id')->filter()->map(fn ($id) => (int) $id)->toArray();
+        if (! in_array($ligneId, $allowedIds, true)) {
+            abort(403);
+        }
+
         $ligne = DepenseLigne::with('affectations')->findOrFail($ligneId);
         $this->ventilationLigneId = $ligneId;
 
@@ -131,6 +137,11 @@ final class DepenseForm extends Component
 
     public function saveVentilation(): void
     {
+        $allowedIds = collect($this->lignes)->pluck('id')->filter()->map(fn ($id) => (int) $id)->toArray();
+        if ($this->ventilationLigneId === null || ! in_array($this->ventilationLigneId, $allowedIds, true)) {
+            abort(403);
+        }
+
         $this->validate([
             'affectations'                  => ['required', 'array', 'min:1'],
             'affectations.*.montant'        => ['required', 'numeric', 'min:0.01'],
@@ -138,6 +149,13 @@ final class DepenseForm extends Component
             'affectations.*.seance'         => ['nullable', 'integer', 'min:1'],
             'affectations.*.notes'          => ['nullable', 'string', 'max:255'],
         ]);
+
+        $ligneMontantCents = (int) round((float) DepenseLigne::findOrFail($this->ventilationLigneId)->montant * 100);
+        $affectationCents  = (int) round(collect($this->affectations)->sum(fn ($a) => (float) ($a['montant'] ?? 0)) * 100);
+        if ($ligneMontantCents !== $affectationCents) {
+            $this->addError('affectations', 'La somme des affectations doit être égale au montant de la ligne.');
+            return;
+        }
 
         $ligne = DepenseLigne::findOrFail($this->ventilationLigneId);
 
@@ -157,6 +175,11 @@ final class DepenseForm extends Component
 
     public function supprimerVentilation(): void
     {
+        $allowedIds = collect($this->lignes)->pluck('id')->filter()->map(fn ($id) => (int) $id)->toArray();
+        if ($this->ventilationLigneId === null || ! in_array($this->ventilationLigneId, $allowedIds, true)) {
+            abort(403);
+        }
+
         $ligne = DepenseLigne::findOrFail($this->ventilationLigneId);
         app(DepenseService::class)->supprimerAffectations($ligne);
         $this->fermerVentilation();
@@ -195,6 +218,7 @@ final class DepenseForm extends Component
         $this->reset([
             'depenseId', 'date', 'libelle', 'mode_paiement',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
+            'ventilationLigneId', 'affectations',
         ]);
         $this->resetValidation();
     }
@@ -287,6 +311,9 @@ final class DepenseForm extends Component
                     collect($this->lignes)->pluck('id')->filter()->toArray()
                 )->pluck('depense_ligne_id')->unique()->toArray()
                 : [],
+            'ligneSrcVentilation' => $this->ventilationLigneId
+                ? DepenseLigne::with('sousCategorie')->find($this->ventilationLigneId)
+                : null,
         ]);
     }
 }
