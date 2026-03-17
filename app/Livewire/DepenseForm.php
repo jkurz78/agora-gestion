@@ -9,6 +9,8 @@ use App\Enums\StatutOperation;
 use App\Enums\TypeCategorie;
 use App\Models\CompteBancaire;
 use App\Models\Depense;
+use App\Models\DepenseLigne;
+use App\Models\DepenseLigneAffectation;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Services\DepenseService;
@@ -41,6 +43,12 @@ final class DepenseForm extends Component
     public bool $showForm = false;
 
     public bool $isLocked = false;
+
+    // État du panneau de ventilation
+    public ?int $ventilationLigneId = null;
+
+    /** @var array<int, array{operation_id: string, seance: string, montant: string, notes: string}> */
+    public array $affectations = [];
 
     public function getMontantTotalProperty(): float
     {
@@ -81,6 +89,78 @@ final class DepenseForm extends Component
     {
         unset($this->lignes[$index]);
         $this->lignes = array_values($this->lignes);
+    }
+
+    public function ouvrirVentilation(int $ligneId): void
+    {
+        $ligne = DepenseLigne::with('affectations')->findOrFail($ligneId);
+        $this->ventilationLigneId = $ligneId;
+
+        if ($ligne->affectations->isEmpty()) {
+            $this->affectations = [[
+                'operation_id' => (string) ($ligne->operation_id ?? ''),
+                'seance'       => (string) ($ligne->seance ?? ''),
+                'montant'      => (string) $ligne->montant,
+                'notes'        => (string) ($ligne->notes ?? ''),
+            ]];
+        } else {
+            $this->affectations = $ligne->affectations->map(fn ($a) => [
+                'operation_id' => (string) ($a->operation_id ?? ''),
+                'seance'       => (string) ($a->seance ?? ''),
+                'montant'      => (string) $a->montant,
+                'notes'        => (string) ($a->notes ?? ''),
+            ])->toArray();
+        }
+    }
+
+    public function fermerVentilation(): void
+    {
+        $this->ventilationLigneId = null;
+        $this->affectations = [];
+    }
+
+    public function addAffectation(): void
+    {
+        $this->affectations[] = ['operation_id' => '', 'seance' => '', 'montant' => '', 'notes' => ''];
+    }
+
+    public function removeAffectation(int $index): void
+    {
+        array_splice($this->affectations, $index, 1);
+    }
+
+    public function saveVentilation(): void
+    {
+        $this->validate([
+            'affectations'                  => ['required', 'array', 'min:1'],
+            'affectations.*.montant'        => ['required', 'numeric', 'min:0.01'],
+            'affectations.*.operation_id'   => ['nullable'],
+            'affectations.*.seance'         => ['nullable', 'integer', 'min:1'],
+            'affectations.*.notes'          => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $ligne = DepenseLigne::findOrFail($this->ventilationLigneId);
+
+        app(DepenseService::class)->affecterLigne(
+            $ligne,
+            collect($this->affectations)->map(fn ($a) => [
+                'operation_id' => $a['operation_id'] !== '' ? (int) $a['operation_id'] : null,
+                'seance'       => $a['seance'] !== '' ? (int) $a['seance'] : null,
+                'montant'      => $a['montant'],
+                'notes'        => $a['notes'] ?: null,
+            ])->toArray()
+        );
+
+        $this->fermerVentilation();
+        $this->dispatch('depense-saved');
+    }
+
+    public function supprimerVentilation(): void
+    {
+        $ligne = DepenseLigne::findOrFail($this->ventilationLigneId);
+        app(DepenseService::class)->supprimerAffectations($ligne);
+        $this->fermerVentilation();
+        $this->dispatch('depense-saved');
     }
 
     #[On('edit-depense')]
@@ -201,6 +281,12 @@ final class DepenseForm extends Component
             'depense_numero_piece' => $this->depenseId
                 ? Depense::select('id', 'numero_piece')->find($this->depenseId)?->numero_piece
                 : null,
+            'lignesAffectations' => $this->depenseId
+                ? DepenseLigneAffectation::whereIn(
+                    'depense_ligne_id',
+                    collect($this->lignes)->pluck('id')->filter()->toArray()
+                )->pluck('depense_ligne_id')->unique()->toArray()
+                : [],
         ]);
     }
 }
