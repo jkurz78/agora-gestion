@@ -132,6 +132,12 @@ final class DepenseForm extends Component
 
     public function removeAffectation(int $index): void
     {
+        if ($this->ventilationLigneId === null) {
+            return;
+        }
+        if (! isset($this->affectations[$index])) {
+            return;
+        }
         array_splice($this->affectations, $index, 1);
     }
 
