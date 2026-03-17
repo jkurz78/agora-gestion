@@ -109,8 +109,15 @@ final class RecetteList extends Component
         }
 
         if ($this->operation_id) {
-            $query->whereHas('lignes', function ($q) {
-                $q->where('operation_id', $this->operation_id);
+            $opId = $this->operation_id;
+            $query->whereHas('lignes', function ($q) use ($opId): void {
+                $q->where(function ($inner) use ($opId): void {
+                    // Ligne sans affectation : operation_id direct
+                    $inner->where('operation_id', $opId)
+                        ->whereDoesntHave('affectations');
+                })->orWhereHas('affectations', function ($qa) use ($opId): void {
+                    $qa->where('operation_id', $opId);
+                });
             });
         }
 
