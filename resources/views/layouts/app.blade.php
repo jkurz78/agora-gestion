@@ -31,6 +31,7 @@
             return (!isNaN(dt) && dt.getDate()===d && dt.getMonth()===m && dt.getFullYear()===yr) ? dt : null;
         }
         if (/^\d{8}$/.test(str)) return make(str.slice(0,2), str.slice(2,4), str.slice(4,8));
+        if (/^\d{6}$/.test(str)) return make(str.slice(0,2), str.slice(2,4), 2000 + parseInt(str.slice(4,6), 10));
         if (/^\d{4}$/.test(str))  return make(str.slice(0,2), str.slice(2,4), y);
         const p = str.split(/[\/\-\.]/);
         if (p.length === 2) return make(p[0], p[1], y);
