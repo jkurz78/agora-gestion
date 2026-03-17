@@ -67,11 +67,12 @@ final class DepenseForm extends Component
     public function addLigne(): void
     {
         $this->lignes[] = [
+            'id'               => null,
             'sous_categorie_id' => '',
-            'operation_id' => '',
-            'seance' => '',
-            'montant' => '',
-            'notes' => '',
+            'operation_id'     => '',
+            'seance'           => '',
+            'montant'          => '',
+            'notes'            => '',
         ];
     }
 
@@ -96,11 +97,12 @@ final class DepenseForm extends Component
         $this->notes = $depense->notes;
 
         $this->lignes = $depense->lignes->map(fn ($ligne) => [
+            'id'               => $ligne->id,
             'sous_categorie_id' => (string) $ligne->sous_categorie_id,
-            'operation_id' => (string) ($ligne->operation_id ?? ''),
-            'seance' => (string) ($ligne->seance ?? ''),
-            'montant' => (string) $ligne->montant,
-            'notes' => (string) ($ligne->notes ?? ''),
+            'operation_id'     => (string) ($ligne->operation_id ?? ''),
+            'seance'           => (string) ($ligne->seance ?? ''),
+            'montant'          => (string) $ligne->montant,
+            'notes'            => (string) ($ligne->notes ?? ''),
         ])->toArray();
 
         $this->isLocked = $depense->isLockedByRapprochement();
@@ -118,21 +120,6 @@ final class DepenseForm extends Component
 
     public function save(): void
     {
-        if ($this->depenseId) {
-            $existing = Depense::with('lignes')->findOrFail($this->depenseId);
-            if ($existing->isLockedByRapprochement()) {
-                // Re-freeze the locked fields from the DB, ignoring user input
-                $this->date = $existing->date->format('Y-m-d');
-                $this->compte_id = $existing->compte_id;
-                // Re-freeze ligne montants
-                foreach ($existing->lignes as $i => $ligne) {
-                    if (isset($this->lignes[$i])) {
-                        $this->lignes[$i]['montant'] = (string) $ligne->montant;
-                    }
-                }
-            }
-        }
-
         $exerciceService = app(ExerciceService::class);
         $range = $exerciceService->dateRange($exerciceService->current());
         $dateDebut = $range['start']->toDateString();
@@ -140,7 +127,9 @@ final class DepenseForm extends Component
 
         $this->validate(
             [
-                'date' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
+                'date' => $this->isLocked
+                    ? ['required', 'date']
+                    : ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
                 'libelle'   => ['nullable', 'string', 'max:255'],
                 'reference' => ['required', 'string', 'max:100'],
                 'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
@@ -171,11 +160,12 @@ final class DepenseForm extends Component
         ];
 
         $lignes = collect($this->lignes)->map(fn ($l) => [
+            'id'               => isset($l['id']) ? (int) $l['id'] : null,
             'sous_categorie_id' => (int) $l['sous_categorie_id'],
-            'operation_id' => $l['operation_id'] !== '' ? (int) $l['operation_id'] : null,
-            'seance' => $l['seance'] !== '' ? (int) $l['seance'] : null,
-            'montant' => $l['montant'],
-            'notes' => $l['notes'] ?: null,
+            'operation_id'     => $l['operation_id'] !== '' ? (int) $l['operation_id'] : null,
+            'seance'           => $l['seance'] !== '' ? (int) $l['seance'] : null,
+            'montant'          => $l['montant'],
+            'notes'            => $l['notes'] ?: null,
         ])->toArray();
 
         $service = app(DepenseService::class);
