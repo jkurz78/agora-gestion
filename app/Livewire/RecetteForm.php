@@ -47,6 +47,10 @@ final class RecetteForm extends Component
     // État du panneau de ventilation
     public ?int $ventilationLigneId = null;
 
+    public string $ventilationLigneSousCategorie = '';
+
+    public string $ventilationLigneMontant = '';
+
     /** @var array<int, array{operation_id: string, seance: string, montant: string, notes: string}> */
     public array $affectations = [];
 
@@ -59,7 +63,7 @@ final class RecetteForm extends Component
     {
         $this->reset(['recetteId', 'date', 'libelle', 'mode_paiement',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
-            'ventilationLigneId', 'affectations']);
+            'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations']);
         $this->isLocked = false;
         $this->resetValidation();
 
@@ -99,8 +103,10 @@ final class RecetteForm extends Component
             abort(403);
         }
 
-        $ligne = RecetteLigne::with('affectations')->findOrFail($ligneId);
+        $ligne = RecetteLigne::with('affectations', 'sousCategorie')->findOrFail($ligneId);
         $this->ventilationLigneId = $ligneId;
+        $this->ventilationLigneSousCategorie = $ligne->sousCategorie->nom ?? '';
+        $this->ventilationLigneMontant = (string) $ligne->montant;
 
         if ($ligne->affectations->isEmpty()) {
             $this->affectations = [[
@@ -122,6 +128,8 @@ final class RecetteForm extends Component
     public function fermerVentilation(): void
     {
         $this->ventilationLigneId = null;
+        $this->ventilationLigneSousCategorie = '';
+        $this->ventilationLigneMontant = '';
         $this->affectations = [];
     }
 
@@ -195,6 +203,8 @@ final class RecetteForm extends Component
     public function edit(int $id): void
     {
         $this->ventilationLigneId = null;
+        $this->ventilationLigneSousCategorie = '';
+        $this->ventilationLigneMontant = '';
         $this->affectations = [];
 
         $recette = Recette::with('lignes')->findOrFail($id);
@@ -226,7 +236,7 @@ final class RecetteForm extends Component
         $this->reset([
             'recetteId', 'date', 'libelle', 'mode_paiement',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
-            'ventilationLigneId', 'affectations',
+            'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
         ]);
         $this->resetValidation();
     }
@@ -319,9 +329,6 @@ final class RecetteForm extends Component
                     collect($this->lignes)->pluck('id')->filter()->toArray()
                 )->pluck('recette_ligne_id')->unique()->toArray()
                 : [],
-            'ligneSrcVentilation' => $this->ventilationLigneId
-                ? RecetteLigne::with('sousCategorie')->find($this->ventilationLigneId)
-                : null,
         ]);
     }
 }
