@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithPerPage;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
 use Illuminate\View\View;
 use Livewire\Component;
-use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class MembreList extends Component
@@ -19,10 +19,18 @@ final class MembreList extends Component
     protected string $paginationTheme = 'bootstrap';
 
     public string $filtre = 'a_jour';
+
     public string $search = '';
 
-    public function updatedFiltre(): void { $this->resetPage(); }
-    public function updatedSearch(): void { $this->resetPage(); }
+    public function updatedFiltre(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
 
     public function render(): View
     {
@@ -43,8 +51,8 @@ final class MembreList extends Component
 
         if ($this->search !== '') {
             $query->where(function ($q): void {
-                $q->where('nom', 'like', '%' . $this->search . '%')
-                    ->orWhere('prenom', 'like', '%' . $this->search . '%');
+                $q->where('nom', 'like', '%'.$this->search.'%')
+                    ->orWhere('prenom', 'like', '%'.$this->search.'%');
             });
         }
 

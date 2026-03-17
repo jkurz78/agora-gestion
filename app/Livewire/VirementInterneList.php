@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithPerPage;
 use App\Models\VirementInterne;
 use App\Services\ExerciceService;
 use App\Services\VirementInterneService;
+use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class VirementInterneList extends Component
@@ -32,7 +33,7 @@ final class VirementInterneList extends Component
         }
     }
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         $exercice = app(ExerciceService::class)->current();
 

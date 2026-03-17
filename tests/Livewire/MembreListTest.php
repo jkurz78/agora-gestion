@@ -75,3 +75,16 @@ it('filtre par recherche texte sur le nom', function (): void {
         ->assertSee('Martin')
         ->assertDontSee('Dupont');
 });
+
+it('has default perPage of 20', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(MembreList::class)
+        ->assertSet('perPage', 20);
+});
+
+it('resets to page 1 when perPage changes', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(MembreList::class)
+        ->set('perPage', 50)
+        ->assertSet('paginators.page', 1);
+});
