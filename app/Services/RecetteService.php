@@ -91,6 +91,43 @@ final class RecetteService
         }
     }
 
+    public function affecterLigne(\App\Models\RecetteLigne $ligne, array $affectations): void
+    {
+        foreach ($affectations as $a) {
+            if ((int) round((float) ($a['montant'] ?? 0) * 100) <= 0) {
+                throw new \RuntimeException('Chaque affectation doit avoir un montant positif.');
+            }
+        }
+
+        $somme = (int) round(
+            collect($affectations)->sum(fn ($a) => (float) $a['montant']) * 100
+        );
+        $attendu = (int) round((float) $ligne->montant * 100);
+
+        if ($somme !== $attendu) {
+            throw new \RuntimeException(
+                "La somme des affectations ({$somme} centimes) ne correspond pas au montant de la ligne ({$attendu} centimes)."
+            );
+        }
+
+        DB::transaction(function () use ($ligne, $affectations) {
+            $ligne->affectations()->delete();
+            foreach ($affectations as $a) {
+                $ligne->affectations()->create([
+                    'operation_id' => $a['operation_id'] ?: null,
+                    'seance'       => $a['seance'] ?: null,
+                    'montant'      => $a['montant'],
+                    'notes'        => $a['notes'] ?: null,
+                ]);
+            }
+        });
+    }
+
+    public function supprimerAffectations(\App\Models\RecetteLigne $ligne): void
+    {
+        $ligne->affectations()->delete();
+    }
+
     public function delete(Recette $recette): void
     {
         if ($recette->rapprochement_id !== null) {
