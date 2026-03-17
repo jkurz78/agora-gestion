@@ -9,11 +9,13 @@ use App\Services\ExerciceService;
 use App\Services\VirementInterneService;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class VirementInterneList extends Component
 {
     use WithPagination;
+    use WithPerPage;
 
     protected string $paginationTheme = 'bootstrap';
 
@@ -37,7 +39,7 @@ final class VirementInterneList extends Component
         $virements = VirementInterne::with(['compteSource', 'compteDestination', 'saisiPar'])
             ->forExercice($exercice)
             ->orderByDesc('date')
-            ->paginate(20);
+            ->paginate($this->effectivePerPage());
 
         return view('livewire.virement-interne-list', [
             'virements' => $virements,

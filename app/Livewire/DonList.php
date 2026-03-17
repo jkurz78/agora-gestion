@@ -10,11 +10,13 @@ use App\Services\DonService;
 use App\Services\ExerciceService;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class DonList extends Component
 {
     use WithPagination;
+    use WithPerPage;
 
     protected string $paginationTheme = 'bootstrap';
 
@@ -95,7 +97,7 @@ final class DonList extends Component
         }
 
         return view('livewire.don-list', [
-            'dons'       => $query->paginate(15),
+            'dons'       => $query->paginate($this->effectivePerPage()),
             'operations' => Operation::orderBy('nom')->get(),
             'naturesdon' => \App\Models\SousCategorie::where('pour_dons', true)->orderBy('nom')->get(),
             'tiersDons'  => $tiersDons,

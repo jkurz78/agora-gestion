@@ -138,6 +138,7 @@
                 </table>
             </div>
             <div class="mt-3">
+                <x-per-page-selector :paginator="$rapprochements" storageKey="rapprochements" wire:model.live="perPage" />
                 {{ $rapprochements->links() }}
             </div>
         @endif

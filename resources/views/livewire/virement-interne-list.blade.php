@@ -62,6 +62,7 @@
             </table>
         </div>
         <div class="mt-3">
+            <x-per-page-selector :paginator="$virements" storageKey="virements" wire:model.live="perPage" />
             {{ $virements->links() }}
         </div>
     @endif

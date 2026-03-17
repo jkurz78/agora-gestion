@@ -10,11 +10,13 @@ use App\Services\TiersService;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class TiersList extends Component
 {
     use WithPagination;
+    use WithPerPage;
 
     protected string $paginationTheme = 'bootstrap';
 
@@ -63,7 +65,7 @@ final class TiersList extends Component
         }
 
         return view('livewire.tiers-list', [
-            'tiersList' => $query->paginate(20),
+            'tiersList' => $query->paginate($this->effectivePerPage()),
         ]);
     }
 }
