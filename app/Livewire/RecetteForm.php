@@ -150,14 +150,13 @@ final class RecetteForm extends Component
             'affectations.*.notes'          => ['nullable', 'string', 'max:255'],
         ]);
 
-        $ligneMontantCents = (int) round((float) RecetteLigne::findOrFail($this->ventilationLigneId)->montant * 100);
+        $ligne = RecetteLigne::findOrFail($this->ventilationLigneId);
+        $ligneMontantCents = (int) round((float) $ligne->montant * 100);
         $affectationCents  = (int) round(collect($this->affectations)->sum(fn ($a) => (float) ($a['montant'] ?? 0)) * 100);
         if ($ligneMontantCents !== $affectationCents) {
             $this->addError('affectations', 'La somme des affectations doit être égale au montant de la ligne.');
             return;
         }
-
-        $ligne = RecetteLigne::findOrFail($this->ventilationLigneId);
 
         app(RecetteService::class)->affecterLigne(
             $ligne,
@@ -189,6 +188,9 @@ final class RecetteForm extends Component
     #[On('edit-recette')]
     public function edit(int $id): void
     {
+        $this->ventilationLigneId = null;
+        $this->affectations = [];
+
         $recette = Recette::with('lignes')->findOrFail($id);
 
         $this->recetteId = $recette->id;

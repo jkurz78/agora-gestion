@@ -150,14 +150,13 @@ final class DepenseForm extends Component
             'affectations.*.notes'          => ['nullable', 'string', 'max:255'],
         ]);
 
-        $ligneMontantCents = (int) round((float) DepenseLigne::findOrFail($this->ventilationLigneId)->montant * 100);
+        $ligne = DepenseLigne::findOrFail($this->ventilationLigneId);
+        $ligneMontantCents = (int) round((float) $ligne->montant * 100);
         $affectationCents  = (int) round(collect($this->affectations)->sum(fn ($a) => (float) ($a['montant'] ?? 0)) * 100);
         if ($ligneMontantCents !== $affectationCents) {
             $this->addError('affectations', 'La somme des affectations doit être égale au montant de la ligne.');
             return;
         }
-
-        $ligne = DepenseLigne::findOrFail($this->ventilationLigneId);
 
         app(DepenseService::class)->affecterLigne(
             $ligne,
@@ -189,6 +188,9 @@ final class DepenseForm extends Component
     #[On('edit-depense')]
     public function edit(int $id): void
     {
+        $this->ventilationLigneId = null;
+        $this->affectations = [];
+
         $depense = Depense::with('lignes')->findOrFail($id);
 
         $this->depenseId = $depense->id;
