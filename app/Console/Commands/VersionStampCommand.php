@@ -35,7 +35,7 @@ final class VersionStampCommand extends Command
         $sha   = ($shaCode === 0 && isset($shaOutput[0])) ? trim($shaOutput[0]) : 'unknown';
 
         return [
-            'tag'  => 'v1.0.' . $build,
+            'tag'  => 'v1.01.' . $build,
             'date' => $sha,
             'year' => date('Y'),
         ];
