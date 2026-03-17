@@ -387,6 +387,10 @@ final class RapportService
         }
     }
 
+    /**
+     * @param array<int> $operationIds
+     * @param array<int, array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,seance:int,montant:float}>> $map
+     */
     private function accumulerRecettesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
     {
         // Lignes sans affectations
