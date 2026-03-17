@@ -58,8 +58,7 @@
                     <div class="row g-2 align-items-end">
                         <div class="col-md-3">
                             <label class="form-label">Date de fin du relevé <span class="text-danger">*</span></label>
-                            <input type="date" wire:model="date_fin"
-                                   class="form-control @error('date_fin') is-invalid @enderror">
+                            <x-date-input name="date_fin" wire:model="date_fin" :value="$date_fin" />
                             @error('date_fin') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-3">
