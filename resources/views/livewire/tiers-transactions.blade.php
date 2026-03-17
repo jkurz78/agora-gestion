@@ -17,11 +17,11 @@
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Du</label>
-                    <input type="date" wire:model.live="dateDebut" class="form-control form-control-sm">
+                    <x-date-input name="date_debut" wire:model.live="dateDebut" :value="$dateDebut" />
                 </div>
                 <div class="col-md-2">
                     <label class="form-label">Au</label>
-                    <input type="date" wire:model.live="dateFin" class="form-control form-control-sm">
+                    <x-date-input name="date_fin" wire:model.live="dateFin" :value="$dateFin" />
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Libellé</label>

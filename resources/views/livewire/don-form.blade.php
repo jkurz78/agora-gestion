@@ -33,8 +33,7 @@
                         </div>
                         <div class="col-md-2">
                             <label for="date" class="form-label">Date <span class="text-danger">*</span></label>
-                            <input type="date" wire:model="date" id="date"
-                                   class="form-control @error('date') is-invalid @enderror">
+                            <x-date-input name="date" wire:model="date" :value="$date" />
                             @error('date')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

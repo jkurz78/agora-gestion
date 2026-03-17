@@ -38,8 +38,7 @@
                         </div>
                         <div class="col-md-2">
                             <label for="date_paiement" class="form-label">Date paiement <span class="text-danger">*</span></label>
-                            <input type="date" wire:model="date_paiement" id="date_paiement"
-                                   class="form-control @error('date_paiement') is-invalid @enderror">
+                            <x-date-input name="date_paiement" wire:model="date_paiement" :value="$date_paiement" />
                             @error('date_paiement')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

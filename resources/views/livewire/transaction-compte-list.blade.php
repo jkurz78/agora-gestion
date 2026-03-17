@@ -12,11 +12,11 @@
         </div>
         <div class="col-md-2">
             <label for="dateDebut" class="form-label">Date début</label>
-            <input type="date" wire:model.live="dateDebut" id="dateDebut" class="form-control">
+            <x-date-input name="date_debut" wire:model.live="dateDebut" :value="$dateDebut" />
         </div>
         <div class="col-md-2">
             <label for="dateFin" class="form-label">Date fin</label>
-            <input type="date" wire:model.live="dateFin" id="dateFin" class="form-control">
+            <x-date-input name="date_fin" wire:model.live="dateFin" :value="$dateFin" />
         </div>
         <div class="col-md-3">
             <label for="searchTiers" class="form-label">Tiers</label>
