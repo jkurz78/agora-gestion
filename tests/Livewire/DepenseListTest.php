@@ -120,3 +120,14 @@ it('resets to page 1 when perPage changes', function () {
         ->set('perPage', 50)
         ->assertSet('paginators.page', 1);
 });
+
+it('shows all records when perPage is 0 (Tous)', function () {
+    Depense::factory(25)->create([
+        'saisi_par' => $this->user->id,
+        'date'      => '2025-10-15',
+    ]);
+
+    Livewire::test(DepenseList::class)
+        ->set('perPage', 0)
+        ->assertViewHas('depenses', fn ($p) => $p->total() === 25);
+});
