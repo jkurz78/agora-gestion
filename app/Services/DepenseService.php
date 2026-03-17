@@ -50,7 +50,17 @@ final class DepenseService
                 foreach ($lignes as $ligneData) {
                     $oldId = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
                     if ($oldId !== null) {
-                        $aff = $depense->lignes()->where('id', $oldId)->first()?->affectations()->get() ?? collect();
+                        $existingLigne = $depense->lignes()->where('id', $oldId)->first();
+                        if ($existingLigne === null) {
+                            continue;
+                        }
+                        // Only preserve affectations if montant is unchanged (compare in centimes)
+                        $oldCents = (int) round((float) $existingLigne->montant * 100);
+                        $newCents = (int) round((float) $ligneData['montant'] * 100);
+                        if ($oldCents !== $newCents) {
+                            continue; // montant changed — drop affectations, user must re-ventilate
+                        }
+                        $aff = $existingLigne->affectations()->get();
                         if ($aff->isNotEmpty()) {
                             $affectationsSnapshot[$oldId] = $aff->map(fn ($a) => [
                                 'operation_id' => $a->operation_id,

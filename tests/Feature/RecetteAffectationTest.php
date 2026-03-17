@@ -155,3 +155,44 @@ it('update() sur pièce non verrouillée préserve les affectations existantes',
     expect($newLigne->affectations)->toHaveCount(2);
     expect((float) $newLigne->affectations->sum('montant'))->toBe(100.0);
 });
+
+it('update() non verrouillé supprime les affectations quand le montant de ligne change', function () {
+    $compte = \App\Models\CompteBancaire::factory()->create();
+    $sousCategorie = \App\Models\SousCategorie::factory()->create();
+    $op = \App\Models\Operation::factory()->create();
+
+    $recette = \App\Models\Recette::factory()->create([
+        'compte_id' => $compte->id,
+        'montant_total' => 100.00,
+    ]);
+    $recette->lignes()->forceDelete();
+    $ligne = $recette->lignes()->create([
+        'sous_categorie_id' => $sousCategorie->id,
+        'operation_id' => null,
+        'montant' => 100.00,
+        'seance' => null,
+        'notes' => null,
+    ]);
+    $ligne->affectations()->create([
+        'operation_id' => $op->id,
+        'seance' => null,
+        'montant' => 100.00,
+        'notes' => null,
+    ]);
+
+    // Update with a different montant — affectations must be dropped
+    $service = app(\App\Services\RecetteService::class);
+    $service->update($recette, [
+        'date' => $recette->date->format('Y-m-d'),
+        'libelle' => $recette->libelle,
+        'montant_total' => 150.00,
+        'mode_paiement' => $recette->mode_paiement->value,
+        'compte_id' => $recette->compte_id,
+        'reference' => $recette->reference,
+    ], [
+        ['id' => $ligne->id, 'sous_categorie_id' => $sousCategorie->id, 'montant' => '150.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    $newLigne = $recette->fresh(['lignes.affectations'])->lignes->first();
+    expect($newLigne->affectations)->toHaveCount(0);
+});
