@@ -28,7 +28,7 @@ it('affiche un message quand aucune transaction', function (): void {
 });
 
 it('affiche les dépenses du tiers', function (): void {
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Achat test']);
+    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Achat test', 'date' => '2025-10-01']);
 
     Livewire::actingAs($this->user)
         ->test(TiersTransactions::class, ['tiersId' => $this->tiers->id])
@@ -36,8 +36,8 @@ it('affiche les dépenses du tiers', function (): void {
 });
 
 it('filtre par type', function (): void {
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma dépense']);
-    Don::factory()->create(['tiers_id' => $this->tiers->id, 'objet' => 'Mon don']);
+    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma dépense', 'date' => '2025-10-01']);
+    Don::factory()->create(['tiers_id' => $this->tiers->id, 'objet' => 'Mon don', 'date' => '2025-10-01']);
 
     Livewire::actingAs($this->user)
         ->test(TiersTransactions::class, ['tiersId' => $this->tiers->id])
@@ -47,8 +47,8 @@ it('filtre par type', function (): void {
 });
 
 it('filtre par recherche texte', function (): void {
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Frais transport']);
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Loyer bureau']);
+    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Frais transport', 'date' => '2025-10-01']);
+    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Loyer bureau', 'date' => '2025-10-01']);
 
     Livewire::actingAs($this->user)
         ->test(TiersTransactions::class, ['tiersId' => $this->tiers->id])
