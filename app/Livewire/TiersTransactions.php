@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\Tiers;
+use App\Services\ExerciceService;
 use App\Services\TiersTransactionService;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -26,6 +27,14 @@ final class TiersTransactions extends Component
     public string $search     = '';
     public string $sortBy     = 'date';
     public string $sortDir    = 'desc';
+
+    public function mount(int $tiersId): void
+    {
+        $this->tiersId = $tiersId;
+        $exercice = app(ExerciceService::class)->current();
+        $this->dateDebut = "{$exercice}-09-01";
+        $this->dateFin   = ($exercice + 1).'-08-31';
+    }
 
     public function sort(string $col): void
     {
