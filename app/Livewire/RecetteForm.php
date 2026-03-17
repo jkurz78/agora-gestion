@@ -10,6 +10,8 @@ use App\Enums\TypeCategorie;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Recette;
+use App\Models\RecetteLigne;
+use App\Models\RecetteLigneAffectation;
 use App\Models\SousCategorie;
 use App\Services\ExerciceService;
 use App\Services\RecetteService;
@@ -41,6 +43,12 @@ final class RecetteForm extends Component
     public bool $showForm = false;
 
     public bool $isLocked = false;
+
+    // État du panneau de ventilation
+    public ?int $ventilationLigneId = null;
+
+    /** @var array<int, array{operation_id: string, seance: string, montant: string, notes: string}> */
+    public array $affectations = [];
 
     public function getMontantTotalProperty(): float
     {
@@ -81,6 +89,78 @@ final class RecetteForm extends Component
     {
         unset($this->lignes[$index]);
         $this->lignes = array_values($this->lignes);
+    }
+
+    public function ouvrirVentilation(int $ligneId): void
+    {
+        $ligne = RecetteLigne::with('affectations')->findOrFail($ligneId);
+        $this->ventilationLigneId = $ligneId;
+
+        if ($ligne->affectations->isEmpty()) {
+            $this->affectations = [[
+                'operation_id' => (string) ($ligne->operation_id ?? ''),
+                'seance'       => (string) ($ligne->seance ?? ''),
+                'montant'      => (string) $ligne->montant,
+                'notes'        => (string) ($ligne->notes ?? ''),
+            ]];
+        } else {
+            $this->affectations = $ligne->affectations->map(fn ($a) => [
+                'operation_id' => (string) ($a->operation_id ?? ''),
+                'seance'       => (string) ($a->seance ?? ''),
+                'montant'      => (string) $a->montant,
+                'notes'        => (string) ($a->notes ?? ''),
+            ])->toArray();
+        }
+    }
+
+    public function fermerVentilation(): void
+    {
+        $this->ventilationLigneId = null;
+        $this->affectations = [];
+    }
+
+    public function addAffectation(): void
+    {
+        $this->affectations[] = ['operation_id' => '', 'seance' => '', 'montant' => '', 'notes' => ''];
+    }
+
+    public function removeAffectation(int $index): void
+    {
+        array_splice($this->affectations, $index, 1);
+    }
+
+    public function saveVentilation(): void
+    {
+        $this->validate([
+            'affectations'                  => ['required', 'array', 'min:1'],
+            'affectations.*.montant'        => ['required', 'numeric', 'min:0.01'],
+            'affectations.*.operation_id'   => ['nullable'],
+            'affectations.*.seance'         => ['nullable', 'integer', 'min:1'],
+            'affectations.*.notes'          => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $ligne = RecetteLigne::findOrFail($this->ventilationLigneId);
+
+        app(RecetteService::class)->affecterLigne(
+            $ligne,
+            collect($this->affectations)->map(fn ($a) => [
+                'operation_id' => $a['operation_id'] !== '' ? (int) $a['operation_id'] : null,
+                'seance'       => $a['seance'] !== '' ? (int) $a['seance'] : null,
+                'montant'      => $a['montant'],
+                'notes'        => $a['notes'] ?: null,
+            ])->toArray()
+        );
+
+        $this->fermerVentilation();
+        $this->dispatch('recette-saved');
+    }
+
+    public function supprimerVentilation(): void
+    {
+        $ligne = RecetteLigne::findOrFail($this->ventilationLigneId);
+        app(RecetteService::class)->supprimerAffectations($ligne);
+        $this->fermerVentilation();
+        $this->dispatch('recette-saved');
     }
 
     #[On('edit-recette')]
@@ -201,6 +281,12 @@ final class RecetteForm extends Component
             'recette_numero_piece' => $this->recetteId
                 ? Recette::select('id', 'numero_piece')->find($this->recetteId)?->numero_piece
                 : null,
+            'lignesAffectations'  => $this->recetteId
+                ? RecetteLigneAffectation::whereIn(
+                    'recette_ligne_id',
+                    collect($this->lignes)->pluck('id')->filter()->toArray()
+                )->pluck('recette_ligne_id')->unique()->toArray()
+                : [],
         ]);
     }
 }
