@@ -174,6 +174,7 @@ final class RapportService
             ])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
 
+        $q2->whereNotNull('dla.operation_id');
         if ($operationIds !== null) {
             $q2->whereIn('dla.operation_id', $operationIds);
         }
@@ -308,6 +309,7 @@ final class RapportService
             ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
             ->whereNull('depense_lignes.deleted_at')->whereNull('d.deleted_at')
             ->whereNotNull('dla.seance')
+            ->whereNotNull('dla.operation_id')
             ->whereIn('dla.operation_id', $operationIds)
             ->whereBetween('d.date', [$start, $end])
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'dla.seance', DB::raw('SUM(dla.montant) as montant')])
@@ -362,6 +364,7 @@ final class RapportService
             ->whereBetween('r.date', [$start, $end])
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(rla.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+        $rq2->whereNotNull('rla.operation_id');
         if ($operationIds !== null) {
             $rq2->whereIn('rla.operation_id', $operationIds);
         }
@@ -409,6 +412,7 @@ final class RapportService
             ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
             ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
             ->whereNotNull('rla.seance')
+            ->whereNotNull('rla.operation_id')
             ->whereIn('rla.operation_id', $operationIds)
             ->whereBetween('r.date', [$start, $end])
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'rla.seance', DB::raw('SUM(rla.montant) as montant')])
