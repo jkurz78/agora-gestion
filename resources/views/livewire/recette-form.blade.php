@@ -174,7 +174,7 @@
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            @if ($ligne['id'] !== null)
+                                            @if (($ligne['id'] ?? null) !== null)
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">

@@ -92,6 +92,7 @@ it('ne supprime pas une recette verrouillée par un rapprochement', function () 
     $rapprochement = \App\Models\RapprochementBancaire::factory()->create([
         'compte_id' => $this->compte->id,
         'statut' => \App\Enums\StatutRapprochement::Verrouille,
+        'verrouille_at' => now(),
         'saisi_par' => $this->user->id,
     ]);
     $recette = Recette::factory()->create([
