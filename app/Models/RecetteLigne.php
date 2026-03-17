@@ -51,4 +51,9 @@ final class RecetteLigne extends Model
     {
         return $this->belongsTo(Operation::class);
     }
+
+    public function affectations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RecetteLigneAffectation::class);
+    }
 }
