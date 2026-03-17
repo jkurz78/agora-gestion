@@ -41,7 +41,8 @@
                x-ref="input"
                class="form-control"
                placeholder="jj/mm/aaaa"
-               autocomplete="off">
+               autocomplete="off"
+               {{ $attributes->except(['name', 'value', 'disabled', 'id'])->filter(fn($v, $k) => !str_starts_with($k, 'wire:')) }}>
         <span class="input-group-text" style="cursor:pointer"
               @click="fp && fp.toggle()">
             <i class="bi bi-calendar3"></i>

@@ -39,7 +39,7 @@
                 </div>
                 <div class="col-md-2">
                     <label for="cb_date" class="form-label">Date solde</label>
-                    <x-date-input name="date_solde_initial" value="" />
+                    <x-date-input name="date_solde_initial" value="" required />
                 </div>
                 <div class="col-md-2">
                     <div class="form-check mt-4">
@@ -151,7 +151,7 @@
                     </div>
                     <div class="col-md-6">
                         <label for="edit_date" class="form-label">Date solde <span class="text-danger">*</span></label>
-                        <x-date-input name="date_solde_initial" id="edit_date" value="" />
+                        <x-date-input name="date_solde_initial" id="edit_date" value="" required />
                     </div>
                     <div class="col-12">
                         <div class="form-check">

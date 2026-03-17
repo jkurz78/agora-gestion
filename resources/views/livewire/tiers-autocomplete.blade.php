@@ -36,7 +36,7 @@
             "
             x-on:keydown.escape="$wire.set('open', false); highlighted = -1"
             x-on:keydown.tab="
-                let items = document.querySelectorAll('[data-nav-item]');
+                let items = $root.querySelectorAll('[data-nav-item]');
                 if (highlighted >= 0 && items[highlighted]) {
                     items[highlighted].click();
                     highlighted = -1;
