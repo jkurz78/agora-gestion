@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Models\CompteBancaire;
 use App\Models\Categorie;
 use App\Models\Depense;
@@ -85,24 +87,23 @@ it('une ligne sans affectation continue d\'utiliser son operation_id direct', fu
 });
 
 it('le rapport onglet 2 prend en compte les affectations de dépenses', function () {
-    $categorieD = \App\Models\Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    $sousCatD   = \App\Models\SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
-    $compte     = \App\Models\CompteBancaire::factory()->create();
+    $categorieD = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
+    $sousCatD   = SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
 
-    $depense = \App\Models\Depense::factory()->create([
-        'compte_id'    => $compte->id,
+    $depense = Depense::factory()->create([
+        'compte_id'    => $this->compte->id,
         'date'         => '2025-10-15',
         'montant_total' => 12000.00,
     ]);
     $depense->lignes()->forceDelete();
-    $ligne = \App\Models\DepenseLigne::factory()->create([
+    $ligne = DepenseLigne::factory()->create([
         'depense_id'       => $depense->id,
         'sous_categorie_id' => $sousCatD->id,
         'operation_id'     => null,
         'montant'          => 12000.00,
     ]);
 
-    \App\Models\DepenseLigneAffectation::create([
+    DepenseLigneAffectation::create([
         'depense_ligne_id' => $ligne->id,
         'operation_id'     => $this->op1->id,
         'montant'          => 7000.00,
@@ -121,13 +122,13 @@ it('le rapport onglet 2 prend en compte les affectations de dépenses', function
 });
 
 it('le rapport onglet 3 prend en compte les affectations de recettes avec séance', function () {
-    $recette = \App\Models\Recette::factory()->create([
+    $recette = Recette::factory()->create([
         'compte_id'    => $this->compte->id,
         'date'         => '2025-10-15',
         'montant_total' => 3000.00,
     ]);
     $recette->lignes()->forceDelete();
-    $ligne = \App\Models\RecetteLigne::factory()->create([
+    $ligne = RecetteLigne::factory()->create([
         'recette_id'       => $recette->id,
         'sous_categorie_id' => $this->sousCategorie->id,
         'operation_id'     => null,

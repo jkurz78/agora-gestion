@@ -225,36 +225,12 @@ final class RapportService
             }
         };
 
-        // Recettes — Partie 1 : lignes sans affectations
-        $rq1 = DB::table('recette_lignes')
-            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
-            ->leftJoin('recette_ligne_affectations as rla', 'rla.recette_ligne_id', '=', 'recette_lignes.id')
-            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
-            ->whereNull('rla.id')
-            ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(recette_lignes.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
-        if ($operationIds !== null) {
-            $rq1->whereIn('recette_lignes.operation_id', $operationIds);
+        // Recettes (avec résolution des affectations)
+        $recettesMap = [];
+        $this->accumulerRecettesResolues($start, $end, $operationIds, $recettesMap);
+        foreach ($recettesMap as $row) {
+            $accumuler(collect([(object) $row]));
         }
-        $accumuler($rq1->get());
-
-        // Recettes — Partie 2 : lignes avec affectations
-        $rq2 = DB::table('recette_ligne_affectations as rla')
-            ->join('recette_lignes', 'recette_lignes.id', '=', 'rla.recette_ligne_id')
-            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
-            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
-            ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(rla.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
-        if ($operationIds !== null) {
-            $rq2->whereIn('rla.operation_id', $operationIds);
-        }
-        $accumuler($rq2->get());
 
         // Dons (sous_categorie_id nullable → INNER JOIN exclut ceux sans sous-catégorie)
         $dq = Don::query()
@@ -356,6 +332,110 @@ final class RapportService
     }
 
     /**
+     * @param array<int>|null $operationIds
+     * @param array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,montant:float}> $map
+     */
+    private function accumulerRecettesResolues(string $start, string $end, ?array $operationIds, array &$map): void
+    {
+        // Partie 1 : lignes sans affectations
+        $rq1 = DB::table('recette_lignes')
+            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
+            ->leftJoin('recette_ligne_affectations as rla', 'rla.recette_ligne_id', '=', 'recette_lignes.id')
+            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
+            ->whereNull('rla.id')
+            ->whereBetween('r.date', [$start, $end])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(recette_lignes.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+        if ($operationIds !== null) {
+            $rq1->whereIn('recette_lignes.operation_id', $operationIds);
+        }
+
+        // Partie 2 : lignes avec affectations
+        $rq2 = DB::table('recette_ligne_affectations as rla')
+            ->join('recette_lignes', 'recette_lignes.id', '=', 'rla.recette_ligne_id')
+            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
+            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
+            ->whereBetween('r.date', [$start, $end])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(rla.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+        if ($operationIds !== null) {
+            $rq2->whereIn('rla.operation_id', $operationIds);
+        }
+
+        foreach ([$rq1->get(), $rq2->get()] as $rows) {
+            foreach ($rows as $row) {
+                $scId = (int) $row->sous_categorie_id;
+                if (isset($map[$scId])) {
+                    $map[$scId]['montant'] += (float) $row->montant;
+                } else {
+                    $map[$scId] = [
+                        'categorie_id'       => (int) $row->categorie_id,
+                        'categorie_nom'      => $row->categorie_nom,
+                        'sous_categorie_id'  => $scId,
+                        'sous_categorie_nom' => $row->sous_categorie_nom,
+                        'montant'            => (float) $row->montant,
+                    ];
+                }
+            }
+        }
+    }
+
+    private function accumulerRecettesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
+    {
+        // Lignes sans affectations
+        $rows1 = DB::table('recette_lignes')
+            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
+            ->leftJoin('recette_ligne_affectations as rla', 'rla.recette_ligne_id', '=', 'recette_lignes.id')
+            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
+            ->whereNull('rla.id')
+            ->whereNotNull('recette_lignes.seance')
+            ->whereIn('recette_lignes.operation_id', $operationIds)
+            ->whereBetween('r.date', [$start, $end])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'recette_lignes.seance', DB::raw('SUM(recette_lignes.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'recette_lignes.seance')
+            ->get();
+
+        // Lignes avec affectations
+        $rows2 = DB::table('recette_ligne_affectations as rla')
+            ->join('recette_lignes', 'recette_lignes.id', '=', 'rla.recette_ligne_id')
+            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
+            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
+            ->whereNotNull('rla.seance')
+            ->whereIn('rla.operation_id', $operationIds)
+            ->whereBetween('r.date', [$start, $end])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'rla.seance', DB::raw('SUM(rla.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'rla.seance')
+            ->get();
+
+        foreach ([$rows1, $rows2] as $rows) {
+            foreach ($rows as $row) {
+                $scId = (int) $row->sous_categorie_id;
+                $seance = (int) $row->seance;
+                if (isset($map[$scId][$seance])) {
+                    $map[$scId][$seance]['montant'] += (float) $row->montant;
+                } else {
+                    $map[$scId][$seance] = [
+                        'categorie_id'       => (int) $row->categorie_id,
+                        'categorie_nom'      => $row->categorie_nom,
+                        'sous_categorie_id'  => $scId,
+                        'sous_categorie_nom' => $row->sous_categorie_nom,
+                        'seance'             => $seance,
+                        'montant'            => (float) $row->montant,
+                    ];
+                }
+            }
+        }
+    }
+
+    /**
      * Agrégation des produits par séance (recettes + dons ; cotisations exclues).
      *
      * @param  array<int>  $operationIds
@@ -385,34 +465,14 @@ final class RapportService
             }
         };
 
-        // Recettes par séance — Partie 1 : lignes sans affectations
-        $accumuler(DB::table('recette_lignes')
-            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
-            ->leftJoin('recette_ligne_affectations as rla', 'rla.recette_ligne_id', '=', 'recette_lignes.id')
-            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
-            ->whereNull('rla.id')
-            ->whereNotNull('recette_lignes.seance')
-            ->whereIn('recette_lignes.operation_id', $operationIds)
-            ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'recette_lignes.seance', DB::raw('SUM(recette_lignes.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'recette_lignes.seance')
-            ->get());
-
-        // Recettes par séance — Partie 2 : lignes avec affectations
-        $accumuler(DB::table('recette_ligne_affectations as rla')
-            ->join('recette_lignes', 'recette_lignes.id', '=', 'rla.recette_ligne_id')
-            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
-            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
-            ->whereNotNull('rla.seance')
-            ->whereIn('rla.operation_id', $operationIds)
-            ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'rla.seance', DB::raw('SUM(rla.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'rla.seance')
-            ->get());
+        // Recettes par séance (avec résolution des affectations)
+        $recettesSeancesMap = [];
+        $this->accumulerRecettesSeancesResolues($start, $end, $operationIds, $recettesSeancesMap);
+        foreach ($recettesSeancesMap as $seanceMap) {
+            foreach ($seanceMap as $entry) {
+                $accumuler(collect([(object) $entry]));
+            }
+        }
 
         // Dons par séance
         $accumuler(Don::query()
