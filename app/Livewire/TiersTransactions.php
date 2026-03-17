@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithPerPage;
 use App\Models\Tiers;
 use App\Services\TiersTransactionService;
 use Illuminate\View\View;
@@ -13,6 +14,7 @@ use Livewire\WithPagination;
 final class TiersTransactions extends Component
 {
     use WithPagination;
+    use WithPerPage;
 
     protected string $paginationTheme = 'bootstrap';
 
@@ -53,6 +55,7 @@ final class TiersTransactions extends Component
             $this->search,
             $this->sortBy,
             $this->sortDir,
+            $this->effectivePerPage(),
         );
 
         return view('livewire.tiers-transactions', compact('tiers', 'transactions'));
