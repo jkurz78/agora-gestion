@@ -11,6 +11,8 @@
              if (saved !== null) {
                  this.$refs.select.value = saved;
                  this.$refs.select.dispatchEvent(new Event('change'));
+             } else {
+                 this.$refs.select.value = String(this.$wire.perPage);
              }
          }
      }">
