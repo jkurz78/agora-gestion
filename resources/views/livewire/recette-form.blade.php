@@ -174,6 +174,14 @@
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
+                                            @if (isset($ligne['id']))
+                                                <button type="button"
+                                                        wire:click="ouvrirVentilation({{ $ligne['id'] }})"
+                                                        class="btn btn-sm btn-outline-warning ms-1">
+                                                    <i class="bi bi-scissors"></i>
+                                                    {{ in_array($ligne['id'], $lignesAffectations) ? 'Modifier ventilation' : 'Ventiler' }}
+                                                </button>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty
@@ -193,6 +201,100 @@
                             </tfoot>
                         </table>
                     </div>
+
+                    @if ($ventilationLigneId)
+                        @php
+                            $ligneSrc = \App\Models\RecetteLigne::with('sousCategorie')->find($ventilationLigneId);
+                        @endphp
+                        @if ($ligneSrc)
+                        <div class="border border-primary border-2 rounded p-3 mb-3" style="background:#f0f7ff">
+                            <div class="fw-bold text-primary mb-2">
+                                <i class="bi bi-scissors"></i>
+                                Ventilation — {{ $ligneSrc->sousCategorie->nom }} ({{ number_format($ligneSrc->montant, 2, ',', ' ') }} €)
+                            </div>
+
+                            <table class="table table-sm mb-2">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Opération</th>
+                                        <th style="width:100px">Séance</th>
+                                        <th style="width:120px">Montant *</th>
+                                        <th>Notes</th>
+                                        <th style="width:40px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($affectations as $ai => $aff)
+                                    <tr wire:key="aff-{{ $ai }}">
+                                        <td>
+                                            <select wire:model.live="affectations.{{ $ai }}.operation_id" class="form-select form-select-sm">
+                                                <option value="">— Aucune (reste non affecté) —</option>
+                                                @foreach ($operations as $op)
+                                                    <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                                @endforeach
+                                            </select>
+                                        </td>
+                                        <td>
+                                            @php
+                                                $selOp = $aff['operation_id'] !== '' ? $operations->firstWhere('id', (int) $aff['operation_id']) : null;
+                                            @endphp
+                                            @if ($selOp?->nombre_seances)
+                                                <select wire:model="affectations.{{ $ai }}.seance" class="form-select form-select-sm">
+                                                    <option value="">--</option>
+                                                    @for ($s = 1; $s <= $selOp->nombre_seances; $s++)
+                                                        <option value="{{ $s }}">{{ $s }}</option>
+                                                    @endfor
+                                                </select>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <input type="number" wire:model.live="affectations.{{ $ai }}.montant"
+                                                   step="0.01" min="0.01"
+                                                   class="form-control form-control-sm text-end @error('affectations.'.$ai.'.montant') is-invalid @enderror">
+                                            @error('affectations.'.$ai.'.montant') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                        </td>
+                                        <td>
+                                            <input type="text" wire:model="affectations.{{ $ai }}.notes" class="form-control form-control-sm">
+                                        </td>
+                                        <td class="text-center">
+                                            <button type="button" wire:click="removeAffectation({{ $ai }})" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+
+                            @php
+                                $resteEn100 = (int) round((float) $ligneSrc->montant * 100)
+                                            - (int) round(collect($affectations)->sum(fn($a) => (float)($a['montant'] ?? 0)) * 100);
+                                $reste = $resteEn100 / 100;
+                            @endphp
+
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button type="button" wire:click="addAffectation" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-plus-lg"></i> Ajouter une ligne
+                                </button>
+                                <span class="badge {{ $resteEn100 === 0 ? 'bg-success' : 'bg-warning text-dark' }}">
+                                    Reste : {{ number_format($reste, 2, ',', ' ') }} €
+                                </span>
+                                <div class="ms-auto d-flex gap-2">
+                                    <button type="button" wire:click="supprimerVentilation" class="btn btn-sm btn-outline-danger"
+                                            wire:confirm="Supprimer toute la ventilation ?">
+                                        Annuler la ventilation
+                                    </button>
+                                    <button type="button" wire:click="fermerVentilation" class="btn btn-sm btn-secondary">Fermer</button>
+                                    <button type="button" wire:click="saveVentilation"
+                                            class="btn btn-sm btn-success"
+                                            @if($resteEn100 !== 0) disabled title="La somme doit être exacte" @endif>
+                                        <i class="bi bi-check-lg"></i> Enregistrer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+                    @endif
 
                     <div class="d-flex gap-2">
                         @if (! $isLocked)
