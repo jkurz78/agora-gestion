@@ -50,6 +50,13 @@
                 }
             "
             x-on:keydown.escape="$wire.set('open', false); highlighted = -1"
+            x-on:keydown.tab="
+                let items = document.querySelectorAll('[data-sc-nav-{{ $this->getId() }}]');
+                if (highlighted >= 0 && items[highlighted]) {
+                    items[highlighted].click();
+                    highlighted = -1;
+                }
+            "
         >
 
         @if($open && (count($results) > 0 || strlen($search) > 0))
