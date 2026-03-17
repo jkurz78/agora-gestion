@@ -15,8 +15,8 @@
          x-data="{
              fp: null,
              init() {
-                 const hidden = this.\$refs.hidden;
-                 this.fp = flatpickr(this.\$refs.input, {
+                 const hidden = this.$refs.hidden;
+                 this.fp = flatpickr(this.$refs.input, {
                      locale: 'fr',
                      dateFormat: 'd/m/Y',
                      allowInput: true,
