@@ -28,7 +28,7 @@ final class RecetteService
     public function update(Recette $recette, array $data, array $lignes): Recette
     {
         return DB::transaction(function () use ($recette, $data, $lignes) {
-            $recette->loadMissing('rapprochement');
+            $recette->load(['rapprochement' => fn ($q) => $q->lockForUpdate()]);
 
             if ($recette->isLockedByRapprochement()) {
                 $this->assertLockedInvariants($recette, $data, $lignes);
@@ -94,25 +94,27 @@ final class RecetteService
 
     public function affecterLigne(RecetteLigne $ligne, array $affectations): void
     {
-        foreach ($affectations as $a) {
-            if ((int) round((float) ($a['montant'] ?? 0) * 100) <= 0) {
-                throw new \RuntimeException('Chaque affectation doit avoir un montant positif.');
-            }
-        }
-
-        $somme = (int) round(
-            collect($affectations)->sum(fn ($a) => (float) $a['montant']) * 100
-        );
-        $attendu = (int) round((float) $ligne->montant * 100);
-
-        if ($somme !== $attendu) {
-            throw new \RuntimeException(
-                "La somme des affectations ({$somme} centimes) ne correspond pas au montant de la ligne ({$attendu} centimes)."
-            );
-        }
-
         DB::transaction(function () use ($ligne, $affectations) {
-            $ligne->affectations()->delete();
+            if (count($affectations) === 0) {
+                throw new \RuntimeException('La liste des affectations ne peut pas être vide.');
+            }
+
+            $total = 0;
+            foreach ($affectations as $a) {
+                if ((int) round((float) ($a['montant'] ?? 0) * 100) <= 0) {
+                    throw new \RuntimeException('Chaque affectation doit avoir un montant positif.');
+                }
+                $total += (int) round((float) $a['montant'] * 100);
+            }
+
+            $attendu = (int) round((float) $ligne->montant * 100);
+            if ($total !== $attendu) {
+                throw new \RuntimeException(
+                    "La somme des affectations ({$total} centimes) ne correspond pas au montant de la ligne ({$attendu} centimes)."
+                );
+            }
+
+            $ligne->affectations()->forceDelete();
             foreach ($affectations as $a) {
                 $ligne->affectations()->create([
                     'operation_id' => $a['operation_id'] ?: null,
@@ -127,7 +129,7 @@ final class RecetteService
     public function supprimerAffectations(RecetteLigne $ligne): void
     {
         DB::transaction(function () use ($ligne) {
-            $ligne->affectations()->delete();
+            $ligne->affectations()->forceDelete();
         });
     }
 

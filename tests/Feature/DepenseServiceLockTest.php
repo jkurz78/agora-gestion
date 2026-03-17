@@ -1,11 +1,13 @@
 <?php
 
+use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
 use App\Models\Depense;
 use App\Models\DepenseLigne;
 use App\Models\Operation;
 use App\Models\RapprochementBancaire;
 use App\Models\SousCategorie;
+use App\Models\Tiers;
 use App\Models\User;
 use App\Services\DepenseService;
 
@@ -20,7 +22,7 @@ function makeLockedDepense(CompteBancaire $compte): Depense
 {
     $rapprochement = RapprochementBancaire::factory()->create([
         'compte_id'    => $compte->id,
-        'statut'       => \App\Enums\StatutRapprochement::Verrouille,
+        'statut'       => StatutRapprochement::Verrouille,
         'verrouille_at' => now(),
     ]);
     $depense = Depense::factory()->create([
@@ -120,7 +122,7 @@ it('update rejette l\'ajout d\'une ligne sur pièce verrouillée', function () {
 
 it('update accepte la modification de tiers_id sur pièce verrouillée', function () {
     $depense = makeLockedDepense($this->compte);
-    $tiers = \App\Models\Tiers::factory()->create();
+    $tiers = Tiers::factory()->create();
     $ligne = $depense->lignes->first();
 
     $this->service->update($depense, [
