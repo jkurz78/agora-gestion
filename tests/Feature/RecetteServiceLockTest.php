@@ -29,6 +29,8 @@ function makeLockedRecette(CompteBancaire $compte): Recette
         'montant_total' => 100.00,
         'rapprochement_id' => $rapprochement->id,
     ]);
+    // Supprimer les lignes auto-créées par le factory, puis créer exactement une ligne
+    $recette->lignes()->forceDelete();
     RecetteLigne::factory()->create([
         'recette_id' => $recette->id,
         'montant' => 100.00,
