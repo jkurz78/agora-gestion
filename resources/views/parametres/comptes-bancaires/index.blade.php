@@ -39,7 +39,7 @@
                 </div>
                 <div class="col-md-2">
                     <label for="cb_date" class="form-label">Date solde</label>
-                    <input type="date" name="date_solde_initial" id="cb_date" class="form-control" required>
+                    <x-date-input name="date_solde_initial" value="" />
                 </div>
                 <div class="col-md-2">
                     <div class="form-check mt-4">
@@ -151,7 +151,7 @@
                     </div>
                     <div class="col-md-6">
                         <label for="edit_date" class="form-label">Date solde <span class="text-danger">*</span></label>
-                        <input type="date" name="date_solde_initial" id="edit_date" class="form-control" required>
+                        <x-date-input name="date_solde_initial" id="edit_date" value="" />
                     </div>
                     <div class="col-12">
                         <div class="form-check">
@@ -186,7 +186,11 @@ function fillEditModal(btn) {
     document.getElementById('edit_nom').value = btn.dataset.nom;
     document.getElementById('edit_iban').value = btn.dataset.iban;
     document.getElementById('edit_solde').value = btn.dataset.solde;
-    document.getElementById('edit_date').value = btn.dataset.date;
+    const editDateWrapper = document.getElementById('edit_date');
+    const editDateInput = editDateWrapper ? editDateWrapper.querySelector('input[type=text]') : null;
+    if (editDateInput && editDateInput._flatpickr) {
+        editDateInput._flatpickr.setDate(btn.dataset.date, true, 'Y-m-d');
+    }
     document.getElementById('edit_actif_rd').checked = btn.dataset.actifRd === '1';
     document.getElementById('edit_actif_dc').checked = btn.dataset.actifDc === '1';
 }

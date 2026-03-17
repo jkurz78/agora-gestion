@@ -28,18 +28,14 @@
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label for="date_debut" class="form-label">Date début</label>
-                        <input type="date" name="date_debut" id="date_debut"
-                               class="form-control @error('date_debut') is-invalid @enderror"
-                               value="{{ old('date_debut', $operation->date_debut?->format('Y-m-d')) }}">
+                        <x-date-input name="date_debut" :value="old('date_debut', $operation->date_debut?->format('Y-m-d') ?? '')" />
                         @error('date_debut')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
                     <div class="col-md-4">
                         <label for="date_fin" class="form-label">Date fin</label>
-                        <input type="date" name="date_fin" id="date_fin"
-                               class="form-control @error('date_fin') is-invalid @enderror"
-                               value="{{ old('date_fin', $operation->date_fin?->format('Y-m-d')) }}">
+                        <x-date-input name="date_fin" :value="old('date_fin', $operation->date_fin?->format('Y-m-d') ?? '')" />
                         @error('date_fin')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
