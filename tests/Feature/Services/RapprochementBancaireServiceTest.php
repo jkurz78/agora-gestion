@@ -128,9 +128,10 @@ test('verrouiller réussit quand écart = 0', function () {
 
 test('toggleTransaction lève une exception si rapprochement verrouillé', function () {
     $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id' => $this->compte->id,
-        'statut' => StatutRapprochement::Verrouille,
-        'saisi_par' => $this->user->id,
+        'compte_id'     => $this->compte->id,
+        'statut'        => StatutRapprochement::Verrouille,
+        'saisi_par'     => $this->user->id,
+        'verrouille_at' => now(),
     ]);
     $depense = Depense::factory()->create(['compte_id' => $this->compte->id]);
 
@@ -162,9 +163,10 @@ test('supprimer supprime un rapprochement en cours et dépointe les opérations'
 
 test('supprimer lève une exception si le rapprochement est verrouillé', function () {
     $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id' => $this->compte->id,
-        'statut' => StatutRapprochement::Verrouille,
-        'saisi_par' => $this->user->id,
+        'compte_id'     => $this->compte->id,
+        'statut'        => StatutRapprochement::Verrouille,
+        'saisi_par'     => $this->user->id,
+        'verrouille_at' => now(),
     ]);
 
     expect(fn () => $this->service->supprimer($rapprochement))
