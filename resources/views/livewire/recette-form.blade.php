@@ -174,7 +174,7 @@
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            @if (isset($ligne['id']))
+                                            @if ($ligne['id'] !== null)
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">
@@ -203,11 +203,10 @@
                     </div>
 
                     @if ($ventilationLigneId)
-                        @if ($ligneSrcVentilation)
                         <div class="border border-primary border-2 rounded p-3 mb-3" style="background:#f0f7ff">
                             <div class="fw-bold text-primary mb-2">
                                 <i class="bi bi-scissors"></i>
-                                Ventilation — {{ $ligneSrcVentilation->sousCategorie->nom }} ({{ number_format($ligneSrcVentilation->montant, 2, ',', ' ') }} €)
+                                Ventilation — {{ $ventilationLigneSousCategorie }} ({{ number_format((float) $ventilationLigneMontant, 2, ',', ' ') }} €)
                             </div>
 
                             <table class="table table-sm mb-2">
@@ -264,7 +263,7 @@
                             </table>
 
                             @php
-                                $resteEn100 = (int) round((float) $ligneSrcVentilation->montant * 100)
+                                $resteEn100 = (int) round((float) $ventilationLigneMontant * 100)
                                             - (int) round(collect($affectations)->sum(fn($a) => (float)($a['montant'] ?? 0)) * 100);
                                 $reste = $resteEn100 / 100;
                             @endphp
@@ -290,7 +289,6 @@
                                 </div>
                             </div>
                         </div>
-                        @endif
                     @endif
 
                     <div class="d-flex gap-2">
