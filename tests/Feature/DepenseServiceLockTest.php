@@ -170,3 +170,17 @@ it('update accepte la modification d\'operation_id de ligne sur pièce verrouill
 
     expect($depense->fresh(['lignes'])->lignes->first()->operation_id)->toBe($operation->id);
 });
+
+it('update rejette la suppression d\'une ligne sur pièce verrouillée', function () {
+    $depense = makeLockedDepense($this->compte);
+    // La dépense a 1 ligne, on soumet 0 lignes
+    expect(fn () => $this->service->update($depense, [
+        'date' => $depense->date->format('Y-m-d'),
+        'libelle' => $depense->libelle,
+        'montant_total' => $depense->montant_total,
+        'mode_paiement' => $depense->mode_paiement->value,
+        'compte_id' => $depense->compte_id,
+        'reference' => $depense->reference,
+    ], [])
+    )->toThrow(\RuntimeException::class);
+});
