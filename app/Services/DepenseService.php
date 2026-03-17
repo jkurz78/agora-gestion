@@ -45,9 +45,32 @@ final class DepenseService
                     ]);
                 }
             } else {
+                // Pièce non verrouillée : snapshot des affectations avant suppression
+                $affectationsSnapshot = [];
+                foreach ($lignes as $ligneData) {
+                    $oldId = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
+                    if ($oldId !== null) {
+                        $aff = $depense->lignes()->where('id', $oldId)->first()?->affectations()->get() ?? collect();
+                        if ($aff->isNotEmpty()) {
+                            $affectationsSnapshot[$oldId] = $aff->map(fn ($a) => [
+                                'operation_id' => $a->operation_id,
+                                'seance'       => $a->seance,
+                                'montant'      => $a->montant,
+                                'notes'        => $a->notes,
+                            ])->toArray();
+                        }
+                    }
+                }
+
                 $depense->lignes()->forceDelete();
-                foreach ($lignes as $ligne) {
-                    $depense->lignes()->create($ligne);
+                foreach ($lignes as $ligneData) {
+                    $newLigne = $depense->lignes()->create($ligneData);
+                    $oldId = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
+                    if ($oldId !== null && isset($affectationsSnapshot[$oldId])) {
+                        foreach ($affectationsSnapshot[$oldId] as $affData) {
+                            $newLigne->affectations()->create($affData);
+                        }
+                    }
                 }
             }
 

@@ -109,3 +109,49 @@ it('supprimerAffectations supprime toutes les affectations d\'une ligne', functi
 
     expect(RecetteLigneAffectation::where('recette_ligne_id', $ligne->id)->count())->toBe(0);
 });
+
+it('update() sur pièce non verrouillée préserve les affectations existantes', function () {
+    $sousCategorie = \App\Models\SousCategorie::factory()->create();
+
+    $recette = Recette::factory()->create([
+        'compte_id' => $this->compte->id,
+        'montant_total' => 100.00,
+    ]);
+    $recette->lignes()->forceDelete();
+    $ligne = $recette->lignes()->create([
+        'sous_categorie_id' => $sousCategorie->id,
+        'operation_id' => null,
+        'montant' => 100.00,
+        'seance' => null,
+        'notes' => null,
+    ]);
+
+    $ligne->affectations()->create([
+        'operation_id' => $this->op1->id,
+        'seance' => null,
+        'montant' => 60.00,
+        'notes' => null,
+    ]);
+    $ligne->affectations()->create([
+        'operation_id' => null,
+        'seance' => null,
+        'montant' => 40.00,
+        'notes' => null,
+    ]);
+
+    $recette->refresh();
+    $this->service->update($recette, [
+        'date' => $recette->date->format('Y-m-d'),
+        'libelle' => 'Nouveau libellé',
+        'montant_total' => 100.00,
+        'mode_paiement' => $recette->mode_paiement->value,
+        'compte_id' => $recette->compte_id,
+        'reference' => $recette->reference,
+    ], [
+        ['id' => $ligne->id, 'sous_categorie_id' => $sousCategorie->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+
+    $newLigne = $recette->fresh(['lignes.affectations'])->lignes->first();
+    expect($newLigne->affectations)->toHaveCount(2);
+    expect((float) $newLigne->affectations->sum('montant'))->toBe(100.0);
+});
