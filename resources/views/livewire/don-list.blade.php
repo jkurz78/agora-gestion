@@ -141,5 +141,6 @@
         </table>
     </div>
 
+    <x-per-page-selector :paginator="$dons" storageKey="dons" wire:model.live="perPage" />
     {{ $dons->links() }}
 </div>

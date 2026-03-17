@@ -8,11 +8,13 @@ use App\Models\Tiers;
 use App\Services\ExerciceService;
 use Illuminate\View\View;
 use Livewire\Component;
+use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class MembreList extends Component
 {
     use WithPagination;
+    use WithPerPage;
 
     protected string $paginationTheme = 'bootstrap';
 
@@ -46,7 +48,7 @@ final class MembreList extends Component
             });
         }
 
-        $membres = $query->orderBy('nom')->paginate(50);
+        $membres = $query->orderBy('nom')->paginate($this->effectivePerPage());
 
         // Eager-load dernière cotisation par tiers
         $membres->getCollection()->each(function (Tiers $tiers): void {

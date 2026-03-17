@@ -11,11 +11,13 @@ use App\Services\ExerciceService;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class CotisationList extends Component
 {
     use WithPagination;
+    use WithPerPage;
 
     protected string $paginationTheme = 'bootstrap';
 
@@ -69,7 +71,7 @@ final class CotisationList extends Component
         }
 
         return view('livewire.cotisation-list', [
-            'cotisations' => $query->paginate(15),
+            'cotisations' => $query->paginate($this->effectivePerPage()),
             'postescotisation' => SousCategorie::where('pour_cotisations', true)->orderBy('nom')->get(),
         ]);
     }

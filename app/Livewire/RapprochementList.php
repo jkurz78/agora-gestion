@@ -9,11 +9,13 @@ use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Services\RapprochementBancaireService;
 use Livewire\Component;
+use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class RapprochementList extends Component
 {
     use WithPagination;
+    use WithPerPage;
 
     protected string $paginationTheme = 'bootstrap';
 
@@ -94,7 +96,7 @@ final class RapprochementList extends Component
 
             $rapprochements = RapprochementBancaire::where('compte_id', $this->compte_id)
                 ->orderByDesc('date_fin')
-                ->paginate(20);
+                ->paginate($this->effectivePerPage());
 
             if (! $aEnCours) {
                 $compte = CompteBancaire::find($this->compte_id);

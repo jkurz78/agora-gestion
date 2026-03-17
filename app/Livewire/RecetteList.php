@@ -14,11 +14,13 @@ use App\Services\RecetteService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class RecetteList extends Component
 {
     use WithPagination;
+    use WithPerPage;
 
     protected string $paginationTheme = 'bootstrap';
 
@@ -137,7 +139,7 @@ final class RecetteList extends Component
         }
 
         return view('livewire.recette-list', [
-            'recettes' => $query->paginate(15),
+            'recettes' => $query->paginate($this->effectivePerPage()),
             'categories' => Categorie::where('type', TypeCategorie::Recette)->orderBy('nom')->get(),
             'operations' => Operation::orderBy('nom')->get(),
             'comptes' => CompteBancaire::orderBy('nom')->get(),

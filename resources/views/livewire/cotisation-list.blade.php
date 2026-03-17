@@ -87,5 +87,6 @@
         </table>
     </div>
 
+    <x-per-page-selector :paginator="$cotisations" storageKey="cotisations" wire:model.live="perPage" />
     {{ $cotisations->links() }}
 </div>
