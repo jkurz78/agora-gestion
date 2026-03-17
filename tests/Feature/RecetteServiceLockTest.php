@@ -1,10 +1,13 @@
 <?php
 
+use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
+use App\Models\Operation;
 use App\Models\RapprochementBancaire;
 use App\Models\Recette;
 use App\Models\RecetteLigne;
 use App\Models\SousCategorie;
+use App\Models\Tiers;
 use App\Models\User;
 use App\Services\RecetteService;
 
@@ -20,7 +23,7 @@ function makeLockedRecette(CompteBancaire $compte): Recette
 {
     $rapprochement = RapprochementBancaire::factory()->create([
         'compte_id'    => $compte->id,
-        'statut'       => \App\Enums\StatutRapprochement::Verrouille,
+        'statut'       => StatutRapprochement::Verrouille,
         'verrouille_at' => now(),
     ]);
     $recette = Recette::factory()->create([
@@ -138,7 +141,7 @@ it('update accepte la modification de libelle et notes sur pièce verrouillée',
 
 it('update accepte la modification d\'operation_id de ligne sur pièce verrouillée', function () {
     $recette = makeLockedRecette($this->compte);
-    $operation = \App\Models\Operation::factory()->create();
+    $operation = Operation::factory()->create();
     $ligne = $recette->lignes->first();
 
     $this->service->update($recette, [
@@ -155,7 +158,7 @@ it('update accepte la modification d\'operation_id de ligne sur pièce verrouill
 
 it('update accepte la modification de tiers_id sur pièce verrouillée', function () {
     $recette = makeLockedRecette($this->compte);
-    $tiers = \App\Models\Tiers::factory()->create();
+    $tiers = Tiers::factory()->create();
     $ligne = $recette->lignes->first();
 
     $this->service->update($recette, [
