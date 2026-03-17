@@ -26,15 +26,67 @@ final class DepenseService
 
     public function update(Depense $depense, array $data, array $lignes): Depense
     {
+        $depense->loadMissing('rapprochement');
+
+        if ($depense->isLockedByRapprochement()) {
+            $this->assertLockedInvariants($depense, $data, $lignes);
+        }
+
         return DB::transaction(function () use ($depense, $data, $lignes) {
             $depense->update($data);
-            $depense->lignes()->forceDelete();
-            foreach ($lignes as $ligne) {
-                $depense->lignes()->create($ligne);
+
+            if ($depense->isLockedByRapprochement()) {
+                foreach ($lignes as $ligneData) {
+                    $depense->lignes()->where('id', $ligneData['id'])->update([
+                        'operation_id' => $ligneData['operation_id'],
+                        'seance'       => $ligneData['seance'],
+                        'notes'        => $ligneData['notes'],
+                    ]);
+                }
+            } else {
+                $depense->lignes()->forceDelete();
+                foreach ($lignes as $ligne) {
+                    $depense->lignes()->create($ligne);
+                }
             }
 
             return $depense->fresh();
         });
+    }
+
+    private function assertLockedInvariants(Depense $depense, array $data, array $lignes): void
+    {
+        if ($depense->date->format('Y-m-d') !== $data['date']) {
+            throw new \RuntimeException('La date ne peut pas être modifiée sur une dépense rapprochée.');
+        }
+
+        if ((int) $depense->compte_id !== (int) $data['compte_id']) {
+            throw new \RuntimeException('Le compte bancaire ne peut pas être modifié sur une dépense rapprochée.');
+        }
+
+        if ((int) round((float) $depense->montant_total * 100) !== (int) round((float) $data['montant_total'] * 100)) {
+            throw new \RuntimeException('Le montant total ne peut pas être modifié sur une dépense rapprochée.');
+        }
+
+        $existingLignes = $depense->lignes()->get()->keyBy('id');
+
+        if (count($lignes) !== $existingLignes->count()) {
+            throw new \RuntimeException('Le nombre de lignes ne peut pas être modifié sur une dépense rapprochée.');
+        }
+
+        foreach ($lignes as $ligneData) {
+            $id = $ligneData['id'] ?? null;
+            if ($id === null || ! $existingLignes->has($id)) {
+                throw new \RuntimeException('Ligne inconnue ou sans identifiant sur une dépense rapprochée.');
+            }
+            $existing = $existingLignes->get($id);
+            if ((int) round((float) $existing->montant * 100) !== (int) round((float) $ligneData['montant'] * 100)) {
+                throw new \RuntimeException('Le montant d\'une ligne ne peut pas être modifié sur une dépense rapprochée.');
+            }
+            if ((int) $existing->sous_categorie_id !== (int) $ligneData['sous_categorie_id']) {
+                throw new \RuntimeException('La sous-catégorie d\'une ligne ne peut pas être modifiée sur une dépense rapprochée.');
+            }
+        }
     }
 
     public function delete(Depense $depense): void
