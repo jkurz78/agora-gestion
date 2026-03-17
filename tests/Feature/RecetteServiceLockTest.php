@@ -22,8 +22,8 @@ beforeEach(function () {
 function makeLockedRecette(CompteBancaire $compte): Recette
 {
     $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id'    => $compte->id,
-        'statut'       => StatutRapprochement::Verrouille,
+        'compte_id' => $compte->id,
+        'statut' => StatutRapprochement::Verrouille,
         'verrouille_at' => now(),
     ]);
     $recette = Recette::factory()->create([
@@ -38,6 +38,7 @@ function makeLockedRecette(CompteBancaire $compte): Recette
         'recette_id' => $recette->id,
         'montant' => 100.00,
     ]);
+
     return $recette->fresh(['lignes', 'rapprochement']);
 }
 
@@ -53,7 +54,7 @@ it('update rejette la modification de date sur pièce verrouillée', function ()
         'compte_id' => $recette->compte_id,
         'reference' => $recette->reference,
     ], [['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update rejette la modification de compte_id sur pièce verrouillée', function () {
@@ -69,7 +70,7 @@ it('update rejette la modification de compte_id sur pièce verrouillée', functi
         'compte_id' => $autreCompte->id,
         'reference' => $recette->reference,
     ], [['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update rejette la modification de montant de ligne sur pièce verrouillée', function () {
@@ -84,7 +85,7 @@ it('update rejette la modification de montant de ligne sur pièce verrouillée',
         'compte_id' => $recette->compte_id,
         'reference' => $recette->reference,
     ], [['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '999.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update rejette la modification de sous_categorie_id de ligne sur pièce verrouillée', function () {
@@ -100,7 +101,7 @@ it('update rejette la modification de sous_categorie_id de ligne sur pièce verr
         'compte_id' => $recette->compte_id,
         'reference' => $recette->reference,
     ], [['id' => $ligne->id, 'sous_categorie_id' => $autreSousCategorie->id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update rejette l\'ajout d\'une ligne sur pièce verrouillée', function () {
@@ -118,7 +119,7 @@ it('update rejette l\'ajout d\'une ligne sur pièce verrouillée', function () {
         ['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '100.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
         ['sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update accepte la modification de libelle et notes sur pièce verrouillée', function () {
@@ -184,5 +185,5 @@ it('update rejette la suppression d\'une ligne sur pièce verrouillée', functio
         'compte_id' => $recette->compte_id,
         'reference' => $recette->reference,
     ], [])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });

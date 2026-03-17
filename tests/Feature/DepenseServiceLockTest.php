@@ -21,8 +21,8 @@ beforeEach(function () {
 function makeLockedDepense(CompteBancaire $compte): Depense
 {
     $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id'    => $compte->id,
-        'statut'       => StatutRapprochement::Verrouille,
+        'compte_id' => $compte->id,
+        'statut' => StatutRapprochement::Verrouille,
         'verrouille_at' => now(),
     ]);
     $depense = Depense::factory()->create([
@@ -37,6 +37,7 @@ function makeLockedDepense(CompteBancaire $compte): Depense
         'depense_id' => $depense->id,
         'montant' => 200.00,
     ]);
+
     return $depense->fresh(['lignes', 'rapprochement']);
 }
 
@@ -52,7 +53,7 @@ it('update rejette la modification de date sur pièce verrouillée', function ()
         'compte_id' => $depense->compte_id,
         'reference' => $depense->reference,
     ], [['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update rejette la modification de compte_id sur pièce verrouillée', function () {
@@ -68,7 +69,7 @@ it('update rejette la modification de compte_id sur pièce verrouillée', functi
         'compte_id' => $autreCompte->id,
         'reference' => $depense->reference,
     ], [['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update rejette la modification de montant de ligne sur pièce verrouillée', function () {
@@ -83,7 +84,7 @@ it('update rejette la modification de montant de ligne sur pièce verrouillée',
         'compte_id' => $depense->compte_id,
         'reference' => $depense->reference,
     ], [['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '999.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update rejette la modification de sous_categorie_id de ligne sur pièce verrouillée', function () {
@@ -99,7 +100,7 @@ it('update rejette la modification de sous_categorie_id de ligne sur pièce verr
         'compte_id' => $depense->compte_id,
         'reference' => $depense->reference,
     ], [['id' => $ligne->id, 'sous_categorie_id' => $autreSousCategorie->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update rejette l\'ajout d\'une ligne sur pièce verrouillée', function () {
@@ -117,7 +118,7 @@ it('update rejette l\'ajout d\'une ligne sur pièce verrouillée', function () {
         ['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
         ['sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
     ])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });
 
 it('update accepte la modification de tiers_id sur pièce verrouillée', function () {
@@ -184,5 +185,5 @@ it('update rejette la suppression d\'une ligne sur pièce verrouillée', functio
         'compte_id' => $depense->compte_id,
         'reference' => $depense->reference,
     ], [])
-    )->toThrow(\RuntimeException::class);
+    )->toThrow(RuntimeException::class);
 });

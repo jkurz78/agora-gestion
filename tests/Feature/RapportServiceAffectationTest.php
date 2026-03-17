@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Models\CompteBancaire;
+use App\Enums\TypeCategorie;
 use App\Models\Categorie;
+use App\Models\CompteBancaire;
 use App\Models\Depense;
 use App\Models\DepenseLigne;
 use App\Models\DepenseLigneAffectation;
@@ -14,7 +15,6 @@ use App\Models\RecetteLigneAffectation;
 use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\RapportService;
-use App\Enums\TypeCategorie;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -54,8 +54,7 @@ it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id
 
     // $rapport['produits'] est une liste de catégories, chaque catégorie ayant une clé 'sous_categories'.
     $produits = collect($rapport['produits'] ?? []);
-    $cat = $produits->first(fn ($c) =>
-        collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $this->sousCategorie->id)
+    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $this->sousCategorie->id)
     );
     $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', $this->sousCategorie->id);
     // Le rapport doit voir 8000 sur op1, pas 0 (car la ligne avait operation_id null)
@@ -79,8 +78,7 @@ it('une ligne sans affectation continue d\'utiliser son operation_id direct', fu
     $rapport = $this->service->compteDeResultatOperations(2025, [$this->op1->id]);
 
     $produits = collect($rapport['produits'] ?? []);
-    $cat = $produits->first(fn ($c) =>
-        collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $this->sousCategorie->id)
+    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $this->sousCategorie->id)
     );
     $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', $this->sousCategorie->id);
     expect((float) ($scRow['montant'] ?? 0))->toBe(5000.0);
@@ -88,34 +86,33 @@ it('une ligne sans affectation continue d\'utiliser son operation_id direct', fu
 
 it('le rapport onglet 2 prend en compte les affectations de dépenses', function () {
     $categorieD = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    $sousCatD   = SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
+    $sousCatD = SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
 
     $depense = Depense::factory()->create([
-        'compte_id'    => $this->compte->id,
-        'date'         => '2025-10-15',
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-15',
         'montant_total' => 12000.00,
     ]);
     $depense->lignes()->forceDelete();
     $ligne = DepenseLigne::factory()->create([
-        'depense_id'       => $depense->id,
+        'depense_id' => $depense->id,
         'sous_categorie_id' => $sousCatD->id,
-        'operation_id'     => null,
-        'montant'          => 12000.00,
+        'operation_id' => null,
+        'montant' => 12000.00,
     ]);
 
     DepenseLigneAffectation::create([
         'depense_ligne_id' => $ligne->id,
-        'operation_id'     => $this->op1->id,
-        'montant'          => 7000.00,
-        'seance'           => null,
-        'notes'            => null,
+        'operation_id' => $this->op1->id,
+        'montant' => 7000.00,
+        'seance' => null,
+        'notes' => null,
     ]);
 
     $rapport = $this->service->compteDeResultatOperations(2025, [$this->op1->id]);
 
     $charges = collect($rapport['charges'] ?? []);
-    $cat = $charges->first(fn ($c) =>
-        collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $sousCatD->id)
+    $cat = $charges->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $sousCatD->id)
     );
     $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', $sousCatD->id);
     expect((float) ($scRow['montant'] ?? 0))->toBe(7000.0);
@@ -123,25 +120,25 @@ it('le rapport onglet 2 prend en compte les affectations de dépenses', function
 
 it('le rapport onglet 3 prend en compte les affectations de recettes avec séance', function () {
     $recette = Recette::factory()->create([
-        'compte_id'    => $this->compte->id,
-        'date'         => '2025-10-15',
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-15',
         'montant_total' => 3000.00,
     ]);
     $recette->lignes()->forceDelete();
     $ligne = RecetteLigne::factory()->create([
-        'recette_id'       => $recette->id,
+        'recette_id' => $recette->id,
         'sous_categorie_id' => $this->sousCategorie->id,
-        'operation_id'     => null,
-        'seance'           => null,
-        'montant'          => 3000.00,
+        'operation_id' => null,
+        'seance' => null,
+        'montant' => 3000.00,
     ]);
 
     RecetteLigneAffectation::create([
         'recette_ligne_id' => $ligne->id,
-        'operation_id'     => $this->op1->id,
-        'seance'           => 2,
-        'montant'          => 3000.00,
-        'notes'            => null,
+        'operation_id' => $this->op1->id,
+        'seance' => 2,
+        'montant' => 3000.00,
+        'notes' => null,
     ]);
 
     $rapport = $this->service->rapportSeances(2025, [$this->op1->id]);
@@ -152,37 +149,36 @@ it('le rapport onglet 3 prend en compte les affectations de recettes avec séanc
     expect($rapport['seances'])->toContain(2);
 
     $produits = collect($rapport['produits'] ?? []);
-    $cat = $produits->first(fn ($c) =>
-        collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $this->sousCategorie->id)
+    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $this->sousCategorie->id)
     );
     $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', $this->sousCategorie->id);
     expect((float) ($scRow['seances'][2] ?? 0))->toBe(3000.0);
 });
 
 it('le rapport onglet 3 prend en compte les affectations de dépenses avec séance', function () {
-    $categorieD  = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
-    $sousCatD    = SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
+    $categorieD = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
+    $sousCatD = SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
 
     $depense = Depense::factory()->create([
-        'compte_id'    => $this->compte->id,
-        'date'         => '2025-10-15',
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-15',
         'montant_total' => 4000.00,
     ]);
     $depense->lignes()->forceDelete();
     $ligne = DepenseLigne::factory()->create([
-        'depense_id'        => $depense->id,
+        'depense_id' => $depense->id,
         'sous_categorie_id' => $sousCatD->id,
-        'operation_id'      => null,
-        'seance'            => null,
-        'montant'           => 4000.00,
+        'operation_id' => null,
+        'seance' => null,
+        'montant' => 4000.00,
     ]);
 
     DepenseLigneAffectation::create([
         'depense_ligne_id' => $ligne->id,
-        'operation_id'     => $this->op1->id,
-        'seance'           => 3,
-        'montant'          => 4000.00,
-        'notes'            => null,
+        'operation_id' => $this->op1->id,
+        'seance' => 3,
+        'montant' => 4000.00,
+        'notes' => null,
     ]);
 
     $rapport = $this->service->rapportSeances(2025, [$this->op1->id]);
@@ -190,8 +186,7 @@ it('le rapport onglet 3 prend en compte les affectations de dépenses avec séan
     expect($rapport['seances'])->toContain(3);
 
     $charges = collect($rapport['charges'] ?? []);
-    $cat = $charges->first(fn ($c) =>
-        collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $sousCatD->id)
+    $cat = $charges->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $sousCatD->id)
     );
     $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', $sousCatD->id);
     expect((float) ($scRow['seances'][3] ?? 0))->toBe(4000.0);

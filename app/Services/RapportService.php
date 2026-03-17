@@ -124,6 +124,7 @@ final class RapportService
     {
         $map = [];
         $this->accumulerDepensesResolues($start, $end, $operationIds, $map);
+
         return collect(array_values($map))->map(fn ($row) => (object) $row);
     }
 
@@ -132,8 +133,8 @@ final class RapportService
      * Lignes avec affectations → utilise les affectations.
      * Lignes sans affectations → utilise operation_id de la ligne.
      *
-     * @param array<int>|null $operationIds
-     * @param array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,montant:float}> $map
+     * @param  array<int>|null  $operationIds
+     * @param  array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,montant:float}>  $map
      */
     private function accumulerDepensesResolues(string $start, string $end, ?array $operationIds, array &$map): void
     {
@@ -186,11 +187,11 @@ final class RapportService
                     $map[$scId]['montant'] += (float) $row->montant;
                 } else {
                     $map[$scId] = [
-                        'categorie_id'       => (int) $row->categorie_id,
-                        'categorie_nom'      => $row->categorie_nom,
-                        'sous_categorie_id'  => $scId,
+                        'categorie_id' => (int) $row->categorie_id,
+                        'categorie_nom' => $row->categorie_nom,
+                        'sous_categorie_id' => $scId,
                         'sous_categorie_nom' => $row->sous_categorie_nom,
-                        'montant'            => (float) $row->montant,
+                        'montant' => (float) $row->montant,
                     ];
                 }
             }
@@ -229,9 +230,7 @@ final class RapportService
         // Recettes (avec résolution des affectations)
         $recettesMap = [];
         $this->accumulerRecettesResolues($start, $end, $operationIds, $recettesMap);
-        foreach ($recettesMap as $row) {
-            $accumuler(collect([(object) $row]));
-        }
+        $accumuler(collect(array_values($recettesMap))->map(fn ($r) => (object) $r));
 
         // Dons (sous_categorie_id nullable → INNER JOIN exclut ceux sans sous-catégorie)
         $dq = Don::query()
@@ -242,6 +241,7 @@ final class RapportService
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(dons.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
         if ($operationIds !== null) {
+            $dq->whereNotNull('dons.operation_id');
             $dq->whereIn('dons.operation_id', $operationIds);
         }
         $accumuler($dq->get());
@@ -277,12 +277,13 @@ final class RapportService
                 $flat[] = $entry;
             }
         }
+
         return collect($flat)->map(fn ($row) => (object) $row);
     }
 
     /**
-     * @param array<int> $operationIds
-     * @param array<int, array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,seance:int,montant:float}>> $map
+     * @param  array<int>  $operationIds
+     * @param  array<int, array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,seance:int,montant:float}>>  $map
      */
     private function accumulerDepensesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
     {
@@ -334,8 +335,8 @@ final class RapportService
     }
 
     /**
-     * @param array<int>|null $operationIds
-     * @param array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,montant:float}> $map
+     * @param  array<int>|null  $operationIds
+     * @param  array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,montant:float}>  $map
      */
     private function accumulerRecettesResolues(string $start, string $end, ?array $operationIds, array &$map): void
     {
@@ -376,11 +377,11 @@ final class RapportService
                     $map[$scId]['montant'] += (float) $row->montant;
                 } else {
                     $map[$scId] = [
-                        'categorie_id'       => (int) $row->categorie_id,
-                        'categorie_nom'      => $row->categorie_nom,
-                        'sous_categorie_id'  => $scId,
+                        'categorie_id' => (int) $row->categorie_id,
+                        'categorie_nom' => $row->categorie_nom,
+                        'sous_categorie_id' => $scId,
                         'sous_categorie_nom' => $row->sous_categorie_nom,
-                        'montant'            => (float) $row->montant,
+                        'montant' => (float) $row->montant,
                     ];
                 }
             }
@@ -388,8 +389,8 @@ final class RapportService
     }
 
     /**
-     * @param array<int> $operationIds
-     * @param array<int, array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,seance:int,montant:float}>> $map
+     * @param  array<int>  $operationIds
+     * @param  array<int, array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,seance:int,montant:float}>>  $map
      */
     private function accumulerRecettesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
     {
@@ -431,12 +432,12 @@ final class RapportService
                     $map[$scId][$seance]['montant'] += (float) $row->montant;
                 } else {
                     $map[$scId][$seance] = [
-                        'categorie_id'       => (int) $row->categorie_id,
-                        'categorie_nom'      => $row->categorie_nom,
-                        'sous_categorie_id'  => $scId,
+                        'categorie_id' => (int) $row->categorie_id,
+                        'categorie_nom' => $row->categorie_nom,
+                        'sous_categorie_id' => $scId,
                         'sous_categorie_nom' => $row->sous_categorie_nom,
-                        'seance'             => $seance,
-                        'montant'            => (float) $row->montant,
+                        'seance' => $seance,
+                        'montant' => (float) $row->montant,
                     ];
                 }
             }
@@ -476,11 +477,7 @@ final class RapportService
         // Recettes par séance (avec résolution des affectations)
         $recettesSeancesMap = [];
         $this->accumulerRecettesSeancesResolues($start, $end, $operationIds, $recettesSeancesMap);
-        foreach ($recettesSeancesMap as $seanceMap) {
-            foreach ($seanceMap as $entry) {
-                $accumuler(collect([(object) $entry]));
-            }
-        }
+        $accumuler(collect($recettesSeancesMap)->flatten(1)->values()->map(fn ($r) => (object) $r));
 
         // Dons par séance
         $accumuler(Don::query()
@@ -489,6 +486,7 @@ final class RapportService
             ->whereNull('dons.deleted_at')
             ->whereBetween('dons.date', [$start, $end])
             ->whereNotNull('dons.seance')
+            ->whereNotNull('dons.operation_id')
             ->whereIn('dons.operation_id', $operationIds)
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'dons.seance', DB::raw('SUM(dons.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'dons.seance')
