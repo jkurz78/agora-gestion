@@ -14,11 +14,13 @@ use App\Services\ExerciceService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class DepenseList extends Component
 {
     use WithPagination;
+    use WithPerPage;
 
     protected string $paginationTheme = 'bootstrap';
 
@@ -137,7 +139,7 @@ final class DepenseList extends Component
         }
 
         return view('livewire.depense-list', [
-            'depenses' => $query->paginate(15),
+            'depenses' => $query->paginate($this->effectivePerPage()),
             'categories' => Categorie::where('type', TypeCategorie::Depense)->orderBy('nom')->get(),
             'operations' => Operation::orderBy('nom')->get(),
             'comptes' => CompteBancaire::orderBy('nom')->get(),
