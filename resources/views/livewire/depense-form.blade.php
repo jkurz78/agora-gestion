@@ -179,7 +179,7 @@
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">
                                                     <i class="bi bi-scissors"></i>
-                                                    {{ in_array($ligne['id'], $lignesAffectations) ? 'Modifier ventilation' : 'Ventiler' }}
+                                                    {{ in_array($ligne['id'], $lignesAffectations) ? 'Modifier la ventilation' : 'Ventiler' }}
                                                 </button>
                                             @endif
                                         </td>
