@@ -17,12 +17,16 @@ use App\Services\ExerciceService;
 use App\Services\RecetteService;
 use App\Services\TransactionCompteService;
 use App\Services\VirementInterneService;
+use App\Livewire\Concerns\WithPerPage;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 final class TransactionCompteList extends Component
 {
     use WithPagination;
+    use WithPerPage;
+
+    protected string $paginationTheme = 'bootstrap';
 
     public ?int $compteId = null;
 
@@ -179,6 +183,7 @@ final class TransactionCompteList extends Component
             searchTiers: $this->searchTiers ?: null,
             sortColumn: $this->sortColumn,
             sortDirection: $this->sortDirection,
+            perPage: $this->effectivePerPage(),
             page: $this->getPage(),
         );
 
