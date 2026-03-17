@@ -27,7 +27,7 @@ $scrollIntoViewJsSnippet = ($scrollTo !== false)
                                     wire:click="gotoPage(1, '{{ $paginator->getPageName() }}')"
                                     x-on:click="{{ $scrollIntoViewJsSnippet }}"
                                     wire:loading.attr="disabled"
-                                    aria-label="Première page">&laquo;</button>
+                                    aria-label="@lang('pagination.first')">&laquo;</button>
                         </li>
                     @endif
 
@@ -66,7 +66,7 @@ $scrollIntoViewJsSnippet = ($scrollTo !== false)
                                     wire:click="gotoPage({{ $paginator->lastPage() }}, '{{ $paginator->getPageName() }}')"
                                     x-on:click="{{ $scrollIntoViewJsSnippet }}"
                                     wire:loading.attr="disabled"
-                                    aria-label="Dernière page">&raquo;</button>
+                                    aria-label="@lang('pagination.last')">&raquo;</button>
                         </li>
                     @else
                         <li class="page-item disabled" aria-disabled="true">
@@ -82,7 +82,7 @@ $scrollIntoViewJsSnippet = ($scrollTo !== false)
                     <ul class="pagination">
                         {{-- First Page --}}
                         @if ($paginator->onFirstPage())
-                            <li class="page-item disabled" aria-disabled="true" aria-label="Première page">
+                            <li class="page-item disabled" aria-disabled="true" aria-label="@lang('pagination.first')">
                                 <span class="page-link" aria-hidden="true">&laquo;</span>
                             </li>
                         @else
@@ -91,7 +91,7 @@ $scrollIntoViewJsSnippet = ($scrollTo !== false)
                                         wire:click="gotoPage(1, '{{ $paginator->getPageName() }}')"
                                         x-on:click="{{ $scrollIntoViewJsSnippet }}"
                                         wire:loading.attr="disabled"
-                                        aria-label="Première page">&laquo;</button>
+                                        aria-label="@lang('pagination.first')">&laquo;</button>
                             </li>
                         @endif
 
@@ -166,10 +166,10 @@ $scrollIntoViewJsSnippet = ($scrollTo !== false)
                                         wire:click="gotoPage({{ $paginator->lastPage() }}, '{{ $paginator->getPageName() }}')"
                                         x-on:click="{{ $scrollIntoViewJsSnippet }}"
                                         wire:loading.attr="disabled"
-                                        aria-label="Dernière page">&raquo;</button>
+                                        aria-label="@lang('pagination.last')">&raquo;</button>
                             </li>
                         @else
-                            <li class="page-item disabled" aria-disabled="true" aria-label="Dernière page">
+                            <li class="page-item disabled" aria-disabled="true" aria-label="@lang('pagination.last')">
                                 <span class="page-link" aria-hidden="true">&raquo;</span>
                             </li>
                         @endif
