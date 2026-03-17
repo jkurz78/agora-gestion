@@ -54,6 +54,8 @@ final class RecetteForm extends Component
     /** @var array<int, array{operation_id: string, seance: string, montant: string, notes: string}> */
     public array $affectations = [];
 
+    public bool $ventilationHasAffectations = false;
+
     public function getMontantTotalProperty(): float
     {
         return round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
@@ -63,7 +65,8 @@ final class RecetteForm extends Component
     {
         $this->reset(['recetteId', 'date', 'libelle', 'mode_paiement',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
-            'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations']);
+            'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
+            'ventilationHasAffectations']);
         $this->isLocked = false;
         $this->resetValidation();
 
@@ -107,6 +110,7 @@ final class RecetteForm extends Component
         $this->ventilationLigneId = $ligneId;
         $this->ventilationLigneSousCategorie = $ligne->sousCategorie->nom ?? '';
         $this->ventilationLigneMontant = (string) $ligne->montant;
+        $this->ventilationHasAffectations = $ligne->affectations->isNotEmpty();
 
         if ($ligne->affectations->isEmpty()) {
             $this->affectations = [[
@@ -131,6 +135,7 @@ final class RecetteForm extends Component
         $this->ventilationLigneSousCategorie = '';
         $this->ventilationLigneMontant = '';
         $this->affectations = [];
+        $this->ventilationHasAffectations = false;
     }
 
     public function addAffectation(): void
@@ -206,6 +211,7 @@ final class RecetteForm extends Component
         $this->ventilationLigneSousCategorie = '';
         $this->ventilationLigneMontant = '';
         $this->affectations = [];
+        $this->ventilationHasAffectations = false;
 
         $recette = Recette::with('lignes')->findOrFail($id);
 
@@ -237,6 +243,7 @@ final class RecetteForm extends Component
             'recetteId', 'date', 'libelle', 'mode_paiement',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
+            'ventilationHasAffectations',
         ]);
         $this->resetValidation();
     }

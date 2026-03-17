@@ -276,10 +276,12 @@
                                     Reste : {{ number_format($reste, 2, ',', ' ') }} €
                                 </span>
                                 <div class="ms-auto d-flex gap-2">
+                                    @if ($ventilationHasAffectations)
                                     <button type="button" wire:click="supprimerVentilation" class="btn btn-sm btn-outline-danger"
                                             wire:confirm="Supprimer toute la ventilation ?">
                                         Annuler la ventilation
                                     </button>
+                                    @endif
                                     <button type="button" wire:click="fermerVentilation" class="btn btn-sm btn-secondary">Fermer</button>
                                     <button type="button" wire:click="saveVentilation"
                                             class="btn btn-sm btn-success"
