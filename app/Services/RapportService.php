@@ -124,7 +124,45 @@ final class RapportService
      */
     private function fetchDepenseRows(string $start, string $end, ?array $operationIds = null): Collection
     {
-        $q = DepenseLigne::query()
+        $map = [];
+        $this->accumulerDepensesResolues($start, $end, $operationIds, $map);
+        return collect(array_values($map))->map(fn ($row) => (object) $row);
+    }
+
+    /**
+     * Accumule les dépenses en résolvant les affectations.
+     * Lignes avec affectations → utilise les affectations.
+     * Lignes sans affectations → utilise operation_id de la ligne.
+     *
+     * @param array<int>|null $operationIds
+     * @param array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,montant:float}> $map
+     */
+    private function accumulerDepensesResolues(string $start, string $end, ?array $operationIds, array &$map): void
+    {
+        // Partie 1 : lignes sans affectations
+        $q1 = DB::table('depense_lignes')
+            ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
+            ->leftJoin('depense_ligne_affectations as dla', 'dla.depense_ligne_id', '=', 'depense_lignes.id')
+            ->whereNull('depense_lignes.deleted_at')
+            ->whereNull('d.deleted_at')
+            ->whereNull('dla.id')
+            ->whereBetween('d.date', [$start, $end])
+            ->select([
+                'c.id as categorie_id', 'c.nom as categorie_nom',
+                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
+                DB::raw('SUM(depense_lignes.montant) as montant'),
+            ])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
+
+        if ($operationIds !== null) {
+            $q1->whereIn('depense_lignes.operation_id', $operationIds);
+        }
+
+        // Partie 2 : lignes avec affectations (utiliser affectation.montant et affectation.operation_id)
+        $q2 = DB::table('depense_ligne_affectations as dla')
+            ->join('depense_lignes', 'depense_lignes.id', '=', 'dla.depense_ligne_id')
             ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
@@ -132,19 +170,32 @@ final class RapportService
             ->whereNull('d.deleted_at')
             ->whereBetween('d.date', [$start, $end])
             ->select([
-                'c.id as categorie_id',
-                'c.nom as categorie_nom',
-                'sc.id as sous_categorie_id',
-                'sc.nom as sous_categorie_nom',
-                DB::raw('SUM(depense_lignes.montant) as montant'),
+                'c.id as categorie_id', 'c.nom as categorie_nom',
+                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
+                DB::raw('SUM(dla.montant) as montant'),
             ])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
 
         if ($operationIds !== null) {
-            $q->whereIn('depense_lignes.operation_id', $operationIds);
+            $q2->whereIn('dla.operation_id', $operationIds);
         }
 
-        return $q->get();
+        foreach ([$q1->get(), $q2->get()] as $rows) {
+            foreach ($rows as $row) {
+                $scId = (int) $row->sous_categorie_id;
+                if (isset($map[$scId])) {
+                    $map[$scId]['montant'] += (float) $row->montant;
+                } else {
+                    $map[$scId] = [
+                        'categorie_id'       => (int) $row->categorie_id,
+                        'categorie_nom'      => $row->categorie_nom,
+                        'sous_categorie_id'  => $scId,
+                        'sous_categorie_nom' => $row->sous_categorie_nom,
+                        'montant'            => (float) $row->montant,
+                    ];
+                }
+            }
+        }
     }
 
     /**
@@ -227,23 +278,67 @@ final class RapportService
      */
     private function fetchDepenseSeancesRows(string $start, string $end, array $operationIds): Collection
     {
-        return DepenseLigne::query()
+        $map = [];
+        $this->accumulerDepensesSeancesResolues($start, $end, $operationIds, $map);
+        $flat = [];
+        foreach ($map as $seanceMap) {
+            foreach ($seanceMap as $entry) {
+                $flat[] = $entry;
+            }
+        }
+        return collect($flat)->map(fn ($row) => (object) $row);
+    }
+
+    /**
+     * @param array<int> $operationIds
+     * @param array<int, array<int, array{categorie_id:int,categorie_nom:string,sous_categorie_id:int,sous_categorie_nom:string,seance:int,montant:float}>> $map
+     */
+    private function accumulerDepensesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
+    {
+        // Lignes sans affectations
+        $rows1 = DB::table('depense_lignes')
             ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
-            ->whereNull('depense_lignes.deleted_at')
-            ->whereNull('d.deleted_at')
-            ->whereBetween('d.date', [$start, $end])
+            ->leftJoin('depense_ligne_affectations as dla', 'dla.depense_ligne_id', '=', 'depense_lignes.id')
+            ->whereNull('depense_lignes.deleted_at')->whereNull('d.deleted_at')
+            ->whereNull('dla.id')
             ->whereNotNull('depense_lignes.seance')
             ->whereIn('depense_lignes.operation_id', $operationIds)
-            ->select([
-                'c.id as categorie_id', 'c.nom as categorie_nom',
-                'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-                'depense_lignes.seance',
-                DB::raw('SUM(depense_lignes.montant) as montant'),
-            ])
+            ->whereBetween('d.date', [$start, $end])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'depense_lignes.seance', DB::raw('SUM(depense_lignes.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'depense_lignes.seance')
             ->get();
+
+        // Lignes avec affectations
+        $rows2 = DB::table('depense_ligne_affectations as dla')
+            ->join('depense_lignes', 'depense_lignes.id', '=', 'dla.depense_ligne_id')
+            ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
+            ->whereNull('depense_lignes.deleted_at')->whereNull('d.deleted_at')
+            ->whereNotNull('dla.seance')
+            ->whereIn('dla.operation_id', $operationIds)
+            ->whereBetween('d.date', [$start, $end])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'dla.seance', DB::raw('SUM(dla.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'dla.seance')
+            ->get();
+
+        foreach ([$rows1, $rows2] as $rows) {
+            foreach ($rows as $row) {
+                $scId = (int) $row->sous_categorie_id;
+                $seance = (int) $row->seance;
+                if (isset($map[$scId][$seance])) {
+                    $map[$scId][$seance]['montant'] += (float) $row->montant;
+                } else {
+                    $map[$scId][$seance] = [
+                        'categorie_id' => (int) $row->categorie_id, 'categorie_nom' => $row->categorie_nom,
+                        'sous_categorie_id' => $scId, 'sous_categorie_nom' => $row->sous_categorie_nom,
+                        'seance' => $seance, 'montant' => (float) $row->montant,
+                    ];
+                }
+            }
+        }
     }
 
     /**
