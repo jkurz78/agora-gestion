@@ -135,6 +135,7 @@
         @endif
 
         <div class="mt-3">
+            <x-per-page-selector :paginator="$paginator" storageKey="transaction-compte" wire:model.live="perPage" />
             {{ $paginator->links() }}
         </div>
     @endif
