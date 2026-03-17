@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\StatutRapprochement;
+use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Services\RapprochementBancaireService;
+use Illuminate\View\View;
 use Livewire\Component;
-use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class RapprochementList extends Component
@@ -82,7 +83,7 @@ final class RapprochementList extends Component
         }
     }
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         $comptes = CompteBancaire::orderBy('nom')->get();
         $rapprochements = collect();

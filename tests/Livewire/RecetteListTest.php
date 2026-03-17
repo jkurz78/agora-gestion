@@ -109,3 +109,14 @@ it('affiche la colonne N° dans la liste des recettes', function () {
         ->assertSee('N°')
         ->assertSee('2025-2026:00001');
 });
+
+it('has default perPage of 20', function () {
+    Livewire::test(RecetteList::class)
+        ->assertSet('perPage', 20);
+});
+
+it('resets to page 1 when perPage changes', function () {
+    Livewire::test(RecetteList::class)
+        ->set('perPage', 50)
+        ->assertSet('paginators.page', 1);
+});
