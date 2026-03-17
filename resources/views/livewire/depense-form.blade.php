@@ -28,13 +28,8 @@
                                 Date <span class="text-danger">*</span>
                                 @if ($isLocked) <i class="bi bi-lock text-warning" title="Champ verrouillé par un rapprochement"></i> @endif
                             </label>
-                            @if ($isLocked)
-                                <input type="text" value="{{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}" class="form-control bg-light" disabled>
-                            @else
-                                <input type="date" wire:model="date" id="date"
-                                       class="form-control @error('date') is-invalid @enderror">
-                                @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                            @endif
+                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked" />
+                            @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
                             <label for="reference" class="form-label">Référence <span class="text-danger">*</span></label>
