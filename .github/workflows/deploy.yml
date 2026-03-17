@@ -69,7 +69,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
             ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
-            "bash /home/${{ secrets.CPANEL_USERNAME }}/public_html/***DEPLOY_SUBDOMAIN***/deploy-cron.sh"
+            "bash /home/${{ secrets.CPANEL_USERNAME }}/public_html/***DEPLOY_SUBDOMAIN***/deploy.sh"
 
       - name: Clean up SSH key
         if: always()
