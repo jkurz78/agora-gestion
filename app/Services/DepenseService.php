@@ -40,8 +40,8 @@ final class DepenseService
                 foreach ($lignes as $ligneData) {
                     $depense->lignes()->where('id', $ligneData['id'])->update([
                         'operation_id' => $ligneData['operation_id'],
-                        'seance'       => $ligneData['seance'],
-                        'notes'        => $ligneData['notes'],
+                        'seance' => $ligneData['seance'],
+                        'notes' => $ligneData['notes'],
                     ]);
                 }
             } else {
@@ -64,9 +64,9 @@ final class DepenseService
                         if ($aff->isNotEmpty()) {
                             $affectationsSnapshot[$oldId] = $aff->map(fn ($a) => [
                                 'operation_id' => $a->operation_id,
-                                'seance'       => $a->seance,
-                                'montant'      => $a->montant,
-                                'notes'        => $a->notes,
+                                'seance' => $a->seance,
+                                'montant' => $a->montant,
+                                'notes' => $a->notes,
                             ])->toArray();
                         }
                     }
@@ -149,9 +149,9 @@ final class DepenseService
             foreach ($affectations as $a) {
                 $ligne->affectations()->create([
                     'operation_id' => $a['operation_id'] ?: null,
-                    'seance'       => $a['seance'] ?: null,
-                    'montant'      => $a['montant'],
-                    'notes'        => $a['notes'] ?: null,
+                    'seance' => $a['seance'] ?: null,
+                    'montant' => $a['montant'],
+                    'notes' => $a['notes'] ?: null,
                 ]);
             }
         });

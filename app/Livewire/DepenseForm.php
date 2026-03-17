@@ -84,12 +84,12 @@ final class DepenseForm extends Component
     public function addLigne(): void
     {
         $this->lignes[] = [
-            'id'               => null,
+            'id' => null,
             'sous_categorie_id' => '',
-            'operation_id'     => '',
-            'seance'           => '',
-            'montant'          => '',
-            'notes'            => '',
+            'operation_id' => '',
+            'seance' => '',
+            'montant' => '',
+            'notes' => '',
         ];
     }
 
@@ -115,16 +115,16 @@ final class DepenseForm extends Component
         if ($ligne->affectations->isEmpty()) {
             $this->affectations = [[
                 'operation_id' => (string) ($ligne->operation_id ?? ''),
-                'seance'       => (string) ($ligne->seance ?? ''),
-                'montant'      => (string) $ligne->montant,
-                'notes'        => (string) ($ligne->notes ?? ''),
+                'seance' => (string) ($ligne->seance ?? ''),
+                'montant' => (string) $ligne->montant,
+                'notes' => (string) ($ligne->notes ?? ''),
             ]];
         } else {
             $this->affectations = $ligne->affectations->map(fn ($a) => [
                 'operation_id' => (string) ($a->operation_id ?? ''),
-                'seance'       => (string) ($a->seance ?? ''),
-                'montant'      => (string) $a->montant,
-                'notes'        => (string) ($a->notes ?? ''),
+                'seance' => (string) ($a->seance ?? ''),
+                'montant' => (string) $a->montant,
+                'notes' => (string) ($a->notes ?? ''),
             ])->toArray();
         }
     }
@@ -162,18 +162,19 @@ final class DepenseForm extends Component
         }
 
         $this->validate([
-            'affectations'                  => ['required', 'array', 'min:1'],
-            'affectations.*.montant'        => ['required', 'numeric', 'min:0.01'],
-            'affectations.*.operation_id'   => ['nullable'],
-            'affectations.*.seance'         => ['nullable', 'integer', 'min:1'],
-            'affectations.*.notes'          => ['nullable', 'string', 'max:255'],
+            'affectations' => ['required', 'array', 'min:1'],
+            'affectations.*.montant' => ['required', 'numeric', 'min:0.01'],
+            'affectations.*.operation_id' => ['nullable'],
+            'affectations.*.seance' => ['nullable', 'integer', 'min:1'],
+            'affectations.*.notes' => ['nullable', 'string', 'max:255'],
         ]);
 
         $ligne = DepenseLigne::findOrFail($this->ventilationLigneId);
         $ligneMontantCents = (int) round((float) $ligne->montant * 100);
-        $affectationCents  = (int) round(collect($this->affectations)->sum(fn ($a) => (float) ($a['montant'] ?? 0)) * 100);
+        $affectationCents = (int) round(collect($this->affectations)->sum(fn ($a) => (float) ($a['montant'] ?? 0)) * 100);
         if ($ligneMontantCents !== $affectationCents) {
             $this->addError('affectations', 'La somme des affectations doit être égale au montant de la ligne.');
+
             return;
         }
 
@@ -181,9 +182,9 @@ final class DepenseForm extends Component
             $ligne,
             collect($this->affectations)->map(fn ($a) => [
                 'operation_id' => $a['operation_id'] !== '' ? (int) $a['operation_id'] : null,
-                'seance'       => $a['seance'] !== '' ? (int) $a['seance'] : null,
-                'montant'      => $a['montant'],
-                'notes'        => $a['notes'] ?: null,
+                'seance' => $a['seance'] !== '' ? (int) $a['seance'] : null,
+                'montant' => $a['montant'],
+                'notes' => $a['notes'] ?: null,
             ])->toArray()
         );
 
@@ -225,12 +226,12 @@ final class DepenseForm extends Component
         $this->notes = $depense->notes;
 
         $this->lignes = $depense->lignes->map(fn ($ligne) => [
-            'id'               => $ligne->id,
+            'id' => $ligne->id,
             'sous_categorie_id' => (string) $ligne->sous_categorie_id,
-            'operation_id'     => (string) ($ligne->operation_id ?? ''),
-            'seance'           => (string) ($ligne->seance ?? ''),
-            'montant'          => (string) $ligne->montant,
-            'notes'            => (string) ($ligne->notes ?? ''),
+            'operation_id' => (string) ($ligne->operation_id ?? ''),
+            'seance' => (string) ($ligne->seance ?? ''),
+            'montant' => (string) $ligne->montant,
+            'notes' => (string) ($ligne->notes ?? ''),
         ])->toArray();
 
         $this->isLocked = $depense->isLockedByRapprochement();
@@ -264,7 +265,7 @@ final class DepenseForm extends Component
                 'date' => $isLocked
                     ? ['required', 'date']
                     : ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
-                'libelle'   => ['nullable', 'string', 'max:255'],
+                'libelle' => ['nullable', 'string', 'max:255'],
                 'reference' => ['required', 'string', 'max:100'],
                 'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement'],
                 'tiers_id' => ['nullable', 'exists:tiers,id'],
@@ -294,12 +295,12 @@ final class DepenseForm extends Component
         ];
 
         $lignes = collect($this->lignes)->map(fn ($l) => [
-            'id'               => isset($l['id']) ? (int) $l['id'] : null,
+            'id' => isset($l['id']) ? (int) $l['id'] : null,
             'sous_categorie_id' => (int) $l['sous_categorie_id'],
-            'operation_id'     => $l['operation_id'] !== '' ? (int) $l['operation_id'] : null,
-            'seance'           => $l['seance'] !== '' ? (int) $l['seance'] : null,
-            'montant'          => $l['montant'],
-            'notes'            => $l['notes'] ?: null,
+            'operation_id' => $l['operation_id'] !== '' ? (int) $l['operation_id'] : null,
+            'seance' => $l['seance'] !== '' ? (int) $l['seance'] : null,
+            'montant' => $l['montant'],
+            'notes' => $l['notes'] ?: null,
         ])->toArray();
 
         $service = app(DepenseService::class);

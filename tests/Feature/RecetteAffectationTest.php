@@ -5,6 +5,7 @@ use App\Models\Operation;
 use App\Models\Recette;
 use App\Models\RecetteLigne;
 use App\Models\RecetteLigneAffectation;
+use App\Models\SousCategorie;
 use App\Models\User;
 use App\Services\RecetteService;
 
@@ -25,6 +26,7 @@ function makeRecetteAvecLigne(CompteBancaire $compte, float $montant = 20000.00)
     ]);
     // Supprimer les lignes auto-créées par le factory, puis créer exactement une ligne
     $recette->lignes()->forceDelete();
+
     return RecetteLigne::factory()->create([
         'recette_id' => $recette->id,
         'montant' => $montant,
@@ -59,7 +61,7 @@ it('affecterLigne rejette si la somme ne correspond pas au montant de la ligne',
     expect(fn () => $this->service->affecterLigne($ligne, [
         ['operation_id' => $this->op1->id, 'seance' => null, 'montant' => '8000.00', 'notes' => null],
         ['operation_id' => $this->op2->id, 'seance' => null, 'montant' => '5000.00', 'notes' => null],
-    ]))->toThrow(\RuntimeException::class, 'somme');
+    ]))->toThrow(RuntimeException::class, 'somme');
 });
 
 it('affecterLigne rejette si un montant est nul ou négatif', function () {
@@ -68,7 +70,7 @@ it('affecterLigne rejette si un montant est nul ou négatif', function () {
     expect(fn () => $this->service->affecterLigne($ligne, [
         ['operation_id' => $this->op1->id, 'seance' => null, 'montant' => '0.00', 'notes' => null],
         ['operation_id' => $this->op2->id, 'seance' => null, 'montant' => '20000.00', 'notes' => null],
-    ]))->toThrow(\RuntimeException::class);
+    ]))->toThrow(RuntimeException::class);
 });
 
 it('affecterLigne remplace les affectations existantes', function () {
@@ -111,7 +113,7 @@ it('supprimerAffectations supprime toutes les affectations d\'une ligne', functi
 });
 
 it('update() sur pièce non verrouillée préserve les affectations existantes', function () {
-    $sousCategorie = \App\Models\SousCategorie::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create();
 
     $recette = Recette::factory()->create([
         'compte_id' => $this->compte->id,
@@ -157,11 +159,11 @@ it('update() sur pièce non verrouillée préserve les affectations existantes',
 });
 
 it('update() non verrouillé supprime les affectations quand le montant de ligne change', function () {
-    $compte = \App\Models\CompteBancaire::factory()->create();
-    $sousCategorie = \App\Models\SousCategorie::factory()->create();
-    $op = \App\Models\Operation::factory()->create();
+    $compte = CompteBancaire::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create();
+    $op = Operation::factory()->create();
 
-    $recette = \App\Models\Recette::factory()->create([
+    $recette = Recette::factory()->create([
         'compte_id' => $compte->id,
         'montant_total' => 100.00,
     ]);
@@ -181,7 +183,7 @@ it('update() non verrouillé supprime les affectations quand le montant de ligne
     ]);
 
     // Update with a different montant — affectations must be dropped
-    $service = app(\App\Services\RecetteService::class);
+    $service = app(RecetteService::class);
     $service->update($recette, [
         'date' => $recette->date->format('Y-m-d'),
         'libelle' => $recette->libelle,
