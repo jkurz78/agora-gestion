@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class DepenseLigne extends Model
@@ -52,7 +53,7 @@ final class DepenseLigne extends Model
         return $this->belongsTo(Operation::class);
     }
 
-    public function affectations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function affectations(): HasMany
     {
         return $this->hasMany(DepenseLigneAffectation::class);
     }
