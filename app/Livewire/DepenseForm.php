@@ -13,6 +13,7 @@ use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Services\DepenseService;
 use App\Services\ExerciceService;
+use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -125,9 +126,13 @@ final class DepenseForm extends Component
         $dateDebut = $range['start']->toDateString();
         $dateFin = $range['end']->toDateString();
 
+        $isLocked = $this->depenseId
+            ? Depense::findOrFail($this->depenseId)->loadMissing('rapprochement')->isLockedByRapprochement()
+            : false;
+
         $this->validate(
             [
-                'date' => $this->isLocked
+                'date' => $isLocked
                     ? ['required', 'date']
                     : ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
                 'libelle'   => ['nullable', 'string', 'max:255'],
@@ -181,7 +186,7 @@ final class DepenseForm extends Component
         $this->resetForm();
     }
 
-    public function render()
+    public function render(): View
     {
         $sousCategories = SousCategorie::with('categorie')
             ->whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Depense))
