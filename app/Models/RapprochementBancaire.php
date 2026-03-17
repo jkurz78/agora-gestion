@@ -81,7 +81,8 @@ final class RapprochementBancaire extends Model
 
     public function isVerrouille(): bool
     {
-        return $this->statut === StatutRapprochement::Verrouille;
+        return $this->statut === StatutRapprochement::Verrouille
+            && $this->verrouille_at !== null;
     }
 
     public function isEnCours(): bool
