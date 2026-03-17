@@ -35,7 +35,7 @@
         if (/^\d{4}$/.test(str))  return make(str.slice(0,2), str.slice(2,4), y);
         const p = str.split(/[\/\-\.]/);
         if (p.length === 2) return make(p[0], p[1], y);
-        if (p.length === 3) return make(p[0], p[1], p[2]);
+        if (p.length === 3) return make(p[0], p[1], p[2].length <= 2 ? 2000 + parseInt(p[2], 10) : p[2]);
         return null;
     };
     </script>
