@@ -23,8 +23,9 @@
         @endif
     </small>
     <div class="d-flex align-items-center gap-2">
-        <label class="form-label mb-0 text-muted small">Lignes par page :</label>
-        <select x-ref="select"
+        <label for="perPage-{{ $storageKey }}" class="form-label mb-0 text-muted small">Lignes par page :</label>
+        <select id="perPage-{{ $storageKey }}"
+                x-ref="select"
                 x-on:change="localStorage.setItem(key, $event.target.value)"
                 class="form-select form-select-sm w-auto"
                 {{ $attributes->filter(fn($v, $k) => str_starts_with($k, 'wire:')) }}>
