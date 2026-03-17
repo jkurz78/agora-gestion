@@ -13,6 +13,7 @@ use App\Models\Recette;
 use App\Models\SousCategorie;
 use App\Services\ExerciceService;
 use App\Services\RecetteService;
+use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -125,9 +126,13 @@ final class RecetteForm extends Component
         $dateDebut = $range['start']->toDateString();
         $dateFin = $range['end']->toDateString();
 
+        $isLocked = $this->recetteId
+            ? Recette::findOrFail($this->recetteId)->loadMissing('rapprochement')->isLockedByRapprochement()
+            : false;
+
         $this->validate(
             [
-                'date' => $this->isLocked
+                'date' => $isLocked
                     ? ['required', 'date']
                     : ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
                 'libelle'   => ['nullable', 'string', 'max:255'],
@@ -181,7 +186,7 @@ final class RecetteForm extends Component
         $this->resetForm();
     }
 
-    public function render()
+    public function render(): View
     {
         $sousCategories = SousCategorie::with('categorie')
             ->whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Recette))

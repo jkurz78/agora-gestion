@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Depense;
+use App\Models\DepenseLigne;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -26,13 +27,13 @@ final class DepenseService
 
     public function update(Depense $depense, array $data, array $lignes): Depense
     {
-        $depense->loadMissing('rapprochement');
-
-        if ($depense->isLockedByRapprochement()) {
-            $this->assertLockedInvariants($depense, $data, $lignes);
-        }
-
         return DB::transaction(function () use ($depense, $data, $lignes) {
+            $depense->loadMissing('rapprochement');
+
+            if ($depense->isLockedByRapprochement()) {
+                $this->assertLockedInvariants($depense, $data, $lignes);
+            }
+
             $depense->update($data);
 
             if ($depense->isLockedByRapprochement()) {
@@ -89,7 +90,7 @@ final class DepenseService
         }
     }
 
-    public function affecterLigne(\App\Models\DepenseLigne $ligne, array $affectations): void
+    public function affecterLigne(DepenseLigne $ligne, array $affectations): void
     {
         foreach ($affectations as $a) {
             if ((int) round((float) ($a['montant'] ?? 0) * 100) <= 0) {
@@ -121,9 +122,11 @@ final class DepenseService
         });
     }
 
-    public function supprimerAffectations(\App\Models\DepenseLigne $ligne): void
+    public function supprimerAffectations(DepenseLigne $ligne): void
     {
-        $ligne->affectations()->delete();
+        DB::transaction(function () use ($ligne) {
+            $ligne->affectations()->delete();
+        });
     }
 
     public function delete(Depense $depense): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Recette;
+use App\Models\RecetteLigne;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -26,13 +27,13 @@ final class RecetteService
 
     public function update(Recette $recette, array $data, array $lignes): Recette
     {
-        $recette->loadMissing('rapprochement');
-
-        if ($recette->isLockedByRapprochement()) {
-            $this->assertLockedInvariants($recette, $data, $lignes);
-        }
-
         return DB::transaction(function () use ($recette, $data, $lignes) {
+            $recette->loadMissing('rapprochement');
+
+            if ($recette->isLockedByRapprochement()) {
+                $this->assertLockedInvariants($recette, $data, $lignes);
+            }
+
             $recette->update($data);
 
             if ($recette->isLockedByRapprochement()) {
@@ -91,7 +92,7 @@ final class RecetteService
         }
     }
 
-    public function affecterLigne(\App\Models\RecetteLigne $ligne, array $affectations): void
+    public function affecterLigne(RecetteLigne $ligne, array $affectations): void
     {
         foreach ($affectations as $a) {
             if ((int) round((float) ($a['montant'] ?? 0) * 100) <= 0) {
@@ -123,9 +124,11 @@ final class RecetteService
         });
     }
 
-    public function supprimerAffectations(\App\Models\RecetteLigne $ligne): void
+    public function supprimerAffectations(RecetteLigne $ligne): void
     {
-        $ligne->affectations()->delete();
+        DB::transaction(function () use ($ligne) {
+            $ligne->affectations()->delete();
+        });
     }
 
     public function delete(Recette $recette): void
