@@ -41,14 +41,9 @@ final class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
-    public function depenses(): HasMany
+    public function transactions(): HasMany
     {
-        return $this->hasMany(Depense::class, 'saisi_par');
-    }
-
-    public function recettes(): HasMany
-    {
-        return $this->hasMany(Recette::class, 'saisi_par');
+        return $this->hasMany(Transaction::class, 'saisi_par');
     }
 
     public function dons(): HasMany
