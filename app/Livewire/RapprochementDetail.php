@@ -101,6 +101,7 @@ final class RapprochementDetail extends Component
 
         $dernierVerrouille = RapprochementBancaire::where('compte_id', $this->rapprochement->compte_id)
             ->where('statut', StatutRapprochement::Verrouille)
+            ->whereNotNull('verrouille_at')
             ->where('id', '!=', $this->rapprochement->id)
             ->orderByDesc('date_fin')
             ->orderByDesc('id')
