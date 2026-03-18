@@ -221,7 +221,7 @@ it('rapportSeances agrège plusieurs opérations par numéro de séance', functi
     expect($result['charges'][0]['sous_categories'][0]['seances'][1])->toBe(200.0);
 });
 
-it('rapportSeances exclut lignes sans seance', function () {
+it('rapportSeances place les lignes sans séance dans la colonne Hors séance (seance=0)', function () {
     $op = Operation::factory()->withSeances(1)->create();
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Divers']);
 
@@ -231,7 +231,17 @@ it('rapportSeances exclut lignes sans seance', function () {
 
     $result = $this->service->rapportSeances(2025, [$op->id]);
 
-    expect($result['charges'])->toHaveCount(0);
+    // La ligne sans séance doit apparaître dans la colonne "Hors séance" (seance=0), pas être exclue
+    expect($result['seances'])->toContain(0);
+    expect($result['charges'])->toHaveCount(1);
+    $sc0 = $result['charges'][0]['sous_categories'][0];
+    expect($sc0['seances'][0])->toBe(500.0);
+    expect($sc0['total'])->toBe(500.0);
+
+    // 0 doit être trié en dernier (après les séances numérotées)
+    $seancesAvecNumerotees = collect([1, 0]);
+    $sorted = $seancesAvecNumerotees->sortBy(fn ($s) => $s === 0 ? PHP_INT_MAX : $s)->values()->all();
+    expect($sorted)->toBe([1, 0]);
 });
 
 // ── toCsv ─────────────────────────────────────────────────────────────────────

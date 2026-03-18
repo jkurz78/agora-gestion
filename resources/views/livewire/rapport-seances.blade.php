@@ -34,7 +34,7 @@
                             <td style="width:20px;"></td>
                             <td></td>
                             @foreach ($seances as $s)
-                                <td class="text-end" style="width:90px;font-size:12px;font-weight:400;opacity:.85;">Séance {{ $s }}</td>
+                                <td class="text-end" style="width:90px;font-size:12px;font-weight:400;opacity:.85;">{{ $s === 0 ? 'Hors séance' : 'Séance '.$s }}</td>
                             @endforeach
                             <td class="text-end" style="width:100px;font-size:12px;font-weight:400;opacity:.85;">Total</td>
                         </tr>

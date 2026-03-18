@@ -70,13 +70,14 @@ final class RapportService
         $chargeRows = $this->fetchDepenseSeancesRows($start, $end, $operationIds);
         $produitsRows = $this->fetchProduitsSeancesRows($start, $end, $operationIds);
 
+        // 0 = "Hors séance" — trié en dernier
         $allSeances = collect($chargeRows)
             ->merge($produitsRows)
             ->pluck('seance')
             ->unique()
-            ->sort()
-            ->values()
             ->map(fn ($s) => (int) $s)
+            ->sortBy(fn ($s) => $s === 0 ? PHP_INT_MAX : $s)
+            ->values()
             ->all();
 
         return [
@@ -288,7 +289,7 @@ final class RapportService
      */
     private function accumulerDepensesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
     {
-        // Lignes sans affectations
+        // Lignes sans affectations (seance=NULL → 0 = "Hors séance")
         $rows1 = DB::table('transaction_lignes')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
@@ -297,14 +298,13 @@ final class RapportService
             ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
             ->whereNull('transaction_lignes.deleted_at')->whereNull('d.deleted_at')
             ->whereNull('tla.id')
-            ->whereNotNull('transaction_lignes.seance')
             ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('d.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'transaction_lignes.seance', DB::raw('SUM(transaction_lignes.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'transaction_lignes.seance')
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(transaction_lignes.seance, 0) as seance'), DB::raw('SUM(transaction_lignes.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(transaction_lignes.seance, 0)'))
             ->get();
 
-        // Lignes avec affectations
+        // Lignes avec affectations (seance=NULL → 0 = "Hors séance")
         $rows2 = DB::table('transaction_ligne_affectations as tla')
             ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
@@ -312,12 +312,11 @@ final class RapportService
             ->join('transactions as d', 'd.id', '=', 'transaction_lignes.transaction_id')
             ->where('d.type', 'depense')
             ->whereNull('transaction_lignes.deleted_at')->whereNull('d.deleted_at')
-            ->whereNotNull('tla.seance')
             ->whereNotNull('tla.operation_id')
             ->whereIn('tla.operation_id', $operationIds)
             ->whereBetween('d.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'tla.seance', DB::raw('SUM(tla.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'tla.seance')
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(tla.seance, 0) as seance'), DB::raw('SUM(tla.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(tla.seance, 0)'))
             ->get();
 
         foreach ([$rows1, $rows2] as $rows) {
@@ -398,7 +397,7 @@ final class RapportService
      */
     private function accumulerRecettesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
     {
-        // Lignes sans affectations
+        // Lignes sans affectations (seance=NULL → 0 = "Hors séance")
         $rows1 = DB::table('transaction_lignes')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
@@ -407,14 +406,13 @@ final class RapportService
             ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
             ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
             ->whereNull('tla.id')
-            ->whereNotNull('transaction_lignes.seance')
             ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'transaction_lignes.seance', DB::raw('SUM(transaction_lignes.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'transaction_lignes.seance')
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(transaction_lignes.seance, 0) as seance'), DB::raw('SUM(transaction_lignes.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(transaction_lignes.seance, 0)'))
             ->get();
 
-        // Lignes avec affectations
+        // Lignes avec affectations (seance=NULL → 0 = "Hors séance")
         $rows2 = DB::table('transaction_ligne_affectations as tla')
             ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
             ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
@@ -422,12 +420,11 @@ final class RapportService
             ->join('transactions as r', 'r.id', '=', 'transaction_lignes.transaction_id')
             ->where('r.type', 'recette')
             ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
-            ->whereNotNull('tla.seance')
             ->whereNotNull('tla.operation_id')
             ->whereIn('tla.operation_id', $operationIds)
             ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'tla.seance', DB::raw('SUM(tla.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'tla.seance')
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(tla.seance, 0) as seance'), DB::raw('SUM(tla.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(tla.seance, 0)'))
             ->get();
 
         foreach ([$rows1, $rows2] as $rows) {
@@ -491,11 +488,10 @@ final class RapportService
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
             ->whereNull('dons.deleted_at')
             ->whereBetween('dons.date', [$start, $end])
-            ->whereNotNull('dons.seance')
             ->whereNotNull('dons.operation_id')
             ->whereIn('dons.operation_id', $operationIds)
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'dons.seance', DB::raw('SUM(dons.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'dons.seance')
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(dons.seance, 0) as seance'), DB::raw('SUM(dons.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(dons.seance, 0)'))
             ->get());
 
         $flat = [];
