@@ -185,8 +185,7 @@ it('update() non verrouillé supprime les affectations quand le montant de ligne
     ]);
 
     // Update with a different montant — affectations must be dropped
-    $service = app(TransactionService::class);
-    $service->update($transaction, [
+    $this->service->update($transaction, [
         'date' => $transaction->date->format('Y-m-d'),
         'libelle' => $transaction->libelle,
         'montant_total' => 150.00,
