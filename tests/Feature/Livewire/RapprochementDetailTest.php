@@ -160,10 +160,11 @@ it('peut modifier la date de fin', function () {
 
 it('refuse une date de fin antérieure au dernier rapprochement verrouillé', function () {
     RapprochementBancaire::factory()->create([
-        'compte_id'  => $this->compte->id,
-        'statut'     => StatutRapprochement::Verrouille,
-        'date_fin'   => '2026-02-28',
-        'saisi_par'  => $this->user->id,
+        'compte_id'      => $this->compte->id,
+        'statut'         => StatutRapprochement::Verrouille,
+        'verrouille_at'  => now(),
+        'date_fin'       => '2026-02-28',
+        'saisi_par'      => $this->user->id,
     ]);
 
     Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
