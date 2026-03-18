@@ -17,11 +17,19 @@
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
             <h4 class="mb-1">{{ $rapprochement->compte->nom }}</h4>
-            <span class="text-muted">Relevé du {{ $rapprochement->date_fin->format('d/m/Y') }}</span>
-            @if ($rapprochement->isVerrouille())
-                <span class="badge bg-secondary ms-2"><i class="bi bi-lock"></i> Verrouillé</span>
+            @if ($rapprochement->isEnCours())
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <label class="text-muted small mb-0">Relevé du</label>
+                    <input type="date"
+                           wire:change="updateDateFin($event.target.value)"
+                           value="{{ $rapprochement->date_fin->format('Y-m-d') }}"
+                           class="form-control form-control-sm" style="width:auto">
+                    <span class="badge bg-warning text-dark ms-1"><i class="bi bi-pencil"></i> En cours</span>
+                </div>
+                @error('date_fin') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
             @else
-                <span class="badge bg-warning text-dark ms-2"><i class="bi bi-pencil"></i> En cours</span>
+                <span class="text-muted">Relevé du {{ $rapprochement->date_fin->format('d/m/Y') }}</span>
+                <span class="badge bg-secondary ms-2"><i class="bi bi-lock"></i> Verrouillé</span>
             @endif
         </div>
         <div class="d-flex gap-2">
@@ -48,7 +56,15 @@
             <div class="card text-center">
                 <div class="card-body py-2">
                     <div class="text-muted small">Solde fin (relevé)</div>
-                    <div class="fw-bold">{{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €</div>
+                    @if ($rapprochement->isEnCours())
+                        <input type="number" step="0.01"
+                               wire:change="updateSoldeFin($event.target.value)"
+                               value="{{ number_format((float) $rapprochement->solde_fin, 2, '.', '') }}"
+                               class="form-control form-control-sm text-center fw-bold" style="width:auto;margin:auto">
+                        @error('solde_fin') <div class="text-danger" style="font-size:.75rem">{{ $message }}</div> @enderror
+                    @else
+                        <div class="fw-bold">{{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €</div>
+                    @endif
                 </div>
             </div>
         </div>

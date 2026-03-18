@@ -135,3 +135,49 @@ it('affiche toutes les écritures quand la case est décochée', function () {
         ->set('masquerPointees', false)
         ->assertSee('Recette pointée');
 });
+
+it('peut modifier le solde de fin', function () {
+    Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
+        ->call('updateSoldeFin', '1500.50')
+        ->assertHasNoErrors();
+
+    expect($this->rapprochement->fresh()->solde_fin)->toEqual('1500.50');
+});
+
+it('refuse un solde de fin non numérique', function () {
+    Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
+        ->call('updateSoldeFin', 'abc')
+        ->assertHasErrors(['solde_fin']);
+});
+
+it('peut modifier la date de fin', function () {
+    Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
+        ->call('updateDateFin', '2026-04-30')
+        ->assertHasNoErrors();
+
+    expect($this->rapprochement->fresh()->date_fin->format('Y-m-d'))->toBe('2026-04-30');
+});
+
+it('refuse une date de fin antérieure au dernier rapprochement verrouillé', function () {
+    RapprochementBancaire::factory()->create([
+        'compte_id'  => $this->compte->id,
+        'statut'     => StatutRapprochement::Verrouille,
+        'date_fin'   => '2026-02-28',
+        'saisi_par'  => $this->user->id,
+    ]);
+
+    Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
+        ->call('updateDateFin', '2026-02-01')
+        ->assertHasErrors(['date_fin']);
+});
+
+it('ne modifie pas les champs si le rapprochement est verrouillé', function () {
+    $this->rapprochement->update([
+        'statut'        => StatutRapprochement::Verrouille,
+        'verrouille_at' => now(),
+    ]);
+
+    Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement->fresh()])
+        ->call('updateSoldeFin', '9999.00')
+        ->assertHasErrors(['solde_fin']);
+});
