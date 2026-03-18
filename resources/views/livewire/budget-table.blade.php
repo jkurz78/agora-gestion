@@ -6,6 +6,102 @@
         $totalProduitsRealise = 0;
     @endphp
 
+    {{-- Boutons Export / Import --}}
+    <div class="d-flex gap-2 mb-3">
+        <button wire:click="openExportModal" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-download"></i> Exporter
+        </button>
+        <button wire:click="toggleImportPanel" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-upload"></i> Importer
+        </button>
+    </div>
+
+    {{-- Modal Export --}}
+    @if ($showExportModal)
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Exporter le budget</h5>
+                    <button wire:click="closeExportModal" type="button" class="btn-close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Format</label>
+                        <select wire:model="exportFormat" class="form-select">
+                            <option value="csv">CSV</option>
+                            <option value="xlsx">Excel (.xlsx)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Exercice à écrire dans le fichier</label>
+                        <select wire:model="exportExercice" class="form-select">
+                            <option value="courant">Exercice courant ({{ $exportExerciceCourant }}-{{ $exportExerciceCourant + 1 }})</option>
+                            <option value="suivant">Exercice suivant ({{ $exportExerciceSuivant }}-{{ $exportExerciceSuivant + 1 }})</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Montants à inclure</label>
+                        <select wire:model="exportSource" class="form-select">
+                            <option value="zero">Zéro partout (cellules vides)</option>
+                            <option value="courant">Montants de l'exercice courant</option>
+                            <option value="n1">Montants de l'exercice N-1</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button wire:click="closeExportModal" type="button" class="btn btn-secondary">Annuler</button>
+                    <button wire:click="export" type="button" class="btn btn-primary">
+                        <i class="bi bi-download"></i> Télécharger
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- Panel Import --}}
+    @if ($showImportPanel)
+    <div class="card mb-3 border-warning">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">Importer le budget — exercice {{ $exerciceLabel }}</span>
+            <button wire:click="toggleImportPanel" type="button" class="btn-close"></button>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                L'import supprimera toutes les lignes budgétaires existantes pour l'exercice {{ $exerciceLabel }} avant de charger les nouvelles données.
+                Les montants vides ou nuls ne sont pas chargés. Cette action est irréversible.
+            </div>
+
+            @if ($importSuccess)
+                <div class="alert alert-success">{{ $importSuccess }}</div>
+            @endif
+
+            @if ($importErrors)
+                <div class="alert alert-danger">
+                    <strong>Erreurs de validation :</strong>
+                    <ul class="mb-0 mt-1">
+                        @foreach ($importErrors as $error)
+                            <li>{{ $error['line'] > 0 ? "Ligne {$error['line']} : " : '' }}{{ $error['message'] }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <div class="mb-3">
+                <label class="form-label">Fichier budget (CSV ou Excel)</label>
+                <input type="file" wire:model="budgetFile" accept=".csv,.txt,.xlsx" class="form-control">
+                @error('budgetFile') <span class="text-danger small">{{ $message }}</span> @enderror
+            </div>
+            <button wire:click="importBudget" class="btn btn-warning" wire:loading.attr="disabled">
+                <span wire:loading wire:target="importBudget" class="spinner-border spinner-border-sm"></span>
+                Valider l'import
+            </button>
+        </div>
+    </div>
+    @endif
+
     {{-- Charges (dépenses) --}}
     <div class="card mb-4">
         <div class="card-header">
