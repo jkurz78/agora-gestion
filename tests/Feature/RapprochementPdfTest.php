@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Enums\StatutRapprochement;
 use App\Models\Association;
 use App\Models\CompteBancaire;
-use App\Models\Depense;
 use App\Models\RapprochementBancaire;
+use App\Models\Transaction;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -66,7 +66,7 @@ it('generates PDF even when logo file is missing', function () {
 });
 
 it('passes only pointed transactions to PDF view', function () {
-    Depense::factory()->create([
+    Transaction::factory()->asDepense()->create([
         'compte_id'        => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'libelle'          => 'Dépense pointée',
@@ -74,7 +74,7 @@ it('passes only pointed transactions to PDF view', function () {
         'date'             => now()->format('Y-m-d'),
     ]);
 
-    Depense::factory()->create([
+    Transaction::factory()->asDepense()->create([
         'compte_id'        => $this->compte->id,
         'rapprochement_id' => null,
         'libelle'          => 'Dépense non pointée',

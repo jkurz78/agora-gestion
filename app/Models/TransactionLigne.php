@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,21 +15,26 @@ final class TransactionLigne extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'transaction_lignes';
+
     public $timestamps = false;
 
     protected $fillable = [
-        'transaction_id', 'sous_categorie_id', 'operation_id',
-        'seance', 'montant', 'notes',
+        'transaction_id',
+        'sous_categorie_id',
+        'operation_id',
+        'seance',
+        'montant',
+        'notes',
     ];
 
     protected function casts(): array
     {
         return [
-            'montant'           => 'decimal:2',
-            'transaction_id'    => 'integer',
+            'montant'          => 'decimal:2',
+            'transaction_id'   => 'integer',
             'sous_categorie_id' => 'integer',
-            'operation_id'      => 'integer',
-            'seance'            => 'integer',
+            'operation_id'     => 'integer',
+            'seance'           => 'integer',
         ];
     }
 

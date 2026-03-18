@@ -19,8 +19,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Livewire full-page routes (just need route + view)
-    Route::view('/depenses', 'depenses.index')->name('depenses.index');
-    Route::view('/recettes', 'recettes.index')->name('recettes.index');
+    Route::view('/transactions', 'transactions.index')->name('transactions.index');
     Route::view('/dons', 'dons.index')->name('dons.index');
     Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
     Route::view('/membres', 'membres.index')->name('membres.index');
@@ -54,13 +53,9 @@ Route::middleware('auth')->group(function () {
     })->name('exercice.changer');
 
     // CSV import templates
-    Route::get('/depenses/import/template', [CsvImportController::class, 'template'])
-        ->defaults('type', 'depense')
-        ->name('depenses.import.template');
-
-    Route::get('/recettes/import/template', [CsvImportController::class, 'template'])
-        ->defaults('type', 'recette')
-        ->name('recettes.import.template');
+    Route::get('/transactions/import/template', [CsvImportController::class, 'template'])
+        ->defaults('type', 'transaction')
+        ->name('transactions.import.template');
 
     // Resource controllers
     Route::resource('operations', OperationController::class)->except(['destroy']);

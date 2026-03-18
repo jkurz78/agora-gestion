@@ -139,45 +139,47 @@ final class RapportService
     private function accumulerDepensesResolues(string $start, string $end, ?array $operationIds, array &$map): void
     {
         // Partie 1 : lignes sans affectations
-        $q1 = DB::table('depense_lignes')
-            ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
+        $q1 = DB::table('transaction_lignes')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
-            ->leftJoin('depense_ligne_affectations as dla', 'dla.depense_ligne_id', '=', 'depense_lignes.id')
-            ->whereNull('depense_lignes.deleted_at')
+            ->join('transactions as d', 'd.id', '=', 'transaction_lignes.transaction_id')
+            ->where('d.type', 'depense')
+            ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
+            ->whereNull('transaction_lignes.deleted_at')
             ->whereNull('d.deleted_at')
-            ->whereNull('dla.id')
+            ->whereNull('tla.id')
             ->whereBetween('d.date', [$start, $end])
             ->select([
                 'c.id as categorie_id', 'c.nom as categorie_nom',
                 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-                DB::raw('SUM(depense_lignes.montant) as montant'),
+                DB::raw('SUM(transaction_lignes.montant) as montant'),
             ])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
 
         if ($operationIds !== null) {
-            $q1->whereIn('depense_lignes.operation_id', $operationIds);
+            $q1->whereIn('transaction_lignes.operation_id', $operationIds);
         }
 
         // Partie 2 : lignes avec affectations (utiliser affectation.montant et affectation.operation_id)
-        $q2 = DB::table('depense_ligne_affectations as dla')
-            ->join('depense_lignes', 'depense_lignes.id', '=', 'dla.depense_ligne_id')
-            ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
+        $q2 = DB::table('transaction_ligne_affectations as tla')
+            ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
-            ->whereNull('depense_lignes.deleted_at')
+            ->join('transactions as d', 'd.id', '=', 'transaction_lignes.transaction_id')
+            ->where('d.type', 'depense')
+            ->whereNull('transaction_lignes.deleted_at')
             ->whereNull('d.deleted_at')
             ->whereBetween('d.date', [$start, $end])
             ->select([
                 'c.id as categorie_id', 'c.nom as categorie_nom',
                 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
-                DB::raw('SUM(dla.montant) as montant'),
+                DB::raw('SUM(tla.montant) as montant'),
             ])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
 
-        $q2->whereNotNull('dla.operation_id');
+        $q2->whereNotNull('tla.operation_id');
         if ($operationIds !== null) {
-            $q2->whereIn('dla.operation_id', $operationIds);
+            $q2->whereIn('tla.operation_id', $operationIds);
         }
 
         foreach ([$q1->get(), $q2->get()] as $rows) {
@@ -288,33 +290,35 @@ final class RapportService
     private function accumulerDepensesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
     {
         // Lignes sans affectations
-        $rows1 = DB::table('depense_lignes')
-            ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
+        $rows1 = DB::table('transaction_lignes')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
-            ->leftJoin('depense_ligne_affectations as dla', 'dla.depense_ligne_id', '=', 'depense_lignes.id')
-            ->whereNull('depense_lignes.deleted_at')->whereNull('d.deleted_at')
-            ->whereNull('dla.id')
-            ->whereNotNull('depense_lignes.seance')
-            ->whereIn('depense_lignes.operation_id', $operationIds)
+            ->join('transactions as d', 'd.id', '=', 'transaction_lignes.transaction_id')
+            ->where('d.type', 'depense')
+            ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
+            ->whereNull('transaction_lignes.deleted_at')->whereNull('d.deleted_at')
+            ->whereNull('tla.id')
+            ->whereNotNull('transaction_lignes.seance')
+            ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('d.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'depense_lignes.seance', DB::raw('SUM(depense_lignes.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'depense_lignes.seance')
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'transaction_lignes.seance', DB::raw('SUM(transaction_lignes.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'transaction_lignes.seance')
             ->get();
 
         // Lignes avec affectations
-        $rows2 = DB::table('depense_ligne_affectations as dla')
-            ->join('depense_lignes', 'depense_lignes.id', '=', 'dla.depense_ligne_id')
-            ->join('sous_categories as sc', 'depense_lignes.sous_categorie_id', '=', 'sc.id')
+        $rows2 = DB::table('transaction_ligne_affectations as tla')
+            ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('depenses as d', 'd.id', '=', 'depense_lignes.depense_id')
-            ->whereNull('depense_lignes.deleted_at')->whereNull('d.deleted_at')
-            ->whereNotNull('dla.seance')
-            ->whereNotNull('dla.operation_id')
-            ->whereIn('dla.operation_id', $operationIds)
+            ->join('transactions as d', 'd.id', '=', 'transaction_lignes.transaction_id')
+            ->where('d.type', 'depense')
+            ->whereNull('transaction_lignes.deleted_at')->whereNull('d.deleted_at')
+            ->whereNotNull('tla.seance')
+            ->whereNotNull('tla.operation_id')
+            ->whereIn('tla.operation_id', $operationIds)
             ->whereBetween('d.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'dla.seance', DB::raw('SUM(dla.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'dla.seance')
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'tla.seance', DB::raw('SUM(tla.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'tla.seance')
             ->get();
 
         foreach ([$rows1, $rows2] as $rows) {
@@ -341,33 +345,35 @@ final class RapportService
     private function accumulerRecettesResolues(string $start, string $end, ?array $operationIds, array &$map): void
     {
         // Partie 1 : lignes sans affectations
-        $rq1 = DB::table('recette_lignes')
-            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+        $rq1 = DB::table('transaction_lignes')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
-            ->leftJoin('recette_ligne_affectations as rla', 'rla.recette_ligne_id', '=', 'recette_lignes.id')
-            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
-            ->whereNull('rla.id')
+            ->join('transactions as r', 'r.id', '=', 'transaction_lignes.transaction_id')
+            ->where('r.type', 'recette')
+            ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
+            ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
+            ->whereNull('tla.id')
             ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(recette_lignes.montant) as montant')])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(transaction_lignes.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
         if ($operationIds !== null) {
-            $rq1->whereIn('recette_lignes.operation_id', $operationIds);
+            $rq1->whereIn('transaction_lignes.operation_id', $operationIds);
         }
 
         // Partie 2 : lignes avec affectations
-        $rq2 = DB::table('recette_ligne_affectations as rla')
-            ->join('recette_lignes', 'recette_lignes.id', '=', 'rla.recette_ligne_id')
-            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+        $rq2 = DB::table('transaction_ligne_affectations as tla')
+            ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
-            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
+            ->join('transactions as r', 'r.id', '=', 'transaction_lignes.transaction_id')
+            ->where('r.type', 'recette')
+            ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
             ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(rla.montant) as montant')])
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(tla.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
-        $rq2->whereNotNull('rla.operation_id');
+        $rq2->whereNotNull('tla.operation_id');
         if ($operationIds !== null) {
-            $rq2->whereIn('rla.operation_id', $operationIds);
+            $rq2->whereIn('tla.operation_id', $operationIds);
         }
 
         foreach ([$rq1->get(), $rq2->get()] as $rows) {
@@ -395,33 +401,35 @@ final class RapportService
     private function accumulerRecettesSeancesResolues(string $start, string $end, array $operationIds, array &$map): void
     {
         // Lignes sans affectations
-        $rows1 = DB::table('recette_lignes')
-            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+        $rows1 = DB::table('transaction_lignes')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
-            ->leftJoin('recette_ligne_affectations as rla', 'rla.recette_ligne_id', '=', 'recette_lignes.id')
-            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
-            ->whereNull('rla.id')
-            ->whereNotNull('recette_lignes.seance')
-            ->whereIn('recette_lignes.operation_id', $operationIds)
+            ->join('transactions as r', 'r.id', '=', 'transaction_lignes.transaction_id')
+            ->where('r.type', 'recette')
+            ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
+            ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
+            ->whereNull('tla.id')
+            ->whereNotNull('transaction_lignes.seance')
+            ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'recette_lignes.seance', DB::raw('SUM(recette_lignes.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'recette_lignes.seance')
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'transaction_lignes.seance', DB::raw('SUM(transaction_lignes.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'transaction_lignes.seance')
             ->get();
 
         // Lignes avec affectations
-        $rows2 = DB::table('recette_ligne_affectations as rla')
-            ->join('recette_lignes', 'recette_lignes.id', '=', 'rla.recette_ligne_id')
-            ->join('sous_categories as sc', 'recette_lignes.sous_categorie_id', '=', 'sc.id')
+        $rows2 = DB::table('transaction_ligne_affectations as tla')
+            ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla.transaction_ligne_id')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
             ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->join('recettes as r', 'r.id', '=', 'recette_lignes.recette_id')
-            ->whereNull('recette_lignes.deleted_at')->whereNull('r.deleted_at')
-            ->whereNotNull('rla.seance')
-            ->whereNotNull('rla.operation_id')
-            ->whereIn('rla.operation_id', $operationIds)
+            ->join('transactions as r', 'r.id', '=', 'transaction_lignes.transaction_id')
+            ->where('r.type', 'recette')
+            ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
+            ->whereNotNull('tla.seance')
+            ->whereNotNull('tla.operation_id')
+            ->whereIn('tla.operation_id', $operationIds)
             ->whereBetween('r.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'rla.seance', DB::raw('SUM(rla.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'rla.seance')
+            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', 'tla.seance', DB::raw('SUM(tla.montant) as montant')])
+            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', 'tla.seance')
             ->get();
 
         foreach ([$rows1, $rows2] as $rows) {

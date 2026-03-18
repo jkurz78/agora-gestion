@@ -7,10 +7,9 @@ namespace App\Services;
 use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
 use App\Models\Cotisation;
-use App\Models\Depense;
 use App\Models\Don;
 use App\Models\RapprochementBancaire;
-use App\Models\Recette;
+use App\Models\Transaction;
 use App\Models\VirementInterne;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -66,11 +65,12 @@ final class RapprochementBancaireService
     {
         $solde = (float) $rapprochement->solde_ouverture;
 
-        $solde += (float) Recette::where('rapprochement_id', $rapprochement->id)->sum('montant_total');
+        $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
+            ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
+            ->value('total');
         $solde += (float) Don::where('rapprochement_id', $rapprochement->id)->sum('montant');
         $solde += (float) Cotisation::where('rapprochement_id', $rapprochement->id)->sum('montant');
         $solde += (float) VirementInterne::where('rapprochement_destination_id', $rapprochement->id)->sum('montant');
-        $solde -= (float) Depense::where('rapprochement_id', $rapprochement->id)->sum('montant_total');
         $solde -= (float) VirementInterne::where('rapprochement_source_id', $rapprochement->id)->sum('montant');
 
         return round($solde, 2);
@@ -103,8 +103,7 @@ final class RapprochementBancaireService
             }
         } else {
             $model = match ($type) {
-                'depense' => Depense::findOrFail($id),
-                'recette' => Recette::findOrFail($id),
+                'depense', 'recette' => Transaction::findOrFail($id),
                 'don' => Don::findOrFail($id),
                 'cotisation' => Cotisation::findOrFail($id),
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
@@ -121,8 +120,7 @@ final class RapprochementBancaireService
             }
 
             $model = match ($type) {
-                'depense' => Depense::findOrFail($id),
-                'recette' => Recette::findOrFail($id),
+                'depense', 'recette' => Transaction::findOrFail($id),
                 'don' => Don::findOrFail($id),
                 'cotisation' => Cotisation::findOrFail($id),
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
@@ -167,10 +165,7 @@ final class RapprochementBancaireService
         DB::transaction(function () use ($rapprochement) {
             $id = $rapprochement->id;
 
-            Depense::where('rapprochement_id', $id)
-                ->update(['rapprochement_id' => null, 'pointe' => false]);
-
-            Recette::where('rapprochement_id', $id)
+            Transaction::where('rapprochement_id', $id)
                 ->update(['rapprochement_id' => null, 'pointe' => false]);
 
             Don::where('rapprochement_id', $id)

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
-use App\Models\Depense;
 use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
-use App\Models\Recette;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\RapprochementBancaireService;
 
@@ -56,7 +55,7 @@ test('create échoue si un rapprochement en cours existe déjà', function () {
 
 test('calculerSoldePointage prend en compte les recettes pointées', function () {
     $rapprochement = $this->service->create($this->compte, '2025-10-31', 1500.00);
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 300.00,
         'rapprochement_id' => $rapprochement->id,
@@ -69,7 +68,7 @@ test('calculerSoldePointage prend en compte les recettes pointées', function ()
 
 test('calculerSoldePointage déduit les dépenses pointées', function () {
     $rapprochement = $this->service->create($this->compte, '2025-10-31', 800.00);
-    Depense::factory()->create([
+    Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 200.00,
         'rapprochement_id' => $rapprochement->id,
@@ -82,7 +81,7 @@ test('calculerSoldePointage déduit les dépenses pointées', function () {
 
 test('toggleTransaction ajoute une dépense au rapprochement', function () {
     $rapprochement = $this->service->create($this->compte, '2025-10-31', 800.00);
-    $depense = Depense::factory()->create([
+    $depense = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 200.00,
         'pointe' => false,
@@ -96,7 +95,7 @@ test('toggleTransaction ajoute une dépense au rapprochement', function () {
 
 test('toggleTransaction retire une dépense déjà pointée', function () {
     $rapprochement = $this->service->create($this->compte, '2025-10-31', 800.00);
-    $depense = Depense::factory()->create([
+    $depense = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 200.00,
         'rapprochement_id' => $rapprochement->id,
@@ -133,7 +132,7 @@ test('toggleTransaction lève une exception si rapprochement verrouillé', funct
         'saisi_par'     => $this->user->id,
         'verrouille_at' => now(),
     ]);
-    $depense = Depense::factory()->create(['compte_id' => $this->compte->id]);
+    $depense = Transaction::factory()->asDepense()->create(['compte_id' => $this->compte->id]);
 
     expect(fn () => $this->service->toggleTransaction($rapprochement, 'depense', $depense->id))
         ->toThrow(RuntimeException::class);
@@ -141,12 +140,12 @@ test('toggleTransaction lève une exception si rapprochement verrouillé', funct
 
 test('supprimer supprime un rapprochement en cours et dépointe les opérations', function () {
     $rapprochement = $this->service->create($this->compte, '2025-10-31', 1000.00);
-    $depense = Depense::factory()->create([
+    $depense = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
         'pointe' => true,
     ]);
-    $recette = Recette::factory()->create([
+    $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
         'pointe' => true,

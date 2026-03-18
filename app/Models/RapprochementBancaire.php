@@ -49,14 +49,19 @@ final class RapprochementBancaire extends Model
         return $this->belongsTo(User::class, 'saisi_par');
     }
 
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class, 'rapprochement_id');
+    }
+
     public function depenses(): HasMany
     {
-        return $this->hasMany(Depense::class, 'rapprochement_id');
+        return $this->transactions()->where('type', 'depense');
     }
 
     public function recettes(): HasMany
     {
-        return $this->hasMany(Recette::class, 'rapprochement_id');
+        return $this->transactions()->where('type', 'recette');
     }
 
     public function dons(): HasMany

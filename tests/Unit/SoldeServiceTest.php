@@ -2,10 +2,9 @@
 
 use App\Models\CompteBancaire;
 use App\Models\Cotisation;
-use App\Models\Depense;
 use App\Models\Don;
-use App\Models\Recette;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\SoldeService;
@@ -29,14 +28,14 @@ it('adds recettes since date_solde_initial', function () {
         'solde_initial'      => 500.00,
         'date_solde_initial' => '2024-06-01',
     ]);
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id'     => $compte->id,
         'montant_total' => 200.00,
         'date'          => '2024-07-01',
         'saisi_par'     => $this->user->id,
     ]);
     // Before date_solde_initial — must be ignored
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id'     => $compte->id,
         'montant_total' => 999.00,
         'date'          => '2024-05-01',
@@ -51,7 +50,7 @@ it('subtracts depenses since date_solde_initial', function () {
         'solde_initial'      => 1000.00,
         'date_solde_initial' => '2024-01-01',
     ]);
-    Depense::factory()->create([
+    Transaction::factory()->asDepense()->create([
         'compte_id'     => $compte->id,
         'montant_total' => 300.00,
         'date'          => '2024-03-01',
@@ -118,7 +117,7 @@ it('ignores soft-deleted depenses', function () {
         'solde_initial'      => 1000.00,
         'date_solde_initial' => '2024-01-01',
     ]);
-    $depense = Depense::factory()->create([
+    $depense = Transaction::factory()->asDepense()->create([
         'compte_id'     => $compte->id,
         'montant_total' => 300.00,
         'date'          => '2024-03-01',
@@ -156,7 +155,7 @@ it('handles null date_solde_initial by including all history', function () {
         'solde_initial'      => 100.00,
         'date_solde_initial' => null,
     ]);
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id'     => $compte->id,
         'montant_total' => 50.00,
         'date'          => '2000-01-01',

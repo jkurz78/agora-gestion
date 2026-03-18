@@ -50,14 +50,8 @@ final class Tiers extends Model
         return $this->hasMany(Cotisation::class);
     }
 
-    public function depenses(): HasMany
+    public function transactions(): HasMany
     {
-        return $this->hasMany(Depense::class);
+        return $this->hasMany(Transaction::class);
     }
-
-    public function recettes(): HasMany
-    {
-        return $this->hasMany(Recette::class);
-    }
-
 }

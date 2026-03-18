@@ -1,8 +1,9 @@
 <?php
 
 use App\Models\Categorie;
-use App\Models\DepenseLigne;
 use App\Models\SousCategorie;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 
 beforeEach(function () {
@@ -105,12 +106,12 @@ it('can destroy a sous-categorie', function () {
 it('returns flash error when destroying a sous-categorie with linked lignes', function () {
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
 
-    $depense = \App\Models\Depense::factory()->create([
+    $depense = Transaction::factory()->asDepense()->create([
         'saisi_par' => $this->user->id,
         'date' => '2025-10-15',
     ]);
-    DepenseLigne::factory()->create([
-        'depense_id'        => $depense->id,
+    TransactionLigne::factory()->create([
+        'transaction_id'    => $depense->id,
         'sous_categorie_id' => $sc->id,
     ]);
 
