@@ -115,6 +115,15 @@
     @endif
 
     {{-- Table des transactions --}}
+    @if ($rapprochement->isEnCours())
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="masquerPointees"
+                   wire:model.live="masquerPointees">
+            <label class="form-check-label small text-muted" for="masquerPointees">
+                Masquer les écritures pointées
+            </label>
+        </div>
+    @endif
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">

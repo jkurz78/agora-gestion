@@ -99,3 +99,39 @@ it('affiche les totaux débits et crédits pointés', function () {
         ->assertSee('150,00')   // total débit pointé
         ->assertSee('300,00');  // total crédit pointé
 });
+
+it('masque les écritures pointées quand la case est cochée', function () {
+    $pointee = Transaction::factory()->asRecette()->create([
+        'compte_id'        => $this->compte->id,
+        'rapprochement_id' => $this->rapprochement->id,
+        'date'             => '2026-03-10',
+        'montant_total'    => 100.00,
+        'libelle'          => 'Recette pointée',
+    ]);
+    $nonPointee = Transaction::factory()->asRecette()->create([
+        'compte_id'        => $this->compte->id,
+        'rapprochement_id' => null,
+        'date'             => '2026-03-15',
+        'montant_total'    => 50.00,
+        'libelle'          => 'Recette non pointée',
+    ]);
+
+    Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
+        ->set('masquerPointees', true)
+        ->assertSee('Recette non pointée')
+        ->assertDontSee('Recette pointée');
+});
+
+it('affiche toutes les écritures quand la case est décochée', function () {
+    Transaction::factory()->asRecette()->create([
+        'compte_id'        => $this->compte->id,
+        'rapprochement_id' => $this->rapprochement->id,
+        'date'             => '2026-03-10',
+        'montant_total'    => 100.00,
+        'libelle'          => 'Recette pointée',
+    ]);
+
+    Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
+        ->set('masquerPointees', false)
+        ->assertSee('Recette pointée');
+});
