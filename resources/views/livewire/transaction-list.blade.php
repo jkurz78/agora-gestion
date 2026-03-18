@@ -6,6 +6,18 @@
         </div>
     @endif
 
+    {{-- Boutons de création --}}
+    <div class="d-flex gap-2 mb-3">
+        <button wire:click="$dispatch('open-transaction-form', {type: 'depense'})"
+                class="btn btn-danger">
+            <i class="bi bi-plus-lg"></i> Nouvelle dépense
+        </button>
+        <button wire:click="$dispatch('open-transaction-form', {type: 'recette'})"
+                class="btn btn-success">
+            <i class="bi bi-plus-lg"></i> Nouvelle recette
+        </button>
+    </div>
+
     {{-- Filter row --}}
     <div class="card mb-4">
         <div class="card-body">
