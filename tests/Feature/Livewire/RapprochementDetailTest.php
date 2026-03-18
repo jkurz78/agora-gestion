@@ -101,14 +101,14 @@ it('affiche les totaux débits et crédits pointés', function () {
 });
 
 it('masque les écritures pointées quand la case est cochée', function () {
-    $pointee = Transaction::factory()->asRecette()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id'        => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'date'             => '2026-03-10',
         'montant_total'    => 100.00,
         'libelle'          => 'Recette pointée',
     ]);
-    $nonPointee = Transaction::factory()->asRecette()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id'        => $this->compte->id,
         'rapprochement_id' => null,
         'date'             => '2026-03-15',
