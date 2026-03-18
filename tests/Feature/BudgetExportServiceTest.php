@@ -84,14 +84,6 @@ it('source 2025 remplit les montants non nuls, laisse vide les zéros', function
     expect($byName['Cotisations'][2])->toBe('850.00');
 });
 
-it('source N-1 absente produit des montants vides', function () {
-    $rows = app(BudgetExportService::class)->rows(2026, 2024); // pas de données 2024
-
-    foreach ($rows as $row) {
-        expect($row[2])->toBe('');
-    }
-});
-
 it('toCsv génère un CSV valide avec en-tête', function () {
     $rows = [
         ['2026-2027', 'Loyers', '1200.00'],

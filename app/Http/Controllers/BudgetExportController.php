@@ -18,7 +18,7 @@ final class BudgetExportController extends Controller
         $request->validate([
             'format'   => ['required', 'in:csv,xlsx'],
             'exercice' => ['required', 'integer'],
-            'source'   => ['required', 'in:zero,courant,n1'],
+            'source'   => ['required', 'in:zero,courant'],
         ]);
 
         $exerciceCible  = (int) $request->exercice;
@@ -27,7 +27,6 @@ final class BudgetExportController extends Controller
         $sourceExercice = match($request->source) {
             'zero'   => null,
             'courant' => $exerciceCourant,
-            'n1'     => $exerciceCourant - 1,
         };
 
         $rows     = $service->rows($exerciceCible, $sourceExercice);
