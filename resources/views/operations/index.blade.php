@@ -1,9 +1,20 @@
 <x-app-layout>
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Opérations</h1>
-        <a href="{{ route('operations.create') }}" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> Ajouter une opération
-        </a>
+        <div class="d-flex gap-2 align-items-center">
+            @if ($showAll)
+                <a href="{{ route('operations.index') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-funnel"></i> Exercice {{ $exercice }}-{{ $exercice + 1 }} seulement
+                </a>
+            @else
+                <a href="{{ route('operations.index', ['all' => 1]) }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-list-ul"></i> Toutes les opérations
+                </a>
+            @endif
+            <a href="{{ route('operations.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Ajouter une opération
+            </a>
+        </div>
     </div>
 
     <div class="card">
