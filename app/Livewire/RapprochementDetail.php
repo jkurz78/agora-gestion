@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\StatutRapprochement;
 use App\Models\Cotisation;
 use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -55,6 +57,63 @@ final class RapprochementDetail extends Component
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }
+    }
+
+    public function updateSoldeFin(string $value): void
+    {
+        if ($this->rapprochement->isVerrouille()) {
+            $this->addError('solde_fin', 'Impossible de modifier un rapprochement verrouillé.');
+            return;
+        }
+
+        $validator = Validator::make(
+            ['solde_fin' => $value],
+            ['solde_fin' => 'required|numeric'],
+            ['solde_fin.required' => 'Le solde de fin est obligatoire.', 'solde_fin.numeric' => 'Le solde de fin doit être un nombre.']
+        );
+        if ($validator->fails()) {
+            $this->addError('solde_fin', $validator->errors()->first('solde_fin'));
+            return;
+        }
+
+        $this->rapprochement->solde_fin = $value;
+        $this->rapprochement->save();
+        $this->rapprochement = $this->rapprochement->fresh();
+    }
+
+    public function updateDateFin(string $value): void
+    {
+        if ($this->rapprochement->isVerrouille()) {
+            $this->addError('date_fin', 'Impossible de modifier un rapprochement verrouillé.');
+            return;
+        }
+
+        // Valider le format avant la règle métier
+        $validator = Validator::make(
+            ['date_fin' => $value],
+            ['date_fin' => 'required|date'],
+            ['date_fin.required' => 'La date de fin est obligatoire.', 'date_fin.date' => 'La date de fin est invalide.']
+        );
+        if ($validator->fails()) {
+            $this->addError('date_fin', $validator->errors()->first('date_fin'));
+            return;
+        }
+
+        $dernierVerrouille = RapprochementBancaire::where('compte_id', $this->rapprochement->compte_id)
+            ->where('statut', StatutRapprochement::Verrouille)
+            ->where('id', '!=', $this->rapprochement->id)
+            ->orderByDesc('date_fin')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($dernierVerrouille && $value < $dernierVerrouille->date_fin->format('Y-m-d')) {
+            $this->addError('date_fin', 'La date ne peut pas être antérieure à celle du rapprochement précédent ('.$dernierVerrouille->date_fin->format('d/m/Y').').');
+            return;
+        }
+
+        $this->rapprochement->date_fin = $value;
+        $this->rapprochement->save();
+        $this->rapprochement = $this->rapprochement->fresh();
     }
 
     public function render(): View
