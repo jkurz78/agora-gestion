@@ -77,6 +77,7 @@ final class RapprochementDetail extends Component
                     })->orWhere('rapprochement_id', $rid);
                 }
             })
+            ->with('tiers')
             ->get()
             ->each(function (Transaction $tx) use (&$transactions, $rid) {
                 $transactions->push([
@@ -84,6 +85,7 @@ final class RapprochementDetail extends Component
                     'type' => $tx->type->value,
                     'date' => $tx->date,
                     'label' => $tx->libelle,
+                    'tiers' => $tx->tiers?->displayName() ?? $tx->libelle,
                     'reference' => $tx->reference,
                     'montant_signe' => $tx->montantSigne(),
                     'pointe' => (int) $tx->rapprochement_id === $rid,
@@ -112,6 +114,7 @@ final class RapprochementDetail extends Component
                     'label' => $d->tiers
                         ? $d->tiers->displayName()
                         : ($d->objet ?? 'Don anonyme'),
+                    'tiers' => $d->tiers ? $d->tiers->displayName() : ($d->objet ?? 'Don anonyme'),
                     'reference' => null,
                     'montant_signe' => (float) $d->montant,
                     'pointe' => (int) $d->rapprochement_id === $rid,
@@ -130,17 +133,18 @@ final class RapprochementDetail extends Component
                     })->orWhere('rapprochement_id', $rid);
                 }
             })
-            ->with('membre')
+            ->with('tiers')
             ->get()
             ->each(function (Cotisation $c) use (&$transactions, $rid) {
                 $transactions->push([
-                    'id' => $c->id,
-                    'type' => 'cotisation',
-                    'date' => $c->date_paiement,
-                    'label' => $c->membre ? $c->membre->nom.' '.$c->membre->prenom : 'Cotisation',
-                    'reference' => null,
+                    'id'            => $c->id,
+                    'type'          => 'cotisation',
+                    'date'          => $c->date_paiement,
+                    'label'         => $c->tiers ? $c->tiers->displayName() : 'Cotisation',
+                    'tiers'         => $c->tiers ? $c->tiers->displayName() : 'Cotisation',
+                    'reference'     => null,
                     'montant_signe' => (float) $c->montant,
-                    'pointe' => (int) $c->rapprochement_id === $rid,
+                    'pointe'        => (int) $c->rapprochement_id === $rid,
                 ]);
             });
 
@@ -164,6 +168,7 @@ final class RapprochementDetail extends Component
                     'type' => 'virement_source',
                     'date' => $v->date,
                     'label' => 'Virement vers '.$v->compteDestination->nom,
+                    'tiers' => $v->compteDestination->nom,
                     'reference' => $v->reference,
                     'montant_signe' => -(float) $v->montant,
                     'pointe' => (int) $v->rapprochement_source_id === $rid,
@@ -190,6 +195,7 @@ final class RapprochementDetail extends Component
                     'type' => 'virement_destination',
                     'date' => $v->date,
                     'label' => 'Virement depuis '.$v->compteSource->nom,
+                    'tiers' => $v->compteSource->nom,
                     'reference' => $v->reference,
                     'montant_signe' => (float) $v->montant,
                     'pointe' => (int) $v->rapprochement_destination_id === $rid,
