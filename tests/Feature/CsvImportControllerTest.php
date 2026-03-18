@@ -8,7 +8,7 @@ it('télécharge le template dépense', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)
-        ->get(route('depenses.import.template'));
+        ->get(route('transactions.import.template', ['type' => 'depense']));
 
     $response->assertStatus(200);
     $response->assertHeader('Content-Type', 'text/csv;charset=UTF-8');
@@ -24,7 +24,7 @@ it('télécharge le template recette', function () {
     $user = User::factory()->create();
 
     $response = $this->actingAs($user)
-        ->get(route('recettes.import.template'));
+        ->get(route('transactions.import.template', ['type' => 'recette']));
 
     $response->assertStatus(200);
     $response->assertHeader('Content-Type', 'text/csv;charset=UTF-8');
@@ -36,6 +36,6 @@ it('télécharge le template recette', function () {
 });
 
 it('redirige les invités vers login', function () {
-    $response = $this->get(route('depenses.import.template'));
+    $response = $this->get(route('transactions.import.template', ['type' => 'depense']));
     $response->assertRedirect(route('login'));
 });

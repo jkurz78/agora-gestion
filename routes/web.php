@@ -53,8 +53,8 @@ Route::middleware('auth')->group(function () {
     })->name('exercice.changer');
 
     // CSV import templates
-    Route::get('/transactions/import/template', [CsvImportController::class, 'template'])
-        ->defaults('type', 'transaction')
+    Route::get('/transactions/import/template/{type}', [CsvImportController::class, 'template'])
+        ->whereIn('type', ['depense', 'recette'])
         ->name('transactions.import.template');
 
     // Resource controllers
