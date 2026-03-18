@@ -41,8 +41,12 @@ final class OperationController extends Controller
 
     public function show(Operation $operation): View
     {
-        $totalDepenses = $operation->depenseLignes()->sum('montant');
-        $totalRecettes = $operation->recetteLignes()->sum('montant');
+        $totalDepenses = $operation->transactionLignes()
+            ->whereHas('transaction', fn ($q) => $q->where('type', 'depense'))
+            ->sum('montant');
+        $totalRecettes = $operation->transactionLignes()
+            ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
+            ->sum('montant');
         $totalDons = $operation->dons()->sum('montant');
         $solde = ($totalRecettes + $totalDons) - $totalDepenses;
 

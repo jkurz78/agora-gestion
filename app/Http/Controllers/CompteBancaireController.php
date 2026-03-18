@@ -49,16 +49,14 @@ final class CompteBancaireController extends Controller
     public function destroy(CompteBancaire $comptesBancaire): RedirectResponse
     {
         // Vérifier les transactions actives et archivées (soft-deleted)
-        $actives = $comptesBancaire->recettes()->count()
-            + $comptesBancaire->depenses()->count()
+        $actives = $comptesBancaire->transactions()->count()
             + $comptesBancaire->dons()->count()
             + $comptesBancaire->cotisations()->count()
             + VirementInterne::where('compte_source_id', $comptesBancaire->id)
                 ->orWhere('compte_destination_id', $comptesBancaire->id)
                 ->count();
 
-        $archivees = $comptesBancaire->recettes()->onlyTrashed()->count()
-            + $comptesBancaire->depenses()->onlyTrashed()->count()
+        $archivees = $comptesBancaire->transactions()->onlyTrashed()->count()
             + $comptesBancaire->dons()->onlyTrashed()->count()
             + $comptesBancaire->cotisations()->onlyTrashed()->count()
             + VirementInterne::onlyTrashed()
