@@ -34,7 +34,10 @@
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('rapprochement.pdf', $rapprochement) }}" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-file-pdf"></i> Télécharger PDF
+                <i class="bi bi-download"></i> Télécharger PDF
+            </a>
+            <a href="{{ route('rapprochement.pdf', $rapprochement) }}?mode=inline" target="_blank" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-file-pdf"></i> Ouvrir PDF
             </a>
             <a href="{{ route('rapprochement.index') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left"></i> Retour
