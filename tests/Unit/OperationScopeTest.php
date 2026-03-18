@@ -14,17 +14,17 @@ it('exclut une opération terminée avant l\'exercice', function () {
         'statut'     => StatutOperation::EnCours,
     ]);
 
-    expect(Operation::pourExercice(2025)->count())->toBe(0);
+    expect(Operation::forExercice(2025)->count())->toBe(0);
 });
 
-it('inclut une opération qui débute avant et se termine dans l\'exercice', function () {
+it('inclut une opération dont le début est antérieur à l\'exercice (chevauchement gauche)', function () {
     Operation::factory()->create([
         'date_debut' => '2025-06-01',
         'date_fin'   => '2025-11-30',
         'statut'     => StatutOperation::EnCours,
     ]);
 
-    expect(Operation::pourExercice(2025)->count())->toBe(1);
+    expect(Operation::forExercice(2025)->count())->toBe(1);
 });
 
 it('inclut une opération entièrement dans l\'exercice', function () {
@@ -34,7 +34,7 @@ it('inclut une opération entièrement dans l\'exercice', function () {
         'statut'     => StatutOperation::EnCours,
     ]);
 
-    expect(Operation::pourExercice(2025)->count())->toBe(1);
+    expect(Operation::forExercice(2025)->count())->toBe(1);
 });
 
 it('inclut une opération qui chevauche entièrement l\'exercice', function () {
@@ -44,7 +44,7 @@ it('inclut une opération qui chevauche entièrement l\'exercice', function () {
         'statut'     => StatutOperation::EnCours,
     ]);
 
-    expect(Operation::pourExercice(2025)->count())->toBe(1);
+    expect(Operation::forExercice(2025)->count())->toBe(1);
 });
 
 it('exclut une opération future qui commence après l\'exercice', function () {
@@ -54,7 +54,7 @@ it('exclut une opération future qui commence après l\'exercice', function () {
         'statut'     => StatutOperation::EnCours,
     ]);
 
-    expect(Operation::pourExercice(2025)->count())->toBe(0);
+    expect(Operation::forExercice(2025)->count())->toBe(0);
 });
 
 it('inclut une opération clôturée si elle chevauche l\'exercice (statut ignoré par le scope)', function () {
@@ -64,5 +64,5 @@ it('inclut une opération clôturée si elle chevauche l\'exercice (statut ignor
         'statut'     => StatutOperation::Cloturee,
     ]);
 
-    expect(Operation::pourExercice(2025)->count())->toBe(1);
+    expect(Operation::forExercice(2025)->count())->toBe(1);
 });
