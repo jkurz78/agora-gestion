@@ -152,6 +152,155 @@ it('le rapport onglet 3 prend en compte les affectations de recettes avec séanc
     expect((float) ($scRow['seances'][2] ?? 0))->toBe(3000.0);
 });
 
+// ── compteDeResultat global (onglet 1) + ventilations ────────────────────────
+
+it('compteDeResultat global : recette ventilée partiellement sans opération — les deux parts sont comptées', function () {
+    // Cas exact du bug : 15 000 sans opération + 5 000 avec opération = 20 000 au total
+    $recette = Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-15',
+        'montant_total' => 20000.00,
+    ]);
+    $recette->lignes()->forceDelete();
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
+        'sous_categorie_id' => $this->sousCategorie->id,
+        'operation_id' => null,
+        'montant' => 20000.00,
+    ]);
+
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
+        'operation_id' => null,
+        'montant' => 15000.00,
+        'seance' => null,
+        'notes' => null,
+    ]);
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
+        'operation_id' => $this->op1->id,
+        'montant' => 5000.00,
+        'seance' => null,
+        'notes' => null,
+    ]);
+
+    $rapport = $this->service->compteDeResultat(2025);
+
+    $produits = collect($rapport['produits'] ?? []);
+    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $this->sousCategorie->id));
+    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', $this->sousCategorie->id);
+    expect((float) ($scRow['montant_n'] ?? 0))->toBe(20000.0);
+});
+
+it('compteDeResultat global : recette ventilée entièrement sans opération — montant complet visible', function () {
+    $recette = Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-15',
+        'montant_total' => 10000.00,
+    ]);
+    $recette->lignes()->forceDelete();
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
+        'sous_categorie_id' => $this->sousCategorie->id,
+        'operation_id' => null,
+        'montant' => 10000.00,
+    ]);
+
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
+        'operation_id' => null,
+        'montant' => 10000.00,
+        'seance' => null,
+        'notes' => null,
+    ]);
+
+    $rapport = $this->service->compteDeResultat(2025);
+
+    $produits = collect($rapport['produits'] ?? []);
+    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $this->sousCategorie->id));
+    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', $this->sousCategorie->id);
+    expect((float) ($scRow['montant_n'] ?? 0))->toBe(10000.0);
+});
+
+it('compteDeResultat global : dépense ventilée partiellement sans opération — les deux parts sont comptées', function () {
+    $categorieD = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
+    $sousCatD = SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
+
+    $depense = Transaction::factory()->asDepense()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-15',
+        'montant_total' => 9000.00,
+    ]);
+    $depense->lignes()->forceDelete();
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $depense->id,
+        'sous_categorie_id' => $sousCatD->id,
+        'operation_id' => null,
+        'montant' => 9000.00,
+    ]);
+
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
+        'operation_id' => null,
+        'montant' => 6000.00,
+        'seance' => null,
+        'notes' => null,
+    ]);
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
+        'operation_id' => $this->op1->id,
+        'montant' => 3000.00,
+        'seance' => null,
+        'notes' => null,
+    ]);
+
+    $rapport = $this->service->compteDeResultat(2025);
+
+    $charges = collect($rapport['charges'] ?? []);
+    $cat = $charges->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $sousCatD->id));
+    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', $sousCatD->id);
+    expect((float) ($scRow['montant_n'] ?? 0))->toBe(9000.0);
+});
+
+it('compteDeResultatOperations filtré : affectation sans opération n\'apparaît pas dans le filtre opération', function () {
+    $recette = Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-10-15',
+        'montant_total' => 20000.00,
+    ]);
+    $recette->lignes()->forceDelete();
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
+        'sous_categorie_id' => $this->sousCategorie->id,
+        'operation_id' => null,
+        'montant' => 20000.00,
+    ]);
+
+    // 15 000 sans opération, 5 000 avec opération
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
+        'operation_id' => null,
+        'montant' => 15000.00,
+        'seance' => null,
+        'notes' => null,
+    ]);
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
+        'operation_id' => $this->op1->id,
+        'montant' => 5000.00,
+        'seance' => null,
+        'notes' => null,
+    ]);
+
+    $rapport = $this->service->compteDeResultatOperations(2025, [$this->op1->id]);
+
+    $produits = collect($rapport['produits'] ?? []);
+    $cat = $produits->first(fn ($c) => collect($c['sous_categories'] ?? [])->contains('sous_categorie_id', $this->sousCategorie->id));
+    $scRow = collect($cat['sous_categories'] ?? [])->firstWhere('sous_categorie_id', $this->sousCategorie->id);
+    // Seuls les 5 000 rattachés à op1 doivent apparaître, pas les 15 000 sans opération
+    expect((float) ($scRow['montant'] ?? 0))->toBe(5000.0);
+});
+
 it('le rapport onglet 3 prend en compte les affectations de dépenses avec séance', function () {
     $categorieD = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
     $sousCatD = SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
