@@ -3,17 +3,33 @@
 declare(strict_types=1);
 
 use App\Enums\TypeCategorie;
-use App\Models\BudgetLine;
+use App\Enums\TypeTransaction;
 use App\Models\Categorie;
+use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
 
-    $cat = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
-    $sc  = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat->id]);
-    BudgetLine::factory()->create(['sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1200.00]);
+    $cat    = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
+    $this->sc = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat->id]);
+
+    // Réalisé exercice 2025 (Sept 2025–Aug 2026) : Loyers=1200
+    $compte = CompteBancaire::factory()->create();
+    $tx = Transaction::factory()->create([
+        'type'          => TypeTransaction::Depense,
+        'date'          => '2025-10-15',
+        'montant_total' => 1200.00,
+        'compte_id'     => $compte->id,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id'    => $tx->id,
+        'sous_categorie_id' => $this->sc->id,
+        'montant'           => 1200.00,
+    ]);
 });
 
 it('télécharge un CSV budget', function () {
@@ -27,7 +43,7 @@ it('télécharge un CSV budget', function () {
 
     expect($response->getContent())
         ->toContain('exercice;sous_categorie;montant_prevu')
-        ->toContain('2026;Loyers;1200.00');
+        ->toContain('2026-2027;Loyers;1200.00');
 });
 
 it('source zero produit des montants vides dans le CSV', function () {
@@ -35,7 +51,7 @@ it('source zero produit des montants vides dans le CSV', function () {
         ->get(route('budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'zero']));
 
     $response->assertOk();
-    expect($response->getContent())->toContain('2026;Loyers;');
+    expect($response->getContent())->toContain('2026-2027;Loyers;');
     expect($response->getContent())->not->toContain('1200');
 });
 

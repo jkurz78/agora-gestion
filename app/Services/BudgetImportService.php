@@ -58,8 +58,12 @@ final class BudgetImportService
             $scNom         = trim((string) ($row[1] ?? ''));
             $montantCell   = trim((string) ($row[2] ?? ''));
 
-            // Exercice
-            if ($exerciceCell !== (string) $exercice) {
+            // Exercice : accepte "2025" ou "2025-2026"
+            $exerciceCellYear = str_contains($exerciceCell, '-')
+                ? (int) explode('-', $exerciceCell)[0]
+                : (int) $exerciceCell;
+
+            if ($exerciceCellYear !== $exercice) {
                 $wrongExercices[] = $exerciceCell;
             }
 
