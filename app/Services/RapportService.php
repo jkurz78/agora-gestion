@@ -177,7 +177,6 @@ final class RapportService
             ])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
 
-        $q2->whereNotNull('tla.operation_id');
         if ($operationIds !== null) {
             $q2->whereIn('tla.operation_id', $operationIds);
         }
@@ -371,7 +370,6 @@ final class RapportService
             ->whereBetween('r.date', [$start, $end])
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(tla.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
-        $rq2->whereNotNull('tla.operation_id');
         if ($operationIds !== null) {
             $rq2->whereIn('tla.operation_id', $operationIds);
         }
