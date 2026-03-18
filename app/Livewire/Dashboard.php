@@ -7,9 +7,8 @@ namespace App\Livewire;
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
 use App\Models\Cotisation;
-use App\Models\Depense;
 use App\Models\Don;
-use App\Models\Recette;
+use App\Models\Transaction;
 use App\Models\Tiers;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
@@ -30,8 +29,8 @@ final class Dashboard extends Component
         $endDate = $range['end']->toDateString();
 
         // Solde général
-        $totalRecettes = (float) Recette::forExercice($exercice)->sum('montant_total');
-        $totalDepenses = (float) Depense::forExercice($exercice)->sum('montant_total');
+        $totalRecettes = (float) Transaction::where('type', 'recette')->forExercice($exercice)->sum('montant_total');
+        $totalDepenses = (float) Transaction::where('type', 'depense')->forExercice($exercice)->sum('montant_total');
         $soldeGeneral = $totalRecettes - $totalDepenses;
 
         // Budget résumé
@@ -46,13 +45,13 @@ final class Dashboard extends Component
         }
 
         // Dernières dépenses
-        $dernieresDepenses = Depense::forExercice($exercice)
+        $dernieresDepenses = Transaction::where('type', 'depense')->forExercice($exercice)
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
         // Dernières recettes
-        $dernieresRecettes = Recette::forExercice($exercice)
+        $dernieresRecettes = Transaction::where('type', 'recette')->forExercice($exercice)
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
