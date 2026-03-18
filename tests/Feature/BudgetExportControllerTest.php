@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
+use App\Models\BudgetLine;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
@@ -61,6 +62,17 @@ it('télécharge un Excel budget', function () {
 
     $response->assertOk();
     $response->assertDownload('budget-2026-2027.xlsx');
+});
+
+it('source budget exporte les montants_prevu', function () {
+    BudgetLine::factory()->create(['sous_categorie_id' => $this->sc->id, 'exercice' => 2025, 'montant_prevu' => 900.00]);
+
+    $response = $this->actingAs($this->user)
+        ->withSession(['exercice_actif' => 2025])
+        ->get(route('budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'budget']));
+
+    $response->assertOk();
+    expect($response->getContent())->toContain('2026-2027;Loyers;900.00');
 });
 
 it('redirige les invités vers login', function () {
