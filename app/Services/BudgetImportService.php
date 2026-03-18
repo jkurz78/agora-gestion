@@ -36,6 +36,10 @@ final class BudgetImportService
 
         $dataRows = array_slice($rows, 1);
 
+        if (empty($dataRows)) {
+            return new BudgetImportResult(false, errors: [['line' => 0, 'message' => 'Le fichier ne contient aucune ligne de données.']]);
+        }
+
         // Charger toutes les sous-catégories indexées par nom (lowercase)
         // Détecte les homonymes : clé => [SousCategorie, ...]
         /** @var array<string, list<SousCategorie>> */
@@ -68,11 +72,15 @@ final class BudgetImportService
                 $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : nom '{$scNom}' ambigu (plusieurs sous-catégories portent ce nom)."];
             }
 
-            // Montant : vide et 0/0.00 sont acceptés, négatif ou non-numérique sont des erreurs
-            if ($montantCell !== '' && $montantCell !== '0' && $montantCell !== '0.00') {
-                if (!is_numeric($montantCell) || (float) $montantCell < 0) {
+            // Montant : vide ou zéro sont acceptés (la ligne sera ignorée à l'import)
+            // Négatif ou non-numérique sont des erreurs
+            if ($montantCell !== '') {
+                if (!is_numeric($montantCell)) {
+                    $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : montant_prevu '{$montantCell}' invalide (nombre >= 0 attendu ou cellule vide)."];
+                } elseif ((float) $montantCell < 0) {
                     $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : montant_prevu '{$montantCell}' invalide (nombre >= 0 attendu ou cellule vide)."];
                 }
+                // Note: (float) $montantCell === 0.0 is accepted (line will be skipped at insert)
             }
         }
 
