@@ -80,3 +80,22 @@ it('affiche la colonne Tiers pour une cotisation via tiers()', function () {
     Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
         ->assertSee('Pierre Durand');
 });
+
+it('affiche les totaux débits et crédits pointés', function () {
+    Transaction::factory()->asDepense()->create([
+        'compte_id'        => $this->compte->id,
+        'rapprochement_id' => $this->rapprochement->id,
+        'date'             => '2026-03-10',
+        'montant_total'    => 150.00,
+    ]);
+    Transaction::factory()->asRecette()->create([
+        'compte_id'        => $this->compte->id,
+        'rapprochement_id' => $this->rapprochement->id,
+        'date'             => '2026-03-15',
+        'montant_total'    => 300.00,
+    ]);
+
+    Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
+        ->assertSee('150,00')   // total débit pointé
+        ->assertSee('300,00');  // total crédit pointé
+});

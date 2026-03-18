@@ -204,13 +204,18 @@ final class RapprochementDetail extends Component
 
         $transactions = $transactions->sortBy('date')->values();
 
+        $totalDebitPointe  = abs($transactions->where('pointe', true)->where('montant_signe', '<', 0)->sum('montant_signe'));
+        $totalCreditPointe = $transactions->where('pointe', true)->where('montant_signe', '>', 0)->sum('montant_signe');
+
         $soldePointage = $service->calculerSoldePointage($this->rapprochement);
         $ecart = $service->calculerEcart($this->rapprochement);
 
         return view('livewire.rapprochement-detail', [
-            'transactions' => $transactions,
-            'soldePointage' => $soldePointage,
-            'ecart' => $ecart,
+            'transactions'       => $transactions,
+            'soldePointage'      => $soldePointage,
+            'ecart'              => $ecart,
+            'totalDebitPointe'   => $totalDebitPointe,
+            'totalCreditPointe'  => $totalCreditPointe,
         ]);
     }
 }
