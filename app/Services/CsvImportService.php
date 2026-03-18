@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
  * Service d'import CSV pour les dépenses et recettes.
  *
  * Phase 1 : validation exhaustive sans écriture en base.
- * Phase 2 : insertion via DepenseService/RecetteService sans transaction globale
+ * Phase 2 : insertion via TransactionService sans transaction globale
  *            (incompatible avec le SELECT FOR UPDATE de NumeroPieceService).
  *            En cas d'échec partiel, les transactions déjà committées sont conservées.
  */
