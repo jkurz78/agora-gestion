@@ -28,6 +28,7 @@ Route::middleware('auth')->group(function () {
         return view('tiers.transactions', compact('tiers'));
     })->name('tiers.transactions');
     Route::view('/budget', 'budget.index')->name('budget.index');
+    Route::get('/budget/export', \App\Http\Controllers\BudgetExportController::class)->name('budget.export');
     Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
     Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
         return view('rapprochement.detail', compact('rapprochement'));
