@@ -44,8 +44,8 @@
                         <label class="form-label fw-semibold">Montants à inclure</label>
                         <select wire:model="exportSource" class="form-select">
                             <option value="zero">Zéro partout (cellules vides)</option>
-                            <option value="courant">Montants de l'exercice courant</option>
-                            <option value="n1">Montants de l'exercice N-1</option>
+                            <option value="courant">Réalisé exercice courant</option>
+                            <option value="n1">Réalisé exercice N-1</option>
                         </select>
                     </div>
                 </div>
