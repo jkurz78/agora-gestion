@@ -97,6 +97,8 @@ it('can update an operation', function () {
         ->put(route('operations.update', $operation), [
             'nom' => 'Nouveau nom',
             'statut' => 'cloturee',
+            'date_debut' => $operation->date_debut->toDateString(),
+            'date_fin' => $operation->date_fin->toDateString(),
         ])
         ->assertRedirect(route('operations.show', $operation));
 
