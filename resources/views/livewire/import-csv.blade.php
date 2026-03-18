@@ -50,7 +50,7 @@
                                 <button type="submit" class="btn btn-primary btn-sm">
                                     <i class="bi bi-upload"></i> Lancer l'import
                                 </button>
-                                <a href="{{ route($type === 'depense' ? 'depenses.import.template' : 'recettes.import.template') }}"
+                                <a href="{{ route('transactions.import.template', ['type' => $type]) }}"
                                    class="btn btn-outline-secondary btn-sm">
                                     <i class="bi bi-download"></i> Télécharger le modèle
                                 </a>
