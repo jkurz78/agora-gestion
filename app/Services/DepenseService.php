@@ -39,6 +39,7 @@ final class DepenseService
             if ($depense->isLockedByRapprochement()) {
                 foreach ($lignes as $ligneData) {
                     $depense->lignes()->where('id', $ligneData['id'])->update([
+                        'sous_categorie_id' => $ligneData['sous_categorie_id'],
                         'operation_id' => $ligneData['operation_id'],
                         'seance' => $ligneData['seance'],
                         'notes' => $ligneData['notes'],
