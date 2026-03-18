@@ -36,7 +36,7 @@
 
     {{-- Bandeau de soldes --}}
     <div class="row g-3 mb-4">
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card text-center">
                 <div class="card-body py-2">
                     <div class="text-muted small">Solde ouverture</div>
@@ -44,7 +44,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card text-center">
                 <div class="card-body py-2">
                     <div class="text-muted small">Solde fin (relevé)</div>
@@ -52,7 +52,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card text-center">
                 <div class="card-body py-2">
                     <div class="text-muted small">Solde pointé</div>
@@ -60,13 +60,29 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card text-center border-{{ $ecart == 0 ? 'success' : 'danger' }}">
                 <div class="card-body py-2">
                     <div class="text-muted small">Écart</div>
                     <div class="fw-bold {{ $ecart == 0 ? 'text-success' : 'text-danger' }}">
                         {{ number_format($ecart, 2, ',', ' ') }} €
                     </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body py-2">
+                    <div class="text-muted small">Débits pointés</div>
+                    <div class="fw-bold text-danger">{{ number_format($totalDebitPointe, 2, ',', ' ') }} €</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body py-2">
+                    <div class="text-muted small">Crédits pointés</div>
+                    <div class="fw-bold text-success">{{ number_format($totalCreditPointe, 2, ',', ' ') }} €</div>
                 </div>
             </div>
         </div>
