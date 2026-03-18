@@ -295,9 +295,9 @@
                     <th style="width: 5%;">#</th>
                     <th style="width: 7%;">Date</th>
                     <th style="width: 5%;">Type</th>
-                    <th>Libellé</th>
-                    <th>Tiers</th>
-                    <th style="width: 10%;">Réf.</th>
+                    <th style="width: 22%;">Libellé</th>
+                    <th style="width: 22%;">Tiers</th>
+                    <th style="white-space: nowrap;">Réf.</th>
                     <th class="text-end" style="width: 10%;">Débit</th>
                     <th class="text-end" style="width: 10%;">Crédit</th>
                 </tr>
@@ -318,7 +318,7 @@
                         @endswitch</td>
                         <td>{{ $tx['label'] }}</td>
                         <td>{{ $tx['tiers'] ?? '—' }}</td>
-                        <td>{{ $tx['reference'] }}</td>
+                        <td style="white-space: nowrap;">{{ $tx['reference'] }}</td>
                         <td class="text-end text-danger">
                             @if ($tx['montant_signe'] < 0)
                                 {{ number_format(abs($tx['montant_signe']), 2, ',', ' ') }}
