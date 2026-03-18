@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Exports\BudgetExport;
 use App\Services\BudgetExportService;
 use App\Services\ExerciceService;
 use Illuminate\Http\Request;
-use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class BudgetExportController extends Controller
 {
@@ -34,13 +35,32 @@ final class BudgetExportController extends Controller
         $filename = 'budget-'.$exerciceService->label($exerciceCible).'.'.$request->format;
 
         if ($request->format === 'xlsx') {
-            return Excel::download(new BudgetExport($rows), $filename);
+            return $this->downloadXlsx($rows, $filename);
         }
 
         $csv = $service->toCsv($rows);
 
         return response($csv, 200, [
             'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
+    /** @param list<array{0: string, 1: string, 2: string, 3: string}> $rows */
+    private function downloadXlsx(array $rows, string $filename): StreamedResponse
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet       = $spreadsheet->getActiveSheet();
+        $sheet->fromArray(
+            array_merge([['exercice', 'categorie', 'sous_categorie', 'montant_prevu']], $rows)
+        );
+
+        $writer = new Xlsx($spreadsheet);
+
+        return new StreamedResponse(function () use ($writer): void {
+            $writer->save('php://output');
+        }, 200, [
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
