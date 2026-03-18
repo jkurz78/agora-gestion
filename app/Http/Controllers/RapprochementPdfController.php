@@ -13,6 +13,7 @@ use App\Models\VirementInterne;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 final class RapprochementPdfController extends Controller
@@ -55,9 +56,17 @@ final class RapprochementPdfController extends Controller
             'logoMime' => $logoMime,
         ];
 
-        $filename = 'rapprochement-'.$rapprochement->id.'.pdf';
+        $dateFin    = $rapprochement->date_fin->format('Y-m-d');
+        $comptePart = str_replace('/', '-', Str::ascii($compte->nom));
+        $prefix     = $association?->nom
+            ? str_replace('/', '-', Str::ascii($association->nom)).' - '
+            : '';
+        $filename   = $prefix.'Rapprochement '.$comptePart.' au '.$dateFin.'.pdf';
 
-        return Pdf::loadView('pdf.rapprochement', $data)->download($filename);
+        $pdf    = Pdf::loadView('pdf.rapprochement', $data);
+        $inline = request()->query('mode') === 'inline';
+
+        return $inline ? $pdf->stream($filename) : $pdf->download($filename);
     }
 
     private function collectTransactions(int $compteId, int $rid): Collection
@@ -66,12 +75,15 @@ final class RapprochementPdfController extends Controller
 
         Transaction::where('compte_id', $compteId)
             ->where('rapprochement_id', $rid)
+            ->with('tiers')
             ->get()
             ->each(function (Transaction $tx) use (&$transactions) {
                 $transactions->push([
+                    'id' => $tx->id,
                     'date' => $tx->date,
                     'type' => $tx->type->label(),
                     'label' => $tx->libelle,
+                    'tiers' => $tx->tiers?->displayName() ?? $tx->libelle,
                     'reference' => $tx->reference ?? null,
                     'montant_signe' => $tx->montantSigne(),
                 ]);
@@ -83,11 +95,13 @@ final class RapprochementPdfController extends Controller
             ->get()
             ->each(function (Don $d) use (&$transactions) {
                 $transactions->push([
+                    'id' => $d->id,
                     'date' => $d->date,
                     'type' => 'Don',
                     'label' => $d->tiers
                         ? $d->tiers->displayName()
                         : ($d->objet ?? 'Don anonyme'),
+                    'tiers' => $d->tiers ? $d->tiers->displayName() : ($d->objet ?? 'Don anonyme'),
                     'reference' => null,
                     'montant_signe' => (float) $d->montant,
                 ]);
@@ -95,13 +109,15 @@ final class RapprochementPdfController extends Controller
 
         Cotisation::where('compte_id', $compteId)
             ->where('rapprochement_id', $rid)
-            ->with('membre')
+            ->with('tiers')
             ->get()
             ->each(function (Cotisation $c) use (&$transactions) {
                 $transactions->push([
+                    'id' => $c->id,
                     'date' => $c->date_paiement,
                     'type' => 'Cotisation',
-                    'label' => $c->membre ? $c->membre->nom.' '.$c->membre->prenom : 'Cotisation',
+                    'label' => $c->tiers?->displayName() ?? 'Cotisation',
+                    'tiers' => $c->tiers ? $c->tiers->displayName() : 'Cotisation',
                     'reference' => null,
                     'montant_signe' => (float) $c->montant,
                 ]);
@@ -113,9 +129,11 @@ final class RapprochementPdfController extends Controller
             ->get()
             ->each(function (VirementInterne $v) use (&$transactions) {
                 $transactions->push([
+                    'id' => $v->id,
                     'date' => $v->date,
                     'type' => 'Virement sortant',
                     'label' => 'Virement vers '.$v->compteDestination->nom,
+                    'tiers' => $v->compteDestination->nom,
                     'reference' => $v->reference ?? null,
                     'montant_signe' => -(float) $v->montant,
                 ]);
@@ -127,9 +145,11 @@ final class RapprochementPdfController extends Controller
             ->get()
             ->each(function (VirementInterne $v) use (&$transactions) {
                 $transactions->push([
+                    'id' => $v->id,
                     'date' => $v->date,
                     'type' => 'Virement entrant',
                     'label' => 'Virement depuis '.$v->compteSource->nom,
+                    'tiers' => $v->compteSource->nom,
                     'reference' => $v->reference ?? null,
                     'montant_signe' => (float) $v->montant,
                 ]);

@@ -292,20 +292,24 @@
         <table class="tx-table">
             <thead>
                 <tr>
-                    <th style="width: 10%;">Date</th>
-                    <th style="width: 13%;">Type</th>
+                    <th style="width: 5%;">#</th>
+                    <th style="width: 9%;">Date</th>
+                    <th style="width: 11%;">Type</th>
                     <th>Libellé</th>
-                    <th style="width: 12%;">Réf.</th>
-                    <th class="text-end" style="width: 11%;">Débit</th>
-                    <th class="text-end" style="width: 11%;">Crédit</th>
+                    <th>Tiers</th>
+                    <th style="width: 10%;">Réf.</th>
+                    <th class="text-end" style="width: 10%;">Débit</th>
+                    <th class="text-end" style="width: 10%;">Crédit</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($transactions as $i => $tx)
                     <tr class="{{ $i % 2 === 1 ? 'even' : '' }}">
+                        <td>{{ $tx['id'] }}</td>
                         <td>{{ \Carbon\Carbon::parse($tx['date'])->format('d/m/Y') }}</td>
                         <td>{{ $tx['type'] }}</td>
                         <td>{{ $tx['label'] }}</td>
+                        <td>{{ $tx['tiers'] ?? '—' }}</td>
                         <td>{{ $tx['reference'] }}</td>
                         <td class="text-end text-danger">
                             @if ($tx['montant_signe'] < 0)
@@ -323,7 +327,7 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="4">Total</td>
+                    <td colspan="6">Total</td>
                     <td class="text-end text-danger">{{ number_format($totalDebit, 2, ',', ' ') }} €</td>
                     <td class="text-end text-success">{{ number_format($totalCredit, 2, ',', ' ') }} €</td>
                 </tr>
