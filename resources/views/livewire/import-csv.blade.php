@@ -1,7 +1,7 @@
 <div>
-    <div class="mb-3">
+    <div>
         <button wire:click="togglePanel" type="button" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-upload"></i> Importer
+            <i class="bi bi-upload"></i> Importer {{ $type === 'depense' ? 'dépenses' : 'recettes' }}
         </button>
     </div>
 
