@@ -5,14 +5,11 @@ declare(strict_types=1);
 use App\Enums\TypeCategorie;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
-use App\Models\Depense;
-use App\Models\DepenseLigne;
-use App\Models\DepenseLigneAffectation;
 use App\Models\Operation;
-use App\Models\Recette;
-use App\Models\RecetteLigne;
-use App\Models\RecetteLigneAffectation;
 use App\Models\SousCategorie;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Models\TransactionLigneAffectation;
 use App\Models\User;
 use App\Services\RapportService;
 
@@ -28,22 +25,22 @@ beforeEach(function () {
 
 it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id ligne', function () {
     // Recette de 20 000 sans opération directe
-    $recette = Recette::factory()->create([
+    $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'date' => '2025-10-15',
         'montant_total' => 20000.00,
     ]);
     $recette->lignes()->forceDelete();
-    $ligne = RecetteLigne::factory()->create([
-        'recette_id' => $recette->id,
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
         'sous_categorie_id' => $this->sousCategorie->id,
         'operation_id' => null,
         'montant' => 20000.00,
     ]);
 
     // Affectation de 8000 à op1
-    RecetteLigneAffectation::create([
-        'recette_ligne_id' => $ligne->id,
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
         'operation_id' => $this->op1->id,
         'montant' => 8000.00,
         'seance' => null,
@@ -62,14 +59,14 @@ it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id
 });
 
 it('une ligne sans affectation continue d\'utiliser son operation_id direct', function () {
-    $recette = Recette::factory()->create([
+    $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'date' => '2025-10-15',
         'montant_total' => 5000.00,
     ]);
     $recette->lignes()->forceDelete();
-    RecetteLigne::factory()->create([
-        'recette_id' => $recette->id,
+    TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
         'sous_categorie_id' => $this->sousCategorie->id,
         'operation_id' => $this->op1->id,
         'montant' => 5000.00,
@@ -88,21 +85,21 @@ it('le rapport onglet 2 prend en compte les affectations de dépenses', function
     $categorieD = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
     $sousCatD = SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
 
-    $depense = Depense::factory()->create([
+    $depense = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'date' => '2025-10-15',
         'montant_total' => 12000.00,
     ]);
     $depense->lignes()->forceDelete();
-    $ligne = DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $depense->id,
         'sous_categorie_id' => $sousCatD->id,
         'operation_id' => null,
         'montant' => 12000.00,
     ]);
 
-    DepenseLigneAffectation::create([
-        'depense_ligne_id' => $ligne->id,
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
         'operation_id' => $this->op1->id,
         'montant' => 7000.00,
         'seance' => null,
@@ -119,22 +116,22 @@ it('le rapport onglet 2 prend en compte les affectations de dépenses', function
 });
 
 it('le rapport onglet 3 prend en compte les affectations de recettes avec séance', function () {
-    $recette = Recette::factory()->create([
+    $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'date' => '2025-10-15',
         'montant_total' => 3000.00,
     ]);
     $recette->lignes()->forceDelete();
-    $ligne = RecetteLigne::factory()->create([
-        'recette_id' => $recette->id,
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $recette->id,
         'sous_categorie_id' => $this->sousCategorie->id,
         'operation_id' => null,
         'seance' => null,
         'montant' => 3000.00,
     ]);
 
-    RecetteLigneAffectation::create([
-        'recette_ligne_id' => $ligne->id,
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
         'operation_id' => $this->op1->id,
         'seance' => 2,
         'montant' => 3000.00,
@@ -159,22 +156,22 @@ it('le rapport onglet 3 prend en compte les affectations de dépenses avec séan
     $categorieD = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
     $sousCatD = SousCategorie::factory()->create(['categorie_id' => $categorieD->id]);
 
-    $depense = Depense::factory()->create([
+    $depense = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'date' => '2025-10-15',
         'montant_total' => 4000.00,
     ]);
     $depense->lignes()->forceDelete();
-    $ligne = DepenseLigne::factory()->create([
-        'depense_id' => $depense->id,
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $depense->id,
         'sous_categorie_id' => $sousCatD->id,
         'operation_id' => null,
         'seance' => null,
         'montant' => 4000.00,
     ]);
 
-    DepenseLigneAffectation::create([
-        'depense_ligne_id' => $ligne->id,
+    TransactionLigneAffectation::create([
+        'transaction_ligne_id' => $ligne->id,
         'operation_id' => $this->op1->id,
         'seance' => 3,
         'montant' => 4000.00,

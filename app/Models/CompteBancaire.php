@@ -33,14 +33,19 @@ final class CompteBancaire extends Model
         ];
     }
 
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class, 'compte_id');
+    }
+
     public function depenses(): HasMany
     {
-        return $this->hasMany(Depense::class, 'compte_id');
+        return $this->transactions()->where('type', 'depense');
     }
 
     public function recettes(): HasMany
     {
-        return $this->hasMany(Recette::class, 'compte_id');
+        return $this->transactions()->where('type', 'recette');
     }
 
     public function dons(): HasMany

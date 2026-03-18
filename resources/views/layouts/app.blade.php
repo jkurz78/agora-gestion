@@ -119,27 +119,30 @@
 
                     {{-- Dropdown Transactions --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('depenses.*') || request()->routeIs('recettes.*') || request()->routeIs('virements.*') || request()->routeIs('dons.*') || request()->routeIs('cotisations.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('transactions.*') || request()->routeIs('virements.*') || request()->routeIs('dons.*') || request()->routeIs('cotisations.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-arrow-down-up"></i> Transactions
                         </a>
                         <ul class="dropdown-menu">
-                            @if (Route::has('depenses.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('depenses.*') ? 'active' : '' }}"
-                                   href="{{ route('depenses.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('transactions.*') && !request()->query('type') ? 'active' : '' }}"
+                                   href="{{ route('transactions.index') }}">
+                                    <i class="bi bi-list-ul"></i> Toutes
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {{ request()->query('type') === 'depense' ? 'active' : '' }}"
+                                   href="{{ route('transactions.index') }}?type=depense">
                                     <i class="bi bi-arrow-down-circle"></i> Dépenses
                                 </a>
                             </li>
-                            @endif
-                            @if (Route::has('recettes.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('recettes.*') ? 'active' : '' }}"
-                                   href="{{ route('recettes.index') }}">
+                                <a class="dropdown-item {{ request()->query('type') === 'recette' ? 'active' : '' }}"
+                                   href="{{ route('transactions.index') }}?type=recette">
                                     <i class="bi bi-arrow-up-circle"></i> Recettes
                                 </a>
                             </li>
-                            @endif
+                            <li><hr class="dropdown-divider"></li>
                             @if (Route::has('virements.index'))
                             <li>
                                 <a class="dropdown-item {{ request()->routeIs('virements.*') ? 'active' : '' }}"

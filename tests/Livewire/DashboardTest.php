@@ -3,9 +3,8 @@
 use App\Livewire\Dashboard;
 use App\Models\CompteBancaire;
 use App\Models\Cotisation;
-use App\Models\Depense;
-use App\Models\Recette;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -35,18 +34,18 @@ it('renders for authenticated user', function () {
 
 
 it('displays solde general', function () {
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'date' => $this->exercice.'-11-01',
         'montant_total' => 1000.00,
         'saisi_par' => $this->user->id,
     ]);
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'date' => $this->exercice.'-12-01',
         'montant_total' => 500.00,
         'saisi_par' => $this->user->id,
     ]);
 
-    Depense::factory()->create([
+    Transaction::factory()->asDepense()->create([
         'date' => $this->exercice.'-10-15',
         'montant_total' => 300.00,
         'saisi_par' => $this->user->id,

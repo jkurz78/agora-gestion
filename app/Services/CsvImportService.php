@@ -7,10 +7,9 @@ namespace App\Services;
 use App\Enums\ModePaiement;
 use App\Enums\TypeCategorie;
 use App\Models\CompteBancaire;
-use App\Models\Depense;
 use App\Models\Operation;
-use App\Models\Recette;
 use App\Models\SousCategorie;
+use App\Models\Transaction;
 use App\Models\Tiers;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -20,7 +19,7 @@ use Illuminate\Support\Str;
  * Service d'import CSV pour les dépenses et recettes.
  *
  * Phase 1 : validation exhaustive sans écriture en base.
- * Phase 2 : insertion via DepenseService/RecetteService sans transaction globale
+ * Phase 2 : insertion via TransactionService sans transaction globale
  *            (incompatible avec le SELECT FOR UPDATE de NumeroPieceService).
  *            En cas d'échec partiel, les transactions déjà committées sont conservées.
  */
@@ -158,6 +157,7 @@ final class CsvImportService
 
                 $groups[$groupKey] = [
                     'data' => [
+                        'type'          => $type,
                         'date'          => $date,
                         'reference'     => $reference,
                         'libelle'       => trim($row[6] ?? '') !== '' ? trim($row[6]) : null,
@@ -185,10 +185,10 @@ final class CsvImportService
         }
 
         // Vérifier les doublons en base (hors soft-deleted, sans filtre exercice)
-        $modelClass = $type === 'depense' ? Depense::class : Recette::class;
         foreach ($groups as $key => $group) {
             [$date, $reference] = explode('|', $key, 2);
-            $exists = $modelClass::withoutTrashed()
+            $exists = Transaction::withoutTrashed()
+                ->where('type', $type)
                 ->whereDate('date', $date)
                 ->where('reference', $reference)
                 ->exists();
@@ -205,10 +205,10 @@ final class CsvImportService
         }
 
         // --- Phase 2 : Insertion ---
-        // Chaque appel à DepenseService/RecetteService gère sa propre transaction DB.
+        // Chaque appel à TransactionService gère sa propre transaction DB.
         // Pas de transaction englobante (incompatible avec SELECT FOR UPDATE de NumeroPieceService).
 
-        $service             = $type === 'depense' ? app(DepenseService::class) : app(RecetteService::class);
+        $service             = app(TransactionService::class);
         $transactionsCreated = 0;
         $lignesCreated       = 0;
 

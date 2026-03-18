@@ -1,9 +1,8 @@
 <?php
 
-use App\Models\DepenseLigne;
 use App\Models\Don;
 use App\Models\Operation;
-use App\Models\RecetteLigne;
+use App\Models\TransactionLigne;
 use App\Models\User;
 
 beforeEach(function () {
@@ -63,18 +62,18 @@ it('validates date_fin must be after or equal to date_debut', function () {
 it('can view show page with financial summary', function () {
     $operation = Operation::factory()->create();
 
-    // Create linked depense lignes
-    DepenseLigne::factory()->create([
+    // Create linked transaction lignes
+    TransactionLigne::factory()->create([
         'operation_id' => $operation->id,
         'montant' => 100.00,
     ]);
-    DepenseLigne::factory()->create([
+    TransactionLigne::factory()->create([
         'operation_id' => $operation->id,
         'montant' => 50.00,
     ]);
 
-    // Create linked recette lignes
-    RecetteLigne::factory()->create([
+    // Create linked transaction lignes (recette)
+    TransactionLigne::factory()->create([
         'operation_id' => $operation->id,
         'montant' => 200.00,
     ]);

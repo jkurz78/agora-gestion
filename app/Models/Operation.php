@@ -32,14 +32,9 @@ final class Operation extends Model
         ];
     }
 
-    public function depenseLignes(): HasMany
+    public function transactionLignes(): HasMany
     {
-        return $this->hasMany(DepenseLigne::class);
-    }
-
-    public function recetteLignes(): HasMany
-    {
-        return $this->hasMany(RecetteLigne::class);
+        return $this->hasMany(TransactionLigne::class);
     }
 
     public function dons(): HasMany

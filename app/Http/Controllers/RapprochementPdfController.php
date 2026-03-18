@@ -6,10 +6,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Association;
 use App\Models\Cotisation;
-use App\Models\Depense;
 use App\Models\Don;
 use App\Models\RapprochementBancaire;
-use App\Models\Recette;
+use App\Models\Transaction;
 use App\Models\VirementInterne;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
@@ -65,29 +64,16 @@ final class RapprochementPdfController extends Controller
     {
         $transactions = collect();
 
-        Depense::where('compte_id', $compteId)
+        Transaction::where('compte_id', $compteId)
             ->where('rapprochement_id', $rid)
             ->get()
-            ->each(function (Depense $d) use (&$transactions) {
+            ->each(function (Transaction $tx) use (&$transactions) {
                 $transactions->push([
-                    'date' => $d->date,
-                    'type' => 'Dépense',
-                    'label' => $d->libelle,
-                    'reference' => $d->reference ?? null,
-                    'montant_signe' => -(float) $d->montant_total,
-                ]);
-            });
-
-        Recette::where('compte_id', $compteId)
-            ->where('rapprochement_id', $rid)
-            ->get()
-            ->each(function (Recette $r) use (&$transactions) {
-                $transactions->push([
-                    'date' => $r->date,
-                    'type' => 'Recette',
-                    'label' => $r->libelle,
-                    'reference' => $r->reference ?? null,
-                    'montant_signe' => (float) $r->montant_total,
+                    'date' => $tx->date,
+                    'type' => $tx->type->label(),
+                    'label' => $tx->libelle,
+                    'reference' => $tx->reference ?? null,
+                    'montant_signe' => $tx->montantSigne(),
                 ]);
             });
 

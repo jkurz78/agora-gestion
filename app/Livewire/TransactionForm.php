@@ -6,22 +6,23 @@ namespace App\Livewire;
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutOperation;
-use App\Enums\TypeCategorie;
 use App\Models\CompteBancaire;
-use App\Models\Depense;
-use App\Models\DepenseLigne;
-use App\Models\DepenseLigneAffectation;
 use App\Models\Operation;
 use App\Models\SousCategorie;
-use App\Services\DepenseService;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Models\TransactionLigneAffectation;
 use App\Services\ExerciceService;
+use App\Services\TransactionService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
-final class DepenseForm extends Component
+final class TransactionForm extends Component
 {
-    public ?int $depenseId = null;
+    public ?int $transactionId = null;
+
+    public string $type = '';
 
     public string $date = '';
 
@@ -61,24 +62,32 @@ final class DepenseForm extends Component
         return round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
     }
 
-    public function showNewForm(): void
+    public function showNewForm(string $type): void
     {
-        $this->reset(['depenseId', 'date', 'libelle', 'mode_paiement',
+        $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations']);
+        $this->type = $type;
         $this->isLocked = false;
         $this->resetValidation();
-
         $this->showForm = true;
         $this->date = app(ExerciceService::class)->defaultDate();
-
-        $this->compte_id = Depense::where('saisi_par', auth()->id())
+        $this->compte_id = Transaction::where('saisi_par', auth()->id())
             ->whereNotNull('compte_id')
             ->latest()
             ->value('compte_id');
-
         $this->addLigne();
+    }
+
+    #[On('open-transaction-form')]
+    public function openForm(string $type, ?int $id = null): void
+    {
+        if ($id !== null) {
+            $this->edit($id);
+        } else {
+            $this->showNewForm($type);
+        }
     }
 
     public function addLigne(): void
@@ -106,7 +115,7 @@ final class DepenseForm extends Component
             abort(403);
         }
 
-        $ligne = DepenseLigne::with('affectations', 'sousCategorie')->findOrFail($ligneId);
+        $ligne = TransactionLigne::with('affectations', 'sousCategorie')->findOrFail($ligneId);
         $this->ventilationLigneId = $ligneId;
         $this->ventilationLigneSousCategorie = $ligne->sousCategorie->nom ?? '';
         $this->ventilationLigneMontant = (string) $ligne->montant;
@@ -169,7 +178,7 @@ final class DepenseForm extends Component
             'affectations.*.notes' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $ligne = DepenseLigne::findOrFail($this->ventilationLigneId);
+        $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
         $ligneMontantCents = (int) round((float) $ligne->montant * 100);
         $affectationCents = (int) round(collect($this->affectations)->sum(fn ($a) => (float) ($a['montant'] ?? 0)) * 100);
         if ($ligneMontantCents !== $affectationCents) {
@@ -178,7 +187,7 @@ final class DepenseForm extends Component
             return;
         }
 
-        app(DepenseService::class)->affecterLigne(
+        app(TransactionService::class)->affecterLigne(
             $ligne,
             collect($this->affectations)->map(fn ($a) => [
                 'operation_id' => $a['operation_id'] !== '' ? (int) $a['operation_id'] : null,
@@ -189,7 +198,7 @@ final class DepenseForm extends Component
         );
 
         $this->fermerVentilation();
-        $this->dispatch('depense-saved');
+        $this->dispatch('transaction-saved');
     }
 
     public function supprimerVentilation(): void
@@ -199,13 +208,13 @@ final class DepenseForm extends Component
             abort(403);
         }
 
-        $ligne = DepenseLigne::findOrFail($this->ventilationLigneId);
-        app(DepenseService::class)->supprimerAffectations($ligne);
+        $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
+        app(TransactionService::class)->supprimerAffectations($ligne);
         $this->fermerVentilation();
-        $this->dispatch('depense-saved');
+        $this->dispatch('transaction-saved');
     }
 
-    #[On('edit-depense')]
+    #[On('edit-transaction')]
     public function edit(int $id): void
     {
         $this->ventilationLigneId = null;
@@ -214,18 +223,19 @@ final class DepenseForm extends Component
         $this->affectations = [];
         $this->ventilationHasAffectations = false;
 
-        $depense = Depense::with('lignes')->findOrFail($id);
+        $transaction = Transaction::with('lignes')->findOrFail($id);
 
-        $this->depenseId = $depense->id;
-        $this->date = $depense->date->format('Y-m-d');
-        $this->libelle = $depense->libelle;
-        $this->mode_paiement = $depense->mode_paiement->value;
-        $this->tiers_id = $depense->tiers_id;
-        $this->reference = $depense->reference;
-        $this->compte_id = $depense->compte_id;
-        $this->notes = $depense->notes;
+        $this->transactionId = $transaction->id;
+        $this->type = $transaction->type->value;
+        $this->date = $transaction->date->format('Y-m-d');
+        $this->libelle = $transaction->libelle;
+        $this->mode_paiement = $transaction->mode_paiement->value;
+        $this->tiers_id = $transaction->tiers_id;
+        $this->reference = $transaction->reference;
+        $this->compte_id = $transaction->compte_id;
+        $this->notes = $transaction->notes;
 
-        $this->lignes = $depense->lignes->map(fn ($ligne) => [
+        $this->lignes = $transaction->lignes->map(fn ($ligne) => [
             'id' => $ligne->id,
             'sous_categorie_id' => (string) $ligne->sous_categorie_id,
             'operation_id' => (string) ($ligne->operation_id ?? ''),
@@ -234,14 +244,14 @@ final class DepenseForm extends Component
             'notes' => (string) ($ligne->notes ?? ''),
         ])->toArray();
 
-        $this->isLocked = $depense->isLockedByRapprochement();
+        $this->isLocked = $transaction->isLockedByRapprochement();
         $this->showForm = true;
     }
 
     public function resetForm(): void
     {
         $this->reset([
-            'depenseId', 'date', 'libelle', 'mode_paiement',
+            'transactionId', 'type', 'date', 'libelle', 'mode_paiement',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
@@ -256,8 +266,8 @@ final class DepenseForm extends Component
         $dateDebut = $range['start']->toDateString();
         $dateFin = $range['end']->toDateString();
 
-        $isLocked = $this->depenseId
-            ? Depense::findOrFail($this->depenseId)->loadMissing('rapprochement')->isLockedByRapprochement()
+        $isLocked = $this->transactionId
+            ? Transaction::findOrFail($this->transactionId)->loadMissing('rapprochement')->isLockedByRapprochement()
             : false;
 
         $this->validate(
@@ -284,6 +294,7 @@ final class DepenseForm extends Component
         );
 
         $data = [
+            'type' => $this->type,
             'date' => $this->date,
             'libelle' => $this->libelle,
             'montant_total' => $this->montantTotal,
@@ -303,39 +314,39 @@ final class DepenseForm extends Component
             'notes' => $l['notes'] ?: null,
         ])->toArray();
 
-        $service = app(DepenseService::class);
+        $service = app(TransactionService::class);
 
-        if ($this->depenseId) {
-            $depense = Depense::findOrFail($this->depenseId);
-            $service->update($depense, $data, $lignes);
+        if ($this->transactionId) {
+            $transaction = Transaction::findOrFail($this->transactionId);
+            $service->update($transaction, $data, $lignes);
         } else {
             $service->create($data, $lignes);
         }
 
-        $this->dispatch('depense-saved');
+        $this->dispatch('transaction-saved');
         $this->resetForm();
     }
 
     public function render(): View
     {
         $sousCategories = SousCategorie::with('categorie')
-            ->whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Depense))
+            ->when($this->type !== '', fn ($q) => $q->whereHas('categorie', fn ($q2) => $q2->where('type', $this->type)))
             ->orderBy('nom')
             ->get();
 
-        return view('livewire.depense-form', [
+        return view('livewire.transaction-form', [
             'comptes' => CompteBancaire::where('actif_recettes_depenses', true)->orderBy('nom')->get(),
             'sousCategories' => $sousCategories,
             'operations' => Operation::where('statut', StatutOperation::EnCours)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
-            'depense_numero_piece' => $this->depenseId
-                ? Depense::select('id', 'numero_piece')->find($this->depenseId)?->numero_piece
+            'transaction_numero_piece' => $this->transactionId
+                ? Transaction::select('id', 'numero_piece')->find($this->transactionId)?->numero_piece
                 : null,
-            'lignesAffectations' => $this->depenseId
-                ? DepenseLigneAffectation::whereIn(
-                    'depense_ligne_id',
+            'lignesAffectations' => $this->transactionId
+                ? TransactionLigneAffectation::whereIn(
+                    'transaction_ligne_id',
                     collect($this->lignes)->pluck('id')->filter()->toArray()
-                )->pluck('depense_ligne_id')->unique()->toArray()
+                )->pluck('transaction_ligne_id')->unique()->toArray()
                 : [],
         ]);
     }

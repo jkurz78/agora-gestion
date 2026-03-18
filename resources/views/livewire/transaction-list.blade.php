@@ -6,10 +6,32 @@
         </div>
     @endif
 
+    {{-- Boutons de création --}}
+    <div class="d-flex gap-2 mb-3">
+        <button wire:click="$dispatch('open-transaction-form', {type: 'depense'})"
+                class="btn btn-danger">
+            <i class="bi bi-plus-lg"></i> Nouvelle dépense
+        </button>
+        <button wire:click="$dispatch('open-transaction-form', {type: 'recette'})"
+                class="btn btn-success">
+            <i class="bi bi-plus-lg"></i> Nouvelle recette
+        </button>
+    </div>
+
     {{-- Filter row --}}
     <div class="card mb-4">
         <div class="card-body">
             <div class="row g-3">
+                <div class="col-12 mb-2">
+                    <div class="btn-group" role="group">
+                        <input type="radio" class="btn-check" wire:model.live="typeFilter" value="" id="filter-type-all">
+                        <label class="btn btn-outline-secondary btn-sm" for="filter-type-all">Toutes</label>
+                        <input type="radio" class="btn-check" wire:model.live="typeFilter" value="depense" id="filter-type-depense">
+                        <label class="btn btn-outline-danger btn-sm" for="filter-type-depense">Dépenses</label>
+                        <input type="radio" class="btn-check" wire:model.live="typeFilter" value="recette" id="filter-type-recette">
+                        <label class="btn btn-outline-success btn-sm" for="filter-type-recette">Recettes</label>
+                    </div>
+                </div>
                 <div class="col-md-2">
                     <label for="filter-categorie" class="form-label">Catégorie</label>
                     <select wire:model.live="categorie_id" id="filter-categorie" class="form-select form-select-sm">
@@ -55,13 +77,14 @@
         </div>
     </div>
 
-    {{-- Recettes table --}}
+    {{-- Transactions table --}}
     <div class="table-responsive">
         <table class="table table-sm table-striped table-hover">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
                     <th>N°</th>
                     <th>Date</th>
+                    <th>Type</th>
                     <th>Réf.</th>
                     <th>Libellé</th>
                     <th>Tiers</th>
@@ -71,33 +94,44 @@
                 </tr>
             </thead>
             <tbody style="color:#555">
-                @forelse ($recettes as $recette)
-                    <tr wire:key="recette-{{ $recette->id }}">
-                        <td class="text-muted small">{{ $recette->numero_piece ?? '—' }}</td>
-                        <td class="text-nowrap small">{{ $recette->date->format('d/m/Y') }}</td>
-                        <td class="text-muted small">{{ $recette->reference ?? '—' }}</td>
-                        <td class="small">{{ $recette->libelle }}</td>
-                        <td class="small">@if($recette->tiers)<span style="font-size:.7rem">{{ $recette->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $recette->tiers->displayName() }}@else—@endif</td>
-                        <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $recette->mode_paiement->label() }}</span></td>
-                        <td class="text-end text-success fw-semibold text-nowrap small">
-                            {{ number_format((float) $recette->montant_total, 2, ',', ' ') }} €
+                @forelse ($transactions as $transaction)
+                    <tr wire:key="transaction-{{ $transaction->id }}">
+                        <td class="text-muted small">{{ $transaction->numero_piece ?? '—' }}</td>
+                        <td class="text-nowrap small">{{ $transaction->date->format('d/m/Y') }}</td>
+                        <td>
+                            @if($transaction->type === \App\Enums\TypeTransaction::Depense)
+                                <span class="badge bg-danger" style="font-size:.7rem">Dépense</span>
+                            @else
+                                <span class="badge bg-success" style="font-size:.7rem">Recette</span>
+                            @endif
+                        </td>
+                        <td class="text-muted small">{{ $transaction->reference ?? '—' }}</td>
+                        <td class="small">{{ $transaction->libelle }}</td>
+                        <td class="small">@if($transaction->tiers)<span style="font-size:.7rem">{{ $transaction->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $transaction->tiers->displayName() }}@else—@endif</td>
+                        <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $transaction->mode_paiement->label() }}</span></td>
+                        <td class="text-end fw-semibold text-nowrap small">
+                            @if($transaction->type === \App\Enums\TypeTransaction::Depense)
+                                <span class="text-danger">-{{ number_format((float) $transaction->montant_total, 2, ',', ' ') }} €</span>
+                            @else
+                                <span class="text-success">{{ number_format((float) $transaction->montant_total, 2, ',', ' ') }} €</span>
+                            @endif
                         </td>
                         <td>
                             <div class="d-flex gap-1 justify-content-end">
-                                <button wire:click="$dispatch('edit-recette', { id: {{ $recette->id }} })"
+                                <button wire:click="$dispatch('edit-transaction', { id: {{ $transaction->id }} })"
                                         class="btn btn-sm btn-outline-primary" title="Modifier"
                                         style="padding:.15rem .35rem;font-size:.75rem">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                @if ($recette->pointe)
+                                @if ($transaction->pointe)
                                     <button class="btn btn-sm btn-outline-danger" disabled
-                                            title="Dépointez cette recette avant de la supprimer."
+                                            title="Dépointez cette transaction avant de la supprimer."
                                             style="padding:.15rem .35rem;font-size:.75rem">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 @else
-                                    <button wire:click="delete({{ $recette->id }})"
-                                            wire:confirm="Supprimer cette recette ?"
+                                    <button wire:click="delete({{ $transaction->id }})"
+                                            wire:confirm="Supprimer cette transaction ?"
                                             class="btn btn-sm btn-outline-danger" title="Supprimer"
                                             style="padding:.15rem .35rem;font-size:.75rem">
                                         <i class="bi bi-trash"></i>
@@ -108,13 +142,13 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-muted text-center">Aucune recette trouvée.</td>
+                        <td colspan="9" class="text-muted text-center">Aucune transaction trouvée.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <x-per-page-selector :paginator="$recettes" storageKey="recettes" wire:model.live="perPage" />
-    {{ $recettes->links() }}
+    <x-per-page-selector :paginator="$transactions" storageKey="transactions" wire:model.live="perPage" />
+    {{ $transactions->links() }}
 </div>
