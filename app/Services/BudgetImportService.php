@@ -9,8 +9,7 @@ use App\Models\SousCategorie;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Maatwebsite\Excel\Concerns\ToArray;
-use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 final class BudgetImportService
 {
@@ -185,26 +184,17 @@ final class BudgetImportService
     /** @return list<list<string>>|null */
     private function parseXlsx(UploadedFile $file): ?array
     {
-        $import = new class implements ToArray {
-            /** @var list<list<string>> */
-            public array $data = [];
-
-            public function array(array $array): void
-            {
-                $this->data = array_map(
-                    fn (array $row): array => array_map(fn ($v): string => (string) ($v ?? ''), $row),
-                    $array
-                );
-            }
-        };
-
         try {
-            Excel::import($import, $file);
+            $spreadsheet = IOFactory::load($file->getRealPath());
+            $rows        = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+
+            return array_map(
+                fn (array $row): array => array_map(fn ($v): string => (string) ($v ?? ''), $row),
+                $rows
+            );
         } catch (\Throwable) {
             return null;
         }
-
-        return $import->data;
     }
 
     private function validateHeader(array $row): ?string
