@@ -24,7 +24,8 @@
 | `app/Services/TransactionService.php` | Logique métier unifiée |
 | `app/Livewire/TransactionList.php` | Liste avec filtre type |
 | `app/Livewire/TransactionForm.php` | Formulaire création/édition |
-| `database/migrations/2026_03_18_100000_create_transactions_unified.php` | Migration + données |
+| `database/migrations/2026_03_18_100000_create_transactions_unified.php` | Migration A : créer tables + migrer données (garde les anciennes) |
+| `database/migrations/2026_03_18_200000_drop_legacy_depenses_recettes.php` | Migration B : supprimer anciennes tables (déploiement suivant) |
 | `database/factories/TransactionFactory.php` | Factory avec états `asDepense()`/`asRecette()` |
 | `database/factories/TransactionLigneFactory.php` | Factory ligne |
 | `tests/Feature/TransactionServiceTest.php` | Tests CRUD service |
@@ -48,7 +49,7 @@
 | `resources/views/layouts/app.blade.php` | Nouveau menu Transactions |
 | `routes/web.php` | Route `/transactions`, suppression `/depenses` `/recettes` |
 
-### Supprimés (Task 12)
+### Supprimés (Task 12 — fichiers PHP/vues uniquement)
 `app/Models/Depense.php`, `Recette.php`, `DepenseLigne.php`, `RecetteLigne.php`, `DepenseLigneAffectation.php`, `RecetteLigneAffectation.php`,
 `app/Services/DepenseService.php`, `RecetteService.php`,
 `app/Livewire/DepenseForm.php`, `DepenseList.php`, `RecetteForm.php`, `RecetteList.php`,
@@ -56,6 +57,8 @@
 `resources/views/livewire/depense-form.blade.php`, `depense-list.blade.php`, `recette-form.blade.php`, `recette-list.blade.php`,
 `resources/views/depenses/index.blade.php`, `recettes/index.blade.php`,
 `tests/Feature/DepenseTest.php`, `DepenseAffectationTest.php`, `DepenseServiceLockTest.php`, `RecetteTest.php`, `RecetteAffectationTest.php`, `RecetteServiceLockTest.php`
+
+> **Les anciennes tables SQL** (`depenses`, `recettes`, `depense_lignes`, etc.) sont supprimées par la **Migration B (Task 13)**, dans un déploiement séparé après validation en production.
 
 ---
 
@@ -334,12 +337,13 @@ git commit -m "feat: add Transaction, TransactionLigne, TransactionLigneAffectat
 
 ---
 
-## Task 3 : Migration de données
+## Task 3 : Migration A — créer tables + migrer données
 
 **Files:**
 - Create: `database/migrations/2026_03_18_100000_create_transactions_unified.php`
 
-Cette migration crée les nouvelles tables, migre les données via `old_id`, puis supprime les anciennes tables.
+> ⚠️ **Avant de déployer en production : faire un backup de la base de données.**
+> Cette migration crée les nouvelles tables et migre les données, **sans supprimer les anciennes tables** (filet de sécurité). Si quelque chose se passe mal en prod, les données originales sont toujours là. La suppression des anciennes tables se fait dans un déploiement séparé (Task 13).
 
 - [ ] **Créer la migration**
 
@@ -472,21 +476,18 @@ return new class extends Migration
             $table->dropColumn('old_id');
         });
 
-        // ── 4. Supprimer les anciennes tables ─────────────────────────────────
-        Schema::dropIfExists('depense_ligne_affectations');
-        Schema::dropIfExists('recette_ligne_affectations');
-        Schema::dropIfExists('depense_lignes');
-        Schema::dropIfExists('recette_lignes');
-        Schema::dropIfExists('depenses');
-        Schema::dropIfExists('recettes');
+        // Les anciennes tables sont conservées intentionnellement comme filet de sécurité.
+        // Elles seront supprimées par la Migration B après validation en production.
 
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
     }
 
     public function down(): void
     {
-        // down() non implémenté — migration de données irréversible sans backup
-        throw new \RuntimeException('Cette migration est irréversible. Restaurer depuis un backup.');
+        Schema::dropIfExists('transaction_ligne_affectations');
+        Schema::dropIfExists('transaction_lignes');
+        Schema::dropIfExists('transactions');
+    }
     }
 };
 ```
@@ -1523,7 +1524,7 @@ git commit -m "chore: suppression des anciens fichiers dépenses/recettes après
 
 ---
 
-## Vérification finale
+## Vérification finale (après Task 12)
 
 - [ ] Ouvrir `/transactions` → liste avec filtre "Toutes"
 - [ ] Cliquer "Dépenses" dans le menu → filtre pré-sélectionné
@@ -1532,3 +1533,60 @@ git commit -m "chore: suppression des anciens fichiers dépenses/recettes après
 - [ ] Ouvrir le rapport compte de résultat → données cohérentes
 - [ ] Ouvrir un rapprochement existant → transactions affichées correctement
 - [ ] `./vendor/bin/sail artisan test` → 0 échec
+
+---
+
+## Task 13 : Migration B — supprimer les anciennes tables (déploiement séparé)
+
+> ⚠️ **Cette task s'exécute dans un déploiement distinct**, après avoir validé que l'application fonctionne correctement en production avec les nouvelles tables. Ne pas l'inclure dans le même push que Tasks 1–12.
+
+**Files:**
+- Create: `database/migrations/2026_03_18_200000_drop_legacy_depenses_recettes.php`
+
+- [ ] **Vérifier en prod que tout fonctionne** (liste, formulaire, rapports, rapprochement)
+
+- [ ] **Créer la migration B**
+
+```php
+<?php
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
+        Schema::dropIfExists('depense_ligne_affectations');
+        Schema::dropIfExists('recette_ligne_affectations');
+        Schema::dropIfExists('depense_lignes');
+        Schema::dropIfExists('recette_lignes');
+        Schema::dropIfExists('depenses');
+        Schema::dropIfExists('recettes');
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
+    }
+
+    public function down(): void
+    {
+        throw new \RuntimeException('Migration B irréversible — les données ont été migrées vers transactions.');
+    }
+};
+```
+
+- [ ] **Lancer les tests**
+
+```bash
+./vendor/bin/sail artisan test 2>&1 | tail -5
+```
+Attendu : 0 échec.
+
+- [ ] **Commit et push**
+
+```bash
+git add database/migrations/2026_03_18_200000_drop_legacy_depenses_recettes.php
+git commit -m "chore: migration B — suppression tables depenses/recettes legacy"
+git push origin main
+```
