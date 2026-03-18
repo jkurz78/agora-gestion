@@ -9,16 +9,24 @@ use App\Http\Requests\StoreOperationRequest;
 use App\Http\Requests\UpdateOperationRequest;
 use App\Models\Operation;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 final class OperationController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $operations = Operation::orderByDesc('date_debut')->get();
+        $showAll = $request->boolean('all');
+        $exercice = app(\App\Services\ExerciceService::class)->current();
+
+        $operations = $showAll
+            ? Operation::orderByDesc('date_debut')->get()
+            : Operation::forExercice($exercice)->orderByDesc('date_debut')->get();
 
         return view('operations.index', [
             'operations' => $operations,
+            'showAll'    => $showAll,
+            'exercice'   => $exercice,
         ]);
     }
 
