@@ -10,7 +10,7 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 final class BudgetExport implements FromArray, WithHeadings
 {
     /**
-     * @param  list<array{0: string, 1: string, 2: string}>  $rows
+     * @param  list<array{0: string, 1: string, 2: string, 3: string}>  $rows
      */
     public function __construct(private readonly array $rows) {}
 
@@ -22,6 +22,6 @@ final class BudgetExport implements FromArray, WithHeadings
     /** @return list<string> */
     public function headings(): array
     {
-        return ['exercice', 'sous_categorie', 'montant_prevu'];
+        return ['exercice', 'categorie', 'sous_categorie', 'montant_prevu'];
     }
 }

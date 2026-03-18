@@ -53,7 +53,7 @@ beforeEach(function () {
 it('retourne les lignes dans l\'ordre dépenses puis recettes', function () {
     $rows = app(BudgetExportService::class)->rows(2026, 'zero', 2026);
 
-    $noms = array_column($rows, 1);
+    $noms = array_column($rows, 2); // col 2 = sous_categorie
     $posLoyers = array_search('Loyers', $noms);
     $posCotis  = array_search('Cotisations', $noms);
     expect($posLoyers)->toBeLessThan($posCotis);
@@ -71,17 +71,17 @@ it('source zero produit des montants vides', function () {
     $rows = app(BudgetExportService::class)->rows(2026, 'zero', 2026);
 
     foreach ($rows as $row) {
-        expect($row[2])->toBe('');
+        expect($row[3])->toBe(''); // col 3 = montant_prevu
     }
 });
 
 it('source realise remplit les montants non nuls, laisse vide les zéros', function () {
     $rows = app(BudgetExportService::class)->rows(2026, 'realise', 2025);
 
-    $byName = array_column($rows, null, 1);
-    expect($byName['Loyers'][2])->toBe('1200.00');
-    expect($byName['Électricité'][2])->toBe('');   // pas de transaction → vide
-    expect($byName['Cotisations'][2])->toBe('850.00');
+    $byName = array_column($rows, null, 2); // col 2 = sous_categorie
+    expect($byName['Loyers'][3])->toBe('1200.00');
+    expect($byName['Électricité'][3])->toBe('');   // pas de transaction → vide
+    expect($byName['Cotisations'][3])->toBe('850.00');
 });
 
 it('source budget exporte les montants_prevu de la table budget_lines', function () {
@@ -91,22 +91,30 @@ it('source budget exporte les montants_prevu de la table budget_lines', function
 
     $rows = app(BudgetExportService::class)->rows(2026, 'budget', 2025);
 
-    $byName = array_column($rows, null, 1);
-    expect($byName['Loyers'][2])->toBe('900.00');
-    expect($byName['Électricité'][2])->toBe('');
-    expect($byName['Cotisations'][2])->toBe('700.00');
+    $byName = array_column($rows, null, 2); // col 2 = sous_categorie
+    expect($byName['Loyers'][3])->toBe('900.00');
+    expect($byName['Électricité'][3])->toBe('');
+    expect($byName['Cotisations'][3])->toBe('700.00');
+});
+
+it('inclut le nom de la catégorie en deuxième colonne', function () {
+    $rows = app(BudgetExportService::class)->rows(2026, 'zero', 2026);
+
+    $byName = array_column($rows, null, 2); // col 2 = sous_categorie
+    expect($byName['Loyers'][1])->toBe('Charges');
+    expect($byName['Cotisations'][1])->toBe('Produits');
 });
 
 it('toCsv génère un CSV valide avec en-tête', function () {
     $rows = [
-        ['2026-2027', 'Loyers', '1200.00'],
-        ['2026-2027', 'Électricité', ''],
+        ['2026-2027', 'Charges', 'Loyers', '1200.00'],
+        ['2026-2027', 'Charges', 'Électricité', ''],
     ];
 
     $csv = app(BudgetExportService::class)->toCsv($rows);
 
     expect($csv)
-        ->toContain('exercice;sous_categorie;montant_prevu')
-        ->toContain('2026-2027;Loyers;1200.00')
-        ->toContain('2026-2027;Électricité;');
+        ->toContain('exercice;categorie;sous_categorie;montant_prevu')
+        ->toContain('2026-2027;Charges;Loyers;1200.00')
+        ->toContain('2026-2027;Charges;Électricité;');
 });

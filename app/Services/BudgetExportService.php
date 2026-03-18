@@ -16,12 +16,12 @@ final class BudgetExportService
      * @param  int     $exerciceCible  Valeur à écrire dans la colonne exercice
      * @param  string  $source         'zero' | 'realise' | 'budget'
      * @param  int     $sourceExercice Exercice source des montants
-     * @return list<array{0: string, 1: string, 2: string}>
+     * @return list<array{0: string, 1: string, 2: string, 3: string}>
      */
     public function rows(int $exerciceCible, string $source, int $sourceExercice): array
     {
-        $budgetService  = app(BudgetService::class);
-        $exerciceLabel  = app(ExerciceService::class)->label($exerciceCible);
+        $budgetService = app(BudgetService::class);
+        $exerciceLabel = app(ExerciceService::class)->label($exerciceCible);
 
         // Pré-charger le budget de l'exercice source en une seule requête
         $budgetMap = $source === 'budget'
@@ -49,6 +49,7 @@ final class BudgetExportService
 
                     $rows[] = [
                         $exerciceLabel,
+                        $categorie->nom,
                         $sc->nom,
                         $montant > 0 ? number_format($montant, 2, '.', '') : '',
                     ];
@@ -66,7 +67,7 @@ final class BudgetExportService
      */
     public function toCsv(array $rows): string
     {
-        $lines = ['exercice;sous_categorie;montant_prevu'];
+        $lines = ['exercice;categorie;sous_categorie;montant_prevu'];
 
         foreach ($rows as $row) {
             $escaped = array_map(
