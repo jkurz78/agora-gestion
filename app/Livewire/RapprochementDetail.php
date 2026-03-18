@@ -17,6 +17,8 @@ final class RapprochementDetail extends Component
 {
     public RapprochementBancaire $rapprochement;
 
+    public bool $masquerPointees = false;
+
     public function mount(RapprochementBancaire $rapprochement): void
     {
         $this->rapprochement = $rapprochement;
@@ -204,8 +206,14 @@ final class RapprochementDetail extends Component
 
         $transactions = $transactions->sortBy('date')->values();
 
+        // Totals first — always over the full set of pointed transactions
         $totalDebitPointe  = abs($transactions->where('pointe', true)->where('montant_signe', '<', 0)->sum('montant_signe'));
         $totalCreditPointe = $transactions->where('pointe', true)->where('montant_signe', '>', 0)->sum('montant_signe');
+
+        // Display filter second — only affects the table, not the summary cards
+        if ($this->masquerPointees) {
+            $transactions = $transactions->filter(fn (array $tx) => ! $tx['pointe'])->values();
+        }
 
         $soldePointage = $service->calculerSoldePointage($this->rapprochement);
         $ecart = $service->calculerEcart($this->rapprochement);
