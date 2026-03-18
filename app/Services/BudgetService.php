@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\TypeCategorie;
-use App\Models\DepenseLigne;
-use App\Models\RecetteLigne;
 use App\Models\SousCategorie;
+use App\Models\TransactionLigne;
 
 final class BudgetService
 {
@@ -24,20 +23,10 @@ final class BudgetService
         $startDate = "{$exercice}-09-01";
         $endDate = ($exercice + 1).'-08-31';
 
-        if ($sousCategorie->categorie->type === TypeCategorie::Depense) {
-            return (float) DepenseLigne::where('sous_categorie_id', $sousCategorieId)
-                ->whereHas('depense', function ($q) use ($startDate, $endDate) {
-                    $q->whereBetween('date', [$startDate, $endDate]);
-                })
-                ->whereNull('deleted_at')
-                ->sum('montant');
-        }
+        $typeValue = $sousCategorie->categorie->type === TypeCategorie::Depense ? 'depense' : 'recette';
 
-        return (float) RecetteLigne::where('sous_categorie_id', $sousCategorieId)
-            ->whereHas('recette', function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('date', [$startDate, $endDate]);
-            })
-            ->whereNull('deleted_at')
+        return (float) TransactionLigne::where('sous_categorie_id', $sousCategorieId)
+            ->whereHas('transaction', fn ($q) => $q->where('type', $typeValue)->whereBetween('date', [$startDate, $endDate]))
             ->sum('montant');
     }
 }

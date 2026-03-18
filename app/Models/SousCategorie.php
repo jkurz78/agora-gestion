@@ -42,13 +42,8 @@ final class SousCategorie extends Model
         return $this->hasMany(BudgetLine::class, 'sous_categorie_id');
     }
 
-    public function depenseLignes(): HasMany
+    public function transactionLignes(): HasMany
     {
-        return $this->hasMany(DepenseLigne::class, 'sous_categorie_id');
-    }
-
-    public function recetteLignes(): HasMany
-    {
-        return $this->hasMany(RecetteLigne::class, 'sous_categorie_id');
+        return $this->hasMany(TransactionLigne::class, 'sous_categorie_id');
     }
 }

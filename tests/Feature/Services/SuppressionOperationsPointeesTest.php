@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
 use App\Models\Cotisation;
-use App\Models\Depense;
 use App\Models\Don;
 use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\RapprochementBancaire;
-use App\Models\Recette;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\CotisationService;
-use App\Services\DepenseService;
 use App\Services\DonService;
-use App\Services\RecetteService;
+use App\Services\TransactionService;
 use App\Services\VirementInterneService;
 
 beforeEach(function () {
@@ -24,43 +22,43 @@ beforeEach(function () {
     $this->compte = CompteBancaire::factory()->create();
 });
 
-test('DepenseService::delete lève une exception si la dépense est pointée', function () {
+test('TransactionService::delete lève une exception si la dépense est pointée', function () {
     $rapprochement = RapprochementBancaire::factory()->create([
         'compte_id' => $this->compte->id,
         'statut' => StatutRapprochement::EnCours,
         'saisi_par' => $this->user->id,
     ]);
-    $depense = Depense::factory()->create([
+    $depense = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
         'pointe' => true,
     ]);
 
-    expect(fn () => app(DepenseService::class)->delete($depense))
+    expect(fn () => app(TransactionService::class)->delete($depense))
         ->toThrow(RuntimeException::class, 'pointée');
 });
 
-test('DepenseService::delete réussit si la dépense n\'est pas pointée', function () {
-    $depense = Depense::factory()->create(['compte_id' => $this->compte->id]);
+test('TransactionService::delete réussit si la dépense n\'est pas pointée', function () {
+    $depense = Transaction::factory()->asDepense()->create(['compte_id' => $this->compte->id]);
 
-    app(DepenseService::class)->delete($depense);
+    app(TransactionService::class)->delete($depense);
 
-    expect(Depense::find($depense->id))->toBeNull();
+    expect(Transaction::find($depense->id))->toBeNull();
 });
 
-test('RecetteService::delete lève une exception si la recette est pointée', function () {
+test('TransactionService::delete lève une exception si la recette est pointée', function () {
     $rapprochement = RapprochementBancaire::factory()->create([
         'compte_id' => $this->compte->id,
         'statut' => StatutRapprochement::EnCours,
         'saisi_par' => $this->user->id,
     ]);
-    $recette = Recette::factory()->create([
+    $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
         'pointe' => true,
     ]);
 
-    expect(fn () => app(RecetteService::class)->delete($recette))
+    expect(fn () => app(TransactionService::class)->delete($recette))
         ->toThrow(RuntimeException::class, 'pointée');
 });
 
@@ -134,12 +132,12 @@ test('VirementInterneService::delete lève une exception si le virement est poin
         ->toThrow(RuntimeException::class, 'pointé');
 });
 
-test('RecetteService::delete réussit si la recette n\'est pas pointée', function () {
-    $recette = Recette::factory()->create(['compte_id' => $this->compte->id]);
+test('TransactionService::delete réussit si la recette n\'est pas pointée', function () {
+    $recette = Transaction::factory()->asRecette()->create(['compte_id' => $this->compte->id]);
 
-    app(RecetteService::class)->delete($recette);
+    app(TransactionService::class)->delete($recette);
 
-    expect(Recette::withTrashed()->find($recette->id)->deleted_at)->not->toBeNull();
+    expect(Transaction::withTrashed()->find($recette->id)->deleted_at)->not->toBeNull();
 });
 
 test('DonService::delete réussit si le don n\'est pas pointé', function () {

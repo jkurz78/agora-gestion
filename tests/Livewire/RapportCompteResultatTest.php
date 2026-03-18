@@ -3,11 +3,9 @@
 use App\Livewire\RapportCompteResultat;
 use App\Models\BudgetLine;
 use App\Models\Categorie;
-use App\Models\Depense;
-use App\Models\DepenseLigne;
-use App\Models\Recette;
-use App\Models\RecetteLigne;
 use App\Models\SousCategorie;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -32,9 +30,9 @@ it('se rend sans erreur', function () {
 it('affiche les catégories et sous-catégories', function () {
     $cat = Categorie::factory()->depense()->create(['nom' => 'Charges admin']);
     $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Fournitures']);
-    $d   = Depense::factory()->create(['date' => '2025-11-15', 'saisi_par' => $this->user->id]);
+    $d   = Transaction::factory()->asDepense()->create(['date' => '2025-11-15', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 250.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 250.00]);
 
     Livewire::test(RapportCompteResultat::class)
         ->assertSee('Charges admin')
@@ -48,13 +46,13 @@ it('affiche EXCÉDENT quand recettes > dépenses', function () {
     $scD  = SousCategorie::factory()->create(['categorie_id' => $catD->id, 'nom' => 'Frais']);
     $scR  = SousCategorie::factory()->create(['categorie_id' => $catR->id, 'nom' => 'Adhésions']);
 
-    $d = Depense::factory()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $d = Transaction::factory()->asDepense()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $scD->id, 'montant' => 100.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $scD->id, 'montant' => 100.00]);
 
-    $r = Recette::factory()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $r = Transaction::factory()->asRecette()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $r->lignes()->forceDelete();
-    RecetteLigne::factory()->create(['recette_id' => $r->id, 'sous_categorie_id' => $scR->id, 'montant' => 500.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $r->id, 'sous_categorie_id' => $scR->id, 'montant' => 500.00]);
 
     Livewire::test(RapportCompteResultat::class)->assertSeeHtml('EXC&Eacute;DENT');
 });
@@ -62,9 +60,9 @@ it('affiche EXCÉDENT quand recettes > dépenses', function () {
 it('affiche DÉFICIT quand dépenses > recettes', function () {
     $cat = Categorie::factory()->depense()->create();
     $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Lourdes charges']);
-    $d   = Depense::factory()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $d   = Transaction::factory()->asDepense()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 5000.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 5000.00]);
 
     Livewire::test(RapportCompteResultat::class)->assertSeeHtml('D&Eacute;FICIT');
 });
@@ -73,9 +71,9 @@ it('affiche la barre de budget quand un budget existe', function () {
     $cat = Categorie::factory()->depense()->create();
     $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Salle']);
     BudgetLine::factory()->create(['sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
-    $d = Depense::factory()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $d = Transaction::factory()->asDepense()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 800.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 800.00]);
 
     Livewire::test(RapportCompteResultat::class)->assertSee('80 %');
 });

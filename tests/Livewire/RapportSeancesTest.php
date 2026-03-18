@@ -2,12 +2,10 @@
 
 use App\Livewire\RapportSeances;
 use App\Models\Categorie;
-use App\Models\Depense;
-use App\Models\DepenseLigne;
 use App\Models\Operation;
-use App\Models\Recette;
-use App\Models\RecetteLigne;
 use App\Models\SousCategorie;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -40,10 +38,10 @@ it('affiche les colonnes séances et le total', function () {
     $cat = Categorie::factory()->depense()->create(['nom' => 'Charges']);
     $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Location salle']);
 
-    $d = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
-    DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
-    DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 2, 'montant' => 150.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 2, 'montant' => 150.00]);
 
     Livewire::test(RapportSeances::class)
         ->set('selectedOperationIds', [$op->id])
@@ -62,9 +60,9 @@ it('agrège les séances de même numéro sur plusieurs opérations', function (
     $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Salle']);
 
     foreach ([$op1, $op2] as $op) {
-        $d = Depense::factory()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+        $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
         $d->lignes()->forceDelete();
-        DepenseLigne::factory()->create(['depense_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
+        TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
     }
 
     Livewire::test(RapportSeances::class)

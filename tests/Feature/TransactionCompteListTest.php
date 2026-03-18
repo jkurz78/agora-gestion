@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 use App\Livewire\TransactionCompteList;
 use App\Models\CompteBancaire;
-use App\Models\Recette;
-use App\Models\Depense;
+use App\Models\Transaction;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -22,7 +21,7 @@ it('renders without compte selected', function () {
 });
 
 it('shows transactions when compte is selected', function () {
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'libelle' => 'Cotisation annuelle',
         'montant_total' => 120.00,
@@ -49,7 +48,7 @@ it('filtre par tiers', function () {
         'pour_recettes' => true,
     ]);
 
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'tiers_id' => $tiersFondation->id,
         'libelle' => 'Subvention',
@@ -57,7 +56,7 @@ it('filtre par tiers', function () {
         'date' => '2025-10-01',
         'saisi_par' => $this->user->id,
     ]);
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'tiers_id' => $tiersMairie->id,
         'libelle' => 'Autre recette',
@@ -74,7 +73,7 @@ it('filtre par tiers', function () {
 });
 
 it('supprime une recette non verrouillée', function () {
-    $recette = Recette::factory()->create([
+    $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 100.00,
         'date' => '2025-10-01',
@@ -85,7 +84,7 @@ it('supprime une recette non verrouillée', function () {
         ->set('compteId', $this->compte->id)
         ->call('deleteTransaction', 'recette', $recette->id);
 
-    $this->assertSoftDeleted('recettes', ['id' => $recette->id]);
+    $this->assertSoftDeleted('transactions', ['id' => $recette->id]);
 });
 
 it('ne supprime pas une recette verrouillée par un rapprochement', function () {
@@ -95,7 +94,7 @@ it('ne supprime pas une recette verrouillée par un rapprochement', function () 
         'verrouille_at' => now(),
         'saisi_par' => $this->user->id,
     ]);
-    $recette = Recette::factory()->create([
+    $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 100.00,
         'date' => '2025-10-01',
@@ -107,18 +106,18 @@ it('ne supprime pas une recette verrouillée par un rapprochement', function () 
         ->set('compteId', $this->compte->id)
         ->call('deleteTransaction', 'recette', $recette->id);
 
-    $this->assertDatabaseHas('recettes', ['id' => $recette->id, 'deleted_at' => null]);
+    $this->assertDatabaseHas('transactions', ['id' => $recette->id, 'deleted_at' => null]);
 });
 
 it('trie par montant', function () {
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'libelle' => 'Petite recette',
         'montant_total' => 10.00,
         'date' => '2025-10-01',
         'saisi_par' => $this->user->id,
     ]);
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'libelle' => 'Grande recette',
         'montant_total' => 1000.00,
@@ -155,7 +154,7 @@ it('reset la pagination quand le compte change', function () {
 });
 
 it('affiche la colonne N° pièce dans les transactions du compte', function () {
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'numero_piece' => '2025-2026:00042',
         'compte_id'    => $this->compte->id,
         'saisi_par'    => $this->user->id,
