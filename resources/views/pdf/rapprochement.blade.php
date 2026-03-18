@@ -293,8 +293,8 @@
             <thead>
                 <tr>
                     <th style="width: 5%;">#</th>
-                    <th style="width: 9%;">Date</th>
-                    <th style="width: 11%;">Type</th>
+                    <th style="width: 7%;">Date</th>
+                    <th style="width: 5%;">Type</th>
                     <th>Libellé</th>
                     <th>Tiers</th>
                     <th style="width: 10%;">Réf.</th>
@@ -306,19 +306,27 @@
                 @forelse ($transactions as $i => $tx)
                     <tr class="{{ $i % 2 === 1 ? 'even' : '' }}">
                         <td>{{ $tx['id'] }}</td>
-                        <td>{{ \Carbon\Carbon::parse($tx['date'])->format('d/m/Y') }}</td>
-                        <td>{{ $tx['type'] }}</td>
+                        <td>{{ \Carbon\Carbon::parse($tx['date'])->format('d/m') }}</td>
+                        <td>@switch($tx['type'])
+                            @case('Dépense') Dép @break
+                            @case('Recette') Rec @break
+                            @case('Cotisation') Cot @break
+                            @case('Don') Don @break
+                            @case('Virement sortant') Vir @break
+                            @case('Virement entrant') Vir @break
+                            @default {{ $tx['type'] }}
+                        @endswitch</td>
                         <td>{{ $tx['label'] }}</td>
                         <td>{{ $tx['tiers'] ?? '—' }}</td>
                         <td>{{ $tx['reference'] }}</td>
                         <td class="text-end text-danger">
                             @if ($tx['montant_signe'] < 0)
-                                {{ number_format(abs($tx['montant_signe']), 2, ',', ' ') }} €
+                                {{ number_format(abs($tx['montant_signe']), 2, ',', ' ') }}
                             @endif
                         </td>
                         <td class="text-end text-success">
                             @if ($tx['montant_signe'] > 0)
-                                {{ number_format($tx['montant_signe'], 2, ',', ' ') }} €
+                                {{ number_format($tx['montant_signe'], 2, ',', ' ') }}
                             @endif
                         </td>
                     </tr>
