@@ -113,7 +113,20 @@ enum TypeTransaction: string {
 **Liste :**
 - `DepenseList` + `RecetteList` → **`TransactionList`**
 - Filtre en en-tête : `Dépenses | Recettes | Toutes` (défaut : Toutes)
-- Les routes existantes `/depenses` et `/recettes` sont remplacées par `/transactions`
+- Les routes `/depenses` et `/recettes` sont remplacées par `/transactions` (paramètre `type` optionnel pour pré-sélectionner le filtre)
+
+**Menu de navigation (dropdown "Transactions") :**
+```
+Toutes          → /transactions
+Dépenses        → /transactions?type=depense
+Recettes        → /transactions?type=recette
+────────────────
+Virements       → /virements
+────────────────
+Dons            → /dons
+Cotisations     → /cotisations
+```
+Le composant `TransactionList` initialise son filtre depuis le paramètre `type` reçu en URL.
 
 **Formulaire :**
 - `DepenseForm` + `RecetteForm` → **`TransactionForm`**
