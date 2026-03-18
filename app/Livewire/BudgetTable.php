@@ -27,7 +27,7 @@ final class BudgetTable extends Component
     public bool $showExportModal = false;
     public string $exportFormat   = 'xlsx';
     public string $exportExercice = 'courant'; // 'courant' | 'suivant'
-    public string $exportSource   = 'courant'; // 'zero' | 'courant'
+    public string $exportSource   = 'courant'; // 'zero' | 'courant' | 'budget'
 
     // ── Import ────────────────────────────────────────────────────────────────
     public bool $showImportPanel = false;
@@ -93,7 +93,7 @@ final class BudgetTable extends Component
     {
         $this->validate([
             'exportFormat' => ['required', 'in:csv,xlsx'],
-            'exportSource' => ['required', 'in:zero,courant'],
+            'exportSource' => ['required', 'in:zero,courant,budget'],
         ]);
 
         $exerciceService = app(ExerciceService::class);

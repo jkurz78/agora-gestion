@@ -45,6 +45,7 @@
                         <select wire:model="exportSource" class="form-select">
                             <option value="zero">Zéro partout (cellules vides)</option>
                             <option value="courant">Réalisé exercice courant</option>
+                            <option value="budget">Budget exercice courant</option>
                         </select>
                     </div>
                 </div>

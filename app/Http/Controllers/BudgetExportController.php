@@ -18,18 +18,19 @@ final class BudgetExportController extends Controller
         $request->validate([
             'format'   => ['required', 'in:csv,xlsx'],
             'exercice' => ['required', 'integer'],
-            'source'   => ['required', 'in:zero,courant'],
+            'source'   => ['required', 'in:zero,courant,budget'],
         ]);
 
-        $exerciceCible  = (int) $request->exercice;
+        $exerciceCible   = (int) $request->exercice;
         $exerciceCourant = $exerciceService->current();
 
-        $sourceExercice = match($request->source) {
-            'zero'   => null,
-            'courant' => $exerciceCourant,
+        $source = match($request->source) {
+            'courant' => 'realise',
+            'budget'  => 'budget',
+            default   => 'zero',
         };
 
-        $rows     = $service->rows($exerciceCible, $sourceExercice);
+        $rows     = $service->rows($exerciceCible, $source, $exerciceCourant);
         $filename = 'budget-'.$exerciceService->label($exerciceCible).'.'.$request->format;
 
         if ($request->format === 'xlsx') {
