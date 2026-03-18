@@ -6,16 +6,14 @@ namespace App\Livewire;
 
 use App\Models\CompteBancaire;
 use App\Models\Cotisation;
-use App\Models\Depense;
 use App\Models\Don;
-use App\Models\Recette;
+use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\CotisationService;
-use App\Services\DepenseService;
 use App\Services\DonService;
 use App\Services\ExerciceService;
-use App\Services\RecetteService;
 use App\Services\TransactionCompteService;
+use App\Services\TransactionService;
 use App\Services\VirementInterneService;
 use App\Livewire\Concerns\WithPerPage;
 use Livewire\Component;
@@ -82,8 +80,7 @@ final class TransactionCompteList extends Component
     public function deleteTransaction(string $sourceType, int $id): void
     {
         match ($sourceType) {
-            'recette' => $this->deleteRecette($id),
-            'depense' => $this->deleteDepense($id),
+            'depense', 'recette' => $this->deleteTransactionGeneric($id),
             'don' => $this->deleteDon($id),
             'cotisation' => $this->deleteCotisation($id),
             'virement_sortant', 'virement_entrant' => $this->deleteVirement($id),
@@ -91,22 +88,17 @@ final class TransactionCompteList extends Component
         };
     }
 
-    private function deleteRecette(int $id): void
+    private function deleteTransactionGeneric(int $id): void
     {
-        $recette = Recette::find($id);
-        if (! $recette || $recette->isLockedByRapprochement()) {
+        $transaction = Transaction::find($id);
+        if (! $transaction) {
             return;
         }
-        app(RecetteService::class)->delete($recette);
-    }
-
-    private function deleteDepense(int $id): void
-    {
-        $depense = Depense::find($id);
-        if (! $depense || $depense->isLockedByRapprochement()) {
-            return;
+        try {
+            app(TransactionService::class)->delete($transaction);
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
         }
-        app(DepenseService::class)->delete($depense);
     }
 
     private function deleteDon(int $id): void
@@ -139,8 +131,7 @@ final class TransactionCompteList extends Component
     public function redirectToEdit(string $sourceType, int $id): mixed
     {
         $url = match ($sourceType) {
-            'recette' => route('recettes.index').'?edit='.$id,
-            'depense' => route('depenses.index').'?edit='.$id,
+            'depense', 'recette' => url('/transactions').'?edit='.$id,
             'don' => route('dons.index').'?edit='.$id,
             'virement_sortant', 'virement_entrant' => route('virements.index').'?edit='.$id,
             'cotisation' => $this->buildCotisationEditUrl($id),
