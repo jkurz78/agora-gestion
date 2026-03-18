@@ -144,6 +144,31 @@ it('rejette si un montant est invalide (non numérique)', function () {
     expect($result->success)->toBeFalse();
 });
 
+it('rejette un fichier sans lignes de données', function () {
+    $csv = "exercice;sous_categorie;montant_prevu\n";
+
+    BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeFalse()
+        ->and($result->errors[0]['message'])->toContain('aucune ligne');
+
+    // Le budget existant est préservé
+    expect(BudgetLine::where('exercice', 2025)->count())->toBe(1);
+});
+
+it('ignore les montants à zéro sous toutes les formes', function () {
+    $csv = "exercice;sous_categorie;montant_prevu\n"
+         . "2025;Loyers;0.0\n"
+         . "2025;Électricité;0.000\n";
+
+    $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
+
+    expect($result->success)->toBeTrue()
+        ->and($result->linesImported)->toBe(0);
+});
+
 it('n\'insère rien si validation échoue (atomicité)', function () {
     BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
 
