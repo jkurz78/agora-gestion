@@ -336,8 +336,8 @@
             <tfoot>
                 <tr>
                     <td colspan="6">Total</td>
-                    <td class="text-end text-danger">{{ number_format($totalDebit, 2, ',', ' ') }} €</td>
-                    <td class="text-end text-success">{{ number_format($totalCredit, 2, ',', ' ') }} €</td>
+                    <td class="text-end text-danger">{{ number_format($totalDebit, 2, ',', ' ') }}</td>
+                    <td class="text-end text-success">{{ number_format($totalCredit, 2, ',', ' ') }}</td>
                 </tr>
             </tfoot>
         </table>
