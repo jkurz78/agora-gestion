@@ -337,7 +337,10 @@ final class TransactionForm extends Component
         return view('livewire.transaction-form', [
             'comptes' => CompteBancaire::where('actif_recettes_depenses', true)->orderBy('nom')->get(),
             'sousCategories' => $sousCategories,
-            'operations' => Operation::where('statut', StatutOperation::EnCours)->orderBy('nom')->get(),
+            'operations' => Operation::forExercice(app(ExerciceService::class)->current())
+                ->where('statut', StatutOperation::EnCours)
+                ->orderBy('nom')
+                ->get(),
             'modesPaiement' => ModePaiement::cases(),
             'transaction_numero_piece' => $this->transactionId
                 ? Transaction::select('id', 'numero_piece')->find($this->transactionId)?->numero_piece
