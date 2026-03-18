@@ -54,6 +54,7 @@ it('redirige les invités vers login', function () {
 
 it('rejette un format invalide', function () {
     $response = $this->actingAs($this->user)
+        ->withHeaders(['Accept' => 'application/json'])
         ->get(route('budget.export', ['format' => 'pdf', 'exercice' => 2026, 'source' => 'zero']));
 
     $response->assertStatus(422);

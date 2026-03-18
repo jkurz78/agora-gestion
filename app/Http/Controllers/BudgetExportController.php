@@ -8,7 +8,6 @@ use App\Exports\BudgetExport;
 use App\Services\BudgetExportService;
 use App\Services\ExerciceService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -16,15 +15,11 @@ final class BudgetExportController extends Controller
 {
     public function __invoke(Request $request, BudgetExportService $service, ExerciceService $exerciceService): Response
     {
-        $validator = Validator::make($request->all(), [
+        $request->validate([
             'format'   => ['required', 'in:csv,xlsx'],
             'exercice' => ['required', 'integer'],
             'source'   => ['required', 'in:zero,courant,n1'],
         ]);
-
-        if ($validator->fails()) {
-            abort(422, $validator->errors()->first());
-        }
 
         $exerciceCible  = (int) $request->exercice;
         $exerciceCourant = $exerciceService->current();
