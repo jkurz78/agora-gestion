@@ -25,7 +25,7 @@ final class BudgetTable extends Component
 
     // ── Export ────────────────────────────────────────────────────────────────
     public bool $showExportModal = false;
-    public string $exportFormat   = 'csv';
+    public string $exportFormat   = 'xlsx';
     public string $exportExercice = 'courant'; // 'courant' | 'suivant'
     public string $exportSource   = 'courant'; // 'zero' | 'courant' | 'n1'
 
