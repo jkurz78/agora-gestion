@@ -6,8 +6,8 @@
         </div>
     @endif
 
-    {{-- Boutons de création --}}
-    <div class="d-flex gap-2 mb-3">
+    {{-- Boutons de création + import --}}
+    <div class="d-flex align-items-center gap-2 mb-3">
         <button wire:click="$dispatch('open-transaction-form', {type: 'depense'})"
                 class="btn btn-danger">
             <i class="bi bi-plus-lg"></i> Nouvelle dépense
@@ -16,6 +16,10 @@
                 class="btn btn-success">
             <i class="bi bi-plus-lg"></i> Nouvelle recette
         </button>
+        <div class="ms-auto d-flex gap-2">
+            <livewire:import-csv type="depense" />
+            <livewire:import-csv type="recette" />
+        </div>
     </div>
 
     {{-- Filter row --}}
