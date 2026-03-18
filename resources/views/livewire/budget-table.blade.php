@@ -83,7 +83,7 @@
                     <strong>Erreurs de validation :</strong>
                     <ul class="mb-0 mt-1">
                         @foreach ($importErrors as $error)
-                            <li>{{ $error['line'] > 0 ? "Ligne {$error['line']} : " : '' }}{{ $error['message'] }}</li>
+                            <li>{{ $error['message'] }}</li>
                         @endforeach
                     </ul>
                 </div>

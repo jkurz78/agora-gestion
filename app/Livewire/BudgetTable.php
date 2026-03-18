@@ -7,7 +7,6 @@ namespace App\Livewire;
 use App\Enums\TypeCategorie;
 use App\Models\BudgetLine;
 use App\Models\Categorie;
-use App\Services\BudgetExportService;
 use App\Services\BudgetImportService;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
@@ -92,6 +91,11 @@ final class BudgetTable extends Component
 
     public function export(): void
     {
+        $this->validate([
+            'exportFormat' => ['required', 'in:csv,xlsx'],
+            'exportSource' => ['required', 'in:zero,courant,n1'],
+        ]);
+
         $exerciceService = app(ExerciceService::class);
         $exerciceCible   = $this->exportExercice === 'suivant'
             ? $exerciceService->current() + 1
