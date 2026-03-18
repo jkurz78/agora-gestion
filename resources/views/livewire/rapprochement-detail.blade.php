@@ -103,9 +103,11 @@
         <table class="table table-sm table-hover align-middle">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
+                    <th>#</th>
                     <th>Date</th>
                     <th>Type</th>
                     <th>Libellé</th>
+                    <th>Tiers</th>
                     <th>Réf.</th>
                     <th class="text-end">Débit</th>
                     <th class="text-end">Crédit</th>
@@ -115,6 +117,7 @@
             <tbody style="color:#555">
                 @forelse ($transactions as $tx)
                     <tr class="{{ $tx['pointe'] ? 'table-success' : '' }}">
+                        <td class="text-muted small">{{ $tx['id'] }}</td>
                         <td class="text-nowrap small">{{ $tx['date']->format('d/m/Y') }}</td>
                         <td>
                             @switch($tx['type'])
@@ -127,6 +130,7 @@
                             @endswitch
                         </td>
                         <td class="small">{{ $tx['label'] }}</td>
+                        <td class="small text-muted">{{ $tx['tiers'] ?? '—' }}</td>
                         <td class="text-muted small">{{ $tx['reference'] ?? '—' }}</td>
                         <td class="text-end text-danger fw-semibold small text-nowrap">
                             @if ($tx['montant_signe'] < 0)
@@ -154,7 +158,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted">
+                        <td colspan="9" class="text-center text-muted">
                             Aucune transaction disponible pour ce compte.
                         </td>
                     </tr>
