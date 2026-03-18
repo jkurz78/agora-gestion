@@ -89,6 +89,21 @@ it('update rejette la modification de montant de ligne sur pièce verrouillée',
     )->toThrow(RuntimeException::class);
 });
 
+it('update rejette la modification de montant_total sur pièce verrouillée', function () {
+    $transaction = makeLockedTransaction($this->compte);
+    $ligne = $transaction->lignes->first();
+
+    expect(fn () => $this->service->update($transaction, [
+        'date'          => $transaction->date->format('Y-m-d'),
+        'libelle'       => $transaction->libelle,
+        'montant_total' => '999.00',
+        'mode_paiement' => $transaction->mode_paiement->value,
+        'compte_id'     => $transaction->compte_id,
+        'reference'     => $transaction->reference,
+    ], [['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
+    )->toThrow(RuntimeException::class);
+});
+
 it('update autorise la modification de sous_categorie_id de ligne sur pièce verrouillée', function () {
     $transaction = makeLockedTransaction($this->compte);
     $autreSousCategorie = SousCategorie::factory()->create();
