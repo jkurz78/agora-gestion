@@ -117,9 +117,7 @@ final class DepenseService
             if ((int) round((float) $existing->montant * 100) !== (int) round((float) $ligneData['montant'] * 100)) {
                 throw new \RuntimeException('Le montant d\'une ligne ne peut pas être modifié sur une dépense rapprochée.');
             }
-            if ((int) $existing->sous_categorie_id !== (int) $ligneData['sous_categorie_id']) {
-                throw new \RuntimeException('La sous-catégorie d\'une ligne ne peut pas être modifiée sur une dépense rapprochée.');
-            }
+
         }
     }
 
