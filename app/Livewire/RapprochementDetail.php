@@ -63,14 +63,19 @@ final class RapprochementDetail extends Component
         $dateFin = $this->rapprochement->date_fin;
 
         $transactions = collect();
+        $verrouille = $this->rapprochement->isVerrouille();
 
         // Transactions (dépenses + recettes)
         Transaction::where('compte_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin) {
-                $q->where(function ($inner) use ($dateFin) {
-                    $inner->whereNull('rapprochement_id')
-                        ->where('date', '<=', $dateFin);
-                })->orWhere('rapprochement_id', $rid);
+            ->where(function ($q) use ($rid, $dateFin, $verrouille) {
+                if ($verrouille) {
+                    $q->where('rapprochement_id', $rid);
+                } else {
+                    $q->where(function ($inner) use ($dateFin) {
+                        $inner->whereNull('rapprochement_id')
+                            ->where('date', '<=', $dateFin);
+                    })->orWhere('rapprochement_id', $rid);
+                }
             })
             ->get()
             ->each(function (Transaction $tx) use (&$transactions, $rid) {
@@ -87,11 +92,15 @@ final class RapprochementDetail extends Component
 
         // Dons
         Don::where('compte_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin) {
-                $q->where(function ($inner) use ($dateFin) {
-                    $inner->whereNull('rapprochement_id')
-                        ->where('date', '<=', $dateFin);
-                })->orWhere('rapprochement_id', $rid);
+            ->where(function ($q) use ($rid, $dateFin, $verrouille) {
+                if ($verrouille) {
+                    $q->where('rapprochement_id', $rid);
+                } else {
+                    $q->where(function ($inner) use ($dateFin) {
+                        $inner->whereNull('rapprochement_id')
+                            ->where('date', '<=', $dateFin);
+                    })->orWhere('rapprochement_id', $rid);
+                }
             })
             ->with('tiers')
             ->get()
@@ -111,11 +120,15 @@ final class RapprochementDetail extends Component
 
         // Cotisations
         Cotisation::where('compte_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin) {
-                $q->where(function ($inner) use ($dateFin) {
-                    $inner->whereNull('rapprochement_id')
-                        ->where('date_paiement', '<=', $dateFin);
-                })->orWhere('rapprochement_id', $rid);
+            ->where(function ($q) use ($rid, $dateFin, $verrouille) {
+                if ($verrouille) {
+                    $q->where('rapprochement_id', $rid);
+                } else {
+                    $q->where(function ($inner) use ($dateFin) {
+                        $inner->whereNull('rapprochement_id')
+                            ->where('date_paiement', '<=', $dateFin);
+                    })->orWhere('rapprochement_id', $rid);
+                }
             })
             ->with('membre')
             ->get()
@@ -133,11 +146,15 @@ final class RapprochementDetail extends Component
 
         // Virements sortants (source = ce compte)
         VirementInterne::where('compte_source_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin) {
-                $q->where(function ($inner) use ($dateFin) {
-                    $inner->whereNull('rapprochement_source_id')
-                        ->where('date', '<=', $dateFin);
-                })->orWhere('rapprochement_source_id', $rid);
+            ->where(function ($q) use ($rid, $dateFin, $verrouille) {
+                if ($verrouille) {
+                    $q->where('rapprochement_source_id', $rid);
+                } else {
+                    $q->where(function ($inner) use ($dateFin) {
+                        $inner->whereNull('rapprochement_source_id')
+                            ->where('date', '<=', $dateFin);
+                    })->orWhere('rapprochement_source_id', $rid);
+                }
             })
             ->with('compteDestination')
             ->get()
@@ -155,11 +172,15 @@ final class RapprochementDetail extends Component
 
         // Virements entrants (destination = ce compte)
         VirementInterne::where('compte_destination_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin) {
-                $q->where(function ($inner) use ($dateFin) {
-                    $inner->whereNull('rapprochement_destination_id')
-                        ->where('date', '<=', $dateFin);
-                })->orWhere('rapprochement_destination_id', $rid);
+            ->where(function ($q) use ($rid, $dateFin, $verrouille) {
+                if ($verrouille) {
+                    $q->where('rapprochement_destination_id', $rid);
+                } else {
+                    $q->where(function ($inner) use ($dateFin) {
+                        $inner->whereNull('rapprochement_destination_id')
+                            ->where('date', '<=', $dateFin);
+                    })->orWhere('rapprochement_destination_id', $rid);
+                }
             })
             ->with('compteSource')
             ->get()
