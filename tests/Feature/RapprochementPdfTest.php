@@ -115,6 +115,7 @@ it('télécharge le PDF avec un nom de fichier structuré', function () {
     expect($contentDisposition)->toContain('attachment');
     expect($contentDisposition)->toContain('SVS Association');
     expect($contentDisposition)->toContain('Compte Test');
+    expect($contentDisposition)->toContain($this->rapprochement->date_fin->format('Y-m-d'));
 });
 
 it('ouvre le PDF inline avec ?mode=inline', function () {
