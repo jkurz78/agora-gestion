@@ -39,7 +39,7 @@ it('télécharge un CSV budget', function () {
 
     $response->assertOk();
     $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
-    $response->assertDownload('budget-2026.csv');
+    $response->assertDownload('budget-2026-2027.csv');
 
     expect($response->getContent())
         ->toContain('exercice;sous_categorie;montant_prevu')
@@ -60,7 +60,7 @@ it('télécharge un Excel budget', function () {
         ->get(route('budget.export', ['format' => 'xlsx', 'exercice' => 2026, 'source' => 'courant']));
 
     $response->assertOk();
-    $response->assertDownload('budget-2026.xlsx');
+    $response->assertDownload('budget-2026-2027.xlsx');
 });
 
 it('redirige les invités vers login', function () {

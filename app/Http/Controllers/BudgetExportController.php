@@ -31,7 +31,7 @@ final class BudgetExportController extends Controller
         };
 
         $rows     = $service->rows($exerciceCible, $sourceExercice);
-        $filename = "budget-{$exerciceCible}.{$request->format}";
+        $filename = 'budget-'.$exerciceService->label($exerciceCible).'.'.$request->format;
 
         if ($request->format === 'xlsx') {
             return Excel::download(new BudgetExport($rows), $filename);
