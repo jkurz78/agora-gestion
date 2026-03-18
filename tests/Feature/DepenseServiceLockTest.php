@@ -87,20 +87,21 @@ it('update rejette la modification de montant de ligne sur pièce verrouillée',
     )->toThrow(RuntimeException::class);
 });
 
-it('update rejette la modification de sous_categorie_id de ligne sur pièce verrouillée', function () {
+it('update autorise la modification de sous_categorie_id de ligne sur pièce verrouillée', function () {
     $depense = makeLockedDepense($this->compte);
     $autreSousCategorie = SousCategorie::factory()->create();
     $ligne = $depense->lignes->first();
 
-    expect(fn () => $this->service->update($depense, [
+    $this->service->update($depense, [
         'date' => $depense->date->format('Y-m-d'),
         'libelle' => $depense->libelle,
         'montant_total' => $depense->montant_total,
         'mode_paiement' => $depense->mode_paiement->value,
         'compte_id' => $depense->compte_id,
         'reference' => $depense->reference,
-    ], [['id' => $ligne->id, 'sous_categorie_id' => $autreSousCategorie->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
-    )->toThrow(RuntimeException::class);
+    ], [['id' => $ligne->id, 'sous_categorie_id' => $autreSousCategorie->id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null]]);
+
+    expect($ligne->fresh()->sous_categorie_id)->toBe($autreSousCategorie->id);
 });
 
 it('update rejette l\'ajout d\'une ligne sur pièce verrouillée', function () {
