@@ -43,8 +43,8 @@ it('télécharge un CSV budget', function () {
     $response->assertDownload('budget-2026-2027.csv');
 
     expect($response->getContent())
-        ->toContain('exercice;sous_categorie;montant_prevu')
-        ->toContain('2026-2027;Loyers;1200.00');
+        ->toContain('exercice;categorie;sous_categorie;montant_prevu')
+        ->toContain('2026-2027;Charges;Loyers;1200.00');
 });
 
 it('source zero produit des montants vides dans le CSV', function () {
@@ -52,7 +52,7 @@ it('source zero produit des montants vides dans le CSV', function () {
         ->get(route('budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'zero']));
 
     $response->assertOk();
-    expect($response->getContent())->toContain('2026-2027;Loyers;');
+    expect($response->getContent())->toContain('2026-2027;Charges;Loyers;');
     expect($response->getContent())->not->toContain('1200');
 });
 
@@ -72,7 +72,7 @@ it('source budget exporte les montants_prevu', function () {
         ->get(route('budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'budget']));
 
     $response->assertOk();
-    expect($response->getContent())->toContain('2026-2027;Loyers;900.00');
+    expect($response->getContent())->toContain('2026-2027;Charges;Loyers;900.00');
 });
 
 it('redirige les invités vers login', function () {

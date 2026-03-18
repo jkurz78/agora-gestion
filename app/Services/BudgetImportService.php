@@ -14,7 +14,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 final class BudgetImportService
 {
-    private const EXPECTED_HEADERS = ['exercice', 'sous_categorie', 'montant_prevu'];
+    private const EXPECTED_HEADERS = ['exercice', 'categorie', 'sous_categorie', 'montant_prevu'];
 
     public function import(UploadedFile $file, int $exercice): BudgetImportResult
     {
@@ -55,8 +55,9 @@ final class BudgetImportService
         foreach ($dataRows as $idx => $row) {
             $lineNum       = $idx + 2;
             $exerciceCell  = trim((string) ($row[0] ?? ''));
-            $scNom         = trim((string) ($row[1] ?? ''));
-            $montantCell   = trim((string) ($row[2] ?? ''));
+            // col 1 = categorie — ignorée à l'import (lecture seule)
+            $scNom         = trim((string) ($row[2] ?? ''));
+            $montantCell   = trim((string) ($row[3] ?? ''));
 
             // Exercice : accepte "2025" ou "2025-2026"
             $exerciceCellYear = str_contains($exerciceCell, '-')
@@ -107,8 +108,8 @@ final class BudgetImportService
             BudgetLine::where('exercice', $exercice)->delete();
 
             foreach ($dataRows as $row) {
-                $scNom       = trim((string) ($row[1] ?? ''));
-                $montantCell = trim((string) ($row[2] ?? ''));
+                $scNom       = trim((string) ($row[2] ?? ''));
+                $montantCell = trim((string) ($row[3] ?? ''));
 
                 // Ignorer montant vide ou zéro
                 if ($montantCell === '' || $montantCell === '0' || $montantCell === '0.00') {
