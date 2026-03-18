@@ -56,7 +56,10 @@ return new class extends Migration
         });
 
         // ── 2. Migration des données ──────────────────────────────────────────
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        $isMySQL = DB::getDriverName() === 'mysql';
+        if ($isMySQL) {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        }
         try {
             DB::statement("
                 INSERT INTO transactions
@@ -126,7 +129,9 @@ return new class extends Migration
             // Les anciennes tables sont conservées intentionnellement comme filet de sécurité.
             // Elles seront supprimées par la Migration B après validation en production.
         } finally {
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            if ($isMySQL) {
+                DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            }
         }
     }
 

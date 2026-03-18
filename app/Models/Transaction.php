@@ -78,6 +78,18 @@ final class Transaction extends Model
         return $this->hasMany(TransactionLigne::class);
     }
 
+    public function montantSigne(): float
+    {
+        $montant = (float) $this->montant_total;
+        return $this->type === TypeTransaction::Depense ? -$montant : $montant;
+    }
+
+    public function isLockedByRapprochement(): bool
+    {
+        return $this->rapprochement_id !== null
+            && $this->rapprochement?->isVerrouille() === true;
+    }
+
     /**
      * @param  Builder<Transaction>  $query
      */
