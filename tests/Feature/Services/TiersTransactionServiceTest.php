@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Models\Depense;
-use App\Models\Don;
 use App\Models\Cotisation;
-use App\Models\Recette;
+use App\Models\Don;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Services\TiersTransactionService;
 
 beforeEach(function (): void {
@@ -16,7 +15,7 @@ beforeEach(function (): void {
 });
 
 it('retourne les transactions de tous les types pour un tiers', function (): void {
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma dépense']);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma dépense']);
     Don::factory()->create(['tiers_id' => $this->tiers->id, 'objet' => 'Mon don']);
 
     $result = $this->service->paginate($this->tiers, '', '', '', '', 'date', 'desc');
@@ -25,7 +24,7 @@ it('retourne les transactions de tous les types pour un tiers', function (): voi
 });
 
 it('filtre par type', function (): void {
-    Depense::factory()->create(['tiers_id' => $this->tiers->id]);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id]);
     Don::factory()->create(['tiers_id' => $this->tiers->id]);
 
     $result = $this->service->paginate($this->tiers, 'don', '', '', '', 'date', 'desc');
@@ -35,8 +34,8 @@ it('filtre par type', function (): void {
 });
 
 it('filtre par texte sur le libellé', function (): void {
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Frais transport']);
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Loyer bureau']);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Frais transport']);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Loyer bureau']);
 
     $result = $this->service->paginate($this->tiers, '', '', '', 'Loyer', 'date', 'desc');
 
@@ -44,8 +43,8 @@ it('filtre par texte sur le libellé', function (): void {
 });
 
 it('filtre par date début', function (): void {
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-10-01']);
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-12-01']);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-10-01']);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-12-01']);
 
     $result = $this->service->paginate($this->tiers, '', '2025-11-01', '', '', 'date', 'desc');
 
@@ -53,7 +52,7 @@ it('filtre par date début', function (): void {
 });
 
 it('exclut les transactions soft-deletées', function (): void {
-    $dep = Depense::factory()->create(['tiers_id' => $this->tiers->id]);
+    $dep = Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id]);
     $dep->delete();
 
     $result = $this->service->paginate($this->tiers, '', '', '', '', 'date', 'desc');
@@ -63,7 +62,7 @@ it('exclut les transactions soft-deletées', function (): void {
 
 it('ne retourne pas les transactions d\'un autre tiers', function (): void {
     $autre = Tiers::factory()->create();
-    Depense::factory()->create(['tiers_id' => $autre->id]);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $autre->id]);
 
     $result = $this->service->paginate($this->tiers, '', '', '', '', 'date', 'desc');
 
@@ -71,8 +70,8 @@ it('ne retourne pas les transactions d\'un autre tiers', function (): void {
 });
 
 it('trie par montant desc', function (): void {
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'montant_total' => 100]);
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'montant_total' => 50]);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'montant_total' => 100]);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'montant_total' => 50]);
 
     $result = $this->service->paginate($this->tiers, '', '', '', '', 'montant', 'desc');
 
@@ -80,7 +79,7 @@ it('trie par montant desc', function (): void {
 });
 
 it('inclut les recettes du tiers', function (): void {
-    Recette::factory()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma recette']);
+    Transaction::factory()->asRecette()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma recette']);
 
     $result = $this->service->paginate($this->tiers, '', '', '', '', 'date', 'desc');
 
@@ -98,8 +97,8 @@ it('inclut les cotisations du tiers', function (): void {
 });
 
 it('filtre par date fin', function (): void {
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-10-01']);
-    Depense::factory()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-12-01']);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-10-01']);
+    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'date' => '2025-12-01']);
 
     $result = $this->service->paginate($this->tiers, '', '', '2025-11-01', '', 'date', 'desc');
 

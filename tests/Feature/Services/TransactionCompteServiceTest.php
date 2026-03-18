@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 use App\Models\CompteBancaire;
 use App\Models\Cotisation;
-use App\Models\Depense;
 use App\Models\Don;
-use App\Models\Recette;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\TransactionCompteService;
@@ -23,7 +22,7 @@ beforeEach(function () {
 });
 
 it('retourne une recette avec montant positif', function () {
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 200.00,
         'date' => '2025-10-01',
@@ -48,7 +47,7 @@ it('retourne une recette avec montant positif', function () {
 });
 
 it('retourne une depense avec montant negatif', function () {
-    Depense::factory()->create([
+    Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 150.00,
         'date' => '2025-10-02',
@@ -186,13 +185,13 @@ it('un virement depuis B vers compte A apparaît sur A comme virement_entrant po
 });
 
 it('filtre par date : seules les transactions dans la plage apparaissent', function () {
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 100.00,
         'date' => '2025-09-15',
         'saisi_par' => $this->user->id,
     ]);
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 200.00,
         'date' => '2025-11-01',
@@ -227,14 +226,14 @@ it('filtre par tiers : seules les transactions correspondantes apparaissent', fu
         'pour_recettes' => true,
     ]);
 
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'tiers_id' => $tiersTartempion->id,
         'montant_total' => 100.00,
         'date' => '2025-10-10',
         'saisi_par' => $this->user->id,
     ]);
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'tiers_id' => $tiersLyon->id,
         'montant_total' => 200.00,
@@ -259,7 +258,7 @@ it('filtre par tiers : seules les transactions correspondantes apparaissent', fu
 });
 
 it('les recettes soft-deleted n\'apparaissent pas', function () {
-    $recette = Recette::factory()->create([
+    $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 100.00,
         'date' => '2025-10-10',
@@ -300,7 +299,7 @@ it('soldeAvantPage sur page 1 est égal à solde_initial', function () {
 it('soldeAvantPage sur page 2 est égal à solde_initial + somme des 15 premières transactions', function () {
     // Créer 16 recettes pour avoir au moins 2 pages
     for ($i = 1; $i <= 16; $i++) {
-        Recette::factory()->create([
+        Transaction::factory()->asRecette()->create([
             'compte_id' => $this->compte->id,
             'montant_total' => 10.00,
             'date' => '2025-10-'.str_pad((string) $i, 2, '0', STR_PAD_LEFT),
@@ -325,19 +324,19 @@ it('soldeAvantPage sur page 2 est égal à solde_initial + somme des 15 premièr
 
 it('accumule le solde_courant ligne par ligne sur la page courante', function () {
     // 3 transactions : +100, -30, +50 → soldes cumulés attendus : 1100, 1070, 1120
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 100.00,
         'date' => '2025-10-01',
         'saisi_par' => $this->user->id,
     ]);
-    Depense::factory()->create([
+    Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 30.00,
         'date' => '2025-10-02',
         'saisi_par' => $this->user->id,
     ]);
-    Recette::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 50.00,
         'date' => '2025-10-03',
