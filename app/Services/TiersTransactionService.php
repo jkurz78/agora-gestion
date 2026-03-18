@@ -22,17 +22,11 @@ final class TiersTransactionService
     ): LengthAwarePaginator {
         $id = $tiers->id;
 
-        $recettes = DB::table('recettes as r')
-            ->leftJoin('comptes_bancaires as cb', 'cb.id', '=', 'r.compte_id')
-            ->selectRaw("r.id, 'recette' as source_type, r.date, r.libelle, cb.nom as compte, r.montant_total as montant")
-            ->where('r.tiers_id', $id)
-            ->whereNull('r.deleted_at');
-
-        $depenses = DB::table('depenses as d')
-            ->leftJoin('comptes_bancaires as cb', 'cb.id', '=', 'd.compte_id')
-            ->selectRaw("d.id, 'depense' as source_type, d.date, d.libelle, cb.nom as compte, d.montant_total as montant")
-            ->where('d.tiers_id', $id)
-            ->whereNull('d.deleted_at');
+        $transactions = DB::table('transactions as tx')
+            ->leftJoin('comptes_bancaires as cb', 'cb.id', '=', 'tx.compte_id')
+            ->selectRaw("tx.id, tx.type as source_type, tx.date, tx.libelle, cb.nom as compte, CASE WHEN tx.type = 'depense' THEN -(tx.montant_total) ELSE tx.montant_total END as montant")
+            ->where('tx.tiers_id', $id)
+            ->whereNull('tx.deleted_at');
 
         $dons = DB::table('dons as dn')
             ->leftJoin('comptes_bancaires as cb', 'cb.id', '=', 'dn.compte_id')
@@ -46,8 +40,7 @@ final class TiersTransactionService
             ->where('c.tiers_id', $id)
             ->whereNull('c.deleted_at');
 
-        $union = $recettes
-            ->unionAll($depenses)
+        $union = $transactions
             ->unionAll($dons)
             ->unionAll($cotisations);
 

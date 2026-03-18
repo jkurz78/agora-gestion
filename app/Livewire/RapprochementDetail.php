@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Models\Cotisation;
-use App\Models\Depense;
 use App\Models\Don;
 use App\Models\RapprochementBancaire;
-use App\Models\Recette;
+use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
 use Illuminate\View\View;
@@ -65,8 +64,8 @@ final class RapprochementDetail extends Component
 
         $transactions = collect();
 
-        // Dépenses
-        Depense::where('compte_id', $compte->id)
+        // Transactions (dépenses + recettes)
+        Transaction::where('compte_id', $compte->id)
             ->where(function ($q) use ($rid, $dateFin) {
                 $q->where(function ($inner) use ($dateFin) {
                     $inner->whereNull('rapprochement_id')
@@ -74,36 +73,15 @@ final class RapprochementDetail extends Component
                 })->orWhere('rapprochement_id', $rid);
             })
             ->get()
-            ->each(function (Depense $d) use (&$transactions, $rid) {
+            ->each(function (Transaction $tx) use (&$transactions, $rid) {
                 $transactions->push([
-                    'id' => $d->id,
-                    'type' => 'depense',
-                    'date' => $d->date,
-                    'label' => $d->libelle,
-                    'reference' => $d->reference,
-                    'montant_signe' => -(float) $d->montant_total,
-                    'pointe' => (int) $d->rapprochement_id === $rid,
-                ]);
-            });
-
-        // Recettes
-        Recette::where('compte_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin) {
-                $q->where(function ($inner) use ($dateFin) {
-                    $inner->whereNull('rapprochement_id')
-                        ->where('date', '<=', $dateFin);
-                })->orWhere('rapprochement_id', $rid);
-            })
-            ->get()
-            ->each(function (Recette $r) use (&$transactions, $rid) {
-                $transactions->push([
-                    'id' => $r->id,
-                    'type' => 'recette',
-                    'date' => $r->date,
-                    'label' => $r->libelle,
-                    'reference' => $r->reference,
-                    'montant_signe' => (float) $r->montant_total,
-                    'pointe' => (int) $r->rapprochement_id === $rid,
+                    'id' => $tx->id,
+                    'type' => $tx->type->value,
+                    'date' => $tx->date,
+                    'label' => $tx->libelle,
+                    'reference' => $tx->reference,
+                    'montant_signe' => $tx->montantSigne(),
+                    'pointe' => (int) $tx->rapprochement_id === $rid,
                 ]);
             });
 
