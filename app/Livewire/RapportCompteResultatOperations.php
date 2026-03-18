@@ -45,7 +45,7 @@ final class RapportCompteResultatOperations extends Component
     public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();
-        $operations = Operation::orderBy('nom')->get();
+        $operations = Operation::forExercice($exercice)->orderBy('nom')->get();
         $charges = [];
         $produits = [];
         $totalChargesN = 0.0;

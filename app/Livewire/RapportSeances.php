@@ -53,7 +53,8 @@ final class RapportSeances extends Component
 
     public function render(): mixed
     {
-        $operations = Operation::whereNotNull('nombre_seances')
+        $exercice = app(ExerciceService::class)->current();
+        $operations = Operation::forExercice($exercice)->whereNotNull('nombre_seances')
             ->where('nombre_seances', '>', 0)
             ->orderBy('nom')
             ->get();
@@ -65,7 +66,6 @@ final class RapportSeances extends Component
         $totalProduitsN = 0.0;
 
         if (! empty($this->selectedOperationIds)) {
-            $exercice = app(ExerciceService::class)->current();
             $data = app(RapportService::class)->rapportSeances($exercice, $this->selectedOperationIds);
             $seances = $data['seances'];
             $charges = $data['charges'];
