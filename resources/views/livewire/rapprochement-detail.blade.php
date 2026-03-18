@@ -160,7 +160,7 @@
             </thead>
             <tbody style="color:#555">
                 @forelse ($transactions as $tx)
-                    <tr class="{{ $tx['pointe'] ? 'table-success' : '' }}">
+                    <tr wire:key="{{ $tx['type'] }}-{{ $tx['id'] }}" class="{{ $tx['pointe'] ? 'table-success' : '' }}">
                         <td class="text-muted small">{{ $tx['id'] }}</td>
                         <td class="text-nowrap small">{{ $tx['date']->format('d/m/Y') }}</td>
                         <td>
