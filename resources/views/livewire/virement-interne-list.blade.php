@@ -27,9 +27,13 @@
                         <tr wire:key="virement-{{ $virement->id }}">
                             <td>{{ $virement->date->format('d/m/Y') }}</td>
                             <td>
-                                {{ $virement->reference ?? '—' }}
                                 @if(!empty($virement->notes))
-                                    <i class="bi bi-chat-right-text text-muted ms-1" data-bs-toggle="tooltip" data-bs-title="{{ $virement->notes }}"></i>
+                                    <span data-bs-toggle="tooltip" data-bs-title="{{ $virement->notes }}" style="cursor:default">
+                                        {{ $virement->reference ?? '—' }}
+                                        <i class="bi bi-chat-left-text text-muted ms-1"></i>
+                                    </span>
+                                @else
+                                    {{ $virement->reference ?? '—' }}
                                 @endif
                             </td>
                             <td>{{ $virement->compteSource->nom }}</td>
