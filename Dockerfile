@@ -12,7 +12,8 @@ RUN apk add --no-cache \
     freetype-dev \
     libzip-dev \
     oniguruma-dev \
-    mysql-client
+    mysql-client \
+    supervisor
 
 # Extensions PHP
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -44,5 +45,8 @@ RUN mkdir -p storage/app/public storage/logs storage/framework/cache storage/fra
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-EXPOSE 9000
-CMD ["php-fpm"]
+COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
+COPY docker/supervisord.conf /etc/supervisord.conf
+
+EXPOSE 80
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
