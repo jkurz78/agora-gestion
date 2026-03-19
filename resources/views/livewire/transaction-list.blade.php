@@ -110,7 +110,12 @@
                             @endif
                         </td>
                         <td class="text-muted small">{{ $transaction->reference ?? '—' }}</td>
-                        <td class="small">{{ $transaction->libelle }}</td>
+                        <td class="small">
+                            {{ $transaction->libelle }}
+                            @if(!empty($transaction->notes))
+                                <i class="bi bi-sticky text-muted ms-1" title="{{ $transaction->notes }}"></i>
+                            @endif
+                        </td>
                         <td class="small">@if($transaction->tiers)<span style="font-size:.7rem">{{ $transaction->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $transaction->tiers->displayName() }}@else—@endif</td>
                         <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $transaction->mode_paiement->label() }}</span></td>
                         <td class="text-end fw-semibold text-nowrap small">
