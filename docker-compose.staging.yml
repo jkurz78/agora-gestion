@@ -27,6 +27,7 @@ services:
   db:
     image: mysql:8.0
     restart: unless-stopped
+    command: --require-secure-transport=0
     environment:
       MYSQL_DATABASE: ${DB_DATABASE}
       MYSQL_USER: ${DB_USERNAME}
