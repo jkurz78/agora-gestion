@@ -50,7 +50,7 @@ ssh o2switch "mysqldump \
     --no-tablespaces \
     $DB_DATABASE" \
 | ssh nas "/usr/local/bin/docker compose -f $NAS_COMPOSE exec -T db \
-    mysql --user=root --password='$STAGING_ROOT_PASS' $STAGING_DB"
+    mariadb --user=root --password='$STAGING_ROOT_PASS' $STAGING_DB"
 
 echo "==> Import terminé."
 
@@ -58,7 +58,7 @@ echo "==> Import terminé."
 echo "==> Anonymisation des données personnelles..."
 cat "$SCRIPT_DIR/anonymize-tiers.sql" \
 | ssh nas "/usr/local/bin/docker compose -f $NAS_COMPOSE exec -T db \
-    mysql --user=root --password='$STAGING_ROOT_PASS' $STAGING_DB"
+    mariadb --user=root --password='$STAGING_ROOT_PASS' $STAGING_DB"
 
 echo "==> Anonymisation terminée."
 
