@@ -74,29 +74,26 @@
                         <td class="small text-muted">{{ $don->operation?->nom ?? '-' }}</td>
                         <td>
                             @if ($don->pointe)
-                                <span class="badge bg-success">Oui</span>
+                                <i class="bi bi-check-lg text-success"></i>
                             @else
-                                <span class="badge bg-secondary">Non</span>
+                                <span class="text-muted">—</span>
                             @endif
                         </td>
                         <td>
                             <div class="d-flex gap-1 justify-content-end">
                                 <button wire:click="$dispatch('edit-don', { id: {{ $don->id }} })"
-                                        class="btn btn-sm btn-outline-primary" title="Modifier"
-                                        style="padding:.15rem .35rem;font-size:.75rem">
+                                        class="btn btn-sm btn-outline-primary" title="Modifier">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 @if ($don->pointe)
                                     <button class="btn btn-sm btn-outline-danger" disabled
-                                            title="Dépointez ce don avant de le supprimer."
-                                            style="padding:.15rem .35rem;font-size:.75rem">
+                                            title="Dépointez ce don avant de le supprimer.">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 @else
                                     <button wire:click="delete({{ $don->id }})"
                                             wire:confirm="Supprimer ce don ?"
-                                            class="btn btn-sm btn-outline-danger" title="Supprimer"
-                                            style="padding:.15rem .35rem;font-size:.75rem">
+                                            class="btn btn-sm btn-outline-danger" title="Supprimer">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 @endif
