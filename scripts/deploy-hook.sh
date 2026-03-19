@@ -18,7 +18,7 @@ while read oldrev newrev ref; do
 
         # Extraire les fichiers dans le répertoire de déploiement
         # Chemin absolu car $HOME peut être vide dans le contexte git hook
-        git --work-tree="$DEPLOY_DIR" --git-dir="/home/jurgen/repos/svs-accounting.git" checkout -f staging
+        git --work-tree="$DEPLOY_DIR" --git-dir="***NAS_HOME***/repos/svs-accounting.git" checkout -f staging
 
         cd "$DEPLOY_DIR"
 
