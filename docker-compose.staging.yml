@@ -16,6 +16,11 @@ services:
   db:
     image: mariadb:11
     restart: unless-stopped
+    command:
+      - --innodb_buffer_pool_size=512M
+      - --innodb_flush_log_at_trx_commit=2
+      - --innodb_flush_method=O_DIRECT
+      - --skip-name-resolve
     environment:
       MARIADB_DATABASE: ${DB_DATABASE}
       MARIADB_USER: ${DB_USERNAME}
