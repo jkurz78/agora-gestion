@@ -22,9 +22,28 @@ while read oldrev newrev ref; do
 
         cd "$DEPLOY_DIR"
 
+        # Stamper la version avant le build (git n'est pas dispo dans le container)
+        _RAW_TAG=$(/usr/local/bin/git --git-dir="/volume1/homes/jurgen/repos/svs-accounting.git" describe --tags 2>/dev/null || echo '')
+        GIT_TAG=$([[ "$_RAW_TAG" =~ ^v[0-9] ]] && echo "$_RAW_TAG" || echo 'staging')
+        GIT_DATE=$(/usr/local/bin/git --git-dir="/volume1/homes/jurgen/repos/svs-accounting.git" log -1 --format=%as 2>/dev/null || date +%Y-%m-%d)
+        GIT_YEAR=$(echo "$GIT_DATE" | cut -c1-4)
+        printf "<?php\nreturn array (\n  'tag' => '%s',\n  'date' => '%s',\n  'year' => '%s',\n);\n" \
+            "$GIT_TAG" "$GIT_DATE" "$GIT_YEAR" > "$DEPLOY_DIR/config/version.php"
+
+        # Auto-mise à jour du hook lui-même
+        cp "$DEPLOY_DIR/scripts/deploy-hook.sh" "/volume1/homes/jurgen/repos/svs-accounting.git/hooks/post-receive"
+        chmod +x "/volume1/homes/jurgen/repos/svs-accounting.git/hooks/post-receive"
+
         # Rebuild et restart
         /usr/local/bin/docker compose -f "$COMPOSE_FILE" build app
         /usr/local/bin/docker compose -f "$COMPOSE_FILE" up -d
+
+        # Attendre que MySQL soit prêt avant les migrations
+        echo "==> Attente de MySQL..."
+        until /usr/local/bin/docker compose -f "$COMPOSE_FILE" exec -T db mysqladmin ping -h localhost --silent 2>/dev/null; do
+            sleep 3
+        done
+        echo "==> MySQL prêt."
 
         # Migrations
         /usr/local/bin/docker compose -f "$COMPOSE_FILE" exec -T app php artisan migrate --force
