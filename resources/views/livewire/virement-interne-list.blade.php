@@ -29,7 +29,7 @@
                             <td>
                                 {{ $virement->reference ?? '—' }}
                                 @if(!empty($virement->notes))
-                                    <i class="bi bi-sticky text-muted ms-1" title="{{ $virement->notes }}"></i>
+                                    <i class="bi bi-sticky text-warning ms-1" data-bs-toggle="tooltip" data-bs-title="{{ $virement->notes }}"></i>
                                 @endif
                             </td>
                             <td>{{ $virement->compteSource->nom }}</td>
