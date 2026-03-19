@@ -1,4 +1,4 @@
-FROM php:8.3-fpm-alpine
+FROM php:8.4-fpm-alpine
 
 # Dépendances système
 RUN apk add --no-cache \
@@ -12,7 +12,8 @@ RUN apk add --no-cache \
     freetype-dev \
     libzip-dev \
     oniguruma-dev \
-    mysql-client
+    mysql-client \
+    supervisor
 
 # Extensions PHP
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -30,6 +31,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-script
 # Code source
 COPY . .
 
+# Supprimer le schema dump (évite le problème SSL client MariaDB vs MySQL 8.0)
+RUN rm -f database/schema/mysql-schema.sql
+
 # Scripts post-install
 RUN composer run-script post-autoload-dump || true \
     && php artisan config:cache \
@@ -41,5 +45,8 @@ RUN mkdir -p storage/app/public storage/logs storage/framework/cache storage/fra
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-EXPOSE 9000
-CMD ["php-fpm"]
+COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
+COPY docker/supervisord.conf /etc/supervisord.conf
+
+EXPOSE 80
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
