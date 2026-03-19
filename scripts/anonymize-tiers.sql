@@ -11,6 +11,6 @@ UPDATE tiers SET
 
 -- Anonymise aussi les utilisateurs (sauf l'admin de staging créé manuellement)
 UPDATE users SET
-    name  = CONCAT('User-', id),
+    nom   = CONCAT('User-', id),
     email = CONCAT('user', id, '@example.com')
 WHERE email NOT LIKE '%@svs.fr';
