@@ -24,20 +24,20 @@ final class VersionStampCommand extends Command
     }
 
     /**
-     * @return array{tag: string, date: string}
+     * @return array{tag: string, date: string, year: string}
      */
     public static function readGitVersion(): array
     {
-        exec('git rev-list --count HEAD 2>/dev/null', $countOutput, $countCode);
-        exec('git rev-parse --short HEAD 2>/dev/null', $shaOutput, $shaCode);
+        exec('git describe --tags --always 2>/dev/null', $tagOutput, $tagCode);
+        exec('git log -1 --format=%as 2>/dev/null', $dateOutput, $dateCode);
 
-        $build = ($countCode === 0 && isset($countOutput[0])) ? trim($countOutput[0]) : '0';
-        $sha   = ($shaCode === 0 && isset($shaOutput[0])) ? trim($shaOutput[0]) : 'unknown';
+        $tag  = ($tagCode === 0 && isset($tagOutput[0])) ? trim($tagOutput[0]) : 'dev';
+        $date = ($dateCode === 0 && isset($dateOutput[0])) ? trim($dateOutput[0]) : date('Y-m-d');
 
         return [
-            'tag'  => 'v1.01.' . $build,
-            'date' => $sha,
-            'year' => date('Y'),
+            'tag'  => $tag,
+            'date' => $date,
+            'year' => substr($date, 0, 4),
         ];
     }
 
