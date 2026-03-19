@@ -12,7 +12,7 @@ beforeEach(function () {
     session(['exercice_actif' => 2025]);
 });
 
-it('affiche bi-sticky accolé au libellé si la transaction a des notes', function () {
+it('affiche bi-chat-left-text accolé au libellé si la transaction a des notes', function () {
     Transaction::factory()->asDepense()->create([
         'libelle' => 'Loyer octobre',
         'notes'   => 'Provision incluse dans le loyer',
@@ -20,11 +20,11 @@ it('affiche bi-sticky accolé au libellé si la transaction a des notes', functi
     ]);
 
     Livewire::test(TransactionList::class)
-        ->assertSeeHtml('bi bi-sticky')
+        ->assertSeeHtml('bi bi-chat-left-text')
         ->assertSeeHtml('title="Provision incluse dans le loyer"');
 });
 
-it('n\'affiche pas bi-sticky si notes est null', function () {
+it('n\'affiche pas bi-chat-left-text si notes est null', function () {
     Transaction::factory()->asDepense()->create([
         'libelle' => 'Loyer octobre',
         'notes'   => null,
@@ -32,10 +32,10 @@ it('n\'affiche pas bi-sticky si notes est null', function () {
     ]);
 
     Livewire::test(TransactionList::class)
-        ->assertDontSeeHtml('bi bi-sticky');
+        ->assertDontSeeHtml('bi bi-chat-left-text');
 });
 
-it('n\'affiche pas bi-sticky si notes est une chaîne vide', function () {
+it('n\'affiche pas bi-chat-left-text si notes est une chaîne vide', function () {
     Transaction::factory()->asDepense()->create([
         'libelle' => 'Loyer octobre',
         'notes'   => '',
@@ -43,5 +43,5 @@ it('n\'affiche pas bi-sticky si notes est une chaîne vide', function () {
     ]);
 
     Livewire::test(TransactionList::class)
-        ->assertDontSeeHtml('bi bi-sticky');
+        ->assertDontSeeHtml('bi bi-chat-left-text');
 });
