@@ -30,6 +30,9 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-script
 # Code source
 COPY . .
 
+# Supprimer le schema dump (évite le problème SSL client MariaDB vs MySQL 8.0)
+RUN rm -f database/schema/mysql-schema.sql
+
 # Scripts post-install
 RUN composer run-script post-autoload-dump || true \
     && php artisan config:cache \
