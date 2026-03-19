@@ -26,14 +26,14 @@
     {{-- Tableau --}}
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle">
-            <thead class="table-light">
-                <tr>
+            <thead>
+                <tr class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                     <th>Nom</th>
                     <th>Type</th>
                     <th>Email</th>
                     <th>Telephone</th>
-                    <th class="text-center">Depenses</th>
-                    <th class="text-center">Recettes</th>
+                    <th class="text-center">Dép.</th>
+                    <th class="text-center">Rec.</th>
                     <th></th>
                 </tr>
             </thead>
@@ -50,12 +50,16 @@
                         <td>{{ $tiers->telephone ?? '-' }}</td>
                         <td class="text-center">
                             @if ($tiers->pour_depenses)
-                                <span class="badge bg-danger">Oui</span>
+                                <i class="bi bi-check-lg text-success"></i>
+                            @else
+                                <span class="text-muted">—</span>
                             @endif
                         </td>
                         <td class="text-center">
                             @if ($tiers->pour_recettes)
-                                <span class="badge bg-success">Oui</span>
+                                <i class="bi bi-check-lg text-success"></i>
+                            @else
+                                <span class="text-muted">—</span>
                             @endif
                         </td>
                         <td class="text-end">
