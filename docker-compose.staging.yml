@@ -17,7 +17,7 @@ services:
     image: mariadb:11
     restart: unless-stopped
     command:
-      - --innodb_buffer_pool_size=512M
+      - --innodb_buffer_pool_size=2G
       - --innodb_flush_log_at_trx_commit=2
       - --innodb_flush_method=O_DIRECT
       - --skip-name-resolve
