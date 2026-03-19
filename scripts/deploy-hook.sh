@@ -38,12 +38,12 @@ while read oldrev newrev ref; do
         /usr/local/bin/docker compose -f "$COMPOSE_FILE" build app
         /usr/local/bin/docker compose -f "$COMPOSE_FILE" up -d
 
-        # Attendre que MySQL soit prêt avant les migrations
-        echo "==> Attente de MySQL..."
-        until /usr/local/bin/docker compose -f "$COMPOSE_FILE" exec -T db mysqladmin ping -h localhost --silent 2>/dev/null; do
+        # Attendre que MariaDB soit prêt avant les migrations
+        echo "==> Attente de MariaDB..."
+        until /usr/local/bin/docker compose -f "$COMPOSE_FILE" exec -T db mariadb-admin ping -h localhost --silent 2>/dev/null; do
             sleep 3
         done
-        echo "==> MySQL prêt."
+        echo "==> MariaDB prêt."
 
         # Migrations
         /usr/local/bin/docker compose -f "$COMPOSE_FILE" exec -T app php artisan migrate --force
