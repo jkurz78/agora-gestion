@@ -350,6 +350,15 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     @livewireScripts
+    <script>
+        function initTooltips() {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+                bootstrap.Tooltip.getOrCreateInstance(el, { delay: { show: 0, hide: 100 } });
+            });
+        }
+        document.addEventListener('DOMContentLoaded', initTooltips);
+        document.addEventListener('livewire:updated', initTooltips);
+    </script>
 
     <footer class="text-center small py-2" style="position:fixed;bottom:0;left:0;right:0;background-color:#722281;color:rgba(255,255,255,0.85);z-index:1030;">
         &copy; {{ config('version.year', date('Y')) }} Jürgen Kurz &middot; SVS Accounting &middot; {{ config('version.tag', 'dev') }} &middot; {{ config('version.date', '') }}
