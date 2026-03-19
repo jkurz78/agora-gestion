@@ -15,10 +15,10 @@
 
 set -euo pipefail
 
-PROD_SSH_USER="${PROD_SSH_USER:-feucherolles}"
+PROD_SSH_USER="${PROD_SSH_USER:-nqgu6487}"
 PROD_SSH_HOST="${PROD_SSH_HOST:-montage.o2switch.net}"
 PROD_SSH_KEY="${PROD_SSH_KEY:-$HOME/.ssh/id_ed25519_svs_deploy}"
-PROD_APP_DIR="/home/$PROD_SSH_USER/public_html/compta.soigner-vivre-sourire.fr"
+PROD_APP_DIR="/home/nqgu6487/public_html/compta.soigner-vivre-sourire.fr"
 
 NAS_SSH_HOST="dog.local"
 NAS_SSH_PORT="2022"
