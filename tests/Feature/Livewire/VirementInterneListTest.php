@@ -20,7 +20,7 @@ it('n\'affiche pas de colonne Notes dans l\'en-tête', function () {
         ->assertDontSee('Notes');
 });
 
-it('affiche bi-sticky si le virement a des notes', function () {
+it('affiche bi-chat-left-text si le virement a des notes', function () {
     VirementInterne::factory()->create([
         'compte_source_id'      => $this->source->id,
         'compte_destination_id' => $this->destination->id,
@@ -30,11 +30,11 @@ it('affiche bi-sticky si le virement a des notes', function () {
     ]);
 
     Livewire::test(VirementInterneList::class)
-        ->assertSeeHtml('bi bi-sticky')
+        ->assertSeeHtml('bi bi-chat-left-text')
         ->assertSeeHtml('title="Provision pour charges Q4"');
 });
 
-it('n\'affiche pas bi-sticky si notes est null', function () {
+it('n\'affiche pas bi-chat-left-text si notes est null', function () {
     VirementInterne::factory()->create([
         'compte_source_id'      => $this->source->id,
         'compte_destination_id' => $this->destination->id,
@@ -44,10 +44,10 @@ it('n\'affiche pas bi-sticky si notes est null', function () {
     ]);
 
     Livewire::test(VirementInterneList::class)
-        ->assertDontSeeHtml('bi bi-sticky');
+        ->assertDontSeeHtml('bi bi-chat-left-text');
 });
 
-it('n\'affiche pas bi-sticky si notes est une chaîne vide', function () {
+it('n\'affiche pas bi-chat-left-text si notes est une chaîne vide', function () {
     VirementInterne::factory()->create([
         'compte_source_id'      => $this->source->id,
         'compte_destination_id' => $this->destination->id,
@@ -57,7 +57,7 @@ it('n\'affiche pas bi-sticky si notes est une chaîne vide', function () {
     ]);
 
     Livewire::test(VirementInterneList::class)
-        ->assertDontSeeHtml('bi bi-sticky');
+        ->assertDontSeeHtml('bi bi-chat-left-text');
 });
 
 it('les boutons d\'action ont la classe btn-sm sans style inline de padding', function () {
