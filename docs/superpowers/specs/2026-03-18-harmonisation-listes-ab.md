@@ -26,21 +26,29 @@ Après analyse des 12 écrans de liste de l'application, deux catégories d'amé
 
 ---
 
-### A2 · TiersList : colonne Usages
+### A2 · TiersList : colonnes Dépenses / Recettes — icônes au lieu de badges texte
 
-**Problème :** Deux colonnes séparées "Depenses" et "Recettes" affichant un badge "Oui" seulement si vrai (pas de "Non" explicite) — l'information est fragmentée et prend de la place pour peu de densité.
+**Problème :** Les colonnes "Depenses" et "Recettes" affichent un badge "Oui" uniquement quand vrai, rien sinon — incohérent avec le traitement de Pointé sur les autres écrans.
 
-**Correction :** Fusionner en une seule colonne `Usages` :
+**Correction :** Conserver les deux colonnes séparées, remplacer le badge "Oui" par `bi-check-lg text-success` et afficher `—` quand faux — même pattern que la colonne Pointé :
 
 ```blade
-{{-- En-tête --}}
-<th>Usages</th>
-
-{{-- Cellule --}}
+{{-- Colonne Dépenses --}}
 <td>
-  <span class="{{ $tiers->pour_depenses ? 'text-danger' : 'text-muted' }}">D</span>
-  <span class="text-muted mx-1">·</span>
-  <span class="{{ $tiers->pour_recettes ? 'text-success' : 'text-muted' }}">R</span>
+  @if($tiers->pour_depenses)
+    <i class="bi bi-check-lg text-success"></i>
+  @else
+    <span class="text-muted">—</span>
+  @endif
+</td>
+
+{{-- Colonne Recettes --}}
+<td>
+  @if($tiers->pour_recettes)
+    <i class="bi bi-check-lg text-success"></i>
+  @else
+    <span class="text-muted">—</span>
+  @endif
 </td>
 ```
 
@@ -204,7 +212,7 @@ Après analyse des 12 écrans de liste de l'application, deux catégories d'amé
 
 **Lot A**
 - TiersList : en-tête a la classe `table-dark` et le style bleu
-- TiersList : colonne Usages affiche `D · —`, `— · R`, `D · R`, `— · —` selon les flags
+- TiersList : colonne Dépenses affiche `bi-check-lg` si `pour_depenses`, `—` sinon ; idem pour Recettes
 - DonList, CotisationList : Pointé affiche `bi-check-lg` si pointé, `—` sinon
 - MembreList : Pointé affiche `bi-check-lg` (Bootstrap Icon, pas le caractère Unicode)
 - CotisationList : aucune colonne Exercice dans le tableau
