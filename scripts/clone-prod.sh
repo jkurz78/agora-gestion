@@ -69,4 +69,4 @@ ssh nas "/usr/local/bin/docker compose -f $NAS_COMPOSE exec -T app php artisan c
 
 echo ""
 echo "Clone termine. Base staging prete sur http://dog.local:8082"
-echo "  Compte admin : admin@svs.fr / (mot de passe de prod, inchange)"
+echo "  Connexion avec vos credentials de prod (tiers anonymises, comptes inchanges)"
