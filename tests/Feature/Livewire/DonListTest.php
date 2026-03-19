@@ -13,14 +13,14 @@ beforeEach(function () {
 });
 
 it('affiche bi-check-lg pour un don pointé', function () {
-    Don::factory()->create(['pointe' => true]);
+    Don::factory()->create(['pointe' => true, 'date' => '2025-10-01']);
 
     Livewire::test(DonList::class)
         ->assertSeeHtml('bi bi-check-lg text-success');
 });
 
 it('affiche un tiret pour un don non pointé', function () {
-    Don::factory()->create(['pointe' => false]);
+    Don::factory()->create(['pointe' => false, 'date' => '2025-10-01']);
 
     Livewire::test(DonList::class)
         ->assertSeeHtml('class="text-muted">—</span>')
@@ -28,8 +28,8 @@ it('affiche un tiret pour un don non pointé', function () {
 });
 
 it('n\'affiche plus les badges Oui/Non pour Pointé', function () {
-    Don::factory()->create(['pointe' => true]);
-    Don::factory()->create(['pointe' => false]);
+    Don::factory()->create(['pointe' => true, 'date' => '2025-10-01']);
+    Don::factory()->create(['pointe' => false, 'date' => '2025-10-01']);
 
     Livewire::test(DonList::class)
         ->assertDontSeeHtml('badge bg-success">Oui')
@@ -37,7 +37,7 @@ it('n\'affiche plus les badges Oui/Non pour Pointé', function () {
 });
 
 it('les boutons d\'action ont la classe btn-sm sans style inline de padding', function () {
-    Don::factory()->create();
+    Don::factory()->create(['date' => '2025-10-01']);
 
     Livewire::test(DonList::class)
         ->assertSeeHtml('btn btn-sm')
