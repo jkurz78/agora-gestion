@@ -113,7 +113,7 @@
                         <td class="small">
                             {{ $transaction->libelle }}
                             @if(!empty($transaction->notes))
-                                <i class="bi bi-sticky text-warning ms-1" data-bs-toggle="tooltip" data-bs-title="{{ $transaction->notes }}"></i>
+                                <i class="bi bi-chat-right-text text-muted ms-1" data-bs-toggle="tooltip" data-bs-title="{{ $transaction->notes }}"></i>
                             @endif
                         </td>
                         <td class="small">@if($transaction->tiers)<span style="font-size:.7rem">{{ $transaction->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $transaction->tiers->displayName() }}@else—@endif</td>
