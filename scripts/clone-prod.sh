@@ -16,7 +16,7 @@
 set -euo pipefail
 
 PROD_SSH_USER="${PROD_SSH_USER:-feucherolles}"
-PROD_SSH_HOST="${PROD_SSH_HOST:-}"
+PROD_SSH_HOST="${PROD_SSH_HOST:-montage.o2switch.net}"
 PROD_SSH_KEY="${PROD_SSH_KEY:-$HOME/.ssh/id_ed25519_svs_deploy}"
 PROD_APP_DIR="/home/$PROD_SSH_USER/public_html/***DEPLOY_SUBDOMAIN***"
 
@@ -29,7 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ── Vérifications préalables ────────────────────────────────────────────────
 if [[ -z "$PROD_SSH_HOST" ]]; then
     echo "ERREUR : PROD_SSH_HOST non défini."
-    echo "Exemple : PROD_SSH_HOST=ssh.o2switch.net ./scripts/clone-prod.sh"
+    echo "Exemple : PROD_SSH_HOST=montage.o2switch.net ./scripts/clone-prod.sh"
     exit 1
 fi
 
