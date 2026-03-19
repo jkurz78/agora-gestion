@@ -111,9 +111,13 @@
                         </td>
                         <td class="text-muted small">{{ $transaction->reference ?? '—' }}</td>
                         <td class="small">
-                            {{ $transaction->libelle }}
                             @if(!empty($transaction->notes))
-                                <i class="bi bi-chat-left-text text-muted ms-1" data-bs-toggle="tooltip" data-bs-title="{{ $transaction->notes }}"></i>
+                                <span data-bs-toggle="tooltip" data-bs-title="{{ $transaction->notes }}" style="cursor:default">
+                                    {{ $transaction->libelle }}
+                                    <i class="bi bi-chat-left-text text-muted ms-1"></i>
+                                </span>
+                            @else
+                                {{ $transaction->libelle }}
                             @endif
                         </td>
                         <td class="small">@if($transaction->tiers)<span style="font-size:.7rem">{{ $transaction->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $transaction->tiers->displayName() }}@else—@endif</td>
