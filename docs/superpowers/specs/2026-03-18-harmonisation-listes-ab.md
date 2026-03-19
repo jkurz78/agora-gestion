@@ -30,9 +30,13 @@ Après analyse des 12 écrans de liste de l'application, deux catégories d'amé
 
 **Problème :** Les colonnes "Depenses" et "Recettes" affichent un badge "Oui" uniquement quand vrai, rien sinon — incohérent avec le traitement de Pointé sur les autres écrans.
 
-**Correction :** Conserver les deux colonnes séparées, remplacer le badge "Oui" par `bi-check-lg text-success` et afficher `—` quand faux — même pattern que la colonne Pointé :
+**Correction :** Conserver les deux colonnes séparées, raccourcir les en-têtes en `Dép.` et `Rec.`, remplacer le badge "Oui" par `bi-check-lg text-success` et afficher `—` quand faux — même pattern que la colonne Pointé :
 
 ```blade
+{{-- En-têtes --}}
+<th>Dép.</th>
+<th>Rec.</th>
+
 {{-- Colonne Dépenses --}}
 <td>
   @if($tiers->pour_depenses)
