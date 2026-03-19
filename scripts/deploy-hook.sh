@@ -20,6 +20,10 @@ while read oldrev newrev ref; do
         # Chemin absolu car $HOME peut être vide dans le contexte git hook
         git --work-tree="$DEPLOY_DIR" --git-dir="***NAS_HOME***/repos/svs-accounting.git" checkout -f staging
 
+        # Auto-mise à jour du hook lui-même (en premier, avant tout le reste)
+        cp "$DEPLOY_DIR/scripts/deploy-hook.sh" "***NAS_HOME***/repos/svs-accounting.git/hooks/post-receive"
+        chmod +x "***NAS_HOME***/repos/svs-accounting.git/hooks/post-receive"
+
         cd "$DEPLOY_DIR"
 
         # Stamper la version avant le build (git n'est pas dispo dans le container)
@@ -29,10 +33,6 @@ while read oldrev newrev ref; do
         GIT_YEAR=$(echo "$GIT_DATE" | cut -c1-4)
         printf "<?php\nreturn array (\n  'tag' => '%s',\n  'date' => '%s',\n  'year' => '%s',\n);\n" \
             "$GIT_TAG" "$GIT_DATE" "$GIT_YEAR" > "$DEPLOY_DIR/config/version.php"
-
-        # Auto-mise à jour du hook lui-même
-        cp "$DEPLOY_DIR/scripts/deploy-hook.sh" "***NAS_HOME***/repos/svs-accounting.git/hooks/post-receive"
-        chmod +x "***NAS_HOME***/repos/svs-accounting.git/hooks/post-receive"
 
         # Rebuild et restart
         /usr/local/bin/docker compose -f "$COMPOSE_FILE" build app
