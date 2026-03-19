@@ -22,6 +22,10 @@ while read oldrev newrev ref; do
 
         cd "$DEPLOY_DIR"
 
+        # Auto-mise à jour du hook lui-même
+        cp "$DEPLOY_DIR/scripts/deploy-hook.sh" "/volume1/homes/jurgen/repos/svs-accounting.git/hooks/post-receive"
+        chmod +x "/volume1/homes/jurgen/repos/svs-accounting.git/hooks/post-receive"
+
         # Rebuild et restart
         /usr/local/bin/docker compose -f "$COMPOSE_FILE" build app
         /usr/local/bin/docker compose -f "$COMPOSE_FILE" up -d
