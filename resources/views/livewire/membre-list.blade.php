@@ -69,20 +69,26 @@
                         </td>
                         <td class="small text-muted">{{ $cot?->compte?->nom ?? '—' }}</td>
                         <td class="small">
-                            @if($cot)
-                                {{ $cot->pointe ? '✓' : '—' }}
+                            @if($cot && $cot->pointe)
+                                <i class="bi bi-check-lg text-success"></i>
                             @else
-                                —
+                                <span class="text-muted">—</span>
                             @endif
                         </td>
                         <td class="text-end">
-                            <button
-                                wire:click="$dispatch('open-cotisation-for-tiers', { tiersId: {{ $membre->id }} })"
-                                class="btn btn-sm btn-outline-primary"
-                                title="Nouvelle cotisation"
-                                style="padding:.15rem .35rem;font-size:.75rem">
-                                <i class="bi bi-plus-circle"></i>
-                            </button>
+                            <div class="d-flex gap-1 justify-content-end">
+                                <a href="{{ route('tiers.transactions', $membre->id) }}"
+                                   class="btn btn-sm btn-outline-secondary"
+                                   title="Voir les transactions">
+                                    <i class="bi bi-clock-history"></i>
+                                </a>
+                                <button
+                                    wire:click="$dispatch('open-cotisation-for-tiers', { tiersId: {{ $membre->id }} })"
+                                    class="btn btn-sm btn-outline-primary"
+                                    title="Nouvelle cotisation">
+                                    <i class="bi bi-plus-circle"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 @empty
