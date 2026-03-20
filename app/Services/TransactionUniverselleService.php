@@ -106,8 +106,8 @@ final class TransactionUniverselleService
             $queries[] = $this->brancheCotisation($compteId, $tiersId, $dateDebut, $dateFin);
         }
         if ($include['virement']) {
-            $queries[] = $this->brancheVirementSortant($compteId, $dateDebut, $dateFin);
-            $queries[] = $this->brancheVirementEntrant($compteId, $dateDebut, $dateFin);
+            $queries[] = $this->brancheVirementSortant($compteId, $tiersId, $dateDebut, $dateFin);
+            $queries[] = $this->brancheVirementEntrant($compteId, $tiersId, $dateDebut, $dateFin);
         }
 
         $base = array_shift($queries);
@@ -264,6 +264,7 @@ final class TransactionUniverselleService
 
     private function brancheVirementSortant(
         ?int $compteId,
+        ?int $tiersId,
         ?string $dateDebut,
         ?string $dateFin,
     ): Builder {
@@ -289,6 +290,7 @@ final class TransactionUniverselleService
                 (vi.rapprochement_source_id IS NOT NULL) as pointe
             ")
             ->whereNull('vi.deleted_at')
+            ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($compteId !== null, fn ($q) => $q->where('vi.compte_source_id', $compteId))
             ->when($dateDebut, fn ($q) => $q->where('vi.date', '>=', $dateDebut))
             ->when($dateFin, fn ($q) => $q->where('vi.date', '<=', $dateFin));
@@ -296,6 +298,7 @@ final class TransactionUniverselleService
 
     private function brancheVirementEntrant(
         ?int $compteId,
+        ?int $tiersId,
         ?string $dateDebut,
         ?string $dateFin,
     ): Builder {
@@ -321,6 +324,7 @@ final class TransactionUniverselleService
                 (vi.rapprochement_destination_id IS NOT NULL) as pointe
             ")
             ->whereNull('vi.deleted_at')
+            ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($compteId !== null, fn ($q) => $q->where('vi.compte_destination_id', $compteId))
             ->when($dateDebut, fn ($q) => $q->where('vi.date', '>=', $dateDebut))
             ->when($dateFin, fn ($q) => $q->where('vi.date', '<=', $dateFin));
