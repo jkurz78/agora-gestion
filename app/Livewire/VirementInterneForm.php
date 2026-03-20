@@ -48,12 +48,6 @@ final class VirementInterneForm extends Component
         $this->showForm = true;
     }
 
-    #[On('edit-virement')]
-    public function editVirement(int $id): void
-    {
-        $this->open($id);
-    }
-
     public function resetForm(): void
     {
         $this->reset([
