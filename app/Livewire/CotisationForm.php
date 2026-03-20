@@ -69,11 +69,11 @@ final class CotisationForm extends Component
     }
 
     #[On('open-cotisation-for-tiers')]
-    public function openForTiers(?int $tiersId = null): void
+    public function openForTiers(?int $tiers_id = null): void
     {
         $this->open(null);
-        if ($tiersId !== null) {
-            $this->tiers_id = $tiersId;
+        if ($tiers_id !== null) {
+            $this->tiers_id = $tiers_id;
             $this->tiersLocked = true;
         }
     }

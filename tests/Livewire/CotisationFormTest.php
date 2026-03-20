@@ -110,6 +110,15 @@ it('s\'ouvre pour une nouvelle cotisation via open-cotisation-form', function ()
         ->assertSet('cotisationId', null);
 });
 
+it('s\'ouvre pour un tiers via open-cotisation-for-tiers', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(CotisationForm::class)
+        ->dispatch('open-cotisation-for-tiers', tiers_id: $this->tiers->id)
+        ->assertSet('showForm', true)
+        ->assertSet('tiers_id', $this->tiers->id)
+        ->assertSet('tiersLocked', true);
+});
+
 it('s\'ouvre en édition avec tiers verrouillé via open-cotisation-form', function (): void {
     $cotisation = Cotisation::factory()->create(['date_paiement' => '2025-10-01']);
 
