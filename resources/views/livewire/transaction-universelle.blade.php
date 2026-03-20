@@ -448,26 +448,38 @@
                 @if($isExpanded && $detail)
                     <tr class="table-light">
                         <td colspan="{{ 9 + (count($availableTypes) > 1 ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
-                            class="px-4 py-2 small text-muted">
+                            class="px-3 py-2">
                             @if(!empty($detail['lignes']))
-                                <strong>Ventilation :</strong>
-                                <ul class="mb-0 mt-1">
-                                    @foreach($detail['lignes'] as $ligne)
-                                        <li>{{ $ligne['categorie'] }} › {{ $ligne['sous_categorie'] }} — {{ number_format($ligne['montant'], 2, ',', ' ') }} €</li>
-                                    @endforeach
-                                </ul>
-                            @endif
-                            @if(!empty($detail['sous_categorie']))
-                                <strong>Sous-catégorie :</strong> {{ $detail['sous_categorie'] }}
-                            @endif
-                            @if(!empty($detail['operation']))
-                                &nbsp;· <strong>Opération :</strong> {{ $detail['operation'] }}
-                            @endif
-                            @if(!empty($detail['seance']))
-                                &nbsp;· <strong>Séance :</strong> {{ $detail['seance'] }}
-                            @endif
-                            @if(!empty($detail['exercice']))
-                                &nbsp;· <strong>Exercice :</strong> {{ $detail['exercice'] }}
+                                <table class="table table-sm table-bordered align-middle mb-0" style="max-width:700px">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="small">Sous-catégorie</th>
+                                            <th class="small">Opération</th>
+                                            <th class="small text-center">Séance</th>
+                                            <th class="small text-end">Montant</th>
+                                            <th class="small">Notes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($detail['lignes'] as $ligne)
+                                            <tr>
+                                                <td class="small">{{ $ligne['sous_categorie'] ?? '—' }}</td>
+                                                <td class="small text-muted">{{ $ligne['operation'] ?? '' }}</td>
+                                                <td class="small text-center text-muted">{{ $ligne['seance'] ?? '' }}</td>
+                                                <td class="small text-end fw-semibold">{{ number_format($ligne['montant'], 2, ',', ' ') }} €</td>
+                                                <td class="small text-muted">{{ $ligne['notes'] ?? '' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            @elseif(!empty($detail['sous_categorie']))
+                                {{-- Don ou Cotisation --}}
+                                <span class="small text-muted">
+                                    <strong>Sous-catégorie :</strong> {{ $detail['sous_categorie'] }}
+                                    @if(!empty($detail['operation'])) &nbsp;· <strong>Opération :</strong> {{ $detail['operation'] }} @endif
+                                    @if(!empty($detail['seance'])) &nbsp;· <strong>Séance :</strong> {{ $detail['seance'] }} @endif
+                                    @if(!empty($detail['exercice'])) &nbsp;· <strong>Exercice :</strong> {{ $detail['exercice'] }} @endif
+                                </span>
                             @endif
                         </td>
                     </tr>
