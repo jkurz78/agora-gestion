@@ -42,18 +42,6 @@ final class CotisationForm extends Component
         $this->showForm = true;
     }
 
-    public function applyStoredDefaults(?int $sous_categorie_id, string $mode_paiement, ?int $compte_id): void
-    {
-        if ($sous_categorie_id) {
-            $this->sous_categorie_id = $sous_categorie_id;
-        }
-        if ($mode_paiement !== '') {
-            $this->mode_paiement = $mode_paiement;
-        }
-        if ($compte_id) {
-            $this->compte_id = $compte_id;
-        }
-    }
 
     public function resetForm(): void
     {
@@ -77,6 +65,10 @@ final class CotisationForm extends Component
             $this->tiersLocked = true;
         } else {
             $this->date_paiement = app(ExerciceService::class)->defaultDate();
+            $defaults = session('cotisation_defaults', []);
+            $this->sous_categorie_id = $defaults['sous_categorie_id'] ?? null;
+            $this->mode_paiement    = $defaults['mode_paiement'] ?? '';
+            $this->compte_id        = $defaults['compte_id'] ?? null;
         }
         $this->showForm = true;
     }
@@ -128,6 +120,11 @@ final class CotisationForm extends Component
             app(CotisationService::class)->create($tiers, $data);
         }
 
+        session(['cotisation_defaults' => [
+            'sous_categorie_id' => $this->sous_categorie_id,
+            'mode_paiement'     => $this->mode_paiement,
+            'compte_id'         => $this->compte_id,
+        ]]);
         $this->dispatch('cotisation-saved');
         $this->resetForm();
     }
