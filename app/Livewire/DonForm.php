@@ -47,11 +47,11 @@ final class DonForm extends Component
             $this->date = $don->date->format('Y-m-d');
             $this->montant = (string) $don->montant;
             $this->mode_paiement = $don->mode_paiement->value;
-            $this->objet = $don->objet ?? '';
+            $this->objet = $don->objet ?? null;
             $this->tiers_id = $don->tiers_id;
             $this->sous_categorie_id = $don->sous_categorie_id;
             $this->operation_id = $don->operation_id;
-            $this->seance = $don->seance;
+            $this->seance = $don->seance ?? null;
             $this->compte_id = $don->compte_id;
         } else {
             $this->date = app(ExerciceService::class)->defaultDate();
