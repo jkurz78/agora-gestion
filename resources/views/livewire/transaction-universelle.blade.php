@@ -433,12 +433,13 @@
                                 <i class="bi bi-pencil"></i>
                             </button>
                             @if($isLocked)
-                                <button type="button" disabled
-                                        class="btn btn-sm btn-outline-danger"
-                                        style="padding:.15rem .3rem;font-size:.7rem;opacity:.4;cursor:not-allowed"
-                                        title="Écriture rapprochée bancaire — suppression interdite">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                <span title="Écriture rapprochée bancaire — suppression interdite" style="cursor:not-allowed">
+                                    <button type="button" disabled
+                                            class="btn btn-sm btn-outline-danger"
+                                            style="padding:.15rem .3rem;font-size:.7rem;opacity:.4;pointer-events:none">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </span>
                             @else
                                 <button type="button"
                                         wire:click="deleteRow('{{ e($tx->source_type) }}', {{ $tx->id }})"
