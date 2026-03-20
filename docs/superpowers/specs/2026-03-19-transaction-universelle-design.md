@@ -22,7 +22,7 @@ Ces props sont injectées par la route ou le composant parent. L'utilisateur ne 
 |---|---|---|
 | `$compteId` | `?int` | Vue par compte — verrouille Compte |
 | `$tiersId` | `?int` | Vue par tiers — verrouille Tiers |
-| `$types` | `?array` | Types autorisés (ex. `['don']`) — masque le filtre Type |
+| `$types` | `?array` | Types autorisés — restreint le scope de la requête. Si un seul type : masque le filtre Type. Si plusieurs types : les boutons toggle n'affichent que ces types-là (ex. `['depense', 'recette']` → boutons Toutes / Dépenses / Recettes, pas de Don ni Virement). |
 | `$exercice` | `?int` | Exercice — verrouille la plage de dates |
 
 Quand `$exercice` est fourni, les dates sont verrouillées sur cet exercice — la colonne Date affiche un label discret "Exercice XXXX–XXXX" sans loupe.
