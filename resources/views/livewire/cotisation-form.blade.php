@@ -1,4 +1,24 @@
-<div>
+<div
+    x-data
+    x-init="
+        $wire.$watch('showForm', value => {
+            if (value && $wire.cotisationId === null) {
+                const saved = localStorage.getItem('cotisation_defaults');
+                if (saved) {
+                    const d = JSON.parse(saved);
+                    $wire.applyStoredDefaults(d.sous_categorie_id ?? null, d.mode_paiement ?? '', d.compte_id ?? null);
+                }
+            }
+        });
+        $wire.on('cotisation-saved', () => {
+            localStorage.setItem('cotisation_defaults', JSON.stringify({
+                sous_categorie_id: $wire.sous_categorie_id,
+                mode_paiement: $wire.mode_paiement,
+                compte_id: $wire.compte_id,
+            }));
+        });
+    "
+>
     @if($showForm)
         <div class="position-fixed top-0 start-0 w-100 h-100" style="background:rgba(0,0,0,.5);z-index:1040;overflow-y:auto" wire:click.self="resetForm">
         <div class="container py-4">
