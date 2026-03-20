@@ -415,18 +415,9 @@
                         </td>
                     @endif
                     <td>
-                        @php
-                            $editEvent = match($tx->source_type) {
-                                'depense', 'recette' => 'open-transaction-form',
-                                'don' => 'open-don-form',
-                                'cotisation' => 'open-cotisation-form',
-                                'virement_sortant', 'virement_entrant' => 'open-virement-form',
-                                default => 'open-transaction-form',
-                            };
-                        @endphp
                         <div class="d-flex gap-1" @click.stop>
                             <button type="button"
-                                    @click="$dispatch('{{ $editEvent }}', { id: {{ $tx->id }} })"
+                                    wire:click="openEdit('{{ e($tx->source_type) }}', {{ $tx->id }})"
                                     class="btn btn-sm btn-outline-primary"
                                     style="padding:.15rem .3rem;font-size:.7rem"
                                     title="Modifier">

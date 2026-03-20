@@ -196,6 +196,21 @@ final class TransactionUniverselle extends Component
         $this->resetPage();
     }
 
+    public function openEdit(string $sourceType, int $id): void
+    {
+        $allowed = ['depense', 'recette', 'don', 'cotisation', 'virement_sortant', 'virement_entrant'];
+        if (! in_array($sourceType, $allowed, true)) {
+            return;
+        }
+        $event = match ($sourceType) {
+            'depense', 'recette' => 'open-transaction-form',
+            'don' => 'open-don-form',
+            'cotisation' => 'open-cotisation-form',
+            'virement_sortant', 'virement_entrant' => 'open-virement-form',
+        };
+        $this->dispatch($event, id: $id);
+    }
+
     // Expansion de ligne
     public function toggleDetail(string $sourceType, int $id): void
     {
