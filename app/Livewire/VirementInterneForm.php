@@ -29,15 +29,6 @@ final class VirementInterneForm extends Component
 
     public bool $showForm = false;
 
-    public function showNewForm(): void
-    {
-        $this->reset(['virementId', 'date', 'montant', 'compte_source_id',
-            'compte_destination_id', 'reference', 'notes']);
-        $this->resetValidation();
-        $this->showForm = true;
-        $this->date = app(ExerciceService::class)->defaultDate();
-    }
-
     #[On('open-virement-form')]
     public function open(?int $id = null): void
     {
@@ -117,7 +108,7 @@ final class VirementInterneForm extends Component
         $this->resetForm();
     }
 
-    public function render()
+    public function render(): \Illuminate\View\View
     {
         return view('livewire.virement-interne-form', [
             'comptes' => CompteBancaire::orderBy('nom')->get(),
