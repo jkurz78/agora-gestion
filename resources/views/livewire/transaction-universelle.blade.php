@@ -106,18 +106,13 @@
         <table class="table table-sm table-hover align-middle">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
+                    <th style="width:1rem;padding:.25rem .3rem"></th>
                     {{-- N°pièce header QBE --}}
                     <th style="position:relative">
                         <div class="d-flex align-items-center gap-1">
                             N°pièce
                             <span x-data="{ open: false }" style="position:relative">
-                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;opacity:.6" @click="open = !open"></i>
-                                @if($filterNumeroPiece !== '')
-                                    <span class="badge rounded-pill text-bg-primary ms-1" style="font-size:.6rem">
-                                        {{ $filterNumeroPiece }}
-                                        <a href="#" wire:click.prevent="$set('filterNumeroPiece', '')" class="text-white ms-1">×</a>
-                                    </span>
-                                @endif
+                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ $filterNumeroPiece !== '' ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
                                 <div x-show="open" @click.outside="open = false"
                                      class="position-absolute bg-white border rounded shadow-sm p-2"
                                      style="z-index:200;min-width:180px;top:1.2rem;left:0">
@@ -128,6 +123,14 @@
                                 </div>
                             </span>
                         </div>
+                        @if($filterNumeroPiece !== '')
+                            <div style="margin-top:.1rem">
+                                <span class="badge text-bg-primary" style="font-size:.6rem;font-weight:normal">
+                                    {{ $filterNumeroPiece }}
+                                    <a href="#" wire:click.prevent="$set('filterNumeroPiece', '')" class="text-white ms-1" style="text-decoration:none">×</a>
+                                </span>
+                            </div>
+                        @endif
                     </th>
 
                     {{-- Date header with presets --}}
@@ -137,15 +140,7 @@
                                 Date @if($sortColumn === 'date')<i class="bi bi-arrow-{{ $sortDirection === 'asc' ? 'up' : 'down' }}"></i>@endif
                             </a>
                             <span x-data="{ open: false }" style="position:relative">
-                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;opacity:.6" @click="open = !open"></i>
-                                @if($filterDateDebut || $filterDateFin)
-                                    <span class="badge rounded-pill text-bg-primary ms-1" style="font-size:.6rem">
-                                        {{ $filterDateDebut ? \Carbon\Carbon::parse($filterDateDebut)->format('d/m') : '…' }}
-                                        –
-                                        {{ $filterDateFin ? \Carbon\Carbon::parse($filterDateFin)->format('d/m') : '…' }}
-                                        <a href="#" wire:click.prevent="applyDatePreset('exercice')" class="text-white ms-1">×</a>
-                                    </span>
-                                @endif
+                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ ($filterDateDebut || $filterDateFin) ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
                                 <div x-show="open" @click.outside="open = false"
                                      class="position-absolute bg-white border rounded shadow-sm p-2 text-dark"
                                      style="z-index:200;min-width:220px;top:1.2rem;left:0">
@@ -169,6 +164,16 @@
                                 </div>
                             </span>
                         </div>
+                        @if($filterDateDebut || $filterDateFin)
+                            <div style="margin-top:.1rem">
+                                <span class="badge text-bg-primary" style="font-size:.6rem;font-weight:normal;white-space:nowrap">
+                                    {{ $filterDateDebut ? \Carbon\Carbon::parse($filterDateDebut)->format('d/m') : '…' }}
+                                    –
+                                    {{ $filterDateFin ? \Carbon\Carbon::parse($filterDateFin)->format('d/m') : '…' }}
+                                    <a href="#" wire:click.prevent="applyDatePreset('exercice')" class="text-white ms-1" style="text-decoration:none">×</a>
+                                </span>
+                            </div>
+                        @endif
                     </th>
 
                     {{-- Type header (only if multi) --}}
@@ -181,13 +186,7 @@
                         <div class="d-flex align-items-center gap-1">
                             Référence
                             <span x-data="{ open: false }" style="position:relative">
-                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;opacity:.6" @click="open = !open"></i>
-                                @if($filterReference !== '')
-                                    <span class="badge rounded-pill text-bg-primary ms-1" style="font-size:.6rem">
-                                        {{ $filterReference }}
-                                        <a href="#" wire:click.prevent="$set('filterReference', '')" class="text-white ms-1">×</a>
-                                    </span>
-                                @endif
+                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ $filterReference !== '' ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
                                 <div x-show="open" @click.outside="open = false"
                                      class="position-absolute bg-white border rounded shadow-sm p-2"
                                      style="z-index:200;min-width:180px;top:1.2rem;left:0">
@@ -198,6 +197,14 @@
                                 </div>
                             </span>
                         </div>
+                        @if($filterReference !== '')
+                            <div style="margin-top:.1rem">
+                                <span class="badge text-bg-primary" style="font-size:.6rem;font-weight:normal">
+                                    {{ $filterReference }}
+                                    <a href="#" wire:click.prevent="$set('filterReference', '')" class="text-white ms-1" style="text-decoration:none">×</a>
+                                </span>
+                            </div>
+                        @endif
                     </th>
 
                     {{-- Tiers header QBE (only if $showTiersCol) --}}
@@ -206,13 +213,7 @@
                         <div class="d-flex align-items-center gap-1">
                             Tiers
                             <span x-data="{ open: false }" style="position:relative">
-                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;opacity:.6" @click="open = !open"></i>
-                                @if($filterTiers !== '')
-                                    <span class="badge rounded-pill text-bg-primary ms-1" style="font-size:.6rem">
-                                        {{ $filterTiers }}
-                                        <a href="#" wire:click.prevent="$set('filterTiers', '')" class="text-white ms-1">×</a>
-                                    </span>
-                                @endif
+                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ $filterTiers !== '' ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
                                 <div x-show="open" @click.outside="open = false"
                                      class="position-absolute bg-white border rounded shadow-sm p-2"
                                      style="z-index:200;min-width:180px;top:1.2rem;left:0">
@@ -223,6 +224,14 @@
                                 </div>
                             </span>
                         </div>
+                        @if($filterTiers !== '')
+                            <div style="margin-top:.1rem">
+                                <span class="badge text-bg-primary" style="font-size:.6rem;font-weight:normal">
+                                    {{ $filterTiers }}
+                                    <a href="#" wire:click.prevent="$set('filterTiers', '')" class="text-white ms-1" style="text-decoration:none">×</a>
+                                </span>
+                            </div>
+                        @endif
                     </th>
                     @endif
 
@@ -232,12 +241,7 @@
                         <div class="d-flex align-items-center gap-1">
                             Compte
                             <span x-data="{ open: false }" style="position:relative">
-                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;opacity:.6" @click="open = !open"></i>
-                                @if($filterCompteId)
-                                    <span class="badge rounded-pill text-bg-primary ms-1" style="font-size:.6rem">
-                                        <a href="#" wire:click.prevent="$set('filterCompteId', null)" class="text-white">×</a>
-                                    </span>
-                                @endif
+                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ $filterCompteId ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
                                 <div x-show="open" @click.outside="open = false"
                                      class="position-absolute bg-white border rounded shadow-sm p-2 text-dark"
                                      style="z-index:200;min-width:180px;top:1.2rem;left:0">
@@ -250,6 +254,14 @@
                                 </div>
                             </span>
                         </div>
+                        @if($filterCompteId)
+                            <div style="margin-top:.1rem">
+                                <span class="badge text-bg-primary" style="font-size:.6rem;font-weight:normal">
+                                    {{ $comptes->firstWhere('id', $filterCompteId)?->nom ?? $filterCompteId }}
+                                    <a href="#" wire:click.prevent="$set('filterCompteId', null)" class="text-white ms-1" style="text-decoration:none">×</a>
+                                </span>
+                            </div>
+                        @endif
                     </th>
                     @endif
 
@@ -258,13 +270,7 @@
                         <div class="d-flex align-items-center gap-1">
                             Libellé
                             <span x-data="{ open: false }" style="position:relative">
-                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;opacity:.6" @click="open = !open"></i>
-                                @if($filterLibelle !== '')
-                                    <span class="badge rounded-pill text-bg-primary ms-1" style="font-size:.6rem">
-                                        {{ $filterLibelle }}
-                                        <a href="#" wire:click.prevent="$set('filterLibelle', '')" class="text-white ms-1">×</a>
-                                    </span>
-                                @endif
+                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ $filterLibelle !== '' ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
                                 <div x-show="open" @click.outside="open = false"
                                      class="position-absolute bg-white border rounded shadow-sm p-2"
                                      style="z-index:200;min-width:180px;top:1.2rem;left:0">
@@ -275,6 +281,14 @@
                                 </div>
                             </span>
                         </div>
+                        @if($filterLibelle !== '')
+                            <div style="margin-top:.1rem">
+                                <span class="badge text-bg-primary" style="font-size:.6rem;font-weight:normal">
+                                    {{ $filterLibelle }}
+                                    <a href="#" wire:click.prevent="$set('filterLibelle', '')" class="text-white ms-1" style="text-decoration:none">×</a>
+                                </span>
+                            </div>
+                        @endif
                     </th>
 
                     {{-- Catégorie --}}
@@ -285,13 +299,7 @@
                         <div class="d-flex align-items-center gap-1">
                             Mode
                             <span x-data="{ open: false }" style="position:relative">
-                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;opacity:.6" @click="open = !open"></i>
-                                @if($filterModePaiement !== '')
-                                    <span class="badge rounded-pill text-bg-primary ms-1" style="font-size:.6rem">
-                                        {{ $filterModePaiement }}
-                                        <a href="#" wire:click.prevent="$set('filterModePaiement', '')" class="text-white ms-1">×</a>
-                                    </span>
-                                @endif
+                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ $filterModePaiement !== '' ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
                                 <div x-show="open" @click.outside="open = false"
                                      class="position-absolute bg-white border rounded shadow-sm p-2 text-dark"
                                      style="z-index:200;min-width:160px;top:1.2rem;left:0">
@@ -304,6 +312,14 @@
                                 </div>
                             </span>
                         </div>
+                        @if($filterModePaiement !== '')
+                            <div style="margin-top:.1rem">
+                                <span class="badge text-bg-primary" style="font-size:.6rem;font-weight:normal">
+                                    {{ collect($modesPaiement)->firstWhere('value', $filterModePaiement)?->label() ?? $filterModePaiement }}
+                                    <a href="#" wire:click.prevent="$set('filterModePaiement', '')" class="text-white ms-1" style="text-decoration:none">×</a>
+                                </span>
+                            </div>
+                        @endif
                     </th>
 
                     {{-- Montant --}}
@@ -318,13 +334,7 @@
                         <div class="d-flex align-items-center gap-1">
                             Pointé
                             <span x-data="{ open: false }" style="position:relative">
-                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;opacity:.6" @click="open = !open"></i>
-                                @if($filterPointe !== '')
-                                    <span class="badge rounded-pill text-bg-primary ms-1" style="font-size:.6rem">
-                                        {{ $filterPointe === '1' ? 'Oui' : 'Non' }}
-                                        <a href="#" wire:click.prevent="$set('filterPointe', '')" class="text-white ms-1">×</a>
-                                    </span>
-                                @endif
+                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ $filterPointe !== '' ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
                                 <div x-show="open" @click.outside="open = false"
                                      class="position-absolute bg-white border rounded shadow-sm p-2 text-dark"
                                      style="z-index:200;min-width:120px;top:1.2rem;left:0">
@@ -336,6 +346,14 @@
                                 </div>
                             </span>
                         </div>
+                        @if($filterPointe !== '')
+                            <div style="margin-top:.1rem">
+                                <span class="badge text-bg-primary" style="font-size:.6rem;font-weight:normal">
+                                    {{ $filterPointe === '1' ? 'Oui' : 'Non' }}
+                                    <a href="#" wire:click.prevent="$set('filterPointe', '')" class="text-white ms-1" style="text-decoration:none">×</a>
+                                </span>
+                            </div>
+                        @endif
                     </th>
 
                     {{-- Solde (only if $showSolde) --}}
@@ -366,6 +384,9 @@
                     $isLocked = (bool) $tx->pointe;
                 @endphp
                 <tr style="cursor:pointer" wire:click="toggleDetail('{{ $tx->source_type }}', {{ $tx->id }})">
+                    <td style="width:1rem;padding:.25rem .3rem;text-align:center;color:#adb5bd">
+                        <i class="bi bi-caret-{{ $isExpanded ? 'down' : 'right' }}-fill" style="font-size:.6rem"></i>
+                    </td>
                     <td class="small text-muted text-nowrap">{{ $tx->numero_piece ?? '—' }}</td>
                     <td class="small text-nowrap">{{ \Carbon\Carbon::parse($tx->date)->format('d/m') }}</td>
                     @if(count($availableTypes) > 1)
@@ -393,7 +414,16 @@
                     @if($showCompteCol)
                         <td class="small text-muted">{{ $tx->compte_nom ?? '—' }}</td>
                     @endif
-                    <td class="small" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">{{ $tx->libelle ?? '—' }}</td>
+                    <td class="small" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">
+                        @if(!empty($tx->notes))
+                            <span data-bs-toggle="tooltip" data-bs-title="{{ $tx->notes }}" style="cursor:default">
+                                {{ $tx->libelle ?? '—' }}
+                                <i class="bi bi-chat-left-text text-muted ms-1"></i>
+                            </span>
+                        @else
+                            {{ $tx->libelle ?? '—' }}
+                        @endif
+                    </td>
                     <td class="small text-muted">
                         @if((int)$tx->nb_lignes > 1)
                             <i class="bi bi-diagram-2 text-secondary me-1" title="{{ $tx->nb_lignes }} lignes"></i>
@@ -446,35 +476,35 @@
                 </tr>
                 {{-- Expansion row --}}
                 @if($isExpanded && $detail)
-                    <tr class="table-light">
-                        <td colspan="{{ 9 + (count($availableTypes) > 1 ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
-                            class="px-3 py-2">
+                    <tr style="background:#f8f9fa">
+                        <td colspan="{{ 10 + (count($availableTypes) > 1 ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
+                            style="padding:0;border-top:none">
                             @if(!empty($detail['lignes']))
-                                <table class="table table-sm table-bordered align-middle mb-0" style="max-width:700px">
-                                    <thead class="table-light">
+                                <table class="table table-sm align-middle mb-0" style="margin-left:1.5rem;width:calc(100% - 1.5rem);--bs-table-bg:#f8f9fa;font-size:.78rem;--bs-table-cell-padding-y:.2rem">
+                                    <thead style="background:#8fa8c4;color:#fff;--bs-table-bg:#8fa8c4;--bs-table-border-color:#9fb5cc">
                                         <tr>
-                                            <th class="small">Sous-catégorie</th>
-                                            <th class="small">Opération</th>
-                                            <th class="small text-center">Séance</th>
-                                            <th class="small text-end">Montant</th>
-                                            <th class="small">Notes</th>
+                                            <th>Sous-catégorie</th>
+                                            <th>Opération</th>
+                                            <th class="text-center">Séance</th>
+                                            <th class="text-end">Montant</th>
+                                            <th>Notes</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach($detail['lignes'] as $ligne)
                                             <tr>
-                                                <td class="small">{{ $ligne['sous_categorie'] ?? '—' }}</td>
-                                                <td class="small text-muted">{{ $ligne['operation'] ?? '' }}</td>
-                                                <td class="small text-center text-muted">{{ $ligne['seance'] ?? '' }}</td>
-                                                <td class="small text-end fw-semibold">{{ number_format($ligne['montant'], 2, ',', ' ') }} €</td>
-                                                <td class="small text-muted">{{ $ligne['notes'] ?? '' }}</td>
+                                                <td>{{ $ligne['sous_categorie'] ?? '—' }}</td>
+                                                <td class="text-muted">{{ $ligne['operation'] ?? '' }}</td>
+                                                <td class="text-center text-muted">{{ $ligne['seance'] ?? '' }}</td>
+                                                <td class="text-end fw-semibold">{{ number_format($ligne['montant'], 2, ',', ' ') }} €</td>
+                                                <td class="text-muted">{{ $ligne['notes'] ?? '' }}</td>
                                             </tr>
                                         @endforeach
                                     </tbody>
                                 </table>
                             @elseif(!empty($detail['sous_categorie']))
                                 {{-- Don ou Cotisation --}}
-                                <span class="small text-muted">
+                                <span class="small text-muted" style="display:block;padding:.3rem .75rem .3rem 1.5rem;background:#f8f9fa">
                                     <strong>Sous-catégorie :</strong> {{ $detail['sous_categorie'] }}
                                     @if(!empty($detail['operation'])) &nbsp;· <strong>Opération :</strong> {{ $detail['operation'] }} @endif
                                     @if(!empty($detail['seance'])) &nbsp;· <strong>Séance :</strong> {{ $detail['seance'] }} @endif
