@@ -6,6 +6,14 @@
         </div>
     @endif
 
+    {{-- Toolbar --}}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <button wire:click="$dispatch('open-don-form', { id: null })"
+                class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg"></i> Nouveau don
+        </button>
+    </div>
+
     {{-- Filter row --}}
     <div class="card mb-4">
         <div class="card-body">
@@ -81,7 +89,7 @@
                         </td>
                         <td>
                             <div class="d-flex gap-1 justify-content-end">
-                                <button wire:click="$dispatch('edit-don', { id: {{ $don->id }} })"
+                                <button wire:click="$dispatch('open-don-form', { id: {{ $don->id }} })"
                                         class="btn btn-sm btn-outline-primary" title="Modifier">
                                     <i class="bi bi-pencil"></i>
                                 </button>

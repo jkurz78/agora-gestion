@@ -6,6 +6,14 @@
         </div>
     @endif
 
+    {{-- Toolbar --}}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <button wire:click="$dispatch('open-cotisation-form', { id: null })"
+                class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg"></i> Nouvelle cotisation
+        </button>
+    </div>
+
     {{-- Filter --}}
     <div class="card mb-4">
         <div class="card-body py-2">
@@ -69,6 +77,11 @@
                         </td>
                         <td>
                             <div class="d-flex gap-1 justify-content-end">
+                                <button wire:click="$dispatch('open-cotisation-form', { id: {{ $cotisation->id }} })"
+                                        class="btn btn-sm btn-outline-secondary" title="Modifier"
+                                        @if($cotisation->pointe) disabled @endif>
+                                    <i class="bi bi-pencil"></i>
+                                </button>
                                 @if ($cotisation->pointe)
                                     <button class="btn btn-sm btn-outline-danger" disabled
                                             title="Dépointez cette cotisation avant de la supprimer.">
