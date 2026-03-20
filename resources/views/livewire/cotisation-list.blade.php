@@ -78,7 +78,7 @@
                         <td>
                             <div class="d-flex gap-1 justify-content-end">
                                 <button wire:click="$dispatch('open-cotisation-form', { id: {{ $cotisation->id }} })"
-                                        class="btn btn-sm btn-outline-secondary" title="Modifier"
+                                        class="btn btn-sm btn-outline-primary" title="Modifier"
                                         @if($cotisation->pointe) disabled @endif>
                                     <i class="bi bi-pencil"></i>
                                 </button>
