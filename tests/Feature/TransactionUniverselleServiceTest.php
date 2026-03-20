@@ -22,7 +22,7 @@ it('retourne toutes les entités par défaut', function () {
     VirementInterne::factory()->create(['compte_source_id' => $this->compte->id, 'date' => '2025-01-13']);
 
     $result = $this->svc->paginate(null, null, null, null, null, null, null, null, null, null, null);
-    expect($result['paginator']->total())->toBeGreaterThanOrEqual(5);
+    expect($result['paginator']->total())->toBe(5);
 });
 
 it('filtre par compteId', function () {
@@ -31,9 +31,7 @@ it('filtre par compteId', function () {
     Transaction::factory()->asDepense()->create(['compte_id' => $autreCompte->id, 'date' => '2025-01-10']);
 
     $result = $this->svc->paginate($this->compte->id, null, null, null, null, null, null, null, null, null, null);
-    foreach ($result['paginator']->items() as $row) {
-        expect($row->compte_id)->toBe($this->compte->id);
-    }
+    expect($result['paginator']->total())->toBe(1);
 });
 
 it('filtre sur types uniquement depense', function () {
@@ -56,8 +54,25 @@ it('filtre par dateDebut et dateFin', function () {
 });
 
 it('retourne soldeAvantPage non-null quand computeSolde=true et compteId fourni', function () {
-    $result = $this->svc->paginate($this->compte->id, null, null, null, null, null, null, null, null, null, null, true, 'date', 'asc');
-    expect($result['soldeAvantPage'])->not->toBeNull();
+    Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-01-10',
+        'montant_total' => 100.0,
+        'mode_paiement' => 'virement',
+    ]);
+    Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-01-11',
+        'montant_total' => 100.0,
+        'mode_paiement' => 'virement',
+    ]);
+
+    // Page 2 with perPage=1: soldeAvantPage = solde_initial (0) + 100 (first page row)
+    $result = $this->svc->paginate(
+        $this->compte->id, null, ['recette'], null, null, null, null, null, null, null, null,
+        true, 'date', 'asc', 1, 2
+    );
+    expect($result['soldeAvantPage'])->toBe(100.0);
 });
 
 it('retourne soldeAvantPage null quand computeSolde=false', function () {
@@ -76,4 +91,20 @@ it('exclut les virements quand tiersId est fourni', function () {
 
     $result = $this->svc->paginate(null, $tiers->id, ['virement'], null, null, null, null, null, null, null, null);
     expect($result['paginator']->total())->toBe(0);
+});
+
+it('filtre par modePaiement', function () {
+    Transaction::factory()->asDepense()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-01-10',
+        'mode_paiement' => 'cheque',
+    ]);
+    Transaction::factory()->asDepense()->create([
+        'compte_id' => $this->compte->id,
+        'date' => '2025-01-11',
+        'mode_paiement' => 'virement',
+    ]);
+
+    $result = $this->svc->paginate(null, null, ['depense'], null, null, null, null, null, null, 'cheque', null);
+    expect($result['paginator']->total())->toBe(1);
 });
