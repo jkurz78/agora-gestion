@@ -206,7 +206,7 @@ En vue verrouillée sur un type unique, le bouton est direct :
 
 | Lot | Contenu | Dépendances |
 |---|---|---|
-| **1** | Convertir DonForm, CotisationForm et VirementInterneForm en modaux Bootstrap autonomes écoutant les événements ci-dessus | Aucune |
+| **1** | Convertir DonForm, CotisationForm et VirementInterneForm en modaux Bootstrap autonomes écoutant les événements ci-dessus. Les modaux sont intégrés dans leurs écrans existants (`/dons`, `/cotisations`, `/virements`) qui déclenchent les événements — ces écrans servent de terrain de recette pour le Lot 1. | Aucune |
 | **2** | Implémenter TransactionUniverselle (route `/transactions/all` provisoire) | Lot 1 |
 | **3** | Remplacer `/transactions` par TransactionUniverselle | Lot 2 |
 | **4** | Remplacer `/transactions/compte/{id}` | Lot 2 |
