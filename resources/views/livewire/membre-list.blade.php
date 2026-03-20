@@ -1,4 +1,13 @@
 <div>
+    {{-- Toolbar --}}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div></div>
+        <button wire:click="$dispatch('open-cotisation-form', { id: null })"
+                class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg"></i> Nouvelle cotisation
+        </button>
+    </div>
+
     {{-- Barre de filtres --}}
     <div class="d-flex gap-3 align-items-center mb-3 flex-wrap">
         <div class="btn-group" role="group">
@@ -83,7 +92,7 @@
                                     <i class="bi bi-clock-history"></i>
                                 </a>
                                 <button
-                                    wire:click="$dispatch('open-cotisation-for-tiers', { tiersId: {{ $membre->id }} })"
+                                    wire:click="$dispatch('open-cotisation-for-tiers', { tiers_id: {{ $membre->id }} })"
                                     class="btn btn-sm btn-outline-primary"
                                     title="Nouvelle cotisation">
                                     <i class="bi bi-plus-circle"></i>
