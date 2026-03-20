@@ -202,13 +202,12 @@ final class TransactionUniverselle extends Component
         if (! in_array($sourceType, $allowed, true)) {
             return;
         }
-        $event = match ($sourceType) {
-            'depense', 'recette' => 'open-transaction-form',
-            'don' => 'open-don-form',
-            'cotisation' => 'open-cotisation-form',
-            'virement_sortant', 'virement_entrant' => 'open-virement-form',
+        match ($sourceType) {
+            'depense', 'recette' => $this->dispatch('open-transaction-form', type: $sourceType, id: $id),
+            'don' => $this->dispatch('open-don-form', id: $id),
+            'cotisation' => $this->dispatch('open-cotisation-form', id: $id),
+            'virement_sortant', 'virement_entrant' => $this->dispatch('open-virement-form', id: $id),
         };
-        $this->dispatch($event, id: $id);
     }
 
     // Expansion de ligne
