@@ -238,7 +238,7 @@ final class TransactionUniverselle extends Component
 
     private function fetchTransactionDetail(int $id): array
     {
-        $tx = Transaction::with(['lignes.sousCategorie.categorie', 'operation'])->find($id);
+        $tx = Transaction::with(['lignes.sousCategorie.categorie', 'lignes.operation'])->find($id);
         if (! $tx) {
             return [];
         }
@@ -249,7 +249,7 @@ final class TransactionUniverselle extends Component
                 'sous_categorie' => $l->sousCategorie?->nom,
                 'montant' => (float) $l->montant,
             ])->toArray(),
-            'operation' => $tx->operation?->nom,
+            'operation' => $tx->lignes->first()?->operation?->nom,
         ];
     }
 
