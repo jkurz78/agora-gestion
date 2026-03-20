@@ -164,12 +164,14 @@ Un clic sur la ligne (hors actions) ouvre une zone de détail inline (toggle Alp
 
 ## 8. Bouton "Nouveau"
 
-En vue libre (aucun type verrouillé), un bouton **"+ Nouvelle transaction"** en haut à droite ouvre un **dropdown Bootstrap** listant les types disponibles (Dépense, Recette, Don, Cotisation). Le clic sur un type dispatche l'événement Livewire `openModal` du formulaire correspondant.
+En vue libre (aucun type verrouillé), un bouton **"+ Nouvelle transaction"** en haut à droite ouvre un **dropdown Bootstrap** listant les types disponibles (Dépense, Recette, Don, Cotisation, Virement). Le clic sur un type dispatche l'événement Livewire `openModal` du formulaire correspondant.
 
 En vue verrouillée sur un type unique, le bouton est direct :
 - `$types = ['depense']` → "Nouvelle dépense" → TransactionForm
+- `$types = ['recette']` → "Nouvelle recette" → TransactionForm
 - `$types = ['don']` → "Nouveau don" → DonForm
 - `$types = ['cotisation']` → "Nouvelle cotisation" → CotisationForm
+- `$types = ['virement']` → "Nouveau virement" → VirementInterneForm
 
 ---
 
