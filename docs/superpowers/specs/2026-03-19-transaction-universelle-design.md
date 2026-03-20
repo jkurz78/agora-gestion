@@ -144,8 +144,10 @@ Chaque colonne filtrable dispose d'une **icône loupe** visible au survol. Un cl
 
 ## 7. Expansion de ligne
 
-Un clic sur la ligne (hors actions) ouvre une ligne de détail en ligne lazy-loadée :
+Un clic sur la ligne (hors actions) ouvre une zone de détail inline (toggle Alpine.js + appel Livewire au premier ouverture) :
 - Lignes de ventilation (dépenses/recettes multi-lignes)
+- **Opération** — opération budgétaire associée (si renseignée)
+- **Séance** — séance/réunion d'association liée (si renseignée)
 - Notes / observations
 - Informations de saisie (date, auteur)
 
