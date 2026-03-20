@@ -25,7 +25,7 @@ afterEach(function () {
 it('renders the form component', function () {
     Livewire::test(DonForm::class)
         ->assertOk()
-        ->assertSee('Nouveau don');
+        ->assertDontSee('Nouveau don');
 });
 
 it('can save a don with existing tiers', function () {
@@ -93,7 +93,7 @@ it('can load existing don for editing', function () {
     ]);
 
     Livewire::test(DonForm::class)
-        ->call('edit', $don->id)
+        ->call('editDon', $don->id)
         ->assertSet('donId', $don->id)
         ->assertSet('mode_paiement', 'cb')
         ->assertSet('objet', 'Don annuel')
@@ -112,7 +112,7 @@ it('can update an existing don', function () {
     ]);
 
     Livewire::test(DonForm::class)
-        ->call('edit', $don->id)
+        ->call('editDon', $don->id)
         ->set('montant', '250.00')
         ->set('objet', 'Nouvel objet')
         ->call('save')
@@ -128,7 +128,7 @@ it('can update an existing don', function () {
 
 it('rejette une date hors exercice', function () {
     Livewire::test(DonForm::class)
-        ->call('showNewForm')
+        ->dispatch('open-don-form', id: null)
         ->set('date', '2025-08-01')
         ->set('montant', '100.00')
         ->set('mode_paiement', 'virement')
