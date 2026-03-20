@@ -86,7 +86,7 @@ use Livewire\WithPagination;
 - Create: `app/Services/TransactionUniverselleService.php`
 - Test: `tests/Feature/TransactionUniverselleServiceTest.php`
 
-### Colonnes UNION (ordre strict, 17 colonnes)
+### Colonnes UNION (ordre strict, 16 colonnes)
 
 ```
 id             INT     — PK de l'entité source
@@ -371,6 +371,7 @@ private function brancheDepense(
 
 ```php
 $outer = DB::query()->fromSub($union, 't')
+    ->when($searchTiers, fn($q) => $q->where('t.tiers', 'like', "%{$searchTiers}%"))
     ->when($searchLibelle, fn($q) => $q->where('t.libelle', 'like', "%{$searchLibelle}%"))
     ->when($searchReference, fn($q) => $q->where('t.reference', 'like', "%{$searchReference}%"))
     ->when($searchNumeroPiece, fn($q) => $q->where('t.numero_piece', 'like', "%{$searchNumeroPiece}%"))
@@ -839,7 +840,7 @@ it('supprime un don via deleteRow', function () {
 });
 
 it('ne supprime pas une transaction pointée', function () {
-    $tx = Transaction::factory()->depense()->create([
+    $tx = Transaction::factory()->asDepense()->create([
         'date'   => '2025-10-01',
         'pointe' => true,
     ]);
