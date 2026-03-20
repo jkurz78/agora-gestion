@@ -122,6 +122,10 @@ Chaque colonne filtrable dispose d'une **icône loupe** visible au survol. Un cl
 
 ## 6. Actions par type
 
+### Règle globale — transactions pointées
+
+Les boutons **Modifier** et **Supprimer** sont masqués quand la transaction est pointée (rapprochement bancaire validé). Seule exception : TransactionForm affiche le verrou et permet de le lever explicitement depuis le modal.
+
 ### Dépenses / Recettes
 
 - **Modifier** : ouvre le modal TransactionForm existant (incluant les lignes de ventilation et l'accès au verrou si rapprochement)
@@ -129,17 +133,18 @@ Chaque colonne filtrable dispose d'une **icône loupe** visible au survol. Un cl
 
 ### Dons
 
-- **Modifier** : ouvre DonForm modal (à créer — Lot 1)
+- **Modifier** : ouvre DonForm modal (Lot 1)
 - **Supprimer** : confirmation, soft delete
 
 ### Cotisations
 
-- **Supprimer** uniquement (pas d'édition, cohérent avec l'écran actuel)
+- **Modifier** : ouvre CotisationForm modal (Lot 1) — le champ Tiers/Membre est affiché en lecture seule, non modifiable
+- **Supprimer** : confirmation, suppression
 
 ### Virements internes
 
-- **Modifier** : ouvre VirementForm modal (à créer — Lot 1)
-- Pas de suppression depuis la ligne (action sur le virement complet, pas la demi-écriture)
+- **Modifier** : ouvre VirementInterneForm modal (Lot 1)
+- **Supprimer** : confirmation, supprime le virement complet (les deux demi-écritures). Les deux lignes du UNION disparaissent au rechargement.
 
 ---
 
