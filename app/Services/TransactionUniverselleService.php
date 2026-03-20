@@ -33,6 +33,14 @@ final class TransactionUniverselleService
         int $perPage = 25,
         int $page = 1,
     ): array {
+        $allowedColumns = ['id', 'date', 'numero_piece', 'reference', 'tiers', 'libelle',
+            'categorie_label', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
+            'montant', 'pointe', 'source_type', 'tiers_type', 'tiers_id'];
+        if (! in_array($sortColumn, $allowedColumns, true)) {
+            $sortColumn = 'date';
+        }
+        $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
+
         $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin);
 
         $outer = DB::query()->fromSub($union, 't')
@@ -108,6 +116,16 @@ final class TransactionUniverselleService
         if ($include['virement']) {
             $queries[] = $this->brancheVirementSortant($compteId, $tiersId, $dateDebut, $dateFin);
             $queries[] = $this->brancheVirementEntrant($compteId, $tiersId, $dateDebut, $dateFin);
+        }
+
+        if (empty($queries)) {
+            // No types selected — return a query that yields no rows
+            return DB::table('transactions')->whereRaw('1 = 0')->selectRaw(
+                "id, 'depense' as source_type, NULL as date, NULL as numero_piece, NULL as reference,
+                 NULL as tiers, NULL as tiers_type, NULL as tiers_id, NULL as libelle,
+                 NULL as categorie_label, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
+                 NULL as mode_paiement, 0 as montant, NULL as pointe"
+            );
         }
 
         $base = array_shift($queries);
