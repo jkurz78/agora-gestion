@@ -181,7 +181,9 @@ En vue verrouillée sur un type unique, le bouton est direct :
 
 | Écran actuel | Route | Composant | Sort |
 |---|---|---|---|
-| Liste transactions | `/transactions` | TransactionList | Remplacé — Lot 3 |
+| Liste transactions — Toutes | `/transactions` | TransactionList | Remplacé — Lot 3 → `$types = ['depense', 'recette']` |
+| Liste transactions — Dépenses | `/transactions?type=depense` | TransactionList | Remplacé — Lot 3 → `$types = ['depense']` |
+| Liste transactions — Recettes | `/transactions?type=recette` | TransactionList | Remplacé — Lot 3 → `$types = ['recette']` |
 | Transactions par compte | `/transactions/compte/{id}` | TransactionCompteList | Remplacé — Lot 4 |
 | Transactions par tiers | `/membres/{id}/transactions` | TiersTransactions | Remplacé — Lot 5 |
 | Liste dons | `/dons` | DonList | Remplacé — Lot 6 |
