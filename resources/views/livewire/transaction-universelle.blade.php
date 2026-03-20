@@ -162,9 +162,9 @@
                                     <hr class="my-1">
                                     <div class="d-flex flex-column gap-1">
                                         <label class="form-label small mb-0">Début</label>
-                                        <input wire:model.live="filterDateDebut" type="date" class="form-control form-control-sm">
+                                        <x-date-input name="filterDateDebut" wire:model.live="filterDateDebut" :value="$filterDateDebut" />
                                         <label class="form-label small mb-0">Fin</label>
-                                        <input wire:model.live="filterDateFin" type="date" class="form-control form-control-sm">
+                                        <x-date-input name="filterDateFin" wire:model.live="filterDateFin" :value="$filterDateFin" />
                                     </div>
                                 </div>
                             </span>
