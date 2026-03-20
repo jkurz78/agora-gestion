@@ -37,23 +37,33 @@ final class DonForm extends Component
 
     public bool $showForm = false;
 
-    #[On('edit-don')]
-    public function edit(int $id): void
+    #[On('open-don-form')]
+    public function open(?int $id = null): void
     {
-        $don = Don::findOrFail($id);
-
-        $this->donId = $don->id;
-        $this->date = $don->date->format('Y-m-d');
-        $this->montant = (string) $don->montant;
-        $this->mode_paiement = $don->mode_paiement->value;
-        $this->objet = $don->objet;
-        $this->tiers_id = $don->tiers_id;
-        $this->sous_categorie_id = $don->sous_categorie_id;
-        $this->operation_id = $don->operation_id;
-        $this->seance = $don->seance;
-        $this->compte_id = $don->compte_id;
-
+        $this->resetForm();
+        if ($id !== null) {
+            $don = Don::findOrFail($id);
+            $this->donId = $don->id;
+            $this->date = $don->date->format('Y-m-d');
+            $this->montant = (string) $don->montant;
+            $this->mode_paiement = $don->mode_paiement->value;
+            $this->objet = $don->objet ?? '';
+            $this->tiers_id = $don->tiers_id;
+            $this->sous_categorie_id = $don->sous_categorie_id;
+            $this->operation_id = $don->operation_id;
+            $this->seance = $don->seance;
+            $this->compte_id = $don->compte_id;
+        } else {
+            $this->date = app(ExerciceService::class)->defaultDate();
+            $this->sous_categorie_id = Don::where('saisi_par', auth()->id())->latest()->value('sous_categorie_id');
+        }
         $this->showForm = true;
+    }
+
+    #[On('edit-don')]
+    public function editDon(int $id): void
+    {
+        $this->open($id);
     }
 
     public function resetForm(): void
@@ -63,14 +73,6 @@ final class DonForm extends Component
             'tiers_id', 'sous_categorie_id', 'operation_id', 'seance', 'compte_id', 'showForm',
         ]);
         $this->resetValidation();
-    }
-
-    public function showNewForm(): void
-    {
-        $this->resetForm();
-        $this->date = app(ExerciceService::class)->defaultDate();
-        $this->sous_categorie_id = Don::where('saisi_par', auth()->id())->latest()->value('sous_categorie_id');
-        $this->showForm = true;
     }
 
     public function save(): void
