@@ -124,6 +124,10 @@ final class TransactionUniverselle extends Component
             $this->filterTypes = array_values(array_filter($this->filterTypes, fn ($t) => $t !== $type));
         } else {
             $this->filterTypes[] = $type;
+            $allTypes = $this->lockedTypes ?? ['depense', 'recette', 'don', 'cotisation', 'virement'];
+            if (! array_diff($allTypes, $this->filterTypes)) {
+                $this->filterTypes = [];
+            }
         }
         $this->resetPage();
     }
