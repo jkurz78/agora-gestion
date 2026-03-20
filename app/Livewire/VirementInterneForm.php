@@ -38,20 +38,29 @@ final class VirementInterneForm extends Component
         $this->date = app(ExerciceService::class)->defaultDate();
     }
 
-    #[On('edit-virement')]
-    public function edit(int $id): void
+    #[On('open-virement-form')]
+    public function open(?int $id = null): void
     {
-        $virement = VirementInterne::findOrFail($id);
-
-        $this->virementId = $virement->id;
-        $this->date = $virement->date->format('Y-m-d');
-        $this->montant = (string) $virement->montant;
-        $this->compte_source_id = $virement->compte_source_id;
-        $this->compte_destination_id = $virement->compte_destination_id;
-        $this->reference = $virement->reference;
-        $this->notes = $virement->notes;
-
+        $this->resetForm();
+        if ($id !== null) {
+            $virement = VirementInterne::findOrFail($id);
+            $this->virementId = $virement->id;
+            $this->date = $virement->date->format('Y-m-d');
+            $this->montant = (string) $virement->montant;
+            $this->compte_source_id = $virement->compte_source_id;
+            $this->compte_destination_id = $virement->compte_destination_id;
+            $this->reference = $virement->reference;
+            $this->notes = $virement->notes;
+        } else {
+            $this->date = app(ExerciceService::class)->defaultDate();
+        }
         $this->showForm = true;
+    }
+
+    #[On('edit-virement')]
+    public function editVirement(int $id): void
+    {
+        $this->open($id);
     }
 
     public function resetForm(): void
