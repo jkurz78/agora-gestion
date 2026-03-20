@@ -126,7 +126,7 @@ final class CotisationForm extends Component
             'comptes' => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
             'tiersNom' => $this->tiersLocked && $this->tiers_id
-                ? (Tiers::find($this->tiers_id)?->nom_complet ?? '')
+                ? (Tiers::find($this->tiers_id)?->displayName() ?? '')
                 : '',
         ]);
     }
