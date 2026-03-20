@@ -427,20 +427,28 @@
                         <div class="d-flex gap-1" @click.stop>
                             <button type="button"
                                     @click="$dispatch('{{ $editEvent }}', { id: {{ $tx->id }} })"
-                                    @if($isLocked) style="display:none" @endif
                                     class="btn btn-sm btn-outline-primary"
                                     style="padding:.15rem .3rem;font-size:.7rem"
                                     title="Modifier">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button type="button" wire:click="deleteRow('{{ e($tx->source_type) }}', {{ $tx->id }})"
-                                    wire:confirm="Supprimer cette ligne ?"
-                                    @if($isLocked) style="display:none" @endif
-                                    class="btn btn-sm btn-outline-danger"
-                                    style="padding:.15rem .3rem;font-size:.7rem"
-                                    title="Supprimer">
-                                <i class="bi bi-trash"></i>
-                            </button>
+                            @if($isLocked)
+                                <button type="button" disabled
+                                        class="btn btn-sm btn-outline-danger"
+                                        style="padding:.15rem .3rem;font-size:.7rem;opacity:.4;cursor:not-allowed"
+                                        title="Écriture rapprochée bancaire — suppression interdite">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            @else
+                                <button type="button"
+                                        wire:click="deleteRow('{{ e($tx->source_type) }}', {{ $tx->id }})"
+                                        wire:confirm="Supprimer cette ligne ?"
+                                        class="btn btn-sm btn-outline-danger"
+                                        style="padding:.15rem .3rem;font-size:.7rem"
+                                        title="Supprimer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            @endif
                         </div>
                     </td>
                 </tr>
