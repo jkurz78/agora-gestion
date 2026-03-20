@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\ModePaiement;
 use App\Models\CompteBancaire;
+use App\Models\Cotisation;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\CotisationService;
@@ -30,6 +31,10 @@ final class CotisationForm extends Component
 
     public bool $showForm = false;
 
+    public ?int $cotisationId = null;
+
+    public bool $tiersLocked = false;
+
     public function showNewForm(): void
     {
         $this->resetForm();
@@ -39,18 +44,37 @@ final class CotisationForm extends Component
 
     public function resetForm(): void
     {
-        $this->reset(['tiers_id', 'sous_categorie_id', 'montant', 'date_paiement', 'mode_paiement', 'compte_id', 'showForm']);
+        $this->reset(['tiers_id', 'sous_categorie_id', 'montant', 'date_paiement', 'mode_paiement', 'compte_id', 'showForm', 'cotisationId', 'tiersLocked']);
         $this->resetValidation();
+    }
+
+    #[On('open-cotisation-form')]
+    public function open(?int $id = null): void
+    {
+        $this->resetForm();
+        if ($id !== null) {
+            $cotisation = Cotisation::findOrFail($id);
+            $this->cotisationId = $cotisation->id;
+            $this->tiers_id = $cotisation->tiers_id;
+            $this->sous_categorie_id = $cotisation->sous_categorie_id;
+            $this->montant = (string) $cotisation->montant;
+            $this->date_paiement = $cotisation->date_paiement->format('Y-m-d');
+            $this->mode_paiement = $cotisation->mode_paiement->value;
+            $this->compte_id = $cotisation->compte_id;
+            $this->tiersLocked = true;
+        } else {
+            $this->date_paiement = app(ExerciceService::class)->defaultDate();
+        }
+        $this->showForm = true;
     }
 
     #[On('open-cotisation-for-tiers')]
     public function openForTiers(?int $tiersId = null): void
     {
-        $this->resetForm();
-        $this->date_paiement = app(ExerciceService::class)->defaultDate();
-        $this->showForm = true;
+        $this->open(null);
         if ($tiersId !== null) {
             $this->tiers_id = $tiersId;
+            $this->tiersLocked = true;
         }
     }
 
@@ -85,7 +109,12 @@ final class CotisationForm extends Component
             'exercice' => $exerciceService->current(),
         ];
 
-        app(CotisationService::class)->create($tiers, $data);
+        if ($this->cotisationId !== null) {
+            $cotisation = Cotisation::findOrFail($this->cotisationId);
+            $cotisation->update($data);
+        } else {
+            app(CotisationService::class)->create($tiers, $data);
+        }
 
         $this->dispatch('cotisation-saved');
         $this->resetForm();
