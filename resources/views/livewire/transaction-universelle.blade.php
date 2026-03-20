@@ -11,22 +11,36 @@
     <div class="mb-3 d-flex justify-content-between align-items-center">
         @if(count($availableTypes) === 1)
             @php $type = $availableTypes[0]; @endphp
-            <button wire:click="$dispatch('{{ match($type) {
-                'depense' => 'open-transaction-form', 'recette' => 'open-transaction-form',
-                'don' => 'open-don-form', 'cotisation' => 'open-cotisation-form',
-                'virement' => 'open-virement-form', default => 'open-transaction-form'
-            } }}', { id: null {{ $type === 'depense' ? ", type: 'depense'" : ($type === 'recette' ? ", type: 'recette'" : '') }} })"
+            @php
+                $newEvent = match($type) {
+                    'depense' => 'open-transaction-form',
+                    'recette' => 'open-transaction-form',
+                    'don' => 'open-don-form',
+                    'cotisation' => 'open-cotisation-form',
+                    'virement' => 'open-virement-form',
+                    default => 'open-transaction-form',
+                };
+                $newPayload = match($type) {
+                    'depense' => "{ id: null, type: 'depense' }",
+                    'recette' => "{ id: null, type: 'recette' }",
+                    default => '{ id: null }',
+                };
+                $newLabel = match($type) {
+                    'depense' => 'Nouvelle dépense',
+                    'recette' => 'Nouvelle recette',
+                    'don' => 'Nouveau don',
+                    'cotisation' => 'Nouvelle cotisation',
+                    'virement' => 'Nouveau virement',
+                    default => 'Nouveau',
+                };
+            @endphp
+            <button type="button" @click="$dispatch('{{ $newEvent }}', {{ $newPayload }})"
                     class="btn btn-sm btn-primary">
-                <i class="bi bi-plus-lg"></i>
-                {{ match($type) {
-                    'depense' => 'Nouvelle dépense', 'recette' => 'Nouvelle recette',
-                    'don' => 'Nouveau don', 'cotisation' => 'Nouvelle cotisation',
-                    'virement' => 'Nouveau virement', default => 'Nouveau'
-                } }}
+                <i class="bi bi-plus-lg"></i> {{ $newLabel }}
             </button>
         @else
             <div class="dropdown">
-                <button class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
                     <i class="bi bi-plus-lg"></i> Nouvelle transaction
                 </button>
                 <ul class="dropdown-menu">
@@ -63,7 +77,7 @@
     {{-- [3] Toggles type (only if count($availableTypes) > 1) --}}
     @if(count($availableTypes) > 1)
     <div class="mb-3 d-flex gap-1 flex-wrap">
-        <button wire:click="$set('filterTypes', [])"
+        <button type="button" wire:click="$set('filterTypes', [])"
                 class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
             Toutes
         </button>
@@ -79,7 +93,7 @@
                 };
                 $active = in_array($type, $filterTypes);
             @endphp
-            <button wire:click="toggleType('{{ $type }}')"
+            <button type="button" wire:click="toggleType('{{ $type }}')"
                     class="btn btn-sm {{ $active ? "btn-{$btnClass}" : "btn-outline-{$btnClass}" }}">
                 {{ $label }}
             </button>
@@ -136,13 +150,13 @@
                                      class="position-absolute bg-white border rounded shadow-sm p-2 text-dark"
                                      style="z-index:200;min-width:220px;top:1.2rem;left:0">
                                     <div class="d-flex flex-column gap-1 mb-2">
-                                        <button wire:click="applyDatePreset('exercice')" @click="open=false"
+                                        <button type="button" wire:click="applyDatePreset('exercice')" @click="open=false"
                                                 class="btn btn-outline-secondary btn-sm text-start">Exercice en cours</button>
-                                        <button wire:click="applyDatePreset('mois')" @click="open=false"
+                                        <button type="button" wire:click="applyDatePreset('mois')" @click="open=false"
                                                 class="btn btn-outline-secondary btn-sm text-start">Mois en cours</button>
-                                        <button wire:click="applyDatePreset('trimestre')" @click="open=false"
+                                        <button type="button" wire:click="applyDatePreset('trimestre')" @click="open=false"
                                                 class="btn btn-outline-secondary btn-sm text-start">Trimestre en cours</button>
-                                        <button wire:click="applyDatePreset('all')" @click="open=false"
+                                        <button type="button" wire:click="applyDatePreset('all')" @click="open=false"
                                                 class="btn btn-outline-secondary btn-sm text-start">Toutes les dates</button>
                                     </div>
                                     <hr class="my-1">
@@ -401,21 +415,25 @@
                         </td>
                     @endif
                     <td>
-                        <div class="d-flex gap-1" @click.stop>
-                            <button wire:click="$dispatch('{{ match($tx->source_type) {
+                        @php
+                            $editEvent = match($tx->source_type) {
                                 'depense', 'recette' => 'open-transaction-form',
                                 'don' => 'open-don-form',
                                 'cotisation' => 'open-cotisation-form',
                                 'virement_sortant', 'virement_entrant' => 'open-virement-form',
-                                default => 'open-transaction-form'
-                            } }}', { id: {{ $tx->id }} })"
+                                default => 'open-transaction-form',
+                            };
+                        @endphp
+                        <div class="d-flex gap-1" @click.stop>
+                            <button type="button"
+                                    @click="$dispatch('{{ $editEvent }}', { id: {{ $tx->id }} })"
                                     @if($isLocked) style="display:none" @endif
                                     class="btn btn-sm btn-outline-primary"
                                     style="padding:.15rem .3rem;font-size:.7rem"
                                     title="Modifier">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button wire:click="deleteRow('{{ $tx->source_type }}', {{ $tx->id }})"
+                            <button type="button" wire:click="deleteRow('{{ e($tx->source_type) }}', {{ $tx->id }})"
                                     wire:confirm="Supprimer cette ligne ?"
                                     @if($isLocked) style="display:none" @endif
                                     class="btn btn-sm btn-outline-danger"
