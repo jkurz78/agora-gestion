@@ -25,6 +25,7 @@ it('renders the form component', function (): void {
     Livewire::actingAs($this->user)
         ->test(CotisationForm::class)
         ->assertOk()
+        ->call('showNewForm')
         ->assertSee('Nouvelle cotisation');
 });
 
