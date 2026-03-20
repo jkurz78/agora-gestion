@@ -181,6 +181,12 @@ final class TransactionUniverselle extends Component
 
     public function sortBy(string $column): void
     {
+        $allowed = ['id', 'date', 'numero_piece', 'reference', 'tiers', 'libelle',
+            'categorie_label', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
+            'montant', 'pointe', 'source_type'];
+        if (! in_array($column, $allowed, true)) {
+            return;
+        }
         if ($this->sortColumn === $column) {
             $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
         } else {
@@ -260,6 +266,10 @@ final class TransactionUniverselle extends Component
     // Suppression
     public function deleteRow(string $sourceType, int $id): void
     {
+        $allowed = ['depense', 'recette', 'don', 'cotisation', 'virement_sortant', 'virement_entrant'];
+        if (! in_array($sourceType, $allowed, true)) {
+            return;
+        }
         match ($sourceType) {
             'depense', 'recette' => $this->deleteTransaction($id),
             'don' => $this->deleteDon($id),
@@ -383,7 +393,7 @@ final class TransactionUniverselle extends Component
             'rows' => $rows,
             'paginator' => $result['paginator'],
             'showSolde' => $showSolde,
-            'comptes' => CompteBancaire::orderBy('nom')->get(),
+            'comptes' => $this->compteId === null ? CompteBancaire::orderBy('nom')->get() : collect(),
             'modesPaiement' => ModePaiement::cases(),
             'availableTypes' => $this->lockedTypes ?? ['depense', 'recette', 'don', 'cotisation', 'virement'],
             'showCompteCol' => $this->compteId === null,
