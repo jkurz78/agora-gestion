@@ -102,7 +102,7 @@
     @endif
 
     {{-- [4] Table --}}
-    <div class="table-responsive">
+    <div class="table-responsive" style="overflow:visible">
         <table class="table table-sm table-hover align-middle">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
