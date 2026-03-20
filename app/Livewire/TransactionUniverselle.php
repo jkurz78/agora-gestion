@@ -245,11 +245,12 @@ final class TransactionUniverselle extends Component
 
         return [
             'lignes' => $tx->lignes->map(fn ($l) => [
-                'categorie' => $l->sousCategorie?->categorie?->nom,
                 'sous_categorie' => $l->sousCategorie?->nom,
+                'operation' => $l->operation?->nom,
+                'seance' => $l->seance,
                 'montant' => (float) $l->montant,
+                'notes' => $l->notes,
             ])->toArray(),
-            'operation' => $tx->lignes->first()?->operation?->nom,
         ];
     }
 
