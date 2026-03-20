@@ -33,7 +33,7 @@ Quand `$exercice` est null, l'écran démarre sur l'exercice courant (résolu vi
 
 Filtres que l'utilisateur peut manipuler librement. Ils s'affichent uniquement si le champ correspondant n'est pas verrouillé.
 
-- **Type** — boutons toggle au-dessus du tableau (un par type actif dans le scope)
+- **Type** — boutons toggle au-dessus du tableau. Un bouton **"Toutes"** en premier, suivi d'un bouton par type disponible dans le scope. Comportement : "Toutes" est actif par défaut et s'active en exclusivité (désactive les autres) ; activer un type spécifique désactive "Toutes" ; si tous les types spécifiques sont désactivés, "Toutes" se réactive automatiquement.
 - **Date** — QBE popover sur la colonne Date : Exercice en cours / Mois en cours / Trimestre / Semestre / Dates libres (date début + date fin)
 - **Tiers / Contrepartie** — QBE popover, recherche textuelle
 - **Compte** — QBE popover, select parmi les comptes
