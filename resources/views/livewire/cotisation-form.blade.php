@@ -16,7 +16,7 @@
                             <label class="form-label fw-semibold">Tiers (membre) <span class="text-danger">*</span></label>
                             @if($tiersLocked)
                                 <input type="text" class="form-control" readonly
-                                       value="{{ $tiers_id ? \App\Models\Tiers::find($tiers_id)?->nom_complet : '' }}">
+                                       value="{{ $tiersNom }}">
                             @else
                                 <livewire:tiers-autocomplete wire:model="tiers_id" filtre="tous" :key="'cotisation-tiers-new'" />
                                 @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
