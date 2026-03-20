@@ -25,13 +25,16 @@ Ces props sont injectées par la route ou le composant parent. L'utilisateur ne 
 | `$types` | `?array` | Types autorisés (ex. `['don']`) — masque le filtre Type |
 | `$exercice` | `?int` | Exercice — verrouille la plage de dates |
 
-Quand `$exercice` est fourni, les dates sont bornées sur l'exercice et le filtre de dates est masqué (label discret "Exercice XXXX–XXXX" affiché à la place).
+Quand `$exercice` est fourni, les dates sont verrouillées sur cet exercice — la colonne Date affiche un label discret "Exercice XXXX–XXXX" sans loupe.
+
+Quand `$exercice` est null, l'écran démarre sur l'exercice courant (résolu via `ExerciceService::exerciceCourant()`) mais l'utilisateur peut modifier librement la plage — y compris la vider pour accéder à toutes les écritures.
 
 ### Filtres libres (utilisateur)
 
 Filtres que l'utilisateur peut manipuler librement. Ils s'affichent uniquement si le champ correspondant n'est pas verrouillé.
 
-- **Type** — boutons toggle (un par type actif dans le scope)
+- **Type** — boutons toggle au-dessus du tableau (un par type actif dans le scope)
+- **Date** — QBE popover sur la colonne Date : Exercice en cours / Mois en cours / Trimestre / Semestre / Dates libres (date début + date fin)
 - **Tiers / Contrepartie** — QBE popover, recherche textuelle
 - **Compte** — QBE popover, select parmi les comptes
 - **Référence** — QBE popover, recherche textuelle
@@ -40,11 +43,9 @@ Filtres que l'utilisateur peut manipuler librement. Ils s'affichent uniquement s
 - **Mode de paiement** — QBE popover, select
 - **Pointé** — QBE popover, select (Tous / Oui / Non)
 
+La barre au-dessus du tableau contient **uniquement les boutons Type**. Tous les autres filtres passent par les popovers QBE des colonnes. Il n'y a pas de champs date dans la barre principale.
+
 > **Note :** Les dons et cotisations n'ont pas de référence dans le UNION (colonne `NULL`). Le filtre Référence actif retournera zéro résultat pour ces types — comportement attendu, non bloquant.
-
-### Filtres de dates
-
-Par défaut, l'écran est borné sur l'exercice courant (ou l'exercice verrouillé). En vue libre (aucun verrouillage), un contrôle de plage de dates est disponible dans la barre de filtres.
 
 ---
 
