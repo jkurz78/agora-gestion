@@ -10,11 +10,11 @@
                 }
             }
         });
-        $wire.on('cotisation-saved', () => {
+        $wire.on('cotisation-saved', (event) => {
             localStorage.setItem('cotisation_defaults', JSON.stringify({
-                sous_categorie_id: $wire.sous_categorie_id,
-                mode_paiement: $wire.mode_paiement,
-                compte_id: $wire.compte_id,
+                sous_categorie_id: event.sous_categorie_id ?? null,
+                mode_paiement: event.mode_paiement ?? '',
+                compte_id: event.compte_id ?? null,
             }));
         });
     "

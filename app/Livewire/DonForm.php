@@ -136,7 +136,11 @@ final class DonForm extends Component
             $service->create($data);
         }
 
-        $this->dispatch('don-saved');
+        $this->dispatch('don-saved',
+            sous_categorie_id: $this->sous_categorie_id,
+            mode_paiement: $this->mode_paiement,
+            compte_id: $this->compte_id,
+        );
         $this->resetForm();
     }
 
