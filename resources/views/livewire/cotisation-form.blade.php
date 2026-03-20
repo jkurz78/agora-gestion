@@ -18,7 +18,7 @@
                                 <input type="text" class="form-control" readonly
                                        value="{{ $tiersNom }}">
                             @else
-                                <livewire:tiers-autocomplete wire:model="tiers_id" filtre="tous" :key="'cotisation-tiers-new'" />
+                                <livewire:tiers-autocomplete wire:model="tiers_id" filtre="recettes" :key="'cotisation-tiers-new'" />
                                 @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                             @endif
                         </div>
