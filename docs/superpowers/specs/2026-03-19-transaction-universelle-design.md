@@ -35,7 +35,7 @@ Filtres que l'utilisateur peut manipuler librement. Ils s'affichent uniquement s
 
 - **Type** — boutons toggle au-dessus du tableau. Un bouton **"Toutes"** en premier, suivi d'un bouton par type disponible dans le scope. Comportement : "Toutes" est actif par défaut et s'active en exclusivité (désactive les autres) ; activer un type spécifique désactive "Toutes" ; si tous les types spécifiques sont désactivés, "Toutes" se réactive automatiquement.
 - **Date** — QBE popover sur la colonne Date : Exercice en cours / Mois en cours / Trimestre en cours / Dates libres (date début + date fin)
-- **Tiers / Contrepartie** — QBE popover, recherche textuelle
+- **Tiers / Contrepartie** — QBE popover, recherche textuelle. La recherche porte sur le champ `tiers` du UNION, qui contient le nom du tiers pour les dépenses/recettes/dons/cotisations, et le nom du compte contrepartie (`→ Livret A`, `← CCP`) pour les virements.
 - **Compte** — QBE popover, select parmi les comptes
 - **Référence** — QBE popover, recherche textuelle
 - **N° pièce** — QBE popover, recherche textuelle
