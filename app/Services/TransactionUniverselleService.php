@@ -163,7 +163,8 @@ final class TransactionUniverselleService
                 cb.nom as compte_nom,
                 tx.mode_paiement,
                 -(tx.montant_total) as montant,
-                tx.pointe
+                tx.pointe,
+                tx.notes
             ")
             ->where('tx.type', 'depense')
             ->whereNull('tx.deleted_at')
@@ -200,7 +201,8 @@ final class TransactionUniverselleService
                 cb.nom as compte_nom,
                 tx.mode_paiement,
                 tx.montant_total as montant,
-                tx.pointe
+                tx.pointe,
+                tx.notes
             ")
             ->where('tx.type', 'recette')
             ->whereNull('tx.deleted_at')
@@ -236,7 +238,8 @@ final class TransactionUniverselleService
                 cb.nom as compte_nom,
                 dn.mode_paiement,
                 dn.montant,
-                dn.pointe
+                dn.pointe,
+                NULL as notes
             ")
             ->whereNull('dn.deleted_at')
             ->when($compteId !== null, fn ($q) => $q->where('dn.compte_id', $compteId))
@@ -271,7 +274,8 @@ final class TransactionUniverselleService
                 cb.nom as compte_nom,
                 c.mode_paiement,
                 c.montant,
-                c.pointe
+                c.pointe,
+                NULL as notes
             ")
             ->whereNull('c.deleted_at')
             ->when($compteId !== null, fn ($q) => $q->where('c.compte_id', $compteId))
@@ -305,7 +309,8 @@ final class TransactionUniverselleService
                 cb_src.nom as compte_nom,
                 NULL as mode_paiement,
                 -(vi.montant) as montant,
-                (vi.rapprochement_source_id IS NOT NULL) as pointe
+                (vi.rapprochement_source_id IS NOT NULL) as pointe,
+                vi.notes
             ")
             ->whereNull('vi.deleted_at')
             ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))
@@ -339,7 +344,8 @@ final class TransactionUniverselleService
                 cb_dest.nom as compte_nom,
                 NULL as mode_paiement,
                 vi.montant,
-                (vi.rapprochement_destination_id IS NOT NULL) as pointe
+                (vi.rapprochement_destination_id IS NOT NULL) as pointe,
+                vi.notes
             ")
             ->whereNull('vi.deleted_at')
             ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))

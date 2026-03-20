@@ -364,7 +364,9 @@
     <script>
         function initTooltips() {
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
-                bootstrap.Tooltip.getOrCreateInstance(el, { delay: { show: 0, hide: 100 } });
+                const existing = bootstrap.Tooltip.getInstance(el);
+                if (existing) existing.dispose();
+                new bootstrap.Tooltip(el, { delay: { show: 0, hide: 100 } });
             });
         }
         document.addEventListener('DOMContentLoaded', initTooltips);
