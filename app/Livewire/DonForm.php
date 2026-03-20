@@ -128,7 +128,7 @@ final class DonForm extends Component
         $this->resetForm();
     }
 
-    public function render()
+    public function render(): \Illuminate\View\View
     {
         return view('livewire.don-form', [
             'naturesdon'   => \App\Models\SousCategorie::where('pour_dons', true)->orderBy('nom')->get(),
