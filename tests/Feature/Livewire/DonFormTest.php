@@ -25,7 +25,7 @@ it('s\'ouvre en édition via open-don-form avec un id', function () {
         ->dispatch('open-don-form', id: $don->id)
         ->assertSet('showForm', true)
         ->assertSet('donId', $don->id)
-        ->assertSet('montant', $don->montant);
+        ->assertSet('montant', (string) $don->montant);
 });
 
 it('se ferme via resetForm', function () {
