@@ -55,9 +55,21 @@ final class DonForm extends Component
             $this->compte_id = $don->compte_id;
         } else {
             $this->date = app(ExerciceService::class)->defaultDate();
-            $this->sous_categorie_id = Don::where('saisi_par', auth()->id())->latest()->value('sous_categorie_id');
         }
         $this->showForm = true;
+    }
+
+    public function applyStoredDefaults(?int $sous_categorie_id, string $mode_paiement, ?int $compte_id): void
+    {
+        if ($sous_categorie_id) {
+            $this->sous_categorie_id = $sous_categorie_id;
+        }
+        if ($mode_paiement !== '') {
+            $this->mode_paiement = $mode_paiement;
+        }
+        if ($compte_id) {
+            $this->compte_id = $compte_id;
+        }
     }
 
     public function resetForm(): void
