@@ -6,6 +6,14 @@
         </div>
     @endif
 
+    {{-- Toolbar --}}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <button wire:click="$dispatch('open-virement-form', { id: null })"
+                class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg"></i> Nouveau virement
+        </button>
+    </div>
+
     @if ($virements->isEmpty())
         <p class="text-muted">Aucun virement enregistré pour cet exercice.</p>
     @else
@@ -42,7 +50,7 @@
                             <td>{{ $virement->saisiPar->nom }}</td>
                             <td>
                                 <div class="d-flex gap-1 justify-content-end">
-                                    <button wire:click="$dispatch('edit-virement', { id: {{ $virement->id }} })"
+                                    <button wire:click="$dispatch('open-virement-form', { id: {{ $virement->id }} })"
                                             class="btn btn-sm btn-outline-primary" title="Modifier">
                                         <i class="bi bi-pencil"></i>
                                     </button>

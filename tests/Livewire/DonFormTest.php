@@ -93,7 +93,7 @@ it('can load existing don for editing', function () {
     ]);
 
     Livewire::test(DonForm::class)
-        ->call('editDon', $don->id)
+        ->dispatch('open-don-form', id: $don->id)
         ->assertSet('donId', $don->id)
         ->assertSet('mode_paiement', 'cb')
         ->assertSet('objet', 'Don annuel')
@@ -112,7 +112,7 @@ it('can update an existing don', function () {
     ]);
 
     Livewire::test(DonForm::class)
-        ->call('editDon', $don->id)
+        ->dispatch('open-don-form', id: $don->id)
         ->set('montant', '250.00')
         ->set('objet', 'Nouvel objet')
         ->call('save')

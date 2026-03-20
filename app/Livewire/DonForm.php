@@ -60,12 +60,6 @@ final class DonForm extends Component
         $this->showForm = true;
     }
 
-    #[On('edit-don')]
-    public function editDon(int $id): void
-    {
-        $this->open($id);
-    }
-
     public function resetForm(): void
     {
         $this->reset([
