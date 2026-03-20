@@ -42,6 +42,19 @@ final class CotisationForm extends Component
         $this->showForm = true;
     }
 
+    public function applyStoredDefaults(?int $sous_categorie_id, string $mode_paiement, ?int $compte_id): void
+    {
+        if ($sous_categorie_id) {
+            $this->sous_categorie_id = $sous_categorie_id;
+        }
+        if ($mode_paiement !== '') {
+            $this->mode_paiement = $mode_paiement;
+        }
+        if ($compte_id) {
+            $this->compte_id = $compte_id;
+        }
+    }
+
     public function resetForm(): void
     {
         $this->reset(['tiers_id', 'sous_categorie_id', 'montant', 'date_paiement', 'mode_paiement', 'compte_id', 'showForm', 'cotisationId', 'tiersLocked']);
