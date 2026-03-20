@@ -128,11 +128,7 @@ final class CotisationForm extends Component
             app(CotisationService::class)->create($tiers, $data);
         }
 
-        $this->dispatch('cotisation-saved',
-            sous_categorie_id: $this->sous_categorie_id,
-            mode_paiement: $this->mode_paiement,
-            compte_id: $this->compte_id,
-        );
+        $this->dispatch('cotisation-saved');
         $this->resetForm();
     }
 

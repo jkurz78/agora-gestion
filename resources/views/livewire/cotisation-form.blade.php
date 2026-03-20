@@ -10,13 +10,6 @@
                 }
             }
         });
-        $wire.on('cotisation-saved', (event) => {
-            localStorage.setItem('cotisation_defaults', JSON.stringify({
-                sous_categorie_id: event.sous_categorie_id ?? null,
-                mode_paiement: event.mode_paiement ?? '',
-                compte_id: event.compte_id ?? null,
-            }));
-        });
     "
 >
     @if($showForm)
@@ -30,7 +23,13 @@
                 </button>
             </div>
             <div class="card-body">
-                <form wire:submit="save">
+                <form wire:submit="save"
+                      x-on:submit="localStorage.setItem('cotisation_defaults', JSON.stringify({
+                          sous_categorie_id: $wire.sous_categorie_id || null,
+                          mode_paiement: $wire.mode_paiement || '',
+                          compte_id: $wire.compte_id || null,
+                      }))"
+                >
                     <div class="row g-3 mb-3">
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Tiers (membre) <span class="text-danger">*</span></label>
