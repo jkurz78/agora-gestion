@@ -98,8 +98,6 @@ final class CotisationForm extends Component
             'date_paiement.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
         ]);
 
-        $tiers = Tiers::findOrFail($validated['tiers_id']);
-
         $data = [
             'sous_categorie_id' => $validated['sous_categorie_id'],
             'montant' => $validated['montant'],
@@ -113,6 +111,7 @@ final class CotisationForm extends Component
             $cotisation = Cotisation::findOrFail($this->cotisationId);
             $cotisation->update($data);
         } else {
+            $tiers = Tiers::findOrFail($validated['tiers_id']);
             app(CotisationService::class)->create($tiers, $data);
         }
 
@@ -126,6 +125,9 @@ final class CotisationForm extends Component
             'postescotisation' => SousCategorie::where('pour_cotisations', true)->orderBy('nom')->get(),
             'comptes' => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
+            'tiersNom' => $this->tiersLocked && $this->tiers_id
+                ? (Tiers::find($this->tiers_id)?->nom_complet ?? '')
+                : '',
         ]);
     }
 }

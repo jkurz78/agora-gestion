@@ -101,3 +101,23 @@ it('rejette une date_paiement après la fin de l\'exercice', function (): void {
         ->call('save')
         ->assertHasErrors(['date_paiement']);
 });
+
+it('s\'ouvre pour une nouvelle cotisation via open-cotisation-form', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(CotisationForm::class)
+        ->dispatch('open-cotisation-form', id: null)
+        ->assertSet('showForm', true)
+        ->assertSet('cotisationId', null);
+});
+
+it('s\'ouvre en édition avec tiers verrouillé via open-cotisation-form', function (): void {
+    $cotisation = Cotisation::factory()->create(['date_paiement' => '2025-10-01']);
+
+    Livewire::actingAs($this->user)
+        ->test(CotisationForm::class)
+        ->dispatch('open-cotisation-form', id: $cotisation->id)
+        ->assertSet('showForm', true)
+        ->assertSet('cotisationId', $cotisation->id)
+        ->assertSet('tiers_id', $cotisation->tiers_id)
+        ->assertSet('tiersLocked', true);
+});
