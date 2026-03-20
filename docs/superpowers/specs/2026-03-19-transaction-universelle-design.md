@@ -152,8 +152,9 @@ Chaque colonne filtrable dispose d'une **icône loupe** visible au survol. Un cl
 
 ## 7. Expansion de ligne
 
-Un clic sur la ligne (hors actions) ouvre une zone de détail inline (toggle Alpine.js + appel Livewire au premier ouverture) :
-- Lignes de ventilation (dépenses/recettes multi-lignes)
+Un clic sur la ligne (hors actions) ouvre une zone de détail inline (toggle Alpine.js + appel Livewire à la première ouverture) :
+- **Lignes de ventilation** (dépenses/recettes multi-lignes) — chaque ligne affiche : catégorie, sous-catégorie, montant
+- **Sous-catégorie** — pour dons et cotisations (attribut direct, pas de ventilation)
 - **Opération** — opération budgétaire associée (si renseignée)
 - **Séance** — séance/réunion d'association liée (si renseignée)
 - Notes / observations
