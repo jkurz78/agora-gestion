@@ -122,9 +122,11 @@ Chaque colonne filtrable dispose d'une **icône loupe** visible au survol. Un cl
 
 ## 6. Actions par type
 
-### Règle globale — transactions pointées
+### Règle globale — disponibilité des actions
 
-Les boutons **Modifier** et **Supprimer** sont masqués quand la transaction est pointée (rapprochement bancaire validé). Seule exception : TransactionForm affiche le verrou et permet de le lever explicitement depuis le modal.
+**Exercice clôturé :** Si l'exercice affiché est marqué comme clôturé (future colonne `cloture` sur la table `exercices`), **tous** les boutons Modifier et Supprimer sont désactivés (`disabled`, grisés) pour toutes les lignes. Un bandeau ou label discret indique que l'exercice est en lecture seule. Le composant détermine cet état lui-même à partir de l'exercice courant — pas de prop `$readonly` externe. Tant que la table `exercices` n'existe pas, cette vérification est un no-op (exercice jamais clôturé).
+
+**Transaction pointée :** Les boutons Modifier et Supprimer sont masqués quand la transaction est pointée (rapprochement bancaire validé). Seule exception : TransactionForm affiche le verrou et permet de le lever explicitement depuis le modal.
 
 ### Dépenses / Recettes
 
