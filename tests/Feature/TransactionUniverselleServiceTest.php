@@ -2,15 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Models\CompteBancaire;
 use App\Models\Cotisation;
 use App\Models\Don;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\TransactionUniverselleService;
 
 beforeEach(function () {
-    $this->svc    = app(TransactionUniverselleService::class);
-    $this->compte = \App\Models\CompteBancaire::factory()->create(['solde_initial' => 0]);
+    $this->svc = app(TransactionUniverselleService::class);
+    $this->compte = CompteBancaire::factory()->create(['solde_initial' => 0]);
 });
 
 it('retourne toutes les entités par défaut', function () {
@@ -24,7 +26,7 @@ it('retourne toutes les entités par défaut', function () {
 });
 
 it('filtre par compteId', function () {
-    $autreCompte = \App\Models\CompteBancaire::factory()->create();
+    $autreCompte = CompteBancaire::factory()->create();
     Transaction::factory()->asDepense()->create(['compte_id' => $this->compte->id, 'date' => '2025-01-10']);
     Transaction::factory()->asDepense()->create(['compte_id' => $autreCompte->id, 'date' => '2025-01-10']);
 
@@ -61,4 +63,17 @@ it('retourne soldeAvantPage non-null quand computeSolde=true et compteId fourni'
 it('retourne soldeAvantPage null quand computeSolde=false', function () {
     $result = $this->svc->paginate($this->compte->id, null, null, null, null, null, null, null, null, null, null, false);
     expect($result['soldeAvantPage'])->toBeNull();
+});
+
+it('exclut les virements quand tiersId est fourni', function () {
+    $compteSource = CompteBancaire::factory()->create();
+    VirementInterne::factory()->create([
+        'compte_source_id' => $compteSource->id,
+        'compte_destination_id' => $this->compte->id,
+        'date' => '2025-06-01',
+    ]);
+    $tiers = Tiers::factory()->create();
+
+    $result = $this->svc->paginate(null, $tiers->id, ['virement'], null, null, null, null, null, null, null, null);
+    expect($result['paginator']->total())->toBe(0);
 });
