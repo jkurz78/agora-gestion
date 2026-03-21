@@ -6,8 +6,8 @@ declare(strict_types=1);
 use App\Models\Tiers;
 use Illuminate\Support\Facades\Schema;
 
-it('displayName returns nom for entreprise', function () {
-    $tiers = new Tiers(['type' => 'entreprise', 'nom' => 'Mairie de Lyon', 'prenom' => null]);
+it('displayName returns nom as fallback when entreprise field is null', function () {
+    $tiers = new Tiers(['type' => 'entreprise', 'entreprise' => null, 'nom' => 'Mairie de Lyon', 'prenom' => null]);
     expect($tiers->displayName())->toBe('Mairie de Lyon');
 });
 
