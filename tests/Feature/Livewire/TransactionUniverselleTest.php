@@ -46,3 +46,13 @@ it('la page /transactions rend TransactionUniverselle avec lockedTypes depense+r
     Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['depense', 'recette']])
         ->assertSet('lockedTypes', ['depense', 'recette']);
 });
+
+it('la page /comptes-bancaires/transactions rend TransactionUniverselle sans lockedTypes', function () {
+    $this->get('/comptes-bancaires/transactions')
+        ->assertStatus(200)
+        ->assertSeeLivewire(TransactionUniverselle::class);
+
+    Livewire::test(TransactionUniverselle::class)
+        ->assertSet('lockedTypes', null)
+        ->assertSet('compteId', null);
+});
