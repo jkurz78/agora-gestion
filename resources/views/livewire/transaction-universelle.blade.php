@@ -7,98 +7,179 @@
         </div>
     @endif
 
-    {{-- [2] Bouton Nouveau (dropdown ou direct) --}}
-    <div class="mb-3 d-flex justify-content-between align-items-center">
-        @if(count($availableTypes) === 1)
-            @php $type = $availableTypes[0]; @endphp
-            @php
-                $newEvent = match($type) {
-                    'depense' => 'open-transaction-form',
-                    'recette' => 'open-transaction-form',
-                    'don' => 'open-don-form',
-                    'cotisation' => 'open-cotisation-form',
-                    'virement' => 'open-virement-form',
-                    default => 'open-transaction-form',
-                };
-                $newPayload = match($type) {
-                    'depense' => "{ id: null, type: 'depense' }",
-                    'recette' => "{ id: null, type: 'recette' }",
-                    default => '{ id: null }',
-                };
-                $newLabel = match($type) {
-                    'depense' => 'Nouvelle dépense',
-                    'recette' => 'Nouvelle recette',
-                    'don' => 'Nouveau don',
-                    'cotisation' => 'Nouvelle cotisation',
-                    'virement' => 'Nouveau virement',
-                    default => 'Nouveau',
-                };
-            @endphp
-            <button type="button" @click="$dispatch('{{ $newEvent }}', {{ $newPayload }})"
-                    class="btn btn-sm btn-primary">
-                <i class="bi bi-plus-lg"></i> {{ $newLabel }}
-            </button>
-        @else
-            <div class="dropdown">
-                <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-plus-lg"></i> Nouvelle transaction
-                </button>
-                <ul class="dropdown-menu">
-                    @if(in_array('depense', $availableTypes))
-                        <li><a class="dropdown-item" href="#"
-                            wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'depense' })">
-                            <i class="bi bi-arrow-down-circle text-danger me-1"></i> Dépense</a></li>
-                    @endif
-                    @if(in_array('recette', $availableTypes))
-                        <li><a class="dropdown-item" href="#"
-                            wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'recette' })">
-                            <i class="bi bi-arrow-up-circle text-success me-1"></i> Recette</a></li>
-                    @endif
-                    @if(in_array('don', $availableTypes))
-                        <li><a class="dropdown-item" href="#"
-                            wire:click.prevent="$dispatch('open-don-form', { id: null })">
-                            <i class="bi bi-heart text-primary me-1"></i> Don</a></li>
-                    @endif
-                    @if(in_array('cotisation', $availableTypes))
-                        <li><a class="dropdown-item" href="#"
-                            wire:click.prevent="$dispatch('open-cotisation-form', { id: null })">
-                            <i class="bi bi-person-check me-1"></i> Cotisation</a></li>
-                    @endif
-                    @if(in_array('virement', $availableTypes))
-                        <li><a class="dropdown-item" href="#"
-                            wire:click.prevent="$dispatch('open-virement-form', { id: null })">
-                            <i class="bi bi-arrow-left-right text-warning me-1"></i> Virement</a></li>
-                    @endif
-                </ul>
-            </div>
-        @endif
-    </div>
+    @php
+        // Calcul du bouton Nouveau (réutilisé dans les deux layouts)
+        if (count($availableTypes) === 1) {
+            $type = $availableTypes[0];
+            $newEvent = match($type) {
+                'depense', 'recette' => 'open-transaction-form',
+                'don'       => 'open-don-form',
+                'cotisation'=> 'open-cotisation-form',
+                'virement'  => 'open-virement-form',
+                default     => 'open-transaction-form',
+            };
+            $newPayload = match($type) {
+                'depense' => "{ id: null, type: 'depense' }",
+                'recette' => "{ id: null, type: 'recette' }",
+                default   => '{ id: null }',
+            };
+            $newLabel = match($type) {
+                'depense'    => 'Nouvelle dépense',
+                'recette'    => 'Nouvelle recette',
+                'don'        => 'Nouveau don',
+                'cotisation' => 'Nouvelle cotisation',
+                'virement'   => 'Nouveau virement',
+                default      => 'Nouveau',
+            };
+        }
+    @endphp
 
-    {{-- [3] Toggles type (only if count($availableTypes) > 1) --}}
-    @if(count($availableTypes) > 1)
-    <div class="mb-3 d-flex gap-1 flex-wrap">
-        <button type="button" wire:click="$set('filterTypes', [])"
-                class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
-            Toutes
-        </button>
-        @foreach($availableTypes as $type)
-            @php
-                [$btnClass, $label] = match($type) {
-                    'depense'   => ['danger',    'DÉP'],
-                    'recette'   => ['success',   'REC'],
-                    'don'       => ['primary',   'DON'],
-                    'cotisation'=> ['secondary', 'COT'],
-                    'virement'  => ['warning',   'VIR'],
-                    default     => ['secondary', strtoupper($type)],
-                };
-                $active = in_array($type, $filterTypes);
-            @endphp
-            <button type="button" wire:click="toggleType('{{ $type }}')"
-                    class="btn btn-sm {{ $active ? "btn-{$btnClass}" : "btn-outline-{$btnClass}" }}">
-                {{ $label }}
+    @if($pageTitle)
+        {{-- Layout compact : ligne 1 = titre + toggles + import ; ligne 2 = Nouveau --}}
+        <div class="mb-2 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h4 class="mb-0"><i class="bi bi-list-ul me-1"></i>{{ $pageTitle }}</h4>
+                @if(count($availableTypes) > 1)
+                    <button type="button" wire:click="$set('filterTypes', [])"
+                            class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
+                        Toutes
+                    </button>
+                    @foreach($availableTypes as $type)
+                        @php
+                            [$btnClass, $label] = match($type) {
+                                'depense'    => ['danger',    'DÉP'],
+                                'recette'    => ['success',   'REC'],
+                                'don'        => ['primary',   'DON'],
+                                'cotisation' => ['secondary', 'COT'],
+                                'virement'   => ['warning',   'VIR'],
+                                default      => ['secondary', strtoupper($type)],
+                            };
+                            $active = in_array($type, $filterTypes);
+                        @endphp
+                        <button type="button" wire:click="toggleType('{{ $type }}')"
+                                class="btn btn-sm {{ $active ? "btn-{$btnClass}" : "btn-outline-{$btnClass}" }}">
+                            {{ $label }}
+                        </button>
+                    @endforeach
+                @endif
+            </div>
+            @if($showImport)
+            <div class="d-flex gap-1 flex-wrap">
+                <livewire:import-csv type="depense" />
+                <livewire:import-csv type="recette" />
+            </div>
+            @endif
+        </div>
+        <div class="mb-3">
+            @if(count($availableTypes) === 1)
+                <button type="button" @click="$dispatch('{{ $newEvent }}', {{ $newPayload }})"
+                        class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg"></i> {{ $newLabel }}
+                </button>
+            @else
+                <div class="dropdown d-inline-block">
+                    <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="bi bi-plus-lg"></i> Nouvelle transaction
+                    </button>
+                    <ul class="dropdown-menu">
+                        @if(in_array('depense', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'depense' })">
+                                <i class="bi bi-arrow-down-circle text-danger me-1"></i> Dépense</a></li>
+                        @endif
+                        @if(in_array('recette', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'recette' })">
+                                <i class="bi bi-arrow-up-circle text-success me-1"></i> Recette</a></li>
+                        @endif
+                        @if(in_array('don', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-don-form', { id: null })">
+                                <i class="bi bi-heart text-primary me-1"></i> Don</a></li>
+                        @endif
+                        @if(in_array('cotisation', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-cotisation-form', { id: null })">
+                                <i class="bi bi-person-check me-1"></i> Cotisation</a></li>
+                        @endif
+                        @if(in_array('virement', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-virement-form', { id: null })">
+                                <i class="bi bi-arrow-left-right text-warning me-1"></i> Virement</a></li>
+                        @endif
+                    </ul>
+                </div>
+            @endif
+        </div>
+
+    @else
+        {{-- Layout standard : ligne 1 = Nouveau ; ligne 2 = toggles --}}
+        <div class="mb-3 d-flex justify-content-between align-items-center">
+            @if(count($availableTypes) === 1)
+                <button type="button" @click="$dispatch('{{ $newEvent }}', {{ $newPayload }})"
+                        class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg"></i> {{ $newLabel }}
+                </button>
+            @else
+                <div class="dropdown">
+                    <button type="button" class="btn btn-sm btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="bi bi-plus-lg"></i> Nouvelle transaction
+                    </button>
+                    <ul class="dropdown-menu">
+                        @if(in_array('depense', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'depense' })">
+                                <i class="bi bi-arrow-down-circle text-danger me-1"></i> Dépense</a></li>
+                        @endif
+                        @if(in_array('recette', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'recette' })">
+                                <i class="bi bi-arrow-up-circle text-success me-1"></i> Recette</a></li>
+                        @endif
+                        @if(in_array('don', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-don-form', { id: null })">
+                                <i class="bi bi-heart text-primary me-1"></i> Don</a></li>
+                        @endif
+                        @if(in_array('cotisation', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-cotisation-form', { id: null })">
+                                <i class="bi bi-person-check me-1"></i> Cotisation</a></li>
+                        @endif
+                        @if(in_array('virement', $availableTypes))
+                            <li><a class="dropdown-item" href="#"
+                                wire:click.prevent="$dispatch('open-virement-form', { id: null })">
+                                <i class="bi bi-arrow-left-right text-warning me-1"></i> Virement</a></li>
+                        @endif
+                    </ul>
+                </div>
+            @endif
+        </div>
+        @if(count($availableTypes) > 1)
+        <div class="mb-3 d-flex gap-1 flex-wrap">
+            <button type="button" wire:click="$set('filterTypes', [])"
+                    class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
+                Toutes
             </button>
-        @endforeach
-    </div>
+            @foreach($availableTypes as $type)
+                @php
+                    [$btnClass, $label] = match($type) {
+                        'depense'    => ['danger',    'DÉP'],
+                        'recette'    => ['success',   'REC'],
+                        'don'        => ['primary',   'DON'],
+                        'cotisation' => ['secondary', 'COT'],
+                        'virement'   => ['warning',   'VIR'],
+                        default      => ['secondary', strtoupper($type)],
+                    };
+                    $active = in_array($type, $filterTypes);
+                @endphp
+                <button type="button" wire:click="toggleType('{{ $type }}')"
+                        class="btn btn-sm {{ $active ? "btn-{$btnClass}" : "btn-outline-{$btnClass}" }}">
+                    {{ $label }}
+                </button>
+            @endforeach
+        </div>
+        @endif
     @endif
 
     {{-- [4] Table --}}
