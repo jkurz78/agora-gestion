@@ -8,7 +8,7 @@ use App\Models\HelloAssoParametres;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
-final class HelloAssoService
+class HelloAssoService
 {
     public function testerConnexion(HelloAssoParametres $parametres): HelloAssoTestResult
     {
