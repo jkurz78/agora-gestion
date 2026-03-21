@@ -165,14 +165,6 @@
                             <i class="bi bi-bank2"></i> Banques
                         </a>
                         <ul class="dropdown-menu">
-                            @if (Route::has('comptes-bancaires.transactions'))
-                            <li>
-                                <a class="dropdown-item {{ request()->routeIs('comptes-bancaires.*') ? 'active' : '' }}"
-                                   href="{{ route('comptes-bancaires.transactions') }}">
-                                    <i class="bi bi-list-ul"></i> Transactions
-                                </a>
-                            </li>
-                            @endif
                             @if (Route::has('rapprochement.index'))
                             <li>
                                 <a class="dropdown-item {{ request()->routeIs('rapprochement.*') ? 'active' : '' }}"

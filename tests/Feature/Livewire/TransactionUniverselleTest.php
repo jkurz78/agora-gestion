@@ -47,14 +47,14 @@ it('la page /transactions rend TransactionUniverselle avec lockedTypes depense+r
         ->assertSet('lockedTypes', ['depense', 'recette']);
 });
 
-it('la page /comptes-bancaires/transactions rend TransactionUniverselle sans lockedTypes', function () {
-    $this->get('/comptes-bancaires/transactions')
+it('la page /comptes-bancaires/{id}/transactions rend TransactionUniverselle avec compteId', function () {
+    $compte = \App\Models\CompteBancaire::factory()->create();
+    $this->get("/comptes-bancaires/{$compte->id}/transactions")
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 
-    Livewire::test(TransactionUniverselle::class)
-        ->assertSet('lockedTypes', null)
-        ->assertSet('compteId', null);
+    Livewire::test(TransactionUniverselle::class, ['compteId' => $compte->id])
+        ->assertSet('compteId', $compte->id);
 });
 
 it('la page /tiers/{id}/transactions rend TransactionUniverselle avec tiersId', function () {
