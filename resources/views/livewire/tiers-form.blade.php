@@ -13,21 +13,19 @@
                 <div class="row g-3">
 
                     {{-- Type --}}
-                    <div class="col-12">
-                        <label class="form-label fw-semibold">Type <span class="text-danger">*</span></label>
-                        <div class="d-flex gap-4">
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio"
-                                       wire:model.live="type" value="particulier" id="type_particulier">
-                                <label class="form-check-label" for="type_particulier">Particulier</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="radio"
-                                       wire:model.live="type" value="entreprise" id="type_entreprise">
-                                <label class="form-check-label" for="type_entreprise">Entreprise</label>
-                            </div>
+                    <div class="col-12 d-flex align-items-center gap-4">
+                        <span class="fw-semibold">Type <span class="text-danger">*</span></span>
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="radio"
+                                   wire:model.live="type" value="particulier" id="type_particulier">
+                            <label class="form-check-label" for="type_particulier">Particulier</label>
                         </div>
-                        @error('type') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                        <div class="form-check mb-0">
+                            <input class="form-check-input" type="radio"
+                                   wire:model.live="type" value="entreprise" id="type_entreprise">
+                            <label class="form-check-label" for="type_entreprise">Entreprise</label>
+                        </div>
+                        @error('type') <span class="text-danger small">{{ $message }}</span> @enderror
                     </div>
 
                     {{-- Entreprise (type = entreprise) --}}
