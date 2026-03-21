@@ -38,7 +38,7 @@
         {{-- Layout compact : ligne 1 = titre + toggles + import ; ligne 2 = Nouveau --}}
         <div class="mb-2 d-flex align-items-center justify-content-between gap-2 flex-wrap">
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <h4 class="mb-0"><i class="bi bi-list-ul me-1"></i>{{ $pageTitle }}</h4>
+                <h4 class="mb-0"><i class="bi bi-{{ $pageTitleIcon }} me-1"></i>{{ $pageTitle }}</h4>
                 @if(count($availableTypes) > 1)
                     <button type="button" wire:click="$set('filterTypes', [])"
                             class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
