@@ -10,6 +10,7 @@ use App\Services\HelloAssoService;
 use Illuminate\View\View;
 use Livewire\Component;
 
+// Nom en minuscules intentionnel : Livewire résout <livewire:parametres.helloasso-form /> en HelloassoForm, pas HelloAssoForm.
 final class HelloassoForm extends Component
 {
     public string $clientId          = '';

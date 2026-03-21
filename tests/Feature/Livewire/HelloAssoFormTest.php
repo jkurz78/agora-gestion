@@ -17,7 +17,7 @@ beforeEach(function () {
 });
 
 it('monte sans configuration existante', function () {
-    Livewire::test(HelloAssoForm::class)
+    Livewire::test(HelloassoForm::class)
         ->assertSet('clientId', '')
         ->assertSet('organisationSlug', '')
         ->assertSet('environnement', 'production')
@@ -33,7 +33,7 @@ it('monte avec configuration existante et ne pré-remplit pas le secret', functi
         'environnement'     => 'production',
     ]);
 
-    Livewire::test(HelloAssoForm::class)
+    Livewire::test(HelloassoForm::class)
         ->assertSet('clientId', 'cid-123')
         ->assertSet('clientSecret', '')
         ->assertSet('organisationSlug', 'association-svs')
@@ -41,7 +41,7 @@ it('monte avec configuration existante et ne pré-remplit pas le secret', functi
 });
 
 it('sauvegarde une nouvelle configuration', function () {
-    Livewire::test(HelloAssoForm::class)
+    Livewire::test(HelloassoForm::class)
         ->set('clientId', 'new-cid')
         ->set('clientSecret', 'new-secret')
         ->set('organisationSlug', 'asso-test')
@@ -65,7 +65,7 @@ it('conserve le secret existant si le champ est laissé vide à la sauvegarde', 
         'environnement'     => 'production',
     ]);
 
-    Livewire::test(HelloAssoForm::class)
+    Livewire::test(HelloassoForm::class)
         ->set('clientId', 'cid-modifie')
         ->set('clientSecret', '')
         ->call('sauvegarder')
@@ -77,7 +77,7 @@ it('conserve le secret existant si le champ est laissé vide à la sauvegarde', 
 });
 
 it('rejette un slug avec des caractères invalides à la sauvegarde', function () {
-    Livewire::test(HelloAssoForm::class)
+    Livewire::test(HelloassoForm::class)
         ->set('clientId', 'cid')
         ->set('organisationSlug', 'SLUG INVALIDE!')
         ->call('sauvegarder')
@@ -91,7 +91,7 @@ it('appelle le service et stocke le succès en tableau', function () {
         ->andReturn(new HelloAssoTestResult(success: true, organisationNom: 'SVS'));
     app()->instance(HelloAssoService::class, $mock);
 
-    Livewire::test(HelloAssoForm::class)
+    Livewire::test(HelloassoForm::class)
         ->set('clientId', 'cid')
         ->set('clientSecret', 'secret')
         ->set('organisationSlug', 'asso-svs')
@@ -107,7 +107,7 @@ it('stocke l\'erreur en tableau si le test échoue', function () {
         ->andReturn(new HelloAssoTestResult(success: false, erreur: "Erreur d'authentification (HTTP 401)"));
     app()->instance(HelloAssoService::class, $mock);
 
-    Livewire::test(HelloAssoForm::class)
+    Livewire::test(HelloassoForm::class)
         ->set('clientId', 'cid')
         ->set('clientSecret', 'mauvais-secret')
         ->set('organisationSlug', 'asso-svs')
@@ -134,7 +134,7 @@ it('utilise le secret en base si clientSecret est vide pour le test', function (
         ->andReturn(new HelloAssoTestResult(success: true, organisationNom: 'SVS'));
     app()->instance(HelloAssoService::class, $mock);
 
-    Livewire::test(HelloAssoForm::class)
+    Livewire::test(HelloassoForm::class)
         ->set('clientId', 'cid')
         ->set('clientSecret', '')
         ->set('organisationSlug', 'asso-svs')
