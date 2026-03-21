@@ -127,7 +127,7 @@
                             <li>
                                 <a class="dropdown-item {{ request()->routeIs('transactions.index') ? 'active' : '' }}"
                                    href="{{ route('transactions.index') }}">
-                                    <i class="bi bi-list-ul"></i> Transactions
+                                    <i class="bi bi-list-ul"></i> Recettes &amp; dépenses
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
@@ -156,6 +156,13 @@
                                 </a>
                             </li>
                             @endif
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('transactions.all') ? 'active' : '' }}"
+                                   href="{{ route('transactions.all') }}">
+                                    <i class="bi bi-collection"></i> Toutes les transactions
+                                </a>
+                            </li>
                         </ul>
                     </li>
 
