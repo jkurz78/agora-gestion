@@ -1,11 +1,11 @@
 {{-- resources/views/livewire/tiers-form.blade.php --}}
 <div>
     {{-- Bouton nouveau --}}
-    @unless ($showForm)
+    @if ($showNewButton && !$showForm)
         <button wire:click="showNewForm" class="btn text-white mb-3" style="background:#722281">
             + Nouveau tiers
         </button>
-    @endunless
+    @endif
 
     {{-- Formulaire --}}
     @if ($showForm)
