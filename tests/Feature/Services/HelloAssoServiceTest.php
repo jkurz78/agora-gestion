@@ -83,3 +83,14 @@ it('utilise la bonne URL pour le sandbox', function () {
     expect($result->success)->toBeTrue();
     expect($result->organisationNom)->toBe('SVS Sandbox');
 });
+
+it('retourne erreur si la réponse OAuth2 ne contient pas de token', function () {
+    Http::fake([
+        'api.helloasso.com/oauth2/token' => Http::response(['error' => 'invalid'], 200),
+    ]);
+
+    $result = $this->service->testerConnexion(makeParametres());
+
+    expect($result->success)->toBeFalse();
+    expect($result->erreur)->toContain('token');
+});
