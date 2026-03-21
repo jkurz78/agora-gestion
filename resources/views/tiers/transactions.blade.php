@@ -6,5 +6,7 @@
         <h1 class="mb-0 h4">Transactions — {{ $tiers->displayName() }}</h1>
     </div>
 
-    <livewire:tiers-transactions :tiersId="$tiers->id" />
+    <livewire:transaction-universelle
+        :tiers-id="$tiers->id"
+        :locked-types="['depense', 'recette', 'don', 'cotisation']" />
 </x-app-layout>
