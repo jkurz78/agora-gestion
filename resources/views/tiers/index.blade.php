@@ -4,7 +4,7 @@
     </x-slot>
 
     <div class="container py-4">
-        @livewire('tiers-form')
+        @livewire('tiers-form', ['showNewButton' => true])
         @livewire('tiers-list')
     </div>
 </x-app-layout>
