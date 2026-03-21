@@ -38,9 +38,11 @@ final class TransactionUniverselle extends Component
 
     public ?int $exercice = null;  // exercice fixe (null = courant)
 
-    public ?string $pageTitle = null; // titre affiché dans le header intégré
+    public ?string $pageTitle = null;     // titre affiché dans le header intégré
 
-    public bool $showImport = false;  // affiche les boutons import CSV dans le header
+    public string $pageTitleIcon = 'list-ul'; // icône Bootstrap du titre
+
+    public bool $showImport = false;      // affiche les boutons import CSV dans le header
 
     // === Filtres libres (manipulables par l'utilisateur) ===
     /** @var array<string> */
@@ -79,6 +81,7 @@ final class TransactionUniverselle extends Component
         ?array $lockedTypes = null,
         ?int $exercice = null,
         ?string $pageTitle = null,
+        string $pageTitleIcon = 'list-ul',
         bool $showImport = false,
     ): void {
         $this->compteId = $compteId;
@@ -86,6 +89,7 @@ final class TransactionUniverselle extends Component
         $this->lockedTypes = $lockedTypes;
         $this->exercice = $exercice;
         $this->pageTitle = $pageTitle;
+        $this->pageTitleIcon = $pageTitleIcon;
         $this->showImport = $showImport;
 
         // Initialiser plage dates sur l'exercice courant
