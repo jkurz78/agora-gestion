@@ -94,6 +94,11 @@
                         @endif
                     </td>
                     <td>
+                        <a href="{{ route('comptes-bancaires.transactions', $compte) }}"
+                           class="btn btn-sm btn-outline-secondary"
+                           data-bs-toggle="tooltip" title="Voir les transactions">
+                            <i class="bi bi-list-ul"></i>
+                        </a>
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 data-bs-toggle="modal"
                                 data-bs-target="#editCompteModal"
