@@ -60,3 +60,8 @@ test('POST /parametres/utilisateurs redirige vers /parametres/utilisateurs', fun
     ]);
     $response->assertRedirect('/parametres/utilisateurs');
 });
+
+test('GET /parametres/helloasso retourne 200', function () {
+    $response = $this->get('/parametres/helloasso');
+    $response->assertStatus(200);
+});
