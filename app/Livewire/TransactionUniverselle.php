@@ -38,6 +38,10 @@ final class TransactionUniverselle extends Component
 
     public ?int $exercice = null;  // exercice fixe (null = courant)
 
+    public ?string $pageTitle = null; // titre affiché dans le header intégré
+
+    public bool $showImport = false;  // affiche les boutons import CSV dans le header
+
     // === Filtres libres (manipulables par l'utilisateur) ===
     /** @var array<string> */
     public array $filterTypes = []; // [] = "Toutes"
@@ -74,11 +78,15 @@ final class TransactionUniverselle extends Component
         ?int $tiersId = null,
         ?array $lockedTypes = null,
         ?int $exercice = null,
+        ?string $pageTitle = null,
+        bool $showImport = false,
     ): void {
         $this->compteId = $compteId;
         $this->tiersId = $tiersId;
         $this->lockedTypes = $lockedTypes;
         $this->exercice = $exercice;
+        $this->pageTitle = $pageTitle;
+        $this->showImport = $showImport;
 
         // Initialiser plage dates sur l'exercice courant
         $exerciceService = app(ExerciceService::class);
