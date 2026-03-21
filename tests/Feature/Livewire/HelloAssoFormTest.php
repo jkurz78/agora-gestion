@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Livewire\Parametres\HelloAssoForm;
+use App\Livewire\Parametres\HelloassoForm;
 use App\Models\HelloAssoParametres;
 use App\Models\User;
 use App\Services\HelloAssoService;
