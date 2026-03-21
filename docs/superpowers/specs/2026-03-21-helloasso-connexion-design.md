@@ -199,31 +199,44 @@ La route hérite du middleware `auth` du groupe parent existant. Pas de gate sup
 
 ## Interface utilisateur
 
-### Bloc d'aide (alerte Bootstrap `alert-info`)
+L'environnement est sélectionné **en premier**, avant tout le reste. Le bloc d'aide (instructions + lien) s'adapte dynamiquement au choix via Livewire (pas de rechargement de page).
 
-Instructions pour créer les credentials sur HelloAsso :
-
-1. Se connecter sur helloasso.com avec un compte administrateur de l'association
-2. Aller dans Tableau de bord > API > Mes applications
-3. Créer une nouvelle application, copier le **Client ID** et le **Client Secret**
-4. Le slug organisation est visible dans l'URL de votre espace HelloAsso : `helloasso.com/associations/{slug}`
-
-### Formulaire
+### Structure de l'écran
 
 ```
-Environnement    ○ Production  ○ Sandbox
+Sur quel environnement HelloAsso voulez-vous vous connecter ?
 
-Client ID        [________________________________]
+  ○ Production    ○ Sandbox
 
-Client Secret    [________________________________]
-                 (chiffré en base de données)
-                 Si déjà enregistré : laisser vide pour conserver la valeur actuelle
+┌─ alert-info ──────────────────────────────────────────────────┐
+│ Pour connecter l'application, connectez-vous sur              │
+│ [admin.helloasso.com] (ou [admin.helloasso-sandbox.com])      │
+│ avec un compte administrateur de l'association, puis :        │
+│                                                               │
+│ 1. Allez dans Tableau de bord > API > Mes applications        │
+│ 2. Créez une nouvelle application                             │
+│ 3. Copiez le Client ID et le Client Secret ci-dessous         │
+│ 4. Le slug organisation est visible dans l'URL de votre       │
+│    espace : helloasso.com/associations/{slug}                 │
+└───────────────────────────────────────────────────────────────┘
 
-Slug organisation [_______________________________]
+Client ID         [________________________________]
+
+Client Secret     [________________________________]
+                  (chiffré en base de données)
+                  Si déjà enregistré : laisser vide pour conserver
+
+Slug organisation [________________________________]
                   ex : association-svs
 
 [ Enregistrer ]   [ Tester la connexion ]
 ```
+
+**Comportement dynamique du lien dans le bloc d'aide :**
+- Environnement `production` → lien `https://admin.helloasso.com`
+- Environnement `sandbox` → lien `https://admin.helloasso-sandbox.com`
+
+Le lien change dès que le radio button est modifié (réactivité Livewire standard, pas d'appel serveur supplémentaire nécessaire — `wire:model` sur `$environnement` suffit, la vue Blade rerend le bon lien).
 
 - `client_secret` : champ `type="password"`, jamais pré-rempli si déjà enregistré en base
 - Si `client_secret` déjà enregistré et champ laissé vide à la sauvegarde → conserver la valeur existante
