@@ -58,6 +58,9 @@ jobs:
             "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/list" \
             | grep "${{ steps.ip.outputs.ipv4 }}"
 
+      - name: Wait for firewall to apply
+        run: sleep 30
+
       - name: Install SSH key
         run: |
           mkdir -p ~/.ssh
