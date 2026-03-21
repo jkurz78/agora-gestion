@@ -40,9 +40,14 @@
                             @error('entreprise') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label text-muted">Contact</label>
+                            <label class="form-label text-muted">Nom du contact</label>
                             <input type="text" wire:model="nom" class="form-control"
-                                   placeholder="Nom du contact (optionnel)">
+                                   placeholder="Nom (optionnel)">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted">Prénom du contact</label>
+                            <input type="text" wire:model="prenom" class="form-control"
+                                   placeholder="Prénom (optionnel)">
                         </div>
                     @else
                         {{-- Particulier --}}
