@@ -1,5 +1,10 @@
 <x-app-layout>
-    <h1 class="mb-4">Transactions</h1>
-    <livewire:transaction-form />
-    <livewire:transaction-list />
+    <div class="container-fluid py-3">
+        <h4 class="mb-3"><i class="bi bi-list-ul me-2"></i>Transactions</h4>
+        <div class="mb-3">
+            <livewire:import-csv type="depense" />
+            <livewire:import-csv type="recette" />
+        </div>
+        <livewire:transaction-universelle :lockedTypes="['depense', 'recette']" />
+    </div>
 </x-app-layout>
