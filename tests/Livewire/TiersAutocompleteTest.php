@@ -70,14 +70,22 @@ it('dispatches open-tiers-form with prefill when creating new tiers', function (
     Livewire::test(TiersAutocomplete::class, ['filtre' => 'recettes'])
         ->set('search', 'Jean Dupont')
         ->call('openCreateModal')
-        ->assertDispatched('open-tiers-form');
+        ->assertDispatched('open-tiers-form', fn ($eventName, $eventParams) =>
+            ($eventParams['prefill']['nom'] ?? null) === 'Jean Dupont' &&
+            ($eventParams['prefill']['pour_recettes'] ?? null) === true &&
+            ($eventParams['prefill']['pour_depenses'] ?? null) === false
+        );
 });
 
 it('dispatches open-tiers-form with depenses flag for depenses filter', function () {
     Livewire::test(TiersAutocomplete::class, ['filtre' => 'depenses'])
         ->set('search', 'ACME')
         ->call('openCreateModal')
-        ->assertDispatched('open-tiers-form');
+        ->assertDispatched('open-tiers-form', fn ($eventName, $eventParams) =>
+            ($eventParams['prefill']['nom'] ?? null) === 'ACME' &&
+            ($eventParams['prefill']['pour_recettes'] ?? null) === false &&
+            ($eventParams['prefill']['pour_depenses'] ?? null) === true
+        );
 });
 
 it('selects tiers on tiers-saved event', function () {
