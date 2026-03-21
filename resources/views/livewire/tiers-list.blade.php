@@ -70,7 +70,7 @@
                             </a>
                             <button
                                 class="btn btn-sm btn-outline-primary me-1"
-                                wire:click="$dispatch('edit-tiers', { id: {{ $tiers->id }} })"
+                                wire:click="requestEdit({{ $tiers->id }})"
                                 title="Modifier"
                             ><i class="bi bi-pencil"></i></button>
                             <button
