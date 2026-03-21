@@ -37,6 +37,11 @@ final class TiersList extends Component
     #[On('tiers-saved')]
     public function refresh(): void {}
 
+    public function requestEdit(int $id): void
+    {
+        $this->dispatch('edit-tiers', id: $id);
+    }
+
     public function delete(int $id): void
     {
         $tiers = Tiers::findOrFail($id);
