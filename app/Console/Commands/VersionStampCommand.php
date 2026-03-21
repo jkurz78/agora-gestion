@@ -28,10 +28,10 @@ final class VersionStampCommand extends Command
      */
     public static function readGitVersion(): array
     {
-        exec('git describe --tags --always 2>/dev/null', $tagOutput, $tagCode);
-        exec('git log -1 --format=%as 2>/dev/null', $dateOutput, $dateCode);
+        $versionFile = base_path('VERSION');
+        $tag  = file_exists($versionFile) ? trim((string) file_get_contents($versionFile)) : 'dev';
 
-        $tag  = ($tagCode === 0 && isset($tagOutput[0])) ? trim($tagOutput[0]) : 'dev';
+        exec('git log -1 --format=%as 2>/dev/null', $dateOutput, $dateCode);
         $date = ($dateCode === 0 && isset($dateOutput[0])) ? trim($dateOutput[0]) : date('Y-m-d');
 
         return [
