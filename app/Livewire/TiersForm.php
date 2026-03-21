@@ -45,6 +45,8 @@ final class TiersForm extends Component
 
     public bool $showDetails = false;
 
+    public ?string $helloasso_id = null;
+
     public function showNewForm(): void
     {
         $this->reset([
@@ -86,6 +88,8 @@ final class TiersForm extends Component
         $this->date_naissance = $tiers->date_naissance?->format('Y-m-d');
         $this->pour_depenses  = $tiers->pour_depenses;
         $this->pour_recettes  = $tiers->pour_recettes;
+
+        $this->helloasso_id   = $tiers->helloasso_id;
 
         $this->showDetails = (bool) ($tiers->email || $tiers->telephone
             || $tiers->adresse_ligne1 || $tiers->code_postal
