@@ -25,7 +25,7 @@ final class TiersForm extends Component
 
     public ?string $telephone = null;
 
-    public ?string $adresse = null;
+    public ?string $adresse_ligne1 = null;
 
     public bool $pour_depenses = false;
 
@@ -37,7 +37,7 @@ final class TiersForm extends Component
     {
         $this->reset([
             'tiersId', 'type', 'nom', 'prenom', 'email',
-            'telephone', 'adresse', 'pour_depenses', 'pour_recettes',
+            'telephone', 'adresse_ligne1', 'pour_depenses', 'pour_recettes',
         ]);
         $this->type = 'particulier';
         $this->resetValidation();
@@ -55,7 +55,7 @@ final class TiersForm extends Component
         $this->prenom = $tiers->prenom;
         $this->email = $tiers->email;
         $this->telephone = $tiers->telephone;
-        $this->adresse = $tiers->adresse;
+        $this->adresse_ligne1 = $tiers->adresse_ligne1;
         $this->pour_depenses = $tiers->pour_depenses;
         $this->pour_recettes = $tiers->pour_recettes;
         $this->showForm = true;
@@ -65,7 +65,7 @@ final class TiersForm extends Component
     {
         $this->reset([
             'tiersId', 'type', 'nom', 'prenom', 'email',
-            'telephone', 'adresse', 'pour_depenses', 'pour_recettes', 'showForm',
+            'telephone', 'adresse_ligne1', 'pour_depenses', 'pour_recettes', 'showForm',
         ]);
         $this->resetValidation();
     }
@@ -78,7 +78,7 @@ final class TiersForm extends Component
             'prenom' => ['nullable', 'string', 'max:100'],
             'email' => ['nullable', 'email', 'max:255'],
             'telephone' => ['nullable', 'string', 'max:30'],
-            'adresse' => ['nullable', 'string', 'max:500'],
+            'adresse_ligne1' => ['nullable', 'string', 'max:500'],
             'pour_depenses' => ['boolean'],
             'pour_recettes' => ['boolean'],
         ], [

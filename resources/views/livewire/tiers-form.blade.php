@@ -71,7 +71,7 @@
                     {{-- Adresse --}}
                     <div class="col-12">
                         <label class="form-label">Adresse</label>
-                        <textarea wire:model="adresse" class="form-control" rows="2" placeholder="Adresse postale"></textarea>
+                        <textarea wire:model="adresse_ligne1" class="form-control" rows="2" placeholder="Adresse postale"></textarea>
                     </div>
 
                     {{-- Flags --}}

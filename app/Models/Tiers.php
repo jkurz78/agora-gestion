@@ -16,28 +16,35 @@ final class Tiers extends Model
         'type',
         'nom',
         'prenom',
+        'entreprise',
         'email',
         'telephone',
-        'adresse',
+        'adresse_ligne1',
+        'code_postal',
+        'ville',
+        'pays',
+        'date_naissance',
         'pour_depenses',
         'pour_recettes',
+        'helloasso_id',
     ];
 
     protected function casts(): array
     {
         return [
-            'pour_depenses' => 'boolean',
-            'pour_recettes' => 'boolean',
+            'pour_depenses'  => 'boolean',
+            'pour_recettes'  => 'boolean',
+            'date_naissance' => 'date',
         ];
     }
 
     public function displayName(): string
     {
         if ($this->type === 'entreprise') {
-            return $this->nom;
+            return $this->entreprise ?? $this->nom;
         }
 
-        return trim(($this->prenom ? $this->prenom.' ' : '').$this->nom);
+        return trim(($this->prenom ? $this->prenom . ' ' : '') . $this->nom);
     }
 
     public function dons(): HasMany
