@@ -56,3 +56,10 @@ it('la page /comptes-bancaires/transactions rend TransactionUniverselle sans loc
         ->assertSet('lockedTypes', null)
         ->assertSet('compteId', null);
 });
+
+it('la page /tiers/{id}/transactions rend TransactionUniverselle avec tiersId', function () {
+    $tiers = \App\Models\Tiers::factory()->create();
+    $this->get("/tiers/{$tiers->id}/transactions")
+        ->assertStatus(200)
+        ->assertSeeLivewire(TransactionUniverselle::class);
+});
