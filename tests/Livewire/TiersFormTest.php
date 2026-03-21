@@ -187,3 +187,15 @@ it('opens with prefill from open-tiers-form event', function () {
         ->assertSet('pour_recettes', true)
         ->assertSet('pour_depenses', false);
 });
+
+it('switch back to particulier from entreprise leaves fields as-is', function () {
+    Livewire::test(TiersForm::class)
+        ->call('showNewForm')
+        ->set('nom', 'Martin')
+        ->set('prenom', 'Jean')
+        ->set('type', 'entreprise')  // switch: entreprise = 'Jean Martin', nom/prenom vidés
+        ->assertSet('entreprise', 'Jean Martin')
+        ->set('type', 'particulier')  // switch retour: updatedType() ne fait rien pour particulier
+        ->assertSet('entreprise', 'Jean Martin') // entreprise inchangé
+        ->assertSet('nom', '');       // nom reste vide (non restauré, comportement attendu)
+});
