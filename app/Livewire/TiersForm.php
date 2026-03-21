@@ -136,7 +136,7 @@ final class TiersForm extends Component
                 : ['nullable', 'string', 'max:255'],
             'email'          => ['nullable', 'email', 'max:255'],
             'telephone'      => ['nullable', 'string', 'max:30'],
-            'adresse_ligne1' => ['nullable', 'string'],
+            'adresse_ligne1' => ['nullable', 'string', 'max:500'],
             'code_postal'    => ['nullable', 'string', 'max:10'],
             'ville'          => ['nullable', 'string', 'max:100'],
             'pays'           => ['nullable', 'string', 'max:100'],
