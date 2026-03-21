@@ -125,27 +125,9 @@
                         </a>
                         <ul class="dropdown-menu">
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('transactions.*') && !request()->query('type') ? 'active' : '' }}"
+                                <a class="dropdown-item {{ request()->routeIs('transactions.index') ? 'active' : '' }}"
                                    href="{{ route('transactions.index') }}">
-                                    <i class="bi bi-list-ul"></i> Toutes
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ request()->routeIs('transactions.all') ? 'active' : '' }}"
-                                   href="{{ route('transactions.all') }}">
-                                    <i class="bi bi-table"></i> Vue unifiée <span class="badge bg-secondary ms-1" style="font-size:.6rem">v2</span>
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ request()->query('type') === 'depense' ? 'active' : '' }}"
-                                   href="{{ route('transactions.index') }}?type=depense">
-                                    <i class="bi bi-arrow-down-circle"></i> Dépenses
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item {{ request()->query('type') === 'recette' ? 'active' : '' }}"
-                                   href="{{ route('transactions.index') }}?type=recette">
-                                    <i class="bi bi-arrow-up-circle"></i> Recettes
+                                    <i class="bi bi-list-ul"></i> Transactions
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>

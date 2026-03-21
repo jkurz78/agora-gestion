@@ -37,3 +37,12 @@ it('ne supprime pas une transaction pointée', function () {
         ->call('deleteRow', 'depense', $tx->id);
     $this->assertDatabaseHas('transactions', ['id' => $tx->id, 'deleted_at' => null]);
 });
+
+it('la page /transactions rend TransactionUniverselle avec lockedTypes depense+recette', function () {
+    $this->get('/transactions')
+        ->assertStatus(200)
+        ->assertSeeLivewire(TransactionUniverselle::class);
+
+    Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['depense', 'recette']])
+        ->assertSet('lockedTypes', ['depense', 'recette']);
+});
