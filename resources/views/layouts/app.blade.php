@@ -235,6 +235,14 @@
                                 </a>
                             </li>
                             @endif
+                            @if (Route::has('parametres.helloasso'))
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('parametres.helloasso') ? 'active' : '' }}"
+                                   href="{{ route('parametres.helloasso') }}">
+                                    <i class="bi bi-plug"></i> Connexion HelloAsso
+                                </a>
+                            </li>
+                            @endif
                             <li><hr class="dropdown-divider"></li>
                             @if (Route::has('parametres.categories.index'))
                             <li>

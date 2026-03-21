@@ -65,6 +65,7 @@ Route::middleware('auth')->group(function () {
     // Parametres
     Route::prefix('parametres')->name('parametres.')->group(function () {
         Route::view('/association', 'parametres.association')->name('association');
+        Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::resource('sous-categories', SousCategorieController::class)->except(['show']);
         Route::post('sous-categories/{sousCategory}/toggle-flag', [SousCategorieController::class, 'toggleFlag'])->name('sous-categories.toggle-flag');
