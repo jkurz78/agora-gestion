@@ -72,3 +72,12 @@ it('la page /dons rend TransactionUniverselle avec lockedTypes don', function ()
     Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['don']])
         ->assertSet('lockedTypes', ['don']);
 });
+
+it('la page /cotisations rend TransactionUniverselle avec lockedTypes cotisation', function () {
+    $this->get('/cotisations')
+        ->assertStatus(200)
+        ->assertSeeLivewire(TransactionUniverselle::class);
+
+    Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['cotisation']])
+        ->assertSet('lockedTypes', ['cotisation']);
+});

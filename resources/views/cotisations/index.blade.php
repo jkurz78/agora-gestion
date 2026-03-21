@@ -1,4 +1,6 @@
 <x-app-layout>
-    <h1 class="mb-4">Cotisations</h1>
-    <livewire:cotisation-list />
+    <div class="container-fluid py-3">
+        <h4 class="mb-3"><i class="bi bi-people me-2"></i>Cotisations</h4>
+        <livewire:transaction-universelle :locked-types="['cotisation']" />
+    </div>
 </x-app-layout>
