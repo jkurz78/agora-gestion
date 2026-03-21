@@ -63,3 +63,12 @@ it('la page /tiers/{id}/transactions rend TransactionUniverselle avec tiersId', 
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 });
+
+it('la page /dons rend TransactionUniverselle avec lockedTypes don', function () {
+    $this->get('/dons')
+        ->assertStatus(200)
+        ->assertSeeLivewire(TransactionUniverselle::class);
+
+    Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['don']])
+        ->assertSet('lockedTypes', ['don']);
+});
