@@ -59,3 +59,30 @@ it('helloasso_id unique constraint rejects duplicate non-null values', function 
     expect(fn () => Tiers::factory()->create(['helloasso_id' => 'ha-123', 'pour_depenses' => true]))
         ->toThrow(\Illuminate\Database\QueryException::class);
 });
+
+it('displayName returns entreprise field for entreprise type', function () {
+    $tiers = new Tiers(['type' => 'entreprise', 'entreprise' => 'ACME Corp', 'nom' => 'Dupont']);
+    expect($tiers->displayName())->toBe('ACME Corp');
+});
+
+it('displayName falls back to nom when entreprise field is null', function () {
+    $tiers = new Tiers(['type' => 'entreprise', 'entreprise' => null, 'nom' => 'Mairie de Lyon']);
+    expect($tiers->displayName())->toBe('Mairie de Lyon');
+});
+
+it('can create tiers with all new fields', function () {
+    $tiers = Tiers::factory()->create([
+        'entreprise'     => 'ACME Corp',
+        'code_postal'    => '75001',
+        'ville'          => 'Paris',
+        'pays'           => 'France',
+        'date_naissance' => '1990-05-15',
+        'helloasso_id'   => 'ha-abc123',
+        'pour_depenses'  => true,
+    ]);
+    expect($tiers->entreprise)->toBe('ACME Corp');
+    expect($tiers->code_postal)->toBe('75001');
+    expect($tiers->pays)->toBe('France');
+    expect($tiers->helloasso_id)->toBe('ha-abc123');
+    expect($tiers->date_naissance)->toBeInstanceOf(\Illuminate\Support\Carbon::class);
+});
