@@ -24,7 +24,7 @@ final class TiersFactory extends Factory
             'prenom' => $type === 'particulier' ? fake()->firstName() : null,
             'email' => fake()->optional()->safeEmail(),
             'telephone' => fake()->optional()->phoneNumber(),
-            'adresse' => fake()->optional()->address(),
+            'adresse_ligne1' => fake()->optional()->address(),
             'pour_depenses' => fake()->boolean(60),
             'pour_recettes' => fake()->boolean(40),
         ];
