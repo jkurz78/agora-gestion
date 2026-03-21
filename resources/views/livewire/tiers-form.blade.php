@@ -32,7 +32,7 @@
 
                     {{-- Entreprise (type = entreprise) --}}
                     @if ($type === 'entreprise')
-                        <div class="col-md-8">
+                        <div class="col-12">
                             <label class="form-label">Raison sociale <span class="text-danger">*</span></label>
                             <input type="text" wire:model="entreprise"
                                    class="form-control @error('entreprise') is-invalid @enderror"
