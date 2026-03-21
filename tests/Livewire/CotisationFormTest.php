@@ -113,7 +113,7 @@ it('s\'ouvre pour une nouvelle cotisation via open-cotisation-form', function ()
 it('s\'ouvre pour un tiers via open-cotisation-for-tiers', function (): void {
     Livewire::actingAs($this->user)
         ->test(CotisationForm::class)
-        ->dispatch('open-cotisation-for-tiers', tiers_id: $this->tiers->id)
+        ->dispatch('open-cotisation-for-tiers', tiersId: $this->tiers->id)
         ->assertSet('showForm', true)
         ->assertSet('tiers_id', $this->tiers->id)
         ->assertSet('tiersLocked', true);
