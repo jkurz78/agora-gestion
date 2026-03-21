@@ -78,8 +78,12 @@
 
             {{-- 4. Boutons --}}
             <div class="d-flex gap-2 mb-3">
-                <button type="button" class="btn btn-primary" wire:click="sauvegarder">
-                    Enregistrer
+                <button type="button" class="btn btn-primary" wire:click="sauvegarder"
+                        wire:loading.attr="disabled" wire:target="sauvegarder">
+                    <span wire:loading.remove wire:target="sauvegarder">Enregistrer</span>
+                    <span wire:loading wire:target="sauvegarder">
+                        <span class="spinner-border spinner-border-sm" role="status"></span> Enregistrement…
+                    </span>
                 </button>
                 <button type="button" class="btn btn-outline-secondary" wire:click="testerConnexion"
                         wire:loading.attr="disabled">
