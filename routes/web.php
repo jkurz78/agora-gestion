@@ -20,7 +20,6 @@ Route::middleware('auth')->group(function () {
 
     // Livewire full-page routes (just need route + view)
     Route::view('/transactions', 'transactions.index')->name('transactions.index');
-    Route::view('/transactions/all', 'transactions.all')->name('transactions.all');
     Route::view('/dons', 'dons.index')->name('dons.index');
     Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
     Route::view('/membres', 'membres.index')->name('membres.index');
