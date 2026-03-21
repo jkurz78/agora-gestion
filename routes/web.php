@@ -37,8 +37,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
         ->name('rapprochement.pdf');
     Route::view('/virements', 'virements.index')->name('virements.index');
-    Route::get('comptes-bancaires/transactions', function () {
-        return view('comptes-bancaires.transactions');
+    Route::get('comptes-bancaires/{compte}/transactions', function (\App\Models\CompteBancaire $compte) {
+        return view('comptes-bancaires.transactions', compact('compte'));
     })->name('comptes-bancaires.transactions');
     Route::view('/rapports', 'rapports.index')->name('rapports.index');
     Route::view('/profil', 'profil.index')->name('profil.index');
