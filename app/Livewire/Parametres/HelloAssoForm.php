@@ -10,7 +10,7 @@ use App\Services\HelloAssoService;
 use Illuminate\View\View;
 use Livewire\Component;
 
-final class HelloAssoForm extends Component
+final class HelloassoForm extends Component
 {
     public string $clientId          = '';
     public string $clientSecret      = '';
