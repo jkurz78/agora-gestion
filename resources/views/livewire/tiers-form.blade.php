@@ -3,8 +3,7 @@
     {{-- Formulaire --}}
     @if ($showForm)
         <div class="position-fixed top-0 start-0 w-100 h-100"
-             style="background:rgba(0,0,0,.5);z-index:2000;overflow-y:auto"
-             wire:click.self="resetForm">
+             style="background:rgba(0,0,0,.5);z-index:2000;overflow-y:auto">
         <div class="container py-4">
         <div class="card mb-4 shadow-sm border-0">
             <div class="card-header fw-semibold" style="background:#722281;color:white">
