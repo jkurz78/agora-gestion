@@ -14,13 +14,13 @@ final class TiersFactory extends Factory
 
     public function definition(): array
     {
-        $type = fake()->randomElement(['entreprise', 'particulier']);
+        $type = 'particulier';
 
         return [
             'type' => $type,
             'nom' => fake()->lastName(),
-            'prenom' => $type === 'particulier' ? fake()->firstName() : null,
-            'entreprise' => $type === 'entreprise' ? fake()->company() : null,
+            'prenom' => fake()->firstName(),
+            'entreprise' => null,
             'email' => fake()->optional()->safeEmail(),
             'telephone' => fake()->optional()->phoneNumber(),
             'adresse_ligne1' => fake()->optional()->address(),
