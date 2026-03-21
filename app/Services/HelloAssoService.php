@@ -37,6 +37,13 @@ final class HelloAssoService
 
         $token = $tokenResponse->json('access_token');
 
+        if (!is_string($token) || $token === '') {
+            return new HelloAssoTestResult(
+                success: false,
+                erreur: "Réponse inattendue du serveur HelloAsso : token manquant",
+            );
+        }
+
         // Étape 2 : vérifier le slug organisation
         try {
             $orgResponse = Http::timeout(10)
