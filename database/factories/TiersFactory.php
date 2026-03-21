@@ -18,10 +18,9 @@ final class TiersFactory extends Factory
 
         return [
             'type' => $type,
-            'nom' => $type === 'entreprise'
-                ? fake()->company()
-                : fake()->lastName(),
+            'nom' => fake()->lastName(),
             'prenom' => $type === 'particulier' ? fake()->firstName() : null,
+            'entreprise' => $type === 'entreprise' ? fake()->company() : null,
             'email' => fake()->optional()->safeEmail(),
             'telephone' => fake()->optional()->phoneNumber(),
             'adresse_ligne1' => fake()->optional()->address(),
