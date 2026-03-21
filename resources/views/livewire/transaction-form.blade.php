@@ -315,4 +315,6 @@
         </div>
         </div>
     @endif
+
+    <livewire:tiers-form />
 </div>
