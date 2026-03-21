@@ -120,7 +120,7 @@
 
                     {{-- Dropdown Transactions --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('transactions.*') || request()->routeIs('virements.*') || request()->routeIs('dons.*') || request()->routeIs('cotisations.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('transactions.*') || request()->routeIs('dons.*') || request()->routeIs('cotisations.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-arrow-down-up"></i> Transactions
                         </a>
@@ -131,15 +131,6 @@
                                     <i class="bi bi-list-ul"></i> Recettes &amp; dépenses
                                 </a>
                             </li>
-                            <li><hr class="dropdown-divider"></li>
-                            @if (Route::has('virements.index'))
-                            <li>
-                                <a class="dropdown-item {{ request()->routeIs('virements.*') ? 'active' : '' }}"
-                                   href="{{ route('virements.index') }}">
-                                    <i class="bi bi-arrow-left-right"></i> Virements
-                                </a>
-                            </li>
-                            @endif
                             <li><hr class="dropdown-divider"></li>
                             @if (Route::has('dons.index'))
                             <li>
@@ -169,7 +160,7 @@
 
                     {{-- Dropdown Banques --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('comptes-bancaires.*') || request()->routeIs('rapprochement.*') || request()->routeIs('parametres.comptes-bancaires.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('comptes-bancaires.*') || request()->routeIs('rapprochement.*') || request()->routeIs('virements.*') || request()->routeIs('parametres.comptes-bancaires.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-bank2"></i> Banques
                         </a>
@@ -187,6 +178,14 @@
                                 <a class="dropdown-item {{ request()->routeIs('rapprochement.*') ? 'active' : '' }}"
                                    href="{{ route('rapprochement.index') }}">
                                     <i class="bi bi-bank"></i> Rapprochement
+                                </a>
+                            </li>
+                            @endif
+                            @if (Route::has('virements.index'))
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('virements.*') ? 'active' : '' }}"
+                                   href="{{ route('virements.index') }}">
+                                    <i class="bi bi-arrow-left-right"></i> Virements
                                 </a>
                             </li>
                             @endif
