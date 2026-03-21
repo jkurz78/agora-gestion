@@ -13,7 +13,7 @@ it('crée un tiers', function () {
         'prenom' => null,
         'email' => 'contact@mairie.fr',
         'telephone' => null,
-        'adresse' => null,
+        'adresse_ligne1' => null,
         'pour_depenses' => true,
         'pour_recettes' => false,
     ]);
