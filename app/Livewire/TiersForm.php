@@ -45,8 +45,6 @@ final class TiersForm extends Component
 
     public bool $showDetails = false;
 
-    public bool $showNewButton = false;
-
     public function showNewForm(): void
     {
         $this->reset([

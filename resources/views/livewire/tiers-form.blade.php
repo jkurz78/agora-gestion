@@ -1,12 +1,5 @@
 {{-- resources/views/livewire/tiers-form.blade.php --}}
 <div>
-    {{-- Bouton nouveau --}}
-    @if ($showNewButton && !$showForm)
-        <button wire:click="showNewForm" class="btn text-white mb-3" style="background:#722281">
-            + Nouveau tiers
-        </button>
-    @endif
-
     {{-- Formulaire --}}
     @if ($showForm)
         <div class="position-fixed top-0 start-0 w-100 h-100"
