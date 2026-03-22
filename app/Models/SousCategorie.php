@@ -21,6 +21,7 @@ final class SousCategorie extends Model
         'code_cerfa',
         'pour_dons',
         'pour_cotisations',
+        'pour_inscriptions',
     ];
 
     protected function casts(): array
@@ -28,7 +29,8 @@ final class SousCategorie extends Model
         return [
             'categorie_id'     => 'integer',
             'pour_dons'        => 'boolean',
-            'pour_cotisations' => 'boolean',
+            'pour_cotisations'  => 'boolean',
+            'pour_inscriptions' => 'boolean',
         ];
     }
 
