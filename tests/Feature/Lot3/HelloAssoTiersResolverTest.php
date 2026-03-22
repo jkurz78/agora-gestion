@@ -15,7 +15,7 @@ it('extracts unique persons from orders by email', function () {
         ['user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'], 'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com']],
     ];
 
-    $resolver = new HelloAssoTiersResolver();
+    $resolver = new HelloAssoTiersResolver;
     $persons = $resolver->extractPersons($orders);
 
     expect($persons)->toHaveCount(2);
@@ -27,7 +27,7 @@ it('uses payer when user is null', function () {
         ['user' => null, 'payer' => ['firstName' => 'Paul', 'lastName' => 'Durand', 'email' => 'paul@test.com']],
     ];
 
-    $resolver = new HelloAssoTiersResolver();
+    $resolver = new HelloAssoTiersResolver;
     $persons = $resolver->extractPersons($orders);
 
     expect($persons)->toHaveCount(1);
@@ -41,7 +41,7 @@ it('skips orders with no email', function () {
         ['user' => null, 'payer' => null],
     ];
 
-    $resolver = new HelloAssoTiersResolver();
+    $resolver = new HelloAssoTiersResolver;
     $persons = $resolver->extractPersons($orders);
 
     expect($persons)->toHaveCount(0);
@@ -54,7 +54,7 @@ it('marks already linked tiers (est_helloasso + same email)', function () {
         ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
     ];
 
-    $resolver = new HelloAssoTiersResolver();
+    $resolver = new HelloAssoTiersResolver;
     $result = $resolver->resolve($persons);
 
     expect($result['linked'])->toHaveCount(1);
@@ -69,7 +69,7 @@ it('suggests match by email for non-helloasso tiers', function () {
         ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
     ];
 
-    $resolver = new HelloAssoTiersResolver();
+    $resolver = new HelloAssoTiersResolver;
     $result = $resolver->resolve($persons);
 
     expect($result['unlinked'])->toHaveCount(1);
@@ -85,7 +85,7 @@ it('suggests match by name+prenom', function () {
         ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean-nouveau@test.com'],
     ];
 
-    $resolver = new HelloAssoTiersResolver();
+    $resolver = new HelloAssoTiersResolver;
     $result = $resolver->resolve($persons);
 
     expect($result['unlinked'])->toHaveCount(1);
@@ -98,7 +98,7 @@ it('returns empty suggestions when no match', function () {
         ['firstName' => 'Inconnu', 'lastName' => 'Personne', 'email' => 'inconnu@test.com'],
     ];
 
-    $resolver = new HelloAssoTiersResolver();
+    $resolver = new HelloAssoTiersResolver;
     $result = $resolver->resolve($persons);
 
     expect($result['unlinked'])->toHaveCount(1);

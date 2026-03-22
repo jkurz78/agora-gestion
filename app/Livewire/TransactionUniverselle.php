@@ -14,6 +14,7 @@ use App\Services\TransactionService;
 use App\Services\TransactionUniverselleService;
 use App\Services\VirementInterneService;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -40,13 +41,12 @@ final class TransactionUniverselle extends Component
 
     public bool $showImport = false;      // affiche les boutons import CSV dans le header
 
-    #[\Livewire\Attributes\Locked]
+    #[Locked]
     public ?string $sousCategorieFilter = null; // filtre sous-catégorie (pour_dons, pour_cotisations, pour_inscriptions)
 
     // === Filtres libres (manipulables par l'utilisateur) ===
     /** @var array<string> */
     public array $filterTypes = []; // [] = "Toutes"
-
 
     public string $filterDateDebut = '';
 

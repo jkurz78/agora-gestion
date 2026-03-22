@@ -4,7 +4,6 @@
 declare(strict_types=1);
 
 use App\Models\Tiers;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
