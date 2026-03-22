@@ -112,8 +112,8 @@ Bouton "Synchroniser avec HelloAsso"
   │   Pour chaque personne HelloAsso non encore liée à un Tiers SVS :
   │   ├─ Proposition automatique de correspondance (email, nom+prénom)
   │   ├─ Le trésorier choisit :
-  │   │   ├─ Associer à un tiers existant → crée le lien helloasso_id
-  │   │   ├─ Créer un nouveau tiers par import
+  │   │   ├─ Associer à un tiers existant → passe est_helloasso à true
+  │   │   ├─ Créer un nouveau tiers par import (est_helloasso = true)
   │   │   └─ Ignorer (l'item ne sera pas importé)
   │   └─ Un tiers déjà lié (helloasso_id connu) passe automatiquement
   │
@@ -143,11 +143,15 @@ Bouton "Synchroniser avec HelloAsso"
       suivantes passent directement à l'étape 4 si tout est déjà rapproché.
 ```
 
-### Identifiant HelloAsso des tiers
+### Rapprochement des tiers
 
-L'objet User HelloAsso (bénéficiaire) n'a pas d'ID persistant dans l'API. Le `helloasso_id` stocké sur le Tiers est construit à partir de l'**email normalisé** (lowercase, trim) du User HelloAsso. C'est la clé de rapprochement automatique.
+L'objet User HelloAsso (bénéficiaire) n'a **pas d'ID persistant** dans l'API — c'est une structure embarquée (nom, email, adresse) sans identifiant stable. Le rapprochement avec les Tiers SVS se fait par **email** (match principal) et **nom+prénom** (suggestion secondaire).
 
-Un tiers portant un `helloasso_id` est considéré comme **piloté par HelloAsso** : ses données (nom, adresse, etc.) sont mises à jour à chaque synchro. Les modifications manuelles sur ce tiers restent possibles mais seront écrasées lors de la prochaine synchronisation.
+Le champ `helloasso_id` (string) existant sur Tiers est **reconverti en booléen `est_helloasso`** :
+- `est_helloasso = true` → le tiers est piloté par HelloAsso. Ses données (nom, adresse, etc.) sont mises à jour à chaque synchro. Les modifications manuelles restent possibles mais seront écrasées à la prochaine synchronisation.
+- `est_helloasso = false` (défaut) → tiers géré manuellement.
+
+Le lien entre un tiers SVS et une personne HelloAsso est établi lors de l'**étape 2 du workflow** (rapprochement tiers) par le trésorier. Les cas limites (changement d'email, homonymes) sont gérés manuellement à cette étape.
 
 ### Résolution des sous-catégories
 
@@ -404,7 +408,8 @@ Même logique que lot 2, appliquée aux cotisations :
 
 1. Service `HelloAssoApiClient` — encapsule l'authentification OAuth2 et les appels API (orders, cash-outs, forms)
 2. Écran de rapprochement des tiers — liste les personnes HelloAsso non liées, propose correspondances, permet associer/créer/ignorer
-3. Stockage du lien `helloasso_id` sur le Tiers (email normalisé comme clé)
+3. Marquage `est_helloasso = true` sur les Tiers associés
+4. Migration : convertir la colonne `helloasso_id` (string nullable) en `est_helloasso` (boolean, default false)
 
 ### Lot 5 — Synchronisation HelloAsso : rapprochement formulaires et import
 
