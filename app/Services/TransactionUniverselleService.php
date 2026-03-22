@@ -94,6 +94,12 @@ final class TransactionUniverselleService
         ?string $dateFin,
         ?string $sousCategorieFilter = null,
     ): Builder {
+        // Whitelist sous-catégorie filter to prevent SQL injection (column name interpolation)
+        $allowedFilters = ['pour_dons', 'pour_cotisations', 'pour_inscriptions'];
+        if ($sousCategorieFilter !== null && ! in_array($sousCategorieFilter, $allowedFilters, true)) {
+            $sousCategorieFilter = null;
+        }
+
         $include = [
             'depense' => $types === null || in_array('depense', $types, true),
             'recette' => $types === null || in_array('recette', $types, true),
