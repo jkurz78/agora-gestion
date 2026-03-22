@@ -11,6 +11,7 @@ enum ModePaiement: string
     case Especes = 'especes';
     case Cb = 'cb';
     case Prelevement = 'prelevement';
+    case HelloAsso = 'helloasso';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum ModePaiement: string
             self::Especes => 'Espèces',
             self::Cb => 'Carte bancaire',
             self::Prelevement => 'Prélèvement',
+            self::HelloAsso => 'HelloAsso',
         };
     }
 }
