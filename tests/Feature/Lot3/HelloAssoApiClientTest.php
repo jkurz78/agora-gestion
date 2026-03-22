@@ -108,4 +108,4 @@ it('throws on authentication failure', function () {
 
     $client = new HelloAssoApiClient($this->parametres);
     $client->fetchOrders('2025-09-01', '2026-08-31');
-})->throws(\RuntimeException::class, 'Authentification HelloAsso échouée');
+})->throws(RuntimeException::class, 'Authentification HelloAsso échouée');
