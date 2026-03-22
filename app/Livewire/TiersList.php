@@ -24,12 +24,19 @@ final class TiersList extends Component
 
     public string $filtre = ''; // '', 'depenses', 'recettes'
 
+    public bool $filtreHelloasso = false;
+
     public function updatedSearch(): void
     {
         $this->resetPage();
     }
 
     public function updatedFiltre(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFiltreHelloasso(): void
     {
         $this->resetPage();
     }
@@ -71,6 +78,10 @@ final class TiersList extends Component
             $query->where('pour_depenses', true);
         } elseif ($this->filtre === 'recettes') {
             $query->where('pour_recettes', true);
+        }
+
+        if ($this->filtreHelloasso) {
+            $query->whereNotNull('helloasso_id');
         }
 
         return view('livewire.tiers-list', [

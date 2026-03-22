@@ -89,3 +89,23 @@ it('recherche dans le champ email', function () {
         ->assertSee('Martin')
         ->assertDontSee('Dupont');
 });
+
+it('filtre helloasso actif — affiche seulement les tiers avec helloasso_id', function () {
+    Tiers::factory()->avecHelloasso()->create(['nom' => 'Martin']);
+    Tiers::factory()->create(['nom' => 'Dupont', 'helloasso_id' => null]);
+
+    Livewire::test(TiersList::class)
+        ->set('filtreHelloasso', true)
+        ->assertSee('Martin')
+        ->assertDontSee('Dupont');
+});
+
+it('filtre helloasso inactif — affiche tous les tiers', function () {
+    Tiers::factory()->avecHelloasso()->create(['nom' => 'Martin']);
+    Tiers::factory()->create(['nom' => 'Dupont', 'helloasso_id' => null]);
+
+    Livewire::test(TiersList::class)
+        ->set('filtreHelloasso', false)
+        ->assertSee('Martin')
+        ->assertSee('Dupont');
+});
