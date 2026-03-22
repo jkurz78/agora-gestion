@@ -24,6 +24,12 @@ final class TransactionCompteService
         int $perPage = 15,
         int $page = 1,
     ): array {
+        $allowedColumns = ['date', 'libelle', 'montant', 'tiers', 'source_type'];
+        if (! in_array($sortColumn, $allowedColumns, true)) {
+            $sortColumn = 'date';
+        }
+        $sortDirection = in_array($sortDirection, ['asc', 'desc'], true) ? $sortDirection : 'asc';
+
         $showSolde = empty($searchTiers) && $sortColumn === 'date' && $sortDirection === 'asc';
 
         $union = $this->buildUnion($compte, $dateDebut, $dateFin, $searchTiers);
