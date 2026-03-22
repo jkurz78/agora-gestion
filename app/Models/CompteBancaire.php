@@ -47,5 +47,4 @@ final class CompteBancaire extends Model
     {
         return $this->transactions()->where('type', 'recette');
     }
-
 }

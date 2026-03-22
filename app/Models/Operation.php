@@ -55,5 +55,4 @@ final class Operation extends Model
     {
         return $this->hasMany(TransactionLigne::class);
     }
-
 }

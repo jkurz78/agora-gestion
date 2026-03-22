@@ -55,8 +55,12 @@ final class OperationController extends Controller
             ->sum('montant');
         $totalRecettes = $operation->transactionLignes()
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
+            ->whereDoesntHave('sousCategorie', fn ($q) => $q->where('pour_dons', true))
             ->sum('montant');
-        $totalDons = $operation->dons()->sum('montant');
+        $totalDons = (float) $operation->transactionLignes()
+            ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
+            ->whereHas('sousCategorie', fn ($q) => $q->where('pour_dons', true))
+            ->sum('montant');
         $solde = ($totalRecettes + $totalDons) - $totalDepenses;
 
         return view('operations.show', [

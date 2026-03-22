@@ -3,21 +3,30 @@
 declare(strict_types=1);
 
 use App\Livewire\MembreList;
-use App\Models\Cotisation;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use Livewire\Livewire;
 
 beforeEach(function () {
     $this->actingAs(User::factory()->create());
+    $this->cotSc = SousCategorie::factory()->create(['pour_cotisations' => true]);
 });
 
 it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée', function () {
     $tiers = Tiers::factory()->create();
-    // La derniereCotisation est chargée via une relation — on crée une cotisation pointée
-    Cotisation::factory()->create([
+    $tx = Transaction::factory()->asRecette()->create([
         'tiers_id' => $tiers->id,
         'pointe' => true,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'sous_categorie_id' => $this->cotSc->id,
+        'exercice' => 2025,
+        'montant' => 30.00,
     ]);
 
     Livewire::test(MembreList::class)
@@ -27,9 +36,16 @@ it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée',
 
 it('n\'affiche pas le caractère unicode ✓', function () {
     $tiers = Tiers::factory()->create();
-    Cotisation::factory()->create([
+    $tx = Transaction::factory()->asRecette()->create([
         'tiers_id' => $tiers->id,
         'pointe' => true,
+    ]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'sous_categorie_id' => $this->cotSc->id,
+        'exercice' => 2025,
+        'montant' => 30.00,
     ]);
 
     Livewire::test(MembreList::class)
@@ -39,7 +55,14 @@ it('n\'affiche pas le caractère unicode ✓', function () {
 
 it('affiche un bouton bi-clock-history lié aux transactions du membre', function () {
     $tiers = Tiers::factory()->create();
-    Cotisation::factory()->create(['tiers_id' => $tiers->id]);
+    $tx = Transaction::factory()->asRecette()->create(['tiers_id' => $tiers->id]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'sous_categorie_id' => $this->cotSc->id,
+        'exercice' => 2025,
+        'montant' => 30.00,
+    ]);
 
     Livewire::test(MembreList::class)
         ->set('filtre', 'tous')
@@ -49,7 +72,14 @@ it('affiche un bouton bi-clock-history lié aux transactions du membre', functio
 
 it('les boutons d\'action ont la classe btn-sm sans style inline de padding', function () {
     $tiers = Tiers::factory()->create();
-    Cotisation::factory()->create(['tiers_id' => $tiers->id]);
+    $tx = Transaction::factory()->asRecette()->create(['tiers_id' => $tiers->id]);
+    $tx->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'sous_categorie_id' => $this->cotSc->id,
+        'exercice' => 2025,
+        'montant' => 30.00,
+    ]);
 
     Livewire::test(MembreList::class)
         ->set('filtre', 'tous')

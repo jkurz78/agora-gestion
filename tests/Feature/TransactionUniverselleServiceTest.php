@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
@@ -17,12 +15,12 @@ beforeEach(function () {
 
 it('retourne toutes les entités par défaut', function () {
     Transaction::factory()->asDepense()->create(['compte_id' => $this->compte->id, 'date' => '2025-01-10']);
-    Don::factory()->create(['compte_id' => $this->compte->id, 'date' => '2025-01-11']);
-    Cotisation::factory()->create(['compte_id' => $this->compte->id, 'date_paiement' => '2025-01-12']);
+    Transaction::factory()->asRecette()->create(['compte_id' => $this->compte->id, 'date' => '2025-01-11']);
     VirementInterne::factory()->create(['compte_source_id' => $this->compte->id, 'date' => '2025-01-13']);
 
     $result = $this->svc->paginate(null, null, null, null, null, null, null, null, null, null, null);
-    expect($result['paginator']->total())->toBe(5);
+    // depense + recette + virement_sortant + virement_entrant = 4
+    expect($result['paginator']->total())->toBe(4);
 });
 
 it('filtre par compteId', function () {
@@ -36,7 +34,7 @@ it('filtre par compteId', function () {
 
 it('filtre sur types uniquement depense', function () {
     Transaction::factory()->asDepense()->create(['compte_id' => $this->compte->id, 'date' => '2025-01-10']);
-    Don::factory()->create(['compte_id' => $this->compte->id, 'date' => '2025-01-11']);
+    Transaction::factory()->asRecette()->create(['compte_id' => $this->compte->id, 'date' => '2025-01-11']);
 
     $result = $this->svc->paginate(null, null, ['depense'], null, null, null, null, null, null, null, null);
     foreach ($result['paginator']->items() as $row) {
@@ -70,13 +68,13 @@ it('retourne soldeAvantPage non-null quand computeSolde=true et compteId fourni'
     // Page 2 with perPage=1: soldeAvantPage = solde_initial (0) + 100 (first page row)
     $result = $this->svc->paginate(
         $this->compte->id, null, ['recette'], null, null, null, null, null, null, null, null,
-        true, 'date', 'asc', 1, 2
+        null, true, 'date', 'asc', 1, 2
     );
     expect($result['soldeAvantPage'])->toBe(100.0);
 });
 
 it('retourne soldeAvantPage null quand computeSolde=false', function () {
-    $result = $this->svc->paginate($this->compte->id, null, null, null, null, null, null, null, null, null, null, false);
+    $result = $this->svc->paginate($this->compte->id, null, null, null, null, null, null, null, null, null, null, null, false);
     expect($result['soldeAvantPage'])->toBeNull();
 });
 

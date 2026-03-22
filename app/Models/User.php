@@ -45,5 +45,4 @@ final class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(Transaction::class, 'saisi_par');
     }
-
 }

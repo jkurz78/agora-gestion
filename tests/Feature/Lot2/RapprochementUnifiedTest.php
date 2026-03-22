@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
-use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -41,10 +40,10 @@ it('toggle only accepts depense, recette, virement types', function () {
     $service = app(RapprochementBancaireService::class);
 
     expect(fn () => $service->toggleTransaction($rapprochement, 'don', 1))
-        ->toThrow(\InvalidArgumentException::class);
+        ->toThrow(InvalidArgumentException::class);
 
     expect(fn () => $service->toggleTransaction($rapprochement, 'cotisation', 1))
-        ->toThrow(\InvalidArgumentException::class);
+        ->toThrow(InvalidArgumentException::class);
 });
 
 it('supprimer resets only transactions and virements', function () {
