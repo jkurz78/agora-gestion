@@ -49,3 +49,43 @@ it('can delete a tiers', function () {
 
     $this->assertDatabaseMissing('tiers', ['id' => $tiers->id]);
 });
+
+it('recherche dans le champ entreprise', function () {
+    Tiers::factory()->entreprise()->create(['nom' => 'ACME Corp', 'entreprise' => 'ACME Corp', 'ville' => null]);
+    Tiers::factory()->create(['nom' => 'Dupont', 'entreprise' => null]);
+
+    Livewire::test(TiersList::class)
+        ->set('search', 'ACME')
+        ->assertSee('ACME Corp')
+        ->assertDontSee('Dupont');
+});
+
+it('recherche dans le champ ville', function () {
+    Tiers::factory()->create(['nom' => 'Martin', 'ville' => 'Lyon']);
+    Tiers::factory()->create(['nom' => 'Dupont', 'ville' => 'Paris']);
+
+    Livewire::test(TiersList::class)
+        ->set('search', 'Lyon')
+        ->assertSee('Martin')
+        ->assertDontSee('Dupont');
+});
+
+it('recherche dans le champ code_postal', function () {
+    Tiers::factory()->create(['nom' => 'Martin', 'code_postal' => '75001', 'ville' => 'Paris']);
+    Tiers::factory()->create(['nom' => 'Dupont', 'code_postal' => '69001', 'ville' => 'Lyon']);
+
+    Livewire::test(TiersList::class)
+        ->set('search', '75')
+        ->assertSee('Martin')
+        ->assertDontSee('Dupont');
+});
+
+it('recherche dans le champ email', function () {
+    Tiers::factory()->create(['nom' => 'Martin', 'email' => 'martin@acme.fr']);
+    Tiers::factory()->create(['nom' => 'Dupont', 'email' => 'dupont@other.fr']);
+
+    Livewire::test(TiersList::class)
+        ->set('search', 'acme')
+        ->assertSee('Martin')
+        ->assertDontSee('Dupont');
+});
