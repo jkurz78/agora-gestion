@@ -72,7 +72,7 @@
                             {{ $tiers->type === 'entreprise' ? '🏢' : '👤' }}
                             {{ $tiers->displayName() }}
                             @if ($tiers->est_helloasso)
-                                <span class="badge ms-1" style="background:#722281;font-size:.65rem" title="Tiers HelloAsso">HA</span>
+                                <span class="badge text-bg-info ms-1" style="font-size:.6rem" title="Synchronisé depuis HelloAsso">HA</span>
                             @endif
                             @if ($tiers->type === 'entreprise' && ($tiers->nom || $tiers->prenom))
                                 <div class="text-muted small">{{ trim(($tiers->prenom ? $tiers->prenom . ' ' : '') . ($tiers->nom ?? '')) }}</div>
