@@ -92,24 +92,6 @@ final class TransactionCompteService
                 "TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) LIKE ?", [$tiersLike]
             ));
 
-        $dons = DB::table('dons as dn')
-            ->leftJoin('tiers as do', 'do.id', '=', 'dn.tiers_id')
-            ->selectRaw("dn.id, 'don' as source_type, dn.date, 'Don' as type_label, TRIM(CONCAT(COALESCE(`do`.prenom,''), ' ', COALESCE(`do`.nom,''))) as tiers, `do`.type as tiers_type, dn.objet as libelle, NULL as reference, dn.montant, dn.mode_paiement, dn.pointe, dn.numero_piece")
-            ->where('dn.compte_id', $id)
-            ->whereNull('dn.deleted_at')
-            ->when($dateDebut, fn (Builder $q) => $q->where('dn.date', '>=', $dateDebut))
-            ->when($dateFin, fn (Builder $q) => $q->where('dn.date', '<=', $dateFin))
-            ->when($tiersLike, fn (Builder $q) => $q->whereRaw("TRIM(CONCAT(COALESCE(`do`.prenom,''), ' ', COALESCE(`do`.nom,''))) LIKE ?", [$tiersLike]));
-
-        $cotisations = DB::table('cotisations as c')
-            ->leftJoin('tiers as t', 't.id', '=', 'c.tiers_id')
-            ->selectRaw("c.id, 'cotisation' as source_type, c.date_paiement as date, 'Cotisation' as type_label, TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) as tiers, t.type as tiers_type, CONCAT('Cotisation ', c.exercice) as libelle, NULL as reference, c.montant, c.mode_paiement, c.pointe, c.numero_piece")
-            ->where('c.compte_id', $id)
-            ->whereNull('c.deleted_at')
-            ->when($dateDebut, fn (Builder $q) => $q->where('c.date_paiement', '>=', $dateDebut))
-            ->when($dateFin, fn (Builder $q) => $q->where('c.date_paiement', '<=', $dateFin))
-            ->when($tiersLike, fn (Builder $q) => $q->whereRaw("TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) LIKE ?", [$tiersLike]));
-
         $virementsSource = DB::table('virements_internes as vi')
             ->join('comptes_bancaires as cb', 'cb.id', '=', 'vi.compte_destination_id')
             ->selectRaw("vi.id, 'virement_sortant' as source_type, vi.date, 'Virement sortant' as type_label, cb.nom as tiers, NULL as tiers_type, CONCAT('Virement vers ', cb.nom) as libelle, vi.reference, -(vi.montant) as montant, NULL as mode_paiement, (vi.rapprochement_source_id IS NOT NULL) as pointe, vi.numero_piece")
@@ -129,8 +111,6 @@ final class TransactionCompteService
             ->when($tiersLike, fn (Builder $q) => $q->where('cb.nom', 'like', $tiersLike));
 
         return $transactions
-            ->unionAll($dons)
-            ->unionAll($cotisations)
             ->unionAll($virementsSource)
             ->unionAll($virementsDestination);
     }

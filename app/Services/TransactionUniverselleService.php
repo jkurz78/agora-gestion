@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 final class TransactionUniverselleService
 {
     /**
-     * @param  array<string>|null  $types  null=all; subset of ['depense','recette','don','cotisation','virement']
+     * @param  array<string>|null  $types  null=all; subset of ['depense','recette','virement']
      * @return array{paginator: LengthAwarePaginator, soldeAvantPage: float|null}
      */
     public function paginate(
@@ -95,8 +95,6 @@ final class TransactionUniverselleService
         $include = [
             'depense' => $types === null || in_array('depense', $types, true),
             'recette' => $types === null || in_array('recette', $types, true),
-            'don' => $types === null || in_array('don', $types, true),
-            'cotisation' => $types === null || in_array('cotisation', $types, true),
             'virement' => $types === null || in_array('virement', $types, true),
         ];
 
@@ -106,12 +104,6 @@ final class TransactionUniverselleService
         }
         if ($include['recette']) {
             $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin);
-        }
-        if ($include['don']) {
-            $queries[] = $this->brancheDon($compteId, $tiersId, $dateDebut, $dateFin);
-        }
-        if ($include['cotisation']) {
-            $queries[] = $this->brancheCotisation($compteId, $tiersId, $dateDebut, $dateFin);
         }
         if ($include['virement']) {
             $queries[] = $this->brancheVirementSortant($compteId, $tiersId, $dateDebut, $dateFin);
@@ -210,78 +202,6 @@ final class TransactionUniverselleService
             ->when($tiersId !== null, fn ($q) => $q->where('tx.tiers_id', $tiersId))
             ->when($dateDebut, fn ($q) => $q->where('tx.date', '>=', $dateDebut))
             ->when($dateFin, fn ($q) => $q->where('tx.date', '<=', $dateFin));
-    }
-
-    private function brancheDon(
-        ?int $compteId,
-        ?int $tiersId,
-        ?string $dateDebut,
-        ?string $dateFin,
-    ): Builder {
-        return DB::table('dons as dn')
-            ->leftJoin('tiers as do', 'do.id', '=', 'dn.tiers_id')
-            ->leftJoin('sous_categories as sc', 'sc.id', '=', 'dn.sous_categorie_id')
-            ->leftJoin('comptes_bancaires as cb', 'cb.id', '=', 'dn.compte_id')
-            ->selectRaw("
-                dn.id,
-                'don' as source_type,
-                DATE(dn.date) as date,
-                dn.numero_piece,
-                NULL as reference,
-                TRIM(CONCAT(COALESCE(`do`.prenom,''), ' ', COALESCE(`do`.nom,''))) as tiers,
-                `do`.type as tiers_type,
-                dn.tiers_id,
-                dn.objet as libelle,
-                sc.nom as categorie_label,
-                1 as nb_lignes,
-                dn.compte_id,
-                cb.nom as compte_nom,
-                dn.mode_paiement,
-                dn.montant,
-                dn.pointe,
-                NULL as notes
-            ")
-            ->whereNull('dn.deleted_at')
-            ->when($compteId !== null, fn ($q) => $q->where('dn.compte_id', $compteId))
-            ->when($tiersId !== null, fn ($q) => $q->where('dn.tiers_id', $tiersId))
-            ->when($dateDebut, fn ($q) => $q->where('dn.date', '>=', $dateDebut))
-            ->when($dateFin, fn ($q) => $q->where('dn.date', '<=', $dateFin));
-    }
-
-    private function brancheCotisation(
-        ?int $compteId,
-        ?int $tiersId,
-        ?string $dateDebut,
-        ?string $dateFin,
-    ): Builder {
-        return DB::table('cotisations as c')
-            ->leftJoin('tiers as t', 't.id', '=', 'c.tiers_id')
-            ->leftJoin('sous_categories as sc', 'sc.id', '=', 'c.sous_categorie_id')
-            ->leftJoin('comptes_bancaires as cb', 'cb.id', '=', 'c.compte_id')
-            ->selectRaw("
-                c.id,
-                'cotisation' as source_type,
-                DATE(c.date_paiement) as date,
-                c.numero_piece,
-                NULL as reference,
-                TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) as tiers,
-                t.type as tiers_type,
-                c.tiers_id,
-                CONCAT('Cotisation ', c.exercice) as libelle,
-                sc.nom as categorie_label,
-                1 as nb_lignes,
-                c.compte_id,
-                cb.nom as compte_nom,
-                c.mode_paiement,
-                c.montant,
-                c.pointe,
-                NULL as notes
-            ")
-            ->whereNull('c.deleted_at')
-            ->when($compteId !== null, fn ($q) => $q->where('c.compte_id', $compteId))
-            ->when($tiersId !== null, fn ($q) => $q->where('c.tiers_id', $tiersId))
-            ->when($dateDebut, fn ($q) => $q->where('c.date_paiement', '>=', $dateDebut))
-            ->when($dateFin, fn ($q) => $q->where('c.date_paiement', '<=', $dateFin));
     }
 
     private function brancheVirementSortant(
