@@ -48,4 +48,21 @@ final class TiersFactory extends Factory
             'pour_recettes' => false,
         ]);
     }
+
+    public function entreprise(): static
+    {
+        return $this->state([
+            'type'       => 'entreprise',
+            'nom'        => null,
+            'prenom'     => null,
+            'entreprise' => fake()->company(),
+        ]);
+    }
+
+    public function avecHelloasso(): static
+    {
+        return $this->state([
+            'helloasso_id' => fake()->uuid(),
+        ]);
+    }
 }
