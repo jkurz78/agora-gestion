@@ -109,3 +109,54 @@ it('filtre helloasso inactif — affiche tous les tiers', function () {
         ->assertSee('Martin')
         ->assertSee('Dupont');
 });
+
+it('tri par nom ASC — ordre COALESCE(entreprise, nom)', function () {
+    Tiers::factory()->entreprise()->create(['entreprise' => 'Zéphyr SA', 'nom' => 'dummy1']);
+    Tiers::factory()->create(['nom' => 'Arnaud', 'entreprise' => null]);
+    Tiers::factory()->entreprise()->create(['entreprise' => 'Martin SARL', 'nom' => 'dummy2']);
+
+    $component = Livewire::test(TiersList::class);
+    // Default is already sortBy='nom', sortDir='asc', so don't call sort
+
+    $html = $component->html();
+    $posArnaud  = strpos($html, 'Arnaud');
+    $posMartin  = strpos($html, 'Martin SARL');
+    $posZephyr  = strpos($html, 'Zéphyr SA');
+
+    expect($posArnaud)->toBeLessThan($posMartin);
+    expect($posMartin)->toBeLessThan($posZephyr);
+});
+
+it('tri par nom DESC', function () {
+    Tiers::factory()->entreprise()->create(['entreprise' => 'Zéphyr SA', 'nom' => 'dummy1']);
+    Tiers::factory()->create(['nom' => 'Arnaud', 'entreprise' => null]);
+
+    $component = Livewire::test(TiersList::class)
+        ->call('sort', 'nom');  // toggle from default asc to desc
+
+    $html = $component->html();
+    expect(strpos($html, 'Zéphyr SA'))->toBeLessThan(strpos($html, 'Arnaud'));
+});
+
+it('tri par ville', function () {
+    Tiers::factory()->create(['nom' => 'Martin', 'email' => 'martin@paris.fr', 'ville' => 'Paris']);
+    Tiers::factory()->create(['nom' => 'Dupont', 'email' => 'dupont@bordeaux.fr', 'ville' => 'Bordeaux']);
+
+    $component = Livewire::test(TiersList::class)
+        ->call('sort', 'ville');
+
+    $html = $component->html();
+    // Bordeaux sorts before Paris
+    expect(strpos($html, 'dupont@bordeaux.fr'))->toBeLessThan(strpos($html, 'martin@paris.fr'));
+});
+
+it('entreprise sans raison sociale — displayName affiche nom, tri COALESCE rabat sur nom', function () {
+    Tiers::factory()->create(['type' => 'entreprise', 'entreprise' => null, 'nom' => 'Ancien', 'prenom' => null]);
+    Tiers::factory()->entreprise()->create(['entreprise' => 'Zéphyr SA', 'nom' => 'dummy']);
+
+    $component = Livewire::test(TiersList::class);
+    // Default is already sortBy='nom', sortDir='asc'
+
+    $html = $component->html();
+    expect(strpos($html, 'Ancien'))->toBeLessThan(strpos($html, 'Zéphyr SA'));
+});
