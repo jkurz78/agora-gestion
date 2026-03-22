@@ -24,6 +24,8 @@ final class TiersFactory extends Factory
             'email' => fake()->optional()->safeEmail(),
             'telephone' => fake()->optional()->phoneNumber(),
             'adresse_ligne1' => fake()->optional()->address(),
+            'code_postal' => fake()->optional()->postcode(),
+            'ville' => fake()->optional()->city(),
             'pour_depenses' => fake()->boolean(60),
             'pour_recettes' => fake()->boolean(40),
         ];
@@ -46,6 +48,23 @@ final class TiersFactory extends Factory
             'prenom'        => fake()->firstName(),
             'pour_depenses' => false,
             'pour_recettes' => false,
+        ]);
+    }
+
+    public function entreprise(): static
+    {
+        return $this->state([
+            'type'       => 'entreprise',
+            'nom'        => null,
+            'prenom'     => null,
+            'entreprise' => fake()->company(),
+        ]);
+    }
+
+    public function avecHelloasso(): static
+    {
+        return $this->state([
+            'helloasso_id' => fake()->uuid(),
         ]);
     }
 }

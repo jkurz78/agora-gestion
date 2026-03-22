@@ -24,6 +24,11 @@ final class TiersList extends Component
 
     public string $filtre = ''; // '', 'depenses', 'recettes'
 
+    public bool $filtreHelloasso = false;
+
+    public string $sortBy  = 'nom';
+    public string $sortDir = 'asc';
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -31,6 +36,26 @@ final class TiersList extends Component
 
     public function updatedFiltre(): void
     {
+        $this->resetPage();
+    }
+
+    public function updatedFiltreHelloasso(): void
+    {
+        $this->resetPage();
+    }
+
+    public function sort(string $col): void
+    {
+        $allowed = ['nom', 'ville', 'email'];
+        if (! in_array($col, $allowed, true)) {
+            return;
+        }
+        if ($this->sortBy === $col) {
+            $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy  = $col;
+            $this->sortDir = 'asc';
+        }
         $this->resetPage();
     }
 
@@ -54,12 +79,16 @@ final class TiersList extends Component
 
     public function render(): View
     {
-        $query = Tiers::orderBy('nom');
+        $query = Tiers::query();
 
         if ($this->search !== '') {
-            $query->where(function ($q) {
-                $q->where('nom', 'like', '%'.$this->search.'%')
-                    ->orWhere('prenom', 'like', '%'.$this->search.'%');
+            $query->where(function ($q): void {
+                $q->where('nom',          'like', "%{$this->search}%")
+                  ->orWhere('prenom',     'like', "%{$this->search}%")
+                  ->orWhere('entreprise', 'like', "%{$this->search}%")
+                  ->orWhere('ville',      'like', "%{$this->search}%")
+                  ->orWhere('code_postal','like', "%{$this->search}%")
+                  ->orWhere('email',      'like', "%{$this->search}%");
             });
         }
 
@@ -67,6 +96,17 @@ final class TiersList extends Component
             $query->where('pour_depenses', true);
         } elseif ($this->filtre === 'recettes') {
             $query->where('pour_recettes', true);
+        }
+
+        if ($this->filtreHelloasso) {
+            $query->whereNotNull('helloasso_id');
+        }
+
+        $dir = $this->sortDir === 'desc' ? 'desc' : 'asc';
+        if ($this->sortBy === 'nom') {
+            $query->orderByRaw('COALESCE(entreprise, nom) ' . $dir);
+        } else {
+            $query->orderBy($this->sortBy, $dir);
         }
 
         return view('livewire.tiers-list', [
