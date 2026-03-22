@@ -57,9 +57,13 @@ final class TiersList extends Component
         $query = Tiers::orderBy('nom');
 
         if ($this->search !== '') {
-            $query->where(function ($q) {
-                $q->where('nom', 'like', '%'.$this->search.'%')
-                    ->orWhere('prenom', 'like', '%'.$this->search.'%');
+            $query->where(function ($q): void {
+                $q->where('nom',          'like', "%{$this->search}%")
+                  ->orWhere('prenom',     'like', "%{$this->search}%")
+                  ->orWhere('entreprise', 'like', "%{$this->search}%")
+                  ->orWhere('ville',      'like', "%{$this->search}%")
+                  ->orWhere('code_postal','like', "%{$this->search}%")
+                  ->orWhere('email',      'like', "%{$this->search}%");
             });
         }
 
