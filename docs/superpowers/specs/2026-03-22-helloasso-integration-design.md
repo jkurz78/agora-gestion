@@ -75,11 +75,20 @@ L'association utilise HelloAsso pour collecter en ligne des cotisations, des don
 |---|---|---|---|
 | `pour_inscriptions` | boolean | default false | Flag pour les sous-catégories d'inscription à des opérations. Les trois flags `pour_dons`, `pour_cotisations`, `pour_inscriptions` sont mutuellement indépendants — une sous-catégorie peut en activer plusieurs si pertinent métier, mais l'UI de mapping HelloAsso filtre par flag correspondant au type d'item. |
 
-### Enum `ModePaiement` — valeur ajoutée
+### Mode de paiement — mapping HelloAsso → ModePaiement existant
 
-| Valeur | Label | Usage |
-|---|---|---|
-| `helloasso` | `HelloAsso` | Mode de paiement pour les transactions issues de HelloAsso |
+Pas de nouveau mode de paiement. Les moyens de paiement HelloAsso sont mappés vers les valeurs existantes :
+
+| HelloAsso PaymentMeans | ModePaiement SVS |
+|---|---|
+| `Card` | `cb` |
+| `Sepa` | `prelevement` |
+| `Check` | `cheque` |
+| `Cash` | `especes` |
+| `BankTransfer` | `virement` |
+| `Other` / `None` | `cb` (défaut, la majorité des paiements HA sont par carte) |
+
+Le compte dédié HelloAsso identifie déjà la source. Le mode de paiement réel est conservé sur la transaction pour information (RFU).
 
 ### Suppression des tables dons et cotisations
 
@@ -175,8 +184,8 @@ Ce mapping est paramétrable dans l'écran HelloAsso (extension de l'écran exis
 
 ### Gestion du mode de paiement
 
-- Toutes les transactions issues de HelloAsso utilisent le mode de paiement `helloasso`.
-- On ne conserve pas le détail du moyen de paiement HelloAsso (CB, SEPA, etc.) car c'est HelloAsso qui encaisse, pas l'association.
+- Les transactions issues de HelloAsso utilisent le mode de paiement réel du contributeur, mappé depuis le champ `paymentMeans` de l'API (Card→cb, Sepa→prelevement, etc.).
+- Le compte dédié HelloAsso identifie déjà la source des transactions — pas besoin d'un mode de paiement spécifique.
 
 ### Gestion de `saisi_par`
 
@@ -368,8 +377,7 @@ Ajout de colonnes, sans modifier le comportement existant :
 2. Ajouter `helloasso_item_id`, `exercice` sur `transaction_lignes`
 3. Ajouter `helloasso_cashout_id` sur `virements_internes`
 4. Ajouter `pour_inscriptions` sur `sous_categories`
-5. Ajouter `helloasso` dans l'enum `ModePaiement`
-6. Ajouter la validation conditionnelle : sous-catégorie `pour_inscriptions` → `operation_id` obligatoire sur TransactionLigne
+5. Ajouter la validation conditionnelle : sous-catégorie `pour_inscriptions` → `operation_id` obligatoire sur TransactionLigne
 
 ### Lot 2 — Suppression des tables dons/cotisations et nettoyage du code
 

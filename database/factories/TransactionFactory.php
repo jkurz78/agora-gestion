@@ -24,10 +24,7 @@ class TransactionFactory extends Factory
             'date' => fake()->dateTimeBetween('-1 year', 'now'),
             'libelle' => fake()->sentence(4),
             'montant_total' => fake()->randomFloat(2, 10, 5000),
-            'mode_paiement' => fake()->randomElement(array_filter(
-                ModePaiement::cases(),
-                fn (ModePaiement $m) => $m !== ModePaiement::HelloAsso,
-            )),
+            'mode_paiement' => fake()->randomElement(ModePaiement::cases()),
             'reference' => fake()->numerify('REF-####'),
             'compte_id' => CompteBancaire::factory(),
             'pointe' => fake()->boolean(20),
