@@ -18,6 +18,8 @@ final class SousCategorieAutocomplete extends Component
 
     public string $filtre = 'tous'; // 'depense' | 'recette' | 'tous'
 
+    public ?string $sousCategorieFlag = null; // 'pour_dons' | 'pour_cotisations' | 'pour_inscriptions'
+
     public string $search = '';
 
     public bool $open = false;
@@ -66,12 +68,16 @@ final class SousCategorieAutocomplete extends Component
 
     public function doSearch(): void
     {
+        $allowedFlags = ['pour_dons', 'pour_cotisations', 'pour_inscriptions'];
+        $flag = in_array($this->sousCategorieFlag, $allowedFlags, true) ? $this->sousCategorieFlag : null;
+
         $query = SousCategorie::with('categorie')
             ->whereHas('categorie', function ($q): void {
                 if ($this->filtre !== 'tous') {
                     $q->where('type', $this->filtre);
                 }
-            });
+            })
+            ->when($flag, fn ($q) => $q->where($flag, true));
 
         if ($this->search !== '') {
             $query->where(function ($q): void {

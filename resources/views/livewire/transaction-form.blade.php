@@ -5,10 +5,21 @@
         <div class="position-fixed top-0 start-0 w-100 h-100" style="background:rgba(0,0,0,.5);z-index:1040;overflow-y:auto" wire:click.self="resetForm">
         <div class="container py-4">
         <div class="card mb-4">
+            @php
+                $formEntityLabel = match($sousCategorieFilter) {
+                    'pour_dons'         => 'don',
+                    'pour_cotisations'  => 'cotisation',
+                    'pour_inscriptions' => 'inscription',
+                    default             => null,
+                };
+            @endphp
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    {{ $transactionId ? 'Modifier la ' : 'Nouvelle ' }}
-                    {{ $type === 'depense' ? 'dépense' : 'recette' }}
+                    @if($formEntityLabel)
+                        {{ $transactionId ? 'Modifier le ' : ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'Nouvelle ' : 'Nouveau ') }}{{ $formEntityLabel }}
+                    @else
+                        {{ $transactionId ? 'Modifier la ' : 'Nouvelle ' }}{{ $type === 'depense' ? 'dépense' : 'recette' }}
+                    @endif
                 </h5>
                 <button wire:click="resetForm" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-x-lg"></i> Annuler
@@ -20,6 +31,7 @@
                 </div>
             @endif
             <div class="card-body">
+                @if(!$sousCategorieFilter)
                 <div class="mb-3">
                     @if ($type === 'depense')
                         <span class="badge bg-danger fs-6">Dépense</span>
@@ -27,6 +39,7 @@
                         <span class="badge bg-success fs-6">Recette</span>
                     @endif
                 </div>
+                @endif
 
                 <form wire:submit="save">
                     <div class="row g-3 mb-4">
@@ -99,7 +112,7 @@
                     </div>
 
                     {{-- Lignes section --}}
-                    <h6 class="mb-2">Lignes de {{ $type === 'depense' ? 'dépense' : 'recette' }}</h6>
+                    <h6 class="mb-2">Lignes de {{ $formEntityLabel ?? ($type === 'depense' ? 'dépense' : 'recette') }}</h6>
                     @error('lignes')
                         <div class="alert alert-danger py-2">{{ $message }}</div>
                     @enderror
@@ -121,9 +134,10 @@
                                     <tr wire:key="ligne-{{ $index }}">
                                         <td style="min-width:220px">
                                             <livewire:sous-categorie-autocomplete
-                                                :key="'sc-tx-'.$index"
+                                                :key="'sc-tx-'.$index.'-'.($sousCategorieFilter ?? 'all')"
                                                 wire:model="lignes.{{ $index }}.sous_categorie_id"
                                                 filtre="{{ $type }}"
+                                                :sousCategorieFlag="$sousCategorieFilter"
                                             />
                                             @error('lignes.' . $index . '.sous_categorie_id')
                                                 <div class="text-danger small mt-1">{{ $message }}</div>
@@ -305,7 +319,7 @@
                             <button type="button" wire:click="resetForm" class="btn btn-secondary">Annuler</button>
                             <button type="submit" class="btn btn-success"
                                     @if ($isLocked) title="Certains champs sont verrouillés et ne pourront pas être modifiés." @endif>
-                                {{ $transactionId ? 'Mettre à jour' : ($type === 'depense' ? 'Enregistrer la dépense' : 'Enregistrer la recette') }}
+                                {{ $transactionId ? 'Mettre à jour' : 'Enregistrer' }}
                             </button>
                         </div>
                     </div>

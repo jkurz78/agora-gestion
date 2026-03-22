@@ -35,8 +35,7 @@
         <div class="mb-2 d-flex align-items-center justify-content-between gap-2 flex-wrap">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <h4 class="mb-0"><i class="bi bi-{{ $pageTitleIcon }} me-1"></i>{{ $pageTitle }}</h4>
-                @if(!$sousCategorieFilter)
-                @if(count($availableTypes) > 1)
+                @if(!$sousCategorieFilter && count($availableTypes) > 1)
                     <button type="button" wire:click="$set('filterTypes', [])"
                             class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
                         Toutes
@@ -57,7 +56,6 @@
                         </button>
                     @endforeach
                 @endif
-                @endif
             </div>
             @if($showImport)
             <div class="d-flex gap-1 flex-wrap">
@@ -67,7 +65,21 @@
             @endif
         </div>
         <div class="mb-3">
-            @if(count($availableTypes) === 1)
+            @if($sousCategorieFilter)
+                @php
+                    $filterLabel = match($sousCategorieFilter) {
+                        'pour_dons'          => 'Nouveau don',
+                        'pour_cotisations'   => 'Nouvelle cotisation',
+                        'pour_inscriptions'  => 'Nouvelle inscription',
+                        default              => 'Nouvelle recette',
+                    };
+                @endphp
+                <button type="button"
+                        @click="$dispatch('open-transaction-form', { id: null, type: 'recette', sousCategorieFilter: '{{ $sousCategorieFilter }}' })"
+                        class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg"></i> {{ $filterLabel }}
+                </button>
+            @elseif(count($availableTypes) === 1)
                 <button type="button" @click="$dispatch('{{ $newEvent }}', {{ $newPayload }})"
                         class="btn btn-sm btn-primary">
                     <i class="bi bi-plus-lg"></i> {{ $newLabel }}
@@ -101,7 +113,21 @@
     @else
         {{-- Layout standard : ligne 1 = Nouveau ; ligne 2 = toggles --}}
         <div class="mb-3 d-flex justify-content-between align-items-center">
-            @if(count($availableTypes) === 1)
+            @if($sousCategorieFilter)
+                @php
+                    $filterLabel = match($sousCategorieFilter) {
+                        'pour_dons'          => 'Nouveau don',
+                        'pour_cotisations'   => 'Nouvelle cotisation',
+                        'pour_inscriptions'  => 'Nouvelle inscription',
+                        default              => 'Nouvelle recette',
+                    };
+                @endphp
+                <button type="button"
+                        @click="$dispatch('open-transaction-form', { id: null, type: 'recette', sousCategorieFilter: '{{ $sousCategorieFilter }}' })"
+                        class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg"></i> {{ $filterLabel }}
+                </button>
+            @elseif(count($availableTypes) === 1)
                 <button type="button" @click="$dispatch('{{ $newEvent }}', {{ $newPayload }})"
                         class="btn btn-sm btn-primary">
                     <i class="bi bi-plus-lg"></i> {{ $newLabel }}
@@ -131,8 +157,7 @@
                 </div>
             @endif
         </div>
-        @if(!$sousCategorieFilter)
-        @if(count($availableTypes) > 1)
+        @if(!$sousCategorieFilter && count($availableTypes) > 1)
         <div class="mb-3 d-flex gap-1 flex-wrap">
             <button type="button" wire:click="$set('filterTypes', [])"
                     class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
@@ -154,7 +179,6 @@
                 </button>
             @endforeach
         </div>
-        @endif
         @endif
     @endif
 
@@ -234,7 +258,7 @@
                     </th>
 
                     {{-- Type header (only if multi) --}}
-                    @if(count($availableTypes) > 1)
+                    @if(count($availableTypes) > 1 && !$sousCategorieFilter)
                     <th>Type</th>
                     @endif
 
@@ -444,7 +468,7 @@
                     </td>
                     <td class="small text-muted text-nowrap">{{ $tx->numero_piece ?? '—' }}</td>
                     <td class="small text-nowrap">{{ \Carbon\Carbon::parse($tx->date)->format('d/m') }}</td>
-                    @if(count($availableTypes) > 1)
+                    @if(count($availableTypes) > 1 && !$sousCategorieFilter)
                         <td>
                             <span class="badge text-bg-{{ $badgeClass }}" style="font-size:.65rem">{{ $badgeLabel }}</span>
                         </td>
@@ -532,7 +556,7 @@
                 {{-- Expansion row --}}
                 @if($isExpanded && $detail)
                     <tr style="background:#f8f9fa">
-                        <td colspan="{{ 10 + (count($availableTypes) > 1 ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
+                        <td colspan="{{ 10 + (count($availableTypes) > 1 && !$sousCategorieFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
                             style="padding:0;border-top:none">
                             @if(!empty($detail['lignes']))
                                 <table class="table table-sm align-middle mb-0" style="margin-left:1.5rem;width:calc(100% - 1.5rem);--bs-table-bg:#f8f9fa;font-size:.78rem;--bs-table-cell-padding-y:.2rem">
@@ -563,7 +587,7 @@
                 @endif
             @empty
                 <tr>
-                    <td colspan="{{ 9 + (count($availableTypes) > 1 ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
+                    <td colspan="{{ 9 + (count($availableTypes) > 1 && !$sousCategorieFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
                         class="text-center text-muted py-4">
                         Aucune transaction trouvée.
                     </td>
