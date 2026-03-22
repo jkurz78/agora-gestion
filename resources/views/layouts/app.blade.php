@@ -347,8 +347,6 @@
     {{-- Formulaires modaux globaux --}}
     <livewire:tiers-form />
     <livewire:transaction-form />
-    <livewire:don-form />
-    <livewire:cotisation-form />
     <livewire:virement-interne-form />
     @livewireScripts
     <script>
