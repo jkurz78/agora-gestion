@@ -280,9 +280,22 @@ Le composant TransactionUniverselle (spec du 2026-03-19) est déjà conçu pour 
 
 Les impacts spécifiques :
 
-- **Badges Type** : DON et COT disparaissent. Toutes les écritures sont DÉP, REC ou VIR. Un filtre par sous-catégorie peut offrir une vue "cotisations uniquement" ou "dons uniquement".
+- **Badges Type** : DON et COT disparaissent comme types de transaction. Toutes les écritures sont DÉP, REC ou VIR.
 - **Bouton Nouveau** : plus de formulaires DonForm / CotisationForm séparés. Le TransactionForm unifié gère tous les cas via le choix de sous-catégorie.
 - **UNION simplifié** : plus besoin d'inclure les tables `dons` et `cotisations` dans le UNION.
+
+### Navigation menu — Dons et Cotisations
+
+Les entrées de menu "Transactions > Dons" et "Transactions > Cotisations" sont **conservées** mais pointent désormais vers des vues filtrées de TransactionUniverselle :
+
+- **Menu "Dons"** → `TransactionUniverselle` avec une prop `$sousCategorieFilter = 'pour_dons'`. Le composant filtre les transactions qui ont **au moins une TransactionLigne** dont la sous-catégorie a `pour_dons = true`.
+- **Menu "Cotisations"** → `TransactionUniverselle` avec une prop `$sousCategorieFilter = 'pour_cotisations'`. Même logique sur `pour_cotisations = true`.
+
+Ce filtre n'est plus basé sur le type de la transaction (qui est toujours `recette`) mais sur les **flags de la sous-catégorie** des lignes. C'est une nouvelle prop verrouillée du composant TransactionUniverselle qui vient s'ajouter à celles définies dans la spec du 2026-03-19 (`$compteId`, `$tiersId`, `$types`, `$exercice`).
+
+Le filtre est un `whereHas('lignes.sousCategorie', fn($q) => $q->where($flag, true))` côté Eloquent. Les boutons toggle Type (DÉP/REC/VIR) ne s'affichent pas quand ce filtre est actif (car toutes les transactions sont de type recette).
+
+À terme, le même mécanisme pourra servir pour une entrée "Inscriptions" via `pour_inscriptions = true`.
 
 ### Fiche membre (TiersTransactions)
 
