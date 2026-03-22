@@ -45,6 +45,8 @@ final class TransactionForm extends Component
 
     public bool $isLocked = false;
 
+    public ?string $sousCategorieFilter = null;
+
     // État du panneau de ventilation
     public ?int $ventilationLigneId = null;
 
@@ -81,8 +83,9 @@ final class TransactionForm extends Component
     }
 
     #[On('open-transaction-form')]
-    public function openForm(string $type, ?int $id = null): void
+    public function openForm(string $type, ?int $id = null, ?string $sousCategorieFilter = null): void
     {
+        $this->sousCategorieFilter = $sousCategorieFilter;
         if ($id !== null) {
             $this->edit($id);
         } else {
@@ -339,8 +342,12 @@ final class TransactionForm extends Component
 
     public function render(): View
     {
+        $allowedFilters = ['pour_dons', 'pour_cotisations', 'pour_inscriptions'];
+        $scFilter = in_array($this->sousCategorieFilter, $allowedFilters, true) ? $this->sousCategorieFilter : null;
+
         $sousCategories = SousCategorie::with('categorie')
             ->when($this->type !== '', fn ($q) => $q->whereHas('categorie', fn ($q2) => $q2->where('type', $this->type)))
+            ->when($scFilter, fn ($q) => $q->where($scFilter, true))
             ->orderBy('nom')
             ->get();
 

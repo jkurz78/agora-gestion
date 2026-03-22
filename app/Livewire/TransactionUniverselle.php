@@ -47,6 +47,7 @@ final class TransactionUniverselle extends Component
     /** @var array<string> */
     public array $filterTypes = []; // [] = "Toutes"
 
+
     public string $filterDateDebut = '';
 
     public string $filterDateFin = '';
@@ -220,7 +221,7 @@ final class TransactionUniverselle extends Component
             return;
         }
         match ($sourceType) {
-            'depense', 'recette' => $this->dispatch('open-transaction-form', type: $sourceType, id: $id),
+            'depense', 'recette' => $this->dispatch('open-transaction-form', type: $sourceType, id: $id, sousCategorieFilter: $this->sousCategorieFilter),
             'virement_sortant', 'virement_entrant' => $this->dispatch('open-virement-form', id: $id),
         };
     }
