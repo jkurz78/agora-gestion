@@ -40,7 +40,12 @@
             <tbody>
                 @forelse ($tiersList as $tiers)
                     <tr>
-                        <td class="fw-semibold">{{ $tiers->displayName() }}</td>
+                        <td class="fw-semibold">
+                            {{ $tiers->displayName() }}
+                            @if ($tiers->helloasso_id)
+                                <span class="badge ms-1" style="background:#722281;font-size:.65rem" title="Identifiant HelloAsso : {{ $tiers->helloasso_id }}">HA</span>
+                            @endif
+                        </td>
                         <td>
                             <span class="badge bg-secondary">
                                 {{ $tiers->type === 'entreprise' ? 'Entreprise' : 'Particulier' }}
@@ -70,7 +75,7 @@
                             </a>
                             <button
                                 class="btn btn-sm btn-outline-primary me-1"
-                                wire:click="$dispatch('edit-tiers', { id: {{ $tiers->id }} })"
+                                wire:click="requestEdit({{ $tiers->id }})"
                                 title="Modifier"
                             ><i class="bi bi-pencil"></i></button>
                             <button
