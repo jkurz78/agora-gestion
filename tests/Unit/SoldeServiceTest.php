@@ -1,9 +1,6 @@
 <?php
 
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
-use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
@@ -60,35 +57,19 @@ it('subtracts depenses since date_solde_initial', function () {
     expect($this->service->solde($compte))->toBe(700.0);
 });
 
-it('adds cotisations (date_paiement) since date_solde_initial', function () {
+it('adds recettes (cotisations/dons) since date_solde_initial', function () {
     $compte = CompteBancaire::factory()->create([
         'solde_initial' => 0.00,
         'date_solde_initial' => '2024-01-01',
     ]);
-    $tiers = Tiers::factory()->membre()->create();
-    Cotisation::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $compte->id,
-        'montant' => 50.00,
-        'date_paiement' => '2024-02-01',
-        'tiers_id' => $tiers->id,
-    ]);
-
-    expect($this->service->solde($compte))->toBe(50.0);
-});
-
-it('subtracts dons since date_solde_initial', function () {
-    $compte = CompteBancaire::factory()->create([
-        'solde_initial' => 1000.00,
-        'date_solde_initial' => '2024-01-01',
-    ]);
-    Don::factory()->create([
-        'compte_id' => $compte->id,
-        'montant' => 100.00,
+        'montant_total' => 50.00,
         'date' => '2024-02-01',
         'saisi_par' => $this->user->id,
     ]);
 
-    expect($this->service->solde($compte))->toBe(900.0);
+    expect($this->service->solde($compte))->toBe(50.0);
 });
 
 it('adds virements received and subtracts virements sent', function () {

@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -71,12 +69,12 @@ it('retourne une depense avec montant negatif', function () {
     expect((float) $depense->montant)->toBe(-150.00);
 });
 
-it('retourne un don avec le nom du donateur comme tiers', function () {
+it('retourne une recette (don) avec le nom du tiers', function () {
     $tiers = Tiers::factory()->pourRecettes()->create(['prenom' => 'Marie', 'nom' => 'Dupont', 'type' => 'particulier']);
-    Don::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'tiers_id' => $tiers->id,
-        'montant' => 50.00,
+        'montant_total' => 50.00,
         'date' => '2025-10-03',
         'saisi_par' => $this->user->id,
     ]);
@@ -93,39 +91,11 @@ it('retourne un don avec le nom du donateur comme tiers', function () {
     );
 
     $items = collect($result['paginator']->items());
-    $don = $items->firstWhere('source_type', 'don');
-    expect($don)->not->toBeNull();
-    expect((float) $don->montant)->toBe(50.00);
-    expect(trim($don->tiers))->toContain('Marie');
-    expect(trim($don->tiers))->toContain('Dupont');
-});
-
-it('retourne une cotisation avec le nom du membre comme tiers', function () {
-    $tiers = Tiers::factory()->membre()->create(['prenom' => 'Jean', 'nom' => 'Martin']);
-    Cotisation::factory()->create([
-        'compte_id' => $this->compte->id,
-        'tiers_id' => $tiers->id,
-        'montant' => 80.00,
-        'date_paiement' => '2025-10-04',
-    ]);
-
-    $result = $this->service->paginate(
-        compte: $this->compte,
-        dateDebut: null,
-        dateFin: null,
-        searchTiers: null,
-        sortColumn: 'date',
-        sortDirection: 'asc',
-        perPage: 15,
-        page: 1,
-    );
-
-    $items = collect($result['paginator']->items());
-    $cotisation = $items->firstWhere('source_type', 'cotisation');
-    expect($cotisation)->not->toBeNull();
-    expect((float) $cotisation->montant)->toBe(80.00);
-    expect(trim($cotisation->tiers))->toContain('Jean');
-    expect(trim($cotisation->tiers))->toContain('Martin');
+    $recette = $items->firstWhere('source_type', 'recette');
+    expect($recette)->not->toBeNull();
+    expect((float) $recette->montant)->toBe(50.00);
+    expect(trim($recette->tiers))->toContain('Marie');
+    expect(trim($recette->tiers))->toContain('Dupont');
 });
 
 it('un virement depuis compte A vers B apparaît sur A comme virement_sortant négatif, tiers = nom de B', function () {

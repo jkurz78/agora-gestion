@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\StatutRapprochement;
 use App\Models\Association;
 use App\Models\CompteBancaire;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -130,21 +129,21 @@ it('ouvre le PDF inline avec ?mode=inline', function () {
 
 it('inclut l\'id et le tiers dans les données PDF', function () {
     $tiers = Tiers::factory()->create(['nom' => 'Test Tiers']);
-    Don::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'tiers_id' => $tiers->id,
-        'montant' => 75.00,
+        'montant_total' => 75.00,
         'date' => now()->format('Y-m-d'),
     ]);
 
     Pdf::shouldReceive('loadView')
         ->once()
         ->withArgs(function (string $view, array $data): bool {
-            $don = collect($data['transactions'])->first(fn ($t) => $t['type'] === 'Don');
-            expect($don)->not->toBeNull();
-            expect($don)->toHaveKey('id');
-            expect($don)->toHaveKey('tiers');
+            $recette = collect($data['transactions'])->first(fn ($t) => $t['type'] === 'Recette');
+            expect($recette)->not->toBeNull();
+            expect($recette)->toHaveKey('id');
+            expect($recette)->toHaveKey('tiers');
 
             return true;
         })

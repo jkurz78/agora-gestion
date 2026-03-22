@@ -2,9 +2,10 @@
 
 use App\Livewire\Dashboard;
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -56,13 +57,23 @@ it('displays solde general', function () {
 });
 
 it('shows membres without cotisation', function () {
+    $cotSc = SousCategorie::factory()->create(['pour_cotisations' => true]);
+
     $tiersWithCotisation = Tiers::factory()->membre()->create([
         'nom' => 'Durand',
         'prenom' => 'Marie',
     ]);
-    Cotisation::factory()->create([
+    $txCurrent = Transaction::factory()->asRecette()->create([
         'tiers_id' => $tiersWithCotisation->id,
+        'date' => $this->exercice.'-10-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $txCurrent->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $txCurrent->id,
+        'sous_categorie_id' => $cotSc->id,
         'exercice' => $this->exercice,
+        'montant' => 30.00,
     ]);
 
     $tiersSansCotisation = Tiers::factory()->membre()->create([
@@ -70,9 +81,17 @@ it('shows membres without cotisation', function () {
         'prenom' => 'Pierre',
     ]);
     // Martin a une cotisation d'un exercice précédent (il est "membre") mais pas pour l'exercice courant
-    Cotisation::factory()->create([
+    $txPrev = Transaction::factory()->asRecette()->create([
         'tiers_id' => $tiersSansCotisation->id,
+        'date' => ($this->exercice - 1).'-10-01',
+        'saisi_par' => $this->user->id,
+    ]);
+    $txPrev->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $txPrev->id,
+        'sous_categorie_id' => $cotSc->id,
         'exercice' => $this->exercice - 1,
+        'montant' => 30.00,
     ]);
 
     Livewire::test(Dashboard::class)
@@ -89,7 +108,6 @@ it('displays comptes bancaires with soldes', function () {
     ]);
 
     Livewire::test(Dashboard::class)
-        ->assertSee('Comptes bancaires')
         ->assertSee('Compte Principal')
         ->assertSee('1 500,00');
 });

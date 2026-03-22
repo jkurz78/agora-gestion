@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
-use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
-use App\Services\CotisationService;
-use App\Services\DonService;
 use App\Services\TransactionService;
 use App\Services\VirementInterneService;
 
@@ -62,40 +57,6 @@ test('TransactionService::delete lève une exception si la recette est pointée'
         ->toThrow(RuntimeException::class, 'pointée');
 });
 
-test('DonService::delete lève une exception si le don est pointé', function () {
-    $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id' => $this->compte->id,
-        'statut' => StatutRapprochement::EnCours,
-        'saisi_par' => $this->user->id,
-    ]);
-    $don = Don::factory()->create([
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
-    ]);
-
-    expect(fn () => app(DonService::class)->delete($don))
-        ->toThrow(RuntimeException::class, 'pointé');
-});
-
-test('CotisationService::delete lève une exception si la cotisation est pointée', function () {
-    $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id' => $this->compte->id,
-        'statut' => StatutRapprochement::EnCours,
-        'saisi_par' => $this->user->id,
-    ]);
-    $tiers = Tiers::factory()->membre()->create();
-    $cotisation = Cotisation::factory()->create([
-        'tiers_id' => $tiers->id,
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
-    ]);
-
-    expect(fn () => app(CotisationService::class)->delete($cotisation))
-        ->toThrow(RuntimeException::class, 'pointée');
-});
-
 test('VirementInterneService::delete lève une exception si le virement est pointé côté source', function () {
     $compteDestination = CompteBancaire::factory()->create();
     $rapprochement = RapprochementBancaire::factory()->create([
@@ -138,26 +99,6 @@ test('TransactionService::delete réussit si la recette n\'est pas pointée', fu
     app(TransactionService::class)->delete($recette);
 
     expect(Transaction::withTrashed()->find($recette->id)->deleted_at)->not->toBeNull();
-});
-
-test('DonService::delete réussit si le don n\'est pas pointé', function () {
-    $don = Don::factory()->create(['compte_id' => $this->compte->id]);
-
-    app(DonService::class)->delete($don);
-
-    expect(Don::withTrashed()->find($don->id)->deleted_at)->not->toBeNull();
-});
-
-test('CotisationService::delete réussit si la cotisation n\'est pas pointée', function () {
-    $tiers = Tiers::factory()->membre()->create();
-    $cotisation = Cotisation::factory()->create([
-        'tiers_id' => $tiers->id,
-        'compte_id' => $this->compte->id,
-    ]);
-
-    app(CotisationService::class)->delete($cotisation);
-
-    expect(Cotisation::withTrashed()->find($cotisation->id)->deleted_at)->not->toBeNull();
 });
 
 test('VirementInterneService::delete réussit si le virement n\'est pas pointé', function () {

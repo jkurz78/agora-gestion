@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Livewire\Dashboard;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\ExerciceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -30,14 +32,14 @@ it('shows recent donations from transaction_lignes with pour_dons sous-categorie
         'montant' => 100.00,
     ]);
 
-    Livewire::test(\App\Livewire\Dashboard::class)
+    Livewire::test(Dashboard::class)
         ->assertSee('Don test');
 });
 
 it('shows tiers without cotisation for current exercice', function () {
     $compte = CompteBancaire::factory()->create();
     $scCot = SousCategorie::factory()->pourCotisations()->create();
-    $exercice = app(\App\Services\ExerciceService::class)->current();
+    $exercice = app(ExerciceService::class)->current();
 
     $tiersAvec = Tiers::factory()->create(['nom' => 'Avec', 'prenom' => 'Cot']);
     $tx = Transaction::factory()->asRecette()->create([
@@ -68,7 +70,7 @@ it('shows tiers without cotisation for current exercice', function () {
         'exercice' => $exercice - 1,
     ]);
 
-    Livewire::test(\App\Livewire\Dashboard::class)
+    Livewire::test(Dashboard::class)
         ->assertDontSee('Avec Cot')
         ->assertSee('Sans');
 });
