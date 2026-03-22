@@ -25,7 +25,7 @@ it('accepte les props verrouillées en mount', function () {
 });
 
 it('supprime une recette via deleteRow', function () {
-    $recette = Transaction::factory()->asRecette()->create(['date' => '2025-10-01']);
+    $recette = Transaction::factory()->asRecette()->create(['date' => '2025-10-01', 'pointe' => false]);
     Livewire::test(TransactionUniverselle::class)
         ->call('deleteRow', 'recette', $recette->id);
     $this->assertSoftDeleted('transactions', ['id' => $recette->id]);
