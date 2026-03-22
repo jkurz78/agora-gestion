@@ -150,6 +150,14 @@ public function updatedFiltreHelloasso(): void
 
 ### Pattern Blade — en-têtes triables
 
+Le `<thead>` doit utiliser le style sombre standard du projet (le fichier actuel utilise `table-light` — à corriger) :
+
+```blade
+<thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+```
+
+En-tête triable (exemple sur Nom) :
+
 ```blade
 <th>
     <a href="#" wire:click.prevent="sort('nom')" class="text-white text-decoration-none">
