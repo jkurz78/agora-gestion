@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Association;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
@@ -86,40 +84,6 @@ final class RapprochementPdfController extends Controller
                     'tiers' => $tx->tiers?->displayName() ?? $tx->libelle,
                     'reference' => $tx->reference ?? null,
                     'montant_signe' => $tx->montantSigne(),
-                ]);
-            });
-
-        Don::where('compte_id', $compteId)
-            ->where('rapprochement_id', $rid)
-            ->with('tiers')
-            ->get()
-            ->each(function (Don $d) use (&$transactions) {
-                $transactions->push([
-                    'id' => $d->id,
-                    'date' => $d->date,
-                    'type' => 'Don',
-                    'label' => $d->tiers
-                        ? $d->tiers->displayName()
-                        : ($d->objet ?? 'Don anonyme'),
-                    'tiers' => $d->tiers ? $d->tiers->displayName() : ($d->objet ?? 'Don anonyme'),
-                    'reference' => null,
-                    'montant_signe' => (float) $d->montant,
-                ]);
-            });
-
-        Cotisation::where('compte_id', $compteId)
-            ->where('rapprochement_id', $rid)
-            ->with('tiers')
-            ->get()
-            ->each(function (Cotisation $c) use (&$transactions) {
-                $transactions->push([
-                    'id' => $c->id,
-                    'date' => $c->date_paiement,
-                    'type' => 'Cotisation',
-                    'label' => $c->tiers?->displayName() ?? 'Cotisation',
-                    'tiers' => $c->tiers ? $c->tiers->displayName() : 'Cotisation',
-                    'reference' => null,
-                    'montant_signe' => (float) $c->montant,
                 ]);
             });
 
