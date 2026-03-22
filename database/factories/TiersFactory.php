@@ -24,6 +24,8 @@ final class TiersFactory extends Factory
             'email' => fake()->optional()->safeEmail(),
             'telephone' => fake()->optional()->phoneNumber(),
             'adresse_ligne1' => fake()->optional()->address(),
+            'code_postal' => fake()->optional()->postcode(),
+            'ville' => fake()->optional()->city(),
             'pour_depenses' => fake()->boolean(60),
             'pour_recettes' => fake()->boolean(40),
         ];

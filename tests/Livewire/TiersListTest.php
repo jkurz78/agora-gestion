@@ -160,3 +160,65 @@ it('entreprise sans raison sociale — displayName affiche nom, tri COALESCE rab
     $html = $component->html();
     expect(strpos($html, 'Ancien'))->toBeLessThan(strpos($html, 'Zéphyr SA'));
 });
+
+it('affiche icône 👤 pour un particulier', function () {
+    Tiers::factory()->create(['type' => 'particulier', 'nom' => 'Durand']);
+
+    Livewire::test(TiersList::class)
+        ->assertSee('👤');
+});
+
+it('affiche icône 🏢 pour une entreprise', function () {
+    Tiers::factory()->entreprise()->create(['entreprise' => 'ACME Corp']);
+
+    Livewire::test(TiersList::class)
+        ->assertSee('🏢');
+});
+
+it('affiche la sous-ligne contact pour une entreprise avec nom renseigné', function () {
+    Tiers::factory()->entreprise()->create([
+        'entreprise' => 'ACME Corp',
+        'nom'        => 'Dupont',
+        'prenom'     => 'Jean',
+    ]);
+
+    Livewire::test(TiersList::class)
+        ->assertSeeHtml('class="text-muted small"')
+        ->assertSee('Jean Dupont');
+});
+
+it('n\'affiche pas de sous-ligne contact pour une entreprise sans nom ni prénom', function () {
+    Tiers::factory()->entreprise()->create([
+        'entreprise' => 'ACME Corp',
+        'nom'        => null,
+        'prenom'     => null,
+    ]);
+
+    Livewire::test(TiersList::class)
+        ->assertDontSeeHtml('class="text-muted small"');
+});
+
+it('affiche la ville et le code postal dans la colonne Ville', function () {
+    Tiers::factory()->create(['nom' => 'Martin', 'ville' => 'Paris', 'code_postal' => '75001']);
+
+    Livewire::test(TiersList::class)
+        ->assertSee('75001 Paris');
+});
+
+it('affiche un tiret si ville et code_postal sont null', function () {
+    Tiers::factory()->create(['nom' => 'Martin', 'ville' => null, 'code_postal' => null]);
+
+    Livewire::test(TiersList::class)
+        ->assertSee('—');
+});
+
+it('affiche la checkbox filtre HelloAsso dans les filtres', function () {
+    Livewire::test(TiersList::class)
+        ->assertSeeHtml('wire:model.live="filtreHelloasso"');
+});
+
+it('affiche les en-têtes triables Nom et Ville avec wire:click', function () {
+    Livewire::test(TiersList::class)
+        ->assertSeeHtml("sort('nom')")
+        ->assertSeeHtml("sort('ville')");
+});
