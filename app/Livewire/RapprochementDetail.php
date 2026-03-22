@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\StatutRapprochement;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
@@ -156,62 +154,6 @@ final class RapprochementDetail extends Component
                     'reference' => $tx->reference,
                     'montant_signe' => $tx->montantSigne(),
                     'pointe' => (int) $tx->rapprochement_id === $rid,
-                ]);
-            });
-
-        // Dons
-        Don::where('compte_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin, $verrouille) {
-                if ($verrouille) {
-                    $q->where('rapprochement_id', $rid);
-                } else {
-                    $q->where(function ($inner) use ($dateFin) {
-                        $inner->whereNull('rapprochement_id')
-                            ->where('date', '<=', $dateFin);
-                    })->orWhere('rapprochement_id', $rid);
-                }
-            })
-            ->with('tiers')
-            ->get()
-            ->each(function (Don $d) use (&$transactions, $rid) {
-                $transactions->push([
-                    'id' => $d->id,
-                    'type' => 'don',
-                    'date' => $d->date,
-                    'label' => $d->tiers
-                        ? $d->tiers->displayName()
-                        : ($d->objet ?? 'Don anonyme'),
-                    'tiers' => $d->tiers ? $d->tiers->displayName() : ($d->objet ?? 'Don anonyme'),
-                    'reference' => null,
-                    'montant_signe' => (float) $d->montant,
-                    'pointe' => (int) $d->rapprochement_id === $rid,
-                ]);
-            });
-
-        // Cotisations
-        Cotisation::where('compte_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin, $verrouille) {
-                if ($verrouille) {
-                    $q->where('rapprochement_id', $rid);
-                } else {
-                    $q->where(function ($inner) use ($dateFin) {
-                        $inner->whereNull('rapprochement_id')
-                            ->where('date_paiement', '<=', $dateFin);
-                    })->orWhere('rapprochement_id', $rid);
-                }
-            })
-            ->with('tiers')
-            ->get()
-            ->each(function (Cotisation $c) use (&$transactions, $rid) {
-                $transactions->push([
-                    'id' => $c->id,
-                    'type' => 'cotisation',
-                    'date' => $c->date_paiement,
-                    'label' => $c->tiers ? $c->tiers->displayName() : 'Cotisation',
-                    'tiers' => $c->tiers ? $c->tiers->displayName() : 'Cotisation',
-                    'reference' => null,
-                    'montant_signe' => (float) $c->montant,
-                    'pointe' => (int) $c->rapprochement_id === $rid,
                 ]);
             });
 

@@ -6,8 +6,6 @@ namespace App\Services;
 
 use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
@@ -68,8 +66,6 @@ final class RapprochementBancaireService
         $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
             ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
             ->value('total');
-        $solde += (float) Don::where('rapprochement_id', $rapprochement->id)->sum('montant');
-        $solde += (float) Cotisation::where('rapprochement_id', $rapprochement->id)->sum('montant');
         $solde += (float) VirementInterne::where('rapprochement_destination_id', $rapprochement->id)->sum('montant');
         $solde -= (float) VirementInterne::where('rapprochement_source_id', $rapprochement->id)->sum('montant');
 
@@ -104,8 +100,6 @@ final class RapprochementBancaireService
         } else {
             $model = match ($type) {
                 'depense', 'recette' => Transaction::findOrFail($id),
-                'don' => Don::findOrFail($id),
-                'cotisation' => Cotisation::findOrFail($id),
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
             if ((int) $model->compte_id !== (int) $rapprochement->compte_id) {
@@ -122,8 +116,6 @@ final class RapprochementBancaireService
 
             $model = match ($type) {
                 'depense', 'recette' => Transaction::findOrFail($id),
-                'don' => Don::findOrFail($id),
-                'cotisation' => Cotisation::findOrFail($id),
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
 
@@ -167,12 +159,6 @@ final class RapprochementBancaireService
             $id = $rapprochement->id;
 
             Transaction::where('rapprochement_id', $id)
-                ->update(['rapprochement_id' => null, 'pointe' => false]);
-
-            Don::where('rapprochement_id', $id)
-                ->update(['rapprochement_id' => null, 'pointe' => false]);
-
-            Cotisation::where('rapprochement_id', $id)
                 ->update(['rapprochement_id' => null, 'pointe' => false]);
 
             VirementInterne::where('rapprochement_source_id', $id)
