@@ -527,16 +527,32 @@ In `app/Models/SousCategorie.php`, add `'pour_inscriptions'` to `$fillable`, and
 'pour_inscriptions' => 'boolean',
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [ ] **Step 5: Update the SousCategorieFactory**
+
+In `database/factories/SousCategorieFactory.php`, add `'pour_inscriptions' => false` to the `definition()` return array, and add a state helper:
+
+```php
+public function pourInscriptions(): static
+{
+    return $this->state(fn (array $attributes) => [
+        'pour_inscriptions' => true,
+    ]);
+}
+```
+
+Cohérent avec les helpers `pourDons()` et `pourCotisations()` existants.
+
+- [ ] **Step 6: Run test to verify it passes**
 
 Run: `./vendor/bin/sail test tests/Feature/Migrations/HelloAssoSchemaTest.php`
 Expected: PASS (all 15 tests)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add database/migrations/2026_03_22_100004_add_pour_inscriptions_to_sous_categories.php \
   app/Models/SousCategorie.php \
+  database/factories/SousCategorieFactory.php \
   tests/Feature/Migrations/HelloAssoSchemaTest.php
 git commit -m "feat(schema): add pour_inscriptions flag to sous_categories"
 ```
@@ -547,8 +563,10 @@ git commit -m "feat(schema): add pour_inscriptions flag to sous_categories"
 
 **Files:**
 - Modify: `app/Enums/ModePaiement.php`
-- Modify: `app/Livewire/TransactionForm.php` (validation rule)
+- Modify: `database/factories/TransactionFactory.php` (exclure HelloAsso du random)
 - Test: `tests/Feature/Migrations/HelloAssoSchemaTest.php` (append)
+
+**Note importante :** Le mode `helloasso` est réservé aux transactions créées par la synchronisation HelloAsso. Il ne doit **pas** être ajouté à la validation du `TransactionForm` (saisie manuelle) ni apparaître dans le dropdown du formulaire.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -600,13 +618,21 @@ And in the `label()` method:
 self::HelloAsso => 'HelloAsso',
 ```
 
-- [ ] **Step 4: Update TransactionForm validation**
+- [ ] **Step 4: Exclure HelloAsso du factory**
 
-In `app/Livewire/TransactionForm.php`, find the validation rule for `mode_paiement` and add `helloasso`:
-
+In `database/factories/TransactionFactory.php`, remplacer :
 ```php
-'mode_paiement' => ['required', 'in:virement,cheque,especes,cb,prelevement,helloasso'],
+'mode_paiement' => fake()->randomElement(ModePaiement::cases()),
 ```
+par :
+```php
+'mode_paiement' => fake()->randomElement(array_filter(
+    ModePaiement::cases(),
+    fn (ModePaiement $m) => $m !== ModePaiement::HelloAsso,
+)),
+```
+
+Cela évite que les tests existants génèrent aléatoirement des transactions avec `mode_paiement = helloasso`.
 
 - [ ] **Step 5: Run test to verify it passes**
 
@@ -622,7 +648,7 @@ Expected: all tests pass (existing validation tests must not break)
 
 ```bash
 git add app/Enums/ModePaiement.php \
-  app/Livewire/TransactionForm.php \
+  database/factories/TransactionFactory.php \
   tests/Feature/Migrations/HelloAssoSchemaTest.php
 git commit -m "feat(enum): add HelloAsso to ModePaiement"
 ```
@@ -749,7 +775,7 @@ Expected: FAIL — the first test does not throw
 
 - [ ] **Step 3: Add validation in TransactionService::create()**
 
-In `app/Services/TransactionService.php`, in the `create()` method, after the `DB::transaction()` opens and before creating lignes, add:
+In `app/Services/TransactionService.php`, in the `create()` method, **avant** l'appel à `DB::transaction()` (pour garder la transaction DB minimale), add:
 
 ```php
 $this->validateInscriptionRequiresOperation($lignes);
@@ -775,7 +801,7 @@ private function validateInscriptionRequiresOperation(array $lignes): void
 }
 ```
 
-Also call `$this->validateInscriptionRequiresOperation($lignes)` in the `update()` method, before recreating lignes.
+Also call `$this->validateInscriptionRequiresOperation($lignes)` in the `update()` method, **avant** `DB::transaction()` (même logique).
 
 Add the import at the top of the file:
 ```php
@@ -839,7 +865,7 @@ Expected: code formatted, no errors
 - [ ] **Step 3: Commit formatting changes if any**
 
 ```bash
-git add -A
+git add app/ database/ tests/
 git commit -m "style: pint formatting"
 ```
 
