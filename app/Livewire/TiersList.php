@@ -26,6 +26,9 @@ final class TiersList extends Component
 
     public bool $filtreHelloasso = false;
 
+    public string $sortBy  = 'nom';
+    public string $sortDir = 'asc';
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -38,6 +41,21 @@ final class TiersList extends Component
 
     public function updatedFiltreHelloasso(): void
     {
+        $this->resetPage();
+    }
+
+    public function sort(string $col): void
+    {
+        $allowed = ['nom', 'ville', 'email'];
+        if (! in_array($col, $allowed, true)) {
+            return;
+        }
+        if ($this->sortBy === $col) {
+            $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy  = $col;
+            $this->sortDir = 'asc';
+        }
         $this->resetPage();
     }
 
@@ -61,7 +79,7 @@ final class TiersList extends Component
 
     public function render(): View
     {
-        $query = Tiers::orderBy('nom');
+        $query = Tiers::query();
 
         if ($this->search !== '') {
             $query->where(function ($q): void {
@@ -82,6 +100,13 @@ final class TiersList extends Component
 
         if ($this->filtreHelloasso) {
             $query->whereNotNull('helloasso_id');
+        }
+
+        $dir = $this->sortDir === 'desc' ? 'desc' : 'asc';
+        if ($this->sortBy === 'nom') {
+            $query->orderByRaw('COALESCE(entreprise, nom) ' . $dir);
+        } else {
+            $query->orderBy($this->sortBy, $dir);
         }
 
         return view('livewire.tiers-list', [
