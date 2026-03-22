@@ -4,9 +4,10 @@
 declare(strict_types=1);
 
 use App\Models\Tiers;
+use Illuminate\Support\Facades\Schema;
 
-it('displayName returns nom for entreprise', function () {
-    $tiers = new Tiers(['type' => 'entreprise', 'nom' => 'Mairie de Lyon', 'prenom' => null]);
+it('displayName returns nom as fallback when entreprise field is null', function () {
+    $tiers = new Tiers(['type' => 'entreprise', 'entreprise' => null, 'nom' => 'Mairie de Lyon', 'prenom' => null]);
     expect($tiers->displayName())->toBe('Mairie de Lyon');
 });
 
@@ -34,4 +35,54 @@ it('pourDepenses state sets pour_depenses to true', function () {
 it('pourRecettes state sets pour_recettes to true', function () {
     $tiers = Tiers::factory()->pourRecettes()->make();
     expect($tiers->pour_recettes)->toBeTrue();
+});
+
+it('tiers table has new columns after migration', function () {
+    expect(Schema::hasColumn('tiers', 'adresse_ligne1'))->toBeTrue();
+    expect(Schema::hasColumn('tiers', 'adresse'))->toBeFalse();
+    expect(Schema::hasColumn('tiers', 'code_postal'))->toBeTrue();
+    expect(Schema::hasColumn('tiers', 'ville'))->toBeTrue();
+    expect(Schema::hasColumn('tiers', 'pays'))->toBeTrue();
+    expect(Schema::hasColumn('tiers', 'entreprise'))->toBeTrue();
+    expect(Schema::hasColumn('tiers', 'date_naissance'))->toBeTrue();
+    expect(Schema::hasColumn('tiers', 'helloasso_id'))->toBeTrue();
+});
+
+it('helloasso_id unique constraint allows multiple nulls', function () {
+    Tiers::factory()->create(['helloasso_id' => null, 'pour_depenses' => true]);
+    Tiers::factory()->create(['helloasso_id' => null, 'pour_depenses' => true]);
+    expect(Tiers::whereNull('helloasso_id')->count())->toBeGreaterThanOrEqual(2);
+});
+
+it('helloasso_id unique constraint rejects duplicate non-null values', function () {
+    Tiers::factory()->create(['helloasso_id' => 'ha-123', 'pour_depenses' => true]);
+    expect(fn () => Tiers::factory()->create(['helloasso_id' => 'ha-123', 'pour_depenses' => true]))
+        ->toThrow(\Illuminate\Database\QueryException::class);
+});
+
+it('displayName returns entreprise field for entreprise type', function () {
+    $tiers = new Tiers(['type' => 'entreprise', 'entreprise' => 'ACME Corp', 'nom' => 'Dupont']);
+    expect($tiers->displayName())->toBe('ACME Corp');
+});
+
+it('displayName falls back to nom when entreprise field is null', function () {
+    $tiers = new Tiers(['type' => 'entreprise', 'entreprise' => null, 'nom' => 'Mairie de Lyon']);
+    expect($tiers->displayName())->toBe('Mairie de Lyon');
+});
+
+it('can create tiers with all new fields', function () {
+    $tiers = Tiers::factory()->create([
+        'entreprise'     => 'ACME Corp',
+        'code_postal'    => '75001',
+        'ville'          => 'Paris',
+        'pays'           => 'France',
+        'date_naissance' => '1990-05-15',
+        'helloasso_id'   => 'ha-abc123',
+        'pour_depenses'  => true,
+    ]);
+    expect($tiers->entreprise)->toBe('ACME Corp');
+    expect($tiers->code_postal)->toBe('75001');
+    expect($tiers->pays)->toBe('France');
+    expect($tiers->helloasso_id)->toBe('ha-abc123');
+    expect($tiers->date_naissance)->toBeInstanceOf(\Illuminate\Support\Carbon::class);
 });
