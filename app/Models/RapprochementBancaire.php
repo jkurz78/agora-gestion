@@ -64,16 +64,6 @@ final class RapprochementBancaire extends Model
         return $this->transactions()->where('type', 'recette');
     }
 
-    public function dons(): HasMany
-    {
-        return $this->hasMany(Don::class, 'rapprochement_id');
-    }
-
-    public function cotisations(): HasMany
-    {
-        return $this->hasMany(Cotisation::class, 'rapprochement_id');
-    }
-
     public function virementsSource(): HasMany
     {
         return $this->hasMany(VirementInterne::class, 'rapprochement_source_id');
