@@ -45,7 +45,7 @@ final class TiersTransactionService
             ->unionAll($cotisations);
 
         $allowed = ['date', 'source_type', 'montant'];
-        $sortBy  = in_array($sortBy, $allowed, true) ? $sortBy : 'date';
+        $sortBy = in_array($sortBy, $allowed, true) ? $sortBy : 'date';
         $sortDir = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
 
         $query = DB::query()->fromSub($union, 't');
@@ -60,7 +60,7 @@ final class TiersTransactionService
             $query->where('date', '<=', $dateFin);
         }
         if ($search !== '') {
-            $query->where('libelle', 'like', '%' . $search . '%');
+            $query->where('libelle', 'like', '%'.$search.'%');
         }
 
         return $query->orderBy($sortBy, $sortDir)->paginate($perPage);

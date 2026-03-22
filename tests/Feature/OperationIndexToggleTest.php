@@ -14,10 +14,10 @@ beforeEach(function () {
 
 it('masque par défaut les opérations hors exercice', function () {
     Operation::factory()->create([
-        'nom'        => 'Op passée',
+        'nom' => 'Op passée',
         'date_debut' => '2024-09-01',
-        'date_fin'   => '2025-08-30',
-        'statut'     => StatutOperation::EnCours,
+        'date_fin' => '2025-08-30',
+        'statut' => StatutOperation::EnCours,
     ]);
 
     $this->get(route('operations.index'))
@@ -26,10 +26,10 @@ it('masque par défaut les opérations hors exercice', function () {
 
 it('affiche toutes les opérations avec ?all=1', function () {
     Operation::factory()->create([
-        'nom'        => 'Op passée',
+        'nom' => 'Op passée',
         'date_debut' => '2024-09-01',
-        'date_fin'   => '2025-08-30',
-        'statut'     => StatutOperation::EnCours,
+        'date_fin' => '2025-08-30',
+        'statut' => StatutOperation::EnCours,
     ]);
 
     $this->get(route('operations.index', ['all' => 1]))

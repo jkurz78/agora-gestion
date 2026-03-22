@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\CompteBancaire;
 use App\Models\Categorie;
+use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\User;
@@ -51,7 +51,7 @@ it('refuses a transaction ligne with inscription sous-categorie without operatio
     ]];
 
     expect(fn () => $this->service->create($data, $lignes))
-        ->toThrow(\InvalidArgumentException::class);
+        ->toThrow(InvalidArgumentException::class);
 });
 
 it('accepts a transaction ligne with inscription sous-categorie with operation_id', function () {

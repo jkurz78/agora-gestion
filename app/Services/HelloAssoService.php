@@ -17,9 +17,9 @@ class HelloAssoService
         // Étape 1 : obtenir un token OAuth2
         try {
             $tokenResponse = Http::timeout(10)->asForm()->post("{$baseUrl}/oauth2/token", [
-                'client_id'     => $parametres->client_id,
+                'client_id' => $parametres->client_id,
                 'client_secret' => $parametres->client_secret,
-                'grant_type'    => 'client_credentials',
+                'grant_type' => 'client_credentials',
             ]);
         } catch (ConnectionException) {
             return new HelloAssoTestResult(
@@ -37,10 +37,10 @@ class HelloAssoService
 
         $token = $tokenResponse->json('access_token');
 
-        if (!is_string($token) || $token === '') {
+        if (! is_string($token) || $token === '') {
             return new HelloAssoTestResult(
                 success: false,
-                erreur: "Réponse inattendue du serveur HelloAsso : token manquant",
+                erreur: 'Réponse inattendue du serveur HelloAsso : token manquant',
             );
         }
 

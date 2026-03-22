@@ -27,9 +27,9 @@ final class SousCategorie extends Model
     protected function casts(): array
     {
         return [
-            'categorie_id'     => 'integer',
-            'pour_dons'        => 'boolean',
-            'pour_cotisations'  => 'boolean',
+            'categorie_id' => 'integer',
+            'pour_dons' => 'boolean',
+            'pour_cotisations' => 'boolean',
             'pour_inscriptions' => 'boolean',
         ];
     }

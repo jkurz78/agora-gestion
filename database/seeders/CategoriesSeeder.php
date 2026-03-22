@@ -8,20 +8,21 @@ use App\Enums\TypeCategorie;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class CategoriesSeeder extends Seeder
 {
     public function run(): void
     {
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
         SousCategorie::truncate();
         Categorie::truncate();
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
         $data = [
             // ─── RECETTES ───────────────────────────────────────────────
             [
-                'nom'  => '70 - Ventes et prestations',
+                'nom' => '70 - Ventes et prestations',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
                     ['nom' => 'Formations',              'code_cerfa' => '706A'],
@@ -30,14 +31,14 @@ class CategoriesSeeder extends Seeder
                 ],
             ],
             [
-                'nom'  => '74 - Subventions',
+                'nom' => '74 - Subventions',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
                     ['nom' => 'Subvention État Ministère des Sports', 'code_cerfa' => '741'],
                 ],
             ],
             [
-                'nom'  => '75 - Cotisations et dons',
+                'nom' => '75 - Cotisations et dons',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
                     ['nom' => 'Cotisations',  'code_cerfa' => '751', 'pour_cotisations' => true],
@@ -46,14 +47,14 @@ class CategoriesSeeder extends Seeder
                 ],
             ],
             [
-                'nom'  => '76 - Produits financiers',
+                'nom' => '76 - Produits financiers',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
                     ['nom' => 'Intérêts', 'code_cerfa' => '761'],
                 ],
             ],
             [
-                'nom'  => '77 - Produits exceptionnels',
+                'nom' => '77 - Produits exceptionnels',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
                     ['nom' => 'Abandon de créance', 'code_cerfa' => '771', 'pour_dons' => true],
@@ -62,7 +63,7 @@ class CategoriesSeeder extends Seeder
 
             // ─── DÉPENSES ───────────────────────────────────────────────
             [
-                'nom'  => '60 - Achats',
+                'nom' => '60 - Achats',
                 'type' => TypeCategorie::Depense,
                 'sous' => [
                     ['nom' => 'Fournitures',      'code_cerfa' => '606'],
@@ -71,7 +72,7 @@ class CategoriesSeeder extends Seeder
                 ],
             ],
             [
-                'nom'  => '61 - Charges de fonctionnement',
+                'nom' => '61 - Charges de fonctionnement',
                 'type' => TypeCategorie::Depense,
                 'sous' => [
                     ['nom' => 'Location salle',                     'code_cerfa' => '613A'],
@@ -80,7 +81,7 @@ class CategoriesSeeder extends Seeder
                 ],
             ],
             [
-                'nom'  => '62 - Autres services extérieurs',
+                'nom' => '62 - Autres services extérieurs',
                 'type' => TypeCategorie::Depense,
                 'sous' => [
                     ['nom' => 'Bilan pré-thérapeutique',  'code_cerfa' => '611A'],
@@ -96,14 +97,14 @@ class CategoriesSeeder extends Seeder
                 ],
             ],
             [
-                'nom'  => '66 - Charges financières',
+                'nom' => '66 - Charges financières',
                 'type' => TypeCategorie::Depense,
                 'sous' => [
                     ['nom' => 'Frais bancaires', 'code_cerfa' => '627'],
                 ],
             ],
             [
-                'nom'  => '67 - Charges exceptionnelles',
+                'nom' => '67 - Charges exceptionnelles',
                 'type' => TypeCategorie::Depense,
                 'sous' => [],
             ],
@@ -111,7 +112,7 @@ class CategoriesSeeder extends Seeder
 
         foreach ($data as $item) {
             $categorie = Categorie::create([
-                'nom'  => $item['nom'],
+                'nom' => $item['nom'],
                 'type' => $item['type'],
             ]);
 

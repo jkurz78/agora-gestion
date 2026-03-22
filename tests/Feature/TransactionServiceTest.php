@@ -1,13 +1,16 @@
 <?php
+
 declare(strict_types=1);
 use App\Enums\TypeTransaction;
 use App\Models\CompteBancaire;
+use App\Models\RapprochementBancaire;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -87,7 +90,7 @@ it('supprime une transaction non rapprochée', function () {
 });
 
 it('rejette la suppression d\'une transaction rapprochée', function () {
-    $rapprochement = \App\Models\RapprochementBancaire::factory()->create(['compte_id' => $this->compte->id]);
+    $rapprochement = RapprochementBancaire::factory()->create(['compte_id' => $this->compte->id]);
     $transaction = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,

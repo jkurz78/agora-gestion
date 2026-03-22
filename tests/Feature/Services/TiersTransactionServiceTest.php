@@ -10,7 +10,7 @@ use App\Services\TiersTransactionService;
 
 beforeEach(function (): void {
     $this->tiers = Tiers::factory()->create();
-    $this->service = new TiersTransactionService();
+    $this->service = new TiersTransactionService;
     session(['exercice_actif' => 2025]);
 });
 

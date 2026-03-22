@@ -43,6 +43,7 @@ final class Operation extends Model
     public function scopeForExercice(Builder $query, int $exercice): Builder
     {
         $range = app(ExerciceService::class)->dateRange($exercice);
+
         return $query
             ->whereNotNull('date_debut')
             ->whereNotNull('date_fin')

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -11,9 +12,13 @@ use Livewire\Component;
 final class MonProfil extends Component
 {
     public string $nom = '';
+
     public string $email = '';
+
     public string $password = '';
+
     public string $password_confirmation = '';
+
     public ?string $successMessage = null;
 
     public function mount(): void
@@ -52,7 +57,7 @@ final class MonProfil extends Component
 
         $user->save();
 
-        if ($emailChanged && $user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail) {
+        if ($emailChanged && $user instanceof MustVerifyEmail) {
             $user->sendEmailVerificationNotification();
         }
 

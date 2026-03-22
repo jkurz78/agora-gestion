@@ -13,21 +13,26 @@ use Livewire\Component;
 // Nom en minuscules intentionnel : Livewire résout <livewire:parametres.helloasso-form /> en HelloassoForm, pas HelloAssoForm.
 final class HelloassoForm extends Component
 {
-    public string $clientId          = '';
-    public string $clientSecret      = '';
-    public string $organisationSlug  = '';
-    public string $environnement     = 'production';
+    public string $clientId = '';
+
+    public string $clientSecret = '';
+
+    public string $organisationSlug = '';
+
+    public string $environnement = 'production';
+
     /** @var array{success: bool, organisationNom: ?string, erreur: ?string}|null */
-    public ?array $testResult        = null;
+    public ?array $testResult = null;
+
     public bool $secretDejaEnregistre = false;
 
     public function mount(): void
     {
         $p = HelloAssoParametres::where('association_id', 1)->first();
         if ($p !== null) {
-            $this->clientId         = $p->client_id ?? '';
+            $this->clientId = $p->client_id ?? '';
             $this->organisationSlug = $p->organisation_slug ?? '';
-            $this->environnement    = $p->environnement->value;
+            $this->environnement = $p->environnement->value;
             if ($p->client_secret !== null) {
                 $this->secretDejaEnregistre = true;
             }
@@ -37,16 +42,16 @@ final class HelloassoForm extends Component
     public function sauvegarder(): void
     {
         $this->validate([
-            'clientId'         => ['nullable', 'string', 'max:255'],
-            'clientSecret'     => ['nullable', 'string'],
+            'clientId' => ['nullable', 'string', 'max:255'],
+            'clientSecret' => ['nullable', 'string'],
             'organisationSlug' => ['nullable', 'string', 'max:255', 'regex:/^[a-z0-9-]*$/'],
-            'environnement'    => ['required', 'in:production,sandbox'],
+            'environnement' => ['required', 'in:production,sandbox'],
         ]);
 
         $payload = [
-            'client_id'         => $this->clientId ?: null,
+            'client_id' => $this->clientId ?: null,
             'organisation_slug' => $this->organisationSlug ?: null,
-            'environnement'     => $this->environnement,
+            'environnement' => $this->environnement,
         ];
 
         if ($this->clientSecret !== '') {
@@ -69,10 +74,10 @@ final class HelloassoForm extends Component
     public function testerConnexion(): void
     {
         $this->validate([
-            'clientId'         => ['required', 'string'],
-            'clientSecret'     => $this->secretDejaEnregistre ? ['nullable', 'string'] : ['required', 'string'],
+            'clientId' => ['required', 'string'],
+            'clientSecret' => $this->secretDejaEnregistre ? ['nullable', 'string'] : ['required', 'string'],
             'organisationSlug' => ['required', 'string'],
-            'environnement'    => ['required', 'in:production,sandbox'],
+            'environnement' => ['required', 'in:production,sandbox'],
         ]);
 
         $secret = $this->clientSecret;
@@ -81,19 +86,19 @@ final class HelloassoForm extends Component
             $secret = $enBase?->client_secret ?? '';
         }
 
-        $parametres = new HelloAssoParametres();
-        $parametres->client_id         = $this->clientId;
-        $parametres->client_secret     = $secret;
+        $parametres = new HelloAssoParametres;
+        $parametres->client_id = $this->clientId;
+        $parametres->client_secret = $secret;
         $parametres->organisation_slug = $this->organisationSlug;
-        $parametres->environnement     = HelloAssoEnvironnement::from($this->environnement);
+        $parametres->environnement = HelloAssoEnvironnement::from($this->environnement);
 
         $result = app(HelloAssoService::class)->testerConnexion($parametres);
 
         // Stocker en tableau pour la sérialisabilité Livewire 4
         $this->testResult = [
-            'success'         => $result->success,
+            'success' => $result->success,
             'organisationNom' => $result->organisationNom,
-            'erreur'          => $result->erreur,
+            'erreur' => $result->erreur,
         ];
     }
 

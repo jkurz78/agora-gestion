@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
+use App\Models\CompteBancaire;
 use App\Models\Cotisation;
 use App\Models\Don;
-use App\Models\CompteBancaire;
-use App\Models\Tiers;
 use App\Models\RapprochementBancaire;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;

@@ -8,8 +8,10 @@ use App\Enums\ModePaiement;
 use App\Models\CompteBancaire;
 use App\Models\Don;
 use App\Models\Operation;
+use App\Models\SousCategorie;
 use App\Services\DonService;
 use App\Services\ExerciceService;
+use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -57,12 +59,11 @@ final class DonForm extends Component
             $this->date = app(ExerciceService::class)->defaultDate();
             $defaults = session('don_defaults', []);
             $this->sous_categorie_id = $defaults['sous_categorie_id'] ?? null;
-            $this->mode_paiement    = $defaults['mode_paiement'] ?? '';
-            $this->compte_id        = $defaults['compte_id'] ?? null;
+            $this->mode_paiement = $defaults['mode_paiement'] ?? '';
+            $this->compte_id = $defaults['compte_id'] ?? null;
         }
         $this->showForm = true;
     }
-
 
     public function resetForm(): void
     {
@@ -130,19 +131,19 @@ final class DonForm extends Component
 
         session(['don_defaults' => [
             'sous_categorie_id' => $this->sous_categorie_id,
-            'mode_paiement'     => $this->mode_paiement,
-            'compte_id'         => $this->compte_id,
+            'mode_paiement' => $this->mode_paiement,
+            'compte_id' => $this->compte_id,
         ]]);
         $this->dispatch('don-saved');
         $this->resetForm();
     }
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         return view('livewire.don-form', [
-            'naturesdon'   => \App\Models\SousCategorie::where('pour_dons', true)->orderBy('nom')->get(),
-            'operations'   => Operation::orderBy('nom')->get(),
-            'comptes'      => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
+            'naturesdon' => SousCategorie::where('pour_dons', true)->orderBy('nom')->get(),
+            'operations' => Operation::orderBy('nom')->get(),
+            'comptes' => CompteBancaire::where('actif_dons_cotisations', true)->orderBy('nom')->get(),
             'modesPaiement' => ModePaiement::cases(),
         ]);
     }

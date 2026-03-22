@@ -17,7 +17,7 @@ it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée',
     // La derniereCotisation est chargée via une relation — on crée une cotisation pointée
     Cotisation::factory()->create([
         'tiers_id' => $tiers->id,
-        'pointe'   => true,
+        'pointe' => true,
     ]);
 
     Livewire::test(MembreList::class)
@@ -29,7 +29,7 @@ it('n\'affiche pas le caractère unicode ✓', function () {
     $tiers = Tiers::factory()->create();
     Cotisation::factory()->create([
         'tiers_id' => $tiers->id,
-        'pointe'   => true,
+        'pointe' => true,
     ]);
 
     Livewire::test(MembreList::class)
@@ -44,7 +44,7 @@ it('affiche un bouton bi-clock-history lié aux transactions du membre', functio
     Livewire::test(MembreList::class)
         ->set('filtre', 'tous')
         ->assertSeeHtml('bi bi-clock-history')
-        ->assertSeeHtml('href="' . route('tiers.transactions', $tiers->id) . '"');
+        ->assertSeeHtml('href="'.route('tiers.transactions', $tiers->id).'"');
 });
 
 it('les boutons d\'action ont la classe btn-sm sans style inline de padding', function () {

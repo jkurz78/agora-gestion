@@ -56,14 +56,14 @@ final class RapprochementPdfController extends Controller
             'logoMime' => $logoMime,
         ];
 
-        $dateFin    = $rapprochement->date_fin->format('Y-m-d');
+        $dateFin = $rapprochement->date_fin->format('Y-m-d');
         $comptePart = str_replace('/', '-', Str::ascii($compte->nom));
-        $prefix     = $association?->nom
+        $prefix = $association?->nom
             ? str_replace('/', '-', Str::ascii($association->nom)).' - '
             : '';
-        $filename   = $prefix.'Rapprochement '.$comptePart.' au '.$dateFin.'.pdf';
+        $filename = $prefix.'Rapprochement '.$comptePart.' au '.$dateFin.'.pdf';
 
-        $pdf    = Pdf::loadView('pdf.rapprochement', $data);
+        $pdf = Pdf::loadView('pdf.rapprochement', $data);
         $inline = request()->query('mode') === 'inline';
 
         return $inline ? $pdf->stream($filename) : $pdf->download($filename);

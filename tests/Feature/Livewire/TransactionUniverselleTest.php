@@ -3,7 +3,11 @@
 declare(strict_types=1);
 
 use App\Livewire\TransactionUniverselle;
-use App\Models\{Don, Transaction, User};
+use App\Models\CompteBancaire;
+use App\Models\Don;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\User;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -16,7 +20,7 @@ it('se rend sans erreur', function () {
 });
 
 it('accepte les props verrouillées en mount', function () {
-    $compte = \App\Models\CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create();
     Livewire::test(TransactionUniverselle::class, ['compteId' => $compte->id])
         ->assertSet('compteId', $compte->id);
 });
@@ -30,7 +34,7 @@ it('supprime un don via deleteRow', function () {
 
 it('ne supprime pas une transaction pointée', function () {
     $tx = Transaction::factory()->asDepense()->create([
-        'date'   => '2025-10-01',
+        'date' => '2025-10-01',
         'pointe' => true,
     ]);
     Livewire::test(TransactionUniverselle::class)
@@ -48,7 +52,7 @@ it('la page /transactions rend TransactionUniverselle avec lockedTypes depense+r
 });
 
 it('la page /comptes-bancaires/{id}/transactions rend TransactionUniverselle avec compteId', function () {
-    $compte = \App\Models\CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create();
     $this->get("/comptes-bancaires/{$compte->id}/transactions")
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
@@ -58,7 +62,7 @@ it('la page /comptes-bancaires/{id}/transactions rend TransactionUniverselle ave
 });
 
 it('la page /tiers/{id}/transactions rend TransactionUniverselle avec tiersId', function () {
-    $tiers = \App\Models\Tiers::factory()->create();
+    $tiers = Tiers::factory()->create();
     $this->get("/tiers/{$tiers->id}/transactions")
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);

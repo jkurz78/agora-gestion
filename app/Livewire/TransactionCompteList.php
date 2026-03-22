@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
 use App\Models\Cotisation;
 use App\Models\Don;
@@ -15,7 +16,6 @@ use App\Services\ExerciceService;
 use App\Services\TransactionCompteService;
 use App\Services\TransactionService;
 use App\Services\VirementInterneService;
-use App\Livewire\Concerns\WithPerPage;
 use Livewire\Component;
 use Livewire\WithPagination;
 
