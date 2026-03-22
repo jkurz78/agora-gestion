@@ -47,16 +47,6 @@ final class Tiers extends Model
         return trim(($this->prenom ? $this->prenom.' ' : '').$this->nom);
     }
 
-    public function dons(): HasMany
-    {
-        return $this->hasMany(Don::class);
-    }
-
-    public function cotisations(): HasMany
-    {
-        return $this->hasMany(Cotisation::class);
-    }
-
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);

@@ -56,8 +56,4 @@ final class Operation extends Model
         return $this->hasMany(TransactionLigne::class);
     }
 
-    public function dons(): HasMany
-    {
-        return $this->hasMany(Don::class);
-    }
 }
