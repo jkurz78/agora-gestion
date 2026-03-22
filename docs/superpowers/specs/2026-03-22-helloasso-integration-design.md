@@ -81,14 +81,9 @@ L'association utilise HelloAsso pour collecter en ligne des cotisations, des don
 |---|---|---|
 | `helloasso` | `HelloAsso` | Mode de paiement pour les transactions issues de HelloAsso |
 
-### Migration des données existantes
+### Suppression des tables dons et cotisations
 
-Les données des tables `dons` et `cotisations` doivent être migrées vers `transactions` + `transaction_lignes` avant suppression des tables. La migration :
-
-1. Pour chaque Don existant → crée une Transaction de type `recette` avec une TransactionLigne liée à la sous-catégorie du don. Champs mappés : `tiers_id`, `date`, `montant` → `montant_total`, `mode_paiement`, `compte_id`, `pointe`, `rapprochement_id`, `numero_piece`, `saisi_par`, `libelle` (← `objet`), `deleted_at`. La TransactionLigne reprend `sous_categorie_id`, `operation_id`, `seance`, `montant`.
-2. Pour chaque Cotisation existante → même logique. `date_paiement` → `date`, `libelle` ← `'Cotisation ' || exercice`, `saisi_par` ← null (la table cotisations ne porte pas ce champ), pas d'`operation_id` ni `seance`. Le champ `exercice` de la cotisation est reporté sur `transaction_lignes.exercice`.
-3. Les IDs de rapprochement (`rapprochement_id`) sont reportés sur la Transaction pour maintenir la cohérence du rapprochement bancaire.
-4. Les tables `dons` et `cotisations` sont conservées temporairement (renommées `legacy_dons`, `legacy_cotisations`) le temps de valider la migration, puis supprimées dans une migration ultérieure.
+Il n'y a **pas de données de production** dans les tables `dons` et `cotisations`. Pas besoin de migration de données — les tables sont simplement supprimées (avec un `DROP TABLE IF EXISTS` pour gérer proprement les bases de test qui pourraient contenir des données résiduelles).
 
 ---
 
@@ -357,7 +352,7 @@ Ces formulaires sont **supprimés**. La saisie manuelle d'un don ou d'une cotisa
 | `app/Models/Tiers.php` | Adapter — retirer les relations `dons()` et `cotisations()` |
 | `app/Models/RapprochementBancaire.php` | Adapter — retirer les relations `dons()` et `cotisations()` |
 | `routes/web.php` | Adapter — retirer les routes `/dons` et `/cotisations` dédiées |
-| `app/Services/BudgetService.php` | Vérifier — fonctionne déjà sur TransactionLigne, mais valider que les anciennes données don/cotisation non comptées en budget ne créent pas de doublon |
+| `app/Services/BudgetService.php` | Vérifier — fonctionne déjà sur TransactionLigne, confirmer qu'il tourne sans les tables supprimées |
 
 ---
 
@@ -376,42 +371,32 @@ Ajout de colonnes, sans modifier le comportement existant :
 5. Ajouter `helloasso` dans l'enum `ModePaiement`
 6. Ajouter la validation conditionnelle : sous-catégorie `pour_inscriptions` → `operation_id` obligatoire sur TransactionLigne
 
-### Lot 2 — Migration des données dons → transactions
+### Lot 2 — Suppression des tables dons/cotisations et nettoyage du code
 
-1. Migration SQL : chaque Don → Transaction (type recette) + TransactionLigne
-2. Adaptation de `SoldeService` — retirer la branche `dons()`
-3. Adaptation de `RapprochementBancaireService` — retirer les requêtes Don
-4. Adaptation de `RapprochementDetail` — retirer les références Don
-5. Adaptation de `Dashboard` — `Don::forExercice()` → requête TransactionLigne avec sous-cat `pour_dons`
-6. Adaptation de `RapportService` (CERFA) — requêter `transaction_lignes` + sous-catégories `pour_dons`
-7. Adaptation de `TransactionUniverselleService` — retirer la branche UNION dons
-8. Suppression de `DonForm`, `DonList`, `DonService`, `Don` (modèle)
-9. Adaptation des relations sur `CompteBancaire`, `Tiers`, `RapprochementBancaire` — retirer `dons()`
-10. Adaptation de `routes/web.php` — route `/dons` pointe vers TransactionUniverselle filtrée
-11. Renommer table `dons` → `legacy_dons`
+Pas de migration de données (aucune donnée de production). Suppression directe :
 
-### Lot 3 — Migration des données cotisations → transactions
+1. Migration SQL : `DROP TABLE IF EXISTS dons, cotisations` (nettoie aussi les bases de test)
+2. Suppression des modèles : `Don`, `Cotisation`
+3. Suppression des services : `DonService`, `CotisationService`
+4. Suppression des composants Livewire : `DonForm`, `DonList`, `CotisationForm`, `CotisationList`
+5. Adaptation de `SoldeService` — retirer les branches `dons()` et `cotisations()`
+6. Adaptation de `RapprochementBancaireService` — retirer les requêtes Don/Cotisation
+7. Adaptation de `RapprochementDetail` — retirer les références Don/Cotisation
+8. Adaptation de `Dashboard` — remplacer `Don::forExercice()` et requêtes cotisation par des requêtes TransactionLigne avec sous-cat `pour_dons` / `pour_cotisations`
+9. Adaptation de `RapportService` (CERFA) — requêter `transaction_lignes` + sous-catégories `pour_dons`
+10. Adaptation de `TransactionUniverselleService` — retirer les branches UNION dons et cotisations
+11. Adaptation des relations sur `CompteBancaire`, `Tiers`, `RapprochementBancaire` — retirer `dons()` et `cotisations()`
+12. Adaptation de `routes/web.php` — routes `/dons` et `/cotisations` pointent vers TransactionUniverselle filtrée
+13. Vérifier `BudgetService` — confirmer qu'il fonctionne sans les tables supprimées
 
-Même logique que lot 2, appliquée aux cotisations :
+### Lot 3 — Synchronisation HelloAsso : récupération et rapprochement tiers
 
-1. Migration SQL : chaque Cotisation → Transaction + TransactionLigne (avec `exercice` reporté)
-2. Adaptation de `SoldeService`, `RapprochementBancaireService`, `RapprochementDetail`
-3. Adaptation de `Dashboard` — requête membres sans cotisation via TransactionLigne
-4. Adaptation de `TransactionUniverselleService` — retirer la branche UNION cotisations
-5. Suppression de `CotisationForm`, `CotisationList`, `CotisationService`, `Cotisation` (modèle)
-6. Adaptation des relations sur `CompteBancaire`, `Tiers`, `RapprochementBancaire` — retirer `cotisations()`
-7. Adaptation de `routes/web.php` — route `/cotisations` pointe vers TransactionUniverselle filtrée
-8. Renommer table `cotisations` → `legacy_cotisations`
-9. Vérifier `BudgetService` — pas de doublon avec les données migrées
+1. Migration : convertir la colonne `helloasso_id` (string nullable) en `est_helloasso` (boolean, default false)
+2. Service `HelloAssoApiClient` — encapsule l'authentification OAuth2 et les appels API (orders, cash-outs, forms)
+3. Écran de rapprochement des tiers — liste les personnes HelloAsso non liées, propose correspondances, permet associer/créer/ignorer
+4. Marquage `est_helloasso = true` sur les Tiers associés
 
-### Lot 4 — Synchronisation HelloAsso : récupération et rapprochement tiers
-
-1. Service `HelloAssoApiClient` — encapsule l'authentification OAuth2 et les appels API (orders, cash-outs, forms)
-2. Écran de rapprochement des tiers — liste les personnes HelloAsso non liées, propose correspondances, permet associer/créer/ignorer
-3. Marquage `est_helloasso = true` sur les Tiers associés
-4. Migration : convertir la colonne `helloasso_id` (string nullable) en `est_helloasso` (boolean, default false)
-
-### Lot 5 — Synchronisation HelloAsso : rapprochement formulaires et import
+### Lot 4 — Synchronisation HelloAsso : rapprochement formulaires et import
 
 1. Écran de rapprochement des formulaires → opérations (associer/créer/ignorer)
 2. Configuration du mapping sous-catégories (Donation→sous-cat, Membership→sous-cat, Registration→sous-cat)
@@ -419,13 +404,13 @@ Même logique que lot 2, appliquée aux cotisations :
 4. `HelloAssoSyncService` — import des orders en transactions (étape 4 du workflow)
 5. Rapport de synchronisation (créés/mis à jour/ignorés/erreurs)
 
-### Lot 6 — Gestion des versements HelloAsso
+### Lot 5 — Gestion des versements HelloAsso
 
 1. Import des cash-outs → VirementInterne (compte HelloAsso → compte courant)
 2. Marquage `helloasso_cashout_id` sur les transactions liées
 3. Contrôle d'intégrité : somme transactions = montant du virement
 
-### Lot 7 — Verrouillage versements (évolution)
+### Lot 6 — Verrouillage versements (évolution)
 
 1. Verrouillage automatique des transactions par `cashOutId` (rapprochement auto-généré)
 2. UI de visualisation du verrouillage par versement
