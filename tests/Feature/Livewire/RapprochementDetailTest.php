@@ -5,8 +5,6 @@ declare(strict_types=1);
 use App\Enums\StatutRapprochement;
 use App\Livewire\RapprochementDetail;
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -53,32 +51,18 @@ it('affiche la colonne Tiers pour une recette', function () {
         ->assertSee('Jean Dupont');
 });
 
-it('affiche la colonne Tiers pour un don', function () {
+it('affiche la colonne Tiers pour une autre recette (don/cotisation)', function () {
     $tiers = Tiers::factory()->create(['nom' => 'Martin', 'prenom' => 'Marie', 'type' => 'particulier']);
-    Don::factory()->create([
+    Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'tiers_id' => $tiers->id,
         'date' => '2026-03-10',
-        'montant' => 50.00,
+        'montant_total' => 50.00,
     ]);
 
     Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
         ->assertSee('Marie Martin');
-});
-
-it('affiche la colonne Tiers pour une cotisation via tiers()', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Durand', 'prenom' => 'Pierre', 'type' => 'particulier']);
-    Cotisation::factory()->create([
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => $this->rapprochement->id,
-        'tiers_id' => $tiers->id,
-        'date_paiement' => '2026-03-05',
-        'montant' => 30.00,
-    ]);
-
-    Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
-        ->assertSee('Pierre Durand');
 });
 
 it('affiche les totaux débits et crédits pointés', function () {

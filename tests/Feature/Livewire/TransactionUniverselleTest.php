@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Livewire\TransactionUniverselle;
 use App\Models\CompteBancaire;
-use App\Models\Don;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -25,11 +24,11 @@ it('accepte les props verrouillées en mount', function () {
         ->assertSet('compteId', $compte->id);
 });
 
-it('supprime un don via deleteRow', function () {
-    $don = Don::factory()->create(['date' => '2025-10-01']);
+it('supprime une recette via deleteRow', function () {
+    $recette = Transaction::factory()->asRecette()->create(['date' => '2025-10-01']);
     Livewire::test(TransactionUniverselle::class)
-        ->call('deleteRow', 'don', $don->id);
-    $this->assertSoftDeleted('dons', ['id' => $don->id]);
+        ->call('deleteRow', 'recette', $recette->id);
+    $this->assertSoftDeleted('transactions', ['id' => $recette->id]);
 });
 
 it('ne supprime pas une transaction pointée', function () {
@@ -68,20 +67,20 @@ it('la page /tiers/{id}/transactions rend TransactionUniverselle avec tiersId', 
         ->assertSeeLivewire(TransactionUniverselle::class);
 });
 
-it('la page /dons rend TransactionUniverselle avec lockedTypes don', function () {
+it('la page /dons rend TransactionUniverselle avec sousCategorieFilter pour_dons', function () {
     $this->get('/dons')
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 
-    Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['don']])
-        ->assertSet('lockedTypes', ['don']);
+    Livewire::test(TransactionUniverselle::class, ['sousCategorieFilter' => 'pour_dons'])
+        ->assertSet('sousCategorieFilter', 'pour_dons');
 });
 
-it('la page /cotisations rend TransactionUniverselle avec lockedTypes cotisation', function () {
+it('la page /cotisations rend TransactionUniverselle avec sousCategorieFilter pour_cotisations', function () {
     $this->get('/cotisations')
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 
-    Livewire::test(TransactionUniverselle::class, ['lockedTypes' => ['cotisation']])
-        ->assertSet('lockedTypes', ['cotisation']);
+    Livewire::test(TransactionUniverselle::class, ['sousCategorieFilter' => 'pour_cotisations'])
+        ->assertSet('sousCategorieFilter', 'pour_cotisations');
 });
