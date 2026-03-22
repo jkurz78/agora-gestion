@@ -27,6 +27,7 @@ final class VirementInterne extends Model
         'rapprochement_source_id',
         'rapprochement_destination_id',
         'numero_piece',
+        'helloasso_cashout_id',
     ];
 
     protected function casts(): array
@@ -39,6 +40,7 @@ final class VirementInterne extends Model
             'saisi_par' => 'integer',
             'rapprochement_source_id' => 'integer',
             'rapprochement_destination_id' => 'integer',
+            'helloasso_cashout_id' => 'integer',
         ];
     }
 
