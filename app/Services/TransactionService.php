@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace App\Services;
 
+use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use Carbon\Carbon;
@@ -11,6 +12,8 @@ final class TransactionService
 {
     public function create(array $data, array $lignes): Transaction
     {
+        $this->validateInscriptionRequiresOperation($lignes);
+
         return DB::transaction(function () use ($data, $lignes) {
             $data['saisi_par']    = auth()->id();
             $data['numero_piece'] = app(NumeroPieceService::class)->assign(Carbon::parse($data['date']));
@@ -24,6 +27,8 @@ final class TransactionService
 
     public function update(Transaction $transaction, array $data, array $lignes): Transaction
     {
+        $this->validateInscriptionRequiresOperation($lignes);
+
         return DB::transaction(function () use ($transaction, $data, $lignes) {
             $transaction->load(['rapprochement' => fn ($q) => $q->lockForUpdate()]);
 
@@ -131,6 +136,22 @@ final class TransactionService
     public function supprimerAffectations(TransactionLigne $ligne): void
     {
         DB::transaction(fn () => $ligne->affectations()->delete());
+    }
+
+    private function validateInscriptionRequiresOperation(array $lignes): void
+    {
+        $inscriptionSousCategorieIds = SousCategorie::where('pour_inscriptions', true)
+            ->pluck('id')
+            ->toArray();
+
+        foreach ($lignes as $index => $ligne) {
+            if (in_array((int) $ligne['sous_categorie_id'], $inscriptionSousCategorieIds, true)
+                && empty($ligne['operation_id'])) {
+                throw new \InvalidArgumentException(
+                    "La ligne {$index} utilise une sous-catégorie d'inscription : operation_id est obligatoire."
+                );
+            }
+        }
     }
 
     private function assertLockedInvariants(Transaction $transaction, array $data, array $lignes): void
