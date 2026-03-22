@@ -82,7 +82,7 @@ final class RapprochementBancaireService
 
     /**
      * Pointe ou dé-pointe une transaction pour ce rapprochement.
-     * Types: 'depense', 'recette', 'don', 'cotisation', 'virement_source', 'virement_destination'
+     * Types: 'depense', 'recette', 'virement_source', 'virement_destination'
      */
     public function toggleTransaction(RapprochementBancaire $rapprochement, string $type, int $id): void
     {
