@@ -40,6 +40,7 @@ final class TransactionUniverselle extends Component
 
     public bool $showImport = false;      // affiche les boutons import CSV dans le header
 
+    #[\Livewire\Attributes\Locked]
     public ?string $sousCategorieFilter = null; // filtre sous-catégorie (pour_dons, pour_cotisations, pour_inscriptions)
 
     // === Filtres libres (manipulables par l'utilisateur) ===
