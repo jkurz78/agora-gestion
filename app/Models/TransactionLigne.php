@@ -25,6 +25,8 @@ final class TransactionLigne extends Model
         'seance',
         'montant',
         'notes',
+        'helloasso_item_id',
+        'exercice',
     ];
 
     protected function casts(): array
@@ -35,6 +37,8 @@ final class TransactionLigne extends Model
             'sous_categorie_id' => 'integer',
             'operation_id'     => 'integer',
             'seance'           => 'integer',
+            'helloasso_item_id' => 'integer',
+            'exercice'         => 'integer',
         ];
     }
 
