@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
+use App\Models\Cotisation;
 use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
@@ -127,9 +128,9 @@ test('verrouiller réussit quand écart = 0', function () {
 
 test('toggleTransaction lève une exception si rapprochement verrouillé', function () {
     $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id'     => $this->compte->id,
-        'statut'        => StatutRapprochement::Verrouille,
-        'saisi_par'     => $this->user->id,
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'saisi_par' => $this->user->id,
         'verrouille_at' => now(),
     ]);
     $depense = Transaction::factory()->asDepense()->create(['compte_id' => $this->compte->id]);
@@ -162,9 +163,9 @@ test('supprimer supprime un rapprochement en cours et dépointe les opérations'
 
 test('supprimer lève une exception si le rapprochement est verrouillé', function () {
     $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id'     => $this->compte->id,
-        'statut'        => StatutRapprochement::Verrouille,
-        'saisi_par'     => $this->user->id,
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'saisi_par' => $this->user->id,
         'verrouille_at' => now(),
     ]);
 
@@ -180,7 +181,7 @@ test('supprimer dépointe aussi les dons et cotisations', function () {
         'pointe' => true,
     ]);
     $tiers = Tiers::factory()->membre()->create();
-    $cotisation = \App\Models\Cotisation::factory()->create([
+    $cotisation = Cotisation::factory()->create([
         'tiers_id' => $tiers->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,

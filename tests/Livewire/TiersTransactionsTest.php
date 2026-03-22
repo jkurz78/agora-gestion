@@ -10,7 +10,7 @@ use App\Models\User;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
-    $this->user  = User::factory()->create();
+    $this->user = User::factory()->create();
     $this->tiers = Tiers::factory()->create(['nom' => 'Dupont']);
 });
 

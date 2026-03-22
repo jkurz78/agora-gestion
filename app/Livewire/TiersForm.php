@@ -63,7 +63,7 @@ final class TiersForm extends Component
     public function updatedType(): void
     {
         if ($this->type === 'entreprise') {
-            $this->entreprise = trim(($this->prenom ? $this->prenom . ' ' : '') . $this->nom);
+            $this->entreprise = trim(($this->prenom ? $this->prenom.' ' : '').$this->nom);
             $this->nom = '';
             $this->prenom = null;
         }
@@ -74,22 +74,22 @@ final class TiersForm extends Component
     {
         $tiers = Tiers::findOrFail($id);
 
-        $this->tiersId        = $tiers->id;
-        $this->type           = $tiers->type;
-        $this->nom            = $tiers->nom;
-        $this->prenom         = $tiers->prenom;
-        $this->entreprise     = $tiers->entreprise;
-        $this->email          = $tiers->email;
-        $this->telephone      = $tiers->telephone;
+        $this->tiersId = $tiers->id;
+        $this->type = $tiers->type;
+        $this->nom = $tiers->nom;
+        $this->prenom = $tiers->prenom;
+        $this->entreprise = $tiers->entreprise;
+        $this->email = $tiers->email;
+        $this->telephone = $tiers->telephone;
         $this->adresse_ligne1 = $tiers->adresse_ligne1;
-        $this->code_postal    = $tiers->code_postal;
-        $this->ville          = $tiers->ville;
-        $this->pays           = $tiers->pays ?? 'France';
+        $this->code_postal = $tiers->code_postal;
+        $this->ville = $tiers->ville;
+        $this->pays = $tiers->pays ?? 'France';
         $this->date_naissance = $tiers->date_naissance?->format('Y-m-d');
-        $this->pour_depenses  = $tiers->pour_depenses;
-        $this->pour_recettes  = $tiers->pour_recettes;
+        $this->pour_depenses = $tiers->pour_depenses;
+        $this->pour_recettes = $tiers->pour_recettes;
 
-        $this->helloasso_id   = $tiers->helloasso_id;
+        $this->helloasso_id = $tiers->helloasso_id;
 
         $this->showDetails = (bool) ($tiers->email || $tiers->telephone
             || $tiers->adresse_ligne1 || $tiers->code_postal
@@ -107,9 +107,9 @@ final class TiersForm extends Component
             'adresse_ligne1', 'code_postal', 'ville', 'pays', 'date_naissance',
             'pour_depenses', 'pour_recettes', 'showDetails',
         ]);
-        $this->type          = 'particulier';
-        $this->pays          = 'France';
-        $this->nom           = $prefill['nom'] ?? '';
+        $this->type = 'particulier';
+        $this->pays = 'France';
+        $this->nom = $prefill['nom'] ?? '';
         $this->pour_recettes = (bool) ($prefill['pour_recettes'] ?? false);
         $this->pour_depenses = (bool) ($prefill['pour_depenses'] ?? false);
         $this->resetValidation();
@@ -130,32 +130,33 @@ final class TiersForm extends Component
     public function save(): void
     {
         $rules = [
-            'type'           => ['required', 'in:entreprise,particulier'],
-            'nom'            => $this->type === 'particulier'
+            'type' => ['required', 'in:entreprise,particulier'],
+            'nom' => $this->type === 'particulier'
                 ? ['required', 'string', 'max:150']
                 : ['nullable', 'string', 'max:150'],
-            'prenom'         => ['nullable', 'string', 'max:100'],
-            'entreprise'     => $this->type === 'entreprise'
+            'prenom' => ['nullable', 'string', 'max:100'],
+            'entreprise' => $this->type === 'entreprise'
                 ? ['required', 'string', 'max:255']
                 : ['nullable', 'string', 'max:255'],
-            'email'          => ['nullable', 'email', 'max:255'],
-            'telephone'      => ['nullable', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'telephone' => ['nullable', 'string', 'max:30'],
             'adresse_ligne1' => ['nullable', 'string', 'max:500'],
-            'code_postal'    => ['nullable', 'string', 'max:10'],
-            'ville'          => ['nullable', 'string', 'max:100'],
-            'pays'           => ['nullable', 'string', 'max:100'],
+            'code_postal' => ['nullable', 'string', 'max:10'],
+            'ville' => ['nullable', 'string', 'max:100'],
+            'pays' => ['nullable', 'string', 'max:100'],
             'date_naissance' => ['nullable', 'date'],
-            'pour_depenses'  => ['boolean'],
-            'pour_recettes'  => ['boolean'],
+            'pour_depenses' => ['boolean'],
+            'pour_recettes' => ['boolean'],
         ];
 
         $validated = $this->validate($rules, [
-            'nom.required'        => 'Le nom est obligatoire.',
+            'nom.required' => 'Le nom est obligatoire.',
             'entreprise.required' => 'La raison sociale est obligatoire.',
         ]);
 
         if (! $this->pour_depenses && ! $this->pour_recettes) {
             $this->addError('pour_depenses', 'Cochez au moins une utilisation (dépenses ou recettes).');
+
             return;
         }
 

@@ -1,4 +1,5 @@
 <?php
+
 // database/migrations/2026_03_14_100000_create_tiers_table.php
 declare(strict_types=1);
 

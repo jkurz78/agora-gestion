@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Tiers;
 use App\Models\Transaction;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
@@ -20,8 +21,8 @@ it('transactions table has helloasso_cashout_id column', function () {
 it('can store helloasso fields on a transaction', function () {
     $tiers = Tiers::factory()->create();
     $transaction = Transaction::factory()->create([
-        'tiers_id'             => $tiers->id,
-        'helloasso_order_id'   => 123456,
+        'tiers_id' => $tiers->id,
+        'helloasso_order_id' => 123456,
         'helloasso_cashout_id' => 789012,
     ]);
 
@@ -33,7 +34,7 @@ it('can store helloasso fields on a transaction', function () {
 
 it('allows null helloasso fields', function () {
     $transaction = Transaction::factory()->create([
-        'helloasso_order_id'   => null,
+        'helloasso_order_id' => null,
         'helloasso_cashout_id' => null,
     ]);
 
@@ -47,26 +48,26 @@ it('rejects duplicate helloasso_order_id for same tiers_id', function () {
     $tiers = Tiers::factory()->create();
 
     Transaction::factory()->create([
-        'tiers_id'           => $tiers->id,
+        'tiers_id' => $tiers->id,
         'helloasso_order_id' => 999,
     ]);
 
     Transaction::factory()->create([
-        'tiers_id'           => $tiers->id,
+        'tiers_id' => $tiers->id,
         'helloasso_order_id' => 999,
     ]);
-})->throws(\Illuminate\Database\QueryException::class);
+})->throws(QueryException::class);
 
 it('allows multiple null helloasso_order_id with same tiers_id', function () {
     $tiers = Tiers::factory()->create();
 
     Transaction::factory()->create([
-        'tiers_id'           => $tiers->id,
+        'tiers_id' => $tiers->id,
         'helloasso_order_id' => null,
     ]);
 
     $second = Transaction::factory()->create([
-        'tiers_id'           => $tiers->id,
+        'tiers_id' => $tiers->id,
         'helloasso_order_id' => null,
     ]);
 

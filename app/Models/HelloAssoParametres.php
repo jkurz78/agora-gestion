@@ -23,9 +23,9 @@ final class HelloAssoParametres extends Model
     protected function casts(): array
     {
         return [
-            'client_secret'  => 'encrypted',
+            'client_secret' => 'encrypted',
             'association_id' => 'integer',
-            'environnement'  => HelloAssoEnvironnement::class,
+            'environnement' => HelloAssoEnvironnement::class,
         ];
     }
 

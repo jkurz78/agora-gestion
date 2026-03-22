@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\SousCategorie;
@@ -15,12 +17,13 @@ final class TransactionService
         $this->validateInscriptionRequiresOperation($lignes);
 
         return DB::transaction(function () use ($data, $lignes) {
-            $data['saisi_par']    = auth()->id();
+            $data['saisi_par'] = auth()->id();
             $data['numero_piece'] = app(NumeroPieceService::class)->assign(Carbon::parse($data['date']));
             $transaction = Transaction::create($data);
             foreach ($lignes as $ligne) {
                 $transaction->lignes()->create($ligne);
             }
+
             return $transaction;
         });
     }
@@ -42,9 +45,9 @@ final class TransactionService
                 foreach ($lignes as $ligneData) {
                     $transaction->lignes()->where('id', $ligneData['id'])->update([
                         'sous_categorie_id' => $ligneData['sous_categorie_id'],
-                        'operation_id'      => $ligneData['operation_id'],
-                        'seance'            => $ligneData['seance'],
-                        'notes'             => $ligneData['notes'],
+                        'operation_id' => $ligneData['operation_id'],
+                        'seance' => $ligneData['seance'],
+                        'notes' => $ligneData['notes'],
                     ]);
                 }
             } else {
@@ -65,9 +68,9 @@ final class TransactionService
                         if ($aff->isNotEmpty()) {
                             $affectationsSnapshot[$oldId] = $aff->map(fn ($a) => [
                                 'operation_id' => $a->operation_id,
-                                'seance'       => $a->seance,
-                                'montant'      => $a->montant,
-                                'notes'        => $a->notes,
+                                'seance' => $a->seance,
+                                'montant' => $a->montant,
+                                'notes' => $a->notes,
                             ])->toArray();
                         }
                     }
@@ -75,7 +78,7 @@ final class TransactionService
                 $transaction->lignes()->forceDelete();
                 foreach ($lignes as $ligneData) {
                     $newLigne = $transaction->lignes()->create($ligneData);
-                    $oldId    = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
+                    $oldId = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
                     if ($oldId !== null && isset($affectationsSnapshot[$oldId])) {
                         foreach ($affectationsSnapshot[$oldId] as $affData) {
                             $newLigne->affectations()->create($affData);
@@ -125,9 +128,9 @@ final class TransactionService
             foreach ($affectations as $a) {
                 $ligne->affectations()->create([
                     'operation_id' => $a['operation_id'] ?: null,
-                    'seance'       => $a['seance'] ?: null,
-                    'montant'      => $a['montant'],
-                    'notes'        => $a['notes'] ?: null,
+                    'seance' => $a['seance'] ?: null,
+                    'montant' => $a['montant'],
+                    'notes' => $a['notes'] ?: null,
                 ]);
             }
         });

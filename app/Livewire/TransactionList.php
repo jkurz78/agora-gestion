@@ -1,15 +1,17 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Livewire;
 
 use App\Enums\TypeTransaction;
+use App\Livewire\Concerns\WithPerPage;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Transaction;
 use App\Services\ExerciceService;
 use App\Services\TransactionService;
-use App\Livewire\Concerns\WithPerPage;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -26,19 +28,52 @@ final class TransactionList extends Component
     public string $typeFilter = ''; // '' | 'depense' | 'recette'
 
     public ?int $categorie_id = null;
+
     public ?int $sous_categorie_id = null;
+
     public ?int $operation_id = null;
+
     public ?int $compte_id = null;
+
     public ?string $pointe = null;
+
     public ?string $tiers = null;
 
-    public function updatedTypeFilter(): void { $this->resetPage(); }
-    public function updatedCategorieId(): void { $this->sous_categorie_id = null; $this->resetPage(); }
-    public function updatedSousCategorieId(): void { $this->resetPage(); }
-    public function updatedOperationId(): void { $this->resetPage(); }
-    public function updatedCompteId(): void { $this->resetPage(); }
-    public function updatedPointe(): void { $this->resetPage(); }
-    public function updatedTiers(): void { $this->resetPage(); }
+    public function updatedTypeFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedCategorieId(): void
+    {
+        $this->sous_categorie_id = null;
+        $this->resetPage();
+    }
+
+    public function updatedSousCategorieId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedOperationId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedCompteId(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPointe(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedTiers(): void
+    {
+        $this->resetPage();
+    }
 
     public function delete(int $id): void
     {
@@ -101,10 +136,10 @@ final class TransactionList extends Component
 
         return view('livewire.transaction-list', [
             'transactions' => $query->paginate($this->effectivePerPage()),
-            'categories'   => $categories,
-            'operations'   => Operation::orderBy('nom')->get(),
-            'comptes'      => CompteBancaire::orderBy('nom')->get(),
-            'typeLabels'   => TypeTransaction::cases(),
+            'categories' => $categories,
+            'operations' => Operation::orderBy('nom')->get(),
+            'comptes' => CompteBancaire::orderBy('nom')->get(),
+            'typeLabels' => TypeTransaction::cases(),
         ]);
     }
 }

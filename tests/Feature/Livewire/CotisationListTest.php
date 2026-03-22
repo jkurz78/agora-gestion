@@ -40,7 +40,7 @@ it('affiche le nom du membre comme lien vers ses transactions', function () {
     Cotisation::factory()->create(['tiers_id' => $tiers->id]);
 
     Livewire::test(CotisationList::class)
-        ->assertSeeHtml('href="' . route('tiers.transactions', $tiers->id) . '"');
+        ->assertSeeHtml('href="'.route('tiers.transactions', $tiers->id).'"');
 });
 
 it('affiche un tiret sans erreur pour une cotisation sans tiers', function () {

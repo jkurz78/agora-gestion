@@ -20,8 +20,8 @@ afterEach(function () {
 });
 
 it('se rend avec la liste des opérations ayant des séances', function () {
-    $opAvec    = Operation::factory()->withSeances(2)->create(['nom' => 'Festival']);
-    $opSans    = Operation::factory()->create(['nombre_seances' => null, 'nom' => 'Invisible']);
+    $opAvec = Operation::factory()->withSeances(2)->create(['nom' => 'Festival']);
+    $opSans = Operation::factory()->create(['nombre_seances' => null, 'nom' => 'Invisible']);
 
     Livewire::test(RapportSeances::class)
         ->assertSee('Festival')
@@ -34,9 +34,9 @@ it('affiche un message si aucune opération sélectionnée', function () {
 });
 
 it('affiche les colonnes séances et le total', function () {
-    $op  = Operation::factory()->withSeances(2)->create();
+    $op = Operation::factory()->withSeances(2)->create();
     $cat = Categorie::factory()->depense()->create(['nom' => 'Charges']);
-    $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Location salle']);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Location salle']);
 
     $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
@@ -57,7 +57,7 @@ it('agrège les séances de même numéro sur plusieurs opérations', function (
     $op1 = Operation::factory()->withSeances(1)->create();
     $op2 = Operation::factory()->withSeances(1)->create();
     $cat = Categorie::factory()->depense()->create();
-    $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Salle']);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Salle']);
 
     foreach ([$op1, $op2] as $op) {
         $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);

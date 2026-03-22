@@ -319,6 +319,7 @@ final class TransactionForm extends Component
             if (in_array((int) ($ligne['sous_categorie_id'] ?? 0), $inscriptionIds, true)
                 && empty($ligne['operation_id'])) {
                 $this->addError("lignes.{$index}.operation_id", "L'opération est obligatoire pour une inscription.");
+
                 return;
             }
         }

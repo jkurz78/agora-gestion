@@ -32,8 +32,8 @@ final class Tiers extends Model
     protected function casts(): array
     {
         return [
-            'pour_depenses'  => 'boolean',
-            'pour_recettes'  => 'boolean',
+            'pour_depenses' => 'boolean',
+            'pour_recettes' => 'boolean',
             'date_naissance' => 'date',
         ];
     }
@@ -44,7 +44,7 @@ final class Tiers extends Model
             return $this->entreprise ?? $this->nom;
         }
 
-        return trim(($this->prenom ? $this->prenom . ' ' : '') . $this->nom);
+        return trim(($this->prenom ? $this->prenom.' ' : '').$this->nom);
     }
 
     public function dons(): HasMany

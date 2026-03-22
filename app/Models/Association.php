@@ -23,14 +23,14 @@ final class Association extends Model
     protected function casts(): array
     {
         return [
-            'id'          => 'integer',
-            'nom'         => 'string',
-            'adresse'     => 'string',
+            'id' => 'integer',
+            'nom' => 'string',
+            'adresse' => 'string',
             'code_postal' => 'string',
-            'ville'       => 'string',
-            'email'       => 'string',
-            'telephone'   => 'string',
-            'logo_path'   => 'string',
+            'ville' => 'string',
+            'email' => 'string',
+            'telephone' => 'string',
+            'logo_path' => 'string',
         ];
     }
 }

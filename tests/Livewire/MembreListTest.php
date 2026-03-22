@@ -20,7 +20,7 @@ it('renders without error', function (): void {
 });
 
 it('filtre a_jour retourne les tiers avec cotisation exercice courant', function (): void {
-    $aJour  = Tiers::factory()->create(['nom' => 'AJour']);
+    $aJour = Tiers::factory()->create(['nom' => 'AJour']);
     $retard = Tiers::factory()->create(['nom' => 'EnRetard']);
 
     Cotisation::factory()->create(['tiers_id' => $aJour->id, 'exercice' => 2025]);
@@ -34,7 +34,7 @@ it('filtre a_jour retourne les tiers avec cotisation exercice courant', function
 });
 
 it('filtre en_retard retourne les tiers avec cotisation N-1 sans cotisation N', function (): void {
-    $aJour  = Tiers::factory()->create(['nom' => 'AJour']);
+    $aJour = Tiers::factory()->create(['nom' => 'AJour']);
     $retard = Tiers::factory()->create(['nom' => 'EnRetard']);
 
     Cotisation::factory()->create(['tiers_id' => $aJour->id, 'exercice' => 2024]);
@@ -49,8 +49,8 @@ it('filtre en_retard retourne les tiers avec cotisation N-1 sans cotisation N', 
 });
 
 it('filtre tous retourne tous les tiers avec au moins une cotisation', function (): void {
-    $avecCot  = Tiers::factory()->create(['nom' => 'AvecCot']);
-    $sansCot  = Tiers::factory()->create(['nom' => 'SansCot']);
+    $avecCot = Tiers::factory()->create(['nom' => 'AvecCot']);
+    $sansCot = Tiers::factory()->create(['nom' => 'SansCot']);
 
     Cotisation::factory()->create(['tiers_id' => $avecCot->id, 'exercice' => 2024]);
 

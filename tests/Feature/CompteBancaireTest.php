@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\CompteBancaire;
+use App\Models\Transaction;
 use App\Models\User;
 
 beforeEach(function () {
@@ -117,7 +118,7 @@ it('can destroy a compte bancaire', function () {
 
 it('returns flash error when destroying a compte bancaire with linked depenses', function () {
     $compte = CompteBancaire::factory()->create();
-    \App\Models\Transaction::factory()->asDepense()->create([
+    Transaction::factory()->asDepense()->create([
         'compte_id' => $compte->id,
         'saisi_par' => $this->user->id,
         'date' => '2025-10-15',

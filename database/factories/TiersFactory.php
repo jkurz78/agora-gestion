@@ -44,8 +44,8 @@ final class TiersFactory extends Factory
     public function membre(): static
     {
         return $this->state([
-            'type'          => 'particulier',
-            'prenom'        => fake()->firstName(),
+            'type' => 'particulier',
+            'prenom' => fake()->firstName(),
             'pour_depenses' => false,
             'pour_recettes' => false,
         ]);
@@ -54,9 +54,9 @@ final class TiersFactory extends Factory
     public function entreprise(): static
     {
         return $this->state([
-            'type'       => 'entreprise',
-            'nom'        => null,
-            'prenom'     => null,
+            'type' => 'entreprise',
+            'nom' => null,
+            'prenom' => null,
             'entreprise' => fake()->company(),
         ]);
     }

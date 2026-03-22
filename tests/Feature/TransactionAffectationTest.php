@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 use App\Models\CompteBancaire;
 use App\Models\Operation;
@@ -8,8 +9,9 @@ use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
 use App\Models\User;
 use App\Services\TransactionService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();

@@ -46,11 +46,11 @@ it('can save a cotisation with a tiers', function (): void {
         ->assertDispatched('cotisation-saved');
 
     $this->assertDatabaseHas('cotisations', [
-        'tiers_id'         => $this->tiers->id,
+        'tiers_id' => $this->tiers->id,
         'sous_categorie_id' => $this->sousCategorie->id,
-        'exercice'         => 2025,
-        'montant'          => '50.00',
-        'mode_paiement'    => 'virement',
+        'exercice' => 2025,
+        'montant' => '50.00',
+        'mode_paiement' => 'virement',
     ]);
 });
 

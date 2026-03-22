@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Categorie;
 use App\Models\SousCategorie;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;

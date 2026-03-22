@@ -10,6 +10,7 @@ use App\Models\Categorie;
 use App\Services\BudgetImportService;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
+use Illuminate\View\View;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -21,13 +22,17 @@ final class BudgetTable extends Component
 
     // ── Edition inline ────────────────────────────────────────────────────────
     public ?int $editingLineId = null;
+
     public string $editingMontant = '';
 
     // ── Export ────────────────────────────────────────────────────────────────
     public bool $showExportModal = false;
-    public string $exportFormat   = 'xlsx';
+
+    public string $exportFormat = 'xlsx';
+
     public string $exportExercice = 'courant'; // 'courant' | 'suivant'
-    public string $exportSource   = 'courant'; // 'zero' | 'courant' | 'budget'
+
+    public string $exportSource = 'courant'; // 'zero' | 'courant' | 'budget'
 
     // ── Import ────────────────────────────────────────────────────────────────
     public bool $showImportPanel = false;
@@ -46,16 +51,16 @@ final class BudgetTable extends Component
     {
         BudgetLine::create([
             'sous_categorie_id' => $sousCategorieId,
-            'exercice'          => app(ExerciceService::class)->current(),
-            'montant_prevu'     => 0,
+            'exercice' => app(ExerciceService::class)->current(),
+            'montant_prevu' => 0,
         ]);
     }
 
     public function startEdit(int $lineId): void
     {
-        $line                  = BudgetLine::findOrFail($lineId);
-        $this->editingLineId   = $lineId;
-        $this->editingMontant  = (string) $line->montant_prevu;
+        $line = BudgetLine::findOrFail($lineId);
+        $this->editingLineId = $lineId;
+        $this->editingMontant = (string) $line->montant_prevu;
     }
 
     public function saveEdit(): void
@@ -68,7 +73,7 @@ final class BudgetTable extends Component
 
     public function cancelEdit(): void
     {
-        $this->editingLineId  = null;
+        $this->editingLineId = null;
         $this->editingMontant = '';
     }
 
@@ -97,14 +102,14 @@ final class BudgetTable extends Component
         ]);
 
         $exerciceService = app(ExerciceService::class);
-        $exerciceCible   = $this->exportExercice === 'suivant'
+        $exerciceCible = $this->exportExercice === 'suivant'
             ? $exerciceService->current() + 1
             : $exerciceService->current();
 
         $url = route('budget.export', [
-            'format'   => $this->exportFormat,
+            'format' => $this->exportFormat,
             'exercice' => $exerciceCible,
-            'source'   => $this->exportSource,
+            'source' => $this->exportSource,
         ]);
 
         $this->js("window.location.href = '{$url}'");
@@ -115,12 +120,12 @@ final class BudgetTable extends Component
 
     public function toggleImportPanel(): void
     {
-        $this->showImportPanel = !$this->showImportPanel;
+        $this->showImportPanel = ! $this->showImportPanel;
 
-        if (!$this->showImportPanel) {
-            $this->importErrors  = null;
+        if (! $this->showImportPanel) {
+            $this->importErrors = null;
             $this->importSuccess = null;
-            $this->budgetFile    = null;
+            $this->budgetFile = null;
             $this->resetValidation();
         }
     }
@@ -130,26 +135,26 @@ final class BudgetTable extends Component
         $this->validate();
 
         $exercice = app(ExerciceService::class)->current();
-        $result   = app(BudgetImportService::class)->import($this->budgetFile, $exercice);
+        $result = app(BudgetImportService::class)->import($this->budgetFile, $exercice);
 
         if ($result->success) {
-            $exerciceLabel       = app(ExerciceService::class)->label($exercice);
+            $exerciceLabel = app(ExerciceService::class)->label($exercice);
             $this->importSuccess = "{$result->linesImported} lignes importées pour l'exercice {$exerciceLabel}.";
-            $this->importErrors  = null;
-            $this->budgetFile    = null;
+            $this->importErrors = null;
+            $this->budgetFile = null;
             $this->resetValidation();
         } else {
-            $this->importErrors  = $result->errors;
+            $this->importErrors = $result->errors;
             $this->importSuccess = null;
         }
     }
 
     // ── Render ────────────────────────────────────────────────────────────────
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         $budgetService = app(BudgetService::class);
-        $exercice      = app(ExerciceService::class)->current();
+        $exercice = app(ExerciceService::class)->current();
 
         $depenseCategories = Categorie::where('type', TypeCategorie::Depense)
             ->with(['sousCategories' => fn ($q) => $q->orderBy('nom')])
@@ -163,7 +168,7 @@ final class BudgetTable extends Component
 
         $budgetLines = BudgetLine::forExercice($exercice)->get()->keyBy('sous_categorie_id');
 
-        $realiseData    = [];
+        $realiseData = [];
         $allSousCategories = $depenseCategories->flatMap->sousCategories
             ->merge($recetteCategories->flatMap->sousCategories);
 
@@ -174,9 +179,9 @@ final class BudgetTable extends Component
         return view('livewire.budget-table', [
             'depenseCategories' => $depenseCategories,
             'recetteCategories' => $recetteCategories,
-            'budgetLines'       => $budgetLines,
-            'realiseData'       => $realiseData,
-            'exerciceLabel'     => app(ExerciceService::class)->label($exercice),
+            'budgetLines' => $budgetLines,
+            'realiseData' => $realiseData,
+            'exerciceLabel' => app(ExerciceService::class)->label($exercice),
             'exportExerciceCourant' => $exercice,
             'exportExerciceSuivant' => $exercice + 1,
         ]);

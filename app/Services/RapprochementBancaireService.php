@@ -42,7 +42,7 @@ final class RapprochementBancaireService
             ->exists();
 
         if ($enCours) {
-            throw new RuntimeException("Un rapprochement est déjà en cours pour ce compte.");
+            throw new RuntimeException('Un rapprochement est déjà en cours pour ce compte.');
         }
 
         return DB::transaction(function () use ($compte, $dateFin, $soldeFin) {
@@ -91,7 +91,7 @@ final class RapprochementBancaireService
     public function toggleTransaction(RapprochementBancaire $rapprochement, string $type, int $id): void
     {
         if ($rapprochement->isVerrouille()) {
-            throw new RuntimeException("Impossible de modifier un rapprochement verrouillé.");
+            throw new RuntimeException('Impossible de modifier un rapprochement verrouillé.');
         }
 
         // Verify account ownership before modifying
@@ -116,6 +116,7 @@ final class RapprochementBancaireService
         DB::transaction(function () use ($rapprochement, $type, $id) {
             if (str_starts_with($type, 'virement')) {
                 $this->toggleVirement($rapprochement, $type, $id);
+
                 return;
             }
 
@@ -159,7 +160,7 @@ final class RapprochementBancaireService
     public function supprimer(RapprochementBancaire $rapprochement): void
     {
         if ($rapprochement->isVerrouille()) {
-            throw new RuntimeException("Impossible de supprimer un rapprochement verrouillé.");
+            throw new RuntimeException('Impossible de supprimer un rapprochement verrouillé.');
         }
 
         DB::transaction(function () use ($rapprochement) {
@@ -199,7 +200,7 @@ final class RapprochementBancaireService
             ->exists();
 
         if ($enCours) {
-            throw new RuntimeException("Impossible de déverrouiller : un rapprochement est en cours sur ce compte.");
+            throw new RuntimeException('Impossible de déverrouiller : un rapprochement est en cours sur ce compte.');
         }
 
         $dernierVerrouille = RapprochementBancaire::where('compte_id', $rapprochement->compte_id)
@@ -209,7 +210,7 @@ final class RapprochementBancaireService
             ->value('id');
 
         if ($dernierVerrouille !== $rapprochement->id) {
-            throw new RuntimeException("Seul le dernier rapprochement verrouillé peut être déverrouillé.");
+            throw new RuntimeException('Seul le dernier rapprochement verrouillé peut être déverrouillé.');
         }
 
         DB::transaction(function () use ($rapprochement) {

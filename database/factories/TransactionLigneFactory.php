@@ -17,12 +17,12 @@ class TransactionLigneFactory extends Factory
     public function definition(): array
     {
         return [
-            'transaction_id'    => Transaction::factory(),
+            'transaction_id' => Transaction::factory(),
             'sous_categorie_id' => SousCategorie::factory(),
-            'montant'           => fake()->randomFloat(2, 5, 500),
-            'operation_id'      => null,
-            'seance'            => null,
-            'notes'             => null,
+            'montant' => fake()->randomFloat(2, 5, 500),
+            'operation_id' => null,
+            'seance' => null,
+            'notes' => null,
         ];
     }
 }

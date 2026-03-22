@@ -4,6 +4,8 @@
 declare(strict_types=1);
 
 use App\Models\Tiers;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 it('displayName returns nom as fallback when entreprise field is null', function () {
@@ -57,7 +59,7 @@ it('helloasso_id unique constraint allows multiple nulls', function () {
 it('helloasso_id unique constraint rejects duplicate non-null values', function () {
     Tiers::factory()->create(['helloasso_id' => 'ha-123', 'pour_depenses' => true]);
     expect(fn () => Tiers::factory()->create(['helloasso_id' => 'ha-123', 'pour_depenses' => true]))
-        ->toThrow(\Illuminate\Database\QueryException::class);
+        ->toThrow(QueryException::class);
 });
 
 it('displayName returns entreprise field for entreprise type', function () {
@@ -72,17 +74,17 @@ it('displayName falls back to nom when entreprise field is null', function () {
 
 it('can create tiers with all new fields', function () {
     $tiers = Tiers::factory()->create([
-        'entreprise'     => 'ACME Corp',
-        'code_postal'    => '75001',
-        'ville'          => 'Paris',
-        'pays'           => 'France',
+        'entreprise' => 'ACME Corp',
+        'code_postal' => '75001',
+        'ville' => 'Paris',
+        'pays' => 'France',
         'date_naissance' => '1990-05-15',
-        'helloasso_id'   => 'ha-abc123',
-        'pour_depenses'  => true,
+        'helloasso_id' => 'ha-abc123',
+        'pour_depenses' => true,
     ]);
     expect($tiers->entreprise)->toBe('ACME Corp');
     expect($tiers->code_postal)->toBe('75001');
     expect($tiers->pays)->toBe('France');
     expect($tiers->helloasso_id)->toBe('ha-abc123');
-    expect($tiers->date_naissance)->toBeInstanceOf(\Illuminate\Support\Carbon::class);
+    expect($tiers->date_naissance)->toBeInstanceOf(Carbon::class);
 });

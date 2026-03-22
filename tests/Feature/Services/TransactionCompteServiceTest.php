@@ -213,13 +213,13 @@ it('filtre par date : seules les transactions dans la plage apparaissent', funct
 });
 
 it('filtre par tiers : seules les transactions correspondantes apparaissent', function () {
-    $tiersTartempion = \App\Models\Tiers::factory()->create([
+    $tiersTartempion = Tiers::factory()->create([
         'type' => 'entreprise',
         'nom' => 'Association Tartempion',
         'prenom' => null,
         'pour_recettes' => true,
     ]);
-    $tiersLyon = \App\Models\Tiers::factory()->create([
+    $tiersLyon = Tiers::factory()->create([
         'type' => 'entreprise',
         'nom' => 'Mairie de Lyon',
         'prenom' => null,

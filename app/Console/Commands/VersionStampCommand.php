@@ -29,28 +29,28 @@ final class VersionStampCommand extends Command
     public static function readGitVersion(): array
     {
         $versionFile = base_path('VERSION');
-        $tag  = file_exists($versionFile) ? trim((string) file_get_contents($versionFile)) : 'dev';
+        $tag = file_exists($versionFile) ? trim((string) file_get_contents($versionFile)) : 'dev';
 
         exec('git log -1 --format=%as 2>/dev/null', $dateOutput, $dateCode);
         $date = ($dateCode === 0 && isset($dateOutput[0])) ? trim($dateOutput[0]) : date('Y-m-d');
 
         return [
-            'tag'  => $tag,
+            'tag' => $tag,
             'date' => $date,
             'year' => substr($date, 0, 4),
         ];
     }
 
     /**
-     * @param array{tag: string, date: string} $data
+     * @param  array{tag: string, date: string}  $data
      */
     public static function writeVersionFile(array $data): void
     {
-        $content = "<?php\nreturn " . var_export($data, true) . ";\n";
+        $content = "<?php\nreturn ".var_export($data, true).";\n";
         $result = file_put_contents(config_path('version.php'), $content);
 
         if ($result === false) {
-            throw new \RuntimeException('Could not write ' . config_path('version.php'));
+            throw new \RuntimeException('Could not write '.config_path('version.php'));
         }
     }
 }

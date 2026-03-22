@@ -38,7 +38,7 @@ final class TiersAutocomplete extends Component
         if ($this->tiersId !== null) {
             $tiers = Tiers::find($this->tiersId);
             $this->selectedLabel = $tiers?->displayName();
-            $this->selectedType  = $tiers?->type;
+            $this->selectedType = $tiers?->type;
         }
     }
 
@@ -49,10 +49,10 @@ final class TiersAutocomplete extends Component
         if ($id !== null) {
             $tiers = Tiers::find($id);
             $this->selectedLabel = $tiers?->displayName();
-            $this->selectedType  = $tiers?->type;
+            $this->selectedType = $tiers?->type;
         } else {
             $this->selectedLabel = null;
-            $this->selectedType  = null;
+            $this->selectedType = null;
         }
     }
 
@@ -68,22 +68,22 @@ final class TiersAutocomplete extends Component
         match ($this->filtre) {
             'depenses' => $query->where('pour_depenses', true),
             'recettes' => $query->where('pour_recettes', true),
-            'dons'     => $query->where('pour_recettes', true),
-            default    => null,
+            'dons' => $query->where('pour_recettes', true),
+            default => null,
         };
 
         if ($this->search !== '') {
             $query->where(function ($q): void {
-                $q->where('nom', 'like', '%' . $this->search . '%')
-                    ->orWhere('prenom', 'like', '%' . $this->search . '%')
-                    ->orWhere('entreprise', 'like', '%' . $this->search . '%');
+                $q->where('nom', 'like', '%'.$this->search.'%')
+                    ->orWhere('prenom', 'like', '%'.$this->search.'%')
+                    ->orWhere('entreprise', 'like', '%'.$this->search.'%');
             });
         }
 
         $this->results = $query->limit(8)->get()->map(fn (Tiers $t): array => [
-            'id'    => $t->id,
+            'id' => $t->id,
             'label' => $t->displayName(),
-            'type'  => $t->type,
+            'type' => $t->type,
         ])->toArray();
 
         $this->open = true;
@@ -92,52 +92,52 @@ final class TiersAutocomplete extends Component
     public function selectTiers(int $id): void
     {
         $tiers = Tiers::findOrFail($id);
-        $this->tiersId       = $tiers->id;
+        $this->tiersId = $tiers->id;
         $this->selectedLabel = $tiers->displayName();
-        $this->selectedType  = $tiers->type;
-        $this->search        = '';
-        $this->open          = false;
-        $this->results       = [];
+        $this->selectedType = $tiers->type;
+        $this->search = '';
+        $this->open = false;
+        $this->results = [];
     }
 
     public function clearTiers(): void
     {
-        $this->tiersId           = null;
-        $this->selectedLabel     = null;
-        $this->selectedType      = null;
-        $this->search            = '';
-        $this->open              = false;
-        $this->results           = [];
-        $this->existingTiers     = null;
+        $this->tiersId = null;
+        $this->selectedLabel = null;
+        $this->selectedType = null;
+        $this->search = '';
+        $this->open = false;
+        $this->results = [];
+        $this->existingTiers = null;
         $this->showActivateModal = false;
     }
 
     public function openCreateModal(): void
     {
-        $search   = $this->search;
+        $search = $this->search;
         $existing = Tiers::where(function ($q) use ($search): void {
-            $q->where('nom', 'like', '%' . $search . '%')
-                ->orWhere('prenom', 'like', '%' . $search . '%')
-                ->orWhere('entreprise', 'like', '%' . $search . '%');
+            $q->where('nom', 'like', '%'.$search.'%')
+                ->orWhere('prenom', 'like', '%'.$search.'%')
+                ->orWhere('entreprise', 'like', '%'.$search.'%');
         })->first();
 
         $excludedByFilter = $existing && match ($this->filtre) {
-            'depenses'         => ! $existing->pour_depenses,
+            'depenses' => ! $existing->pour_depenses,
             'recettes', 'dons' => ! $existing->pour_recettes,
-            default            => false,
+            default => false,
         };
 
         if ($excludedByFilter) {
             $this->existingTiers = [
-                'id'    => $existing->id,
+                'id' => $existing->id,
                 'label' => $existing->displayName(),
-                'type'  => $existing->type,
+                'type' => $existing->type,
             ];
             $this->showActivateModal = true;
             $this->open = false;
         } else {
             $this->dispatch('open-tiers-form', prefill: [
-                'nom'           => $this->search,
+                'nom' => $this->search,
                 'pour_recettes' => in_array($this->filtre, ['recettes', 'dons']),
                 'pour_depenses' => $this->filtre === 'depenses',
             ])->to(TiersForm::class);
@@ -154,9 +154,9 @@ final class TiersAutocomplete extends Component
         $tiers = Tiers::findOrFail($this->existingTiers['id']);
 
         $updates = match ($this->filtre) {
-            'depenses'         => ['pour_depenses' => true],
+            'depenses' => ['pour_depenses' => true],
             'recettes', 'dons' => ['pour_recettes' => true],
-            default            => [],
+            default => [],
         };
 
         if (! empty($updates)) {
@@ -165,7 +165,7 @@ final class TiersAutocomplete extends Component
 
         $this->selectTiers($tiers->id);
         $this->showActivateModal = false;
-        $this->existingTiers     = null;
+        $this->existingTiers = null;
     }
 
     #[On('tiers-saved')]

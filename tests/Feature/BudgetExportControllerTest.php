@@ -15,21 +15,21 @@ use App\Models\User;
 beforeEach(function () {
     $this->user = User::factory()->create();
 
-    $cat    = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
+    $cat = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
     $this->sc = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat->id]);
 
     // Réalisé exercice 2025 (Sept 2025–Aug 2026) : Loyers=1200
     $compte = CompteBancaire::factory()->create();
     $tx = Transaction::factory()->create([
-        'type'          => TypeTransaction::Depense,
-        'date'          => '2025-10-15',
+        'type' => TypeTransaction::Depense,
+        'date' => '2025-10-15',
         'montant_total' => 1200.00,
-        'compte_id'     => $compte->id,
+        'compte_id' => $compte->id,
     ]);
     TransactionLigne::factory()->create([
-        'transaction_id'    => $tx->id,
+        'transaction_id' => $tx->id,
         'sous_categorie_id' => $this->sc->id,
-        'montant'           => 1200.00,
+        'montant' => 1200.00,
     ]);
 });
 
