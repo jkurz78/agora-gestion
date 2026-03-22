@@ -100,7 +100,7 @@ final class TiersList extends Component
         }
 
         if ($this->filtreHelloasso) {
-            $query->whereNotNull('helloasso_id');
+            $query->where('est_helloasso', true);
         }
 
         $dir = $this->sortDir === 'desc' ? 'desc' : 'asc';

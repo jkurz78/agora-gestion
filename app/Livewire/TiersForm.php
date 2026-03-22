@@ -45,7 +45,7 @@ final class TiersForm extends Component
 
     public bool $showDetails = false;
 
-    public ?string $helloasso_id = null;
+    public bool $est_helloasso = false;
 
     public function showNewForm(): void
     {
@@ -89,7 +89,7 @@ final class TiersForm extends Component
         $this->pour_depenses = $tiers->pour_depenses;
         $this->pour_recettes = $tiers->pour_recettes;
 
-        $this->helloasso_id = $tiers->helloasso_id;
+        $this->est_helloasso = $tiers->est_helloasso;
 
         $this->showDetails = (bool) ($tiers->email || $tiers->telephone
             || $tiers->adresse_ligne1 || $tiers->code_postal
