@@ -43,6 +43,13 @@ class DatabaseSeeder extends Seeder
             'date_solde_initial' => '2025-09-01',
         ]);
 
+        \DB::table('association')->insert([
+            'id' => 1,
+            'nom' => 'Soigner Vivre Sourire (SVS)',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $this->call(CategoriesSeeder::class);
         $this->call(OperationsTiersSeeder::class);
     }
