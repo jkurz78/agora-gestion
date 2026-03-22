@@ -6,8 +6,7 @@ namespace App\Livewire;
 
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Services\BudgetService;
@@ -56,17 +55,30 @@ final class Dashboard extends Component
             ->take(5)
             ->get();
 
-        // Derniers dons
-        $derniersDons = Don::forExercice($exercice)
+        // Derniers dons — transactions ayant au moins une ligne avec sous-cat pour_dons
+        $donSousCategorieIds = SousCategorie::where('pour_dons', true)->pluck('id');
+        $derniersDons = Transaction::where('type', 'recette')
+            ->forExercice($exercice)
+            ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $donSousCategorieIds))
             ->with('tiers')
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
         // Membres sans cotisation pour l'exercice courant
-        $membresSansCotisation = Tiers::whereHas('cotisations')->whereDoesntHave('cotisations', function ($q) use ($exercice) {
-            $q->where('exercice', $exercice);
-        })->orderBy('nom')->get();
+        // Un "membre" est un tiers ayant déjà eu au moins une ligne de cotisation (tous exercices)
+        $cotSousCategorieIds = SousCategorie::where('pour_cotisations', true)->pluck('id');
+        $membresSansCotisation = Tiers::whereHas('transactions', function ($q) use ($cotSousCategorieIds) {
+            $q->whereHas('lignes', fn ($lq) => $lq->whereIn('sous_categorie_id', $cotSousCategorieIds));
+        })
+            ->whereDoesntHave('transactions', function ($q) use ($cotSousCategorieIds, $exercice) {
+                $q->whereHas('lignes', function ($lq) use ($cotSousCategorieIds, $exercice) {
+                    $lq->whereIn('sous_categorie_id', $cotSousCategorieIds)
+                        ->where('exercice', $exercice);
+                });
+            })
+            ->orderBy('nom')
+            ->get();
 
         // Comptes bancaires avec soldes courants
         $soldeService = app(SoldeService::class);
