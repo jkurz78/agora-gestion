@@ -314,6 +314,15 @@ final class TransactionForm extends Component
             'notes' => $l['notes'] ?: null,
         ])->toArray();
 
+        $inscriptionIds = SousCategorie::where('pour_inscriptions', true)->pluck('id')->toArray();
+        foreach ($this->lignes as $index => $ligne) {
+            if (in_array((int) ($ligne['sous_categorie_id'] ?? 0), $inscriptionIds, true)
+                && empty($ligne['operation_id'])) {
+                $this->addError("lignes.{$index}.operation_id", "L'opération est obligatoire pour une inscription.");
+                return;
+            }
+        }
+
         $service = app(TransactionService::class);
 
         if ($this->transactionId) {
