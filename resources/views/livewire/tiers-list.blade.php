@@ -5,8 +5,8 @@
     @endif
 
     {{-- Filtres --}}
-    <div class="row g-2 mb-3">
-        <div class="col-md-6">
+    <div class="row g-2 mb-3 align-items-center">
+        <div class="col-md-5">
             <input
                 type="text"
                 wire:model.live.debounce.300ms="search"
@@ -14,12 +14,19 @@
                 placeholder="Rechercher un tiers..."
             >
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <select wire:model.live="filtre" class="form-select">
                 <option value="">Tous les tiers</option>
-                <option value="depenses">Utilisables en depenses</option>
+                <option value="depenses">Utilisables en dépenses</option>
                 <option value="recettes">Utilisables en recettes</option>
             </select>
+        </div>
+        <div class="col-md-auto d-flex align-items-center">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox"
+                       wire:model.live="filtreHelloasso" id="filtreHelloasso">
+                <label class="form-check-label" for="filtreHelloasso">HelloAsso uniquement</label>
+            </div>
         </div>
     </div>
 
@@ -28,10 +35,31 @@
         <table class="table table-sm table-hover align-middle">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
-                    <th>Nom</th>
-                    <th>Type</th>
-                    <th>Email</th>
-                    <th>Telephone</th>
+                    <th>
+                        <a href="#" wire:click.prevent="sort('nom')" class="text-white text-decoration-none">
+                            Nom
+                            @if($sortBy === 'nom')
+                                <i class="bi bi-arrow-{{ $sortDir === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </a>
+                    </th>
+                    <th>
+                        <a href="#" wire:click.prevent="sort('email')" class="text-white text-decoration-none">
+                            Email
+                            @if($sortBy === 'email')
+                                <i class="bi bi-arrow-{{ $sortDir === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </a>
+                    </th>
+                    <th>Téléphone</th>
+                    <th>
+                        <a href="#" wire:click.prevent="sort('ville')" class="text-white text-decoration-none">
+                            Ville
+                            @if($sortBy === 'ville')
+                                <i class="bi bi-arrow-{{ $sortDir === 'asc' ? 'up' : 'down' }}"></i>
+                            @endif
+                        </a>
+                    </th>
                     <th class="text-center">Dép.</th>
                     <th class="text-center">Rec.</th>
                     <th></th>
@@ -41,18 +69,18 @@
                 @forelse ($tiersList as $tiers)
                     <tr>
                         <td class="fw-semibold">
+                            {{ $tiers->type === 'entreprise' ? '🏢' : '👤' }}
                             {{ $tiers->displayName() }}
                             @if ($tiers->helloasso_id)
                                 <span class="badge ms-1" style="background:#722281;font-size:.65rem" title="Identifiant HelloAsso : {{ $tiers->helloasso_id }}">HA</span>
                             @endif
-                        </td>
-                        <td>
-                            <span class="badge bg-secondary">
-                                {{ $tiers->type === 'entreprise' ? 'Entreprise' : 'Particulier' }}
-                            </span>
+                            @if ($tiers->type === 'entreprise' && ($tiers->nom || $tiers->prenom))
+                                <div class="text-muted small">{{ trim(($tiers->prenom ? $tiers->prenom . ' ' : '') . ($tiers->nom ?? '')) }}</div>
+                            @endif
                         </td>
                         <td>{{ $tiers->email ?? '-' }}</td>
                         <td>{{ $tiers->telephone ?? '-' }}</td>
+                        <td>{{ trim(($tiers->code_postal ? $tiers->code_postal . ' ' : '') . ($tiers->ville ?? '')) ?: '—' }}</td>
                         <td class="text-center">
                             @if ($tiers->pour_depenses)
                                 <i class="bi bi-check-lg text-success"></i>
