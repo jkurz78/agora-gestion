@@ -25,13 +25,13 @@ class OperationsTiersSeeder extends Seeder
         // ── Tiers ─────────────────────────────────────────────────────────────
         $tiers = [
             // Particuliers
-            ['type' => 'particulier', 'nom' => 'Tiers 1', 'prenom' => null, 'email' => null, 'telephone' => null, 'adresse' => null, 'pour_depenses' => true,  'pour_recettes' => true],
-            ['type' => 'particulier', 'nom' => 'Tiers 2', 'prenom' => null, 'email' => null, 'telephone' => null, 'adresse' => null, 'pour_depenses' => true,  'pour_recettes' => true],
-            ['type' => 'particulier', 'nom' => 'Tiers 3', 'prenom' => null, 'email' => null, 'telephone' => null, 'adresse' => null, 'pour_depenses' => true,  'pour_recettes' => true],
+            ['type' => 'particulier', 'nom' => 'Tiers 1', 'prenom' => null, 'email' => null, 'telephone' => null, 'adresse_ligne1' => null, 'pour_depenses' => true,  'pour_recettes' => true],
+            ['type' => 'particulier', 'nom' => 'Tiers 2', 'prenom' => null, 'email' => null, 'telephone' => null, 'adresse_ligne1' => null, 'pour_depenses' => true,  'pour_recettes' => true],
+            ['type' => 'particulier', 'nom' => 'Tiers 3', 'prenom' => null, 'email' => null, 'telephone' => null, 'adresse_ligne1' => null, 'pour_depenses' => true,  'pour_recettes' => true],
             // Entreprises
-            ['type' => 'entreprise',  'nom' => 'FRS 1',   'prenom' => null, 'email' => null, 'telephone' => null, 'adresse' => null, 'pour_depenses' => true,  'pour_recettes' => false],
-            ['type' => 'entreprise',  'nom' => 'FRS 2',   'prenom' => null, 'email' => null, 'telephone' => null, 'adresse' => null, 'pour_depenses' => true,  'pour_recettes' => false],
-            ['type' => 'entreprise',  'nom' => 'FRS 3',   'prenom' => null, 'email' => null, 'telephone' => null, 'adresse' => null, 'pour_depenses' => true,  'pour_recettes' => false],
+            ['type' => 'entreprise',  'nom' => 'FRS 1',   'prenom' => null, 'email' => null, 'telephone' => null, 'adresse_ligne1' => null, 'pour_depenses' => true,  'pour_recettes' => false],
+            ['type' => 'entreprise',  'nom' => 'FRS 2',   'prenom' => null, 'email' => null, 'telephone' => null, 'adresse_ligne1' => null, 'pour_depenses' => true,  'pour_recettes' => false],
+            ['type' => 'entreprise',  'nom' => 'FRS 3',   'prenom' => null, 'email' => null, 'telephone' => null, 'adresse_ligne1' => null, 'pour_depenses' => true,  'pour_recettes' => false],
         ];
 
         foreach ($tiers as $t) {
