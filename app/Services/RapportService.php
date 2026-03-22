@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Models\Cotisation;
-use App\Models\Don;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -201,64 +199,15 @@ final class RapportService
     }
 
     /**
-     * Agrégation des produits (recettes + dons + cotisations si pas de filtre opération).
+     * Agrégation des produits (recettes via transaction_lignes).
      *
-     * @param  array<int>|null  $operationIds  null = pas de filtre, cotisations incluses
+     * @param  array<int>|null  $operationIds  null = pas de filtre
      * @return Collection<int, object>
      */
     private function fetchProduitsRows(string $start, string $end, int $exercice, ?array $operationIds = null): Collection
     {
-        // Map intermédiaire keyed by sous_categorie_id
-        /** @var array<int, array{categorie_id: int, categorie_nom: string, sous_categorie_id: int, sous_categorie_nom: string, montant: float}> */
         $map = [];
-
-        $accumuler = function (Collection $rows) use (&$map): void {
-            foreach ($rows as $row) {
-                $scId = (int) $row->sous_categorie_id;
-                if (isset($map[$scId])) {
-                    $map[$scId]['montant'] += (float) $row->montant;
-                } else {
-                    $map[$scId] = [
-                        'categorie_id' => (int) $row->categorie_id,
-                        'categorie_nom' => $row->categorie_nom,
-                        'sous_categorie_id' => $scId,
-                        'sous_categorie_nom' => $row->sous_categorie_nom,
-                        'montant' => (float) $row->montant,
-                    ];
-                }
-            }
-        };
-
-        // Recettes (avec résolution des affectations)
-        $recettesMap = [];
-        $this->accumulerRecettesResolues($start, $end, $operationIds, $recettesMap);
-        $accumuler(collect(array_values($recettesMap))->map(fn ($r) => (object) $r));
-
-        // Dons (sous_categorie_id nullable → INNER JOIN exclut ceux sans sous-catégorie)
-        $dq = Don::query()
-            ->join('sous_categories as sc', 'dons.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->whereNull('dons.deleted_at')
-            ->whereBetween('dons.date', [$start, $end])
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(dons.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
-        if ($operationIds !== null) {
-            $dq->whereNotNull('dons.operation_id');
-            $dq->whereIn('dons.operation_id', $operationIds);
-        }
-        $accumuler($dq->get());
-
-        // Cotisations — uniquement sans filtre opération (elles n'ont pas d'operation_id)
-        if ($operationIds === null) {
-            $cq = Cotisation::query()
-                ->join('sous_categories as sc', 'cotisations.sous_categorie_id', '=', 'sc.id')
-                ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-                ->whereNull('cotisations.deleted_at')
-                ->where('cotisations.exercice', $exercice)
-                ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(cotisations.montant) as montant')])
-                ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
-            $accumuler($cq->get());
-        }
+        $this->accumulerRecettesResolues($start, $end, $operationIds, $map);
 
         return collect(array_values($map))->map(fn ($row) => (object) $row);
     }
@@ -448,51 +397,15 @@ final class RapportService
     }
 
     /**
-     * Agrégation des produits par séance (recettes + dons ; cotisations exclues).
+     * Agrégation des produits par séance (recettes via transaction_lignes).
      *
      * @param  array<int>  $operationIds
      * @return Collection<int, object>
      */
     private function fetchProduitsSeancesRows(string $start, string $end, array $operationIds): Collection
     {
-        /** @var array<int, array<int, array{categorie_id: int, categorie_nom: string, sous_categorie_id: int, sous_categorie_nom: string, seance: int, montant: float}>> */
         $map = [];
-
-        $accumuler = function (Collection $rows) use (&$map): void {
-            foreach ($rows as $row) {
-                $scId = (int) $row->sous_categorie_id;
-                $seance = (int) $row->seance;
-                if (isset($map[$scId][$seance])) {
-                    $map[$scId][$seance]['montant'] += (float) $row->montant;
-                } else {
-                    $map[$scId][$seance] = [
-                        'categorie_id' => (int) $row->categorie_id,
-                        'categorie_nom' => $row->categorie_nom,
-                        'sous_categorie_id' => $scId,
-                        'sous_categorie_nom' => $row->sous_categorie_nom,
-                        'seance' => $seance,
-                        'montant' => (float) $row->montant,
-                    ];
-                }
-            }
-        };
-
-        // Recettes par séance (avec résolution des affectations)
-        $recettesSeancesMap = [];
-        $this->accumulerRecettesSeancesResolues($start, $end, $operationIds, $recettesSeancesMap);
-        $accumuler(collect($recettesSeancesMap)->flatten(1)->values()->map(fn ($r) => (object) $r));
-
-        // Dons par séance
-        $accumuler(Don::query()
-            ->join('sous_categories as sc', 'dons.sous_categorie_id', '=', 'sc.id')
-            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
-            ->whereNull('dons.deleted_at')
-            ->whereBetween('dons.date', [$start, $end])
-            ->whereNotNull('dons.operation_id')
-            ->whereIn('dons.operation_id', $operationIds)
-            ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(dons.seance, 0) as seance'), DB::raw('SUM(dons.montant) as montant')])
-            ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(dons.seance, 0)'))
-            ->get());
+        $this->accumulerRecettesSeancesResolues($start, $end, $operationIds, $map);
 
         $flat = [];
         foreach ($map as $seanceMap) {
