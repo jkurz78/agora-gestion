@@ -111,6 +111,8 @@ final class TiersList extends Component
 
         return view('livewire.tiers-list', [
             'tiersList' => $query->paginate($this->effectivePerPage()),
+            'sortBy'    => $this->sortBy,
+            'sortDir'   => $this->sortDir,
         ]);
     }
 }
