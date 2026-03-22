@@ -11,8 +11,6 @@
                         <option value="">Tous</option>
                         <option value="depense">Dépense</option>
                         <option value="recette">Recette</option>
-                        <option value="don">Don</option>
-                        <option value="cotisation">Cotisation</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -59,15 +57,11 @@
                                 $badgeClass = match($tx->source_type) {
                                     'recette'    => 'bg-success',
                                     'depense'    => 'bg-danger',
-                                    'don'        => 'bg-info',
-                                    'cotisation' => 'bg-secondary',
                                     default      => 'bg-light text-dark',
                                 };
                                 $label = match($tx->source_type) {
                                     'recette'    => 'Recette',
                                     'depense'    => 'Dépense',
-                                    'don'        => 'Don',
-                                    'cotisation' => 'Cotisation',
                                     default      => $tx->source_type,
                                 };
                             @endphp
@@ -75,7 +69,7 @@
                         </td>
                         <td class="small">{{ $tx->libelle }}</td>
                         <td class="small text-muted">{{ $tx->compte ?? '—' }}</td>
-                        <td class="text-end text-nowrap fw-semibold small @if(in_array($tx->source_type, ['recette','don'])) text-success @else text-danger @endif">
+                        <td class="text-end text-nowrap fw-semibold small @if($tx->source_type === 'recette') text-success @else text-danger @endif">
                             {{ number_format((float) $tx->montant, 2, ',', ' ') }} €
                         </td>
                     </tr>
