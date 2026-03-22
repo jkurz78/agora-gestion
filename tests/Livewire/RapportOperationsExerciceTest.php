@@ -17,10 +17,10 @@ beforeEach(function () {
 
 it('RapportCompteResultatOperations n\'affiche pas les opérations hors exercice', function () {
     Operation::factory()->create([
-        'nom'        => 'Op hors exercice',
+        'nom' => 'Op hors exercice',
         'date_debut' => '2024-09-01',
-        'date_fin'   => '2025-08-30',
-        'statut'     => StatutOperation::EnCours,
+        'date_fin' => '2025-08-30',
+        'statut' => StatutOperation::EnCours,
     ]);
 
     Livewire::test(RapportCompteResultatOperations::class)
@@ -29,10 +29,10 @@ it('RapportCompteResultatOperations n\'affiche pas les opérations hors exercice
 
 it('RapportCompteResultatOperations affiche les opérations clôturées dans l\'exercice', function () {
     Operation::factory()->create([
-        'nom'        => 'Op clôturée visible',
+        'nom' => 'Op clôturée visible',
         'date_debut' => '2025-10-01',
-        'date_fin'   => '2026-03-31',
-        'statut'     => StatutOperation::Cloturee,
+        'date_fin' => '2026-03-31',
+        'statut' => StatutOperation::Cloturee,
     ]);
 
     Livewire::test(RapportCompteResultatOperations::class)
@@ -41,11 +41,11 @@ it('RapportCompteResultatOperations affiche les opérations clôturées dans l\'
 
 it('RapportSeances n\'affiche pas les opérations hors exercice', function () {
     Operation::factory()->create([
-        'nom'           => 'Op séances hors exercice',
-        'date_debut'    => '2024-09-01',
-        'date_fin'      => '2025-08-30',
+        'nom' => 'Op séances hors exercice',
+        'date_debut' => '2024-09-01',
+        'date_fin' => '2025-08-30',
         'nombre_seances' => 3,
-        'statut'        => StatutOperation::EnCours,
+        'statut' => StatutOperation::EnCours,
     ]);
 
     Livewire::test(RapportSeances::class)

@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutRapprochement;
 use App\Livewire\TransactionCompteList;
 use App\Models\CompteBancaire;
+use App\Models\RapprochementBancaire;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use Livewire\Livewire;
@@ -35,13 +38,13 @@ it('shows transactions when compte is selected', function () {
 });
 
 it('filtre par tiers', function () {
-    $tiersFondation = \App\Models\Tiers::factory()->create([
+    $tiersFondation = Tiers::factory()->create([
         'type' => 'entreprise',
         'nom' => 'Fondation ABC',
         'prenom' => null,
         'pour_recettes' => true,
     ]);
-    $tiersMairie = \App\Models\Tiers::factory()->create([
+    $tiersMairie = Tiers::factory()->create([
         'type' => 'entreprise',
         'nom' => 'Mairie XYZ',
         'prenom' => null,
@@ -88,9 +91,9 @@ it('supprime une recette non verrouillée', function () {
 });
 
 it('ne supprime pas une recette verrouillée par un rapprochement', function () {
-    $rapprochement = \App\Models\RapprochementBancaire::factory()->create([
+    $rapprochement = RapprochementBancaire::factory()->create([
         'compte_id' => $this->compte->id,
-        'statut' => \App\Enums\StatutRapprochement::Verrouille,
+        'statut' => StatutRapprochement::Verrouille,
         'verrouille_at' => now(),
         'saisi_par' => $this->user->id,
     ]);
@@ -156,9 +159,9 @@ it('reset la pagination quand le compte change', function () {
 it('affiche la colonne N° pièce dans les transactions du compte', function () {
     Transaction::factory()->asRecette()->create([
         'numero_piece' => '2025-2026:00042',
-        'compte_id'    => $this->compte->id,
-        'saisi_par'    => $this->user->id,
-        'date'         => '2025-10-01',
+        'compte_id' => $this->compte->id,
+        'saisi_par' => $this->user->id,
+        'date' => '2025-10-01',
     ]);
 
     Livewire::test(TransactionCompteList::class)

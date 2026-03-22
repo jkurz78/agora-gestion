@@ -17,21 +17,21 @@ final class BudgetExportController extends Controller
     public function __invoke(Request $request, BudgetExportService $service, ExerciceService $exerciceService): Response
     {
         $request->validate([
-            'format'   => ['required', 'in:csv,xlsx'],
+            'format' => ['required', 'in:csv,xlsx'],
             'exercice' => ['required', 'integer'],
-            'source'   => ['required', 'in:zero,courant,budget'],
+            'source' => ['required', 'in:zero,courant,budget'],
         ]);
 
-        $exerciceCible   = (int) $request->exercice;
+        $exerciceCible = (int) $request->exercice;
         $exerciceCourant = $exerciceService->current();
 
-        $source = match($request->source) {
+        $source = match ($request->source) {
             'courant' => 'realise',
-            'budget'  => 'budget',
-            default   => 'zero',
+            'budget' => 'budget',
+            default => 'zero',
         };
 
-        $rows     = $service->rows($exerciceCible, $source, $exerciceCourant);
+        $rows = $service->rows($exerciceCible, $source, $exerciceCourant);
         $filename = 'budget-'.$exerciceService->label($exerciceCible).'.'.$request->format;
 
         if ($request->format === 'xlsx') {
@@ -41,7 +41,7 @@ final class BudgetExportController extends Controller
         $csv = $service->toCsv($rows);
 
         return response($csv, 200, [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }
@@ -49,8 +49,8 @@ final class BudgetExportController extends Controller
     /** @param list<array{0: string, 1: string, 2: string, 3: string}> $rows */
     private function downloadXlsx(array $rows, string $filename): StreamedResponse
     {
-        $spreadsheet = new Spreadsheet();
-        $sheet       = $spreadsheet->getActiveSheet();
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
         $sheet->fromArray(
             array_merge([['exercice', 'categorie', 'sous_categorie', 'montant_prevu']], $rows)
         );
@@ -60,7 +60,7 @@ final class BudgetExportController extends Controller
         return new StreamedResponse(function () use ($writer): void {
             $writer->save('php://output');
         }, 200, [
-            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
         ]);
     }

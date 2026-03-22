@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Services\CsvImportService;
+use Illuminate\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Livewire\WithFileUploads;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 final class ImportCsv extends Component
 {
@@ -36,9 +37,9 @@ final class ImportCsv extends Component
 
     public function togglePanel(): void
     {
-        $this->showPanel = !$this->showPanel;
+        $this->showPanel = ! $this->showPanel;
 
-        if (!$this->showPanel) {
+        if (! $this->showPanel) {
             $this->importErrors = null;
             $this->successMessage = null;
             $this->csvFile = null;
@@ -62,7 +63,7 @@ final class ImportCsv extends Component
         }
     }
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         return view('livewire.import-csv');
     }

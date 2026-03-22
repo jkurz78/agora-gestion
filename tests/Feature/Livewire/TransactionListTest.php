@@ -15,8 +15,8 @@ beforeEach(function () {
 it('affiche bi-chat-left-text accolé au libellé si la transaction a des notes', function () {
     Transaction::factory()->asDepense()->create([
         'libelle' => 'Loyer octobre',
-        'notes'   => 'Provision incluse dans le loyer',
-        'date'    => '2025-10-01',
+        'notes' => 'Provision incluse dans le loyer',
+        'date' => '2025-10-01',
     ]);
 
     Livewire::test(TransactionList::class)
@@ -27,8 +27,8 @@ it('affiche bi-chat-left-text accolé au libellé si la transaction a des notes'
 it('n\'affiche pas bi-chat-left-text si notes est null', function () {
     Transaction::factory()->asDepense()->create([
         'libelle' => 'Loyer octobre',
-        'notes'   => null,
-        'date'    => '2025-10-01',
+        'notes' => null,
+        'date' => '2025-10-01',
     ]);
 
     Livewire::test(TransactionList::class)
@@ -38,8 +38,8 @@ it('n\'affiche pas bi-chat-left-text si notes est null', function () {
 it('n\'affiche pas bi-chat-left-text si notes est une chaîne vide', function () {
     Transaction::factory()->asDepense()->create([
         'libelle' => 'Loyer octobre',
-        'notes'   => '',
-        'date'    => '2025-10-01',
+        'notes' => '',
+        'date' => '2025-10-01',
     ]);
 
     Livewire::test(TransactionList::class)

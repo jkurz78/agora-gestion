@@ -32,7 +32,6 @@ it('renders for authenticated user', function () {
         ->assertSee('Aucun compte bancaire configuré');
 });
 
-
 it('displays solde general', function () {
     Transaction::factory()->asRecette()->create([
         'date' => $this->exercice.'-11-01',
@@ -84,8 +83,8 @@ it('shows membres without cotisation', function () {
 
 it('displays comptes bancaires with soldes', function () {
     CompteBancaire::factory()->create([
-        'nom'                => 'Compte Principal',
-        'solde_initial'      => 1500.00,
+        'nom' => 'Compte Principal',
+        'solde_initial' => 1500.00,
         'date_solde_initial' => '2024-01-01',
     ]);
 

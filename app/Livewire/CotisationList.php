@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithPerPage;
 use App\Models\Cotisation;
 use App\Models\SousCategorie;
 use App\Services\CotisationService;
@@ -11,7 +12,6 @@ use App\Services\ExerciceService;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class CotisationList extends Component

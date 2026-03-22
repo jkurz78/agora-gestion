@@ -11,4 +11,3 @@ it('dons table has tiers_id column', function () {
 it('cotisations table has tiers_id column', function () {
     expect(Schema::hasColumn('cotisations', 'tiers_id'))->toBeTrue();
 });
-

@@ -5,12 +5,12 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithPerPage;
 use App\Models\Tiers;
 use App\Services\TiersService;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Concerns\WithPerPage;
 use Livewire\WithPagination;
 
 final class TiersList extends Component
@@ -26,7 +26,8 @@ final class TiersList extends Component
 
     public bool $filtreHelloasso = false;
 
-    public string $sortBy  = 'nom';
+    public string $sortBy = 'nom';
+
     public string $sortDir = 'asc';
 
     public function updatedSearch(): void
@@ -53,7 +54,7 @@ final class TiersList extends Component
         if ($this->sortBy === $col) {
             $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
         } else {
-            $this->sortBy  = $col;
+            $this->sortBy = $col;
             $this->sortDir = 'asc';
         }
         $this->resetPage();
@@ -83,12 +84,12 @@ final class TiersList extends Component
 
         if ($this->search !== '') {
             $query->where(function ($q): void {
-                $q->where('nom',          'like', "%{$this->search}%")
-                  ->orWhere('prenom',     'like', "%{$this->search}%")
-                  ->orWhere('entreprise', 'like', "%{$this->search}%")
-                  ->orWhere('ville',      'like', "%{$this->search}%")
-                  ->orWhere('code_postal','like', "%{$this->search}%")
-                  ->orWhere('email',      'like', "%{$this->search}%");
+                $q->where('nom', 'like', "%{$this->search}%")
+                    ->orWhere('prenom', 'like', "%{$this->search}%")
+                    ->orWhere('entreprise', 'like', "%{$this->search}%")
+                    ->orWhere('ville', 'like', "%{$this->search}%")
+                    ->orWhere('code_postal', 'like', "%{$this->search}%")
+                    ->orWhere('email', 'like', "%{$this->search}%");
             });
         }
 
@@ -104,15 +105,15 @@ final class TiersList extends Component
 
         $dir = $this->sortDir === 'desc' ? 'desc' : 'asc';
         if ($this->sortBy === 'nom') {
-            $query->orderByRaw('COALESCE(entreprise, nom) ' . $dir);
+            $query->orderByRaw('COALESCE(entreprise, nom) '.$dir);
         } else {
             $query->orderBy($this->sortBy, $dir);
         }
 
         return view('livewire.tiers-list', [
             'tiersList' => $query->paginate($this->effectivePerPage()),
-            'sortBy'    => $this->sortBy,
-            'sortDir'   => $this->sortDir,
+            'sortBy' => $this->sortBy,
+            'sortDir' => $this->sortDir,
         ]);
     }
 }

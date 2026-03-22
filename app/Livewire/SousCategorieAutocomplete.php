@@ -75,8 +75,8 @@ final class SousCategorieAutocomplete extends Component
 
         if ($this->search !== '') {
             $query->where(function ($q): void {
-                $q->where('nom', 'like', '%' . $this->search . '%')
-                    ->orWhereHas('categorie', fn ($q) => $q->where('nom', 'like', '%' . $this->search . '%'));
+                $q->where('nom', 'like', '%'.$this->search.'%')
+                    ->orWhereHas('categorie', fn ($q) => $q->where('nom', 'like', '%'.$this->search.'%'));
             });
         }
 
@@ -88,11 +88,11 @@ final class SousCategorieAutocomplete extends Component
             ->groupBy('categorie_id')
             ->map(function (Collection $items): array {
                 return [
-                    'categorie_id'  => (int) $items->first()->categorie_id,
+                    'categorie_id' => (int) $items->first()->categorie_id,
                     'categorie_nom' => $items->first()->categorie->nom,
-                    'items'         => $items->map(fn (SousCategorie $sc): array => [
-                        'id'         => $sc->id,
-                        'nom'        => $sc->nom,
+                    'items' => $items->map(fn (SousCategorie $sc): array => [
+                        'id' => $sc->id,
+                        'nom' => $sc->nom,
                         'code_cerfa' => $sc->code_cerfa,
                     ])->toArray(),
                 ];
@@ -136,15 +136,15 @@ final class SousCategorieAutocomplete extends Component
     public function confirmCreate(): void
     {
         $this->validate([
-            'newNom'         => ['required', 'string', 'max:150'],
+            'newNom' => ['required', 'string', 'max:150'],
             'newCategorieId' => ['required', 'integer', 'exists:categories,id'],
-            'newCodeCerfa'   => ['nullable', 'string', 'max:20'],
+            'newCodeCerfa' => ['nullable', 'string', 'max:20'],
         ]);
 
         $sc = SousCategorie::create([
             'categorie_id' => $this->newCategorieId,
-            'nom'          => $this->newNom,
-            'code_cerfa'   => $this->newCodeCerfa !== '' ? $this->newCodeCerfa : null,
+            'nom' => $this->newNom,
+            'code_cerfa' => $this->newCodeCerfa !== '' ? $this->newCodeCerfa : null,
         ]);
 
         $this->selectSousCategorie($sc->id);

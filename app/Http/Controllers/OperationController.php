@@ -8,6 +8,7 @@ use App\Enums\StatutOperation;
 use App\Http\Requests\StoreOperationRequest;
 use App\Http\Requests\UpdateOperationRequest;
 use App\Models\Operation;
+use App\Services\ExerciceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,7 +18,7 @@ final class OperationController extends Controller
     public function index(Request $request): View
     {
         $showAll = $request->boolean('all');
-        $exercice = app(\App\Services\ExerciceService::class)->current();
+        $exercice = app(ExerciceService::class)->current();
 
         $operations = $showAll
             ? Operation::orderByDesc('date_debut')->get()
@@ -25,8 +26,8 @@ final class OperationController extends Controller
 
         return view('operations.index', [
             'operations' => $operations,
-            'showAll'    => $showAll,
-            'exercice'   => $exercice,
+            'showAll' => $showAll,
+            'exercice' => $exercice,
         ]);
     }
 

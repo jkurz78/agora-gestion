@@ -9,8 +9,8 @@ use App\Enums\TypeCategorie;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\SousCategorie;
-use App\Models\Transaction;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -44,7 +44,7 @@ final class CsvImportService
         $content = $this->readUtf8($file);
         if ($content === null) {
             return new CsvImportResult(false, errors: [[
-                'line'    => 0,
+                'line' => 0,
                 'message' => 'Le fichier doit être encodé en UTF-8. Enregistrez votre fichier CSV en UTF-8 depuis Excel ou LibreOffice.',
             ]]);
         }
@@ -64,7 +64,7 @@ final class CsvImportService
         array_shift($rows); // Retirer la ligne d'en-tête
 
         // Charger les lookups DB une seule fois (case-insensitive via lowercase key)
-        $typeEnum  = TypeCategorie::from($type);
+        $typeEnum = TypeCategorie::from($type);
         $flagField = $type === 'depense' ? 'pour_depenses' : 'pour_recettes';
         $typeLabel = $type === 'depense' ? 'dépenses' : 'recettes';
 
@@ -79,15 +79,15 @@ final class CsvImportService
         // Map tiers : displayName (lowercase) → liste de Tiers (pour détecter les homonymes)
         $tiersMap = [];
         foreach (Tiers::all() as $tiers) {
-            $key              = Str::lower(trim($tiers->displayName()));
+            $key = Str::lower(trim($tiers->displayName()));
             $tiersMap[$key][] = $tiers;
         }
 
         $operations = Operation::all()->keyBy(fn ($op) => Str::lower(trim($op->nom)));
 
         // Parser et grouper les lignes par date+reference
-        $errors     = [];
-        $groups     = []; // groupKey => ['data' => [...], 'lignes' => [...], 'firstLine' => int]
+        $errors = [];
+        $groups = []; // groupKey => ['data' => [...], 'lignes' => [...], 'firstLine' => int]
         $groupOrder = []; // ordre d'apparition des groupes
 
         foreach ($rows as $idx => $row) {
@@ -95,78 +95,83 @@ final class CsvImportService
 
             // Validation des champs par ligne
             $rowErrors = $this->validateRow($row, $csvLine, $sousCategories, $tiersMap, $operations, $flagField, $typeLabel);
-            $errors    = array_merge($errors, $rowErrors);
+            $errors = array_merge($errors, $rowErrors);
 
-            if (!empty($rowErrors)) {
+            if (! empty($rowErrors)) {
                 continue;
             }
 
-            $date      = trim($row[0]);
+            $date = trim($row[0]);
             $reference = trim($row[1]);
-            $groupKey  = $date . '|' . $reference;
+            $groupKey = $date.'|'.$reference;
 
-            $scNom        = Str::lower(trim($row[2]));
-            $sc           = $sousCategories[$scNom];
-            $montant      = trim($row[3]);
+            $scNom = Str::lower(trim($row[2]));
+            $sc = $sousCategories[$scNom];
+            $montant = trim($row[3]);
             $operationNom = Str::lower(trim($row[8] ?? ''));
-            $operation    = $operationNom !== '' ? ($operations[$operationNom] ?? null) : null;
-            $operationId  = $operation?->id;
+            $operation = $operationNom !== '' ? ($operations[$operationNom] ?? null) : null;
+            $operationId = $operation?->id;
 
             // Valider séance par rapport au nombre de séances de l'opération
             $seanceRaw = trim($row[9] ?? '');
-            $seance    = null;
+            $seance = null;
             if ($seanceRaw !== '') {
                 $seance = (int) $seanceRaw;
                 if ($operation !== null && $operation->nombre_seances !== null && $seance > $operation->nombre_seances) {
                     $errors[] = ['line' => $csvLine, 'message' => "Colonne seance : valeur {$seance} dépasse le nombre de séances de l'opération ({$operation->nombre_seances})."];
+
                     continue;
                 }
             }
 
-            if (!isset($groups[$groupKey])) {
+            if (! isset($groups[$groupKey])) {
                 // Première ligne de ce groupe : mode_paiement et compte sont obligatoires
-                $mode      = trim($row[4] ?? '');
+                $mode = trim($row[4] ?? '');
                 $compteNom = Str::lower(trim($row[5] ?? ''));
 
                 if ($mode === '') {
                     $errors[] = ['line' => $csvLine, 'message' => 'Colonne mode_paiement : obligatoire sur la première ligne d\'une transaction.'];
+
                     continue;
                 }
 
-                if (!in_array($mode, self::modesValides(), true)) {
-                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne mode_paiement : valeur "' . $mode . '" invalide. Valeurs acceptées : ' . implode(', ', self::modesValides()) . '.'];
+                if (! in_array($mode, self::modesValides(), true)) {
+                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne mode_paiement : valeur "'.$mode.'" invalide. Valeurs acceptées : '.implode(', ', self::modesValides()).'.'];
+
                     continue;
                 }
 
                 if ($compteNom === '') {
                     $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte : obligatoire sur la première ligne d\'une transaction.'];
+
                     continue;
                 }
 
-                if (!isset($comptes[$compteNom])) {
-                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte : "' . trim($row[5]) . '" inconnu ou inactif (actif_recettes_depenses = false).'];
+                if (! isset($comptes[$compteNom])) {
+                    $errors[] = ['line' => $csvLine, 'message' => 'Colonne compte : "'.trim($row[5]).'" inconnu ou inactif (actif_recettes_depenses = false).'];
+
                     continue;
                 }
 
                 // Résoudre le tiers (déjà validé dans validateRow)
                 $tiersCsvNom = Str::lower(trim($row[7] ?? ''));
-                $tiersId     = null;
+                $tiersId = null;
                 if ($tiersCsvNom !== '') {
                     $tiersId = $tiersMap[$tiersCsvNom][0]->id;
                 }
 
                 $groups[$groupKey] = [
                     'data' => [
-                        'type'          => $type,
-                        'date'          => $date,
-                        'reference'     => $reference,
-                        'libelle'       => trim($row[6] ?? '') !== '' ? trim($row[6]) : null,
+                        'type' => $type,
+                        'date' => $date,
+                        'reference' => $reference,
+                        'libelle' => trim($row[6] ?? '') !== '' ? trim($row[6]) : null,
                         'mode_paiement' => $mode,
-                        'compte_id'     => $comptes[$compteNom]->id,
-                        'tiers_id'      => $tiersId,
+                        'compte_id' => $comptes[$compteNom]->id,
+                        'tiers_id' => $tiersId,
                         'montant_total' => 0.0,
                     ],
-                    'lignes'    => [],
+                    'lignes' => [],
                     'firstLine' => $csvLine,
                 ];
                 $groupOrder[] = $groupKey;
@@ -175,10 +180,10 @@ final class CsvImportService
             $notesRaw = trim($row[10] ?? '');
             $groups[$groupKey]['lignes'][] = [
                 'sous_categorie_id' => $sc->id,
-                'montant'           => (float) $montant,
-                'operation_id'      => $operationId,
-                'seance'            => $seance,
-                'notes'             => $notesRaw !== '' ? $notesRaw : null,
+                'montant' => (float) $montant,
+                'operation_id' => $operationId,
+                'seance' => $seance,
+                'notes' => $notesRaw !== '' ? $notesRaw : null,
             ];
             $groups[$groupKey]['data']['montant_total'] =
                 round($groups[$groupKey]['data']['montant_total'] + (float) $montant, 2);
@@ -194,13 +199,13 @@ final class CsvImportService
                 ->exists();
             if ($exists) {
                 $errors[] = [
-                    'line'    => $group['firstLine'],
+                    'line' => $group['firstLine'],
                     'message' => "Doublon : la transaction du {$date} avec la référence \"{$reference}\" existe déjà en base.",
                 ];
             }
         }
 
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             return new CsvImportResult(false, errors: $errors);
         }
 
@@ -208,9 +213,9 @@ final class CsvImportService
         // Chaque appel à TransactionService gère sa propre transaction DB.
         // Pas de transaction englobante (incompatible avec SELECT FOR UPDATE de NumeroPieceService).
 
-        $service             = app(TransactionService::class);
+        $service = app(TransactionService::class);
         $transactionsCreated = 0;
-        $lignesCreated       = 0;
+        $lignesCreated = 0;
 
         foreach ($groupOrder as $key) {
             $group = $groups[$key];
@@ -222,17 +227,18 @@ final class CsvImportService
                 $alreadyInserted = $transactionsCreated > 0
                     ? "{$transactionsCreated} transaction(s) déjà insérée(s) avant l'erreur (ne les re-soumettez pas). "
                     : '';
+
                 return new CsvImportResult(false, errors: [[
-                    'line'    => 0,
-                    'message' => $alreadyInserted . 'Erreur lors de l\'insertion : ' . $e->getMessage(),
+                    'line' => 0,
+                    'message' => $alreadyInserted.'Erreur lors de l\'insertion : '.$e->getMessage(),
                 ]]);
             }
         }
 
         return new CsvImportResult(
-            success:             true,
+            success: true,
             transactionsCreated: $transactionsCreated,
-            lignesCreated:       $lignesCreated,
+            lignesCreated: $lignesCreated,
         );
     }
 
@@ -248,7 +254,7 @@ final class CsvImportService
             $content = substr($content, 3);
         }
 
-        if (!mb_check_encoding($content, 'UTF-8')) {
+        if (! mb_check_encoding($content, 'UTF-8')) {
             return null;
         }
 
@@ -258,7 +264,7 @@ final class CsvImportService
     /** @return list<list<string>> */
     private function parseCsv(string $content): array
     {
-        $rows  = [];
+        $rows = [];
         $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
         foreach ($lines as $line) {
             if (trim($line) === '') {
@@ -273,9 +279,9 @@ final class CsvImportService
     private function validateHeader(array $row): ?string
     {
         $normalized = array_map(fn ($h) => Str::lower(trim($h)), $row);
-        $missing    = array_diff(self::EXPECTED_HEADERS, $normalized);
-        if (!empty($missing)) {
-            return 'En-tête invalide. Colonnes manquantes : ' . implode(', ', $missing) . '.';
+        $missing = array_diff(self::EXPECTED_HEADERS, $normalized);
+        if (! empty($missing)) {
+            return 'En-tête invalide. Colonnes manquantes : '.implode(', ', $missing).'.';
         }
 
         return null;
@@ -299,7 +305,7 @@ final class CsvImportService
         $errors = [];
 
         // date (col 0) — format YYYY-MM-DD
-        $date   = trim($row[0] ?? '');
+        $date = trim($row[0] ?? '');
         $parsed = \DateTime::createFromFormat('Y-m-d', $date);
         if ($date === '' || $parsed === false || $parsed->format('Y-m-d') !== $date) {
             $errors[] = ['line' => $csvLine, 'message' => "Colonne date : valeur \"{$date}\" invalide (format attendu : YYYY-MM-DD)."];
@@ -317,13 +323,13 @@ final class CsvImportService
         $scNom = Str::lower(trim($row[2] ?? ''));
         if ($scNom === '') {
             $errors[] = ['line' => $csvLine, 'message' => 'Colonne sous_categorie : valeur vide (champ obligatoire).'];
-        } elseif (!isset($sousCategories[$scNom])) {
+        } elseif (! isset($sousCategories[$scNom])) {
             $errors[] = ['line' => $csvLine, 'message' => "Colonne sous_categorie : \"{$row[2]}\" inconnue ou de mauvais type."];
         }
 
         // montant_ligne (col 3)
         $montant = trim($row[3] ?? '');
-        if (!is_numeric($montant) || (float) $montant <= 0) {
+        if (! is_numeric($montant) || (float) $montant <= 0) {
             $errors[] = ['line' => $csvLine, 'message' => "Colonne montant_ligne : valeur \"{$montant}\" invalide (doit être un nombre > 0)."];
         }
 
@@ -334,22 +340,22 @@ final class CsvImportService
             if (empty($candidates)) {
                 $errors[] = ['line' => $csvLine, 'message' => "Colonne tiers : \"{$row[7]}\" inconnu."];
             } elseif (count($candidates) > 1) {
-                $nb       = count($candidates);
+                $nb = count($candidates);
                 $errors[] = ['line' => $csvLine, 'message' => "Colonne tiers : \"{$row[7]}\" — homonyme détecté ({$nb} tiers trouvés). Résolvez l'ambiguïté en base avant l'import."];
-            } elseif (!$candidates[0]->{$flagField}) {
+            } elseif (! $candidates[0]->{$flagField}) {
                 $errors[] = ['line' => $csvLine, 'message' => "Le tiers \"{$row[7]}\" existe mais n'est pas autorisé pour les {$typeLabel}."];
             }
         }
 
         // operation (col 8) — optionnel
         $opNom = Str::lower(trim($row[8] ?? ''));
-        if ($opNom !== '' && !isset($operations[$opNom])) {
+        if ($opNom !== '' && ! isset($operations[$opNom])) {
             $errors[] = ['line' => $csvLine, 'message' => "Colonne operation : \"{$row[8]}\" inconnue."];
         }
 
         // seance (col 9) — optionnel, entier positif
         $seanceRaw = trim($row[9] ?? '');
-        if ($seanceRaw !== '' && (!ctype_digit($seanceRaw) || (int) $seanceRaw < 1)) {
+        if ($seanceRaw !== '' && (! ctype_digit($seanceRaw) || (int) $seanceRaw < 1)) {
             $errors[] = ['line' => $csvLine, 'message' => "Colonne seance : \"{$seanceRaw}\" invalide (doit être un entier >= 1)."];
         }
 

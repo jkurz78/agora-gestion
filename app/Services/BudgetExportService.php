@@ -13,9 +13,9 @@ final class BudgetExportService
     /**
      * Retourne les lignes d'export triées dépenses puis recettes.
      *
-     * @param  int     $exerciceCible  Valeur à écrire dans la colonne exercice
-     * @param  string  $source         'zero' | 'realise' | 'budget'
-     * @param  int     $sourceExercice Exercice source des montants
+     * @param  int  $exerciceCible  Valeur à écrire dans la colonne exercice
+     * @param  string  $source  'zero' | 'realise' | 'budget'
+     * @param  int  $sourceExercice  Exercice source des montants
      * @return list<array{0: string, 1: string, 2: string, 3: string}>
      */
     public function rows(int $exerciceCible, string $source, int $sourceExercice): array
@@ -43,8 +43,8 @@ final class BudgetExportService
                 foreach ($categorie->sousCategories as $sc) {
                     $montant = match ($source) {
                         'realise' => $budgetService->realise($sc->id, $sourceExercice),
-                        'budget'  => $budgetMap[$sc->id] ?? 0.0,
-                        default   => 0.0,
+                        'budget' => $budgetMap[$sc->id] ?? 0.0,
+                        default => 0.0,
                     };
 
                     $rows[] = [
@@ -72,13 +72,13 @@ final class BudgetExportService
         foreach ($rows as $row) {
             $escaped = array_map(
                 fn (string $v): string => str_contains($v, ';') || str_contains($v, '"')
-                    ? '"' . str_replace('"', '""', $v) . '"'
+                    ? '"'.str_replace('"', '""', $v).'"'
                     : $v,
                 $row
             );
             $lines[] = implode(';', $escaped);
         }
 
-        return implode("\n", $lines) . "\n";
+        return implode("\n", $lines)."\n";
     }
 }

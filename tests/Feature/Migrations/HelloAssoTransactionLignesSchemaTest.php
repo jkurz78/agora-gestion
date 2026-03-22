@@ -7,6 +7,7 @@ use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
@@ -107,4 +108,4 @@ it('helloasso_item_id is unique and rejects duplicates', function () {
         'helloasso_item_id' => 999888777,
         'exercice' => 2025,
     ]);
-})->throws(\Illuminate\Database\QueryException::class);
+})->throws(QueryException::class);

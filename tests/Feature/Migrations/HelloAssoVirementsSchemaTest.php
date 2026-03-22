@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\CompteBancaire;
 use App\Models\User;
 use App\Models\VirementInterne;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
@@ -69,4 +70,4 @@ it('rejects duplicate helloasso_cashout_id values', function (): void {
         'saisi_par' => $user->id,
         'helloasso_cashout_id' => 999,
     ]);
-})->throws(\Illuminate\Database\QueryException::class);
+})->throws(QueryException::class);

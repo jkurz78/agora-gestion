@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Operation;
 use App\Models\User;
 
 beforeEach(function () {
@@ -10,7 +11,7 @@ beforeEach(function () {
 
 it('rejette la création sans date_debut', function () {
     $response = $this->actingAs($this->user)->post(route('operations.store'), [
-        'nom'    => 'Test op',
+        'nom' => 'Test op',
         'statut' => 'en_cours',
     ]);
     $response->assertSessionHasErrors('date_debut');
@@ -18,28 +19,28 @@ it('rejette la création sans date_debut', function () {
 
 it('rejette la création sans date_fin', function () {
     $response = $this->actingAs($this->user)->post(route('operations.store'), [
-        'nom'       => 'Test op',
+        'nom' => 'Test op',
         'date_debut' => '2025-09-01',
-        'statut'    => 'en_cours',
+        'statut' => 'en_cours',
     ]);
     $response->assertSessionHasErrors('date_fin');
 });
 
 it('accepte la création avec les deux dates', function () {
     $response = $this->actingAs($this->user)->post(route('operations.store'), [
-        'nom'        => 'Test op',
+        'nom' => 'Test op',
         'date_debut' => '2025-09-01',
-        'date_fin'   => '2026-03-31',
-        'statut'     => 'en_cours',
+        'date_fin' => '2026-03-31',
+        'statut' => 'en_cours',
     ]);
     $response->assertRedirect();
     $response->assertSessionHasNoErrors();
 });
 
 it('rejette la modification sans date_debut', function () {
-    $op = \App\Models\Operation::factory()->create();
+    $op = Operation::factory()->create();
     $response = $this->actingAs($this->user)->put(route('operations.update', $op), [
-        'nom'    => 'Test op',
+        'nom' => 'Test op',
         'statut' => 'en_cours',
     ]);
     $response->assertSessionHasErrors('date_debut');
