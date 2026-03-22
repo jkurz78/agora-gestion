@@ -21,6 +21,7 @@ L'association utilise HelloAsso pour collecter en ligne des cotisations, des don
 - `recu_emis` (dons) est abandonné dans l'immédiat. Les reçus fiscaux seront gérés dans un chantier séparé (table `documents_emis`), découplé de cette intégration.
 - `objet` (dons) : mappé vers le champ `libelle` de la Transaction lors de la migration (pas vers `notes`). C'est ce champ qui est affiché dans les listes.
 - Pas de nouvelle table pour les inscriptions — c'est une TransactionLigne avec la sous-catégorie appropriée et une `operation_id`.
+- **Règle métier** : quand une TransactionLigne utilise une sous-catégorie avec `pour_inscriptions = true`, le champ `operation_id` devient **obligatoire** (validation côté formulaire et côté synchro HelloAsso — un item Registration sans mapping formSlug → Opération est bloquant à l'étape 3 du workflow).
 
 ### Mapping HelloAsso → SVS
 
@@ -93,46 +94,60 @@ Les données des tables `dons` et `cotisations` doivent être migrées vers `tra
 
 ## Architecture de la synchronisation
 
-### Flux principal
+### Workflow guidé en étapes
+
+La synchronisation n'est pas un import automatique aveugle. C'est un **workflow interactif** qui permet au trésorier de valider les rapprochements avant import.
 
 ```
 Bouton "Synchroniser avec HelloAsso"
   │
-  ├─ 1. Authentification OAuth2 (token 30 min)
+  ├─ Étape 1 — Récupération et analyse
+  │   ├─ Authentification OAuth2 (token 30 min)
+  │   ├─ GET /v5/organizations/{slug}/orders?from={debut_exercice}&to={fin_exercice}
+  │   │   → Pagination par continuationToken jusqu'à épuisement
+  │   ├─ GET /v5/organizations/{slug}/cash-outs?from={debut_exercice}&to={fin_exercice}
+  │   └─ Stockage temporaire des données récupérées (table de staging ou session)
   │
-  ├─ 2. GET /v5/organizations/{slug}/orders?from={debut_exercice}&to={fin_exercice}
-  │     → Pagination par continuationToken jusqu'à épuisement
+  ├─ Étape 2 — Rapprochement des tiers
+  │   Pour chaque personne HelloAsso non encore liée à un Tiers SVS :
+  │   ├─ Proposition automatique de correspondance (email, nom+prénom)
+  │   ├─ Le trésorier choisit :
+  │   │   ├─ Associer à un tiers existant → crée le lien helloasso_id
+  │   │   ├─ Créer un nouveau tiers par import
+  │   │   └─ Ignorer (l'item ne sera pas importé)
+  │   └─ Un tiers déjà lié (helloasso_id connu) passe automatiquement
   │
-  ├─ 3. Pour chaque Order :
-  │     ├─ Grouper les Items par bénéficiaire (User, ou Payer si User absent)
-  │     ├─ Pour chaque groupe (bénéficiaire unique) :
-  │     │   ├─ Upsert Tiers (match helloasso_id ou email)
-  │     │   ├─ Upsert Transaction (match helloasso_order_id + tiers_id)
-  │     │   └─ Pour chaque Item du groupe :
-  │     │       ├─ Résoudre la sous-catégorie (mapping item.type → SousCategorie)
-  │     │       ├─ Résoudre l'opération (mapping formSlug → Operation, si applicable)
-  │     │       └─ Upsert TransactionLigne (match helloasso_item_id)
-  │     └─ Reporter le cashOutId des Payments sur la Transaction
+  ├─ Étape 3 — Rapprochement des formulaires → opérations
+  │   Pour chaque formSlug non encore mappé :
+  │   ├─ Associer à une opération existante
+  │   ├─ Créer une nouvelle opération
+  │   └─ Pas d'opération (ne concerne pas les inscriptions)
   │
-  ├─ 4. GET /v5/organizations/{slug}/cash-outs?from={debut_exercice}&to={fin_exercice}
-  │     → Pour chaque CashOut :
-  │       ├─ Upsert VirementInterne (match helloasso_cashout_id)
-  │       │   compte_source = Compte HelloAsso
-  │       │   compte_destination = Compte courant par défaut (paramétrable)
-  │       └─ Marquer les Transactions liées (helloasso_cashout_id)
+  ├─ Étape 4 — Import
+  │   ├─ Pour chaque Order :
+  │   │   ├─ Grouper les Items par bénéficiaire (User, ou Payer si User absent)
+  │   │   ├─ Pour chaque groupe (bénéficiaire unique) :
+  │   │   │   ├─ Upsert Transaction (match helloasso_order_id + tiers_id)
+  │   │   │   └─ Pour chaque Item du groupe :
+  │   │   │       ├─ Résoudre la sous-catégorie (mapping item.type → SousCategorie)
+  │   │   │       ├─ Résoudre l'opération (mapping formSlug → Operation)
+  │   │   │       └─ Upsert TransactionLigne (match helloasso_item_id)
+  │   │   └─ Reporter le cashOutId des Payments sur la Transaction
+  │   ├─ Pour chaque CashOut :
+  │   │   ├─ Upsert VirementInterne (match helloasso_cashout_id)
+  │   │   └─ Marquer les Transactions liées (helloasso_cashout_id)
+  │   └─ Rapport de synchro : créés / mis à jour / ignorés / erreurs
   │
-  └─ 5. Rapport de synchro : créés / mis à jour / erreurs
+  └─ Les étapes 2 et 3 ne sont bloquantes que lors de la première synchro
+      ou quand de nouveaux tiers/formulaires apparaissent. Les synchros
+      suivantes passent directement à l'étape 4 si tout est déjà rapproché.
 ```
 
-### Résolution des tiers
+### Identifiant HelloAsso des tiers
 
-Ordre de recherche pour éviter les doublons :
+L'objet User HelloAsso (bénéficiaire) n'a pas d'ID persistant dans l'API. Le `helloasso_id` stocké sur le Tiers est construit à partir de l'**email normalisé** (lowercase, trim) du User HelloAsso. C'est la clé de rapprochement automatique.
 
-1. `Tiers::where('helloasso_id', $userId)` — match exact si déjà synchronisé
-2. `Tiers::where('email', $userEmail)` — match par email si nouveau dans HelloAsso mais déjà saisi manuellement
-3. Création d'un nouveau Tiers avec les données HelloAsso (nom, prénom, email, adresse, date de naissance)
-
-Lors du match par email, le `helloasso_id` est mis à jour sur le Tiers existant pour les prochaines synchros.
+Un tiers portant un `helloasso_id` est considéré comme **piloté par HelloAsso** : ses données (nom, adresse, etc.) sont mises à jour à chaque synchro. Les modifications manuelles sur ce tiers restent possibles mais seront écrasées lors de la prochaine synchronisation.
 
 ### Résolution des sous-catégories
 
@@ -344,28 +359,71 @@ Ces formulaires sont **supprimés**. La saisie manuelle d'un don ou d'une cotisa
 
 ## Séquencement des chantiers
 
-Ce projet se décompose en phases indépendantes et déployables séparément :
+Ce projet se décompose en **lots fins**, chacun déployable et testable indépendamment. Chaque lot produit une application fonctionnelle.
 
-### Phase 1 — Migration du modèle (pré-requis)
+### Lot 1 — Évolutions de schéma (migrations sans impact fonctionnel)
 
-1. Ajouter les colonnes HelloAsso sur `transactions`, `transaction_lignes`, `virements_internes`
-2. Ajouter `pour_inscriptions` sur `sous_categories`
-3. Ajouter `helloasso` dans l'enum `ModePaiement`
-4. Migrer les données `dons` → `transactions` + `transaction_lignes`
-5. Migrer les données `cotisations` → `transactions` + `transaction_lignes`
-6. Adapter les écrans (suppression DonForm/CotisationForm, adaptation des requêtes, rapports)
-7. Renommer les tables legacy
+Ajout de colonnes, sans modifier le comportement existant :
 
-### Phase 2 — Synchronisation HelloAsso
+1. Ajouter `helloasso_order_id`, `helloasso_cashout_id` sur `transactions`
+2. Ajouter `helloasso_item_id`, `exercice` sur `transaction_lignes`
+3. Ajouter `helloasso_cashout_id` sur `virements_internes`
+4. Ajouter `pour_inscriptions` sur `sous_categories`
+5. Ajouter `helloasso` dans l'enum `ModePaiement`
+6. Ajouter la validation conditionnelle : sous-catégorie `pour_inscriptions` → `operation_id` obligatoire sur TransactionLigne
 
-1. `HelloAssoSyncService` avec résolution tiers, sous-catégories, opérations
-2. Extension de l'écran Paramètres > HelloAsso (configuration mapping + lancement synchro)
-3. Gestion des versements (VirementInterne auto-générés)
+### Lot 2 — Migration des données dons → transactions
 
-### Phase 3 — Verrouillage versements (évolution)
+1. Migration SQL : chaque Don → Transaction (type recette) + TransactionLigne
+2. Adaptation de `SoldeService` — retirer la branche `dons()`
+3. Adaptation de `RapprochementBancaireService` — retirer les requêtes Don
+4. Adaptation de `RapprochementDetail` — retirer les références Don
+5. Adaptation de `Dashboard` — `Don::forExercice()` → requête TransactionLigne avec sous-cat `pour_dons`
+6. Adaptation de `RapportService` (CERFA) — requêter `transaction_lignes` + sous-catégories `pour_dons`
+7. Adaptation de `TransactionUniverselleService` — retirer la branche UNION dons
+8. Suppression de `DonForm`, `DonList`, `DonService`, `Don` (modèle)
+9. Adaptation des relations sur `CompteBancaire`, `Tiers`, `RapprochementBancaire` — retirer `dons()`
+10. Adaptation de `routes/web.php` — route `/dons` pointe vers TransactionUniverselle filtrée
+11. Renommer table `dons` → `legacy_dons`
 
-1. Verrouillage automatique par `cashOutId`
-2. Contrôle d'intégrité (somme = 0)
+### Lot 3 — Migration des données cotisations → transactions
+
+Même logique que lot 2, appliquée aux cotisations :
+
+1. Migration SQL : chaque Cotisation → Transaction + TransactionLigne (avec `exercice` reporté)
+2. Adaptation de `SoldeService`, `RapprochementBancaireService`, `RapprochementDetail`
+3. Adaptation de `Dashboard` — requête membres sans cotisation via TransactionLigne
+4. Adaptation de `TransactionUniverselleService` — retirer la branche UNION cotisations
+5. Suppression de `CotisationForm`, `CotisationList`, `CotisationService`, `Cotisation` (modèle)
+6. Adaptation des relations sur `CompteBancaire`, `Tiers`, `RapprochementBancaire` — retirer `cotisations()`
+7. Adaptation de `routes/web.php` — route `/cotisations` pointe vers TransactionUniverselle filtrée
+8. Renommer table `cotisations` → `legacy_cotisations`
+9. Vérifier `BudgetService` — pas de doublon avec les données migrées
+
+### Lot 4 — Synchronisation HelloAsso : récupération et rapprochement tiers
+
+1. Service `HelloAssoApiClient` — encapsule l'authentification OAuth2 et les appels API (orders, cash-outs, forms)
+2. Écran de rapprochement des tiers — liste les personnes HelloAsso non liées, propose correspondances, permet associer/créer/ignorer
+3. Stockage du lien `helloasso_id` sur le Tiers (email normalisé comme clé)
+
+### Lot 5 — Synchronisation HelloAsso : rapprochement formulaires et import
+
+1. Écran de rapprochement des formulaires → opérations (associer/créer/ignorer)
+2. Configuration du mapping sous-catégories (Donation→sous-cat, Membership→sous-cat, Registration→sous-cat)
+3. Configuration compte HelloAsso + compte de versement
+4. `HelloAssoSyncService` — import des orders en transactions (étape 4 du workflow)
+5. Rapport de synchronisation (créés/mis à jour/ignorés/erreurs)
+
+### Lot 6 — Gestion des versements HelloAsso
+
+1. Import des cash-outs → VirementInterne (compte HelloAsso → compte courant)
+2. Marquage `helloasso_cashout_id` sur les transactions liées
+3. Contrôle d'intégrité : somme transactions = montant du virement
+
+### Lot 7 — Verrouillage versements (évolution)
+
+1. Verrouillage automatique des transactions par `cashOutId` (rapprochement auto-généré)
+2. UI de visualisation du verrouillage par versement
 
 ---
 
