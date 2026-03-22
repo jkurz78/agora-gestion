@@ -17,8 +17,9 @@ L'association utilise HelloAsso pour collecter en ligne des cotisations, des don
 - Les tables `dons` et `cotisations` sont **abandonnées**. Toutes les écritures (dons, cotisations, inscriptions, recettes, dépenses) passent par `transactions` + `transaction_lignes`.
 - La distinction don/cotisation/inscription est portée par la **sous-catégorie** (code CERFA) de la TransactionLigne.
 - Les flags `pour_dons` et `pour_cotisations` sur `sous_categories` restent pertinents pour guider la saisie et le filtrage.
-- `exercice` (cotisations) est dérivé de la date via `scopeForExercice()` — pas de champ dédié.
-- `recu_emis` et `objet` (dons) sont abandonnés dans l'immédiat. Les reçus fiscaux seront gérés dans un chantier séparé (table `documents_emis`), découplé de cette intégration.
+- `exercice` (cotisations) : un champ `exercice` nullable (integer) est ajouté sur `TransactionLigne` pour les lignes de type cotisation. Ce champ préserve l'attribution explicite d'une cotisation à un exercice, indépendamment de la date de paiement (un membre peut payer sa cotisation 2025 en septembre 2026). Pour les transactions issues de HelloAsso, l'exercice est dérivé de la date du formulaire d'adhésion. Le scope `forExercice()` sur les requêtes de cotisations filtre sur ce champ quand il est renseigné, et sur la date sinon.
+- `recu_emis` (dons) est abandonné dans l'immédiat. Les reçus fiscaux seront gérés dans un chantier séparé (table `documents_emis`), découplé de cette intégration.
+- `objet` (dons) : mappé vers le champ `libelle` de la Transaction lors de la migration (pas vers `notes`). C'est ce champ qui est affiché dans les listes.
 - Pas de nouvelle table pour les inscriptions — c'est une TransactionLigne avec la sous-catégorie appropriée et une `operation_id`.
 
 ### Mapping HelloAsso → SVS
@@ -40,7 +41,7 @@ L'association utilise HelloAsso pour collecter en ligne des cotisations, des don
 
 - Un versement HelloAsso regroupe N paiements en 1 virement bancaire vers l'association.
 - Le `cashOutId` HelloAsso est stocké sur les Transactions (`helloasso_cashout_id`) et sur le VirementInterne correspondant.
-- **Contrôle d'intégrité** : la somme des transactions portant un `cashOutId` donné + le montant du VirementInterne associé doit être = 0.
+- **Contrôle d'intégrité** : la somme des `montant_total` des transactions portant un `cashOutId` donné doit être égale au `montant` du VirementInterne associé (toutes les valeurs sont positives — c'est une égalité, pas une somme à zéro).
 - **Verrouillage automatique** : quand un versement est rapproché, toutes les transactions liées par le même `cashOutId` sont verrouillées ensemble (rapprochement auto-généré).
 
 ---
@@ -51,7 +52,7 @@ L'association utilise HelloAsso pour collecter en ligne des cotisations, des don
 
 | Colonne | Type | Contraintes | Description |
 |---|---|---|---|
-| `helloasso_order_id` | bigint | nullable, index | ID de la commande HelloAsso source |
+| `helloasso_order_id` | bigint | nullable, index composite unique avec `tiers_id` | ID de la commande HelloAsso source |
 | `helloasso_cashout_id` | bigint | nullable, index | ID du versement HelloAsso (cash-out) |
 
 ### Table `transaction_lignes` — colonnes ajoutées
@@ -59,6 +60,7 @@ L'association utilise HelloAsso pour collecter en ligne des cotisations, des don
 | Colonne | Type | Contraintes | Description |
 |---|---|---|---|
 | `helloasso_item_id` | bigint | nullable, unique | ID de l'item HelloAsso — clé d'idempotence |
+| `exercice` | integer | nullable | Exercice d'attribution (cotisations). Permet de dissocier l'exercice de la date de paiement. |
 
 ### Table `virements_internes` — colonnes ajoutées
 
@@ -70,7 +72,7 @@ L'association utilise HelloAsso pour collecter en ligne des cotisations, des don
 
 | Colonne | Type | Contraintes | Description |
 |---|---|---|---|
-| `pour_inscriptions` | boolean | default false | Flag pour les sous-catégories d'inscription à des opérations |
+| `pour_inscriptions` | boolean | default false | Flag pour les sous-catégories d'inscription à des opérations. Les trois flags `pour_dons`, `pour_cotisations`, `pour_inscriptions` sont mutuellement indépendants — une sous-catégorie peut en activer plusieurs si pertinent métier, mais l'UI de mapping HelloAsso filtre par flag correspondant au type d'item. |
 
 ### Enum `ModePaiement` — valeur ajoutée
 
@@ -82,8 +84,8 @@ L'association utilise HelloAsso pour collecter en ligne des cotisations, des don
 
 Les données des tables `dons` et `cotisations` doivent être migrées vers `transactions` + `transaction_lignes` avant suppression des tables. La migration :
 
-1. Pour chaque Don existant → crée une Transaction de type `recette` avec une TransactionLigne liée à la sous-catégorie du don. Champs mappés : `tiers_id`, `date`, `montant` → `montant_total`, `mode_paiement`, `compte_id`, `pointe`, `rapprochement_id`, `numero_piece`, `saisi_par`, `notes` (← `objet`), `deleted_at`. La TransactionLigne reprend `sous_categorie_id`, `operation_id`, `seance`, `montant`.
-2. Pour chaque Cotisation existante → même logique. `date_paiement` → `date`, pas d'`operation_id` ni `seance`.
+1. Pour chaque Don existant → crée une Transaction de type `recette` avec une TransactionLigne liée à la sous-catégorie du don. Champs mappés : `tiers_id`, `date`, `montant` → `montant_total`, `mode_paiement`, `compte_id`, `pointe`, `rapprochement_id`, `numero_piece`, `saisi_par`, `libelle` (← `objet`), `deleted_at`. La TransactionLigne reprend `sous_categorie_id`, `operation_id`, `seance`, `montant`.
+2. Pour chaque Cotisation existante → même logique. `date_paiement` → `date`, `libelle` ← `'Cotisation ' || exercice`, `saisi_par` ← null (la table cotisations ne porte pas ce champ), pas d'`operation_id` ni `seance`. Le champ `exercice` de la cotisation est reporté sur `transaction_lignes.exercice`.
 3. Les IDs de rapprochement (`rapprochement_id`) sont reportés sur la Transaction pour maintenir la cohérence du rapprochement bancaire.
 4. Les tables `dons` et `cotisations` sont conservées temporairement (renommées `legacy_dons`, `legacy_cotisations`) le temps de valider la migration, puis supprimées dans une migration ultérieure.
 
@@ -161,6 +163,19 @@ Ce mapping est paramétrable dans l'écran HelloAsso (extension de l'écran exis
 
 - Toutes les transactions issues de HelloAsso utilisent le mode de paiement `helloasso`.
 - On ne conserve pas le détail du moyen de paiement HelloAsso (CB, SEPA, etc.) car c'est HelloAsso qui encaisse, pas l'association.
+
+### Gestion de `saisi_par`
+
+- Les transactions créées par la synchronisation ont `saisi_par` = l'utilisateur connecté qui a déclenché la synchro.
+- Cela permet de tracer qui a importé les données dans l'audit trail.
+
+### Items à montant zéro
+
+- Les items HelloAsso avec `amount = 0` (inscriptions gratuites) sont importés normalement. Ils créent des TransactionLignes à 0,00 €, ce qui est comptablement correct (constatation d'une inscription sans flux financier).
+
+### Remboursements HelloAsso
+
+- Hors périmètre de cette version. Si un paiement est remboursé côté HelloAsso après synchronisation, la Transaction SVS conserve son montant original. Le trésorier doit gérer manuellement le remboursement dans SVS. Cette limitation est documentée dans l'écran de synchro.
 
 ---
 
@@ -287,6 +302,31 @@ Les rapports qui agrègent les dons (reçus fiscaux) doivent requêter `transact
 
 Ces formulaires sont **supprimés**. La saisie manuelle d'un don ou d'une cotisation se fait via TransactionForm, en choisissant la sous-catégorie appropriée.
 
+### Blast radius — fichiers impactés par l'unification (Phase 1)
+
+| Fichier | Action |
+|---|---|
+| `app/Models/Don.php` | Supprimer |
+| `app/Models/Cotisation.php` | Supprimer |
+| `app/Services/DonService.php` | Supprimer |
+| `app/Services/CotisationService.php` | Supprimer |
+| `app/Livewire/DonForm.php` | Supprimer |
+| `app/Livewire/CotisationForm.php` | Supprimer |
+| `app/Livewire/DonList.php` | Supprimer |
+| `app/Livewire/CotisationList.php` | Supprimer |
+| `app/Services/SoldeService.php` | Adapter — retirer les branches `dons()` et `cotisations()`, tout passe par `recettes()` |
+| `app/Services/RapprochementBancaireService.php` | Adapter — retirer les requêtes Don/Cotisation directes |
+| `app/Services/RapportService.php` | Adapter — requêter `transaction_lignes` jointes aux sous-catégories au lieu des tables `dons`/`cotisations` |
+| `app/Services/TransactionUniverselleService.php` | Simplifier — retirer les branches UNION dons/cotisations |
+| `app/Livewire/Dashboard.php` | Adapter — `Don::forExercice()` → requête TransactionLigne avec sous-cat `pour_dons`, cotisations idem |
+| `app/Livewire/RapprochementDetail.php` | Adapter — retirer les imports/références Don/Cotisation |
+| `app/Livewire/TransactionCompteList.php` | Adapter — retirer les références Don/Cotisation |
+| `app/Models/CompteBancaire.php` | Adapter — retirer les relations `dons()` et `cotisations()` |
+| `app/Models/Tiers.php` | Adapter — retirer les relations `dons()` et `cotisations()` |
+| `app/Models/RapprochementBancaire.php` | Adapter — retirer les relations `dons()` et `cotisations()` |
+| `routes/web.php` | Adapter — retirer les routes `/dons` et `/cotisations` dédiées |
+| `app/Services/BudgetService.php` | Vérifier — fonctionne déjà sur TransactionLigne, mais valider que les anciennes données don/cotisation non comptées en budget ne créent pas de doublon |
+
 ---
 
 ## Séquencement des chantiers
@@ -322,4 +362,5 @@ Ce projet se décompose en phases indépendantes et déployables séparément :
 - **Table `documents_emis`** (reçus fiscaux, factures) — chantier séparé
 - **Payeur HelloAsso** — non conservé dans le modèle SVS (récupérable via l'API si besoin)
 - **Détail du moyen de paiement HelloAsso** (CB vs SEPA) — non pertinent pour la compta de l'association
-- **Remboursements HelloAsso** — à traiter dans une évolution future
+- **Remboursements HelloAsso** — limitation connue : une transaction synchronisée puis remboursée côté HelloAsso conserve son montant original dans SVS (traitement manuel par le trésorier)
+- **Sync en job asynchrone** — pour la V1 la synchro est synchrone (requête Livewire). Si les volumes deviennent importants, une évolution vers un job queued avec barre de progression est envisageable
