@@ -52,7 +52,7 @@ final class TiersForm extends Component
         $this->reset([
             'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
             'adresse_ligne1', 'code_postal', 'ville', 'pays', 'date_naissance',
-            'pour_depenses', 'pour_recettes', 'showDetails',
+            'pour_depenses', 'pour_recettes', 'est_helloasso', 'showDetails',
         ]);
         $this->type = 'particulier';
         $this->pays = 'France';
@@ -105,7 +105,7 @@ final class TiersForm extends Component
         $this->reset([
             'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
             'adresse_ligne1', 'code_postal', 'ville', 'pays', 'date_naissance',
-            'pour_depenses', 'pour_recettes', 'showDetails',
+            'pour_depenses', 'pour_recettes', 'est_helloasso', 'showDetails',
         ]);
         $this->type = 'particulier';
         $this->pays = 'France';
@@ -121,7 +121,7 @@ final class TiersForm extends Component
         $this->reset([
             'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
             'adresse_ligne1', 'code_postal', 'ville', 'pays', 'date_naissance',
-            'pour_depenses', 'pour_recettes', 'showForm', 'showDetails',
+            'pour_depenses', 'pour_recettes', 'est_helloasso', 'showForm', 'showDetails',
         ]);
         $this->pays = 'France';
         $this->resetValidation();
