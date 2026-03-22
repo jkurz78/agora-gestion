@@ -25,7 +25,7 @@ Le badge **HA** dans la colonne Nom est déjà implémenté dans la branche `fea
 | Téléphone | **Téléphone** | Inchangé |
 | Dép. ✓ | **Dép.** ✓ | Inchangé |
 | Rec. ✓ | **Rec.** ✓ | Inchangé |
-| *(absent)* | **Ville** | Nouveau |
+| *(absent)* | **Ville** (`code_postal` + `ville`) | Nouveau |
 | Actions | **Actions** | Inchangé |
 
 Total : 7 colonnes → 7 colonnes (Type remplacé par Ville).
@@ -45,7 +45,11 @@ Total : 7 colonnes → 7 colonnes (Type remplacé par Ville).
 
 ### Colonne Ville
 
-- Affiche `$tiers->ville ?? '—'`
+- Affiche `code_postal` et `ville` sur une ligne : `75001 Paris`. Si seul l'un des deux est renseigné, on affiche ce qui existe. Si aucun : `—`.
+  ```blade
+  {{ trim(($tiers->code_postal ? $tiers->code_postal . ' ' : '') . ($tiers->ville ?? '')) ?: '—' }}
+  ```
+- Le tri porte sur `ville` (champ SQL). Trier sur `code_postal` serait équivalent géographiquement mais moins lisible en ordre inverse — `ville` est plus intuitif.
 - Triable
 
 ---
@@ -61,19 +65,20 @@ Total : 7 colonnes → 7 colonnes (Type remplacé par Ville).
 ### Recherche textuelle élargie
 
 Actuellement : `nom`, `prenom`.
-Après : `nom`, `prenom`, `entreprise`, `ville`, `email`.
+Après : `nom`, `prenom`, `entreprise`, `ville`, `code_postal`, `email`.
 
 ```php
 $query->where(function ($q): void {
-    $q->where('nom',         'like', "%{$this->search}%")
-      ->orWhere('prenom',    'like', "%{$this->search}%")
-      ->orWhere('entreprise','like', "%{$this->search}%")
-      ->orWhere('ville',     'like', "%{$this->search}%")
-      ->orWhere('email',     'like', "%{$this->search}%");
+    $q->where('nom',          'like', "%{$this->search}%")
+      ->orWhere('prenom',     'like', "%{$this->search}%")
+      ->orWhere('entreprise', 'like', "%{$this->search}%")
+      ->orWhere('ville',      'like', "%{$this->search}%")
+      ->orWhere('code_postal','like', "%{$this->search}%")
+      ->orWhere('email',      'like', "%{$this->search}%");
 });
 ```
 
-Cela permet de trouver "ACME" même si la raison sociale est dans `entreprise`, et de filtrer par ville.
+Cela permet de trouver "ACME" par raison sociale, de filtrer par ville ou par code postal (ex : "75" pour tous les tiers parisiens).
 
 ### Filtre HelloAsso
 
@@ -190,6 +195,7 @@ Aucun nouveau fichier. Aucune modification du modèle, du service, des routes, n
 |---|---|
 | Recherche sur `entreprise` | Un tiers entreprise "ACME Corp" remonte si on cherche "ACME" |
 | Recherche sur `ville` | Un tiers avec `ville = "Lyon"` remonte si on cherche "Lyon" |
+| Recherche sur `code_postal` | Un tiers avec `code_postal = "75001"` remonte si on cherche "75" |
 | Filtre HelloAsso actif | Seuls les tiers avec `helloasso_id` non null apparaissent |
 | Filtre HelloAsso inactif | Tous les tiers apparaissent (comportement par défaut) |
 | Tri par nom ASC | Ordre COALESCE(entreprise, nom) croissant |
