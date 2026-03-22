@@ -47,19 +47,18 @@ it('tiers table has new columns after migration', function () {
     expect(Schema::hasColumn('tiers', 'pays'))->toBeTrue();
     expect(Schema::hasColumn('tiers', 'entreprise'))->toBeTrue();
     expect(Schema::hasColumn('tiers', 'date_naissance'))->toBeTrue();
-    expect(Schema::hasColumn('tiers', 'helloasso_id'))->toBeTrue();
+    expect(Schema::hasColumn('tiers', 'est_helloasso'))->toBeTrue();
+    expect(Schema::hasColumn('tiers', 'helloasso_id'))->toBeFalse();
 });
 
-it('helloasso_id unique constraint allows multiple nulls', function () {
-    Tiers::factory()->create(['helloasso_id' => null, 'pour_depenses' => true]);
-    Tiers::factory()->create(['helloasso_id' => null, 'pour_depenses' => true]);
-    expect(Tiers::whereNull('helloasso_id')->count())->toBeGreaterThanOrEqual(2);
+it('est_helloasso defaults to false', function () {
+    $tiers = Tiers::factory()->create(['pour_depenses' => true]);
+    expect($tiers->est_helloasso)->toBeFalse();
 });
 
-it('helloasso_id unique constraint rejects duplicate non-null values', function () {
-    Tiers::factory()->create(['helloasso_id' => 'ha-123', 'pour_depenses' => true]);
-    expect(fn () => Tiers::factory()->create(['helloasso_id' => 'ha-123', 'pour_depenses' => true]))
-        ->toThrow(QueryException::class);
+it('est_helloasso can be set to true', function () {
+    $tiers = Tiers::factory()->avecHelloasso()->create(['pour_depenses' => true]);
+    expect($tiers->est_helloasso)->toBeTrue();
 });
 
 it('displayName returns entreprise field for entreprise type', function () {
@@ -79,12 +78,12 @@ it('can create tiers with all new fields', function () {
         'ville' => 'Paris',
         'pays' => 'France',
         'date_naissance' => '1990-05-15',
-        'helloasso_id' => 'ha-abc123',
+        'est_helloasso' => true,
         'pour_depenses' => true,
     ]);
     expect($tiers->entreprise)->toBe('ACME Corp');
     expect($tiers->code_postal)->toBe('75001');
     expect($tiers->pays)->toBe('France');
-    expect($tiers->helloasso_id)->toBe('ha-abc123');
+    expect($tiers->est_helloasso)->toBeTrue();
     expect($tiers->date_naissance)->toBeInstanceOf(Carbon::class);
 });

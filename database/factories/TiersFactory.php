@@ -28,6 +28,7 @@ final class TiersFactory extends Factory
             'ville' => fake()->optional()->city(),
             'pour_depenses' => fake()->boolean(60),
             'pour_recettes' => fake()->boolean(40),
+            'est_helloasso' => false,
         ];
     }
 
@@ -64,7 +65,7 @@ final class TiersFactory extends Factory
     public function avecHelloasso(): static
     {
         return $this->state([
-            'helloasso_id' => fake()->uuid(),
+            'est_helloasso' => true,
         ]);
     }
 }

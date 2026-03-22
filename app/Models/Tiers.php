@@ -26,7 +26,7 @@ final class Tiers extends Model
         'date_naissance',
         'pour_depenses',
         'pour_recettes',
-        'helloasso_id',
+        'est_helloasso',
     ];
 
     protected function casts(): array
@@ -34,6 +34,7 @@ final class Tiers extends Model
         return [
             'pour_depenses' => 'boolean',
             'pour_recettes' => 'boolean',
+            'est_helloasso' => 'boolean',
             'date_naissance' => 'date',
         ];
     }

@@ -26,8 +26,8 @@
                             <label class="form-check-label" for="type_entreprise">Entreprise</label>
                         </div>
                         @error('type') <span class="text-danger small">{{ $message }}</span> @enderror
-                        @if ($helloasso_id)
-                            <span class="ms-auto badge" style="background:#722281" title="Identifiant HelloAsso : {{ $helloasso_id }}">HelloAsso</span>
+                        @if ($est_helloasso)
+                            <span class="ms-auto badge" style="background:#722281" title="Tiers HelloAsso">HelloAsso</span>
                         @endif
                     </div>
 
