@@ -31,6 +31,8 @@ final class Transaction extends Model
         'saisi_par',
         'rapprochement_id',
         'numero_piece',
+        'helloasso_order_id',
+        'helloasso_cashout_id',
     ];
 
     protected function casts(): array
@@ -45,6 +47,8 @@ final class Transaction extends Model
             'compte_id'     => 'integer',
             'saisi_par'     => 'integer',
             'rapprochement_id' => 'integer',
+            'helloasso_order_id' => 'integer',
+            'helloasso_cashout_id' => 'integer',
         ];
     }
 
