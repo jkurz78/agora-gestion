@@ -26,7 +26,9 @@ Conserve :
 - Configuration comptes bancaires + mapping sous-catégories (partie haute de `helloasso-sync-config` — inchangée)
 
 Retire :
-- Le tableau mapping formulaires → opérations (déplacé vers le wizard)
+- Le tableau mapping formulaires → opérations (déplacé vers le wizard étape 1)
+- Le composant rapprochement des tiers (déplacé vers le wizard étape 2)
+- Le composant synchronisation (déplacé vers le wizard étape 3)
 
 ### Écran Synchronisation — "Synchronisation HelloAsso"
 
