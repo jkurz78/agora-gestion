@@ -101,35 +101,15 @@ it('fetches organization forms', function () {
     expect($forms[0]['formSlug'])->toBe('adhesion-2025');
 });
 
-it('extracts cash-outs from orders by grouping payments', function () {
-    $orders = [
-        [
-            'id' => 1,
-            'payments' => [
-                ['id' => 101, 'amount' => 3000, 'idCashOut' => 500, 'cashOutDate' => '2025-10-20T10:00:00+02:00', 'cashOutState' => 'CashedOut'],
-            ],
-        ],
-        [
-            'id' => 2,
-            'payments' => [
-                ['id' => 102, 'amount' => 2000, 'idCashOut' => 500, 'cashOutDate' => '2025-10-20T10:00:00+02:00', 'cashOutState' => 'CashedOut'],
-            ],
-        ],
-        [
-            'id' => 3,
-            'payments' => [
-                ['id' => 103, 'amount' => 1500, 'idCashOut' => 501, 'cashOutDate' => '2025-10-25T10:00:00+02:00', 'cashOutState' => 'CashedOut'],
-            ],
-        ],
-        [
-            'id' => 4,
-            'payments' => [
-                ['id' => 104, 'amount' => 1000, 'idCashOut' => null, 'cashOutState' => 'MoneyIn'],
-            ],
-        ],
+it('extracts cash-outs from payments by grouping by idCashOut', function () {
+    $payments = [
+        ['id' => 101, 'amount' => 3000, 'idCashOut' => 500, 'cashOutDate' => '2025-10-20T10:00:00+02:00', 'cashOutState' => 'CashedOut'],
+        ['id' => 102, 'amount' => 2000, 'idCashOut' => 500, 'cashOutDate' => '2025-10-20T10:00:00+02:00', 'cashOutState' => 'CashedOut'],
+        ['id' => 103, 'amount' => 1500, 'idCashOut' => 501, 'cashOutDate' => '2025-10-25T10:00:00+02:00', 'cashOutState' => 'CashedOut'],
+        ['id' => 104, 'amount' => 1000, 'idCashOut' => null, 'cashOutState' => 'MoneyIn'],
     ];
 
-    $cashOuts = HelloAssoApiClient::extractCashOutsFromOrders($orders);
+    $cashOuts = HelloAssoApiClient::extractCashOutsFromPayments($payments);
 
     expect($cashOuts)->toHaveCount(2);
 
@@ -143,20 +123,15 @@ it('extracts cash-outs from orders by grouping payments', function () {
 });
 
 it('ignores non-CashedOut payments when extracting cash-outs', function () {
-    $orders = [
-        [
-            'id' => 1,
-            'payments' => [
-                ['id' => 101, 'amount' => 3000, 'idCashOut' => 500, 'cashOutDate' => '2025-10-20', 'cashOutState' => 'TransferInProgress'],
-                ['id' => 102, 'amount' => 2000, 'idCashOut' => 500, 'cashOutDate' => '2025-10-20', 'cashOutState' => 'CashedOut'],
-            ],
-        ],
+    $payments = [
+        ['id' => 101, 'amount' => 3000, 'idCashOut' => 500, 'cashOutDate' => '2025-10-20', 'cashOutState' => 'TransferInProgress'],
+        ['id' => 102, 'amount' => 2000, 'idCashOut' => 500, 'cashOutDate' => '2025-10-20', 'cashOutState' => 'CashedOut'],
     ];
 
-    $cashOuts = HelloAssoApiClient::extractCashOutsFromOrders($orders);
+    $cashOuts = HelloAssoApiClient::extractCashOutsFromPayments($payments);
 
     expect($cashOuts)->toHaveCount(1);
-    expect($cashOuts[0]['amount'])->toBe(2000); // Only the CashedOut payment
+    expect($cashOuts[0]['amount'])->toBe(2000);
     expect($cashOuts[0]['payments'])->toHaveCount(1);
 });
 
