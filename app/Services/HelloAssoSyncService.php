@@ -100,9 +100,14 @@ final class HelloAssoSyncService
 
             DB::transaction(function () use ($order, $orderDate, $modePaiement, $tiers, $resolvedItems, $exercice, &$result) {
                 // Upsert Transaction (montant_total recalculated after lignes)
-                $existing = Transaction::where('helloasso_order_id', $order['id'])
+                $existing = Transaction::withTrashed()
+                    ->where('helloasso_order_id', $order['id'])
                     ->where('tiers_id', $tiers->id)
                     ->first();
+
+                if ($existing?->trashed()) {
+                    $existing->restore();
+                }
 
                 if ($existing) {
                     $existing->update([
