@@ -56,6 +56,42 @@ final class RapprochementBancaireService
     }
 
     /**
+     * Crée un rapprochement directement verrouillé (auto-généré par la sync HelloAsso).
+     * Ne vérifie pas s'il existe un rapprochement en cours — indépendant du workflow manuel.
+     *
+     * @param  list<int>  $transactionIds  IDs des transactions à pointer
+     */
+    public function createVerrouilleAuto(
+        CompteBancaire $compte,
+        string $dateFin,
+        float $soldeFin,
+        array $transactionIds,
+        int $virementId,
+    ): RapprochementBancaire {
+        return DB::transaction(function () use ($compte, $dateFin, $soldeFin, $transactionIds, $virementId) {
+            $rapprochement = RapprochementBancaire::create([
+                'compte_id' => $compte->id,
+                'date_fin' => $dateFin,
+                'solde_ouverture' => $this->calculerSoldeOuverture($compte),
+                'solde_fin' => $soldeFin,
+                'statut' => StatutRapprochement::Verrouille,
+                'verrouille_at' => now(),
+                'saisi_par' => auth()->id() ?? 1,
+            ]);
+
+            if (! empty($transactionIds)) {
+                Transaction::whereIn('id', $transactionIds)
+                    ->update(['rapprochement_id' => $rapprochement->id, 'pointe' => true]);
+            }
+
+            VirementInterne::where('id', $virementId)
+                ->update(['rapprochement_source_id' => $rapprochement->id]);
+
+            return $rapprochement;
+        });
+    }
+
+    /**
      * Calcule le solde pointé courant :
      * solde_ouverture + entrées pointées − sorties pointées.
      */
