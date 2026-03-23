@@ -35,8 +35,28 @@
                         @if($result['ordersSkipped'] > 0)
                             <li>Commandes ignorées : <strong>{{ $result['ordersSkipped'] }}</strong></li>
                         @endif
+                        @if(($result['virementsCreated'] ?? 0) > 0 || ($result['virementsUpdated'] ?? 0) > 0)
+                            <li>Virements : <strong>{{ $result['virementsCreated'] }} créé(s)</strong>, <strong>{{ $result['virementsUpdated'] }} mis à jour</strong></li>
+                        @endif
                     </ul>
                 </div>
+
+                @if(!empty($result['cashoutSkipped']))
+                    <div class="alert alert-info small">
+                        <i class="bi bi-info-circle me-1"></i> Versements non synchronisés : le compte de versement n'est pas configuré dans les paramètres HelloAsso.
+                    </div>
+                @endif
+
+                @if(!empty($result['integrityWarnings']))
+                    <div class="alert alert-warning">
+                        <strong><i class="bi bi-exclamation-triangle me-1"></i> Avertissements d'intégrité :</strong>
+                        <ul class="mb-0 mt-1">
+                            @foreach($result['integrityWarnings'] as $warning)
+                                <li class="small">{{ $warning }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
 
                 @if(count($result['errors']) > 0)
                     <div class="alert alert-danger">
