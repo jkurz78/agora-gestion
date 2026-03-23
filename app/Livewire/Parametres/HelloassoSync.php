@@ -73,23 +73,19 @@ final class HelloassoSync extends Component
             'cashoutSkipped' => false,
         ];
 
-        // Cashout sync — only if compte_versement_id is configured
+        // Cashout sync — extract cash-outs from the orders we already fetched
         if ($parametres->compte_versement_id === null) {
             $this->result['cashoutSkipped'] = true;
         } else {
-            try {
-                $cashOuts = $client->fetchCashOuts($from, $to);
-                $cashoutResult = $syncService->synchroniserCashouts($cashOuts);
+            $cashOuts = HelloAssoApiClient::extractCashOutsFromOrders($orders);
+            $cashoutResult = $syncService->synchroniserCashouts($cashOuts);
 
-                $this->result['virementsCreated'] = $cashoutResult['virements_created'];
-                $this->result['virementsUpdated'] = $cashoutResult['virements_updated'];
-                $this->result['integrityWarnings'] = $cashoutResult['integrity_warnings'];
+            $this->result['virementsCreated'] = $cashoutResult['virements_created'];
+            $this->result['virementsUpdated'] = $cashoutResult['virements_updated'];
+            $this->result['integrityWarnings'] = $cashoutResult['integrity_warnings'];
 
-                if (! empty($cashoutResult['errors'])) {
-                    $this->result['errors'] = array_merge($this->result['errors'], $cashoutResult['errors']);
-                }
-            } catch (\RuntimeException $e) {
-                $this->result['errors'][] = "Cashouts : {$e->getMessage()}";
+            if (! empty($cashoutResult['errors'])) {
+                $this->result['errors'] = array_merge($this->result['errors'], $cashoutResult['errors']);
             }
         }
     }
