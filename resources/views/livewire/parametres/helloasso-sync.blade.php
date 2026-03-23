@@ -38,6 +38,9 @@
                         @if(($result['virementsCreated'] ?? 0) > 0 || ($result['virementsUpdated'] ?? 0) > 0)
                             <li>Virements : <strong>{{ $result['virementsCreated'] }} créé(s)</strong>, <strong>{{ $result['virementsUpdated'] }} mis à jour</strong></li>
                         @endif
+                        @if(($result['rapprochementsCreated'] ?? 0) > 0)
+                            <li>Rapprochements auto : <strong>{{ $result['rapprochementsCreated'] }} créée(s)</strong></li>
+                        @endif
                     </ul>
                 </div>
 
@@ -47,11 +50,11 @@
                     </div>
                 @endif
 
-                @if(!empty($result['integrityWarnings']))
+                @if(!empty($result['cashoutsIncomplets']))
                     <div class="alert alert-warning">
-                        <strong><i class="bi bi-exclamation-triangle me-1"></i> Avertissements d'intégrité :</strong>
+                        <strong><i class="bi bi-exclamation-triangle me-1"></i> Versements incomplets :</strong>
                         <ul class="mb-0 mt-1">
-                            @foreach($result['integrityWarnings'] as $warning)
+                            @foreach($result['cashoutsIncomplets'] as $warning)
                                 <li class="small">{{ $warning }}</li>
                             @endforeach
                         </ul>
