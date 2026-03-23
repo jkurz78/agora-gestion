@@ -39,6 +39,8 @@ beforeEach(function () {
 });
 
 it('syncs orders and cashouts together and displays full report', function () {
+    $this->actingAs(User::first());
+
     Http::fake([
         '*/oauth2/token' => Http::response(['access_token' => 'fake-token'], 200),
         '*/v5/organizations/mon-asso/orders*' => Http::sequence()
