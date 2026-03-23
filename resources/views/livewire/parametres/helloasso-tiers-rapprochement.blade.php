@@ -69,17 +69,44 @@
                                         @endif
                                     </td>
                                     <td>
-                                        <div class="d-flex gap-1">
-                                            <button wire:click="creer('{{ $person['email'] }}')"
-                                                    class="btn btn-sm btn-outline-primary py-0 px-1"
-                                                    title="Créer un nouveau tiers">
-                                                <i class="bi bi-person-plus"></i> Créer
-                                            </button>
-                                            <button wire:click="ignorer('{{ $person['email'] }}')"
-                                                    class="btn btn-sm btn-outline-secondary py-0 px-1"
-                                                    title="Ignorer cette personne">
-                                                <i class="bi bi-x-lg"></i>
-                                            </button>
+                                        <div class="d-flex flex-column gap-1">
+                                            <div class="d-flex gap-1">
+                                                <button wire:click="creer('{{ $person['email'] }}')"
+                                                        class="btn btn-sm btn-outline-primary py-0 px-1"
+                                                        title="Créer un nouveau tiers">
+                                                    <i class="bi bi-person-plus"></i> Créer
+                                                </button>
+                                                <button wire:click="ignorer('{{ $person['email'] }}')"
+                                                        class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                        title="Ignorer pour cette session">
+                                                    <i class="bi bi-x-lg"></i> Ignorer
+                                                </button>
+                                            </div>
+                                            {{-- Recherche tiers existant --}}
+                                            <div class="input-group input-group-sm mt-1">
+                                                <input type="text"
+                                                       wire:model.defer="recherche.{{ $person['email'] }}"
+                                                       wire:keydown.enter="rechercherTiers('{{ $person['email'] }}')"
+                                                       class="form-control form-control-sm"
+                                                       placeholder="Chercher un tiers existant…">
+                                                <button wire:click="rechercherTiers('{{ $person['email'] }}')"
+                                                        class="btn btn-outline-secondary btn-sm" type="button">
+                                                    <i class="bi bi-search"></i>
+                                                </button>
+                                            </div>
+                                            @if(!empty($resultatsRecherche[$person['email']]))
+                                                <div class="list-group list-group-flush small">
+                                                    @foreach($resultatsRecherche[$person['email']] as $res)
+                                                        <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-1 px-2">
+                                                            <span>{{ $res['name'] }}</span>
+                                                            <button wire:click="associer('{{ $person['email'] }}', {{ $res['id'] }})"
+                                                                    class="btn btn-sm btn-outline-success py-0 px-1">
+                                                                <i class="bi bi-link-45deg"></i>
+                                                            </button>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>

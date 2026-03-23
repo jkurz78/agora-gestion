@@ -20,22 +20,36 @@ final class HelloAssoTiersResolver
         $seen = [];
 
         foreach ($orders as $order) {
-            $person = $order['user'] ?? $order['payer'] ?? null;
-            if ($person === null) {
-                continue;
+            $persons = [];
+
+            // Extract per-item beneficiaries (user on each item)
+            foreach ($order['items'] ?? [] as $item) {
+                if (isset($item['user']['email']) && $item['user']['email'] !== '') {
+                    $persons[] = $item['user'];
+                }
             }
 
-            $email = strtolower(trim($person['email'] ?? ''));
-            if ($email === '') {
-                continue;
+            // Fallback to order-level user/payer if no per-item users found
+            if ($persons === []) {
+                $person = $order['user'] ?? $order['payer'] ?? null;
+                if ($person !== null) {
+                    $persons[] = $person;
+                }
             }
 
-            if (! isset($seen[$email])) {
-                $seen[$email] = [
-                    'firstName' => $person['firstName'] ?? '',
-                    'lastName' => $person['lastName'] ?? '',
-                    'email' => $email,
-                ];
+            foreach ($persons as $person) {
+                $email = strtolower(trim($person['email'] ?? ''));
+                if ($email === '') {
+                    continue;
+                }
+
+                if (! isset($seen[$email])) {
+                    $seen[$email] = [
+                        'firstName' => $person['firstName'] ?? '',
+                        'lastName' => $person['lastName'] ?? '',
+                        'email' => $email,
+                    ];
+                }
             }
         }
 

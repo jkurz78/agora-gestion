@@ -29,6 +29,12 @@ final class HelloassoTiersRapprochement extends Component
 
     public ?string $erreur = null;
 
+    /** @var array<string, string> Recherche par email de personne */
+    public array $recherche = [];
+
+    /** @var array<string, list<array{id: int, name: string}>> Résultats de recherche */
+    public array $resultatsRecherche = [];
+
     public function mount(): void
     {
         $this->exercice = app(ExerciceService::class)->current();
@@ -80,6 +86,29 @@ final class HelloassoTiersRapprochement extends Component
                 }
             }
         }
+    }
+
+    public function rechercherTiers(string $email): void
+    {
+        $query = trim($this->recherche[$email] ?? '');
+        if (mb_strlen($query) < 2) {
+            $this->resultatsRecherche[$email] = [];
+
+            return;
+        }
+
+        $results = Tiers::where(function ($q) use ($query) {
+            $q->where('nom', 'like', "%{$query}%")
+                ->orWhere('prenom', 'like', "%{$query}%")
+                ->orWhere('email', 'like', "%{$query}%")
+                ->orWhere('entreprise', 'like', "%{$query}%");
+        })
+            ->limit(10)
+            ->get()
+            ->map(fn (Tiers $t) => ['id' => $t->id, 'name' => $t->displayName()])
+            ->all();
+
+        $this->resultatsRecherche[$email] = $results;
     }
 
     public function associer(string $email, int $tiersId): void
