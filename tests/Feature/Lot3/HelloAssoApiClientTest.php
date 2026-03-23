@@ -101,6 +101,27 @@ it('fetches organization forms', function () {
     expect($forms[0]['formSlug'])->toBe('adhesion-2025');
 });
 
+it('fetches cash-outs with pagination', function () {
+    Http::fake([
+        '*/oauth2/token' => Http::response(['access_token' => 'fake-token'], 200),
+        '*/v5/organizations/mon-asso/cash-outs*' => Http::sequence()
+            ->push([
+                'data' => [
+                    ['id' => 1, 'date' => '2025-10-15T10:00:00+02:00', 'amount' => 50000, 'payments' => [['id' => 101, 'amount' => 50000]]],
+                ],
+                'pagination' => ['continuationToken' => 'next'],
+            ])
+            ->push(['data' => [], 'pagination' => []]),
+    ]);
+
+    $client = new HelloAssoApiClient($this->parametres);
+    $cashOuts = $client->fetchCashOuts('2025-09-01', '2026-08-31');
+
+    expect($cashOuts)->toHaveCount(1);
+    expect($cashOuts[0]['id'])->toBe(1);
+    expect($cashOuts[0]['payments'])->toHaveCount(1);
+});
+
 it('throws on authentication failure', function () {
     Http::fake([
         '*/oauth2/token' => Http::response(['error' => 'invalid_client'], 401),
