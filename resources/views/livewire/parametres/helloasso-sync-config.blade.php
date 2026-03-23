@@ -91,6 +91,8 @@
                         <tr>
                             <th>Formulaire</th>
                             <th>Type</th>
+                            <th>Période</th>
+                            <th>Statut</th>
                             <th>Opération SVS</th>
                         </tr>
                     </thead>
@@ -99,6 +101,30 @@
                             <tr wire:key="fm-{{ $fm->id }}">
                                 <td class="small">{{ $fm->form_title ?? $fm->form_slug }}<br><code class="text-muted">{{ $fm->form_slug }}</code></td>
                                 <td class="small"><span class="badge text-bg-secondary">{{ $fm->form_type }}</span></td>
+                                <td class="small text-nowrap">
+                                    @if($fm->start_date || $fm->end_date)
+                                        {{ $fm->start_date?->format('d/m/Y') ?? '—' }}
+                                        → {{ $fm->end_date?->format('d/m/Y') ?? '…' }}
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td class="small">
+                                    @if($fm->state)
+                                        @php
+                                            $badgeClass = match($fm->state) {
+                                                'Public' => 'text-bg-success',
+                                                'Draft' => 'text-bg-warning',
+                                                'Private' => 'text-bg-info',
+                                                'Disabled' => 'text-bg-danger',
+                                                default => 'text-bg-secondary',
+                                            };
+                                        @endphp
+                                        <span class="badge {{ $badgeClass }}">{{ $fm->state }}</span>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
                                 <td>
                                     <select wire:model="formOperations.{{ $fm->id }}" class="form-select form-select-sm">
                                         <option value="">Ne pas suivre ce formulaire comme une opération</option>
