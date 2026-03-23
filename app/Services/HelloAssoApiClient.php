@@ -59,18 +59,53 @@ final class HelloAssoApiClient
     }
 
     /**
-     * Fetch all cash-outs for a date range, handling pagination.
+     * Extract cash-outs from orders by grouping payments by idCashOut.
      *
-     * @return list<array<string, mixed>>
+     * HelloAsso API has no list endpoint for cash-outs — the data lives
+     * on payment objects (idCashOut, cashOutDate, cashOutState).
+     *
+     * @param  list<array<string, mixed>>  $orders
+     * @return list<array{id: int, date: string, amount: int, payments: list<array{id: int}>}>
      */
-    public function fetchCashOuts(string $from, string $to): array
+    public static function extractCashOutsFromOrders(array $orders): array
     {
-        $this->authenticate();
+        $groups = []; // idCashOut → [date, totalCents, paymentIds[]]
 
-        return $this->fetchPaginated(
-            "/v5/organizations/{$this->organisationSlug}/cash-outs",
-            ['from' => $from, 'to' => $to],
-        );
+        foreach ($orders as $order) {
+            foreach ($order['payments'] ?? [] as $payment) {
+                $cashOutId = $payment['idCashOut'] ?? null;
+                if ($cashOutId === null) {
+                    continue;
+                }
+                $state = $payment['cashOutState'] ?? null;
+                if ($state !== 'CashedOut') {
+                    continue; // Only process completed cash-outs
+                }
+
+                if (! isset($groups[$cashOutId])) {
+                    $groups[$cashOutId] = [
+                        'date' => $payment['cashOutDate'] ?? $payment['date'] ?? now()->toIso8601String(),
+                        'totalCents' => 0,
+                        'payments' => [],
+                    ];
+                }
+
+                $groups[$cashOutId]['totalCents'] += $payment['amount'] ?? 0;
+                $groups[$cashOutId]['payments'][] = ['id' => $payment['id']];
+            }
+        }
+
+        $result = [];
+        foreach ($groups as $cashOutId => $group) {
+            $result[] = [
+                'id' => $cashOutId,
+                'date' => $group['date'],
+                'amount' => $group['totalCents'],
+                'payments' => $group['payments'],
+            ];
+        }
+
+        return $result;
     }
 
     private function authenticate(): void

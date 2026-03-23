@@ -89,12 +89,30 @@ it('uses payer as fallback when order has no items', function () {
     expect($persons[0]['email'])->toBe('paul@test.com');
 });
 
-it('skips items with no user or empty lastName', function () {
+it('falls back to order payer when item has no user', function () {
     $orders = [
         [
-            'payer' => ['firstName' => 'X', 'lastName' => 'Y', 'email' => 'x@test.com'],
+            'payer' => ['firstName' => 'Virginie', 'lastName' => 'Delaporte', 'email' => 'v@test.com'],
             'items' => [
                 ['name' => 'Item sans user'],
+            ],
+        ],
+    ];
+
+    $resolver = new HelloAssoTiersResolver;
+    $persons = $resolver->extractPersons($orders);
+
+    expect($persons)->toHaveCount(1);
+    expect($persons[0]['firstName'])->toBe('Virginie');
+    expect($persons[0]['lastName'])->toBe('Delaporte');
+    expect($persons[0]['email'])->toBe('v@test.com');
+});
+
+it('skips items with empty lastName even after fallback', function () {
+    $orders = [
+        [
+            'payer' => ['firstName' => 'X', 'lastName' => '', 'email' => 'x@test.com'],
+            'items' => [
                 ['user' => ['firstName' => 'A', 'lastName' => '']],
             ],
         ],
