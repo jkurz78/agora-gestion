@@ -72,7 +72,7 @@ final class HelloassoTiersRapprochement extends Component
         // Map extracted persons by key for payer data lookup
         $personDataByKey = [];
         foreach ($extractedPersons as $p) {
-            $key = strtolower($p['lastName']) . '|' . strtolower($p['firstName']);
+            $key = strtolower($p['lastName']).'|'.strtolower($p['firstName']);
             $personDataByKey[$key] = $p;
         }
 
@@ -83,7 +83,7 @@ final class HelloassoTiersRapprochement extends Component
                 $suggestedId = $person['suggestions'][0]['tiers_id'];
             }
 
-            $key = strtolower($person['lastName']) . '|' . strtolower($person['firstName']);
+            $key = strtolower($person['lastName']).'|'.strtolower($person['firstName']);
             $data = $personDataByKey[$key] ?? [];
 
             $this->persons[] = [
