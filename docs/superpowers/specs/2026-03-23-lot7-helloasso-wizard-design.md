@@ -31,6 +31,7 @@ Retire :
 ### Écran Synchronisation — "Synchronisation HelloAsso"
 
 **Route** : `/banques/helloasso-sync` (nouvelle)
+**Nom de route** : `banques.helloasso-sync`
 **Menu** : Banques, en bas du dropdown :
 
 ```
@@ -43,32 +44,43 @@ Banques
 └── Comptes bancaires
 ```
 
+La condition `active` du dropdown Banques dans `app.blade.php` doit inclure `request()->routeIs('banques.helloasso-sync')`.
+
 **Composant** : `HelloassoSyncWizard` — un seul composant Livewire avec propriété `$step`.
 
 ## Exercice
 
 Pas de sélecteur d'exercice dans le wizard. L'exercice actif est celui de la session, lu via `ExerciceService::current()`, cohérent avec le reste de l'application.
 
+Contrairement aux composants actuels `HelloassoTiersRapprochement` et `HelloassoSync` qui affichent un sélecteur d'exercice, le wizard n'en a pas. Le sélecteur d'exercice global dans la barre de navigation contrôle l'exercice pour toute l'application.
+
+## Pré-requis : credentials
+
+Avant tout auto-fetch (étape 1 au mount), le wizard vérifie que les `HelloAssoParametres` existent et ont des credentials valides (`client_id` non null). Si ce n'est pas le cas, le wizard affiche un avertissement inline : _"Les credentials HelloAsso ne sont pas encore configurés."_ avec un lien vers Paramètres → Connexion HelloAsso. Aucun appel API n'est tenté.
+
 ## Layout : accordéon à 3 étapes
 
 Les 3 étapes sont affichées comme des cards empilées. L'étape active est ouverte (bordure accentuée, contenu visible). Les étapes terminées sont repliées avec un résumé compact. Les étapes futures sont grisées.
 
-Cliquer sur une étape terminée la réouvre (sans relancer l'auto-fetch — les données sont déjà chargées).
+Cliquer sur une étape terminée la réouvre sans relancer l'auto-fetch (les données restent en cache dans les propriétés Livewire).
 
 ## Étape 1 — Mapping Formulaires → Opérations
 
 ### Comportement
 
-1. **Auto-fetch** au mount du composant : appel API `chargerFormulaires()` pour récupérer les formulaires HelloAsso et upsert les `HelloAssoFormMapping`
+1. **Auto-fetch** au mount du composant : appel API `chargerFormulaires()` pour récupérer les formulaires HelloAsso et upsert les `HelloAssoFormMapping`. Spinner pendant le chargement.
 2. **Filtre** : afficher uniquement les formulaires dont `date_fin` est `null` OU `>= date début de l'exercice courant`. Les anciens formulaires avec un mapping restent en base mais ne s'affichent plus.
 3. **Tableau** : titre, type, période, état, dropdown opération (valeur par défaut "Ne pas suivre")
-4. **Bouton "+" créer opération** : à côté du dropdown, ouvre un formulaire inline ou modal avec les champs pré-remplis depuis le formulaire HelloAsso :
-   - `nom` ← titre du formulaire
+4. **Bouton "+" créer opération** : à côté du dropdown de chaque ligne, ouvre un formulaire inline (ligne supplémentaire dans le tableau ou section dépliable sous la ligne) avec les champs pré-remplis depuis le formulaire HelloAsso :
+   - `nom` ← titre du formulaire (requis)
    - `date_debut` ← date début du formulaire
    - `date_fin` ← date fin du formulaire
-   - `description`, `nombre_seances`, `statut` ← valeurs par défaut
-   - L'opération créée est automatiquement sélectionnée dans le dropdown
-5. **Bouton "Suite →"** : sauvegarde les mappings et passe à l'étape 2
+   - `description` ← vide (optionnel)
+   - `nombre_seances` ← null (optionnel)
+   - `statut` ← "active" par défaut
+   - Validation : `nom` requis, `date_debut` requise
+   - L'opération créée est automatiquement sélectionnée dans le dropdown de cette ligne
+5. **Bouton "Suite →"** : sauvegarde les mappings et passe à l'étape 2. Zéro formulaire mappé est un état valide (le bouton est toujours actif).
 
 ### Résumé replié
 
@@ -78,7 +90,7 @@ Exemple : "8 formulaires, 3 mappés"
 
 ### Comportement
 
-1. **Auto-fetch** à l'ouverture de l'étape : appel API pour récupérer les tiers HelloAsso de l'exercice
+1. **Auto-fetch** la première fois que l'étape devient active (garde `$tiersFetched` pour ne pas relancer à la réouverture) : appel API pour récupérer les tiers HelloAsso de l'exercice. Spinner pendant le chargement.
 2. **Affichage** : uniquement les tiers **non liés**. La liste des tiers déjà liés est supprimée (pas de valeur ajoutée sans possibilité de délier).
 3. Pour chaque tiers non lié :
    - Nom + email HelloAsso
@@ -95,7 +107,7 @@ Exemple : "3 tiers à lier" ou "Tous les tiers liés"
 
 ### Comportement
 
-1. La synchro est **déclenchée automatiquement** par le bouton de l'étape 2
+1. La synchro est **déclenchée automatiquement** par le bouton de l'étape 2. L'exécution est **synchrone** (acceptable à l'échelle de l'association : quelques centaines de transactions max).
 2. Spinner pendant l'exécution
 3. Affichage du rapport :
    - Transactions créées / mises à jour
@@ -104,6 +116,7 @@ Exemple : "3 tiers à lier" ou "Tous les tiers liés"
    - Rapprochements auto-verrouillés
    - Cashouts incomplets (filtrés par exercice courant uniquement)
    - Erreurs éventuelles
+4. Si la synchro est relancée (retour étape 2 → re-clic "Lancer la synchronisation"), le résultat précédent est effacé et remplacé par le nouveau.
 
 ### Résumé replié
 
@@ -115,14 +128,26 @@ Exemple : "22 mises à jour, 1 rapprochement"
 - `HelloassoForm` — credentials API
 
 ### À modifier
-- `HelloassoSyncConfig` — retirer le bloc mapping formulaires (ne garde que comptes + sous-catégories)
+- `HelloassoSyncConfig` — retirer le bloc mapping formulaires (ne garde que comptes + sous-catégories). Le composant et sa vue continuent d'exister, seule la section formulaires est supprimée.
 
 ### À supprimer (absorbés dans le wizard)
 - `HelloassoTiersRapprochement` — logique absorbée dans le wizard étape 2
 - `HelloassoSync` — logique absorbée dans le wizard étape 3
 
 ### À créer
-- `HelloassoSyncWizard` — nouveau composant unique pour les 3 étapes
+- `HelloassoSyncWizard` — nouveau composant Livewire dans `App\Livewire\Banques\HelloassoSyncWizard`, avec sa vue dans `resources/views/livewire/banques/helloasso-sync-wizard.blade.php`
+
+## Vue wrapper
+
+Nouvelle vue `resources/views/banques/helloasso-sync.blade.php` :
+```blade
+<x-app-layout>
+    <div class="container py-3">
+        <h1 class="mb-4"><i class="bi bi-arrow-repeat"></i> Synchronisation HelloAsso</h1>
+        <livewire:banques.helloasso-sync-wizard />
+    </div>
+</x-app-layout>
+```
 
 ## Navigation
 
