@@ -177,16 +177,11 @@ final class HelloassoTiersRapprochement extends Component
 
     public function render(): View
     {
-        $allTiers = Tiers::orderBy('nom')->orderBy('prenom')->get()
-            ->map(fn (Tiers $t) => ['id' => $t->id, 'name' => $t->displayName()])
-            ->all();
-
         $linkedCount = collect($this->persons)->whereNotNull('tiers_id')->count();
         $unlinkedCount = collect($this->persons)->whereNull('tiers_id')->count();
 
         return view('livewire.parametres.helloasso-tiers-rapprochement', [
             'exercices' => app(ExerciceService::class)->available(5),
-            'allTiers' => $allTiers,
             'linkedCount' => $linkedCount,
             'unlinkedCount' => $unlinkedCount,
         ]);
