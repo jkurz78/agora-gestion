@@ -43,10 +43,11 @@ final class HelloassoSync extends Component
             return;
         }
 
+        $exerciceService = app(ExerciceService::class);
+
         try {
             $client = new HelloAssoApiClient($parametres);
 
-            $exerciceService = app(ExerciceService::class);
             $range = $exerciceService->dateRange($this->exercice);
             $from = $range['start']->toDateString();
             $to = $range['end']->toDateString();
@@ -69,24 +70,33 @@ final class HelloassoSync extends Component
             'errors' => $syncResult->errors,
             'virementsCreated' => 0,
             'virementsUpdated' => 0,
-            'integrityWarnings' => [],
+            'rapprochementsCreated' => 0,
+            'cashoutsIncomplets' => [],
             'cashoutSkipped' => false,
         ];
 
-        // Cashout sync — fetch payments (which have idCashOut) and extract cash-outs
+        // Cashout sync — fetch payments with extended range (N-1 → N)
         if ($parametres->compte_versement_id === null) {
             $this->result['cashoutSkipped'] = true;
         } else {
-            $payments = $client->fetchPayments($from, $to);
-            $cashOuts = HelloAssoApiClient::extractCashOutsFromPayments($payments);
-            $cashoutResult = $syncService->synchroniserCashouts($cashOuts);
+            try {
+                $rangePrev = $exerciceService->dateRange($this->exercice - 1);
+                $paymentsFrom = $rangePrev['start']->toDateString();
 
-            $this->result['virementsCreated'] = $cashoutResult['virements_created'];
-            $this->result['virementsUpdated'] = $cashoutResult['virements_updated'];
-            $this->result['integrityWarnings'] = $cashoutResult['integrity_warnings'];
+                $payments = $client->fetchPayments($paymentsFrom, $to);
+                $cashOuts = HelloAssoApiClient::extractCashOutsFromPayments($payments);
+                $cashoutResult = $syncService->synchroniserCashouts($cashOuts);
 
-            if (! empty($cashoutResult['errors'])) {
-                $this->result['errors'] = array_merge($this->result['errors'], $cashoutResult['errors']);
+                $this->result['virementsCreated'] = $cashoutResult['virements_created'];
+                $this->result['virementsUpdated'] = $cashoutResult['virements_updated'];
+                $this->result['rapprochementsCreated'] = $cashoutResult['rapprochements_created'];
+                $this->result['cashoutsIncomplets'] = $cashoutResult['cashouts_incomplets'];
+
+                if (! empty($cashoutResult['errors'])) {
+                    $this->result['errors'] = array_merge($this->result['errors'], $cashoutResult['errors']);
+                }
+            } catch (\RuntimeException $e) {
+                $this->result['errors'][] = "Cashouts : {$e->getMessage()}";
             }
         }
     }
