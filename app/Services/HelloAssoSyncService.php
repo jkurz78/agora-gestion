@@ -83,8 +83,8 @@ final class HelloAssoSyncService
             $firstName = $group['firstName'];
             $lastName = $group['lastName'];
 
-            $tiers = Tiers::whereRaw('LOWER(nom) = ?', [strtolower($lastName)])
-                ->whereRaw('LOWER(prenom) = ?', [strtolower($firstName)])
+            $tiers = Tiers::whereRaw('LOWER(helloasso_nom) = ?', [strtolower($lastName)])
+                ->whereRaw('LOWER(helloasso_prenom) = ?', [strtolower($firstName)])
                 ->where('est_helloasso', true)
                 ->first();
             if ($tiers === null) {

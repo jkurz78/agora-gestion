@@ -133,6 +133,8 @@ final class HelloassoTiersRapprochement extends Component
 
         $tiers->update([
             'est_helloasso' => true,
+            'helloasso_nom' => $person['lastName'],
+            'helloasso_prenom' => $person['firstName'],
         ]);
 
         $this->persons[$index]['tiers_id'] = $tiers->id;
@@ -156,6 +158,8 @@ final class HelloassoTiersRapprochement extends Component
             'code_postal' => $person['zipCode'],
             'pays' => $person['country'],
             'est_helloasso' => true,
+            'helloasso_nom' => $person['lastName'],
+            'helloasso_prenom' => $person['firstName'],
             'pour_recettes' => true,
         ]);
 
