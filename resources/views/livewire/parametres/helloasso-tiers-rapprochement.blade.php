@@ -51,17 +51,16 @@
                                         @if($person['tiers_id'])
                                             <span class="badge text-bg-success"><i class="bi bi-check-lg me-1"></i>{{ $person['tiers_name'] }}</span>
                                         @else
-                                            <select wire:model="selectedTiers.{{ $person['email'] }}" class="form-select form-select-sm">
-                                                <option value="">— Sélectionner un tiers —</option>
-                                                @foreach($allTiers as $t)
-                                                    <option value="{{ $t['id'] }}">{{ $t['name'] }}</option>
-                                                @endforeach
-                                            </select>
+                                            <livewire:tiers-autocomplete
+                                                wire:model.live="selectedTiers.{{ $person['email'] }}"
+                                                filtre="recettes"
+                                                :key="'rapprochement-'.$person['email']"
+                                            />
                                         @endif
                                     </td>
                                     <td>
                                         @if(!$person['tiers_id'])
-                                            <div class="d-flex gap-1">
+                                            <div class="d-flex flex-column gap-1">
                                                 @if(!empty($selectedTiers[$person['email']]))
                                                     <button wire:click="associer('{{ $person['email'] }}')"
                                                             class="btn btn-sm btn-outline-success py-0 px-2">
