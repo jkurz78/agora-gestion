@@ -52,22 +52,20 @@
                                             <span class="badge text-bg-success"><i class="bi bi-check-lg me-1"></i>{{ $person['tiers_name'] }}</span>
                                         @else
                                             <livewire:tiers-autocomplete
-                                                wire:model.live="selectedTiers.{{ $person['email'] }}"
+                                                wire:model.live="selectedTiers.{{ $loop->index }}"
                                                 filtre="recettes"
-                                                :key="'rapprochement-'.$person['email']"
+                                                :key="'rapprochement-'.$loop->index"
                                             />
                                         @endif
                                     </td>
                                     <td>
                                         @if(!$person['tiers_id'])
                                             <div class="d-flex flex-column gap-1">
-                                                @if(!empty($selectedTiers[$person['email']]))
-                                                    <button wire:click="associer('{{ $person['email'] }}')"
-                                                            class="btn btn-sm btn-outline-success py-0 px-2">
-                                                        <i class="bi bi-link-45deg me-1"></i>Associer
-                                                    </button>
-                                                @endif
-                                                <button wire:click="creer('{{ $person['email'] }}')"
+                                                <button wire:click="associer({{ $loop->index }})"
+                                                        class="btn btn-sm btn-outline-success py-0 px-2">
+                                                    <i class="bi bi-link-45deg me-1"></i>Associer
+                                                </button>
+                                                <button wire:click="creer({{ $loop->index }})"
                                                         class="btn btn-sm btn-outline-primary py-0 px-2"
                                                         title="Créer un nouveau tiers à partir des données HelloAsso">
                                                     <i class="bi bi-person-plus me-1"></i>Ajouter depuis HelloAsso
