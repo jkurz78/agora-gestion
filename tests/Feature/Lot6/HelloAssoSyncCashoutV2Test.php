@@ -133,11 +133,22 @@ it('updates helloasso_cashout_id on transactions even when incomplete', function
 });
 
 it('skips already-processed cashouts (idempotent)', function () {
+    $rapprochement = RapprochementBancaire::create([
+        'compte_id' => $this->compteHA->id,
+        'date_fin' => '2025-10-20',
+        'solde_ouverture' => 0,
+        'solde_fin' => 0,
+        'statut' => StatutRapprochement::Verrouille,
+        'verrouille_at' => now(),
+        'saisi_par' => User::first()->id,
+    ]);
+
     VirementInterne::factory()->create([
         'helloasso_cashout_id' => 3004,
         'compte_source_id' => $this->compteHA->id,
         'compte_destination_id' => $this->compteCourant->id,
         'montant' => 75.00,
+        'rapprochement_source_id' => $rapprochement->id,
         'saisi_par' => User::first()->id,
     ]);
 
@@ -156,6 +167,49 @@ it('skips already-processed cashouts (idempotent)', function () {
     expect($result['virements_created'])->toBe(0);
     expect($result['rapprochements_created'])->toBe(0);
     expect(VirementInterne::where('helloasso_cashout_id', 3004)->count())->toBe(1);
+});
+
+it('creates rapprochement for existing virement without one (transitional)', function () {
+    $tx = Transaction::factory()->create([
+        'compte_id' => $this->compteHA->id,
+        'type' => 'recette',
+        'montant_total' => 75.00,
+        'helloasso_payment_id' => 501,
+        'saisi_par' => User::first()->id,
+    ]);
+
+    $existingVirement = VirementInterne::factory()->create([
+        'helloasso_cashout_id' => 3005,
+        'compte_source_id' => $this->compteHA->id,
+        'compte_destination_id' => $this->compteCourant->id,
+        'montant' => 75.00,
+        'rapprochement_source_id' => null,
+        'saisi_par' => User::first()->id,
+    ]);
+
+    $cashOuts = [
+        [
+            'id' => 3005,
+            'date' => '2025-10-20T10:00:00+02:00',
+            'amount' => 7500,
+            'payments' => [['id' => 501]],
+        ],
+    ];
+
+    $service = new HelloAssoSyncService($this->parametres);
+    $result = $service->synchroniserCashouts($cashOuts);
+
+    // Virement not re-created, but rapprochement created
+    expect($result['virements_created'])->toBe(0);
+    expect($result['rapprochements_created'])->toBe(1);
+    expect(VirementInterne::where('helloasso_cashout_id', 3005)->count())->toBe(1);
+
+    $rapprochement = RapprochementBancaire::where('compte_id', $this->compteHA->id)
+        ->where('statut', StatutRapprochement::Verrouille)
+        ->first();
+    expect($rapprochement)->not->toBeNull();
+    expect($existingVirement->fresh()->rapprochement_source_id)->toBe($rapprochement->id);
+    expect($tx->fresh()->rapprochement_id)->toBe($rapprochement->id);
 });
 
 it('processes multiple cashouts in chronological order', function () {
