@@ -17,15 +17,12 @@ final class HelloassoTiersRapprochement extends Component
     public int $exercice;
 
     /**
-     * @var list<array{email: string, firstName: string, lastName: string, tiers_id: ?int, tiers_name: ?string}>
+     * @var list<array{firstName: string, lastName: string, email: ?string, address: ?string, city: ?string, zipCode: ?string, country: ?string, tiers_id: ?int, tiers_name: ?string}>
      */
     public array $persons = [];
 
     /** @var array<int, ?int> index → selected tiers_id */
     public array $selectedTiers = [];
-
-    /** @var array<string, array> Données payer indexées par email, pour la création */
-    public array $payerData = [];
 
     public bool $fetched = false;
 
@@ -72,6 +69,13 @@ final class HelloassoTiersRapprochement extends Component
         $this->selectedTiers = [];
         $index = 0;
 
+        // Map extracted persons by key for payer data lookup
+        $personDataByKey = [];
+        foreach ($extractedPersons as $p) {
+            $key = strtolower($p['lastName']) . '|' . strtolower($p['firstName']);
+            $personDataByKey[$key] = $p;
+        }
+
         // Unlinked persons (sorted first)
         foreach ($result['unlinked'] as $person) {
             $suggestedId = null;
@@ -79,10 +83,17 @@ final class HelloassoTiersRapprochement extends Component
                 $suggestedId = $person['suggestions'][0]['tiers_id'];
             }
 
+            $key = strtolower($person['lastName']) . '|' . strtolower($person['firstName']);
+            $data = $personDataByKey[$key] ?? [];
+
             $this->persons[] = [
-                'email' => $person['email'],
                 'firstName' => $person['firstName'],
                 'lastName' => $person['lastName'],
+                'email' => $person['email'] ?? null,
+                'address' => $data['address'] ?? null,
+                'city' => $data['city'] ?? null,
+                'zipCode' => $data['zipCode'] ?? null,
+                'country' => $data['country'] ?? null,
                 'tiers_id' => null,
                 'tiers_name' => null,
             ];
@@ -93,9 +104,13 @@ final class HelloassoTiersRapprochement extends Component
         // Linked persons (after unlinked)
         foreach ($result['linked'] as $person) {
             $this->persons[] = [
-                'email' => $person['email'],
                 'firstName' => $person['firstName'],
                 'lastName' => $person['lastName'],
+                'email' => $person['email'] ?? null,
+                'address' => null,
+                'city' => null,
+                'zipCode' => null,
+                'country' => null,
                 'tiers_id' => $person['tiers_id'],
                 'tiers_name' => $person['tiers_name'],
             ];
@@ -104,25 +119,13 @@ final class HelloassoTiersRapprochement extends Component
         }
 
         $this->fetched = true;
-
-        // Store payer data for creation (address info)
-        $this->payerData = [];
-        foreach ($orders as $order) {
-            $payer = $order['payer'] ?? null;
-            if ($payer && ! empty($payer['email'])) {
-                $email = strtolower(trim($payer['email']));
-                if (! isset($this->payerData[$email])) {
-                    $this->payerData[$email] = $payer;
-                }
-            }
-        }
     }
 
     public function associer(int $index): void
     {
-        $email = $this->persons[$index]['email'] ?? null;
         $tiersId = $this->selectedTiers[$index] ?? null;
-        if ($tiersId === null || $email === null) {
+        $person = $this->persons[$index] ?? null;
+        if ($tiersId === null || $person === null) {
             return;
         }
 
@@ -130,18 +133,10 @@ final class HelloassoTiersRapprochement extends Component
 
         $tiers->update([
             'est_helloasso' => true,
-            'email' => $email,
         ]);
 
-        // Update the person in the list
-        $this->persons = collect($this->persons)->map(function (array $p) use ($email, $tiers) {
-            if ($p['email'] === $email) {
-                $p['tiers_id'] = $tiers->id;
-                $p['tiers_name'] = $tiers->displayName();
-            }
-
-            return $p;
-        })->all();
+        $this->persons[$index]['tiers_id'] = $tiers->id;
+        $this->persons[$index]['tiers_name'] = $tiers->displayName();
     }
 
     public function creer(int $index): void
@@ -151,18 +146,15 @@ final class HelloassoTiersRapprochement extends Component
             return;
         }
 
-        $email = $person['email'];
-        $payer = $this->payerData[$email] ?? [];
-
         $tiers = Tiers::create([
             'type' => 'particulier',
             'nom' => $person['lastName'],
             'prenom' => $person['firstName'],
-            'email' => $email,
-            'adresse_ligne1' => $payer['address'] ?? null,
-            'ville' => $payer['city'] ?? null,
-            'code_postal' => $payer['zipCode'] ?? null,
-            'pays' => $payer['country'] ?? null,
+            'email' => $person['email'],
+            'adresse_ligne1' => $person['address'],
+            'ville' => $person['city'],
+            'code_postal' => $person['zipCode'],
+            'pays' => $person['country'],
             'est_helloasso' => true,
             'pour_recettes' => true,
         ]);
