@@ -16,11 +16,13 @@ final class HelloassoTiersRapprochement extends Component
 {
     public int $exercice;
 
-    /** @var list<array> */
-    public array $linked = [];
+    /**
+     * @var list<array{email: string, firstName: string, lastName: string, tiers_id: ?int, tiers_name: ?string}>
+     */
+    public array $persons = [];
 
-    /** @var list<array> */
-    public array $unlinked = [];
+    /** @var array<string, ?int> email → selected tiers_id */
+    public array $selectedTiers = [];
 
     /** @var array<string, array> Données payer indexées par email, pour la création */
     public array $payerData = [];
@@ -28,12 +30,6 @@ final class HelloassoTiersRapprochement extends Component
     public bool $fetched = false;
 
     public ?string $erreur = null;
-
-    /** @var array<string, string> Recherche par email de personne */
-    public array $recherche = [];
-
-    /** @var array<string, list<array{id: int, name: string}>> Résultats de recherche */
-    public array $resultatsRecherche = [];
 
     public function mount(): void
     {
@@ -68,11 +64,42 @@ final class HelloassoTiersRapprochement extends Component
         }
 
         $resolver = new HelloAssoTiersResolver;
-        $persons = $resolver->extractPersons($orders);
-        $result = $resolver->resolve($persons);
+        $extractedPersons = $resolver->extractPersons($orders);
+        $result = $resolver->resolve($extractedPersons);
 
-        $this->linked = $result['linked'];
-        $this->unlinked = $result['unlinked'];
+        // Build unified persons list: unlinked first, then linked
+        $this->persons = [];
+        $this->selectedTiers = [];
+
+        // Unlinked persons (sorted first)
+        foreach ($result['unlinked'] as $person) {
+            $suggestedId = null;
+            if (count($person['suggestions']) > 0) {
+                $suggestedId = $person['suggestions'][0]['tiers_id'];
+            }
+
+            $this->persons[] = [
+                'email' => $person['email'],
+                'firstName' => $person['firstName'],
+                'lastName' => $person['lastName'],
+                'tiers_id' => null,
+                'tiers_name' => null,
+            ];
+            $this->selectedTiers[$person['email']] = $suggestedId;
+        }
+
+        // Linked persons (after unlinked)
+        foreach ($result['linked'] as $person) {
+            $this->persons[] = [
+                'email' => $person['email'],
+                'firstName' => $person['firstName'],
+                'lastName' => $person['lastName'],
+                'tiers_id' => $person['tiers_id'],
+                'tiers_name' => $person['tiers_name'],
+            ];
+            $this->selectedTiers[$person['email']] = $person['tiers_id'];
+        }
+
         $this->fetched = true;
 
         // Store payer data for creation (address info)
@@ -88,59 +115,34 @@ final class HelloassoTiersRapprochement extends Component
         }
     }
 
-    public function rechercherTiers(string $email): void
+    public function associer(string $email): void
     {
-        $query = trim($this->recherche[$email] ?? '');
-        if (mb_strlen($query) < 2) {
-            $this->resultatsRecherche[$email] = [];
-
+        $tiersId = $this->selectedTiers[$email] ?? null;
+        if ($tiersId === null) {
             return;
         }
 
-        $results = Tiers::where(function ($q) use ($query) {
-            $q->where('nom', 'like', "%{$query}%")
-                ->orWhere('prenom', 'like', "%{$query}%")
-                ->orWhere('email', 'like', "%{$query}%")
-                ->orWhere('entreprise', 'like', "%{$query}%");
-        })
-            ->limit(10)
-            ->get()
-            ->map(fn (Tiers $t) => ['id' => $t->id, 'name' => $t->displayName()])
-            ->all();
-
-        $this->resultatsRecherche[$email] = $results;
-    }
-
-    public function associer(string $email, int $tiersId): void
-    {
         $tiers = Tiers::findOrFail($tiersId);
-
-        // Capture person data BEFORE removing from unlinked
-        $person = collect($this->unlinked)->firstWhere('email', $email);
 
         $tiers->update([
             'est_helloasso' => true,
             'email' => $email,
         ]);
 
-        // Move from unlinked to linked
-        $this->unlinked = collect($this->unlinked)
-            ->reject(fn (array $p) => $p['email'] === $email)
-            ->values()
-            ->all();
+        // Update the person in the list
+        $this->persons = collect($this->persons)->map(function (array $p) use ($email, $tiers) {
+            if ($p['email'] === $email) {
+                $p['tiers_id'] = $tiers->id;
+                $p['tiers_name'] = $tiers->displayName();
+            }
 
-        $this->linked[] = [
-            'email' => $email,
-            'firstName' => $person['firstName'] ?? '',
-            'lastName' => $person['lastName'] ?? '',
-            'tiers_id' => $tiers->id,
-            'tiers_name' => $tiers->displayName(),
-        ];
+            return $p;
+        })->all();
     }
 
     public function creer(string $email): void
     {
-        $person = collect($this->unlinked)->firstWhere('email', $email);
+        $person = collect($this->persons)->firstWhere('email', $email);
         if ($person === null) {
             return;
         }
@@ -160,34 +162,33 @@ final class HelloassoTiersRapprochement extends Component
             'pour_recettes' => true,
         ]);
 
-        $this->unlinked = collect($this->unlinked)
-            ->reject(fn (array $p) => $p['email'] === $email)
-            ->values()
-            ->all();
+        // Update the person in the list
+        $this->persons = collect($this->persons)->map(function (array $p) use ($email, $tiers) {
+            if ($p['email'] === $email) {
+                $p['tiers_id'] = $tiers->id;
+                $p['tiers_name'] = $tiers->displayName();
+            }
 
-        $this->linked[] = [
-            'email' => $email,
-            'firstName' => $person['firstName'],
-            'lastName' => $person['lastName'],
-            'tiers_id' => $tiers->id,
-            'tiers_name' => $tiers->displayName(),
-        ];
-    }
+            return $p;
+        })->all();
 
-    public function ignorer(string $email): void
-    {
-        $this->unlinked = collect($this->unlinked)
-            ->reject(fn (array $p) => $p['email'] === $email)
-            ->values()
-            ->all();
+        $this->selectedTiers[$email] = $tiers->id;
     }
 
     public function render(): View
     {
-        $exercices = app(ExerciceService::class)->available(5);
+        $allTiers = Tiers::orderBy('nom')->orderBy('prenom')->get()
+            ->map(fn (Tiers $t) => ['id' => $t->id, 'name' => $t->displayName()])
+            ->all();
+
+        $linkedCount = collect($this->persons)->whereNotNull('tiers_id')->count();
+        $unlinkedCount = collect($this->persons)->whereNull('tiers_id')->count();
 
         return view('livewire.parametres.helloasso-tiers-rapprochement', [
-            'exercices' => $exercices,
+            'exercices' => app(ExerciceService::class)->available(5),
+            'allTiers' => $allTiers,
+            'linkedCount' => $linkedCount,
+            'unlinkedCount' => $unlinkedCount,
         ]);
     }
 }
