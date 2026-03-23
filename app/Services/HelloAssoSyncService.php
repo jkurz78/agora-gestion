@@ -139,7 +139,13 @@ final class HelloAssoSyncService
                     $item = $resolved['item'];
                     $montantEuros = round($item['amount'] / 100, 2);
 
-                    $existingLigne = TransactionLigne::where('helloasso_item_id', $item['id'])->first();
+                    $existingLigne = TransactionLigne::withTrashed()
+                        ->where('helloasso_item_id', $item['id'])
+                        ->first();
+
+                    if ($existingLigne?->trashed()) {
+                        $existingLigne->restore();
+                    }
 
                     if ($existingLigne) {
                         $existingLigne->update([
