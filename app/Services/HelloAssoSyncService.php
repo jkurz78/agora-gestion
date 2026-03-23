@@ -344,12 +344,6 @@ final class HelloAssoSyncService
     {
         $result = ['created' => 0, 'rapprochement_created' => 0, 'incomplet' => null];
 
-        // Idempotence: skip if virement already exists
-        $existingVirement = VirementInterne::where('helloasso_cashout_id', $cashOut['id'])->exists();
-        if ($existingVirement) {
-            return $result;
-        }
-
         $cashOutDate = Carbon::parse($cashOut['date']);
         $montantEuros = round($cashOut['amount'] / 100, 2);
 
@@ -379,24 +373,36 @@ final class HelloAssoSyncService
             return $result;
         }
 
-        // Complete → create virement + auto-locked rapprochement
+        // Idempotence: check if virement already exists for this cashout
+        $existingVirement = VirementInterne::where('helloasso_cashout_id', $cashOut['id'])->first();
+
+        if ($existingVirement && $existingVirement->rapprochement_source_id !== null) {
+            // Virement + rapprochement already exist → fully processed
+            return $result;
+        }
+
+        // Complete → create virement (if needed) + auto-locked rapprochement
         $rapprochementService = app(RapprochementBancaireService::class);
         $compte = CompteBancaire::find($this->parametres->compte_helloasso_id);
         $soldeOuverture = $rapprochementService->calculerSoldeOuverture($compte);
 
-        DB::transaction(function () use ($cashOut, $cashOutDate, $montantEuros, $transactions, $rapprochementService, $compte, $soldeOuverture, &$result) {
-            $virement = VirementInterne::create([
-                'date' => $cashOutDate->toDateString(),
-                'montant' => $montantEuros,
-                'compte_source_id' => $this->parametres->compte_helloasso_id,
-                'compte_destination_id' => $this->parametres->compte_versement_id,
-                'notes' => 'Versement HelloAsso du '.$cashOutDate->format('d/m/Y'),
-                'reference' => "HA-CO-{$cashOut['id']}",
-                'helloasso_cashout_id' => $cashOut['id'],
-                'saisi_par' => auth()->id() ?? 1,
-                'numero_piece' => app(NumeroPieceService::class)->assign($cashOutDate),
-            ]);
-            $result['created']++;
+        DB::transaction(function () use ($cashOut, $cashOutDate, $montantEuros, $transactions, $existingVirement, $rapprochementService, $compte, $soldeOuverture, &$result) {
+            $virement = $existingVirement;
+
+            if ($virement === null) {
+                $virement = VirementInterne::create([
+                    'date' => $cashOutDate->toDateString(),
+                    'montant' => $montantEuros,
+                    'compte_source_id' => $this->parametres->compte_helloasso_id,
+                    'compte_destination_id' => $this->parametres->compte_versement_id,
+                    'notes' => 'Versement HelloAsso du '.$cashOutDate->format('d/m/Y'),
+                    'reference' => "HA-CO-{$cashOut['id']}",
+                    'helloasso_cashout_id' => $cashOut['id'],
+                    'saisi_par' => auth()->id() ?? 1,
+                    'numero_piece' => app(NumeroPieceService::class)->assign($cashOutDate),
+                ]);
+                $result['created']++;
+            }
 
             // Auto-locked rapprochement
             $rapprochementService->createVerrouilleAuto(
