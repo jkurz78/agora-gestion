@@ -28,7 +28,9 @@ final class HelloAssoTiersResolver
             $payerLastName = strtolower(trim($payer['lastName'] ?? ''));
 
             foreach ($order['items'] ?? [] as $item) {
-                $user = $item['user'] ?? null;
+                // Same fallback logic as groupItemsByBeneficiary:
+                // per-item user takes priority, fallback to order-level user/payer
+                $user = $item['user'] ?? $order['user'] ?? $payer ?: null;
                 if ($user === null || empty($user['lastName'])) {
                     continue;
                 }
@@ -56,7 +58,7 @@ final class HelloAssoTiersResolver
                 ];
             }
 
-            // Fallback: if order has no items with user, use payer directly
+            // Fallback: if order has no items at all, use payer directly
             if (empty($order['items'])) {
                 $person = $order['user'] ?? $payer;
                 if (! empty($person['lastName'])) {

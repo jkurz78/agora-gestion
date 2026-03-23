@@ -50,18 +50,8 @@ it('syncs orders and cashouts together and displays full report', function () {
                         'items' => [['id' => 1001, 'amount' => 5000, 'state' => 'Processed', 'type' => 'Donation', 'name' => 'Don']],
                         'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont'],
                         'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
-                        'payments' => [['id' => 201, 'amount' => 5000, 'date' => '2025-10-15T10:00:00+02:00', 'paymentMeans' => 'Card']],
-                    ],
-                ],
-                'pagination' => [],
-            ])
-            ->push(['data' => [], 'pagination' => []]),
-        '*/v5/organizations/mon-asso/cash-outs*' => Http::sequence()
-            ->push([
-                'data' => [
-                    [
-                        'id' => 5001, 'date' => '2025-10-20T10:00:00+02:00', 'amount' => 5000,
-                        'payments' => [['id' => 201, 'amount' => 5000]],
+                        'payments' => [['id' => 201, 'amount' => 5000, 'date' => '2025-10-15T10:00:00+02:00', 'paymentMeans' => 'Card',
+                            'idCashOut' => 5001, 'cashOutDate' => '2025-10-20T10:00:00+02:00', 'cashOutState' => 'CashedOut']],
                     ],
                 ],
                 'pagination' => [],
