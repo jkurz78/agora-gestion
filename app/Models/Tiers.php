@@ -27,6 +27,8 @@ final class Tiers extends Model
         'pour_depenses',
         'pour_recettes',
         'est_helloasso',
+        'helloasso_nom',
+        'helloasso_prenom',
     ];
 
     protected function casts(): array

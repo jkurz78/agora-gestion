@@ -129,7 +129,7 @@ it('creates a new tiers from HelloAsso person', function () {
 });
 
 it('shows unlinked persons before linked ones', function () {
-    Tiers::factory()->create(['nom' => 'Ancien', 'prenom' => 'Lié', 'email' => 'lie@test.com', 'est_helloasso' => true]);
+    Tiers::factory()->create(['nom' => 'Ancien', 'prenom' => 'Lié', 'email' => 'lie@test.com', 'est_helloasso' => true, 'helloasso_nom' => 'Ancien', 'helloasso_prenom' => 'Lié']);
 
     fakeHelloAssoOrders([
         [
