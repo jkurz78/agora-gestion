@@ -143,7 +143,7 @@ it('groups items by beneficiary into one transaction', function () {
     expect($tx->lignes)->toHaveCount(2);
 });
 
-it('skips orders with unknown tiers email', function () {
+it('skips orders with unknown tiers name', function () {
     $orders = [
         [
             'id' => 103,
@@ -166,7 +166,7 @@ it('skips orders with unknown tiers email', function () {
     expect($result->transactionsCreated)->toBe(0);
     expect($result->ordersSkipped)->toBe(1);
     expect($result->errors)->toHaveCount(1);
-    expect($result->errors[0])->toContain('inconnu@test.com');
+    expect($result->errors[0])->toContain('Inconnu Personne');
 });
 
 it('is idempotent — re-importing same order updates instead of duplicating', function () {
@@ -305,11 +305,11 @@ it('splits order with multiple beneficiaries into separate transactions', functi
             'items' => [
                 [
                     'id' => 1010, 'amount' => 3000, 'state' => 'Processed', 'type' => 'Membership', 'name' => 'Adhésion Jean',
-                    'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+                    'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont'],
                 ],
                 [
                     'id' => 1011, 'amount' => 3000, 'state' => 'Processed', 'type' => 'Membership', 'name' => 'Adhésion Marie',
-                    'user' => ['firstName' => 'Marie', 'lastName' => 'Martin', 'email' => 'marie@test.com'],
+                    'user' => ['firstName' => 'Marie', 'lastName' => 'Martin'],
                 ],
             ],
             'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],

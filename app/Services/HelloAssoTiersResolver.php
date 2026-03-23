@@ -9,46 +9,72 @@ use App\Models\Tiers;
 final class HelloAssoTiersResolver
 {
     /**
-     * Extract unique persons from orders, deduplicated by email.
-     * Uses user (beneficiary) if present, otherwise payer.
+     * Extract unique persons (beneficiaries) from orders, deduplicated by nom+prénom.
+     *
+     * For each item, the beneficiary is item.user (nom+prénom only in HelloAsso).
+     * Payer data (email, address) is attached when the beneficiary name matches the payer,
+     * or as fallback context when there's a single item.
      *
      * @param  list<array<string, mixed>>  $orders
-     * @return list<array{firstName: string, lastName: string, email: string}>
+     * @return list<array{firstName: string, lastName: string, email: ?string, address: ?string, city: ?string, zipCode: ?string, country: ?string}>
      */
     public function extractPersons(array $orders): array
     {
         $seen = [];
 
         foreach ($orders as $order) {
-            $persons = [];
+            $payer = $order['payer'] ?? [];
+            $payerFirstName = strtolower(trim($payer['firstName'] ?? ''));
+            $payerLastName = strtolower(trim($payer['lastName'] ?? ''));
 
-            // Extract per-item beneficiaries (user on each item)
             foreach ($order['items'] ?? [] as $item) {
-                if (isset($item['user']['email']) && $item['user']['email'] !== '') {
-                    $persons[] = $item['user'];
-                }
-            }
-
-            // Fallback to order-level user/payer if no per-item users found
-            if ($persons === []) {
-                $person = $order['user'] ?? $order['payer'] ?? null;
-                if ($person !== null) {
-                    $persons[] = $person;
-                }
-            }
-
-            foreach ($persons as $person) {
-                $email = strtolower(trim($person['email'] ?? ''));
-                if ($email === '') {
+                $user = $item['user'] ?? null;
+                if ($user === null || empty($user['lastName'])) {
                     continue;
                 }
 
-                if (! isset($seen[$email])) {
-                    $seen[$email] = [
-                        'firstName' => $person['firstName'] ?? '',
-                        'lastName' => $person['lastName'] ?? '',
-                        'email' => $email,
-                    ];
+                $firstName = trim($user['firstName'] ?? '');
+                $lastName = trim($user['lastName'] ?? '');
+                $key = strtolower($lastName) . '|' . strtolower($firstName);
+
+                if (isset($seen[$key])) {
+                    continue;
+                }
+
+                // Is the beneficiary the same person as the payer?
+                $isSameAsPayer = strtolower($firstName) === $payerFirstName
+                    && strtolower($lastName) === $payerLastName;
+
+                $seen[$key] = [
+                    'firstName' => $firstName,
+                    'lastName' => $lastName,
+                    'email' => $isSameAsPayer ? strtolower(trim($payer['email'] ?? '')) ?: null : null,
+                    'address' => $payer['address'] ?? null,
+                    'city' => $payer['city'] ?? null,
+                    'zipCode' => $payer['zipCode'] ?? null,
+                    'country' => $payer['country'] ?? null,
+                ];
+            }
+
+            // Fallback: if order has no items with user, use payer directly
+            if (empty($order['items'])) {
+                $person = $order['user'] ?? $payer;
+                if (! empty($person['lastName'])) {
+                    $firstName = trim($person['firstName'] ?? '');
+                    $lastName = trim($person['lastName'] ?? '');
+                    $key = strtolower($lastName) . '|' . strtolower($firstName);
+
+                    if (! isset($seen[$key])) {
+                        $seen[$key] = [
+                            'firstName' => $firstName,
+                            'lastName' => $lastName,
+                            'email' => strtolower(trim($person['email'] ?? '')) ?: null,
+                            'address' => $payer['address'] ?? null,
+                            'city' => $payer['city'] ?? null,
+                            'zipCode' => $payer['zipCode'] ?? null,
+                            'country' => $payer['country'] ?? null,
+                        ];
+                    }
                 }
             }
         }
@@ -58,8 +84,10 @@ final class HelloAssoTiersResolver
 
     /**
      * Resolve persons against SVS Tiers database.
+     * Primary match: nom+prénom (case-insensitive) + est_helloasso.
+     * Suggestions: nom+prénom match, then email match if available.
      *
-     * @param  list<array{firstName: string, lastName: string, email: string}>  $persons
+     * @param  list<array{firstName: string, lastName: string, email: ?string}>  $persons
      * @return array{linked: list<array>, unlinked: list<array>}
      */
     public function resolve(array $persons): array
@@ -68,16 +96,20 @@ final class HelloAssoTiersResolver
         $unlinked = [];
 
         foreach ($persons as $person) {
-            // Check if already linked (est_helloasso + same email)
-            $existingLinked = Tiers::where('email', $person['email'])
+            $lowerLastName = strtolower($person['lastName']);
+            $lowerFirstName = strtolower($person['firstName']);
+
+            // Check if already linked (est_helloasso + same nom+prénom)
+            $existingLinked = Tiers::whereRaw('LOWER(nom) = ?', [$lowerLastName])
+                ->whereRaw('LOWER(prenom) = ?', [$lowerFirstName])
                 ->where('est_helloasso', true)
                 ->first();
 
             if ($existingLinked) {
                 $linked[] = [
-                    'email' => $person['email'],
                     'firstName' => $person['firstName'],
                     'lastName' => $person['lastName'],
+                    'email' => $person['email'] ?? null,
                     'tiers_id' => $existingLinked->id,
                     'tiers_name' => $existingLinked->displayName(),
                 ];
@@ -88,21 +120,9 @@ final class HelloAssoTiersResolver
             // Find suggestions
             $suggestions = [];
 
-            // Match by email (strong match)
-            $emailMatch = Tiers::where('email', $person['email'])->first();
-            if ($emailMatch) {
-                $suggestions[] = [
-                    'tiers_id' => $emailMatch->id,
-                    'tiers_name' => $emailMatch->displayName(),
-                    'match_type' => 'email',
-                ];
-            }
-
-            // Match by name+prenom case-insensitive (weak match) — only if not already suggested
-            $suggestedIds = collect($suggestions)->pluck('tiers_id')->all();
-            $nameMatches = Tiers::whereRaw('LOWER(nom) = ?', [strtolower($person['lastName'])])
-                ->whereRaw('LOWER(prenom) = ?', [strtolower($person['firstName'])])
-                ->whereNotIn('id', $suggestedIds)
+            // Match by name+prenom (strong match for HelloAsso context)
+            $nameMatches = Tiers::whereRaw('LOWER(nom) = ?', [$lowerLastName])
+                ->whereRaw('LOWER(prenom) = ?', [$lowerFirstName])
                 ->get();
 
             foreach ($nameMatches as $match) {
@@ -113,10 +133,26 @@ final class HelloAssoTiersResolver
                 ];
             }
 
+            // Match by email if available (and not already suggested)
+            if (! empty($person['email'])) {
+                $suggestedIds = collect($suggestions)->pluck('tiers_id')->all();
+                $emailMatch = Tiers::where('email', $person['email'])
+                    ->whereNotIn('id', $suggestedIds)
+                    ->first();
+
+                if ($emailMatch) {
+                    $suggestions[] = [
+                        'tiers_id' => $emailMatch->id,
+                        'tiers_name' => $emailMatch->displayName(),
+                        'match_type' => 'email',
+                    ];
+                }
+            }
+
             $unlinked[] = [
-                'email' => $person['email'],
                 'firstName' => $person['firstName'],
                 'lastName' => $person['lastName'],
+                'email' => $person['email'] ?? null,
                 'suggestions' => $suggestions,
             ];
         }
