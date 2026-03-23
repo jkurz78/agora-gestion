@@ -543,7 +543,7 @@
                             @else
                                 <button type="button"
                                         wire:click="deleteRow('{{ e($tx->source_type) }}', {{ $tx->id }})"
-                                        wire:confirm="Supprimer cette ligne ?"
+                                        wire:confirm="{{ $tx->is_helloasso ? 'Supprimer cette transaction HelloAsso ? Elle ne sera plus ré-importée lors des prochaines synchronisations.' : 'Supprimer cette ligne ?' }}"
                                         class="btn btn-sm btn-outline-danger"
                                         style="padding:.15rem .3rem;font-size:.7rem"
                                         title="Supprimer">
