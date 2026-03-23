@@ -73,16 +73,25 @@ final class HelloassoSync extends Component
             'cashoutSkipped' => false,
         ];
 
-        // DEBUG: log payment structure to see cashout fields
-        $firstPayment = null;
+        // DEBUG: log cashout field stats across all payments
+        $paymentStats = ['total' => 0, 'with_idCashOut' => 0, 'states' => []];
+        $sampleCashOut = null;
         foreach ($orders as $o) {
             foreach ($o['payments'] ?? [] as $p) {
-                $firstPayment = $p;
-                break 2;
+                $paymentStats['total']++;
+                $state = $p['cashOutState'] ?? 'MISSING';
+                $paymentStats['states'][$state] = ($paymentStats['states'][$state] ?? 0) + 1;
+                if (isset($p['idCashOut'])) {
+                    $paymentStats['with_idCashOut']++;
+                    if ($sampleCashOut === null) {
+                        $sampleCashOut = $p;
+                    }
+                }
             }
         }
-        if ($firstPayment !== null) {
-            \Log::info('HelloAsso payment keys: '.implode(', ', array_keys($firstPayment)), $firstPayment);
+        \Log::info('HelloAsso payment cashout stats', $paymentStats);
+        if ($sampleCashOut !== null) {
+            \Log::info('HelloAsso sample payment with idCashOut', $sampleCashOut);
         }
 
         // Cashout sync — extract cash-outs from the orders we already fetched
