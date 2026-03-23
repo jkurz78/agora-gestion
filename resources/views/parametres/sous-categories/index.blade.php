@@ -67,6 +67,11 @@
                         <input type="checkbox" name="pour_cotisations" id="sc_pour_cotisations" value="1" class="form-check-input">
                         <label class="form-check-label" for="sc_pour_cotisations">Cotisations</label>
                     </div>
+                    <div class="form-check">
+                        <input type="hidden" name="pour_inscriptions" value="0">
+                        <input type="checkbox" name="pour_inscriptions" id="sc_pour_inscriptions" value="1" class="form-check-input">
+                        <label class="form-check-label" for="sc_pour_inscriptions">Inscriptions</label>
+                    </div>
                 </div>
                 <div class="col-md-1">
                     <button type="submit" class="btn btn-success w-100">Enregistrer</button>
@@ -83,6 +88,7 @@
                 <th data-col="2" style="cursor:pointer;user-select:none;">Code CERFA <i class="bi bi-arrow-down-up text-secondary" id="sortIcon2"></i></th>
                 <th class="text-center">Dons</th>
                 <th class="text-center">Cotisations</th>
+                <th class="text-center">Inscriptions</th>
                 <th style="width: 120px;">Actions</th>
             </tr>
         </thead>
@@ -124,6 +130,11 @@
                             <input type="checkbox" name="pour_cotisations" form="edit-form-{{ $sc->id }}" value="1"
                                    class="form-check-input" @checked(old('pour_cotisations', $sc->pour_cotisations))>
                         </td>
+                        <td class="text-center">
+                            <input type="hidden" name="pour_inscriptions" form="edit-form-{{ $sc->id }}" value="0">
+                            <input type="checkbox" name="pour_inscriptions" form="edit-form-{{ $sc->id }}" value="1"
+                                   class="form-check-input" @checked(old('pour_inscriptions', $sc->pour_inscriptions))>
+                        </td>
                         <td>
                             <button type="submit" form="edit-form-{{ $sc->id }}" class="btn btn-sm btn-success"
                                     style="padding:.15rem .4rem;font-size:.75rem">
@@ -162,6 +173,18 @@
                                 </button>
                             </form>
                         </td>
+                        <td class="text-center">
+                            <form action="{{ route('parametres.sous-categories.toggle-flag', $sc) }}" method="POST" class="d-inline">
+                                @csrf
+                                <input type="hidden" name="flag" value="pour_inscriptions">
+                                <button type="submit"
+                                        class="btn btn-sm {{ $sc->pour_inscriptions ? 'btn-success' : 'btn-outline-secondary' }}"
+                                        style="padding:.15rem .4rem;font-size:.7rem"
+                                        title="{{ $sc->pour_inscriptions ? 'Désactiver pour les inscriptions' : 'Activer pour les inscriptions' }}">
+                                    {{ $sc->pour_inscriptions ? '✓' : '–' }}
+                                </button>
+                            </form>
+                        </td>
                         <td>
                             <a href="{{ route('parametres.sous-categories.index') }}?edit={{ $sc->id }}"
                                class="btn btn-sm btn-outline-primary"
@@ -182,7 +205,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" class="text-muted">Aucune sous-catégorie enregistrée.</td>
+                    <td colspan="7" class="text-muted">Aucune sous-catégorie enregistrée.</td>
                 </tr>
             @endforelse
         </tbody>

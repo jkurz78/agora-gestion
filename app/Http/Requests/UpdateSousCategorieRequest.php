@@ -24,6 +24,7 @@ final class UpdateSousCategorieRequest extends FormRequest
             'code_cerfa' => ['nullable', 'string', 'max:10'],
             'pour_dons' => ['sometimes', 'boolean'],
             'pour_cotisations' => ['sometimes', 'boolean'],
+            'pour_inscriptions' => ['sometimes', 'boolean'],
         ];
     }
 }
