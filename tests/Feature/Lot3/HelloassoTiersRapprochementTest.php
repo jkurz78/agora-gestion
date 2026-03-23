@@ -56,7 +56,7 @@ it('fetches and displays unlinked persons', function () {
         ->assertSee('jean@test.com');
 });
 
-it('associates a person to an existing tiers via select', function () {
+it('associates a person to an existing tiers', function () {
     $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean', 'email' => 'jean-ancien@test.com']);
 
     fakeHelloAssoOrders([
@@ -70,15 +70,15 @@ it('associates a person to an existing tiers via select', function () {
 
     Livewire::test(HelloassoTiersRapprochement::class)
         ->call('fetchTiers')
-        ->set('selectedTiers.jean@test.com', $tiers->id)
-        ->call('associer', 'jean@test.com');
+        ->set('selectedTiers.0', $tiers->id)
+        ->call('associer', 0);
 
     $tiers->refresh();
     expect($tiers->est_helloasso)->toBeTrue();
     expect($tiers->email)->toBe('jean@test.com');
 });
 
-it('pre-selects suggested tiers in the select', function () {
+it('pre-selects suggested tiers by index', function () {
     Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean', 'email' => 'jean@test.com', 'est_helloasso' => false]);
 
     fakeHelloAssoOrders([
@@ -94,7 +94,7 @@ it('pre-selects suggested tiers in the select', function () {
         ->call('fetchTiers');
 
     $selectedTiers = $component->get('selectedTiers');
-    expect($selectedTiers['jean@test.com'])->not->toBeNull();
+    expect($selectedTiers[0])->not->toBeNull();
 });
 
 it('creates a new tiers from HelloAsso person', function () {
@@ -109,7 +109,7 @@ it('creates a new tiers from HelloAsso person', function () {
 
     Livewire::test(HelloassoTiersRapprochement::class)
         ->call('fetchTiers')
-        ->call('creer', 'marie@test.com');
+        ->call('creer', 0);
 
     $tiers = Tiers::where('email', 'marie@test.com')->first();
     expect($tiers)->not->toBeNull();
