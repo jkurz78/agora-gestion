@@ -374,3 +374,27 @@ it('defaults to cb for orders with empty payments array', function () {
     $tx = Transaction::where('helloasso_order_id', 110)->first();
     expect($tx->mode_paiement)->toBe(ModePaiement::Cb);
 });
+
+it('stores helloasso_payment_id on transaction', function () {
+    $orders = [
+        [
+            'id' => 120,
+            'date' => '2025-10-15T10:00:00+02:00',
+            'amount' => 5000,
+            'formSlug' => 'dons-libres',
+            'formType' => 'Donation',
+            'items' => [
+                ['id' => 1020, 'amount' => 5000, 'state' => 'Processed', 'type' => 'Donation', 'name' => 'Don'],
+            ],
+            'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payments' => [['id' => 555, 'amount' => 5000, 'date' => '2025-10-15T10:00:00+02:00', 'paymentMeans' => 'Card']],
+        ],
+    ];
+
+    $service = new HelloAssoSyncService($this->parametres);
+    $service->synchroniser($orders, 2025);
+
+    $tx = Transaction::where('helloasso_order_id', 120)->first();
+    expect($tx->helloasso_payment_id)->toBe(555);
+});
