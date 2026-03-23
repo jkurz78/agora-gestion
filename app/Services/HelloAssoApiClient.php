@@ -59,40 +59,53 @@ final class HelloAssoApiClient
     }
 
     /**
-     * Extract cash-outs from orders by grouping payments by idCashOut.
+     * Fetch all payments for a date range.
      *
-     * HelloAsso API has no list endpoint for cash-outs — the data lives
-     * on payment objects (idCashOut, cashOutDate, cashOutState).
+     * The /payments endpoint returns idCashOut, cashOutDate, cashOutState
+     * which are NOT available on the /orders endpoint's embedded payments.
      *
-     * @param  list<array<string, mixed>>  $orders
+     * @return list<array<string, mixed>>
+     */
+    public function fetchPayments(string $from, string $to): array
+    {
+        $this->authenticate();
+
+        return $this->fetchPaginated(
+            "/v5/organizations/{$this->organisationSlug}/payments",
+            ['from' => $from, 'to' => $to],
+        );
+    }
+
+    /**
+     * Extract cash-outs from payments by grouping by idCashOut.
+     *
+     * @param  list<array<string, mixed>>  $payments  From fetchPayments()
      * @return list<array{id: int, date: string, amount: int, payments: list<array{id: int}>}>
      */
-    public static function extractCashOutsFromOrders(array $orders): array
+    public static function extractCashOutsFromPayments(array $payments): array
     {
         $groups = []; // idCashOut → [date, totalCents, paymentIds[]]
 
-        foreach ($orders as $order) {
-            foreach ($order['payments'] ?? [] as $payment) {
-                $cashOutId = $payment['idCashOut'] ?? null;
-                if ($cashOutId === null) {
-                    continue;
-                }
-                $state = $payment['cashOutState'] ?? null;
-                if ($state !== 'CashedOut') {
-                    continue; // Only process completed cash-outs
-                }
-
-                if (! isset($groups[$cashOutId])) {
-                    $groups[$cashOutId] = [
-                        'date' => $payment['cashOutDate'] ?? $payment['date'] ?? now()->toIso8601String(),
-                        'totalCents' => 0,
-                        'payments' => [],
-                    ];
-                }
-
-                $groups[$cashOutId]['totalCents'] += $payment['amount'] ?? 0;
-                $groups[$cashOutId]['payments'][] = ['id' => $payment['id']];
+        foreach ($payments as $payment) {
+            $cashOutId = $payment['idCashOut'] ?? null;
+            if ($cashOutId === null) {
+                continue;
             }
+            $state = $payment['cashOutState'] ?? null;
+            if ($state !== 'CashedOut') {
+                continue;
+            }
+
+            if (! isset($groups[$cashOutId])) {
+                $groups[$cashOutId] = [
+                    'date' => $payment['cashOutDate'] ?? $payment['date'] ?? now()->toIso8601String(),
+                    'totalCents' => 0,
+                    'payments' => [],
+                ];
+            }
+
+            $groups[$cashOutId]['totalCents'] += $payment['amount'] ?? 0;
+            $groups[$cashOutId]['payments'][] = ['id' => $payment['id']];
         }
 
         $result = [];

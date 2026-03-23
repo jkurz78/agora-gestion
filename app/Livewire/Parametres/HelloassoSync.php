@@ -73,32 +73,12 @@ final class HelloassoSync extends Component
             'cashoutSkipped' => false,
         ];
 
-        // DEBUG: log cashout field stats across all payments
-        $paymentStats = ['total' => 0, 'with_idCashOut' => 0, 'states' => []];
-        $sampleCashOut = null;
-        foreach ($orders as $o) {
-            foreach ($o['payments'] ?? [] as $p) {
-                $paymentStats['total']++;
-                $state = $p['cashOutState'] ?? 'MISSING';
-                $paymentStats['states'][$state] = ($paymentStats['states'][$state] ?? 0) + 1;
-                if (isset($p['idCashOut'])) {
-                    $paymentStats['with_idCashOut']++;
-                    if ($sampleCashOut === null) {
-                        $sampleCashOut = $p;
-                    }
-                }
-            }
-        }
-        \Log::info('HelloAsso payment cashout stats', $paymentStats);
-        if ($sampleCashOut !== null) {
-            \Log::info('HelloAsso sample payment with idCashOut', $sampleCashOut);
-        }
-
-        // Cashout sync — extract cash-outs from the orders we already fetched
+        // Cashout sync — fetch payments (which have idCashOut) and extract cash-outs
         if ($parametres->compte_versement_id === null) {
             $this->result['cashoutSkipped'] = true;
         } else {
-            $cashOuts = HelloAssoApiClient::extractCashOutsFromOrders($orders);
+            $payments = $client->fetchPayments($from, $to);
+            $cashOuts = HelloAssoApiClient::extractCashOutsFromPayments($payments);
             $cashoutResult = $syncService->synchroniserCashouts($cashOuts);
 
             $this->result['virementsCreated'] = $cashoutResult['virements_created'];
