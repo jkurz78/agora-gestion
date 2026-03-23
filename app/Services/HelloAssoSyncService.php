@@ -118,6 +118,9 @@ final class HelloAssoSyncService
                     if (empty($existing->reference)) {
                         $data['reference'] = $this->buildReference($order);
                     }
+                    if ($existing->helloasso_payment_id === null && isset($order['payments'][0]['id'])) {
+                        $data['helloasso_payment_id'] = $order['payments'][0]['id'];
+                    }
                     $existing->update($data);
                     $result['tx_updated']++;
                     $tx = $existing;
@@ -132,6 +135,7 @@ final class HelloAssoSyncService
                         'reference' => $this->buildReference($order),
                         'compte_id' => $this->parametres->compte_helloasso_id,
                         'helloasso_order_id' => $order['id'],
+                        'helloasso_payment_id' => $order['payments'][0]['id'] ?? null,
                         'saisi_par' => auth()->id(),
                         'numero_piece' => app(NumeroPieceService::class)->assign(Carbon::parse($orderDate)),
                     ]);
