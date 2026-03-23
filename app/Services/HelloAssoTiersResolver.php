@@ -35,7 +35,7 @@ final class HelloAssoTiersResolver
 
                 $firstName = trim($user['firstName'] ?? '');
                 $lastName = trim($user['lastName'] ?? '');
-                $key = strtolower($lastName) . '|' . strtolower($firstName);
+                $key = strtolower($lastName).'|'.strtolower($firstName);
 
                 if (isset($seen[$key])) {
                     continue;
@@ -62,7 +62,7 @@ final class HelloAssoTiersResolver
                 if (! empty($person['lastName'])) {
                     $firstName = trim($person['firstName'] ?? '');
                     $lastName = trim($person['lastName'] ?? '');
-                    $key = strtolower($lastName) . '|' . strtolower($firstName);
+                    $key = strtolower($lastName).'|'.strtolower($firstName);
 
                     if (! isset($seen[$key])) {
                         $seen[$key] = [

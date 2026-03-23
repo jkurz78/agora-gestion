@@ -206,7 +206,7 @@ final class HelloAssoSyncService
 
             $firstName = trim($person['firstName'] ?? '');
             $lastName = trim($person['lastName'] ?? '');
-            $key = strtolower($lastName) . '|' . strtolower($firstName);
+            $key = strtolower($lastName).'|'.strtolower($firstName);
 
             if (! isset($groups[$key])) {
                 $groups[$key] = [
@@ -355,7 +355,7 @@ final class HelloAssoSyncService
                     'montant' => $montantEuros,
                     'compte_source_id' => $this->parametres->compte_helloasso_id,
                     'compte_destination_id' => $this->parametres->compte_versement_id,
-                    'notes' => 'Versement HelloAsso du ' . $cashOutDate->format('d/m/Y'),
+                    'notes' => 'Versement HelloAsso du '.$cashOutDate->format('d/m/Y'),
                     'reference' => "HA-CO-{$cashOut['id']}",
                 ]);
                 $result['updated']++;
@@ -365,7 +365,7 @@ final class HelloAssoSyncService
                     'montant' => $montantEuros,
                     'compte_source_id' => $this->parametres->compte_helloasso_id,
                     'compte_destination_id' => $this->parametres->compte_versement_id,
-                    'notes' => 'Versement HelloAsso du ' . $cashOutDate->format('d/m/Y'),
+                    'notes' => 'Versement HelloAsso du '.$cashOutDate->format('d/m/Y'),
                     'reference' => "HA-CO-{$cashOut['id']}",
                     'helloasso_cashout_id' => $cashOut['id'],
                     'saisi_par' => auth()->id() ?? 1,
