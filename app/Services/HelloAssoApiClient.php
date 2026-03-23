@@ -58,6 +58,21 @@ final class HelloAssoApiClient
         );
     }
 
+    /**
+     * Fetch all cash-outs for a date range, handling pagination.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function fetchCashOuts(string $from, string $to): array
+    {
+        $this->authenticate();
+
+        return $this->fetchPaginated(
+            "/v5/organizations/{$this->organisationSlug}/cash-outs",
+            ['from' => $from, 'to' => $to],
+        );
+    }
+
     private function authenticate(): void
     {
         if ($this->accessToken !== null) {
