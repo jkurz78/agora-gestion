@@ -15,7 +15,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    \DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
 
     $compte = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
     $scDon = SousCategorie::where('pour_dons', true)->first()

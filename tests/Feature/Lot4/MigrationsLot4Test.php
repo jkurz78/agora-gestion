@@ -24,10 +24,10 @@ it('has helloasso_form_mappings table', function () {
 });
 
 it('can save sync config on helloasso_parametres', function () {
-    \DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
-    \DB::table('comptes_bancaires')->insertOrIgnore(['id' => 1, 'nom' => 'HelloAsso', 'solde_initial' => 0, 'date_solde_initial' => now()->toDateString(), 'created_at' => now(), 'updated_at' => now()]);
-    \DB::table('categories')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'type' => 'recette', 'created_at' => now(), 'updated_at' => now()]);
-    \DB::table('sous_categories')->insertOrIgnore(['id' => 2, 'categorie_id' => 1, 'nom' => 'Don', 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('comptes_bancaires')->insertOrIgnore(['id' => 1, 'nom' => 'HelloAsso', 'solde_initial' => 0, 'date_solde_initial' => now()->toDateString(), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('categories')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'type' => 'recette', 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('sous_categories')->insertOrIgnore(['id' => 2, 'categorie_id' => 1, 'nom' => 'Don', 'created_at' => now(), 'updated_at' => now()]);
 
     $p = HelloAssoParametres::create([
         'association_id' => 1,

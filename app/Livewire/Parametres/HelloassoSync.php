@@ -35,11 +35,13 @@ final class HelloassoSync extends Component
         $parametres = HelloAssoParametres::where('association_id', 1)->first();
         if ($parametres === null || $parametres->client_id === null) {
             $this->erreur = 'Paramètres HelloAsso non configurés.';
+
             return;
         }
 
         if ($parametres->compte_helloasso_id === null) {
             $this->erreur = 'Compte HelloAsso non configuré. Configurez-le dans la section ci-dessus.';
+
             return;
         }
 
@@ -54,6 +56,7 @@ final class HelloassoSync extends Component
             $orders = $client->fetchOrders($from, $to);
         } catch (\RuntimeException $e) {
             $this->erreur = $e->getMessage();
+
             return;
         }
 
