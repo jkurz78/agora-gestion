@@ -144,7 +144,7 @@
                                     </button>
                                 @else
                                     <button wire:click="delete({{ $transaction->id }})"
-                                            wire:confirm="Supprimer cette transaction ?"
+                                            wire:confirm="{{ $transaction->helloasso_order_id ? 'Supprimer cette transaction HelloAsso ? Elle ne sera plus ré-importée lors des prochaines synchronisations.' : 'Supprimer cette transaction ?' }}"
                                             class="btn btn-sm btn-outline-danger" title="Supprimer"
                                             style="padding:.15rem .35rem;font-size:.75rem">
                                         <i class="bi bi-trash"></i>

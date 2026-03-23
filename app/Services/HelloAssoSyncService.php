@@ -108,7 +108,9 @@ final class HelloAssoSyncService
                     ->first();
 
                 if ($existing?->trashed()) {
-                    $existing->restore();
+                    $result['skipped']++;
+
+                    return;
                 }
 
                 if ($existing) {
