@@ -7,7 +7,10 @@
         </div>
     @endif
 
-    <div class="card" style="max-width: 640px;">
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-plug me-1"></i> Connexion HelloAsso</h5>
+        </div>
         <div class="card-body">
 
             {{-- 1. Choix de l'environnement en tête --}}

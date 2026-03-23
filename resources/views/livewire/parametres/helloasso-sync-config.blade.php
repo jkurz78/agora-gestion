@@ -68,13 +68,17 @@
             <button wire:click="sauvegarder" class="btn btn-sm btn-primary">
                 <i class="bi bi-check-lg me-1"></i> Enregistrer la configuration
             </button>
+        </div>
+    </div>
 
-            <hr class="my-4">
-
-            {{-- Mapping formulaires → opérations --}}
-            <h6>Mapping des formulaires → opérations</h6>
+    {{-- Mapping formulaires → opérations --}}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-diagram-3 me-1"></i> Mapping des formulaires → opérations</h5>
+        </div>
+        <div class="card-body">
             <div class="d-flex align-items-center gap-2 mb-3">
-                <button wire:click="chargerFormulaires" class="btn btn-sm btn-outline-primary" wire:loading.attr="disabled">
+                <button wire:click="chargerFormulaires" class="btn btn-sm btn-primary" wire:loading.attr="disabled">
                     <span wire:loading wire:target="chargerFormulaires" class="spinner-border spinner-border-sm me-1"></span>
                     <i class="bi bi-cloud-download me-1" wire:loading.remove wire:target="chargerFormulaires"></i>
                     Charger les formulaires depuis HelloAsso
@@ -97,7 +101,7 @@
                                 <td class="small"><span class="badge text-bg-secondary">{{ $fm->form_type }}</span></td>
                                 <td>
                                     <select wire:model="formOperations.{{ $fm->id }}" class="form-select form-select-sm">
-                                        <option value="">— Aucune —</option>
+                                        <option value="">Ne pas suivre ce formulaire comme une opération</option>
                                         @foreach($operations as $op)
                                             <option value="{{ $op->id }}">{{ $op->nom }}</option>
                                         @endforeach
