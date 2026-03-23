@@ -33,6 +33,7 @@ final class Transaction extends Model
         'numero_piece',
         'helloasso_order_id',
         'helloasso_cashout_id',
+        'helloasso_payment_id',
     ];
 
     protected function casts(): array
@@ -49,6 +50,7 @@ final class Transaction extends Model
             'rapprochement_id' => 'integer',
             'helloasso_order_id' => 'integer',
             'helloasso_cashout_id' => 'integer',
+            'helloasso_payment_id' => 'integer',
         ];
     }
 
