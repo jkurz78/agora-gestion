@@ -54,9 +54,19 @@ Pas de sélecteur d'exercice dans le wizard. L'exercice actif est celui de la se
 
 Contrairement aux composants actuels `HelloassoTiersRapprochement` et `HelloassoSync` qui affichent un sélecteur d'exercice, le wizard n'en a pas. Le sélecteur d'exercice global dans la barre de navigation contrôle l'exercice pour toute l'application.
 
-## Pré-requis : credentials
+## Pré-requis : vérification de la configuration
 
-Avant tout auto-fetch (étape 1 au mount), le wizard vérifie que les `HelloAssoParametres` existent et ont des credentials valides (`client_id` non null). Si ce n'est pas le cas, le wizard affiche un avertissement inline : _"Les credentials HelloAsso ne sont pas encore configurés."_ avec un lien vers Paramètres → Connexion HelloAsso. Aucun appel API n'est tenté.
+Au mount du composant, le wizard vérifie la configuration HelloAsso et affiche des messages adaptés. Tous les messages incluent un lien vers Paramètres → Connexion HelloAsso.
+
+**Bloquant** (empêche le démarrage du wizard, aucun appel API tenté) :
+- Credentials API absents (`client_id` null) : _"Les credentials HelloAsso ne sont pas encore configurés."_
+- Compte HelloAsso non configuré (`compte_helloasso_id` null) : _"Le compte bancaire HelloAsso n'est pas configuré."_
+
+**Avertissements** (affichés en haut du wizard, n'empêchent pas la synchro) :
+- Compte de versement non configuré (`compte_versement_id` null) : _"Le compte de versement n'est pas configuré — les versements (cashouts) ne seront pas traités."_
+- Sous-catégorie Dons non configurée : _"La sous-catégorie Dons n'est pas configurée — les dons ne seront pas importés."_
+- Sous-catégorie Cotisations non configurée : _"La sous-catégorie Cotisations n'est pas configurée — les cotisations ne seront pas importées."_
+- Sous-catégorie Inscriptions non configurée : _"La sous-catégorie Inscriptions n'est pas configurée — les inscriptions ne seront pas importées."_
 
 ## Layout : accordéon à 3 étapes
 
