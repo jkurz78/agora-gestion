@@ -21,7 +21,7 @@ final class HelloassoTiersRapprochement extends Component
      */
     public array $persons = [];
 
-    /** @var array<string, ?int> email → selected tiers_id */
+    /** @var array<int, ?int> index → selected tiers_id */
     public array $selectedTiers = [];
 
     /** @var array<string, array> Données payer indexées par email, pour la création */
@@ -70,6 +70,7 @@ final class HelloassoTiersRapprochement extends Component
         // Build unified persons list: unlinked first, then linked
         $this->persons = [];
         $this->selectedTiers = [];
+        $index = 0;
 
         // Unlinked persons (sorted first)
         foreach ($result['unlinked'] as $person) {
@@ -85,7 +86,8 @@ final class HelloassoTiersRapprochement extends Component
                 'tiers_id' => null,
                 'tiers_name' => null,
             ];
-            $this->selectedTiers[$person['email']] = $suggestedId;
+            $this->selectedTiers[$index] = $suggestedId;
+            $index++;
         }
 
         // Linked persons (after unlinked)
@@ -97,7 +99,8 @@ final class HelloassoTiersRapprochement extends Component
                 'tiers_id' => $person['tiers_id'],
                 'tiers_name' => $person['tiers_name'],
             ];
-            $this->selectedTiers[$person['email']] = $person['tiers_id'];
+            $this->selectedTiers[$index] = $person['tiers_id'];
+            $index++;
         }
 
         $this->fetched = true;
@@ -115,10 +118,11 @@ final class HelloassoTiersRapprochement extends Component
         }
     }
 
-    public function associer(string $email): void
+    public function associer(int $index): void
     {
-        $tiersId = $this->selectedTiers[$email] ?? null;
-        if ($tiersId === null) {
+        $email = $this->persons[$index]['email'] ?? null;
+        $tiersId = $this->selectedTiers[$index] ?? null;
+        if ($tiersId === null || $email === null) {
             return;
         }
 
@@ -140,13 +144,14 @@ final class HelloassoTiersRapprochement extends Component
         })->all();
     }
 
-    public function creer(string $email): void
+    public function creer(int $index): void
     {
-        $person = collect($this->persons)->firstWhere('email', $email);
+        $person = $this->persons[$index] ?? null;
         if ($person === null) {
             return;
         }
 
+        $email = $person['email'];
         $payer = $this->payerData[$email] ?? [];
 
         $tiers = Tiers::create([
@@ -162,17 +167,9 @@ final class HelloassoTiersRapprochement extends Component
             'pour_recettes' => true,
         ]);
 
-        // Update the person in the list
-        $this->persons = collect($this->persons)->map(function (array $p) use ($email, $tiers) {
-            if ($p['email'] === $email) {
-                $p['tiers_id'] = $tiers->id;
-                $p['tiers_name'] = $tiers->displayName();
-            }
-
-            return $p;
-        })->all();
-
-        $this->selectedTiers[$email] = $tiers->id;
+        $this->persons[$index]['tiers_id'] = $tiers->id;
+        $this->persons[$index]['tiers_name'] = $tiers->displayName();
+        $this->selectedTiers[$index] = $tiers->id;
     }
 
     public function render(): View
