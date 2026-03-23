@@ -71,17 +71,24 @@ final class HelloAssoSyncService
      */
     private function processOrder(array $order, int $exercice): array
     {
-        // Group items by beneficiary email
+        // Group items by beneficiary nom+prénom
         $groups = $this->groupItemsByBeneficiary($order);
         $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'skipped' => 0];
 
         $orderDate = Carbon::parse($order['date'])->toDateString();
         $modePaiement = $this->resolveModePaiement($order['payments'] ?? []);
 
-        foreach ($groups as $email => $items) {
-            $tiers = Tiers::where('email', $email)->where('est_helloasso', true)->first();
+        foreach ($groups as $key => $group) {
+            $items = $group['items'];
+            $firstName = $group['firstName'];
+            $lastName = $group['lastName'];
+
+            $tiers = Tiers::whereRaw('LOWER(nom) = ?', [strtolower($lastName)])
+                ->whereRaw('LOWER(prenom) = ?', [strtolower($firstName)])
+                ->where('est_helloasso', true)
+                ->first();
             if ($tiers === null) {
-                throw new \RuntimeException("Tiers non trouvé pour {$email} — rapprochez d'abord les tiers");
+                throw new \RuntimeException("Tiers non trouvé pour {$firstName} {$lastName} — rapprochez d'abord les tiers");
             }
 
             // Pre-validate: resolve sous-catégories and opérations for all items
@@ -160,9 +167,9 @@ final class HelloAssoSyncService
     }
 
     /**
-     * Group items by beneficiary email. Uses 'user' if present, else 'payer'.
+     * Group items by beneficiary nom+prénom.
      *
-     * @return array<string, list<array>>
+     * @return array<string, array{firstName: string, lastName: string, items: list<array>}>
      */
     private function groupItemsByBeneficiary(array $order): array
     {
@@ -171,16 +178,23 @@ final class HelloAssoSyncService
         foreach ($order['items'] as $item) {
             // Per-item user takes priority, fallback to order-level user/payer
             $person = $item['user'] ?? $order['user'] ?? $order['payer'] ?? null;
-            if ($person === null) {
+            if ($person === null || empty($person['lastName'])) {
                 continue;
             }
 
-            $email = strtolower(trim($person['email'] ?? ''));
-            if ($email === '') {
-                continue;
+            $firstName = trim($person['firstName'] ?? '');
+            $lastName = trim($person['lastName'] ?? '');
+            $key = strtolower($lastName) . '|' . strtolower($firstName);
+
+            if (! isset($groups[$key])) {
+                $groups[$key] = [
+                    'firstName' => $firstName,
+                    'lastName' => $lastName,
+                    'items' => [],
+                ];
             }
 
-            $groups[$email][] = $item;
+            $groups[$key]['items'][] = $item;
         }
 
         return $groups;

@@ -43,9 +43,11 @@ it('fetches and displays unlinked persons', function () {
     fakeHelloAssoOrders([
         [
             'id' => 1, 'amount' => 5000,
-            'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
             'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
-            'items' => [], 'payments' => [],
+            'items' => [
+                ['user' => ['firstName' => 'Jean', 'lastName' => 'Dupont']],
+            ],
+            'payments' => [],
         ],
     ]);
 
@@ -62,9 +64,11 @@ it('associates a person to an existing tiers', function () {
     fakeHelloAssoOrders([
         [
             'id' => 1, 'amount' => 5000,
-            'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
             'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
-            'items' => [], 'payments' => [],
+            'items' => [
+                ['user' => ['firstName' => 'Jean', 'lastName' => 'Dupont']],
+            ],
+            'payments' => [],
         ],
     ]);
 
@@ -75,18 +79,21 @@ it('associates a person to an existing tiers', function () {
 
     $tiers->refresh();
     expect($tiers->est_helloasso)->toBeTrue();
-    expect($tiers->email)->toBe('jean@test.com');
+    // Email is NOT overwritten — associer only sets est_helloasso
+    expect($tiers->email)->toBe('jean-ancien@test.com');
 });
 
 it('pre-selects suggested tiers by index', function () {
-    Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean', 'email' => 'jean@test.com', 'est_helloasso' => false]);
+    Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean', 'est_helloasso' => false]);
 
     fakeHelloAssoOrders([
         [
             'id' => 1, 'amount' => 5000,
-            'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
             'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
-            'items' => [], 'payments' => [],
+            'items' => [
+                ['user' => ['firstName' => 'Jean', 'lastName' => 'Dupont']],
+            ],
+            'payments' => [],
         ],
     ]);
 
@@ -101,9 +108,11 @@ it('creates a new tiers from HelloAsso person', function () {
     fakeHelloAssoOrders([
         [
             'id' => 1, 'amount' => 5000,
-            'user' => ['firstName' => 'Marie', 'lastName' => 'Martin', 'email' => 'marie@test.com'],
             'payer' => ['firstName' => 'Marie', 'lastName' => 'Martin', 'email' => 'marie@test.com', 'address' => '5 rue A', 'city' => 'Lyon', 'zipCode' => '69001', 'country' => 'FRA'],
-            'items' => [], 'payments' => [],
+            'items' => [
+                ['user' => ['firstName' => 'Marie', 'lastName' => 'Martin']],
+            ],
+            'payments' => [],
         ],
     ]);
 
@@ -111,12 +120,12 @@ it('creates a new tiers from HelloAsso person', function () {
         ->call('fetchTiers')
         ->call('creer', 0);
 
-    $tiers = Tiers::where('email', 'marie@test.com')->first();
+    $tiers = Tiers::where('nom', 'Martin')->where('prenom', 'Marie')->first();
     expect($tiers)->not->toBeNull();
-    expect($tiers->nom)->toBe('Martin');
-    expect($tiers->prenom)->toBe('Marie');
+    expect($tiers->email)->toBe('marie@test.com');
     expect($tiers->est_helloasso)->toBeTrue();
     expect($tiers->pour_recettes)->toBeTrue();
+    expect($tiers->ville)->toBe('Lyon');
 });
 
 it('shows unlinked persons before linked ones', function () {
@@ -125,15 +134,19 @@ it('shows unlinked persons before linked ones', function () {
     fakeHelloAssoOrders([
         [
             'id' => 1, 'amount' => 5000,
-            'user' => ['firstName' => 'Lié', 'lastName' => 'Ancien', 'email' => 'lie@test.com'],
             'payer' => ['firstName' => 'Lié', 'lastName' => 'Ancien', 'email' => 'lie@test.com'],
-            'items' => [], 'payments' => [],
+            'items' => [
+                ['user' => ['firstName' => 'Lié', 'lastName' => 'Ancien']],
+            ],
+            'payments' => [],
         ],
         [
             'id' => 2, 'amount' => 3000,
-            'user' => ['firstName' => 'Nouveau', 'lastName' => 'Inconnu', 'email' => 'nouveau@test.com'],
             'payer' => ['firstName' => 'Nouveau', 'lastName' => 'Inconnu', 'email' => 'nouveau@test.com'],
-            'items' => [], 'payments' => [],
+            'items' => [
+                ['user' => ['firstName' => 'Nouveau', 'lastName' => 'Inconnu']],
+            ],
+            'payments' => [],
         ],
     ]);
 
@@ -142,9 +155,9 @@ it('shows unlinked persons before linked ones', function () {
 
     $persons = $component->get('persons');
     // Unlinked (nouveau) should be first
-    expect($persons[0]['email'])->toBe('nouveau@test.com');
+    expect($persons[0]['lastName'])->toBe('Inconnu');
     expect($persons[0]['tiers_id'])->toBeNull();
-    // Linked (lie) should be second
-    expect($persons[1]['email'])->toBe('lie@test.com');
+    // Linked (ancien) should be second
+    expect($persons[1]['lastName'])->toBe('Ancien');
     expect($persons[1]['tiers_id'])->not->toBeNull();
 });
