@@ -72,7 +72,7 @@ it('creates rapprochement auto when cashout is complete', function () {
     Livewire::test(HelloassoSync::class)
         ->call('synchroniser')
         ->assertSee('1 créée')
-        ->assertSee('Rapprochements')
+        ->assertSee('Rapprochements auto-verrouillés')
         ->assertSee('Synchronisation terminée');
 
     expect(VirementInterne::where('helloasso_cashout_id', 5001)->count())->toBe(1);
@@ -101,6 +101,6 @@ it('fetches payments with extended range N-1 to N', function () {
         // For exercice 2025: orders use from=2025-09-01, payments should use from=2024-09-01
         $from = $request['from'] ?? '';
 
-        return str_starts_with($from, '2024-09-01') || str_starts_with($from, '2025-09-01');
+        return str_starts_with($from, '2024-09-01');
     });
 });

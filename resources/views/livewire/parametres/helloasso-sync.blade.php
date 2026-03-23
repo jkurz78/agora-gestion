@@ -39,7 +39,7 @@
                             <li>Virements : <strong>{{ $result['virementsCreated'] }} créé(s)</strong>, <strong>{{ $result['virementsUpdated'] }} mis à jour</strong></li>
                         @endif
                         @if(($result['rapprochementsCreated'] ?? 0) > 0)
-                            <li>Rapprochements auto : <strong>{{ $result['rapprochementsCreated'] }} créée(s)</strong></li>
+                            <li>Rapprochements auto-verrouillés : <strong>{{ $result['rapprochementsCreated'] }}</strong></li>
                         @endif
                     </ul>
                 </div>
