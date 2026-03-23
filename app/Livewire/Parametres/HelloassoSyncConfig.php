@@ -54,6 +54,7 @@ final class HelloassoSyncConfig extends Component
         $p = HelloAssoParametres::where('association_id', 1)->first();
         if ($p === null) {
             $this->erreur = 'Paramètres HelloAsso non configurés.';
+
             return;
         }
 
@@ -74,6 +75,7 @@ final class HelloassoSyncConfig extends Component
         $p = HelloAssoParametres::where('association_id', 1)->first();
         if ($p === null || $p->client_id === null) {
             $this->erreur = 'Paramètres HelloAsso non configurés.';
+
             return;
         }
 
@@ -82,6 +84,7 @@ final class HelloassoSyncConfig extends Component
             $forms = $client->fetchForms();
         } catch (\RuntimeException $e) {
             $this->erreur = $e->getMessage();
+
             return;
         }
 
@@ -105,7 +108,7 @@ final class HelloassoSyncConfig extends Component
             $this->formOperations[$m->id] = $m->operation_id;
         }
 
-        $this->message = count($forms) . ' formulaires chargés.';
+        $this->message = count($forms).' formulaires chargés.';
     }
 
     public function sauvegarderFormulaires(): void

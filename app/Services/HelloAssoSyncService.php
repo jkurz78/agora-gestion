@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
-use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Services\NumeroPieceService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
