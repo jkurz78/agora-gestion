@@ -17,7 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    \DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
 
     $this->compte = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
     $this->scDon = SousCategorie::where('pour_dons', true)->first()
