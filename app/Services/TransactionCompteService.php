@@ -88,7 +88,8 @@ final class TransactionCompteService
                 CASE WHEN tx.type = 'depense' THEN -(tx.montant_total) ELSE tx.montant_total END as montant,
                 tx.mode_paiement,
                 tx.pointe,
-                tx.numero_piece
+                tx.numero_piece,
+                (tx.helloasso_order_id IS NOT NULL) as is_helloasso
             ")
             ->where('tx.compte_id', $id)
             ->whereNull('tx.deleted_at')
@@ -100,7 +101,7 @@ final class TransactionCompteService
 
         $virementsSource = DB::table('virements_internes as vi')
             ->join('comptes_bancaires as cb', 'cb.id', '=', 'vi.compte_destination_id')
-            ->selectRaw("vi.id, 'virement_sortant' as source_type, vi.date, 'Virement sortant' as type_label, cb.nom as tiers, NULL as tiers_type, CONCAT('Virement vers ', cb.nom) as libelle, vi.reference, -(vi.montant) as montant, NULL as mode_paiement, (vi.rapprochement_source_id IS NOT NULL) as pointe, vi.numero_piece")
+            ->selectRaw("vi.id, 'virement_sortant' as source_type, vi.date, 'Virement sortant' as type_label, cb.nom as tiers, NULL as tiers_type, CONCAT('Virement vers ', cb.nom) as libelle, vi.reference, -(vi.montant) as montant, NULL as mode_paiement, (vi.rapprochement_source_id IS NOT NULL) as pointe, vi.numero_piece, 0 as is_helloasso")
             ->where('vi.compte_source_id', $id)
             ->whereNull('vi.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('vi.date', '>=', $dateDebut))
@@ -109,7 +110,7 @@ final class TransactionCompteService
 
         $virementsDestination = DB::table('virements_internes as vi')
             ->join('comptes_bancaires as cb', 'cb.id', '=', 'vi.compte_source_id')
-            ->selectRaw("vi.id, 'virement_entrant' as source_type, vi.date, 'Virement entrant' as type_label, cb.nom as tiers, NULL as tiers_type, CONCAT('Virement depuis ', cb.nom) as libelle, vi.reference, vi.montant, NULL as mode_paiement, (vi.rapprochement_destination_id IS NOT NULL) as pointe, vi.numero_piece")
+            ->selectRaw("vi.id, 'virement_entrant' as source_type, vi.date, 'Virement entrant' as type_label, cb.nom as tiers, NULL as tiers_type, CONCAT('Virement depuis ', cb.nom) as libelle, vi.reference, vi.montant, NULL as mode_paiement, (vi.rapprochement_destination_id IS NOT NULL) as pointe, vi.numero_piece, 0 as is_helloasso")
             ->where('vi.compte_destination_id', $id)
             ->whereNull('vi.deleted_at')
             ->when($dateDebut, fn (Builder $q) => $q->where('vi.date', '>=', $dateDebut))

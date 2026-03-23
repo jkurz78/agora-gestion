@@ -124,7 +124,7 @@ final class TransactionUniverselleService
                 "id, 'depense' as source_type, NULL as date, NULL as numero_piece, NULL as reference,
                  NULL as tiers, NULL as tiers_type, NULL as tiers_id, NULL as libelle,
                  NULL as categorie_label, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
-                 NULL as mode_paiement, 0 as montant, NULL as pointe"
+                 NULL as mode_paiement, 0 as montant, NULL as pointe, 0 as is_helloasso"
             );
         }
 
@@ -165,7 +165,8 @@ final class TransactionUniverselleService
                 tx.mode_paiement,
                 -(tx.montant_total) as montant,
                 tx.pointe,
-                tx.notes
+                tx.notes,
+                (tx.helloasso_order_id IS NOT NULL) as is_helloasso
             ")
             ->where('tx.type', 'depense')
             ->whereNull('tx.deleted_at')
@@ -211,7 +212,8 @@ final class TransactionUniverselleService
                 tx.mode_paiement,
                 tx.montant_total as montant,
                 tx.pointe,
-                tx.notes
+                tx.notes,
+                (tx.helloasso_order_id IS NOT NULL) as is_helloasso
             ")
             ->where('tx.type', 'recette')
             ->whereNull('tx.deleted_at')
@@ -254,7 +256,8 @@ final class TransactionUniverselleService
                 NULL as mode_paiement,
                 -(vi.montant) as montant,
                 (vi.rapprochement_source_id IS NOT NULL) as pointe,
-                vi.notes
+                vi.notes,
+                0 as is_helloasso
             ")
             ->whereNull('vi.deleted_at')
             ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))
@@ -289,7 +292,8 @@ final class TransactionUniverselleService
                 NULL as mode_paiement,
                 vi.montant,
                 (vi.rapprochement_destination_id IS NOT NULL) as pointe,
-                vi.notes
+                vi.notes,
+                0 as is_helloasso
             ")
             ->whereNull('vi.deleted_at')
             ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))
