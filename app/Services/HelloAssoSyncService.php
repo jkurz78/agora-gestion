@@ -99,10 +99,7 @@ final class HelloAssoSyncService
             }
 
             DB::transaction(function () use ($order, $orderDate, $modePaiement, $tiers, $resolvedItems, $exercice, &$result) {
-                $totalCentimes = collect($resolvedItems)->sum(fn (array $r) => $r['item']['amount']);
-                $totalEuros = round($totalCentimes / 100, 2);
-
-                // Upsert Transaction
+                // Upsert Transaction (montant_total recalculated after lignes)
                 $existing = Transaction::where('helloasso_order_id', $order['id'])
                     ->where('tiers_id', $tiers->id)
                     ->first();
@@ -110,7 +107,6 @@ final class HelloAssoSyncService
                 if ($existing) {
                     $existing->update([
                         'date' => $orderDate,
-                        'montant_total' => $totalEuros,
                         'mode_paiement' => $modePaiement,
                         'libelle' => $this->buildLibelle($order),
                     ]);
@@ -121,9 +117,10 @@ final class HelloAssoSyncService
                         'type' => 'recette',
                         'date' => $orderDate,
                         'libelle' => $this->buildLibelle($order),
-                        'montant_total' => $totalEuros,
+                        'montant_total' => 0,
                         'mode_paiement' => $modePaiement,
                         'tiers_id' => $tiers->id,
+                        'reference' => $this->buildReference($order),
                         'compte_id' => $this->parametres->compte_helloasso_id,
                         'helloasso_order_id' => $order['id'],
                         'saisi_par' => auth()->id(),
@@ -160,6 +157,11 @@ final class HelloAssoSyncService
                         $result['lignes_created']++;
                     }
                 }
+
+                // Recalculate montant_total from actual lignes (handles split groups)
+                $tx->update([
+                    'montant_total' => round((float) $tx->lignes()->sum('montant'), 2),
+                ]);
             });
         }
 
@@ -256,6 +258,13 @@ final class HelloAssoSyncService
             'BankTransfer' => ModePaiement::Virement,
             default => ModePaiement::Cb,
         };
+    }
+
+    private function buildReference(array $order): string
+    {
+        $paymentId = $order['payments'][0]['id'] ?? $order['id'];
+
+        return "HA-{$paymentId}";
     }
 
     private function buildLibelle(array $order): string
