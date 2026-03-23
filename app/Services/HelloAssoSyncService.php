@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
+use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -296,25 +297,28 @@ final class HelloAssoSyncService
     }
 
     /**
-     * Import HelloAsso cash-outs into SVS virements internes.
+     * Import HelloAsso cash-outs: verify completeness, create virements + auto-locked rapprochements.
      *
      * @param  list<array<string, mixed>>  $cashOuts
-     * @return array{virements_created: int, virements_updated: int, integrity_warnings: list<string>, errors: list<string>}
+     * @return array{virements_created: int, virements_updated: int, rapprochements_created: int, cashouts_incomplets: list<string>, info_exercice_precedent: list<string>, errors: list<string>}
      */
     public function synchroniserCashouts(array $cashOuts): array
     {
         $virementsCreated = 0;
-        $virementsUpdated = 0;
-        $integrityWarnings = [];
+        $rapprochementsCreated = 0;
+        $cashoutsIncomplets = [];
         $errors = [];
+
+        // Sort by cashout date (chronological) for consistent rapprochement chain
+        usort($cashOuts, fn ($a, $b) => strcmp($a['date'], $b['date']));
 
         foreach ($cashOuts as $cashOut) {
             try {
                 $result = $this->processCashout($cashOut);
                 $virementsCreated += $result['created'];
-                $virementsUpdated += $result['updated'];
-                if ($result['warning'] !== null) {
-                    $integrityWarnings[] = $result['warning'];
+                $rapprochementsCreated += $result['rapprochement_created'];
+                if ($result['incomplet'] !== null) {
+                    $cashoutsIncomplets[] = $result['incomplet'];
                 }
             } catch (\Throwable $e) {
                 $errors[] = "Cashout #{$cashOut['id']} : {$e->getMessage()}";
@@ -323,78 +327,81 @@ final class HelloAssoSyncService
 
         return [
             'virements_created' => $virementsCreated,
-            'virements_updated' => $virementsUpdated,
-            'integrity_warnings' => $integrityWarnings,
+            'virements_updated' => 0,
+            'rapprochements_created' => $rapprochementsCreated,
+            'cashouts_incomplets' => $cashoutsIncomplets,
+            'info_exercice_precedent' => [],
             'errors' => $errors,
         ];
     }
 
     /**
-     * @return array{created: int, updated: int, warning: ?string}
+     * @return array{created: int, rapprochement_created: int, incomplet: ?string}
      */
     private function processCashout(array $cashOut): array
     {
-        $result = ['created' => 0, 'updated' => 0, 'warning' => null];
+        $result = ['created' => 0, 'rapprochement_created' => 0, 'incomplet' => null];
+
+        // Idempotence: skip if virement already exists
+        $existingVirement = VirementInterne::where('helloasso_cashout_id', $cashOut['id'])->exists();
+        if ($existingVirement) {
+            return $result;
+        }
 
         $cashOutDate = Carbon::parse($cashOut['date']);
         $montantEuros = round($cashOut['amount'] / 100, 2);
 
-        DB::transaction(function () use ($cashOut, $cashOutDate, $montantEuros, &$result) {
-            // 1. Upsert VirementInterne
-            $existing = VirementInterne::withTrashed()
-                ->where('helloasso_cashout_id', $cashOut['id'])
-                ->first();
+        // Collect payment IDs from the cashout
+        $paymentIds = collect($cashOut['payments'] ?? [])->pluck('id')->filter()->all();
 
-            if ($existing?->trashed()) {
-                $existing->restore();
-            }
+        // Find matching transactions in DB (no exercice filter)
+        $transactions = Transaction::whereIn('helloasso_payment_id', $paymentIds)->get();
 
-            if ($existing) {
-                $existing->update([
-                    'date' => $cashOutDate->toDateString(),
-                    'montant' => $montantEuros,
-                    'compte_source_id' => $this->parametres->compte_helloasso_id,
-                    'compte_destination_id' => $this->parametres->compte_versement_id,
-                    'notes' => 'Versement HelloAsso du '.$cashOutDate->format('d/m/Y'),
-                    'reference' => "HA-CO-{$cashOut['id']}",
-                ]);
-                $result['updated']++;
-            } else {
-                VirementInterne::create([
-                    'date' => $cashOutDate->toDateString(),
-                    'montant' => $montantEuros,
-                    'compte_source_id' => $this->parametres->compte_helloasso_id,
-                    'compte_destination_id' => $this->parametres->compte_versement_id,
-                    'notes' => 'Versement HelloAsso du '.$cashOutDate->format('d/m/Y'),
-                    'reference' => "HA-CO-{$cashOut['id']}",
-                    'helloasso_cashout_id' => $cashOut['id'],
-                    'saisi_par' => auth()->id() ?? 1,
-                    'numero_piece' => app(NumeroPieceService::class)->assign($cashOutDate),
-                ]);
-                $result['created']++;
-            }
+        // Update helloasso_cashout_id on found transactions (even if incomplete)
+        Transaction::whereIn('helloasso_payment_id', $paymentIds)
+            ->whereNull('helloasso_cashout_id')
+            ->update(['helloasso_cashout_id' => $cashOut['id']]);
 
-            // 2. Mark linked transactions
-            $paymentIds = collect($cashOut['payments'] ?? [])->pluck('id')->filter()->all();
-            if (! empty($paymentIds)) {
-                Transaction::whereIn('helloasso_payment_id', $paymentIds)
-                    ->whereNull('helloasso_cashout_id')
-                    ->update(['helloasso_cashout_id' => $cashOut['id']]);
-            }
+        // Check completeness
+        $sumTransactions = round((float) $transactions->sum('montant_total'), 2);
 
-            // 3. Integrity check
-            $sumTransactions = (float) Transaction::where('helloasso_cashout_id', $cashOut['id'])->sum('montant_total');
-            $sumTransactions = round($sumTransactions, 2);
+        if (abs($sumTransactions - $montantEuros) > 0.01) {
+            $result['incomplet'] = sprintf(
+                'Cashout #%d incomplet : écart de %.2f € (versement %.2f €, transactions %.2f €)',
+                $cashOut['id'],
+                abs($montantEuros - $sumTransactions),
+                $montantEuros,
+                $sumTransactions,
+            );
 
-            if (abs($sumTransactions - $montantEuros) > 0.01) {
-                $result['warning'] = sprintf(
-                    'Cashout #%d : écart de %.2f € entre le versement (%.2f €) et les transactions liées (%.2f €)',
-                    $cashOut['id'],
-                    abs($montantEuros - $sumTransactions),
-                    $montantEuros,
-                    $sumTransactions,
-                );
-            }
+            return $result;
+        }
+
+        // Complete → create virement + auto-locked rapprochement
+        DB::transaction(function () use ($cashOut, $cashOutDate, $montantEuros, $transactions, &$result) {
+            $virement = VirementInterne::create([
+                'date' => $cashOutDate->toDateString(),
+                'montant' => $montantEuros,
+                'compte_source_id' => $this->parametres->compte_helloasso_id,
+                'compte_destination_id' => $this->parametres->compte_versement_id,
+                'notes' => 'Versement HelloAsso du '.$cashOutDate->format('d/m/Y'),
+                'reference' => "HA-CO-{$cashOut['id']}",
+                'helloasso_cashout_id' => $cashOut['id'],
+                'saisi_par' => auth()->id() ?? 1,
+                'numero_piece' => app(NumeroPieceService::class)->assign($cashOutDate),
+            ]);
+            $result['created']++;
+
+            // Auto-locked rapprochement
+            $compte = CompteBancaire::find($this->parametres->compte_helloasso_id);
+            app(RapprochementBancaireService::class)->createVerrouilleAuto(
+                compte: $compte,
+                dateFin: $cashOutDate->toDateString(),
+                soldeFin: app(RapprochementBancaireService::class)->calculerSoldeOuverture($compte),
+                transactionIds: $transactions->pluck('id')->all(),
+                virementId: $virement->id,
+            );
+            $result['rapprochement_created']++;
         });
 
         return $result;
