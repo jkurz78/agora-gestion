@@ -110,11 +110,15 @@ final class HelloAssoSyncService
                 }
 
                 if ($existing) {
-                    $existing->update([
+                    $data = [
                         'date' => $orderDate,
                         'mode_paiement' => $modePaiement,
                         'libelle' => $this->buildLibelle($order),
-                    ]);
+                    ];
+                    if (empty($existing->reference)) {
+                        $data['reference'] = $this->buildReference($order);
+                    }
+                    $existing->update($data);
                     $result['tx_updated']++;
                     $tx = $existing;
                 } else {
