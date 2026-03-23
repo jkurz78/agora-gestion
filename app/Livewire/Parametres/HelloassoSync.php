@@ -20,8 +20,6 @@ final class HelloassoSync extends Component
 
     public ?string $erreur = null;
 
-    public bool $syncing = false;
-
     public function mount(): void
     {
         $this->exercice = app(ExerciceService::class)->current();
