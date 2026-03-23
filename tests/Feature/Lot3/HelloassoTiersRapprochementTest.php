@@ -56,7 +56,7 @@ it('fetches and displays unlinked persons', function () {
         ->assertSee('jean@test.com');
 });
 
-it('associates a person to an existing tiers', function () {
+it('associates a person to an existing tiers via select', function () {
     $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean', 'email' => 'jean-ancien@test.com']);
 
     fakeHelloAssoOrders([
@@ -70,11 +70,31 @@ it('associates a person to an existing tiers', function () {
 
     Livewire::test(HelloassoTiersRapprochement::class)
         ->call('fetchTiers')
-        ->call('associer', 'jean@test.com', $tiers->id);
+        ->set('selectedTiers.jean@test.com', $tiers->id)
+        ->call('associer', 'jean@test.com');
 
     $tiers->refresh();
     expect($tiers->est_helloasso)->toBeTrue();
     expect($tiers->email)->toBe('jean@test.com');
+});
+
+it('pre-selects suggested tiers in the select', function () {
+    Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean', 'email' => 'jean@test.com', 'est_helloasso' => false]);
+
+    fakeHelloAssoOrders([
+        [
+            'id' => 1, 'amount' => 5000,
+            'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'items' => [], 'payments' => [],
+        ],
+    ]);
+
+    $component = Livewire::test(HelloassoTiersRapprochement::class)
+        ->call('fetchTiers');
+
+    $selectedTiers = $component->get('selectedTiers');
+    expect($selectedTiers['jean@test.com'])->not->toBeNull();
 });
 
 it('creates a new tiers from HelloAsso person', function () {
@@ -99,18 +119,32 @@ it('creates a new tiers from HelloAsso person', function () {
     expect($tiers->pour_recettes)->toBeTrue();
 });
 
-it('ignores a person', function () {
+it('shows unlinked persons before linked ones', function () {
+    Tiers::factory()->create(['nom' => 'Ancien', 'prenom' => 'Lié', 'email' => 'lie@test.com', 'est_helloasso' => true]);
+
     fakeHelloAssoOrders([
         [
             'id' => 1, 'amount' => 5000,
-            'user' => ['firstName' => 'Paul', 'lastName' => 'Durand', 'email' => 'paul@test.com'],
-            'payer' => ['firstName' => 'Paul', 'lastName' => 'Durand', 'email' => 'paul@test.com'],
+            'user' => ['firstName' => 'Lié', 'lastName' => 'Ancien', 'email' => 'lie@test.com'],
+            'payer' => ['firstName' => 'Lié', 'lastName' => 'Ancien', 'email' => 'lie@test.com'],
+            'items' => [], 'payments' => [],
+        ],
+        [
+            'id' => 2, 'amount' => 3000,
+            'user' => ['firstName' => 'Nouveau', 'lastName' => 'Inconnu', 'email' => 'nouveau@test.com'],
+            'payer' => ['firstName' => 'Nouveau', 'lastName' => 'Inconnu', 'email' => 'nouveau@test.com'],
             'items' => [], 'payments' => [],
         ],
     ]);
 
-    Livewire::test(HelloassoTiersRapprochement::class)
-        ->call('fetchTiers')
-        ->call('ignorer', 'paul@test.com')
-        ->assertDontSee('paul@test.com');
+    $component = Livewire::test(HelloassoTiersRapprochement::class)
+        ->call('fetchTiers');
+
+    $persons = $component->get('persons');
+    // Unlinked (nouveau) should be first
+    expect($persons[0]['email'])->toBe('nouveau@test.com');
+    expect($persons[0]['tiers_id'])->toBeNull();
+    // Linked (lie) should be second
+    expect($persons[1]['email'])->toBe('lie@test.com');
+    expect($persons[1]['tiers_id'])->not->toBeNull();
 });
