@@ -73,6 +73,18 @@ final class HelloassoSync extends Component
             'cashoutSkipped' => false,
         ];
 
+        // DEBUG: log payment structure to see cashout fields
+        $firstPayment = null;
+        foreach ($orders as $o) {
+            foreach ($o['payments'] ?? [] as $p) {
+                $firstPayment = $p;
+                break 2;
+            }
+        }
+        if ($firstPayment !== null) {
+            \Log::info('HelloAsso payment keys: '.implode(', ', array_keys($firstPayment)), $firstPayment);
+        }
+
         // Cashout sync — extract cash-outs from the orders we already fetched
         if ($parametres->compte_versement_id === null) {
             $this->result['cashoutSkipped'] = true;
