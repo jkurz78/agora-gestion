@@ -68,7 +68,7 @@ it('uses solde_fin of last locked rapprochement as solde_ouverture', function ()
         'compte_id' => $this->compte->id,
         'date_fin' => '2025-09-15',
         'solde_ouverture' => 0.00,
-        'solde_fin' => 0.00,
+        'solde_fin' => 150.00,
         'statut' => StatutRapprochement::Verrouille,
         'verrouille_at' => now(),
         'saisi_par' => User::first()->id,
@@ -90,7 +90,7 @@ it('uses solde_fin of last locked rapprochement as solde_ouverture', function ()
         virementId: $virement->id,
     );
 
-    expect($rapprochement->solde_ouverture)->toBe('0.00');
+    expect($rapprochement->solde_ouverture)->toBe('150.00');
 });
 
 it('works even when a manual rapprochement en cours exists', function () {
