@@ -99,9 +99,9 @@ final class HelloAssoTiersResolver
             $lowerLastName = strtolower($person['lastName']);
             $lowerFirstName = strtolower($person['firstName']);
 
-            // Check if already linked (est_helloasso + same nom+prénom)
-            $existingLinked = Tiers::whereRaw('LOWER(nom) = ?', [$lowerLastName])
-                ->whereRaw('LOWER(prenom) = ?', [$lowerFirstName])
+            // Check if already linked (est_helloasso + same helloasso_nom+helloasso_prenom)
+            $existingLinked = Tiers::whereRaw('LOWER(helloasso_nom) = ?', [$lowerLastName])
+                ->whereRaw('LOWER(helloasso_prenom) = ?', [$lowerFirstName])
                 ->where('est_helloasso', true)
                 ->first();
 

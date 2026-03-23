@@ -64,8 +64,10 @@ final class TiersFactory extends Factory
 
     public function avecHelloasso(): static
     {
-        return $this->state([
-            'est_helloasso' => true,
-        ]);
+        return $this->state(['est_helloasso' => true])
+            ->afterMaking(function (Tiers $tiers) {
+                $tiers->helloasso_nom ??= $tiers->nom;
+                $tiers->helloasso_prenom ??= $tiers->prenom;
+            });
     }
 }

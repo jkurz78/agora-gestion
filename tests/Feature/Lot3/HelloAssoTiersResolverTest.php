@@ -106,8 +106,8 @@ it('skips items with no user or empty lastName', function () {
     expect($persons)->toHaveCount(0);
 });
 
-it('marks already linked tiers (est_helloasso + same nom+prénom)', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean', 'est_helloasso' => true]);
+it('marks already linked tiers (est_helloasso + same helloasso_nom+prénom)', function () {
+    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean', 'est_helloasso' => true, 'helloasso_nom' => 'Dupont', 'helloasso_prenom' => 'Jean']);
 
     $persons = [
         ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
