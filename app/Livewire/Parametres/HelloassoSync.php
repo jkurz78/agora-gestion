@@ -85,7 +85,7 @@ final class HelloassoSync extends Component
 
                 $payments = $client->fetchPayments($paymentsFrom, $to);
                 $cashOuts = HelloAssoApiClient::extractCashOutsFromPayments($payments);
-                $cashoutResult = $syncService->synchroniserCashouts($cashOuts);
+                $cashoutResult = $syncService->synchroniserCashouts($cashOuts, $this->exercice);
 
                 $this->result['virementsCreated'] = $cashoutResult['virements_created'];
                 $this->result['virementsUpdated'] = $cashoutResult['virements_updated'];

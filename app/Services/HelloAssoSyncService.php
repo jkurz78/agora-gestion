@@ -304,12 +304,17 @@ final class HelloAssoSyncService
      * @param  list<array<string, mixed>>  $cashOuts
      * @return array{virements_created: int, virements_updated: int, rapprochements_created: int, cashouts_incomplets: list<string>, info_exercice_precedent: list<string>, errors: list<string>}
      */
-    public function synchroniserCashouts(array $cashOuts): array
+    public function synchroniserCashouts(array $cashOuts, ?int $exercice = null): array
     {
         $virementsCreated = 0;
         $rapprochementsCreated = 0;
         $cashoutsIncomplets = [];
         $errors = [];
+
+        // Only warn about incomplete cashouts within the active exercice
+        $exerciceRange = $exercice !== null
+            ? app(ExerciceService::class)->dateRange($exercice)
+            : null;
 
         // Sort by cashout date (chronological) for consistent rapprochement chain
         usort($cashOuts, fn ($a, $b) => strcmp($a['date'], $b['date']));
@@ -319,7 +324,12 @@ final class HelloAssoSyncService
                 $result = $this->processCashout($cashOut);
                 $virementsCreated += $result['created'];
                 $rapprochementsCreated += $result['rapprochement_created'];
-                if ($result['incomplet'] !== null) {
+                if ($result['incomplet'] !== null && $exerciceRange !== null) {
+                    $cashOutDate = Carbon::parse($cashOut['date']);
+                    if ($cashOutDate->between($exerciceRange['start'], $exerciceRange['end'])) {
+                        $cashoutsIncomplets[] = $result['incomplet'];
+                    }
+                } elseif ($result['incomplet'] !== null) {
                     $cashoutsIncomplets[] = $result['incomplet'];
                 }
             } catch (\Throwable $e) {
