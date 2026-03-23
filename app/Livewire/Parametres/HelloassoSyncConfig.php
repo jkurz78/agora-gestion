@@ -98,6 +98,9 @@ final class HelloassoSyncConfig extends Component
                 [
                     'form_type' => $form['formType'] ?? '',
                     'form_title' => $form['title'] ?? $form['formSlug'],
+                    'start_date' => isset($form['startDate']) ? \Carbon\Carbon::parse($form['startDate'])->toDateString() : null,
+                    'end_date' => isset($form['endDate']) ? \Carbon\Carbon::parse($form['endDate'])->toDateString() : null,
+                    'state' => $form['state'] ?? null,
                 ],
             );
         }

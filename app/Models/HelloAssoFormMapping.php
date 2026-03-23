@@ -16,6 +16,9 @@ final class HelloAssoFormMapping extends Model
         'form_slug',
         'form_type',
         'form_title',
+        'start_date',
+        'end_date',
+        'state',
         'operation_id',
     ];
 
@@ -24,6 +27,8 @@ final class HelloAssoFormMapping extends Model
         return [
             'helloasso_parametres_id' => 'integer',
             'operation_id' => 'integer',
+            'start_date' => 'date',
+            'end_date' => 'date',
         ];
     }
 
