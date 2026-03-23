@@ -378,7 +378,11 @@ final class HelloAssoSyncService
         }
 
         // Complete → create virement + auto-locked rapprochement
-        DB::transaction(function () use ($cashOut, $cashOutDate, $montantEuros, $transactions, &$result) {
+        $rapprochementService = app(RapprochementBancaireService::class);
+        $compte = CompteBancaire::find($this->parametres->compte_helloasso_id);
+        $soldeOuverture = $rapprochementService->calculerSoldeOuverture($compte);
+
+        DB::transaction(function () use ($cashOut, $cashOutDate, $montantEuros, $transactions, $rapprochementService, $compte, $soldeOuverture, &$result) {
             $virement = VirementInterne::create([
                 'date' => $cashOutDate->toDateString(),
                 'montant' => $montantEuros,
@@ -393,11 +397,10 @@ final class HelloAssoSyncService
             $result['created']++;
 
             // Auto-locked rapprochement
-            $compte = CompteBancaire::find($this->parametres->compte_helloasso_id);
-            app(RapprochementBancaireService::class)->createVerrouilleAuto(
+            $rapprochementService->createVerrouilleAuto(
                 compte: $compte,
                 dateFin: $cashOutDate->toDateString(),
-                soldeFin: app(RapprochementBancaireService::class)->calculerSoldeOuverture($compte),
+                soldeFin: $soldeOuverture,
                 transactionIds: $transactions->pluck('id')->all(),
                 virementId: $virement->id,
             );
