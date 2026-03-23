@@ -9,6 +9,7 @@ use App\Models\HelloAssoParametres;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\VirementInterne;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -292,5 +293,110 @@ final class HelloAssoSyncService
         $formType = $order['formType'] ?? '';
 
         return "HelloAsso — {$formType} ({$formSlug})";
+    }
+
+    /**
+     * Import HelloAsso cash-outs into SVS virements internes.
+     *
+     * @param  list<array<string, mixed>>  $cashOuts
+     * @return array{virements_created: int, virements_updated: int, integrity_warnings: list<string>, errors: list<string>}
+     */
+    public function synchroniserCashouts(array $cashOuts): array
+    {
+        $virementsCreated = 0;
+        $virementsUpdated = 0;
+        $integrityWarnings = [];
+        $errors = [];
+
+        foreach ($cashOuts as $cashOut) {
+            try {
+                $result = $this->processCashout($cashOut);
+                $virementsCreated += $result['created'];
+                $virementsUpdated += $result['updated'];
+                if ($result['warning'] !== null) {
+                    $integrityWarnings[] = $result['warning'];
+                }
+            } catch (\Throwable $e) {
+                $errors[] = "Cashout #{$cashOut['id']} : {$e->getMessage()}";
+            }
+        }
+
+        return [
+            'virements_created' => $virementsCreated,
+            'virements_updated' => $virementsUpdated,
+            'integrity_warnings' => $integrityWarnings,
+            'errors' => $errors,
+        ];
+    }
+
+    /**
+     * @return array{created: int, updated: int, warning: ?string}
+     */
+    private function processCashout(array $cashOut): array
+    {
+        $result = ['created' => 0, 'updated' => 0, 'warning' => null];
+
+        $cashOutDate = Carbon::parse($cashOut['date']);
+        $montantEuros = round($cashOut['amount'] / 100, 2);
+
+        DB::transaction(function () use ($cashOut, $cashOutDate, $montantEuros, &$result) {
+            // 1. Upsert VirementInterne
+            $existing = VirementInterne::withTrashed()
+                ->where('helloasso_cashout_id', $cashOut['id'])
+                ->first();
+
+            if ($existing?->trashed()) {
+                $existing->restore();
+            }
+
+            if ($existing) {
+                $existing->update([
+                    'date' => $cashOutDate->toDateString(),
+                    'montant' => $montantEuros,
+                    'compte_source_id' => $this->parametres->compte_helloasso_id,
+                    'compte_destination_id' => $this->parametres->compte_versement_id,
+                    'notes' => 'Versement HelloAsso du ' . $cashOutDate->format('d/m/Y'),
+                    'reference' => "HA-CO-{$cashOut['id']}",
+                ]);
+                $result['updated']++;
+            } else {
+                VirementInterne::create([
+                    'date' => $cashOutDate->toDateString(),
+                    'montant' => $montantEuros,
+                    'compte_source_id' => $this->parametres->compte_helloasso_id,
+                    'compte_destination_id' => $this->parametres->compte_versement_id,
+                    'notes' => 'Versement HelloAsso du ' . $cashOutDate->format('d/m/Y'),
+                    'reference' => "HA-CO-{$cashOut['id']}",
+                    'helloasso_cashout_id' => $cashOut['id'],
+                    'saisi_par' => auth()->id() ?? 1,
+                    'numero_piece' => app(NumeroPieceService::class)->assign($cashOutDate),
+                ]);
+                $result['created']++;
+            }
+
+            // 2. Mark linked transactions
+            $paymentIds = collect($cashOut['payments'] ?? [])->pluck('id')->filter()->all();
+            if (! empty($paymentIds)) {
+                Transaction::whereIn('helloasso_payment_id', $paymentIds)
+                    ->whereNull('helloasso_cashout_id')
+                    ->update(['helloasso_cashout_id' => $cashOut['id']]);
+            }
+
+            // 3. Integrity check
+            $sumTransactions = (float) Transaction::where('helloasso_cashout_id', $cashOut['id'])->sum('montant_total');
+            $sumTransactions = round($sumTransactions, 2);
+
+            if (abs($sumTransactions - $montantEuros) > 0.01) {
+                $result['warning'] = sprintf(
+                    'Cashout #%d : écart de %.2f € entre le versement (%.2f €) et les transactions liées (%.2f €)',
+                    $cashOut['id'],
+                    abs($montantEuros - $sumTransactions),
+                    $montantEuros,
+                    $sumTransactions,
+                );
+            }
+        });
+
+        return $result;
     }
 }

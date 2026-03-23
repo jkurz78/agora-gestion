@@ -7,9 +7,6 @@ namespace App\Services;
 final class HelloAssoSyncResult
 {
     /**
-     * Note : tiersCreated/tiersUpdated (Lot 3) et virementsCreated/virementsUpdated (Lot 5)
-     * seront ajoutés quand ces lots s'intégreront avec ce service.
-     *
      * @param  list<string>  $errors
      */
     public function __construct(
