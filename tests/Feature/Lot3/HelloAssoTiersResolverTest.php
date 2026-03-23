@@ -93,6 +93,44 @@ it('suggests match by name+prenom', function () {
     expect($result['unlinked'][0]['suggestions'][0]['match_type'])->toBe('nom');
 });
 
+it('extracts per-item beneficiaries when items have distinct users', function () {
+    $orders = [
+        [
+            'user' => ['firstName' => 'Parent', 'lastName' => 'Dupont', 'email' => 'parent@test.com'],
+            'payer' => ['firstName' => 'Parent', 'lastName' => 'Dupont', 'email' => 'parent@test.com'],
+            'items' => [
+                ['user' => ['firstName' => 'Enfant1', 'lastName' => 'Dupont', 'email' => 'enfant1@test.com']],
+                ['user' => ['firstName' => 'Enfant2', 'lastName' => 'Dupont', 'email' => 'enfant2@test.com']],
+            ],
+        ],
+    ];
+
+    $resolver = new HelloAssoTiersResolver;
+    $persons = $resolver->extractPersons($orders);
+
+    expect($persons)->toHaveCount(2);
+    $emails = collect($persons)->pluck('email')->sort()->values()->all();
+    expect($emails)->toBe(['enfant1@test.com', 'enfant2@test.com']);
+});
+
+it('falls back to order-level user when items have no user', function () {
+    $orders = [
+        [
+            'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'items' => [
+                ['name' => 'Adhésion'],
+            ],
+        ],
+    ];
+
+    $resolver = new HelloAssoTiersResolver;
+    $persons = $resolver->extractPersons($orders);
+
+    expect($persons)->toHaveCount(1);
+    expect($persons[0]['email'])->toBe('jean@test.com');
+});
+
 it('returns empty suggestions when no match', function () {
     $persons = [
         ['firstName' => 'Inconnu', 'lastName' => 'Personne', 'email' => 'inconnu@test.com'],
