@@ -14,7 +14,7 @@
                     <li>{{ $err }}</li>
                 @endforeach
             </ul>
-            <a href="{{ route('parametres.helloasso') }}" class="alert-link d-block mt-2">
+            <a href="{{ route($espace->value . '.parametres.helloasso') }}" class="alert-link d-block mt-2">
                 <i class="bi bi-gear me-1"></i> Paramètres → Connexion HelloAsso
             </a>
         </div>
@@ -28,7 +28,7 @@
                         <li>{{ $warn }}</li>
                     @endforeach
                 </ul>
-                <a href="{{ route('parametres.helloasso') }}" class="alert-link d-block mt-1">
+                <a href="{{ route($espace->value . '.parametres.helloasso') }}" class="alert-link d-block mt-1">
                     Configurer dans Paramètres → Connexion HelloAsso
                 </a>
             </div>

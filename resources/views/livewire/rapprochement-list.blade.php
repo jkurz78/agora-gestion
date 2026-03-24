@@ -118,7 +118,7 @@
                                 <td class="small text-muted text-nowrap">{{ $rapprochement->verrouille_at?->format('d/m/Y H:i') ?? '—' }}</td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <a href="{{ route('rapprochement.detail', $rapprochement) }}"
+                                        <a href="{{ route('compta.rapprochement.detail', $rapprochement) }}"
                                            class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye"></i>
                                             {{ $rapprochement->isEnCours() && ! $exerciceCloture ? 'Continuer' : 'Consulter' }}

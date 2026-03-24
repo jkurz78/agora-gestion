@@ -43,7 +43,7 @@
                                             <div class="small text-muted text-truncate">{{ $item['compte']->nom }}</div>
                                             <div class="fw-bold {{ $item['solde'] >= 0 ? 'text-success' : 'text-danger' }}">
                                                 {{ number_format($item['solde'], 2, ',', ' ') }} &euro;
-                                                <a href="{{ route('comptes-bancaires.transactions', $item['compte']) }}"
+                                                <a href="{{ route('compta.comptes-bancaires.transactions', $item['compte']) }}"
                                                    class="ms-1 text-muted" style="font-size:.8rem"
                                                    data-bs-toggle="tooltip" title="Voir les transactions">
                                                     <i class="bi bi-list-ul"></i>

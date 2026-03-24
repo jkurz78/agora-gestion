@@ -1,7 +1,7 @@
 <x-app-layout>
     <div class="container-fluid py-3">
         <div class="mb-2">
-            <a href="{{ route('parametres.comptes-bancaires.index') }}" class="btn btn-sm btn-outline-secondary">
+            <a href="{{ route($espace->value . '.parametres.comptes-bancaires.index') }}" class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i> Comptes
             </a>
         </div>

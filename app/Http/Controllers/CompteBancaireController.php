@@ -22,27 +22,27 @@ final class CompteBancaireController extends Controller
 
     public function create(): RedirectResponse
     {
-        return redirect()->route('parametres.comptes-bancaires.index');
+        return redirect()->route(request()->attributes->get('espace')->value.'.parametres.comptes-bancaires.index');
     }
 
     public function store(StoreCompteBancaireRequest $request): RedirectResponse
     {
         CompteBancaire::create($request->validated());
 
-        return redirect()->route('parametres.comptes-bancaires.index')
+        return redirect()->route(request()->attributes->get('espace')->value.'.parametres.comptes-bancaires.index')
             ->with('success', 'Compte bancaire créé avec succès.');
     }
 
     public function edit(CompteBancaire $comptesBancaire): RedirectResponse
     {
-        return redirect()->route('parametres.comptes-bancaires.index');
+        return redirect()->route(request()->attributes->get('espace')->value.'.parametres.comptes-bancaires.index');
     }
 
     public function update(UpdateCompteBancaireRequest $request, CompteBancaire $comptesBancaire): RedirectResponse
     {
         $comptesBancaire->update($request->validated());
 
-        return redirect()->route('parametres.comptes-bancaires.index')
+        return redirect()->route(request()->attributes->get('espace')->value.'.parametres.comptes-bancaires.index')
             ->with('success', 'Compte bancaire mis à jour avec succès.');
     }
 
@@ -61,18 +61,18 @@ final class CompteBancaireController extends Controller
                 ->count();
 
         if ($actives > 0) {
-            return redirect()->route('parametres.comptes-bancaires.index')
+            return redirect()->route(request()->attributes->get('espace')->value.'.parametres.comptes-bancaires.index')
                 ->with('error', "Suppression impossible : ce compte a {$actives} transaction(s) active(s).");
         }
 
         if ($archivees > 0) {
-            return redirect()->route('parametres.comptes-bancaires.index')
+            return redirect()->route(request()->attributes->get('espace')->value.'.parametres.comptes-bancaires.index')
                 ->with('error', "Suppression impossible : ce compte a {$archivees} transaction(s) archivée(s) (supprimées mais conservées pour la traçabilité). Purgez-les d'abord si nécessaire.");
         }
 
         $comptesBancaire->delete();
 
-        return redirect()->route('parametres.comptes-bancaires.index')
+        return redirect()->route(request()->attributes->get('espace')->value.'.parametres.comptes-bancaires.index')
             ->with('success', 'Compte bancaire supprimé avec succès.');
     }
 }

@@ -22,7 +22,7 @@
     </div>
     <div class="collapse mb-3" id="addUserForm">
         <div class="card card-body">
-            <form action="{{ route('parametres.utilisateurs.store') }}" method="POST" class="row g-2 align-items-end">
+            <form action="{{ route($espace->value . '.parametres.utilisateurs.store') }}" method="POST" class="row g-2 align-items-end">
                 @csrf
                 <div class="col-md-3">
                     <label class="form-label">Nom</label>
@@ -72,7 +72,7 @@
                             </button>
                             @if ($utilisateur->id !== auth()->id())
                                 <form method="POST"
-                                      action="{{ route('parametres.utilisateurs.destroy', $utilisateur) }}"
+                                      action="{{ route($espace->value . '.parametres.utilisateurs.destroy', $utilisateur) }}"
                                       onsubmit="return confirm('Supprimer cet utilisateur ?')">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
@@ -85,7 +85,7 @@
                 </tr>
                 <tr class="collapse" id="editUser{{ $utilisateur->id }}">
                     <td colspan="3" class="bg-light">
-                        <form action="{{ route('parametres.utilisateurs.update', $utilisateur) }}"
+                        <form action="{{ route($espace->value . '.parametres.utilisateurs.update', $utilisateur) }}"
                               method="POST" class="row g-2 align-items-end p-2">
                             @csrf @method('PUT')
                             <div class="col-md-3">
