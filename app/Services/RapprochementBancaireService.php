@@ -18,6 +18,7 @@ final class RapprochementBancaireService
     public function __construct(
         private readonly ExerciceService $exerciceService,
     ) {}
+
     /**
      * Calcule le solde d'ouverture : solde_fin du dernier rapprochement verrouillé,
      * ou solde_initial du compte si aucun n'existe.

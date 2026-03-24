@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutOperation;
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\SousCategorie;
@@ -20,7 +21,7 @@ use Livewire\Component;
 
 final class TransactionForm extends Component
 {
-    use \App\Livewire\Concerns\RespectsExerciceCloture;
+    use RespectsExerciceCloture;
 
     public ?int $transactionId = null;
 

@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\StatutRapprochement;
 use App\Enums\TypeTransaction;
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
@@ -18,9 +19,9 @@ use Livewire\WithPagination;
 
 final class RapprochementList extends Component
 {
+    use RespectsExerciceCloture;
     use WithPagination;
     use WithPerPage;
-    use \App\Livewire\Concerns\RespectsExerciceCloture;
 
     protected string $paginationTheme = 'bootstrap';
 

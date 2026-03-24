@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\TypeTransaction;
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
@@ -20,8 +21,8 @@ use Livewire\WithPagination;
 
 final class TransactionList extends Component
 {
+    use RespectsExerciceCloture;
     use WithPagination, WithPerPage;
-    use \App\Livewire\Concerns\RespectsExerciceCloture;
 
     protected string $paginationTheme = 'bootstrap';
 
