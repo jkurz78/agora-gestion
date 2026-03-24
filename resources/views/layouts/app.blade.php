@@ -1,13 +1,14 @@
 @php
     $association   = \App\Models\Association::find(1);
-    $nomAsso       = $association?->nom ?? 'Soigner•Vivre•Sourire';
+    $nomAsso       = $association?->nom ?? 'Soigner·Vivre·Sourire';
     $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
         ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
         : asset('images/logo.png');
     $exerciceService = app(\App\Services\ExerciceService::class);
     $exerciceActif   = $exerciceService->current();
     $exerciceLabel   = $exerciceService->label($exerciceActif);
-    $exercicesDispos = $exerciceService->available(6);
+    $exerciceModel   = $exerciceService->exerciceAffiche();
+    $exerciceCloture = $exerciceModel?->isCloture() ?? false;
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -229,6 +230,44 @@
                         @endif
                     @endforeach
 
+                    {{-- Dropdown Exercices --}}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('exercices.*') ? 'active' : '' }}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-journal-check"></i> Exercices
+                        </a>
+                        <ul class="dropdown-menu">
+                            @if ($exerciceCloture)
+                                <li>
+                                    <a class="dropdown-item text-danger {{ request()->routeIs('exercices.reouvrir') ? 'active' : '' }}"
+                                       href="{{ route('exercices.reouvrir') }}">
+                                        <i class="bi bi-unlock"></i> Réouvrir l'exercice
+                                    </a>
+                                </li>
+                            @else
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('exercices.cloture') ? 'active' : '' }}"
+                                       href="{{ route('exercices.cloture') }}">
+                                        <i class="bi bi-lock"></i> Clôturer l'exercice
+                                    </a>
+                                </li>
+                            @endif
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('exercices.changer') ? 'active' : '' }}"
+                                   href="{{ route('exercices.changer') }}">
+                                    <i class="bi bi-arrow-left-right"></i> Changer d'exercice
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('exercices.audit') ? 'active' : '' }}"
+                                   href="{{ route('exercices.audit') }}">
+                                    <i class="bi bi-clock-history"></i> Piste d'audit
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
                     {{-- Dropdown Paramètres --}}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ (request()->routeIs('parametres.*') && !request()->routeIs('parametres.comptes-bancaires.*')) || request()->routeIs('operations.*') ? 'active' : '' }}"
@@ -291,31 +330,12 @@
                 </ul>
 
                 <ul class="navbar-nav align-items-center gap-2">
-                    <li class="nav-item dropdown">
-                        <button class="badge rounded-pill dropdown-toggle border-0"
-                                style="background-color: rgba(255,255,255,0.18); color:#fff; font-size:.8rem; font-weight:500; padding:.4em .85em; border: 1px solid rgba(255,255,255,0.35) !important; cursor:pointer;"
-                                data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-calendar3"></i> Exercice {{ $exerciceLabel }}
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><h6 class="dropdown-header">Changer d'exercice</h6></li>
-                            @foreach ($exercicesDispos as $annee)
-                                <li>
-                                    <form method="POST" action="{{ route('exercice.changer') }}">
-                                        @csrf
-                                        <input type="hidden" name="annee" value="{{ $annee }}">
-                                        <button type="submit"
-                                                class="dropdown-item {{ $annee === $exerciceActif ? 'active' : '' }}">
-                                            <i class="bi bi-calendar3"></i>
-                                            {{ $exerciceService->label($annee) }}
-                                            @if ($annee === $exerciceActif)
-                                                <i class="bi bi-check2 float-end mt-1"></i>
-                                            @endif
-                                        </button>
-                                    </form>
-                                </li>
-                            @endforeach
-                        </ul>
+                    <li class="nav-item d-flex align-items-center">
+                        <span class="badge rounded-pill"
+                              style="background-color: rgba(255,255,255,0.18); color:#fff; font-size:.8rem; font-weight:500; padding:.4em .85em; border: 1px solid rgba(255,255,255,0.35) !important;">
+                            <i class="bi bi-{{ $exerciceCloture ? 'lock' : 'calendar3' }}"></i>
+                            Exercice {{ $exerciceLabel }}
+                        </span>
                     </li>
                     <li class="nav-item">
                         <div class="dropdown">
