@@ -8,6 +8,7 @@ use App\Enums\StatutOperation;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
 use App\Services\HelloAssoApiClient;
@@ -78,6 +79,8 @@ final class HelloassoSyncWizard extends Component
     public ?string $newOperationDateDebut = null;
 
     public ?string $newOperationDateFin = null;
+
+    public ?int $newOperationSousCategorieId = null;
 
     public function mount(): void
     {
@@ -157,7 +160,7 @@ final class HelloassoSyncWizard extends Component
     public function cancelCreateOperation(): void
     {
         $this->creatingOperationForMapping = null;
-        $this->reset('newOperationNom', 'newOperationDateDebut', 'newOperationDateFin');
+        $this->reset('newOperationNom', 'newOperationDateDebut', 'newOperationDateFin', 'newOperationSousCategorieId');
     }
 
     public function storeOperation(): void
@@ -166,6 +169,7 @@ final class HelloassoSyncWizard extends Component
             'newOperationNom' => 'required|string|max:255',
             'newOperationDateDebut' => 'required|date',
             'newOperationDateFin' => 'nullable|date|after_or_equal:newOperationDateDebut',
+            'newOperationSousCategorieId' => 'nullable|exists:sous_categories,id',
         ]);
 
         $operation = Operation::create([
@@ -173,6 +177,7 @@ final class HelloassoSyncWizard extends Component
             'date_debut' => $this->newOperationDateDebut,
             'date_fin' => $this->newOperationDateFin,
             'statut' => StatutOperation::EnCours,
+            'sous_categorie_id' => $this->newOperationSousCategorieId,
         ]);
 
         // Auto-select in the dropdown
@@ -483,6 +488,7 @@ final class HelloassoSyncWizard extends Component
         return view('livewire.banques.helloasso-sync-wizard', [
             'formMappings' => $formMappings,
             'operations' => Operation::orderBy('nom')->get(),
+            'sousCategoriesInscription' => SousCategorie::where('pour_inscriptions', true)->orderBy('nom')->get(),
         ]);
     }
 }
