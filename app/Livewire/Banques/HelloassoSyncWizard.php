@@ -6,6 +6,7 @@ namespace App\Livewire\Banques;
 
 use App\Enums\StatutOperation;
 use App\Models\HelloAssoFormMapping;
+use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
 use App\Models\SousCategorie;
@@ -84,6 +85,7 @@ final class HelloassoSyncWizard extends Component
 
     public function mount(): void
     {
+        HelloAssoNotification::where('association_id', 1)->delete();
         $this->checkConfig();
     }
 
