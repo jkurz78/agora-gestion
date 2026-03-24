@@ -8,12 +8,21 @@ use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 final class TransactionService
 {
+    public function __construct(
+        private readonly ExerciceService $exerciceService,
+    ) {}
+
     public function create(array $data, array $lignes): Transaction
     {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($data['date']))
+        );
+
         $this->validateInscriptionRequiresOperation($lignes);
 
         return DB::transaction(function () use ($data, $lignes) {
@@ -30,6 +39,10 @@ final class TransactionService
 
     public function update(Transaction $transaction, array $data, array $lignes): Transaction
     {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($data['date']))
+        );
+
         $this->validateInscriptionRequiresOperation($lignes);
 
         return DB::transaction(function () use ($transaction, $data, $lignes) {
@@ -93,6 +106,10 @@ final class TransactionService
 
     public function delete(Transaction $transaction): void
     {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
+        );
+
         if ($transaction->rapprochement_id !== null) {
             throw new \RuntimeException('Cette transaction est pointée dans un rapprochement et ne peut pas être supprimée.');
         }
@@ -107,6 +124,11 @@ final class TransactionService
 
     public function affecterLigne(TransactionLigne $ligne, array $affectations): void
     {
+        $transaction = $ligne->transaction;
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
+        );
+
         DB::transaction(function () use ($ligne, $affectations) {
             if (count($affectations) === 0) {
                 throw new \RuntimeException('La liste des affectations ne peut pas être vide.');
@@ -138,6 +160,11 @@ final class TransactionService
 
     public function supprimerAffectations(TransactionLigne $ligne): void
     {
+        $transaction = $ligne->transaction;
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
+        );
+
         DB::transaction(fn () => $ligne->affectations()->delete());
     }
 

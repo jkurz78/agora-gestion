@@ -49,6 +49,8 @@ final class BudgetTable extends Component
 
     public function addLine(int $sousCategorieId): void
     {
+        app(\App\Services\ExerciceService::class)->assertOuvert(app(\App\Services\ExerciceService::class)->current());
+
         BudgetLine::create([
             'sous_categorie_id' => $sousCategorieId,
             'exercice' => app(ExerciceService::class)->current(),
@@ -65,6 +67,8 @@ final class BudgetTable extends Component
 
     public function saveEdit(): void
     {
+        app(\App\Services\ExerciceService::class)->assertOuvert(app(\App\Services\ExerciceService::class)->current());
+
         $this->validate(['editingMontant' => ['required', 'numeric', 'min:0']]);
 
         BudgetLine::findOrFail($this->editingLineId)->update(['montant_prevu' => $this->editingMontant]);
@@ -79,6 +83,8 @@ final class BudgetTable extends Component
 
     public function deleteLine(int $lineId): void
     {
+        app(\App\Services\ExerciceService::class)->assertOuvert(app(\App\Services\ExerciceService::class)->current());
+
         BudgetLine::findOrFail($lineId)->delete();
     }
 
