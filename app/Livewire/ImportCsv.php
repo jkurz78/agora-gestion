@@ -15,6 +15,7 @@ use Livewire\WithFileUploads;
 final class ImportCsv extends Component
 {
     use WithFileUploads;
+    use \App\Livewire\Concerns\RespectsExerciceCloture;
 
     // #[Locked] prevents client-side tampering via wire:model
     #[Locked]

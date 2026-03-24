@@ -20,6 +20,7 @@ final class RapprochementList extends Component
 {
     use WithPagination;
     use WithPerPage;
+    use \App\Livewire\Concerns\RespectsExerciceCloture;
 
     protected string $paginationTheme = 'bootstrap';
 

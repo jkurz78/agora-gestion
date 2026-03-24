@@ -14,6 +14,8 @@ use Livewire\Component;
 
 final class VirementInterneForm extends Component
 {
+    use \App\Livewire\Concerns\RespectsExerciceCloture;
+
     public ?int $virementId = null;
 
     public string $date = '';
