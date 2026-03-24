@@ -129,9 +129,10 @@ Pas de middleware dédié ni de système de permissions complexe — le contrôl
 
 **Actions :**
 - Bouton "Ajouter un participant" → modale avec :
-  - Sélecteur de tiers (autocomplete sur nom/prénom)
+  - Sélecteur de tiers (autocomplete sur nom/prénom, filtre `tous`)
   - Possibilité de créer un nouveau tiers via la modale TiersForm existante
   - Date d'inscription (défaut : aujourd'hui)
+  - Notes (optionnel, texte libre)
 - Par participant :
   - Saisir/modifier les données médicales (modale, si flag activé)
   - Supprimer le participant (avec confirmation)
@@ -163,6 +164,7 @@ Ajout d'une checkbox "Accès aux données sensibles" par utilisateur dans le for
 | `app/Models/User.php` | Ajout `peut_voir_donnees_sensibles` au fillable et cast |
 | `app/Models/Operation.php` | Ajout relation `participants()` |
 | `app/Models/Tiers.php` | Ajout relation `participants()` |
+| `app/Http/Controllers/UserController.php` | Validation et persistance du flag `peut_voir_donnees_sensibles` dans store/update |
 | `resources/views/operations/show.blade.php` | Intégration `<livewire:participant-list :operation="$operation" />` |
 | `resources/views/parametres/utilisateurs/index.blade.php` | Checkbox données sensibles |
 
@@ -173,6 +175,8 @@ Ajout d'une checkbox "Accès aux données sensibles" par utilisateur dans le for
 - Modèle Operation (sauf ajout de relation)
 - Le double espace Compta/Gestion
 - Les séances / présence (lot futur)
+
+**Note sur le hard delete :** Les participants ne sont pas en SoftDeletes (contrairement aux modèles financiers). La suppression d'un participant entraîne la suppression en cascade de ses données médicales — c'est intentionnel pour la purge RGPD.
 
 ## Tests
 
