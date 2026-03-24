@@ -78,18 +78,105 @@
         </div>
         @if ($step === 2)
             <div class="card-body">
-                <h6>Soldes des comptes bancaires au {{ \Carbon\Carbon::create($annee + 1, 8, 31)->format('d/m/Y') }}</h6>
+
+                {{-- Section 1: Soldes d'ouverture --}}
+                <h6>Soldes d'ouverture au 01/09/{{ $annee }}</h6>
                 <table class="table table-sm">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                        <tr><th>Compte</th><th class="text-end">Solde</th></tr>
+                        <tr><th>Compte</th><th class="text-end">Solde d'ouverture</th></tr>
                     </thead>
                     <tbody>
-                        @foreach ($checkResult->soldesComptes as $nom => $solde)
+                        @foreach ($summary['comptesData'] as $c)
                             <tr>
-                                <td>{{ $nom }}</td>
-                                <td class="text-end">{{ number_format($solde, 2, ',', ' ') }} &euro;</td>
+                                <td>{{ $c['nom'] }}</td>
+                                <td class="text-end">{{ number_format($c['solde_ouverture'], 2, ',', ' ') }} &euro;</td>
                             </tr>
                         @endforeach
+                    </tbody>
+                    <tfoot class="fw-bold">
+                        <tr>
+                            <td>Total</td>
+                            <td class="text-end">{{ number_format($summary['totalSoldeOuverture'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                {{-- Section 2: Résultat de l'exercice --}}
+                <h6 class="mt-4">Résultat de l'exercice</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <td>Total recettes</td>
+                            <td class="text-end">{{ number_format($summary['totalRecettes'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                        <tr>
+                            <td>Total dépenses</td>
+                            <td class="text-end">{{ number_format($summary['totalDepenses'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                        <tr class="fw-bold {{ $summary['resultat'] >= 0 ? 'text-success' : 'text-danger' }}">
+                            <td>Résultat : {{ $summary['resultat'] >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }}</td>
+                            <td class="text-end">{{ number_format(abs($summary['resultat']), 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {{-- Section 3: Soldes de clôture --}}
+                <h6 class="mt-4">Soldes de clôture au 31/08/{{ $annee + 1 }}</h6>
+                <table class="table table-sm">
+                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                        <tr>
+                            <th>Compte</th>
+                            <th class="text-end">Solde d'ouverture</th>
+                            <th class="text-end">Mouvements exercice</th>
+                            <th class="text-end">Solde actuel</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($summary['comptesData'] as $c)
+                            <tr>
+                                <td>{{ $c['nom'] }}</td>
+                                <td class="text-end">{{ number_format($c['solde_ouverture'], 2, ',', ' ') }} &euro;</td>
+                                <td class="text-end">{{ number_format($c['mouvements'], 2, ',', ' ') }} &euro;</td>
+                                <td class="text-end">{{ number_format($c['solde_reel'], 2, ',', ' ') }} &euro;</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot class="fw-bold">
+                        <tr>
+                            <td>Total</td>
+                            <td class="text-end">{{ number_format($summary['totalSoldeOuverture'], 2, ',', ' ') }} &euro;</td>
+                            <td class="text-end">{{ number_format($summary['totalMouvements'], 2, ',', ' ') }} &euro;</td>
+                            <td class="text-end">{{ number_format($summary['totalSoldeReel'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                        <tr>
+                            <td>Solde théorique</td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-end">{{ number_format($summary['soldeTheorique'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                {{-- Section 4: Réconciliation --}}
+                <h6 class="mt-4">Réconciliation</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <td>Solde bancaire total</td>
+                            <td class="text-end">{{ number_format($summary['totalSoldeReel'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                        <tr>
+                            <td>Écritures non pointées ({{ $summary['nombreNonPointees'] }} écriture{{ $summary['nombreNonPointees'] > 1 ? 's' : '' }})</td>
+                            <td class="text-end">{{ number_format($summary['montantNetNonPointees'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                        <tr class="fw-bold">
+                            <td>Solde théorique</td>
+                            <td class="text-end">{{ number_format($summary['soldeTheorique'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
+                        <tr class="{{ $summary['ecartResiduel'] == 0 ? 'text-success' : 'text-danger' }} fw-bold">
+                            <td>Écart résiduel</td>
+                            <td class="text-end">{{ number_format($summary['ecartResiduel'], 2, ',', ' ') }} &euro;</td>
+                        </tr>
                     </tbody>
                 </table>
 
