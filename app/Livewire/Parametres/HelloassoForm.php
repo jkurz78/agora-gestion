@@ -26,6 +26,8 @@ final class HelloassoForm extends Component
 
     public bool $secretDejaEnregistre = false;
 
+    public ?string $callbackToken = null;
+
     public function mount(): void
     {
         $p = HelloAssoParametres::where('association_id', 1)->first();
@@ -36,6 +38,7 @@ final class HelloassoForm extends Component
             if ($p->client_secret !== null) {
                 $this->secretDejaEnregistre = true;
             }
+            $this->callbackToken = $p->callback_token;
         }
     }
 
@@ -58,10 +61,19 @@ final class HelloassoForm extends Component
             $payload['client_secret'] = $this->clientSecret;
         }
 
-        HelloAssoParametres::updateOrCreate(
+        $parametres = HelloAssoParametres::updateOrCreate(
             ['association_id' => 1],
             $payload,
         );
+
+        // Générer le token callback si absent
+        if ($parametres->callback_token === null) {
+            $token = bin2hex(random_bytes(32));
+            $parametres->update(['callback_token' => $token]);
+            $this->callbackToken = $token;
+        } else {
+            $this->callbackToken = $parametres->callback_token;
+        }
 
         if ($this->clientSecret !== '') {
             $this->secretDejaEnregistre = true;
@@ -69,6 +81,24 @@ final class HelloassoForm extends Component
 
         $this->testResult = null;
         session()->flash('success', 'Paramètres HelloAsso enregistrés.');
+    }
+
+    public function regenererToken(): void
+    {
+        $p = HelloAssoParametres::where('association_id', 1)->first();
+        if ($p !== null) {
+            $token = bin2hex(random_bytes(32));
+            $p->update(['callback_token' => $token]);
+            $this->callbackToken = $token;
+        }
+    }
+
+    public function getCallbackUrl(): ?string
+    {
+        if ($this->callbackToken === null) {
+            return null;
+        }
+        return url("/api/helloasso/callback/{$this->callbackToken}");
     }
 
     public function testerConnexion(): void
