@@ -19,6 +19,7 @@ use Livewire\WithFileUploads;
 final class BudgetTable extends Component
 {
     use WithFileUploads;
+    use \App\Livewire\Concerns\RespectsExerciceCloture;
 
     // ── Edition inline ────────────────────────────────────────────────────────
     public ?int $editingLineId = null;

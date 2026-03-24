@@ -21,6 +21,8 @@ use Livewire\Component;
 
 final class HelloassoSyncWizard extends Component
 {
+    use \App\Livewire\Concerns\RespectsExerciceCloture;
+
     public int $step = 1;
 
     public bool $configBloquante = false;

@@ -20,6 +20,8 @@ use Livewire\Component;
 
 final class TransactionForm extends Component
 {
+    use \App\Livewire\Concerns\RespectsExerciceCloture;
+
     public ?int $transactionId = null;
 
     public string $type = '';

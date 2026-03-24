@@ -15,6 +15,8 @@ use Livewire\Component;
 
 final class RapprochementDetail extends Component
 {
+    use \App\Livewire\Concerns\RespectsExerciceCloture;
+
     public RapprochementBancaire $rapprochement;
 
     public bool $masquerPointees = false;
