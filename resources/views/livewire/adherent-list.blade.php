@@ -24,7 +24,7 @@
                wire:model.live.debounce.300ms="search"
                class="form-control form-control-sm"
                style="max-width:250px"
-               placeholder="Rechercher un membre…">
+               placeholder="Rechercher un adhérent…">
     </div>
 
     {{-- Tableau --}}
@@ -100,13 +100,13 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">Aucun membre trouvé.</td>
+                        <td colspan="7" class="text-center text-muted py-4">Aucun adhérent trouvé.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <x-per-page-selector :paginator="$membres" storageKey="membres" wire:model.live="perPage" />
+    <x-per-page-selector :paginator="$membres" storageKey="adherents" wire:model.live="perPage" />
     {{ $membres->links() }}
 </div>
