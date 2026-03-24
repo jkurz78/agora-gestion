@@ -40,6 +40,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
         ->name('rapprochement.pdf');
     Route::view('/virements', 'virements.index')->name('virements.index');
+    Route::view('/banques/helloasso-sync', 'banques.helloasso-sync')->name('banques.helloasso-sync');
     Route::get('comptes-bancaires/{compte}/transactions', function (CompteBancaire $compte) {
         return view('comptes-bancaires.transactions', compact('compte'));
     })->name('comptes-bancaires.transactions');
