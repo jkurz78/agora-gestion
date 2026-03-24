@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
-use App\Enums\StatutOperation;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
