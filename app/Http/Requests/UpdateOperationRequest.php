@@ -27,6 +27,7 @@ final class UpdateOperationRequest extends FormRequest
             'date_fin' => ['required', 'date', 'after_or_equal:date_debut'],
             'nombre_seances' => ['nullable', 'integer', 'min:1'],
             'statut' => ['required', Rule::in(array_column(StatutOperation::cases(), 'value'))],
+            'sous_categorie_id' => ['nullable', 'exists:sous_categories,id'],
         ];
     }
 }

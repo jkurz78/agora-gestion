@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\ModePaiement;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
+use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -18,6 +19,9 @@ final class HelloAssoSyncService
 {
     /** @var array<string, int> Cache formSlug → operation_id */
     private array $formMappingCache = [];
+
+    /** @var array<int, ?int> operation_id => sous_categorie_id */
+    private array $operationSousCategorieCache = [];
 
     public function __construct(
         private readonly HelloAssoParametres $parametres,
@@ -233,13 +237,20 @@ final class HelloAssoSyncService
     private function resolveItem(array $item, string $formSlug): array
     {
         $type = $item['type'] ?? 'Donation';
-        $sousCategorieId = $this->resolveSousCategorie($type);
-
         $operationId = $this->formMappingCache[$formSlug] ?? null;
 
         // Registration items require an operation
         if ($type === 'Registration' && $operationId === null) {
             throw new \RuntimeException("Formulaire '{$formSlug}' non mappé — impossible d'importer un item Registration sans opération");
+        }
+
+        // Use operation's sous-catégorie if set, otherwise fall back to default
+        $sousCategorieId = null;
+        if ($operationId !== null) {
+            $sousCategorieId = $this->getOperationSousCategorieId($operationId);
+        }
+        if ($sousCategorieId === null) {
+            $sousCategorieId = $this->resolveSousCategorie($type);
         }
 
         // Exercice: only for Membership items (null = don't set exercice on the ligne)
@@ -251,6 +262,15 @@ final class HelloAssoSyncService
             'operation_id' => $operationId,
             'exercice' => $exercice,
         ];
+    }
+
+    private function getOperationSousCategorieId(int $operationId): ?int
+    {
+        if (! array_key_exists($operationId, $this->operationSousCategorieCache)) {
+            $this->operationSousCategorieCache[$operationId] = Operation::where('id', $operationId)->value('sous_categorie_id');
+        }
+
+        return $this->operationSousCategorieCache[$operationId];
     }
 
     private function resolveSousCategorie(string $itemType): int

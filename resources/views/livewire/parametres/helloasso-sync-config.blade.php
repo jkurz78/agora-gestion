@@ -34,7 +34,7 @@
             </div>
 
             {{-- Mapping sous-catégories --}}
-            <h6 class="mt-3">Mapping des sous-catégories</h6>
+            <h6 class="mt-3">Sous-catégories par défaut</h6>
             <div class="row g-3 mb-3">
                 <div class="col-md-4">
                     <label class="form-label small">Dons (Donation)</label>
