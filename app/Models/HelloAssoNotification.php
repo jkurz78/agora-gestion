@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class HelloAssoNotification extends Model
 {
+    protected $table = 'helloasso_notifications';
+
     public $timestamps = false;
 
     protected $fillable = [
