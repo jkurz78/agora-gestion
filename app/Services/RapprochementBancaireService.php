@@ -9,11 +9,15 @@ use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class RapprochementBancaireService
 {
+    public function __construct(
+        private readonly ExerciceService $exerciceService,
+    ) {}
     /**
      * Calcule le solde d'ouverture : solde_fin du dernier rapprochement verrouillé,
      * ou solde_initial du compte si aucun n'existe.
@@ -35,6 +39,10 @@ final class RapprochementBancaireService
      */
     public function create(CompteBancaire $compte, string $dateFin, float $soldeFin): RapprochementBancaire
     {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($dateFin))
+        );
+
         $enCours = RapprochementBancaire::where('compte_id', $compte->id)
             ->where('statut', StatutRapprochement::EnCours)
             ->exists();
@@ -68,6 +76,10 @@ final class RapprochementBancaireService
         array $transactionIds,
         int $virementId,
     ): RapprochementBancaire {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($dateFin))
+        );
+
         return DB::transaction(function () use ($compte, $dateFin, $soldeFin, $transactionIds, $virementId) {
             $rapprochement = RapprochementBancaire::create([
                 'compte_id' => $compte->id,
@@ -125,6 +137,10 @@ final class RapprochementBancaireService
         if ($rapprochement->isVerrouille()) {
             throw new RuntimeException('Impossible de modifier un rapprochement verrouillé.');
         }
+
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($rapprochement->date_fin))
+        );
 
         // Verify account ownership before modifying
         if (str_starts_with($type, 'virement')) {
@@ -191,6 +207,10 @@ final class RapprochementBancaireService
             throw new RuntimeException('Impossible de supprimer un rapprochement verrouillé.');
         }
 
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($rapprochement->date_fin))
+        );
+
         DB::transaction(function () use ($rapprochement) {
             $id = $rapprochement->id;
 
@@ -216,6 +236,10 @@ final class RapprochementBancaireService
         if (! $rapprochement->isVerrouille()) {
             throw new RuntimeException("Ce rapprochement n'est pas verrouillé.");
         }
+
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($rapprochement->date_fin))
+        );
 
         $enCours = RapprochementBancaire::where('compte_id', $rapprochement->compte_id)
             ->where('statut', StatutRapprochement::EnCours)
@@ -247,6 +271,10 @@ final class RapprochementBancaireService
      */
     public function verrouiller(RapprochementBancaire $rapprochement): void
     {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($rapprochement->date_fin))
+        );
+
         if ((int) round($this->calculerEcart($rapprochement) * 100) !== 0) {
             throw new RuntimeException("Le rapprochement ne peut être verrouillé que si l'écart est nul.");
         }
