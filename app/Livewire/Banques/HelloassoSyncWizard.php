@@ -8,8 +8,10 @@ use App\Enums\StatutOperation;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
+use App\Models\Tiers;
 use App\Services\ExerciceService;
 use App\Services\HelloAssoApiClient;
+use App\Services\HelloAssoTiersResolver;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -42,6 +44,21 @@ final class HelloassoSyncWizard extends Component
 
     public ?string $formErreur = null;
 
+    // Étape 2 — Tiers
+    public bool $tiersFetched = false;
+
+    public bool $tiersLoading = false;
+
+    public ?string $tiersErreur = null;
+
+    /**
+     * @var list<array{firstName: string, lastName: string, email: ?string, address: ?string, city: ?string, zipCode: ?string, country: ?string, tiers_id: ?int, tiers_name: ?string}>
+     */
+    public array $persons = [];
+
+    /** @var array<int, ?int> */
+    public array $selectedTiers = [];
+
     // Création opération inline
     public ?int $creatingOperationForMapping = null;
 
@@ -63,6 +80,10 @@ final class HelloassoSyncWizard extends Component
         }
 
         $this->step = $step;
+
+        if ($step === 2 && ! $this->tiersFetched) {
+            $this->loadTiers();
+        }
     }
 
     public function loadFormulaires(): void
@@ -167,6 +188,135 @@ final class HelloassoSyncWizard extends Component
 
         $this->updateStepOneSummary();
         $this->step = 2;
+
+        if (! $this->tiersFetched) {
+            $this->loadTiers();
+        }
+    }
+
+    public function loadTiers(): void
+    {
+        $this->tiersLoading = true;
+        $this->tiersErreur = null;
+
+        $p = HelloAssoParametres::where('association_id', 1)->first();
+
+        try {
+            $client = new HelloAssoApiClient($p);
+            $exercice = app(ExerciceService::class)->current();
+            $range = app(ExerciceService::class)->dateRange($exercice);
+            $orders = $client->fetchOrders($range['start']->toDateString(), $range['end']->toDateString());
+        } catch (\RuntimeException $e) {
+            $this->tiersErreur = $e->getMessage();
+            $this->tiersLoading = false;
+
+            return;
+        }
+
+        $resolver = new HelloAssoTiersResolver;
+        $extractedPersons = $resolver->extractPersons($orders);
+        $result = $resolver->resolve($extractedPersons);
+
+        $personDataByKey = [];
+        foreach ($extractedPersons as $personData) {
+            $key = strtolower($personData['lastName']).'|'.strtolower($personData['firstName']);
+            $personDataByKey[$key] = $personData;
+        }
+
+        // Only unlinked persons
+        $this->persons = [];
+        $this->selectedTiers = [];
+        $index = 0;
+
+        foreach ($result['unlinked'] as $person) {
+            $suggestedId = count($person['suggestions']) > 0 ? $person['suggestions'][0]['tiers_id'] : null;
+            $key = strtolower($person['lastName']).'|'.strtolower($person['firstName']);
+            $data = $personDataByKey[$key] ?? [];
+
+            $this->persons[] = [
+                'firstName' => $person['firstName'],
+                'lastName' => $person['lastName'],
+                'email' => $person['email'] ?? null,
+                'address' => $data['address'] ?? null,
+                'city' => $data['city'] ?? null,
+                'zipCode' => $data['zipCode'] ?? null,
+                'country' => $data['country'] ?? null,
+                'tiers_id' => null,
+                'tiers_name' => null,
+            ];
+            $this->selectedTiers[$index] = $suggestedId;
+            $index++;
+        }
+
+        $this->tiersFetched = true;
+        $this->tiersLoading = false;
+        $this->updateStepTwoSummary();
+    }
+
+    public function associerTiers(int $index): void
+    {
+        $tiersId = $this->selectedTiers[$index] ?? null;
+        $person = $this->persons[$index] ?? null;
+        if ($tiersId === null || $person === null) {
+            return;
+        }
+
+        $tiers = Tiers::findOrFail($tiersId);
+        $tiers->update([
+            'est_helloasso' => true,
+            'helloasso_nom' => $person['lastName'],
+            'helloasso_prenom' => $person['firstName'],
+        ]);
+
+        $this->persons[$index]['tiers_id'] = $tiers->id;
+        $this->persons[$index]['tiers_name'] = $tiers->displayName();
+        $this->updateStepTwoSummary();
+    }
+
+    public function creerTiers(int $index): void
+    {
+        $person = $this->persons[$index] ?? null;
+        if ($person === null) {
+            return;
+        }
+
+        $tiers = Tiers::create([
+            'type' => 'particulier',
+            'nom' => $person['lastName'],
+            'prenom' => $person['firstName'],
+            'email' => $person['email'],
+            'adresse_ligne1' => $person['address'],
+            'ville' => $person['city'],
+            'code_postal' => $person['zipCode'],
+            'pays' => $person['country'],
+            'est_helloasso' => true,
+            'helloasso_nom' => $person['lastName'],
+            'helloasso_prenom' => $person['firstName'],
+            'pour_recettes' => true,
+        ]);
+
+        $this->persons[$index]['tiers_id'] = $tiers->id;
+        $this->persons[$index]['tiers_name'] = $tiers->displayName();
+        $this->selectedTiers[$index] = $tiers->id;
+        $this->updateStepTwoSummary();
+    }
+
+    public function lancerSynchronisation(): void
+    {
+        $this->updateStepTwoSummary();
+        $this->step = 3;
+        $this->synchroniser();
+    }
+
+    public function synchroniser(): void
+    {
+        // Implémenté dans Task 6
+    }
+
+    private function updateStepTwoSummary(): void
+    {
+        $unlinked = collect($this->persons)->whereNull('tiers_id')->count();
+        $this->stepTwoSummary = $unlinked > 0 ? "{$unlinked} tiers à lier" : 'Tous les tiers liés';
     }
 
     private function updateStepOneSummary(): void
