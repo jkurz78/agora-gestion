@@ -1,7 +1,7 @@
 <?php
+
 declare(strict_types=1);
 use App\Enums\StatutRapprochement;
-use App\Enums\TypeTransaction;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\RapprochementBancaire;
@@ -11,8 +11,9 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\TransactionService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
-uses(\Illuminate\Foundation\Testing\RefreshDatabase::class);
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -40,6 +41,7 @@ function makeLockedTransaction(CompteBancaire $compte, string $type = 'depense')
         'transaction_id' => $transaction->id,
         'montant' => 200.00,
     ]);
+
     return $transaction->fresh(['lignes', 'rapprochement']);
 }
 
@@ -94,12 +96,12 @@ it('update rejette la modification de montant_total sur pièce verrouillée', fu
     $ligne = $transaction->lignes->first();
 
     expect(fn () => $this->service->update($transaction, [
-        'date'          => $transaction->date->format('Y-m-d'),
-        'libelle'       => $transaction->libelle,
+        'date' => $transaction->date->format('Y-m-d'),
+        'libelle' => $transaction->libelle,
         'montant_total' => '999.00',
         'mode_paiement' => $transaction->mode_paiement->value,
-        'compte_id'     => $transaction->compte_id,
-        'reference'     => $transaction->reference,
+        'compte_id' => $transaction->compte_id,
+        'reference' => $transaction->reference,
     ], [['id' => $ligne->id, 'sous_categorie_id' => $ligne->sous_categorie_id, 'montant' => '200.00', 'operation_id' => null, 'seance' => null, 'notes' => null]])
     )->toThrow(RuntimeException::class);
 });

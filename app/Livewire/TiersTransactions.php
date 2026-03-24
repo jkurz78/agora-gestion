@@ -22,18 +22,23 @@ final class TiersTransactions extends Component
     public int $tiersId;
 
     public string $typeFilter = '';
-    public string $dateDebut  = '';
-    public string $dateFin    = '';
-    public string $search     = '';
-    public string $sortBy     = 'date';
-    public string $sortDir    = 'desc';
+
+    public string $dateDebut = '';
+
+    public string $dateFin = '';
+
+    public string $search = '';
+
+    public string $sortBy = 'date';
+
+    public string $sortDir = 'desc';
 
     public function mount(int $tiersId): void
     {
         $this->tiersId = $tiersId;
         $exercice = app(ExerciceService::class)->current();
         $this->dateDebut = "{$exercice}-09-01";
-        $this->dateFin   = ($exercice + 1).'-08-31';
+        $this->dateFin = ($exercice + 1).'-08-31';
     }
 
     public function sort(string $col): void
@@ -41,16 +46,31 @@ final class TiersTransactions extends Component
         if ($this->sortBy === $col) {
             $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
         } else {
-            $this->sortBy  = $col;
+            $this->sortBy = $col;
             $this->sortDir = 'asc';
         }
         $this->resetPage();
     }
 
-    public function updatedTypeFilter(): void { $this->resetPage(); }
-    public function updatedDateDebut(): void  { $this->resetPage(); }
-    public function updatedDateFin(): void    { $this->resetPage(); }
-    public function updatedSearch(): void     { $this->resetPage(); }
+    public function updatedTypeFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedDateDebut(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedDateFin(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
 
     public function render(): View
     {

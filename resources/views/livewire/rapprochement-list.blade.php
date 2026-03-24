@@ -90,6 +90,8 @@
                         <tr>
                             <th>Date de fin</th>
                             <th class="text-end">Solde ouverture</th>
+                            <th class="text-end">Total débit</th>
+                            <th class="text-end">Total crédit</th>
                             <th class="text-end">Solde fin</th>
                             <th>Statut</th>
                             <th>Verrouillé le</th>
@@ -101,6 +103,8 @@
                             <tr wire:key="rapprochement-{{ $rapprochement->id }}">
                                 <td class="small text-nowrap">{{ $rapprochement->date_fin->format('d/m/Y') }}</td>
                                 <td class="text-end fw-semibold small text-nowrap">{{ number_format((float) $rapprochement->solde_ouverture, 2, ',', ' ') }} €</td>
+                                <td class="text-end small text-nowrap text-danger">{{ number_format($rapprochementTotals[$rapprochement->id]['debit'] ?? 0, 2, ',', ' ') }} €</td>
+                                <td class="text-end small text-nowrap text-success">{{ number_format($rapprochementTotals[$rapprochement->id]['credit'] ?? 0, 2, ',', ' ') }} €</td>
                                 <td class="text-end fw-semibold small text-nowrap">{{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €</td>
                                 <td>
                                     @if ($rapprochement->isVerrouille())

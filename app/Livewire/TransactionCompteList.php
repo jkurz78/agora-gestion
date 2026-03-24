@@ -4,18 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
-use App\Services\CotisationService;
-use App\Services\DonService;
 use App\Services\ExerciceService;
 use App\Services\TransactionCompteService;
 use App\Services\TransactionService;
 use App\Services\VirementInterneService;
-use App\Livewire\Concerns\WithPerPage;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -81,8 +77,6 @@ final class TransactionCompteList extends Component
     {
         match ($sourceType) {
             'depense', 'recette' => $this->deleteTransactionGeneric($id),
-            'don' => $this->deleteDon($id),
-            'cotisation' => $this->deleteCotisation($id),
             'virement_sortant', 'virement_entrant' => $this->deleteVirement($id),
             default => null,
         };
@@ -101,24 +95,6 @@ final class TransactionCompteList extends Component
         }
     }
 
-    private function deleteDon(int $id): void
-    {
-        $don = Don::find($id);
-        if (! $don || $don->isLockedByRapprochement()) {
-            return;
-        }
-        app(DonService::class)->delete($don);
-    }
-
-    private function deleteCotisation(int $id): void
-    {
-        $cotisation = Cotisation::find($id);
-        if (! $cotisation || $cotisation->isLockedByRapprochement()) {
-            return;
-        }
-        app(CotisationService::class)->delete($cotisation);
-    }
-
     private function deleteVirement(int $id): void
     {
         $virement = VirementInterne::find($id);
@@ -132,23 +108,11 @@ final class TransactionCompteList extends Component
     {
         $url = match ($sourceType) {
             'depense', 'recette' => url('/transactions').'?edit='.$id,
-            'don' => route('dons.index').'?edit='.$id,
             'virement_sortant', 'virement_entrant' => route('virements.index').'?edit='.$id,
-            'cotisation' => $this->buildCotisationEditUrl($id),
             default => route('dashboard'),
         };
 
         return redirect()->to($url);
-    }
-
-    private function buildCotisationEditUrl(int $id): string
-    {
-        $cotisation = Cotisation::find($id);
-        if (! $cotisation) {
-            return route('membres.index');
-        }
-
-        return route('membres.index').'?membre='.$cotisation->tiers_id.'&edit='.$id;
     }
 
     public function render(): mixed

@@ -2,21 +2,19 @@
 
 declare(strict_types=1);
 
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Services\TiersTransactionService;
 
 beforeEach(function (): void {
     $this->tiers = Tiers::factory()->create();
-    $this->service = new TiersTransactionService();
+    $this->service = new TiersTransactionService;
     session(['exercice_actif' => 2025]);
 });
 
 it('retourne les transactions de tous les types pour un tiers', function (): void {
     Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma dépense']);
-    Don::factory()->create(['tiers_id' => $this->tiers->id, 'objet' => 'Mon don']);
+    Transaction::factory()->asRecette()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Mon don']);
 
     $result = $this->service->paginate($this->tiers, '', '', '', '', 'date', 'desc');
 
@@ -25,12 +23,12 @@ it('retourne les transactions de tous les types pour un tiers', function (): voi
 
 it('filtre par type', function (): void {
     Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id]);
-    Don::factory()->create(['tiers_id' => $this->tiers->id]);
+    Transaction::factory()->asRecette()->create(['tiers_id' => $this->tiers->id]);
 
-    $result = $this->service->paginate($this->tiers, 'don', '', '', '', 'date', 'desc');
+    $result = $this->service->paginate($this->tiers, 'recette', '', '', '', 'date', 'desc');
 
     expect($result->total())->toBe(1)
-        ->and($result->items()[0]->source_type)->toBe('don');
+        ->and($result->items()[0]->source_type)->toBe('recette');
 });
 
 it('filtre par texte sur le libellé', function (): void {
@@ -85,15 +83,6 @@ it('inclut les recettes du tiers', function (): void {
 
     expect($result->total())->toBe(1)
         ->and($result->items()[0]->source_type)->toBe('recette');
-});
-
-it('inclut les cotisations du tiers', function (): void {
-    Cotisation::factory()->create(['tiers_id' => $this->tiers->id, 'exercice' => 2025]);
-
-    $result = $this->service->paginate($this->tiers, '', '', '', '', 'date', 'desc');
-
-    expect($result->total())->toBe(1)
-        ->and($result->items()[0]->source_type)->toBe('cotisation');
 });
 
 it('filtre par date fin', function (): void {

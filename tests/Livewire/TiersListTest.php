@@ -90,9 +90,9 @@ it('recherche dans le champ email', function () {
         ->assertDontSee('Dupont');
 });
 
-it('filtre helloasso actif — affiche seulement les tiers avec helloasso_id', function () {
+it('filtre helloasso actif — affiche seulement les tiers avec est_helloasso', function () {
     Tiers::factory()->avecHelloasso()->create(['nom' => 'Martin']);
-    Tiers::factory()->create(['nom' => 'Dupont', 'helloasso_id' => null]);
+    Tiers::factory()->create(['nom' => 'Dupont', 'est_helloasso' => false]);
 
     Livewire::test(TiersList::class)
         ->set('filtreHelloasso', true)
@@ -102,7 +102,7 @@ it('filtre helloasso actif — affiche seulement les tiers avec helloasso_id', f
 
 it('filtre helloasso inactif — affiche tous les tiers', function () {
     Tiers::factory()->avecHelloasso()->create(['nom' => 'Martin']);
-    Tiers::factory()->create(['nom' => 'Dupont', 'helloasso_id' => null]);
+    Tiers::factory()->create(['nom' => 'Dupont', 'est_helloasso' => false]);
 
     Livewire::test(TiersList::class)
         ->set('filtreHelloasso', false)
@@ -119,9 +119,9 @@ it('tri par nom ASC — ordre COALESCE(entreprise, nom)', function () {
     // Default is already sortBy='nom', sortDir='asc', so don't call sort
 
     $html = $component->html();
-    $posArnaud  = strpos($html, 'Arnaud');
-    $posMartin  = strpos($html, 'Martin SARL');
-    $posZephyr  = strpos($html, 'Zéphyr SA');
+    $posArnaud = strpos($html, 'Arnaud');
+    $posMartin = strpos($html, 'Martin SARL');
+    $posZephyr = strpos($html, 'Zéphyr SA');
 
     expect($posArnaud)->toBeLessThan($posMartin);
     expect($posMartin)->toBeLessThan($posZephyr);
@@ -178,8 +178,8 @@ it('affiche icône 🏢 pour une entreprise', function () {
 it('affiche la sous-ligne contact pour une entreprise avec nom renseigné', function () {
     Tiers::factory()->entreprise()->create([
         'entreprise' => 'ACME Corp',
-        'nom'        => 'Dupont',
-        'prenom'     => 'Jean',
+        'nom' => 'Dupont',
+        'prenom' => 'Jean',
     ]);
 
     Livewire::test(TiersList::class)
@@ -190,8 +190,8 @@ it('affiche la sous-ligne contact pour une entreprise avec nom renseigné', func
 it('n\'affiche pas de sous-ligne contact pour une entreprise sans nom ni prénom', function () {
     Tiers::factory()->entreprise()->create([
         'entreprise' => 'ACME Corp',
-        'nom'        => null,
-        'prenom'     => null,
+        'nom' => null,
+        'prenom' => null,
     ]);
 
     Livewire::test(TiersList::class)

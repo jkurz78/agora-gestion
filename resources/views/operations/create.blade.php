@@ -51,6 +51,22 @@
                 </div>
 
                 <div class="mb-3">
+                    <label for="sous_categorie_id" class="form-label">Sous-catégorie (inscriptions)</label>
+                    <select name="sous_categorie_id" id="sous_categorie_id" class="form-select @error('sous_categorie_id') is-invalid @enderror">
+                        <option value="">— Aucune (utiliser la valeur par défaut) —</option>
+                        @foreach ($sousCategories as $sc)
+                            <option value="{{ $sc->id }}" {{ old('sous_categorie_id') == $sc->id ? 'selected' : '' }}>
+                                {{ $sc->nom }} ({{ $sc->code_cerfa }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="form-text">Si vide, la sous-catégorie par défaut configurée dans les paramètres HelloAsso sera utilisée.</div>
+                    @error('sous_categorie_id')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="mb-3">
                     <label for="statut" class="form-label">Statut <span class="text-danger">*</span></label>
                     <select name="statut" id="statut" class="form-select @error('statut') is-invalid @enderror" required>
                         @foreach (\App\Enums\StatutOperation::cases() as $statut)

@@ -8,6 +8,8 @@ use App\Enums\StatutOperation;
 use App\Http\Requests\StoreOperationRequest;
 use App\Http\Requests\UpdateOperationRequest;
 use App\Models\Operation;
+use App\Models\SousCategorie;
+use App\Services\ExerciceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,7 +19,7 @@ final class OperationController extends Controller
     public function index(Request $request): View
     {
         $showAll = $request->boolean('all');
-        $exercice = app(\App\Services\ExerciceService::class)->current();
+        $exercice = app(ExerciceService::class)->current();
 
         $operations = $showAll
             ? Operation::orderByDesc('date_debut')->get()
@@ -25,14 +27,16 @@ final class OperationController extends Controller
 
         return view('operations.index', [
             'operations' => $operations,
-            'showAll'    => $showAll,
-            'exercice'   => $exercice,
+            'showAll' => $showAll,
+            'exercice' => $exercice,
         ]);
     }
 
     public function create(): View
     {
-        return view('operations.create');
+        return view('operations.create', [
+            'sousCategories' => SousCategorie::where('pour_inscriptions', true)->orderBy('nom')->get(),
+        ]);
     }
 
     public function store(StoreOperationRequest $request): RedirectResponse
@@ -54,8 +58,12 @@ final class OperationController extends Controller
             ->sum('montant');
         $totalRecettes = $operation->transactionLignes()
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
+            ->whereDoesntHave('sousCategorie', fn ($q) => $q->where('pour_dons', true))
             ->sum('montant');
-        $totalDons = $operation->dons()->sum('montant');
+        $totalDons = (float) $operation->transactionLignes()
+            ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
+            ->whereHas('sousCategorie', fn ($q) => $q->where('pour_dons', true))
+            ->sum('montant');
         $solde = ($totalRecettes + $totalDons) - $totalDepenses;
 
         return view('operations.show', [
@@ -71,6 +79,7 @@ final class OperationController extends Controller
     {
         return view('operations.edit', [
             'operation' => $operation,
+            'sousCategories' => SousCategorie::where('pour_inscriptions', true)->orderBy('nom')->get(),
         ]);
     }
 

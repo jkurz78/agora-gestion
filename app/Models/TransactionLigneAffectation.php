@@ -22,10 +22,10 @@ final class TransactionLigneAffectation extends Model
     protected function casts(): array
     {
         return [
-            'montant'              => 'decimal:2',
+            'montant' => 'decimal:2',
             'transaction_ligne_id' => 'integer',
-            'operation_id'         => 'integer',
-            'seance'               => 'integer',
+            'operation_id' => 'integer',
+            'seance' => 'integer',
         ];
     }
 

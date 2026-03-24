@@ -32,10 +32,10 @@ it('affiche un message si aucune opération sélectionnée', function () {
 });
 
 it('affiche les données filtrées par opération', function () {
-    $op  = Operation::factory()->create();
+    $op = Operation::factory()->create();
     $op2 = Operation::factory()->create();
     $cat = Categorie::factory()->depense()->create(['nom' => 'Frais']);
-    $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Transport']);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Transport']);
 
     $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();

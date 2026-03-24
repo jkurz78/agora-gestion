@@ -23,6 +23,7 @@ class SousCategorieFactory extends Factory
             'code_cerfa' => fake()->optional(0.3)->numerify('####'),
             'pour_dons' => false,
             'pour_cotisations' => false,
+            'pour_inscriptions' => false,
         ];
     }
 
@@ -34,5 +35,12 @@ class SousCategorieFactory extends Factory
     public function pourCotisations(): static
     {
         return $this->state(['pour_cotisations' => true]);
+    }
+
+    public function pourInscriptions(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'pour_inscriptions' => true,
+        ]);
     }
 }

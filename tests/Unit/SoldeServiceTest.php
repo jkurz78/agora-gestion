@@ -1,9 +1,6 @@
 <?php
 
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
-use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
@@ -16,7 +13,7 @@ beforeEach(function () {
 
 it('returns solde_initial when no movements', function () {
     $compte = CompteBancaire::factory()->create([
-        'solde_initial'      => 1000.00,
+        'solde_initial' => 1000.00,
         'date_solde_initial' => '2024-01-01',
     ]);
 
@@ -25,21 +22,21 @@ it('returns solde_initial when no movements', function () {
 
 it('adds recettes since date_solde_initial', function () {
     $compte = CompteBancaire::factory()->create([
-        'solde_initial'      => 500.00,
+        'solde_initial' => 500.00,
         'date_solde_initial' => '2024-06-01',
     ]);
     Transaction::factory()->asRecette()->create([
-        'compte_id'     => $compte->id,
+        'compte_id' => $compte->id,
         'montant_total' => 200.00,
-        'date'          => '2024-07-01',
-        'saisi_par'     => $this->user->id,
+        'date' => '2024-07-01',
+        'saisi_par' => $this->user->id,
     ]);
     // Before date_solde_initial — must be ignored
     Transaction::factory()->asRecette()->create([
-        'compte_id'     => $compte->id,
+        'compte_id' => $compte->id,
         'montant_total' => 999.00,
-        'date'          => '2024-05-01',
-        'saisi_par'     => $this->user->id,
+        'date' => '2024-05-01',
+        'saisi_par' => $this->user->id,
     ]);
 
     expect($this->service->solde($compte))->toBe(700.0);
@@ -47,65 +44,49 @@ it('adds recettes since date_solde_initial', function () {
 
 it('subtracts depenses since date_solde_initial', function () {
     $compte = CompteBancaire::factory()->create([
-        'solde_initial'      => 1000.00,
+        'solde_initial' => 1000.00,
         'date_solde_initial' => '2024-01-01',
     ]);
     Transaction::factory()->asDepense()->create([
-        'compte_id'     => $compte->id,
+        'compte_id' => $compte->id,
         'montant_total' => 300.00,
-        'date'          => '2024-03-01',
-        'saisi_par'     => $this->user->id,
+        'date' => '2024-03-01',
+        'saisi_par' => $this->user->id,
     ]);
 
     expect($this->service->solde($compte))->toBe(700.0);
 });
 
-it('adds cotisations (date_paiement) since date_solde_initial', function () {
+it('adds recettes (cotisations/dons) since date_solde_initial', function () {
     $compte = CompteBancaire::factory()->create([
-        'solde_initial'      => 0.00,
+        'solde_initial' => 0.00,
         'date_solde_initial' => '2024-01-01',
     ]);
-    $tiers = Tiers::factory()->membre()->create();
-    Cotisation::factory()->create([
-        'compte_id'     => $compte->id,
-        'montant'       => 50.00,
-        'date_paiement' => '2024-02-01',
-        'tiers_id'      => $tiers->id,
+    Transaction::factory()->asRecette()->create([
+        'compte_id' => $compte->id,
+        'montant_total' => 50.00,
+        'date' => '2024-02-01',
+        'saisi_par' => $this->user->id,
     ]);
 
     expect($this->service->solde($compte))->toBe(50.0);
 });
 
-it('subtracts dons since date_solde_initial', function () {
-    $compte = CompteBancaire::factory()->create([
-        'solde_initial'      => 1000.00,
-        'date_solde_initial' => '2024-01-01',
-    ]);
-    Don::factory()->create([
-        'compte_id' => $compte->id,
-        'montant'   => 100.00,
-        'date'      => '2024-02-01',
-        'saisi_par' => $this->user->id,
-    ]);
-
-    expect($this->service->solde($compte))->toBe(900.0);
-});
-
 it('adds virements received and subtracts virements sent', function () {
-    $source      = CompteBancaire::factory()->create([
-        'solde_initial'      => 2000.00,
+    $source = CompteBancaire::factory()->create([
+        'solde_initial' => 2000.00,
         'date_solde_initial' => '2024-01-01',
     ]);
     $destination = CompteBancaire::factory()->create([
-        'solde_initial'      => 500.00,
+        'solde_initial' => 500.00,
         'date_solde_initial' => '2024-01-01',
     ]);
     VirementInterne::factory()->create([
-        'compte_source_id'      => $source->id,
+        'compte_source_id' => $source->id,
         'compte_destination_id' => $destination->id,
-        'montant'               => 400.00,
-        'date'                  => '2024-03-01',
-        'saisi_par'             => $this->user->id,
+        'montant' => 400.00,
+        'date' => '2024-03-01',
+        'saisi_par' => $this->user->id,
     ]);
 
     expect($this->service->solde($source))->toBe(1600.0);
@@ -114,14 +95,14 @@ it('adds virements received and subtracts virements sent', function () {
 
 it('ignores soft-deleted depenses', function () {
     $compte = CompteBancaire::factory()->create([
-        'solde_initial'      => 1000.00,
+        'solde_initial' => 1000.00,
         'date_solde_initial' => '2024-01-01',
     ]);
     $depense = Transaction::factory()->asDepense()->create([
-        'compte_id'     => $compte->id,
+        'compte_id' => $compte->id,
         'montant_total' => 300.00,
-        'date'          => '2024-03-01',
-        'saisi_par'     => $this->user->id,
+        'date' => '2024-03-01',
+        'saisi_par' => $this->user->id,
     ]);
     $depense->delete();
 
@@ -130,19 +111,19 @@ it('ignores soft-deleted depenses', function () {
 
 it('ignores soft-deleted virements', function () {
     $source = CompteBancaire::factory()->create([
-        'solde_initial'      => 1000.00,
+        'solde_initial' => 1000.00,
         'date_solde_initial' => '2024-01-01',
     ]);
     $destination = CompteBancaire::factory()->create([
-        'solde_initial'      => 0.00,
+        'solde_initial' => 0.00,
         'date_solde_initial' => '2024-01-01',
     ]);
     $virement = VirementInterne::factory()->create([
-        'compte_source_id'      => $source->id,
+        'compte_source_id' => $source->id,
         'compte_destination_id' => $destination->id,
-        'montant'               => 400.00,
-        'date'                  => '2024-03-01',
-        'saisi_par'             => $this->user->id,
+        'montant' => 400.00,
+        'date' => '2024-03-01',
+        'saisi_par' => $this->user->id,
     ]);
     $virement->delete();
 
@@ -152,14 +133,14 @@ it('ignores soft-deleted virements', function () {
 
 it('handles null date_solde_initial by including all history', function () {
     $compte = CompteBancaire::factory()->create([
-        'solde_initial'      => 100.00,
+        'solde_initial' => 100.00,
         'date_solde_initial' => null,
     ]);
     Transaction::factory()->asRecette()->create([
-        'compte_id'     => $compte->id,
+        'compte_id' => $compte->id,
         'montant_total' => 50.00,
-        'date'          => '2000-01-01',
-        'saisi_par'     => $this->user->id,
+        'date' => '2000-01-01',
+        'saisi_par' => $this->user->id,
     ]);
 
     expect($this->service->solde($compte))->toBe(150.0);

@@ -1,6 +1,8 @@
 <?php
+
 declare(strict_types=1);
 
+use App\Livewire\Parametres\AssociationForm;
 use App\Models\Association;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,7 +17,7 @@ beforeEach(function () {
 });
 
 it('creates association row with id=1 when none exists', function () {
-    $association = Association::find(1) ?? new Association();
+    $association = Association::find(1) ?? new Association;
     $association->id = 1;
     $association->fill(['nom' => 'SVS Test', 'ville' => 'Paris'])->save();
 
@@ -24,11 +26,11 @@ it('creates association row with id=1 when none exists', function () {
 });
 
 it('updates existing association without creating duplicate', function () {
-    $assoc = Association::find(1) ?? new Association();
+    $assoc = Association::find(1) ?? new Association;
     $assoc->id = 1;
     $assoc->fill(['nom' => 'Initial', 'ville' => 'Paris'])->save();
 
-    $assoc2 = Association::find(1) ?? new Association();
+    $assoc2 = Association::find(1) ?? new Association;
     $assoc2->id = 1;
     $assoc2->fill(['nom' => 'Mis à jour', 'ville' => 'Lyon'])->save();
 
@@ -49,7 +51,7 @@ it('association page redirects guest to login', function () {
 
 it('can save association info via livewire', function () {
     Livewire::actingAs($this->user)
-        ->test(\App\Livewire\Parametres\AssociationForm::class)
+        ->test(AssociationForm::class)
         ->set('nom', 'SVS')
         ->set('adresse', '12 rue des Lilas')
         ->set('code_postal', '75001')
@@ -60,7 +62,7 @@ it('can save association info via livewire', function () {
         ->assertHasNoErrors();
 
     $this->assertDatabaseHas('association', [
-        'id'  => 1,
+        'id' => 1,
         'nom' => 'SVS',
         'email' => 'contact@svs.fr',
     ]);
@@ -68,7 +70,7 @@ it('can save association info via livewire', function () {
 
 it('validates nom is required', function () {
     Livewire::actingAs($this->user)
-        ->test(\App\Livewire\Parametres\AssociationForm::class)
+        ->test(AssociationForm::class)
         ->set('nom', '')
         ->call('save')
         ->assertHasErrors(['nom' => 'required']);
@@ -76,7 +78,7 @@ it('validates nom is required', function () {
 
 it('validates email format', function () {
     Livewire::actingAs($this->user)
-        ->test(\App\Livewire\Parametres\AssociationForm::class)
+        ->test(AssociationForm::class)
         ->set('nom', 'SVS')
         ->set('email', 'pas-un-email')
         ->call('save')
@@ -88,7 +90,7 @@ it('rejects logo exceeding 2MB', function () {
     $file = UploadedFile::fake()->create('logo.png', 3000, 'image/png'); // 3 Mo
 
     Livewire::actingAs($this->user)
-        ->test(\App\Livewire\Parametres\AssociationForm::class)
+        ->test(AssociationForm::class)
         ->set('nom', 'SVS')
         ->set('logo', $file)
         ->call('save')
@@ -100,7 +102,7 @@ it('rejects logo with invalid mime type', function () {
     $file = UploadedFile::fake()->create('logo.pdf', 100, 'application/pdf');
 
     Livewire::actingAs($this->user)
-        ->test(\App\Livewire\Parametres\AssociationForm::class)
+        ->test(AssociationForm::class)
         ->set('nom', 'SVS')
         ->set('logo', $file)
         ->call('save')
@@ -112,7 +114,7 @@ it('saves valid logo and persists logo_path', function () {
     $file = UploadedFile::fake()->image('logo.png', 200, 200);
 
     Livewire::actingAs($this->user)
-        ->test(\App\Livewire\Parametres\AssociationForm::class)
+        ->test(AssociationForm::class)
         ->set('nom', 'SVS')
         ->set('logo', $file)
         ->call('save')
@@ -128,14 +130,14 @@ it('deletes old logo file before saving new one', function () {
 
     // Premier upload — use direct assignment (id not in fillable)
     Storage::disk('public')->put('association/logo.png', 'old');
-    $assoc = Association::find(1) ?? new Association();
+    $assoc = Association::find(1) ?? new Association;
     $assoc->id = 1;
     $assoc->fill(['nom' => 'SVS', 'logo_path' => 'association/logo.png'])->save();
 
     $newFile = UploadedFile::fake()->image('logo.jpg', 200, 200);
 
     Livewire::actingAs($this->user)
-        ->test(\App\Livewire\Parametres\AssociationForm::class)
+        ->test(AssociationForm::class)
         ->set('nom', 'SVS')
         ->set('logo', $newFile)
         ->call('save')

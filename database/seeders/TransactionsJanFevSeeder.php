@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
-use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 /**
@@ -55,7 +55,7 @@ class TransactionsJanFevSeeder extends Seeder
 
     public function run(): void
     {
-        $userId = \App\Models\User::first()?->id ?? 1;
+        $userId = User::first()?->id ?? 1;
 
         // ── 60 dépenses ───────────────────────────────────────────────────────
         for ($i = 0; $i < 60; $i++) {

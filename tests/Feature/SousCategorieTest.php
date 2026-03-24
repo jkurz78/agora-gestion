@@ -111,7 +111,7 @@ it('returns flash error when destroying a sous-categorie with linked lignes', fu
         'date' => '2025-10-15',
     ]);
     TransactionLigne::factory()->create([
-        'transaction_id'    => $depense->id,
+        'transaction_id' => $depense->id,
         'sous_categorie_id' => $sc->id,
     ]);
 

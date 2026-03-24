@@ -20,13 +20,13 @@ class RapprochementBancaireFactory extends Factory
     public function definition(): array
     {
         return [
-            'compte_id'      => CompteBancaire::factory(),
-            'date_fin'       => fake()->dateTimeBetween('-6 months', 'now')->format('Y-m-d'),
+            'compte_id' => CompteBancaire::factory(),
+            'date_fin' => fake()->dateTimeBetween('-6 months', 'now')->format('Y-m-d'),
             'solde_ouverture' => fake()->randomFloat(2, 0, 10000),
-            'solde_fin'      => fake()->randomFloat(2, 0, 10000),
-            'statut'         => StatutRapprochement::EnCours,
-            'saisi_par'      => User::factory(),
-            'verrouille_at'  => null,
+            'solde_fin' => fake()->randomFloat(2, 0, 10000),
+            'statut' => StatutRapprochement::EnCours,
+            'saisi_par' => User::factory(),
+            'verrouille_at' => null,
         ];
     }
 }

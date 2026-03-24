@@ -6,8 +6,6 @@ namespace App\Services;
 
 use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
@@ -42,7 +40,7 @@ final class RapprochementBancaireService
             ->exists();
 
         if ($enCours) {
-            throw new RuntimeException("Un rapprochement est déjà en cours pour ce compte.");
+            throw new RuntimeException('Un rapprochement est déjà en cours pour ce compte.');
         }
 
         return DB::transaction(function () use ($compte, $dateFin, $soldeFin) {
@@ -58,6 +56,42 @@ final class RapprochementBancaireService
     }
 
     /**
+     * Crée un rapprochement directement verrouillé (auto-généré par la sync HelloAsso).
+     * Ne vérifie pas s'il existe un rapprochement en cours — indépendant du workflow manuel.
+     *
+     * @param  list<int>  $transactionIds  IDs des transactions à pointer
+     */
+    public function createVerrouilleAuto(
+        CompteBancaire $compte,
+        string $dateFin,
+        float $soldeFin,
+        array $transactionIds,
+        int $virementId,
+    ): RapprochementBancaire {
+        return DB::transaction(function () use ($compte, $dateFin, $soldeFin, $transactionIds, $virementId) {
+            $rapprochement = RapprochementBancaire::create([
+                'compte_id' => $compte->id,
+                'date_fin' => $dateFin,
+                'solde_ouverture' => $this->calculerSoldeOuverture($compte),
+                'solde_fin' => $soldeFin,
+                'statut' => StatutRapprochement::Verrouille,
+                'verrouille_at' => now(),
+                'saisi_par' => auth()->id() ?? 1,
+            ]);
+
+            if (! empty($transactionIds)) {
+                Transaction::whereIn('id', $transactionIds)
+                    ->update(['rapprochement_id' => $rapprochement->id, 'pointe' => true]);
+            }
+
+            VirementInterne::where('id', $virementId)
+                ->update(['rapprochement_source_id' => $rapprochement->id]);
+
+            return $rapprochement;
+        });
+    }
+
+    /**
      * Calcule le solde pointé courant :
      * solde_ouverture + entrées pointées − sorties pointées.
      */
@@ -68,8 +102,6 @@ final class RapprochementBancaireService
         $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
             ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
             ->value('total');
-        $solde += (float) Don::where('rapprochement_id', $rapprochement->id)->sum('montant');
-        $solde += (float) Cotisation::where('rapprochement_id', $rapprochement->id)->sum('montant');
         $solde += (float) VirementInterne::where('rapprochement_destination_id', $rapprochement->id)->sum('montant');
         $solde -= (float) VirementInterne::where('rapprochement_source_id', $rapprochement->id)->sum('montant');
 
@@ -86,12 +118,12 @@ final class RapprochementBancaireService
 
     /**
      * Pointe ou dé-pointe une transaction pour ce rapprochement.
-     * Types: 'depense', 'recette', 'don', 'cotisation', 'virement_source', 'virement_destination'
+     * Types: 'depense', 'recette', 'virement_source', 'virement_destination'
      */
     public function toggleTransaction(RapprochementBancaire $rapprochement, string $type, int $id): void
     {
         if ($rapprochement->isVerrouille()) {
-            throw new RuntimeException("Impossible de modifier un rapprochement verrouillé.");
+            throw new RuntimeException('Impossible de modifier un rapprochement verrouillé.');
         }
 
         // Verify account ownership before modifying
@@ -104,8 +136,6 @@ final class RapprochementBancaireService
         } else {
             $model = match ($type) {
                 'depense', 'recette' => Transaction::findOrFail($id),
-                'don' => Don::findOrFail($id),
-                'cotisation' => Cotisation::findOrFail($id),
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
             if ((int) $model->compte_id !== (int) $rapprochement->compte_id) {
@@ -116,13 +146,12 @@ final class RapprochementBancaireService
         DB::transaction(function () use ($rapprochement, $type, $id) {
             if (str_starts_with($type, 'virement')) {
                 $this->toggleVirement($rapprochement, $type, $id);
+
                 return;
             }
 
             $model = match ($type) {
                 'depense', 'recette' => Transaction::findOrFail($id),
-                'don' => Don::findOrFail($id),
-                'cotisation' => Cotisation::findOrFail($id),
                 default => throw new \InvalidArgumentException("Type de transaction inconnu : {$type}"),
             };
 
@@ -159,19 +188,13 @@ final class RapprochementBancaireService
     public function supprimer(RapprochementBancaire $rapprochement): void
     {
         if ($rapprochement->isVerrouille()) {
-            throw new RuntimeException("Impossible de supprimer un rapprochement verrouillé.");
+            throw new RuntimeException('Impossible de supprimer un rapprochement verrouillé.');
         }
 
         DB::transaction(function () use ($rapprochement) {
             $id = $rapprochement->id;
 
             Transaction::where('rapprochement_id', $id)
-                ->update(['rapprochement_id' => null, 'pointe' => false]);
-
-            Don::where('rapprochement_id', $id)
-                ->update(['rapprochement_id' => null, 'pointe' => false]);
-
-            Cotisation::where('rapprochement_id', $id)
                 ->update(['rapprochement_id' => null, 'pointe' => false]);
 
             VirementInterne::where('rapprochement_source_id', $id)
@@ -199,7 +222,7 @@ final class RapprochementBancaireService
             ->exists();
 
         if ($enCours) {
-            throw new RuntimeException("Impossible de déverrouiller : un rapprochement est en cours sur ce compte.");
+            throw new RuntimeException('Impossible de déverrouiller : un rapprochement est en cours sur ce compte.');
         }
 
         $dernierVerrouille = RapprochementBancaire::where('compte_id', $rapprochement->compte_id)
@@ -209,7 +232,7 @@ final class RapprochementBancaireService
             ->value('id');
 
         if ($dernierVerrouille !== $rapprochement->id) {
-            throw new RuntimeException("Seul le dernier rapprochement verrouillé peut être déverrouillé.");
+            throw new RuntimeException('Seul le dernier rapprochement verrouillé peut être déverrouillé.');
         }
 
         DB::transaction(function () use ($rapprochement) {

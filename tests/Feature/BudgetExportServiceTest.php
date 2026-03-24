@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
 use App\Models\BudgetLine;
 use App\Models\Categorie;
@@ -9,14 +10,13 @@ use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Enums\TypeCategorie;
 use App\Services\BudgetExportService;
 
 beforeEach(function () {
     // Catégories dépenses
     $catCharge = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
     $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id]);
-    $this->scElec   = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id]);
+    $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id]);
 
     // Catégories recettes
     $catProduit = Categorie::factory()->create(['nom' => 'Produits', 'type' => TypeCategorie::Recette]);
@@ -26,27 +26,27 @@ beforeEach(function () {
     $compte = CompteBancaire::factory()->create();
 
     $txLoyers = Transaction::factory()->create([
-        'type'          => TypeTransaction::Depense,
-        'date'          => '2025-10-15',
+        'type' => TypeTransaction::Depense,
+        'date' => '2025-10-15',
         'montant_total' => 1200.00,
-        'compte_id'     => $compte->id,
+        'compte_id' => $compte->id,
     ]);
     TransactionLigne::factory()->create([
-        'transaction_id'    => $txLoyers->id,
+        'transaction_id' => $txLoyers->id,
         'sous_categorie_id' => $this->scLoyers->id,
-        'montant'           => 1200.00,
+        'montant' => 1200.00,
     ]);
 
     $txCotis = Transaction::factory()->create([
-        'type'          => TypeTransaction::Recette,
-        'date'          => '2025-10-15',
+        'type' => TypeTransaction::Recette,
+        'date' => '2025-10-15',
         'montant_total' => 850.00,
-        'compte_id'     => $compte->id,
+        'compte_id' => $compte->id,
     ]);
     TransactionLigne::factory()->create([
-        'transaction_id'    => $txCotis->id,
+        'transaction_id' => $txCotis->id,
         'sous_categorie_id' => $this->scCotis->id,
-        'montant'           => 850.00,
+        'montant' => 850.00,
     ]);
 });
 
@@ -55,7 +55,7 @@ it('retourne les lignes dans l\'ordre dépenses puis recettes', function () {
 
     $noms = array_column($rows, 2); // col 2 = sous_categorie
     $posLoyers = array_search('Loyers', $noms);
-    $posCotis  = array_search('Cotisations', $noms);
+    $posCotis = array_search('Cotisations', $noms);
     expect($posLoyers)->toBeLessThan($posCotis);
 });
 

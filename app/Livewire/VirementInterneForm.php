@@ -8,6 +8,7 @@ use App\Models\CompteBancaire;
 use App\Models\VirementInterne;
 use App\Services\ExerciceService;
 use App\Services\VirementInterneService;
+use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -102,7 +103,7 @@ final class VirementInterneForm extends Component
         $this->resetForm();
     }
 
-    public function render(): \Illuminate\View\View
+    public function render(): View
     {
         return view('livewire.virement-interne-form', [
             'comptes' => CompteBancaire::orderBy('nom')->get(),

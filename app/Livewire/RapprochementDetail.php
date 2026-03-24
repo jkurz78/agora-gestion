@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\StatutRapprochement;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
@@ -63,6 +61,7 @@ final class RapprochementDetail extends Component
     {
         if ($this->rapprochement->isVerrouille()) {
             $this->addError('solde_fin', 'Impossible de modifier un rapprochement verrouillé.');
+
             return;
         }
 
@@ -73,6 +72,7 @@ final class RapprochementDetail extends Component
         );
         if ($validator->fails()) {
             $this->addError('solde_fin', $validator->errors()->first('solde_fin'));
+
             return;
         }
 
@@ -85,6 +85,7 @@ final class RapprochementDetail extends Component
     {
         if ($this->rapprochement->isVerrouille()) {
             $this->addError('date_fin', 'Impossible de modifier un rapprochement verrouillé.');
+
             return;
         }
 
@@ -96,6 +97,7 @@ final class RapprochementDetail extends Component
         );
         if ($validator->fails()) {
             $this->addError('date_fin', $validator->errors()->first('date_fin'));
+
             return;
         }
 
@@ -109,6 +111,7 @@ final class RapprochementDetail extends Component
 
         if ($dernierVerrouille && $value < $dernierVerrouille->date_fin->format('Y-m-d')) {
             $this->addError('date_fin', 'La date ne peut pas être antérieure à celle du rapprochement précédent ('.$dernierVerrouille->date_fin->format('d/m/Y').').');
+
             return;
         }
 
@@ -151,62 +154,6 @@ final class RapprochementDetail extends Component
                     'reference' => $tx->reference,
                     'montant_signe' => $tx->montantSigne(),
                     'pointe' => (int) $tx->rapprochement_id === $rid,
-                ]);
-            });
-
-        // Dons
-        Don::where('compte_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin, $verrouille) {
-                if ($verrouille) {
-                    $q->where('rapprochement_id', $rid);
-                } else {
-                    $q->where(function ($inner) use ($dateFin) {
-                        $inner->whereNull('rapprochement_id')
-                            ->where('date', '<=', $dateFin);
-                    })->orWhere('rapprochement_id', $rid);
-                }
-            })
-            ->with('tiers')
-            ->get()
-            ->each(function (Don $d) use (&$transactions, $rid) {
-                $transactions->push([
-                    'id' => $d->id,
-                    'type' => 'don',
-                    'date' => $d->date,
-                    'label' => $d->tiers
-                        ? $d->tiers->displayName()
-                        : ($d->objet ?? 'Don anonyme'),
-                    'tiers' => $d->tiers ? $d->tiers->displayName() : ($d->objet ?? 'Don anonyme'),
-                    'reference' => null,
-                    'montant_signe' => (float) $d->montant,
-                    'pointe' => (int) $d->rapprochement_id === $rid,
-                ]);
-            });
-
-        // Cotisations
-        Cotisation::where('compte_id', $compte->id)
-            ->where(function ($q) use ($rid, $dateFin, $verrouille) {
-                if ($verrouille) {
-                    $q->where('rapprochement_id', $rid);
-                } else {
-                    $q->where(function ($inner) use ($dateFin) {
-                        $inner->whereNull('rapprochement_id')
-                            ->where('date_paiement', '<=', $dateFin);
-                    })->orWhere('rapprochement_id', $rid);
-                }
-            })
-            ->with('tiers')
-            ->get()
-            ->each(function (Cotisation $c) use (&$transactions, $rid) {
-                $transactions->push([
-                    'id'            => $c->id,
-                    'type'          => 'cotisation',
-                    'date'          => $c->date_paiement,
-                    'label'         => $c->tiers ? $c->tiers->displayName() : 'Cotisation',
-                    'tiers'         => $c->tiers ? $c->tiers->displayName() : 'Cotisation',
-                    'reference'     => null,
-                    'montant_signe' => (float) $c->montant,
-                    'pointe'        => (int) $c->rapprochement_id === $rid,
                 ]);
             });
 
@@ -267,7 +214,7 @@ final class RapprochementDetail extends Component
         $transactions = $transactions->sortBy('date')->values();
 
         // Totals first — always over the full set of pointed transactions
-        $totalDebitPointe  = abs($transactions->where('pointe', true)->where('montant_signe', '<', 0)->sum('montant_signe'));
+        $totalDebitPointe = abs($transactions->where('pointe', true)->where('montant_signe', '<', 0)->sum('montant_signe'));
         $totalCreditPointe = $transactions->where('pointe', true)->where('montant_signe', '>', 0)->sum('montant_signe');
 
         // Display filter second — only affects the table, not the summary cards
@@ -279,11 +226,11 @@ final class RapprochementDetail extends Component
         $ecart = $service->calculerEcart($this->rapprochement);
 
         return view('livewire.rapprochement-detail', [
-            'transactions'       => $transactions,
-            'soldePointage'      => $soldePointage,
-            'ecart'              => $ecart,
-            'totalDebitPointe'   => $totalDebitPointe,
-            'totalCreditPointe'  => $totalCreditPointe,
+            'transactions' => $transactions,
+            'soldePointage' => $soldePointage,
+            'ecart' => $ecart,
+            'totalDebitPointe' => $totalDebitPointe,
+            'totalCreditPointe' => $totalCreditPointe,
         ]);
     }
 }
