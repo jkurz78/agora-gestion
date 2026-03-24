@@ -6,12 +6,21 @@ namespace App\Services;
 
 use App\Models\VirementInterne;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 final class VirementInterneService
 {
+    public function __construct(
+        private readonly ExerciceService $exerciceService,
+    ) {}
+
     public function create(array $data): VirementInterne
     {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($data['date']))
+        );
+
         return DB::transaction(function () use ($data) {
             $data['saisi_par'] = auth()->id();
             $data['numero_piece'] = app(NumeroPieceService::class)->assign(Carbon::parse($data['date']));
@@ -22,6 +31,10 @@ final class VirementInterneService
 
     public function update(VirementInterne $virement, array $data): VirementInterne
     {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($data['date']))
+        );
+
         return DB::transaction(function () use ($virement, $data) {
             $virement->update($data);
 
@@ -31,6 +44,10 @@ final class VirementInterneService
 
     public function delete(VirementInterne $virement): void
     {
+        $this->exerciceService->assertOuvert(
+            $this->exerciceService->anneeForDate(CarbonImmutable::parse($virement->date))
+        );
+
         if ($virement->rapprochement_source_id !== null || $virement->rapprochement_destination_id !== null) {
             throw new \RuntimeException('Ce virement est pointé dans un rapprochement et ne peut pas être supprimé.');
         }

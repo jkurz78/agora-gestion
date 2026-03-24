@@ -41,7 +41,7 @@ it('creates a locked rapprochement with pointed transactions and virement', func
         'saisi_par' => User::first()->id,
     ]);
 
-    $service = new RapprochementBancaireService;
+    $service = app(RapprochementBancaireService::class);
     $rapprochement = $service->createVerrouilleAuto(
         compte: $this->compte,
         dateFin: '2025-10-20',
@@ -81,7 +81,7 @@ it('uses solde_fin of last locked rapprochement as solde_ouverture', function ()
         'saisi_par' => User::first()->id,
     ]);
 
-    $service = new RapprochementBancaireService;
+    $service = app(RapprochementBancaireService::class);
     $rapprochement = $service->createVerrouilleAuto(
         compte: $this->compte,
         dateFin: '2025-10-20',
@@ -110,7 +110,7 @@ it('works even when a manual rapprochement en cours exists', function () {
         'saisi_par' => User::first()->id,
     ]);
 
-    $service = new RapprochementBancaireService;
+    $service = app(RapprochementBancaireService::class);
     $rapprochement = $service->createVerrouilleAuto(
         compte: $this->compte,
         dateFin: '2025-10-20',
