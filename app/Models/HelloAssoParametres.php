@@ -19,6 +19,7 @@ final class HelloAssoParametres extends Model
         'client_secret',
         'organisation_slug',
         'environnement',
+        'callback_token',
         'compte_helloasso_id',
         'compte_versement_id',
         'sous_categorie_don_id',
