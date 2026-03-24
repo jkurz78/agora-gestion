@@ -82,7 +82,7 @@ final class RapprochementList extends Component
             $this->solde_fin = '';
             $this->resetValidation();
 
-            $this->redirect(route('rapprochement.detail', $rapprochement));
+            $this->redirect(route('compta.rapprochement.detail', $rapprochement));
         } catch (\RuntimeException $e) {
             $this->addError('date_fin', $e->getMessage());
         }

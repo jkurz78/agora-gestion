@@ -42,7 +42,7 @@ final class RapprochementDetail extends Component
     {
         try {
             app(RapprochementBancaireService::class)->supprimer($this->rapprochement);
-            $this->redirect(route('rapprochement.index'));
+            $this->redirect(route('compta.rapprochement.index'));
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }

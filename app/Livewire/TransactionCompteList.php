@@ -109,9 +109,9 @@ final class TransactionCompteList extends Component
     public function redirectToEdit(string $sourceType, int $id): mixed
     {
         $url = match ($sourceType) {
-            'depense', 'recette' => url('/transactions').'?edit='.$id,
-            'virement_sortant', 'virement_entrant' => route('virements.index').'?edit='.$id,
-            default => route('dashboard'),
+            'depense', 'recette' => url('/compta/transactions').'?edit='.$id,
+            'virement_sortant', 'virement_entrant' => route('compta.virements.index').'?edit='.$id,
+            default => route('compta.dashboard'),
         };
 
         return redirect()->to($url);

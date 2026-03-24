@@ -31,7 +31,7 @@
 
     <div class="collapse mb-3" id="addCategorieForm">
         <div class="card card-body">
-            <form action="{{ route('parametres.categories.store') }}" method="POST" class="row g-2 align-items-end">
+            <form action="{{ route($espace->value . '.parametres.categories.store') }}" method="POST" class="row g-2 align-items-end">
                 @csrf
                 <div class="col-md-5">
                     <label for="cat_nom" class="form-label">Nom</label>
@@ -73,7 +73,7 @@
                     </td>
                     <td>{{ $categorie->sousCategories->count() }}</td>
                     <td>
-                        <form action="{{ route('parametres.categories.update', $categorie) }}" method="POST" class="d-inline">
+                        <form action="{{ route($espace->value . '.parametres.categories.update', $categorie) }}" method="POST" class="d-inline">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="nom" value="{{ $categorie->nom }}">
@@ -83,7 +83,7 @@
                                 <i class="bi bi-pencil"></i>
                             </button>
                         </form>
-                        <form action="{{ route('parametres.categories.destroy', $categorie) }}" method="POST" class="d-inline"
+                        <form action="{{ route($espace->value . '.parametres.categories.destroy', $categorie) }}" method="POST" class="d-inline"
                               onsubmit="return confirm('Supprimer cette catégorie ?')">
                             @csrf
                             @method('DELETE')
