@@ -64,7 +64,7 @@ it('affiche DÉFICIT quand dépenses > recettes', function () {
     $d->lignes()->forceDelete();
     TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 5000.00]);
 
-    Livewire::test(RapportCompteResultat::class)->assertSeeHtml('D&Eacute;FICIT');
+    Livewire::test(RapportCompteResultat::class)->assertSeeHtml('DÉFICIT');
 });
 
 it('affiche la barre de budget quand un budget existe', function () {

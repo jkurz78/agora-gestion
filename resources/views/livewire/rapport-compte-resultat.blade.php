@@ -127,7 +127,7 @@
     @else
     <div class="rounded p-4 d-flex justify-content-between align-items-center mt-2"
          style="background:#dc3545;color:#fff;font-size:1.1rem;font-weight:700;">
-        <span>D&Eacute;FICIT</span>
+        <span>DÉFICIT</span>
         <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} &euro;</span>
     </div>
     @endif

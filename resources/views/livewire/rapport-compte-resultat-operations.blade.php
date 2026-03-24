@@ -68,7 +68,7 @@
 
         <div class="rounded p-4 d-flex justify-content-between align-items-center mt-2"
              style="background:{{ $resultatNet >= 0 ? '#198754' : '#dc3545' }};color:#fff;font-size:1.1rem;font-weight:700;">
-            <span>{{ $resultatNet >= 0 ? 'EXC&Eacute;DENT' : 'D&Eacute;FICIT' }}</span>
+            <span>{{ $resultatNet >= 0 ? 'EXCÉDENT' : 'DÉFICIT' }}</span>
             <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} &euro;</span>
         </div>
     @endif
