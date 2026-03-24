@@ -1,4 +1,7 @@
 <div>
+    @if ($exerciceCloture)
+        {{-- Import désactivé sur exercice clôturé --}}
+    @else
     <div>
         <button wire:click="togglePanel" type="button" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-upload"></i> Importer {{ $type === 'depense' ? 'dépenses' : 'recettes' }}
@@ -60,5 +63,6 @@
                 </div>
             </div>
         </div>
+    @endif
     @endif
 </div>
