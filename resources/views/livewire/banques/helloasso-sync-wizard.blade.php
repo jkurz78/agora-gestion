@@ -125,19 +125,28 @@
                                                     <div class="bg-light rounded p-3">
                                                         <h6 class="mb-2"><i class="bi bi-plus-circle me-1"></i> Nouvelle opération</h6>
                                                         <div class="row g-2 align-items-end">
-                                                            <div class="col-md-4">
+                                                            <div class="col-md-3">
                                                                 <label class="form-label small">Nom *</label>
                                                                 <input type="text" wire:model="newOperationNom" class="form-control form-control-sm @error('newOperationNom') is-invalid @enderror">
                                                                 @error('newOperationNom') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                                             </div>
-                                                            <div class="col-md-3">
+                                                            <div class="col-md-2">
                                                                 <label class="form-label small">Date début *</label>
                                                                 <x-date-input name="new_op_debut" wire:model="newOperationDateDebut" :value="$newOperationDateDebut" />
                                                                 @error('newOperationDateDebut') <div class="text-danger small">{{ $message }}</div> @enderror
                                                             </div>
-                                                            <div class="col-md-3">
+                                                            <div class="col-md-2">
                                                                 <label class="form-label small">Date fin</label>
                                                                 <x-date-input name="new_op_fin" wire:model="newOperationDateFin" :value="$newOperationDateFin" />
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <label class="form-label small">Sous-catégorie</label>
+                                                                <select wire:model="newOperationSousCategorieId" class="form-select form-select-sm">
+                                                                    <option value="">Par défaut</option>
+                                                                    @foreach ($sousCategoriesInscription as $sc)
+                                                                        <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
+                                                                    @endforeach
+                                                                </select>
                                                             </div>
                                                             <div class="col-md-2 d-flex gap-1">
                                                                 <button wire:click="storeOperation" class="btn btn-sm btn-success">
