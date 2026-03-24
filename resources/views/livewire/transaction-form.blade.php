@@ -15,7 +15,9 @@
             @endphp
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    @if($formEntityLabel)
+                    @if($exerciceCloture)
+                        Visualiser {{ $formEntityLabel ? ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'la ' : 'le ') . $formEntityLabel : ($type === 'depense' ? 'la dépense' : 'la recette') }}
+                    @elseif($formEntityLabel)
                         {{ $transactionId ? 'Modifier le ' : ($formEntityLabel === 'cotisation' || $formEntityLabel === 'inscription' ? 'Nouvelle ' : 'Nouveau ') }}{{ $formEntityLabel }}
                     @else
                         {{ $transactionId ? 'Modifier la ' : 'Nouvelle ' }}{{ $type === 'depense' ? 'dépense' : 'recette' }}
@@ -48,19 +50,21 @@
                                 Date <span class="text-danger">*</span>
                                 @if ($isLocked) <i class="bi bi-lock text-warning" title="Champ verrouillé par un rapprochement"></i> @endif
                             </label>
-                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked" />
+                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $exerciceCloture" />
                             @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
                             <label for="reference" class="form-label">Référence <span class="text-danger">*</span></label>
                             <input type="text" wire:model="reference" id="reference"
-                                   class="form-control @error('reference') is-invalid @enderror">
+                                   class="form-control @error('reference') is-invalid @enderror"
+                                   {{ $exerciceCloture ? 'disabled' : '' }}>
                             @error('reference') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-3">
                             <label for="libelle" class="form-label">Libellé</label>
                             <input type="text" wire:model="libelle" id="libelle"
-                                   class="form-control @error('libelle') is-invalid @enderror">
+                                   class="form-control @error('libelle') is-invalid @enderror"
+                                   {{ $exerciceCloture ? 'disabled' : '' }}>
                             @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
@@ -71,7 +75,8 @@
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
                             <select wire:model="mode_paiement" id="mode_paiement"
-                                    class="form-select @error('mode_paiement') is-invalid @enderror">
+                                    class="form-select @error('mode_paiement') is-invalid @enderror"
+                                    {{ $exerciceCloture ? 'disabled' : '' }}>
                                 <option value="">-- Choisir --</option>
                                 @foreach ($modesPaiement as $mode)
                                     <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
@@ -88,7 +93,8 @@
                                 <input type="text" value="{{ $comptes->firstWhere('id', $compte_id)?->nom ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
-                                <select wire:model="compte_id" id="compte_id" class="form-select">
+                                <select wire:model="compte_id" id="compte_id" class="form-select"
+                                        {{ $exerciceCloture ? 'disabled' : '' }}>
                                     <option value="">-- Aucun --</option>
                                     @foreach ($comptes as $compte)
                                         <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
@@ -107,7 +113,8 @@
                         </div>
                         <div class="col-12">
                             <label for="notes" class="form-label">Notes</label>
-                            <input type="text" wire:model="notes" id="notes" class="form-control">
+                            <input type="text" wire:model="notes" id="notes" class="form-control"
+                                   {{ $exerciceCloture ? 'disabled' : '' }}>
                         </div>
                     </div>
 
@@ -145,7 +152,8 @@
                                         </td>
                                         <td>
                                             <select wire:model.live="lignes.{{ $index }}.operation_id"
-                                                    class="form-select form-select-sm">
+                                                    class="form-select form-select-sm"
+                                                    {{ $exerciceCloture ? 'disabled' : '' }}>
                                                 <option value="">-- Aucune --</option>
                                                 @foreach ($operations as $op)
                                                     <option value="{{ $op->id }}">{{ $op->nom }}</option>
@@ -159,7 +167,8 @@
                                             @endphp
                                             @if ($nbSeances)
                                                 <select wire:model="lignes.{{ $index }}.seance"
-                                                        class="form-select form-select-sm">
+                                                        class="form-select form-select-sm"
+                                                        {{ $exerciceCloture ? 'disabled' : '' }}>
                                                     <option value="">--</option>
                                                     @for ($s = 1; $s <= $nbSeances; $s++)
                                                         <option value="{{ $s }}">{{ $s }}</option>
@@ -173,7 +182,8 @@
                                             @else
                                                 <input type="number" wire:model.live="lignes.{{ $index }}.montant"
                                                        step="0.01" min="0.01"
-                                                       class="form-control form-control-sm @error('lignes.' . $index . '.montant') is-invalid @enderror">
+                                                       class="form-control form-control-sm @error('lignes.' . $index . '.montant') is-invalid @enderror"
+                                                       {{ $exerciceCloture ? 'disabled' : '' }}>
                                                 @error('lignes.' . $index . '.montant')
                                                     <div class="invalid-feedback">{{ $message }}</div>
                                                 @enderror
@@ -181,16 +191,17 @@
                                         </td>
                                         <td>
                                             <input type="text" wire:model="lignes.{{ $index }}.notes"
-                                                   class="form-control form-control-sm">
+                                                   class="form-control form-control-sm"
+                                                   {{ $exerciceCloture ? 'disabled' : '' }}>
                                         </td>
                                         <td class="text-center">
-                                            @if (! $isLocked)
+                                            @if (! $isLocked && ! $exerciceCloture)
                                                 <button type="button" wire:click="removeLigne({{ $index }})"
                                                         class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            @if ($isLocked && ($ligne['id'] ?? null) !== null)
+                                            @if ($isLocked && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">
@@ -218,7 +229,7 @@
                         </table>
                     </div>
 
-                    @if ($ventilationLigneId)
+                    @if ($ventilationLigneId && ! $exerciceCloture)
                         <div class="border border-primary border-2 rounded p-3 mb-3" style="background:#f0f7ff">
                             <div class="fw-bold text-primary mb-2">
                                 <i class="bi bi-scissors"></i>
@@ -310,17 +321,19 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        @if (! $isLocked)
+                        @if (! $isLocked && ! $exerciceCloture)
                             <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>
                         @endif
                         <div class="ms-auto">
-                            <button type="button" wire:click="resetForm" class="btn btn-secondary">Annuler</button>
+                            <button type="button" wire:click="resetForm" class="btn btn-secondary">{{ $exerciceCloture ? 'Fermer' : 'Annuler' }}</button>
+                            @if (! $exerciceCloture)
                             <button type="submit" class="btn btn-success"
                                     @if ($isLocked) title="Certains champs sont verrouillés et ne pourront pas être modifiés." @endif>
                                 {{ $transactionId ? 'Mettre à jour' : 'Enregistrer' }}
                             </button>
+                            @endif
                         </div>
                     </div>
                 </form>

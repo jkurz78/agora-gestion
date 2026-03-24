@@ -7,6 +7,7 @@
     @endif
 
     {{-- Boutons de création + import --}}
+    @if (! $exerciceCloture)
     <div class="d-flex align-items-center gap-2 mb-3">
         <button wire:click="$dispatch('open-transaction-form', {type: 'depense'})"
                 class="btn btn-danger">
@@ -21,6 +22,7 @@
             <livewire:import-csv type="recette" />
         </div>
     </div>
+    @endif
 
     {{-- Filter row --}}
     <div class="card mb-4">
@@ -132,10 +134,11 @@
                         <td>
                             <div class="d-flex gap-1 justify-content-end">
                                 <button wire:click="$dispatch('edit-transaction', { id: {{ $transaction->id }} })"
-                                        class="btn btn-sm btn-outline-primary" title="Modifier"
+                                        class="btn btn-sm btn-outline-primary" title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}"
                                         style="padding:.15rem .35rem;font-size:.75rem">
-                                    <i class="bi bi-pencil"></i>
+                                    <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
                                 </button>
+                                @if (! $exerciceCloture)
                                 @if ($transaction->pointe)
                                     <button class="btn btn-sm btn-outline-danger" disabled
                                             title="Dépointez cette transaction avant de la supprimer."
@@ -149,6 +152,7 @@
                                             style="padding:.15rem .35rem;font-size:.75rem">
                                         <i class="bi bi-trash"></i>
                                     </button>
+                                @endif
                                 @endif
                             </div>
                         </td>

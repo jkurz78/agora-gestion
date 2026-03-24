@@ -57,13 +57,14 @@
                     @endforeach
                 @endif
             </div>
-            @if($showImport)
+            @if($showImport && ! $exerciceCloture)
             <div class="d-flex gap-1 flex-wrap">
                 <livewire:import-csv type="depense" />
                 <livewire:import-csv type="recette" />
             </div>
             @endif
         </div>
+        @if (! $exerciceCloture)
         <div class="mb-3">
             @if($sousCategorieFilter)
                 @php
@@ -109,9 +110,11 @@
                 </div>
             @endif
         </div>
+        @endif
 
     @else
         {{-- Layout standard : ligne 1 = Nouveau ; ligne 2 = toggles --}}
+        @if (! $exerciceCloture)
         <div class="mb-3 d-flex justify-content-between align-items-center">
             @if($sousCategorieFilter)
                 @php
@@ -157,6 +160,7 @@
                 </div>
             @endif
         </div>
+        @endif
         @if(!$sousCategorieFilter && count($availableTypes) > 1)
         <div class="mb-3 d-flex gap-1 flex-wrap">
             <button type="button" wire:click="$set('filterTypes', [])"
@@ -529,9 +533,10 @@
                                     wire:click="openEdit('{{ e($tx->source_type) }}', {{ $tx->id }})"
                                     class="btn btn-sm btn-outline-primary"
                                     style="padding:.15rem .3rem;font-size:.7rem"
-                                    title="Modifier">
-                                <i class="bi bi-pencil"></i>
+                                    title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
+                                <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
                             </button>
+                            @if (! $exerciceCloture)
                             @if($isLocked)
                                 <span title="Écriture rapprochée bancaire — suppression interdite" style="cursor:not-allowed">
                                     <button type="button" disabled
@@ -549,6 +554,7 @@
                                         title="Supprimer">
                                     <i class="bi bi-trash"></i>
                                 </button>
+                            @endif
                             @endif
                         </div>
                     </td>

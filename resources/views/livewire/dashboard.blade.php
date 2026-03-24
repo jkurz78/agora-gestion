@@ -1,4 +1,10 @@
 <div>
+    @if ($exerciceCloture)
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Vous consultez un exercice clôturé (lecture seule).
+        </div>
+    @endif
+
     {{-- Header --}}
     <div class="mb-4">
         <h1 class="mb-0">Tableau de bord</h1>

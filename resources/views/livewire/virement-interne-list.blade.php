@@ -7,12 +7,14 @@
     @endif
 
     {{-- Toolbar --}}
+    @if (! $exerciceCloture)
     <div class="d-flex justify-content-between align-items-center mb-3">
         <button wire:click="$dispatch('open-virement-form', { id: null })"
                 class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg"></i> Nouveau virement
         </button>
     </div>
+    @endif
 
     @if ($virements->isEmpty())
         <p class="text-muted">Aucun virement enregistré pour cet exercice.</p>
@@ -51,9 +53,10 @@
                             <td>
                                 <div class="d-flex gap-1 justify-content-end">
                                     <button wire:click="$dispatch('open-virement-form', { id: {{ $virement->id }} })"
-                                            class="btn btn-sm btn-outline-primary" title="Modifier">
-                                        <i class="bi bi-pencil"></i>
+                                            class="btn btn-sm btn-outline-primary" title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
+                                        <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
                                     </button>
+                                    @if (! $exerciceCloture)
                                     @if ($virement->rapprochement_source_id !== null || $virement->rapprochement_destination_id !== null)
                                         <button class="btn btn-sm btn-outline-danger" disabled
                                                 title="Dépointez ce virement avant de le supprimer.">
@@ -65,6 +68,7 @@
                                                 class="btn btn-sm btn-outline-danger" title="Supprimer">
                                             <i class="bi bi-trash"></i>
                                         </button>
+                                    @endif
                                     @endif
                                 </div>
                             </td>
