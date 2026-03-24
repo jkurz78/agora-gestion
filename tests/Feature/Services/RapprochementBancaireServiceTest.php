@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
-use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\RapprochementBancaireService;
@@ -127,9 +125,9 @@ test('verrouiller réussit quand écart = 0', function () {
 
 test('toggleTransaction lève une exception si rapprochement verrouillé', function () {
     $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id'     => $this->compte->id,
-        'statut'        => StatutRapprochement::Verrouille,
-        'saisi_par'     => $this->user->id,
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'saisi_par' => $this->user->id,
         'verrouille_at' => now(),
     ]);
     $depense = Transaction::factory()->asDepense()->create(['compte_id' => $this->compte->id]);
@@ -162,9 +160,9 @@ test('supprimer supprime un rapprochement en cours et dépointe les opérations'
 
 test('supprimer lève une exception si le rapprochement est verrouillé', function () {
     $rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id'     => $this->compte->id,
-        'statut'        => StatutRapprochement::Verrouille,
-        'saisi_par'     => $this->user->id,
+        'compte_id' => $this->compte->id,
+        'statut' => StatutRapprochement::Verrouille,
+        'saisi_par' => $this->user->id,
         'verrouille_at' => now(),
     ]);
 
@@ -172,16 +170,14 @@ test('supprimer lève une exception si le rapprochement est verrouillé', functi
         ->toThrow(RuntimeException::class);
 });
 
-test('supprimer dépointe aussi les dons et cotisations', function () {
+test('supprimer dépointe aussi les recettes (dons/cotisations)', function () {
     $rapprochement = $this->service->create($this->compte, '2025-10-31', 1000.00);
-    $don = Don::factory()->create([
+    $recette1 = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
         'pointe' => true,
     ]);
-    $tiers = Tiers::factory()->membre()->create();
-    $cotisation = \App\Models\Cotisation::factory()->create([
-        'tiers_id' => $tiers->id,
+    $recette2 = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
         'pointe' => true,
@@ -189,10 +185,10 @@ test('supprimer dépointe aussi les dons et cotisations', function () {
 
     $this->service->supprimer($rapprochement);
 
-    expect($don->fresh()->rapprochement_id)->toBeNull()
-        ->and($don->fresh()->pointe)->toBeFalse()
-        ->and($cotisation->fresh()->rapprochement_id)->toBeNull()
-        ->and($cotisation->fresh()->pointe)->toBeFalse();
+    expect($recette1->fresh()->rapprochement_id)->toBeNull()
+        ->and($recette1->fresh()->pointe)->toBeFalse()
+        ->and($recette2->fresh()->rapprochement_id)->toBeNull()
+        ->and($recette2->fresh()->pointe)->toBeFalse();
 });
 
 test('deverrouiller déverrouille le dernier rapprochement si aucun en cours', function () {

@@ -160,7 +160,7 @@
 
                     {{-- Dropdown Banques --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('comptes-bancaires.*') || request()->routeIs('rapprochement.*') || request()->routeIs('virements.*') || request()->routeIs('parametres.comptes-bancaires.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('comptes-bancaires.*') || request()->routeIs('rapprochement.*') || request()->routeIs('virements.*') || request()->routeIs('parametres.comptes-bancaires.*') || request()->routeIs('banques.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-bank2"></i> Banques
                         </a>
@@ -178,6 +178,15 @@
                                 <a class="dropdown-item {{ request()->routeIs('virements.*') ? 'active' : '' }}"
                                    href="{{ route('virements.index') }}">
                                     <i class="bi bi-arrow-left-right"></i> Virements
+                                </a>
+                            </li>
+                            @endif
+                            <li><hr class="dropdown-divider"></li>
+                            @if (Route::has('banques.helloasso-sync'))
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('banques.helloasso-sync') ? 'active' : '' }}"
+                                   href="{{ route('banques.helloasso-sync') }}">
+                                    <i class="bi bi-arrow-repeat"></i> Synchronisation HelloAsso
                                 </a>
                             </li>
                             @endif
@@ -336,6 +345,7 @@
             </div>
         </div>
     </nav>
+    <livewire:helloasso-notification-banner />
     @endauth
 
     <div class="container-fluid px-4 pb-5 mb-3">
@@ -347,8 +357,6 @@
     {{-- Formulaires modaux globaux --}}
     <livewire:tiers-form />
     <livewire:transaction-form />
-    <livewire:don-form />
-    <livewire:cotisation-form />
     <livewire:virement-interne-form />
     @livewireScripts
     <script>

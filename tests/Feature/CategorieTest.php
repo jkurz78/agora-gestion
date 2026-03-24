@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Categorie;
+use App\Models\SousCategorie;
 use App\Models\User;
 
 beforeEach(function () {
@@ -88,7 +89,7 @@ it('can destroy a categorie', function () {
 
 it('returns flash error when destroying a categorie with sous-categories', function () {
     $categorie = Categorie::factory()->create();
-    \App\Models\SousCategorie::factory()->create(['categorie_id' => $categorie->id]);
+    SousCategorie::factory()->create(['categorie_id' => $categorie->id]);
 
     $this->actingAs($this->user)
         ->delete(route('parametres.categories.destroy', $categorie))

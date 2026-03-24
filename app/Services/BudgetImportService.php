@@ -48,15 +48,15 @@ final class BudgetImportService
             $scByName[$key][] = $sc;
         }
 
-        $errors           = [];
-        $wrongExercices   = [];
+        $errors = [];
+        $wrongExercices = [];
 
         foreach ($dataRows as $idx => $row) {
-            $lineNum       = $idx + 2;
-            $exerciceCell  = trim((string) ($row[0] ?? ''));
+            $lineNum = $idx + 2;
+            $exerciceCell = trim((string) ($row[0] ?? ''));
             // col 1 = categorie — ignorée à l'import (lecture seule)
-            $scNom         = trim((string) ($row[2] ?? ''));
-            $montantCell   = trim((string) ($row[3] ?? ''));
+            $scNom = trim((string) ($row[2] ?? ''));
+            $montantCell = trim((string) ($row[3] ?? ''));
 
             // Exercice : accepte "2025" ou "2025-2026"
             $exerciceCellYear = str_contains($exerciceCell, '-')
@@ -70,7 +70,7 @@ final class BudgetImportService
             // Sous-catégorie
             if ($scNom === '') {
                 $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : sous-catégorie vide (champ obligatoire)."];
-            } elseif (!isset($scByName[Str::lower($scNom)])) {
+            } elseif (! isset($scByName[Str::lower($scNom)])) {
                 $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : sous-catégorie '{$scNom}' introuvable."];
             } elseif (count($scByName[Str::lower($scNom)]) > 1) {
                 $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : nom '{$scNom}' ambigu (plusieurs sous-catégories portent ce nom)."];
@@ -79,7 +79,7 @@ final class BudgetImportService
             // Montant : vide ou zéro sont acceptés (la ligne sera ignorée à l'import)
             // Négatif ou non-numérique sont des erreurs
             if ($montantCell !== '') {
-                if (!is_numeric($montantCell)) {
+                if (! is_numeric($montantCell)) {
                     $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : montant_prevu '{$montantCell}' invalide (nombre >= 0 attendu ou cellule vide)."];
                 } elseif ((float) $montantCell < 0) {
                     $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : montant_prevu '{$montantCell}' invalide (nombre >= 0 attendu ou cellule vide)."];
@@ -89,14 +89,14 @@ final class BudgetImportService
         }
 
         // Erreur exercice : rapport groupé
-        if (!empty($wrongExercices)) {
+        if (! empty($wrongExercices)) {
             $unique = array_unique($wrongExercices);
             sort($unique);
-            $list   = implode(', ', $unique);
+            $list = implode(', ', $unique);
             $errors = array_merge([['line' => 0, 'message' => "Le fichier contient les exercices {$list}, l'exercice ouvert est {$exercice}."]], $errors);
         }
 
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             return new BudgetImportResult(false, errors: $errors);
         }
 
@@ -107,7 +107,7 @@ final class BudgetImportService
             BudgetLine::where('exercice', $exercice)->delete();
 
             foreach ($dataRows as $row) {
-                $scNom       = trim((string) ($row[2] ?? ''));
+                $scNom = trim((string) ($row[2] ?? ''));
                 $montantCell = trim((string) ($row[3] ?? ''));
 
                 // Ignorer montant vide ou zéro
@@ -115,7 +115,7 @@ final class BudgetImportService
                     continue;
                 }
 
-                if (!is_numeric($montantCell) || (float) $montantCell <= 0) {
+                if (! is_numeric($montantCell) || (float) $montantCell <= 0) {
                     continue;
                 }
 
@@ -123,8 +123,8 @@ final class BudgetImportService
 
                 BudgetLine::create([
                     'sous_categorie_id' => $sc->id,
-                    'exercice'          => $exercice,
-                    'montant_prevu'     => (float) $montantCell,
+                    'exercice' => $exercice,
+                    'montant_prevu' => (float) $montantCell,
                 ]);
 
                 $inserted++;
@@ -164,11 +164,11 @@ final class BudgetImportService
             $content = substr($content, 3);
         }
 
-        if (!mb_check_encoding($content, 'UTF-8')) {
+        if (! mb_check_encoding($content, 'UTF-8')) {
             return null;
         }
 
-        $rows  = [];
+        $rows = [];
         $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
 
         foreach ($lines as $line) {
@@ -186,7 +186,7 @@ final class BudgetImportService
     {
         try {
             $spreadsheet = IOFactory::load($file->getRealPath());
-            $rows        = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+            $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
 
             return array_map(
                 fn (array $row): array => array_map(fn ($v): string => (string) ($v ?? ''), $row),
@@ -200,10 +200,10 @@ final class BudgetImportService
     private function validateHeader(array $row): ?string
     {
         $normalized = array_map(fn ($h) => Str::lower(trim($h)), $row);
-        $missing    = array_diff(self::EXPECTED_HEADERS, $normalized);
+        $missing = array_diff(self::EXPECTED_HEADERS, $normalized);
 
-        if (!empty($missing)) {
-            return 'En-tête invalide. Colonnes manquantes ou incorrectes : ' . implode(', ', $missing) . '.';
+        if (! empty($missing)) {
+            return 'En-tête invalide. Colonnes manquantes ou incorrectes : '.implode(', ', $missing).'.';
         }
 
         return null;

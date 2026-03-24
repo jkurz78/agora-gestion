@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 final class TransactionUniverselleService
 {
     /**
-     * @param  array<string>|null  $types  null=all; subset of ['depense','recette','don','cotisation','virement']
+     * @param  array<string>|null  $types  null=all; subset of ['depense','recette','virement']
      * @return array{paginator: LengthAwarePaginator, soldeAvantPage: float|null}
      */
     public function paginate(
@@ -27,6 +27,7 @@ final class TransactionUniverselleService
         ?string $searchNumeroPiece,
         ?string $modePaiement,
         ?bool $pointe,
+        ?string $sousCategorieFilter = null,
         bool $computeSolde = false,
         string $sortColumn = 'date',
         string $sortDirection = 'desc',
@@ -41,7 +42,7 @@ final class TransactionUniverselleService
         }
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin);
+        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter);
 
         $outer = DB::query()->fromSub($union, 't')
             ->when($searchTiers, fn ($q) => $q->where('t.tiers', 'like', "%{$searchTiers}%"))
@@ -63,7 +64,7 @@ final class TransactionUniverselleService
                 $offset = ($paginator->currentPage() - 1) * $perPage;
                 $sumAvant = 0.0;
                 if ($offset > 0) {
-                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin);
+                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter);
                     $inner = DB::query()->fromSub($unionForSolde, 'u')
                         ->select('montant')
                         ->orderBy("u.{$sortColumn}", $sortDirection)
@@ -91,29 +92,28 @@ final class TransactionUniverselleService
         ?array $types,
         ?string $dateDebut,
         ?string $dateFin,
+        ?string $sousCategorieFilter = null,
     ): Builder {
+        // Whitelist sous-catégorie filter to prevent SQL injection (column name interpolation)
+        $allowedFilters = ['pour_dons', 'pour_cotisations', 'pour_inscriptions'];
+        if ($sousCategorieFilter !== null && ! in_array($sousCategorieFilter, $allowedFilters, true)) {
+            $sousCategorieFilter = null;
+        }
+
         $include = [
             'depense' => $types === null || in_array('depense', $types, true),
             'recette' => $types === null || in_array('recette', $types, true),
-            'don' => $types === null || in_array('don', $types, true),
-            'cotisation' => $types === null || in_array('cotisation', $types, true),
             'virement' => $types === null || in_array('virement', $types, true),
         ];
 
         $queries = [];
         if ($include['depense']) {
-            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin);
+            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin, $sousCategorieFilter);
         }
         if ($include['recette']) {
-            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin);
+            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin, $sousCategorieFilter);
         }
-        if ($include['don']) {
-            $queries[] = $this->brancheDon($compteId, $tiersId, $dateDebut, $dateFin);
-        }
-        if ($include['cotisation']) {
-            $queries[] = $this->brancheCotisation($compteId, $tiersId, $dateDebut, $dateFin);
-        }
-        if ($include['virement']) {
+        if ($include['virement'] && $sousCategorieFilter === null) {
             $queries[] = $this->brancheVirementSortant($compteId, $tiersId, $dateDebut, $dateFin);
             $queries[] = $this->brancheVirementEntrant($compteId, $tiersId, $dateDebut, $dateFin);
         }
@@ -124,7 +124,7 @@ final class TransactionUniverselleService
                 "id, 'depense' as source_type, NULL as date, NULL as numero_piece, NULL as reference,
                  NULL as tiers, NULL as tiers_type, NULL as tiers_id, NULL as libelle,
                  NULL as categorie_label, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
-                 NULL as mode_paiement, 0 as montant, NULL as pointe"
+                 NULL as mode_paiement, 0 as montant, NULL as pointe, 0 as is_helloasso"
             );
         }
 
@@ -141,6 +141,7 @@ final class TransactionUniverselleService
         ?int $tiersId,
         ?string $dateDebut,
         ?string $dateFin,
+        ?string $sousCategorieFilter = null,
     ): Builder {
         return DB::table('transactions as tx')
             ->leftJoin('tiers as t', 't.id', '=', 'tx.tiers_id')
@@ -164,14 +165,22 @@ final class TransactionUniverselleService
                 tx.mode_paiement,
                 -(tx.montant_total) as montant,
                 tx.pointe,
-                tx.notes
+                tx.notes,
+                (tx.helloasso_order_id IS NOT NULL) as is_helloasso
             ")
             ->where('tx.type', 'depense')
             ->whereNull('tx.deleted_at')
             ->when($compteId !== null, fn ($q) => $q->where('tx.compte_id', $compteId))
             ->when($tiersId !== null, fn ($q) => $q->where('tx.tiers_id', $tiersId))
             ->when($dateDebut, fn ($q) => $q->where('tx.date', '>=', $dateDebut))
-            ->when($dateFin, fn ($q) => $q->where('tx.date', '<=', $dateFin));
+            ->when($dateFin, fn ($q) => $q->where('tx.date', '<=', $dateFin))
+            ->when($sousCategorieFilter, fn ($q) => $q->whereExists(function ($sub) use ($sousCategorieFilter) {
+                $sub->select(DB::raw(1))
+                    ->from('transaction_lignes as tl_filter')
+                    ->join('sous_categories as sc_filter', 'sc_filter.id', '=', 'tl_filter.sous_categorie_id')
+                    ->whereColumn('tl_filter.transaction_id', 'tx.id')
+                    ->where("sc_filter.{$sousCategorieFilter}", true);
+            }));
     }
 
     private function brancheRecette(
@@ -179,6 +188,7 @@ final class TransactionUniverselleService
         ?int $tiersId,
         ?string $dateDebut,
         ?string $dateFin,
+        ?string $sousCategorieFilter = null,
     ): Builder {
         return DB::table('transactions as tx')
             ->leftJoin('tiers as t', 't.id', '=', 'tx.tiers_id')
@@ -202,86 +212,22 @@ final class TransactionUniverselleService
                 tx.mode_paiement,
                 tx.montant_total as montant,
                 tx.pointe,
-                tx.notes
+                tx.notes,
+                (tx.helloasso_order_id IS NOT NULL) as is_helloasso
             ")
             ->where('tx.type', 'recette')
             ->whereNull('tx.deleted_at')
             ->when($compteId !== null, fn ($q) => $q->where('tx.compte_id', $compteId))
             ->when($tiersId !== null, fn ($q) => $q->where('tx.tiers_id', $tiersId))
             ->when($dateDebut, fn ($q) => $q->where('tx.date', '>=', $dateDebut))
-            ->when($dateFin, fn ($q) => $q->where('tx.date', '<=', $dateFin));
-    }
-
-    private function brancheDon(
-        ?int $compteId,
-        ?int $tiersId,
-        ?string $dateDebut,
-        ?string $dateFin,
-    ): Builder {
-        return DB::table('dons as dn')
-            ->leftJoin('tiers as do', 'do.id', '=', 'dn.tiers_id')
-            ->leftJoin('sous_categories as sc', 'sc.id', '=', 'dn.sous_categorie_id')
-            ->leftJoin('comptes_bancaires as cb', 'cb.id', '=', 'dn.compte_id')
-            ->selectRaw("
-                dn.id,
-                'don' as source_type,
-                DATE(dn.date) as date,
-                dn.numero_piece,
-                NULL as reference,
-                TRIM(CONCAT(COALESCE(`do`.prenom,''), ' ', COALESCE(`do`.nom,''))) as tiers,
-                `do`.type as tiers_type,
-                dn.tiers_id,
-                dn.objet as libelle,
-                sc.nom as categorie_label,
-                1 as nb_lignes,
-                dn.compte_id,
-                cb.nom as compte_nom,
-                dn.mode_paiement,
-                dn.montant,
-                dn.pointe,
-                NULL as notes
-            ")
-            ->whereNull('dn.deleted_at')
-            ->when($compteId !== null, fn ($q) => $q->where('dn.compte_id', $compteId))
-            ->when($tiersId !== null, fn ($q) => $q->where('dn.tiers_id', $tiersId))
-            ->when($dateDebut, fn ($q) => $q->where('dn.date', '>=', $dateDebut))
-            ->when($dateFin, fn ($q) => $q->where('dn.date', '<=', $dateFin));
-    }
-
-    private function brancheCotisation(
-        ?int $compteId,
-        ?int $tiersId,
-        ?string $dateDebut,
-        ?string $dateFin,
-    ): Builder {
-        return DB::table('cotisations as c')
-            ->leftJoin('tiers as t', 't.id', '=', 'c.tiers_id')
-            ->leftJoin('sous_categories as sc', 'sc.id', '=', 'c.sous_categorie_id')
-            ->leftJoin('comptes_bancaires as cb', 'cb.id', '=', 'c.compte_id')
-            ->selectRaw("
-                c.id,
-                'cotisation' as source_type,
-                DATE(c.date_paiement) as date,
-                c.numero_piece,
-                NULL as reference,
-                TRIM(CONCAT(COALESCE(t.prenom,''), ' ', COALESCE(t.nom,''))) as tiers,
-                t.type as tiers_type,
-                c.tiers_id,
-                CONCAT('Cotisation ', c.exercice) as libelle,
-                sc.nom as categorie_label,
-                1 as nb_lignes,
-                c.compte_id,
-                cb.nom as compte_nom,
-                c.mode_paiement,
-                c.montant,
-                c.pointe,
-                NULL as notes
-            ")
-            ->whereNull('c.deleted_at')
-            ->when($compteId !== null, fn ($q) => $q->where('c.compte_id', $compteId))
-            ->when($tiersId !== null, fn ($q) => $q->where('c.tiers_id', $tiersId))
-            ->when($dateDebut, fn ($q) => $q->where('c.date_paiement', '>=', $dateDebut))
-            ->when($dateFin, fn ($q) => $q->where('c.date_paiement', '<=', $dateFin));
+            ->when($dateFin, fn ($q) => $q->where('tx.date', '<=', $dateFin))
+            ->when($sousCategorieFilter, fn ($q) => $q->whereExists(function ($sub) use ($sousCategorieFilter) {
+                $sub->select(DB::raw(1))
+                    ->from('transaction_lignes as tl_filter')
+                    ->join('sous_categories as sc_filter', 'sc_filter.id', '=', 'tl_filter.sous_categorie_id')
+                    ->whereColumn('tl_filter.transaction_id', 'tx.id')
+                    ->where("sc_filter.{$sousCategorieFilter}", true);
+            }));
     }
 
     private function brancheVirementSortant(
@@ -310,7 +256,8 @@ final class TransactionUniverselleService
                 NULL as mode_paiement,
                 -(vi.montant) as montant,
                 (vi.rapprochement_source_id IS NOT NULL) as pointe,
-                vi.notes
+                vi.notes,
+                0 as is_helloasso
             ")
             ->whereNull('vi.deleted_at')
             ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))
@@ -345,7 +292,8 @@ final class TransactionUniverselleService
                 NULL as mode_paiement,
                 vi.montant,
                 (vi.rapprochement_destination_id IS NOT NULL) as pointe,
-                vi.notes
+                vi.notes,
+                0 as is_helloasso
             ")
             ->whereNull('vi.deleted_at')
             ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))

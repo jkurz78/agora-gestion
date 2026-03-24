@@ -176,7 +176,7 @@
                                     <tr>
                                         <td class="small text-nowrap">{{ $don->date->format('d/m/Y') }}</td>
                                         <td class="small">{{ $don->tiers ? $don->tiers->displayName() : 'Anonyme' }}</td>
-                                        <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $don->montant, 2, ',', ' ') }} &euro;</td>
+                                        <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $don->montant_total, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty
                                     <tr>

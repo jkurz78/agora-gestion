@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Livewire\TiersAutocomplete;
-use App\Livewire\TiersForm;
 use App\Models\Tiers;
 use App\Models\User;
 use Livewire\Livewire;
@@ -30,9 +29,9 @@ it('can search tiers by name', function () {
 
 it('can search tiers by entreprise name', function () {
     Tiers::factory()->create([
-        'type'          => 'entreprise',
-        'entreprise'    => 'ACME Corp',
-        'nom'           => 'Dupont',
+        'type' => 'entreprise',
+        'entreprise' => 'ACME Corp',
+        'nom' => 'Dupont',
         'pour_depenses' => true,
     ]);
 
@@ -44,9 +43,9 @@ it('can search tiers by entreprise name', function () {
 
 it('can select a tiers', function () {
     $tiers = Tiers::factory()->create([
-        'type'          => 'entreprise',
-        'entreprise'    => 'ACME Corp',
-        'nom'           => 'Dupont',
+        'type' => 'entreprise',
+        'entreprise' => 'ACME Corp',
+        'nom' => 'Dupont',
         'pour_depenses' => true,
     ]);
 
@@ -70,8 +69,7 @@ it('dispatches open-tiers-form with prefill when creating new tiers', function (
     Livewire::test(TiersAutocomplete::class, ['filtre' => 'recettes'])
         ->set('search', 'Jean Dupont')
         ->call('openCreateModal')
-        ->assertDispatched('open-tiers-form', fn ($eventName, $eventParams) =>
-            ($eventParams['prefill']['nom'] ?? null) === 'Jean Dupont' &&
+        ->assertDispatched('open-tiers-form', fn ($eventName, $eventParams) => ($eventParams['prefill']['nom'] ?? null) === 'Jean Dupont' &&
             ($eventParams['prefill']['pour_recettes'] ?? null) === true &&
             ($eventParams['prefill']['pour_depenses'] ?? null) === false
         );
@@ -81,8 +79,7 @@ it('dispatches open-tiers-form with depenses flag for depenses filter', function
     Livewire::test(TiersAutocomplete::class, ['filtre' => 'depenses'])
         ->set('search', 'ACME')
         ->call('openCreateModal')
-        ->assertDispatched('open-tiers-form', fn ($eventName, $eventParams) =>
-            ($eventParams['prefill']['nom'] ?? null) === 'ACME' &&
+        ->assertDispatched('open-tiers-form', fn ($eventName, $eventParams) => ($eventParams['prefill']['nom'] ?? null) === 'ACME' &&
             ($eventParams['prefill']['pour_recettes'] ?? null) === false &&
             ($eventParams['prefill']['pour_depenses'] ?? null) === true
         );
@@ -98,7 +95,7 @@ it('selects tiers on tiers-saved event', function () {
 
 it('shows activate modal for tiers excluded by filter', function () {
     Tiers::factory()->create([
-        'nom'           => 'Dupont',
+        'nom' => 'Dupont',
         'pour_depenses' => false,
         'pour_recettes' => true,
     ]);

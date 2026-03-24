@@ -9,6 +9,7 @@ use App\Services\ExerciceService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class Operation extends Model
@@ -22,6 +23,7 @@ final class Operation extends Model
         'date_fin',
         'nombre_seances',
         'statut',
+        'sous_categorie_id',
     ];
 
     protected function casts(): array
@@ -31,6 +33,7 @@ final class Operation extends Model
             'date_debut' => 'date',
             'date_fin' => 'date',
             'nombre_seances' => 'integer',
+            'sous_categorie_id' => 'integer',
         ];
     }
 
@@ -43,6 +46,7 @@ final class Operation extends Model
     public function scopeForExercice(Builder $query, int $exercice): Builder
     {
         $range = app(ExerciceService::class)->dateRange($exercice);
+
         return $query
             ->whereNotNull('date_debut')
             ->whereNotNull('date_fin')
@@ -50,13 +54,13 @@ final class Operation extends Model
             ->where('date_fin', '>=', $range['start']->toDateString());
     }
 
+    public function sousCategorie(): BelongsTo
+    {
+        return $this->belongsTo(SousCategorie::class);
+    }
+
     public function transactionLignes(): HasMany
     {
         return $this->hasMany(TransactionLigne::class);
-    }
-
-    public function dons(): HasMany
-    {
-        return $this->hasMany(Don::class);
     }
 }

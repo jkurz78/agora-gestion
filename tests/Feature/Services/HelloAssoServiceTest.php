@@ -6,6 +6,7 @@ use App\Enums\HelloAssoEnvironnement;
 use App\Models\HelloAssoParametres;
 use App\Services\HelloAssoService;
 use App\Services\HelloAssoTestResult;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
@@ -14,11 +15,12 @@ beforeEach(function () {
 
 function makeParametres(string $env = 'production'): HelloAssoParametres
 {
-    $p = new HelloAssoParametres();
-    $p->client_id         = 'mon-client-id';
-    $p->client_secret     = 'mon-client-secret';
+    $p = new HelloAssoParametres;
+    $p->client_id = 'mon-client-id';
+    $p->client_secret = 'mon-client-secret';
     $p->organisation_slug = 'association-svs';
-    $p->environnement     = HelloAssoEnvironnement::from($env);
+    $p->environnement = HelloAssoEnvironnement::from($env);
+
     return $p;
 }
 
@@ -62,7 +64,7 @@ it('retourne erreur si slug introuvable (404)', function () {
 it('retourne erreur réseau si connexion impossible', function () {
     Http::fake([
         'api.helloasso.com/*' => function () {
-            throw new \Illuminate\Http\Client\ConnectionException('Connection refused');
+            throw new ConnectionException('Connection refused');
         },
     ]);
 

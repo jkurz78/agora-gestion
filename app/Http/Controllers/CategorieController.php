@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreCategorieRequest;
 use App\Http\Requests\UpdateCategorieRequest;
 use App\Models\Categorie;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -52,7 +53,7 @@ final class CategorieController extends Controller
 
             return redirect()->route('parametres.categories.index')
                 ->with('success', 'Catégorie supprimée avec succès.');
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             if ($e->getCode() === '23000') {
                 return redirect()->route('parametres.categories.index')
                     ->with('error', 'Suppression impossible : cet élément est utilisé dans les données de l\'application.');

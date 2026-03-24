@@ -26,7 +26,7 @@ final class TiersService
 
     public function delete(Tiers $tiers): void
     {
-        // Plan B ajoutera ici la vérification des FK (dons, cotisations, depenses, recettes)
+        // Plan B ajoutera ici la vérification des FK (transactions)
         DB::transaction(function () use ($tiers): void {
             $tiers->delete();
         });

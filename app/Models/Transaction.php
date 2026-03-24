@@ -31,20 +31,26 @@ final class Transaction extends Model
         'saisi_par',
         'rapprochement_id',
         'numero_piece',
+        'helloasso_order_id',
+        'helloasso_cashout_id',
+        'helloasso_payment_id',
     ];
 
     protected function casts(): array
     {
         return [
-            'type'          => TypeTransaction::class,
-            'date'          => 'date',
+            'type' => TypeTransaction::class,
+            'date' => 'date',
             'montant_total' => 'decimal:2',
             'mode_paiement' => ModePaiement::class,
-            'pointe'        => 'boolean',
-            'tiers_id'      => 'integer',
-            'compte_id'     => 'integer',
-            'saisi_par'     => 'integer',
+            'pointe' => 'boolean',
+            'tiers_id' => 'integer',
+            'compte_id' => 'integer',
+            'saisi_par' => 'integer',
             'rapprochement_id' => 'integer',
+            'helloasso_order_id' => 'integer',
+            'helloasso_cashout_id' => 'integer',
+            'helloasso_payment_id' => 'integer',
         ];
     }
 
@@ -81,6 +87,7 @@ final class Transaction extends Model
     public function montantSigne(): float
     {
         $montant = (float) $this->montant_total;
+
         return $this->type === TypeTransaction::Depense ? -$montant : $montant;
     }
 

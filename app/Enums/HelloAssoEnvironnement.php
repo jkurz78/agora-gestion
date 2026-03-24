@@ -7,13 +7,13 @@ namespace App\Enums;
 enum HelloAssoEnvironnement: string
 {
     case Production = 'production';
-    case Sandbox    = 'sandbox';
+    case Sandbox = 'sandbox';
 
     public function baseUrl(): string
     {
         return match ($this) {
             self::Production => 'https://api.helloasso.com',
-            self::Sandbox    => 'https://api.helloasso-sandbox.com',
+            self::Sandbox => 'https://api.helloasso-sandbox.com',
         };
     }
 
@@ -21,7 +21,7 @@ enum HelloAssoEnvironnement: string
     {
         return match ($this) {
             self::Production => 'https://admin.helloasso.com',
-            self::Sandbox    => 'https://admin.helloasso-sandbox.com',
+            self::Sandbox => 'https://admin.helloasso-sandbox.com',
         };
     }
 
@@ -29,7 +29,7 @@ enum HelloAssoEnvironnement: string
     {
         return match ($this) {
             self::Production => 'Production',
-            self::Sandbox    => 'Sandbox',
+            self::Sandbox => 'Sandbox',
         };
     }
 }

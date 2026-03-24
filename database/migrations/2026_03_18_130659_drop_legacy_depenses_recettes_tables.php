@@ -60,7 +60,7 @@ return new class extends Migration
         // La restauration complète des tables legacy n'est pas supportée —
         // les données source sont dans transactions/transaction_lignes.
         // En cas de rollback nécessaire, restaurer depuis une sauvegarde.
-        throw new \RuntimeException(
+        throw new RuntimeException(
             'Migration B irréversible : restaurer depuis une sauvegarde si nécessaire.'
         );
     }

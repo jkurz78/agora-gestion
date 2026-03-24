@@ -1,7 +1,7 @@
 <x-app-layout>
     <div class="container-fluid py-3">
         <livewire:transaction-universelle
-            :locked-types="['cotisation']"
+            sous-categorie-filter="pour_cotisations"
             page-title="Cotisations"
             page-title-icon="people" />
     </div>

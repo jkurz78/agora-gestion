@@ -7,7 +7,10 @@
         </div>
     @endif
 
-    <div class="card" style="max-width: 640px;">
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-plug me-1"></i> Connexion HelloAsso</h5>
+        </div>
         <div class="card-body">
 
             {{-- 1. Choix de l'environnement en tête --}}
@@ -111,4 +114,39 @@
 
         </div>
     </div>
+
+@php $callbackUrl = $this->getCallbackUrl(); @endphp
+@if ($callbackUrl)
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-bell me-1"></i> Notification de callback</h5>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info mb-3">
+            <p class="mb-1">Pour recevoir les notifications HelloAsso en temps réel, copiez l'URL ci-dessous
+            et collez-la dans votre espace HelloAsso :</p>
+            <ol class="mb-0">
+                <li>Connectez-vous sur <strong>admin.helloasso.com</strong></li>
+                <li>Allez dans <strong>Paramètres API → Notifications</strong></li>
+                <li>Collez l'URL dans le champ <strong>« Mon URL de callback »</strong></li>
+            </ol>
+        </div>
+
+        <div class="input-group mb-3">
+            <input type="text" class="form-control font-monospace" value="{{ $callbackUrl }}" readonly
+                   id="callback-url-input">
+            <button class="btn btn-outline-secondary" type="button"
+                    onclick="navigator.clipboard.writeText(document.getElementById('callback-url-input').value).then(() => { this.innerHTML = '<i class=\'bi bi-check2\'></i> Copié'; setTimeout(() => this.innerHTML = '<i class=\'bi bi-clipboard\'></i> Copier', 2000) })">
+                <i class="bi bi-clipboard"></i> Copier
+            </button>
+        </div>
+
+        <button type="button" class="btn btn-outline-warning btn-sm"
+                wire:click="regenererToken"
+                wire:confirm="Attention : si vous régénérez le token, l'ancienne URL ne fonctionnera plus. Vous devrez mettre à jour l'URL sur HelloAsso. Continuer ?">
+            <i class="bi bi-arrow-repeat"></i> Régénérer le token
+        </button>
+    </div>
+</div>
+@endif
 </div>

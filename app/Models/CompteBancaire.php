@@ -47,14 +47,4 @@ final class CompteBancaire extends Model
     {
         return $this->transactions()->where('type', 'recette');
     }
-
-    public function dons(): HasMany
-    {
-        return $this->hasMany(Don::class, 'compte_id');
-    }
-
-    public function cotisations(): HasMany
-    {
-        return $this->hasMany(Cotisation::class, 'compte_id');
-    }
 }
