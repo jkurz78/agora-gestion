@@ -39,27 +39,39 @@ Deux groupes de routes Laravel avec préfixe, un middleware `DetecteEspace` qui 
 ### Structure URL
 
 ```
-/                              → redirect vers /{dernier_espace}/dashboard
-/compta/dashboard              → Dashboard comptabilité (existant)
-/compta/transactions           → Transactions
-/compta/transactions/all       → Toutes les transactions
-/compta/dons                   → Dons
-/compta/cotisations            → Cotisations
-/compta/tiers                  → Tiers
-/compta/tiers/{tiers}/transactions → Transactions d'un tiers
-/compta/budget                 → Budget
-/compta/rapprochement          → Rapprochement bancaire
-/compta/rapprochement/{id}     → Détail rapprochement
-/compta/virements              → Virements internes
-/compta/operations             → Opérations (resource)
-/compta/rapports               → Rapports
-/compta/parametres/*           → Paramètres (association, catégories, etc.)
-/compta/exercices/*            → Exercices (clôture, changer, audit)
+/                                        → redirect vers /{dernier_espace}/dashboard
+/compta/dashboard                        → Dashboard comptabilité (existant)
+/compta/transactions                     → Transactions
+/compta/transactions/all                 → Toutes les transactions
+/compta/transactions/import/template/{t} → Template CSV import
+/compta/dons                             → Dons
+/compta/cotisations                      → Cotisations
+/compta/tiers                            → Tiers
+/compta/tiers/{tiers}/transactions       → Transactions d'un tiers
+/compta/budget                           → Budget
+/compta/budget/export                    → Export budget
+/compta/rapprochement                    → Rapprochement bancaire
+/compta/rapprochement/{id}               → Détail rapprochement
+/compta/rapprochement/{id}/pdf           → PDF rapprochement
+/compta/virements                        → Virements internes
+/compta/comptes-bancaires/{c}/transactions → Transactions par compte
+/compta/operations                       → Opérations (resource)
+/compta/rapports                         → Rapports
+/compta/parametres/*                     → Paramètres (association, catégories, etc.)
+/compta/exercices/*                      → Exercices (clôture, changer, audit)
+/compta/helloasso-sync                   → Synchronisation HelloAsso
 
-/gestion/dashboard             → Dashboard gestion (nouveau)
-/gestion/adherents             → Liste adhérents (ex /membres)
-/gestion/parametres/*          → Paramètres (mêmes contrôleurs)
+/gestion/dashboard                       → Dashboard gestion (nouveau)
+/gestion/adherents                       → Liste adhérents (ex /membres)
+/gestion/helloasso-sync                  → Synchronisation HelloAsso (même contrôleur)
+/gestion/parametres/*                    → Paramètres (mêmes contrôleurs)
+
+/profil                                  → Profil utilisateur (route partagée, sans préfixe)
 ```
+
+**Règle générale pour les redirects legacy :** Toute route existante sans préfixe est redirigée en 301 vers son équivalent sous `/compta/`, sauf `/membres` qui redirige vers `/gestion/adherents` et `/profil` qui reste sans préfixe.
+
+**Routes partagées entre espaces :** HelloAsso Sync et Paramètres existent sous les deux préfixes, pointant vers les mêmes contrôleurs. Le profil utilisateur reste hors préfixe.
 
 ### Middleware DetecteEspace
 
@@ -74,16 +86,13 @@ Routes préfixées par l'espace :
 - `compta.dashboard`, `compta.transactions.index`, `compta.tiers.index`...
 - `gestion.dashboard`, `gestion.adherents`...
 
+**Routes partagées (Paramètres, HelloAsso Sync) :** Enregistrées sous les deux préfixes (`compta.parametres.*` et `gestion.parametres.*`), pointant vers les mêmes contrôleurs.
+
+**Convention pour les liens dans les vues partagées :** Les vues utilisées par les deux espaces (Paramètres, HelloAsso Sync) doivent utiliser la variable `$espace` pour construire les noms de route dynamiquement. Exemple : `route($espace . '.parametres.categories.index')`. Un helper Blade `espaceRoute('parametres.categories.index')` pourra être créé pour simplifier, s'appuyant sur la variable `$espace` partagée par le middleware.
+
 ### Redirects legacy
 
-Routes sans préfixe redirigent en 301 vers leur équivalent préfixé :
-- `/dashboard` → `/compta/dashboard`
-- `/transactions` → `/compta/transactions`
-- `/membres` → `/gestion/adherents`
-- `/operations` → `/compta/operations`
-- Etc.
-
-À retirer après quelques mois.
+Voir la règle générale dans la section "Structure URL" ci-dessus. À retirer après quelques mois.
 
 ### Route racine
 
@@ -103,6 +112,8 @@ Un seul `layouts/app.blade.php` recevant les variables d'espace du middleware.
 | Gestion | `#63B2EA` (bleu ciel) |
 
 Seuls la navbar et le footer changent de couleur. Le reste de l'app (tableaux, boutons) conserve ses styles actuels.
+
+Note : en environnement non-production, le footer affiche actuellement une couleur orange d'avertissement. Cette logique environnement est conservée et prend priorité sur la couleur d'espace (l'orange non-prod reste visible pour éviter les confusions dev/prod).
 
 ### Switcher
 
@@ -147,7 +158,11 @@ Trois cartes Bootstrap :
 Liste des opérations de l'exercice courant :
 - Nom de l'opération
 - Dates (début → fin)
-- Badge statut : "Dans X jours" (date_debut future) / "En cours" (entre début et fin) / "Terminée" (clôturée ou date_fin passée)
+- Badge statut selon la logique :
+  - `StatutOperation::Cloturee` → "Terminée" (prioritaire sur les dates)
+  - `date_debut` future → "Dans X jours"
+  - `date_debut` passée et `date_fin` future ou nulle → "En cours"
+  - `date_fin` passée → "Terminée"
 - Lien vers la fiche opération (`/compta/operations/{id}`)
 
 **Carte 2 — Dernières adhésions**
@@ -175,10 +190,11 @@ Si la carte 3 s'avère trop complexe lors de l'implémentation, elle sera report
 |---|---|
 | `app/Http/Middleware/DetecteEspace.php` | Middleware détection et persistance espace |
 | `database/migrations/xxxx_add_dernier_espace_to_users_table.php` | Colonne `dernier_espace` sur users |
-| `app/Livewire/EspaceSwitcher.php` | Composant dropdown switcher |
+| `resources/views/components/espace-switcher.blade.php` | Composant Blade (partial) pour le dropdown switcher |
 | `app/Livewire/GestionDashboard.php` | Dashboard espace Gestion |
 | `resources/views/gestion/dashboard.blade.php` | Vue dashboard Gestion |
 | `resources/views/gestion/adherents.blade.php` | Vue liste adhérents |
+| `app/Enums/Espace.php` | Enum PHP backed (`compta`, `gestion`) |
 
 ### Fichiers modifiés
 
@@ -186,7 +202,7 @@ Si la carte 3 s'avère trop complexe lors de l'implémentation, elle sera report
 |---|---|
 | `routes/web.php` | Restructuration en deux groupes préfixés + redirects legacy |
 | `resources/views/layouts/app.blade.php` | Navbar/footer dynamiques, intégration switcher, menus conditionnels |
-| `app/Models/User.php` | Ajout attribut `dernier_espace`, cast enum |
+| `app/Models/User.php` | Ajout attribut `dernier_espace`, cast vers `Espace` enum |
 | `app/Livewire/MembreList.php` → `AdherentList.php` | Renommage + adaptation route |
 | Toutes les vues et composants Livewire | Mise à jour des appels `route()` avec préfixe `compta.` |
 
