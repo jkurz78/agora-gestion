@@ -13,6 +13,11 @@ final class HelloAssoParametres extends Model
 {
     protected $table = 'helloasso_parametres';
 
+    protected $hidden = [
+        'client_secret',
+        'callback_token',
+    ];
+
     protected $fillable = [
         'association_id',
         'client_id',
