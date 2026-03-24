@@ -52,5 +52,12 @@ class DatabaseSeeder extends Seeder
 
         $this->call(CategoriesSeeder::class);
         $this->call(OperationsTiersSeeder::class);
+
+        // Create exercice for seeded data
+        $exerciceService = app(\App\Services\ExerciceService::class);
+        $annee = $exerciceService->current();
+        if (!\App\Models\Exercice::where('annee', $annee)->exists()) {
+            $exerciceService->creerExercice($annee, \App\Models\User::first());
+        }
     }
 }
