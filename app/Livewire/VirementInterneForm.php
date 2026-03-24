@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
 use App\Models\VirementInterne;
 use App\Services\ExerciceService;
@@ -14,7 +15,7 @@ use Livewire\Component;
 
 final class VirementInterneForm extends Component
 {
-    use \App\Livewire\Concerns\RespectsExerciceCloture;
+    use RespectsExerciceCloture;
 
     public ?int $virementId = null;
 

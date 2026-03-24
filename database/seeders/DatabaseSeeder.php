@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Models\CompteBancaire;
+use App\Models\Exercice;
 use App\Models\User;
+use App\Services\ExerciceService;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -54,10 +56,10 @@ class DatabaseSeeder extends Seeder
         $this->call(OperationsTiersSeeder::class);
 
         // Create exercice for seeded data
-        $exerciceService = app(\App\Services\ExerciceService::class);
+        $exerciceService = app(ExerciceService::class);
         $annee = $exerciceService->current();
-        if (!\App\Models\Exercice::where('annee', $annee)->exists()) {
-            $exerciceService->creerExercice($annee, \App\Models\User::first());
+        if (! Exercice::where('annee', $annee)->exists()) {
+            $exerciceService->creerExercice($annee, User::first());
         }
     }
 }

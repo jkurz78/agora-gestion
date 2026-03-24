@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
 use App\Models\Transaction;
@@ -17,9 +18,9 @@ use Livewire\WithPagination;
 
 final class TransactionCompteList extends Component
 {
+    use RespectsExerciceCloture;
     use WithPagination;
     use WithPerPage;
-    use \App\Livewire\Concerns\RespectsExerciceCloture;
 
     protected string $paginationTheme = 'bootstrap';
 

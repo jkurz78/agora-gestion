@@ -98,6 +98,7 @@ final class HelloassoForm extends Component
         if ($this->callbackToken === null) {
             return null;
         }
+
         return url("/api/helloasso/callback/{$this->callbackToken}");
     }
 

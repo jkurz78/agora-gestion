@@ -10,6 +10,7 @@ use App\Models\ExerciceAction;
 use App\Models\User;
 use App\Services\ExerciceService;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -118,7 +119,7 @@ describe('creerExercice()', function () {
     it('throws when exercice already exists', function () {
         Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
         $this->service->creerExercice(2025, $this->user);
-    })->throws(\Illuminate\Database\QueryException::class);
+    })->throws(QueryException::class);
 });
 
 describe('changerExerciceAffiche()', function () {
