@@ -173,7 +173,76 @@
             </div>
             @if ($step === 2)
                 <div class="card-body">
-                    <p class="text-muted">Contenu étape 2 (task suivante)</p>
+                    @if ($tiersErreur)
+                        <div class="alert alert-danger">{{ $tiersErreur }}</div>
+                    @endif
+
+                    @if ($tiersLoading && ! $tiersFetched)
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="text-muted mt-2">Récupération des tiers HelloAsso...</p>
+                        </div>
+                    @elseif ($tiersFetched)
+                        @php
+                            $unlinkedPersons = collect($persons)->whereNull('tiers_id');
+                        @endphp
+
+                        @if ($unlinkedPersons->isEmpty())
+                            <div class="alert alert-success mb-3">
+                                <i class="bi bi-check-circle me-1"></i> Tous les tiers HelloAsso sont déjà associés.
+                            </div>
+                        @else
+                            <table class="table table-sm table-hover">
+                                <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                    <tr>
+                                        <th>Personne HelloAsso</th>
+                                        <th>Email</th>
+                                        <th>Correspond à</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($persons as $index => $person)
+                                        @if ($person['tiers_id'] === null)
+                                            <tr wire:key="person-{{ $index }}">
+                                                <td class="small">{{ $person['firstName'] }} {{ $person['lastName'] }}</td>
+                                                <td class="small text-muted">{{ $person['email'] }}</td>
+                                                <td>
+                                                    <livewire:tiers-autocomplete
+                                                        wire:model.live="selectedTiers.{{ $index }}"
+                                                        filtre="recettes"
+                                                        :key="'rapprochement-'.$index"
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <div class="d-flex flex-column gap-1">
+                                                        <button wire:click="associerTiers({{ $index }})"
+                                                                class="btn btn-sm btn-outline-success py-0 px-2">
+                                                            <i class="bi bi-link-45deg me-1"></i>Associer
+                                                        </button>
+                                                        <button wire:click="creerTiers({{ $index }})"
+                                                                class="btn btn-sm btn-outline-primary py-0 px-2"
+                                                                title="Créer un nouveau tiers à partir des données HelloAsso">
+                                                            <i class="bi bi-person-plus me-1"></i>Ajouter depuis HelloAsso
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endif
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        @endif
+
+                        <div class="d-flex justify-content-end mt-3">
+                            <button wire:click="lancerSynchronisation" class="btn btn-success"
+                                    wire:loading.attr="disabled" wire:target="lancerSynchronisation">
+                                <span wire:loading wire:target="lancerSynchronisation" class="spinner-border spinner-border-sm me-1"></span>
+                                <i class="bi bi-arrow-repeat me-1" wire:loading.remove wire:target="lancerSynchronisation"></i>
+                                Lancer la synchronisation
+                            </button>
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>
