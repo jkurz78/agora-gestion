@@ -467,11 +467,8 @@ final class HelloassoSyncWizard extends Component
 
         $p = HelloAssoParametres::where('association_id', 1)->first();
 
+        // DEBUG: filtre désactivé temporairement pour diagnostic
         $formMappings = $p?->formMappings()
-            ->where(function ($q) use ($exerciceStart) {
-                $q->whereNull('end_date')
-                    ->orWhere('end_date', '>=', $exerciceStart);
-            })
             ->orderBy('form_title')
             ->get() ?? collect();
 
