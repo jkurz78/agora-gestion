@@ -11,7 +11,7 @@ test('Espace enum has compta and gestion cases', function (): void {
     expect(Espace::Compta->label())->toBe('Comptabilité');
     expect(Espace::Gestion->label())->toBe('Gestion');
     expect(Espace::Compta->color())->toBe('#722281');
-    expect(Espace::Gestion->color())->toBe('#63B2EA');
+    expect(Espace::Gestion->color())->toBe('#A9014F');
 });
 
 test('user dernier_espace defaults to compta', function (): void {
