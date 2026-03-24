@@ -259,7 +259,61 @@
             </div>
             @if ($step === 3)
                 <div class="card-body">
-                    <p class="text-muted">Contenu étape 3 (task suivante)</p>
+                    @if ($syncErreur)
+                        <div class="alert alert-danger">{{ $syncErreur }}</div>
+                    @endif
+
+                    @if ($syncLoading)
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status"></div>
+                            <p class="text-muted mt-2">Synchronisation en cours...</p>
+                        </div>
+                    @elseif ($syncResult)
+                        <div class="alert {{ count($syncResult['errors']) > 0 ? 'alert-warning' : 'alert-success' }}">
+                            <strong><i class="bi bi-check-circle me-1"></i> Synchronisation terminée</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Transactions : <strong>{{ $syncResult['transactionsCreated'] }} créée(s)</strong>, <strong>{{ $syncResult['transactionsUpdated'] }} mise(s) à jour</strong></li>
+                                <li>Lignes : <strong>{{ $syncResult['lignesCreated'] }} créée(s)</strong>, <strong>{{ $syncResult['lignesUpdated'] }} mise(s) à jour</strong></li>
+                                @if ($syncResult['ordersSkipped'] > 0)
+                                    <li>Commandes ignorées : <strong>{{ $syncResult['ordersSkipped'] }}</strong></li>
+                                @endif
+                                @if (($syncResult['virementsCreated'] ?? 0) > 0)
+                                    <li>Virements : <strong>{{ $syncResult['virementsCreated'] }} créé(s)</strong></li>
+                                @endif
+                                @if (($syncResult['rapprochementsCreated'] ?? 0) > 0)
+                                    <li>Rapprochements auto-verrouillés : <strong>{{ $syncResult['rapprochementsCreated'] }}</strong></li>
+                                @endif
+                            </ul>
+                        </div>
+
+                        @if (! empty($syncResult['cashoutSkipped']))
+                            <div class="alert alert-info small">
+                                <i class="bi bi-info-circle me-1"></i> Versements non synchronisés : le compte de versement n'est pas configuré.
+                            </div>
+                        @endif
+
+                        @if (! empty($syncResult['cashoutsIncomplets']))
+                            <div class="alert alert-warning">
+                                <strong><i class="bi bi-exclamation-triangle me-1"></i> Versements incomplets :</strong>
+                                <ul class="mb-0 mt-1">
+                                    @foreach ($syncResult['cashoutsIncomplets'] as $warning)
+                                        <li class="small">{{ $warning }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+
+                        @if (count($syncResult['errors']) > 0)
+                            <div class="alert alert-danger">
+                                <strong><i class="bi bi-exclamation-triangle me-1"></i> {{ count($syncResult['errors']) }} erreur(s) :</strong>
+                                <ul class="mb-0 mt-1">
+                                    @foreach ($syncResult['errors'] as $error)
+                                        <li class="small">{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                    @endif
                 </div>
             @endif
         </div>

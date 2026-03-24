@@ -11,6 +11,7 @@ use App\Models\Operation;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
 use App\Services\HelloAssoApiClient;
+use App\Services\HelloAssoSyncService;
 use App\Services\HelloAssoTiersResolver;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -58,6 +59,14 @@ final class HelloassoSyncWizard extends Component
 
     /** @var array<int, ?int> */
     public array $selectedTiers = [];
+
+    // Étape 3 — Synchronisation
+    /** @var array<string, mixed>|null */
+    public ?array $syncResult = null;
+
+    public ?string $syncErreur = null;
+
+    public bool $syncLoading = false;
 
     // Création opération inline
     public ?int $creatingOperationForMapping = null;
@@ -310,7 +319,88 @@ final class HelloassoSyncWizard extends Component
 
     public function synchroniser(): void
     {
-        // Implémenté dans Task 6
+        $this->syncLoading = true;
+        $this->syncResult = null;
+        $this->syncErreur = null;
+
+        $parametres = HelloAssoParametres::where('association_id', 1)->first();
+        $exercice = app(ExerciceService::class)->current();
+        $exerciceService = app(ExerciceService::class);
+
+        try {
+            $client = new HelloAssoApiClient($parametres);
+            $range = $exerciceService->dateRange($exercice);
+            $from = $range['start']->toDateString();
+            $to = $range['end']->toDateString();
+
+            $orders = $client->fetchOrders($from, $to);
+        } catch (\RuntimeException $e) {
+            $this->syncErreur = $e->getMessage();
+            $this->syncLoading = false;
+
+            return;
+        }
+
+        $syncService = new HelloAssoSyncService($parametres);
+        $syncResult = $syncService->synchroniser($orders, $exercice);
+
+        $this->syncResult = [
+            'transactionsCreated' => $syncResult->transactionsCreated,
+            'transactionsUpdated' => $syncResult->transactionsUpdated,
+            'lignesCreated' => $syncResult->lignesCreated,
+            'lignesUpdated' => $syncResult->lignesUpdated,
+            'ordersSkipped' => $syncResult->ordersSkipped,
+            'errors' => $syncResult->errors,
+            'virementsCreated' => 0,
+            'virementsUpdated' => 0,
+            'rapprochementsCreated' => 0,
+            'cashoutsIncomplets' => [],
+            'cashoutSkipped' => false,
+        ];
+
+        if ($parametres->compte_versement_id === null) {
+            $this->syncResult['cashoutSkipped'] = true;
+        } else {
+            try {
+                $rangePrev = $exerciceService->dateRange($exercice - 1);
+                $paymentsFrom = $rangePrev['start']->toDateString();
+
+                $payments = $client->fetchPayments($paymentsFrom, $to);
+                $cashOuts = HelloAssoApiClient::extractCashOutsFromPayments($payments);
+                $cashoutResult = $syncService->synchroniserCashouts($cashOuts, $exercice);
+
+                $this->syncResult['virementsCreated'] = $cashoutResult['virements_created'];
+                $this->syncResult['virementsUpdated'] = $cashoutResult['virements_updated'];
+                $this->syncResult['rapprochementsCreated'] = $cashoutResult['rapprochements_created'];
+                $this->syncResult['cashoutsIncomplets'] = $cashoutResult['cashouts_incomplets'];
+
+                if (! empty($cashoutResult['errors'])) {
+                    $this->syncResult['errors'] = array_merge($this->syncResult['errors'], $cashoutResult['errors']);
+                }
+            } catch (\RuntimeException $e) {
+                $this->syncResult['errors'][] = "Cashouts : {$e->getMessage()}";
+            }
+        }
+
+        $this->syncLoading = false;
+        $this->updateStepThreeSummary();
+    }
+
+    private function updateStepThreeSummary(): void
+    {
+        if ($this->syncResult === null) {
+            return;
+        }
+        $parts = [];
+        $total = $this->syncResult['transactionsCreated'] + $this->syncResult['transactionsUpdated'];
+        if ($total > 0) {
+            $parts[] = "{$total} transactions";
+        }
+        $rap = $this->syncResult['rapprochementsCreated'] ?? 0;
+        if ($rap > 0) {
+            $parts[] = "{$rap} rapprochement(s)";
+        }
+        $this->stepThreeSummary = implode(', ', $parts) ?: 'Aucun changement';
     }
 
     private function updateStepTwoSummary(): void
