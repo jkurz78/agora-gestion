@@ -17,6 +17,8 @@ use Livewire\Component;
 
 final class Dashboard extends Component
 {
+    use \App\Livewire\Concerns\RespectsExerciceCloture;
+
     public function render(): View
     {
         $exerciceService = app(ExerciceService::class);

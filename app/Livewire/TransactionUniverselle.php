@@ -22,6 +22,7 @@ use Livewire\WithPagination;
 final class TransactionUniverselle extends Component
 {
     use WithPagination, WithPerPage;
+    use \App\Livewire\Concerns\RespectsExerciceCloture;
 
     protected string $paginationTheme = 'bootstrap';
 
