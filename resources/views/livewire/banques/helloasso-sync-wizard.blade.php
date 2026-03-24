@@ -1,4 +1,9 @@
 <div>
+    @if ($exerciceCloture)
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Exercice clôturé — la synchronisation HelloAsso est désactivée.
+        </div>
+    @else
     {{-- Erreurs bloquantes --}}
     @if ($configBloquante)
         <div class="alert alert-danger">
@@ -334,5 +339,6 @@
                 </div>
             @endif
         </div>
+    @endif
     @endif
 </div>

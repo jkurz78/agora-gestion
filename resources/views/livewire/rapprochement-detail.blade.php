@@ -23,7 +23,8 @@
                     <input type="date"
                            wire:change="updateDateFin($event.target.value)"
                            value="{{ $rapprochement->date_fin->format('Y-m-d') }}"
-                           class="form-control form-control-sm" style="width:auto">
+                           class="form-control form-control-sm" style="width:auto"
+                           {{ $exerciceCloture ? 'disabled' : '' }}>
                     <span class="badge bg-warning text-dark ms-1"><i class="bi bi-pencil"></i> En cours</span>
                 </div>
                 @error('date_fin') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
@@ -63,7 +64,8 @@
                         <input type="number" step="0.01"
                                wire:change="updateSoldeFin($event.target.value)"
                                value="{{ number_format((float) $rapprochement->solde_fin, 2, '.', '') }}"
-                               class="form-control form-control-sm text-center fw-bold" style="width:auto;margin:auto">
+                               class="form-control form-control-sm text-center fw-bold" style="width:auto;margin:auto"
+                               {{ $exerciceCloture ? 'disabled' : '' }}>
                         @error('solde_fin') <div class="text-danger" style="font-size:.75rem">{{ $message }}</div> @enderror
                     @else
                         <div class="fw-bold">{{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €</div>
@@ -108,7 +110,7 @@
     </div>
 
     {{-- Actions --}}
-    @if ($rapprochement->isEnCours())
+    @if ($rapprochement->isEnCours() && ! $exerciceCloture)
         <div class="d-flex gap-2 mb-4">
             <a href="{{ route('rapprochement.index') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-floppy"></i> Enregistrer et quitter
@@ -134,7 +136,7 @@
     @endif
 
     {{-- Table des transactions --}}
-    @if ($rapprochement->isEnCours())
+    @if ($rapprochement->isEnCours() && ! $exerciceCloture)
         <div class="form-check mb-2">
             <input class="form-check-input" type="checkbox" id="masquerPointees"
                    wire:model.live="masquerPointees">
@@ -185,7 +187,7 @@
                             @endif
                         </td>
                         <td class="text-center">
-                            @if ($rapprochement->isEnCours())
+                            @if ($rapprochement->isEnCours() && ! $exerciceCloture)
                                 <input type="checkbox"
                                        wire:click="toggle('{{ $tx['type'] }}', {{ $tx['id'] }})"
                                        {{ $tx['pointe'] ? 'checked' : '' }}

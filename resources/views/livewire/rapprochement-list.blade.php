@@ -25,6 +25,7 @@
                         @endforeach
                     </select>
                 </div>
+                @if (! $exerciceCloture)
                 @if ($compte_id && ! $aEnCours)
                     <div class="col-md-auto">
                         <button wire:click="$set('showCreateForm', true)"
@@ -43,10 +44,11 @@
                         </div>
                     </div>
                 @endif
+                @endif
             </div>
 
             {{-- Formulaire de création --}}
-            @if ($showCreateForm)
+            @if ($showCreateForm && ! $exerciceCloture)
                 <div class="mt-3 p-3 border rounded bg-light">
                     <h6 class="mb-3">Nouveau relevé bancaire</h6>
                     @if ($soldeOuverture !== null)
@@ -119,8 +121,9 @@
                                         <a href="{{ route('rapprochement.detail', $rapprochement) }}"
                                            class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye"></i>
-                                            {{ $rapprochement->isEnCours() ? 'Continuer' : 'Consulter' }}
+                                            {{ $rapprochement->isEnCours() && ! $exerciceCloture ? 'Continuer' : 'Consulter' }}
                                         </a>
+                                        @if (! $exerciceCloture)
                                         @if ($rapprochement->isEnCours())
                                             <button wire:click="supprimer({{ $rapprochement->id }})"
                                                     wire:confirm="Supprimer ce rapprochement ? Toutes les écritures pointées seront dépointées."
@@ -133,6 +136,7 @@
                                                     class="btn btn-sm btn-outline-warning" title="Déverrouiller">
                                                 <i class="bi bi-unlock"></i>
                                             </button>
+                                        @endif
                                         @endif
                                     </div>
                                 </td>
