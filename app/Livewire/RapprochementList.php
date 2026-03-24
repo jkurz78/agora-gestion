@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\StatutRapprochement;
+use App\Enums\TypeTransaction;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
+use App\Models\Transaction;
+use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -117,12 +120,30 @@ final class RapprochementList extends Component
                 ->value('id');
         }
 
+        $rapprochementTotals = [];
+        foreach ($rapprochements as $r) {
+            $credit = Transaction::where('rapprochement_id', $r->id)
+                ->where('type', TypeTransaction::Recette)
+                ->sum('montant_total');
+            $debit = Transaction::where('rapprochement_id', $r->id)
+                ->where('type', TypeTransaction::Depense)
+                ->sum('montant_total');
+            $creditVir = VirementInterne::where('rapprochement_destination_id', $r->id)->sum('montant');
+            $debitVir = VirementInterne::where('rapprochement_source_id', $r->id)->sum('montant');
+
+            $rapprochementTotals[$r->id] = [
+                'credit' => (float) $credit + (float) $creditVir,
+                'debit' => (float) $debit + (float) $debitVir,
+            ];
+        }
+
         return view('livewire.rapprochement-list', [
             'comptes' => $comptes,
             'rapprochements' => $rapprochements,
             'aEnCours' => $aEnCours,
             'soldeOuverture' => $soldeOuverture,
             'dernierVerrouilleId' => $dernierVerrouilleId,
+            'rapprochementTotals' => $rapprochementTotals,
         ]);
     }
 }
