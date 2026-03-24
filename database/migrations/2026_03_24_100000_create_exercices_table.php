@@ -36,6 +36,11 @@ return new class extends Migration
             return;
         }
 
+        // YEAR() is a MySQL/MariaDB function not available in SQLite (used for tests)
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         $dates = DB::table('transactions')
             ->whereNull('deleted_at')
             ->selectRaw('DISTINCT YEAR(date) as y, MONTH(date) as m')
