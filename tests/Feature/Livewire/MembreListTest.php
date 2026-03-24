@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Livewire\MembreList;
+use App\Livewire\AdherentList;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -29,7 +29,7 @@ it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée',
         'montant' => 30.00,
     ]);
 
-    Livewire::test(MembreList::class)
+    Livewire::test(AdherentList::class)
         ->set('filtre', 'tous')
         ->assertSeeHtml('bi bi-check-lg text-success');
 });
@@ -48,7 +48,7 @@ it('n\'affiche pas le caractère unicode ✓', function () {
         'montant' => 30.00,
     ]);
 
-    Livewire::test(MembreList::class)
+    Livewire::test(AdherentList::class)
         ->set('filtre', 'tous')
         ->assertDontSee('✓');
 });
@@ -64,10 +64,10 @@ it('affiche un bouton bi-clock-history lié aux transactions du membre', functio
         'montant' => 30.00,
     ]);
 
-    Livewire::test(MembreList::class)
+    Livewire::test(AdherentList::class)
         ->set('filtre', 'tous')
         ->assertSeeHtml('bi bi-clock-history')
-        ->assertSeeHtml('href="'.route('tiers.transactions', $tiers->id).'"');
+        ->assertSeeHtml('href="'.route('compta.tiers.transactions', $tiers->id).'"');
 });
 
 it('les boutons d\'action ont la classe btn-sm sans style inline de padding', function () {
@@ -81,7 +81,7 @@ it('les boutons d\'action ont la classe btn-sm sans style inline de padding', fu
         'montant' => 30.00,
     ]);
 
-    Livewire::test(MembreList::class)
+    Livewire::test(AdherentList::class)
         ->set('filtre', 'tous')
         ->assertSeeHtml('btn btn-sm')
         ->assertDontSeeHtml('padding:.15rem');

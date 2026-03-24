@@ -36,7 +36,7 @@ beforeEach(function () {
 it('télécharge un CSV budget', function () {
     $response = $this->actingAs($this->user)
         ->withSession(['exercice_actif' => 2025])
-        ->get(route('budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'courant']));
+        ->get(route('compta.budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'courant']));
 
     $response->assertOk();
     $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
@@ -49,7 +49,7 @@ it('télécharge un CSV budget', function () {
 
 it('source zero produit des montants vides dans le CSV', function () {
     $response = $this->actingAs($this->user)
-        ->get(route('budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'zero']));
+        ->get(route('compta.budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'zero']));
 
     $response->assertOk();
     expect($response->getContent())->toContain('2026-2027;Charges;Loyers;');
@@ -58,7 +58,7 @@ it('source zero produit des montants vides dans le CSV', function () {
 
 it('télécharge un Excel budget', function () {
     $response = $this->actingAs($this->user)
-        ->get(route('budget.export', ['format' => 'xlsx', 'exercice' => 2026, 'source' => 'courant']));
+        ->get(route('compta.budget.export', ['format' => 'xlsx', 'exercice' => 2026, 'source' => 'courant']));
 
     $response->assertOk();
     $response->assertDownload('budget-2026-2027.xlsx');
@@ -69,21 +69,21 @@ it('source budget exporte les montants_prevu', function () {
 
     $response = $this->actingAs($this->user)
         ->withSession(['exercice_actif' => 2025])
-        ->get(route('budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'budget']));
+        ->get(route('compta.budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'budget']));
 
     $response->assertOk();
     expect($response->getContent())->toContain('2026-2027;Charges;Loyers;900.00');
 });
 
 it('redirige les invités vers login', function () {
-    $response = $this->get(route('budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'zero']));
+    $response = $this->get(route('compta.budget.export', ['format' => 'csv', 'exercice' => 2026, 'source' => 'zero']));
     $response->assertRedirect(route('login'));
 });
 
 it('rejette un format invalide', function () {
     $response = $this->actingAs($this->user)
         ->withHeaders(['Accept' => 'application/json'])
-        ->get(route('budget.export', ['format' => 'pdf', 'exercice' => 2026, 'source' => 'zero']));
+        ->get(route('compta.budget.export', ['format' => 'pdf', 'exercice' => 2026, 'source' => 'zero']));
 
     $response->assertStatus(422);
 });

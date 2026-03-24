@@ -20,7 +20,7 @@ it('masque par défaut les opérations hors exercice', function () {
         'statut' => StatutOperation::EnCours,
     ]);
 
-    $this->get(route('operations.index'))
+    $this->get(route('compta.operations.index'))
         ->assertDontSee('Op passée');
 });
 
@@ -32,6 +32,6 @@ it('affiche toutes les opérations avec ?all=1', function () {
         'statut' => StatutOperation::EnCours,
     ]);
 
-    $this->get(route('operations.index', ['all' => 1]))
+    $this->get(route('compta.operations.index', ['all' => 1]))
         ->assertSee('Op passée');
 });

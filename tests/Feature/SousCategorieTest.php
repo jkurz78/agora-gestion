@@ -13,12 +13,12 @@ beforeEach(function () {
 
 it('can store a sous-categorie', function () {
     $this->actingAs($this->user)
-        ->post(route('parametres.sous-categories.store'), [
+        ->post(route('compta.parametres.sous-categories.store'), [
             'categorie_id' => $this->categorie->id,
             'nom' => 'Électricité',
             'code_cerfa' => '1234',
         ])
-        ->assertRedirect(route('parametres.sous-categories.index'));
+        ->assertRedirect(route('compta.parametres.sous-categories.index'));
 
     $this->assertDatabaseHas('sous_categories', [
         'categorie_id' => $this->categorie->id,
@@ -29,13 +29,13 @@ it('can store a sous-categorie', function () {
 
 it('validates required fields when storing a sous-categorie', function () {
     $this->actingAs($this->user)
-        ->post(route('parametres.sous-categories.store'), [])
+        ->post(route('compta.parametres.sous-categories.store'), [])
         ->assertSessionHasErrors(['categorie_id', 'nom']);
 });
 
 it('validates categorie_id exists', function () {
     $this->actingAs($this->user)
-        ->post(route('parametres.sous-categories.store'), [
+        ->post(route('compta.parametres.sous-categories.store'), [
             'categorie_id' => 99999,
             'nom' => 'Test',
         ])
@@ -44,7 +44,7 @@ it('validates categorie_id exists', function () {
 
 it('validates nom max length for sous-categorie', function () {
     $this->actingAs($this->user)
-        ->post(route('parametres.sous-categories.store'), [
+        ->post(route('compta.parametres.sous-categories.store'), [
             'categorie_id' => $this->categorie->id,
             'nom' => str_repeat('a', 101),
         ])
@@ -53,7 +53,7 @@ it('validates nom max length for sous-categorie', function () {
 
 it('validates code_cerfa max length', function () {
     $this->actingAs($this->user)
-        ->post(route('parametres.sous-categories.store'), [
+        ->post(route('compta.parametres.sous-categories.store'), [
             'categorie_id' => $this->categorie->id,
             'nom' => 'Test',
             'code_cerfa' => str_repeat('a', 11),
@@ -63,11 +63,11 @@ it('validates code_cerfa max length', function () {
 
 it('can store a sous-categorie without code_cerfa', function () {
     $this->actingAs($this->user)
-        ->post(route('parametres.sous-categories.store'), [
+        ->post(route('compta.parametres.sous-categories.store'), [
             'categorie_id' => $this->categorie->id,
             'nom' => 'Sans CERFA',
         ])
-        ->assertRedirect(route('parametres.sous-categories.index'));
+        ->assertRedirect(route('compta.parametres.sous-categories.index'));
 
     $this->assertDatabaseHas('sous_categories', [
         'nom' => 'Sans CERFA',
@@ -79,12 +79,12 @@ it('can update a sous-categorie', function () {
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
 
     $this->actingAs($this->user)
-        ->put(route('parametres.sous-categories.update', $sc), [
+        ->put(route('compta.parametres.sous-categories.update', $sc), [
             'categorie_id' => $this->categorie->id,
             'nom' => 'Nom modifié',
             'code_cerfa' => '9999',
         ])
-        ->assertRedirect(route('parametres.sous-categories.index'));
+        ->assertRedirect(route('compta.parametres.sous-categories.index'));
 
     $this->assertDatabaseHas('sous_categories', [
         'id' => $sc->id,
@@ -97,8 +97,8 @@ it('can destroy a sous-categorie', function () {
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
 
     $this->actingAs($this->user)
-        ->delete(route('parametres.sous-categories.destroy', $sc))
-        ->assertRedirect(route('parametres.sous-categories.index'));
+        ->delete(route('compta.parametres.sous-categories.destroy', $sc))
+        ->assertRedirect(route('compta.parametres.sous-categories.index'));
 
     $this->assertDatabaseMissing('sous_categories', ['id' => $sc->id]);
 });
@@ -116,8 +116,8 @@ it('returns flash error when destroying a sous-categorie with linked lignes', fu
     ]);
 
     $this->actingAs($this->user)
-        ->delete(route('parametres.sous-categories.destroy', $sc))
-        ->assertRedirect(route('parametres.sous-categories.index'))
+        ->delete(route('compta.parametres.sous-categories.destroy', $sc))
+        ->assertRedirect(route('compta.parametres.sous-categories.index'))
         ->assertSessionHas('error');
 
     $this->assertDatabaseHas('sous_categories', ['id' => $sc->id]);
