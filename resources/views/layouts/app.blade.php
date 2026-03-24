@@ -331,15 +331,13 @@
                                 </a>
                             </li>
                             @endif
-                            @if(($espace ?? null) === \App\Enums\Espace::Compta)
-                            @if (Route::has($espacePrefix . '.operations.index'))
+                            @if (Route::has('compta.operations.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.operations.*') ? 'active' : '' }}"
-                                   href="{{ route($espacePrefix . '.operations.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('compta.operations.*') ? 'active' : '' }}"
+                                   href="{{ route('compta.operations.index') }}">
                                     <i class="bi bi-calendar-event"></i> Opérations
                                 </a>
                             </li>
-                            @endif
                             @endif
                             <li><hr class="dropdown-divider"></li>
                             @if (Route::has($espacePrefix . '.parametres.utilisateurs.index'))
