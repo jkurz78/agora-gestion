@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Espace;
 use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
@@ -9,58 +10,22 @@ use App\Http\Controllers\OperationController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
+use App\Http\Middleware\DetecteEspace;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/dashboard');
+// Root: redirect to user's last espace
+Route::middleware('auth')->get('/', function () {
+    $espace = auth()->user()->dernier_espace ?? Espace::Compta;
 
-Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    return redirect("/{$espace->value}/dashboard");
+})->name('home');
 
-    // Livewire full-page routes (just need route + view)
-    Route::view('/transactions', 'transactions.index')->name('transactions.index');
-    Route::view('/transactions/all', 'transactions.all')->name('transactions.all');
-    Route::view('/dons', 'dons.index')->name('dons.index');
-    Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
-    Route::view('/membres', 'membres.index')->name('membres.index');
-    Route::view('/tiers', 'tiers.index')->name('tiers.index');
-    Route::get('/tiers/{tiers}/transactions', function (Tiers $tiers) {
-        return view('tiers.transactions', compact('tiers'));
-    })->name('tiers.transactions');
-    Route::view('/budget', 'budget.index')->name('budget.index');
-    Route::get('/budget/export', BudgetExportController::class)->name('budget.export');
-    Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
-    Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
-        return view('rapprochement.detail', compact('rapprochement'));
-    })->name('rapprochement.detail');
-    Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
-        ->name('rapprochement.pdf');
-    Route::view('/virements', 'virements.index')->name('virements.index');
-    Route::view('/banques/helloasso-sync', 'banques.helloasso-sync')->name('banques.helloasso-sync');
-    Route::get('comptes-bancaires/{compte}/transactions', function (CompteBancaire $compte) {
-        return view('comptes-bancaires.transactions', compact('compte'));
-    })->name('comptes-bancaires.transactions');
-    Route::view('/rapports', 'rapports.index')->name('rapports.index');
-    Route::view('/profil', 'profil.index')->name('profil.index');
-
-    // Exercices
-    Route::view('/exercices/cloture', 'exercices.cloture')->name('exercices.cloture');
-    Route::view('/exercices/changer', 'exercices.changer')->name('exercices.changer');
-    Route::view('/exercices/reouvrir', 'exercices.reouvrir')->name('exercices.reouvrir');
-    Route::view('/exercices/audit', 'exercices.audit')->name('exercices.audit');
-
-    // CSV import templates
-    Route::get('/transactions/import/template/{type}', [CsvImportController::class, 'template'])
-        ->whereIn('type', ['depense', 'recette'])
-        ->name('transactions.import.template');
-
-    // Resource controllers
-    Route::resource('operations', OperationController::class)->except(['destroy']);
-
-    // Parametres
-    Route::prefix('parametres')->name('parametres.')->group(function () {
+// ── Shared route registrar (parametres, helloasso-sync) ──
+$registerParametres = function (): void {
+    Route::prefix('parametres')->name('parametres.')->group(function (): void {
         Route::view('/association', 'parametres.association')->name('association');
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::resource('categories', CategorieController::class)->except(['show']);
@@ -69,6 +34,89 @@ Route::middleware('auth')->group(function () {
         Route::resource('comptes-bancaires', CompteBancaireController::class)->except(['show']);
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
+    Route::view('/helloasso-sync', 'banques.helloasso-sync')->name('helloasso-sync');
+};
+
+// ── Espace Comptabilité ──
+Route::middleware(['auth', DetecteEspace::class.':compta'])
+    ->prefix('compta')
+    ->name('compta.')
+    ->group(function () use ($registerParametres): void {
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+        Route::view('/transactions', 'transactions.index')->name('transactions.index');
+        Route::view('/transactions/all', 'transactions.all')->name('transactions.all');
+        Route::get('/transactions/import/template/{type}', [CsvImportController::class, 'template'])
+            ->whereIn('type', ['depense', 'recette'])
+            ->name('transactions.import.template');
+        Route::view('/dons', 'dons.index')->name('dons.index');
+        Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
+        Route::view('/tiers', 'tiers.index')->name('tiers.index');
+        Route::get('/tiers/{tiers}/transactions', function (Tiers $tiers) {
+            return view('tiers.transactions', compact('tiers'));
+        })->name('tiers.transactions');
+        Route::view('/budget', 'budget.index')->name('budget.index');
+        Route::get('/budget/export', BudgetExportController::class)->name('budget.export');
+        Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
+        Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
+            return view('rapprochement.detail', compact('rapprochement'));
+        })->name('rapprochement.detail');
+        Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
+            ->name('rapprochement.pdf');
+        Route::view('/virements', 'virements.index')->name('virements.index');
+        Route::get('comptes-bancaires/{compte}/transactions', function (CompteBancaire $compte) {
+            return view('comptes-bancaires.transactions', compact('compte'));
+        })->name('comptes-bancaires.transactions');
+        Route::view('/rapports', 'rapports.index')->name('rapports.index');
+
+        // Exercices
+        Route::view('/exercices/cloture', 'exercices.cloture')->name('exercices.cloture');
+        Route::view('/exercices/changer', 'exercices.changer')->name('exercices.changer');
+        Route::view('/exercices/reouvrir', 'exercices.reouvrir')->name('exercices.reouvrir');
+        Route::view('/exercices/audit', 'exercices.audit')->name('exercices.audit');
+
+        // Operations
+        Route::resource('operations', OperationController::class)->except(['destroy']);
+
+        // Shared registrations
+        $registerParametres();
+    });
+
+// ── Espace Gestion ──
+Route::middleware(['auth', DetecteEspace::class.':gestion'])
+    ->prefix('gestion')
+    ->name('gestion.')
+    ->group(function () use ($registerParametres): void {
+        Route::view('/dashboard', 'gestion.dashboard')->name('dashboard');
+        Route::view('/adherents', 'gestion.adherents')->name('adherents');
+
+        // Shared registrations
+        $registerParametres();
+    });
+
+// ── Profile (espace-agnostic) ──
+Route::middleware('auth')->group(function (): void {
+    Route::view('/profil', 'profil.index')->name('profil.index');
+});
+
+// ── Legacy redirects (301) ──
+Route::middleware('auth')->group(function (): void {
+    Route::permanentRedirect('/dashboard', '/compta/dashboard');
+    Route::permanentRedirect('/transactions', '/compta/transactions');
+    Route::permanentRedirect('/transactions/all', '/compta/transactions/all');
+    Route::permanentRedirect('/dons', '/compta/dons');
+    Route::permanentRedirect('/cotisations', '/compta/cotisations');
+    Route::permanentRedirect('/tiers', '/compta/tiers');
+    Route::permanentRedirect('/budget', '/compta/budget');
+    Route::permanentRedirect('/rapprochement', '/compta/rapprochement');
+    Route::permanentRedirect('/virements', '/compta/virements');
+    Route::permanentRedirect('/rapports', '/compta/rapports');
+    Route::permanentRedirect('/membres', '/gestion/adherents');
+    Route::permanentRedirect('/banques/helloasso-sync', '/compta/helloasso-sync');
+    Route::permanentRedirect('/exercices/cloture', '/compta/exercices/cloture');
+    Route::permanentRedirect('/exercices/changer', '/compta/exercices/changer');
+    Route::permanentRedirect('/exercices/reouvrir', '/compta/exercices/reouvrir');
+    Route::permanentRedirect('/exercices/audit', '/compta/exercices/audit');
 });
 
 require __DIR__.'/auth.php';

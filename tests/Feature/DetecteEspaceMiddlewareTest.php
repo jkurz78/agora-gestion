@@ -38,3 +38,33 @@ test('root redirects to compta dashboard by default', function (): void {
         ->get('/')
         ->assertRedirect('/compta/dashboard');
 });
+
+test('legacy /dashboard redirects 301 to /compta/dashboard', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user)
+        ->get('/dashboard')
+        ->assertRedirect('/compta/dashboard')
+        ->assertStatus(301);
+});
+
+test('legacy /membres redirects 301 to /gestion/adherents', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user)
+        ->get('/membres')
+        ->assertRedirect('/gestion/adherents')
+        ->assertStatus(301);
+});
+
+test('legacy /transactions redirects 301 to /compta/transactions', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user)
+        ->get('/transactions')
+        ->assertRedirect('/compta/transactions')
+        ->assertStatus(301);
+});
+
+test('parametres accessible from both spaces', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user)->get('/compta/parametres/association')->assertOk();
+    $this->actingAs($user)->get('/gestion/parametres/association')->assertOk();
+});
