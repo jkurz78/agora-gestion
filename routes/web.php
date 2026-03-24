@@ -12,8 +12,6 @@ use App\Http\Controllers\UserController;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
-use App\Services\ExerciceService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -47,16 +45,11 @@ Route::middleware('auth')->group(function () {
     Route::view('/rapports', 'rapports.index')->name('rapports.index');
     Route::view('/profil', 'profil.index')->name('profil.index');
 
-    // Changer d'exercice
-    Route::post('/exercice/changer', function (Request $request) {
-        $annee = (int) $request->input('annee');
-        $available = app(ExerciceService::class)->available(10);
-        if (in_array($annee, $available, true)) {
-            session(['exercice_actif' => $annee]);
-        }
-
-        return redirect()->back();
-    })->name('exercice.changer');
+    // Exercices
+    Route::view('/exercices/cloture', 'exercices.cloture')->name('exercices.cloture');
+    Route::view('/exercices/changer', 'exercices.changer')->name('exercices.changer');
+    Route::view('/exercices/reouvrir', 'exercices.reouvrir')->name('exercices.reouvrir');
+    Route::view('/exercices/audit', 'exercices.audit')->name('exercices.audit');
 
     // CSV import templates
     Route::get('/transactions/import/template/{type}', [CsvImportController::class, 'template'])
