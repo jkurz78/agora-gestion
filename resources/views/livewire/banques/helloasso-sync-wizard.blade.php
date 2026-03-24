@@ -53,6 +53,14 @@
                             <p class="text-muted mt-2">Chargement des formulaires HelloAsso...</p>
                         </div>
                     @elseif ($formsLoaded)
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="showAllForms"
+                                   wire:model.live="showAllForms">
+                            <label class="form-check-label small text-muted" for="showAllForms">
+                                Afficher aussi les anciens formulaires
+                            </label>
+                        </div>
+
                         @if ($formMappings->isEmpty())
                             <p class="text-muted">Aucun formulaire trouvé pour cet exercice.</p>
                         @else

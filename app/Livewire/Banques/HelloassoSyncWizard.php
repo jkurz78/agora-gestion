@@ -36,6 +36,8 @@ final class HelloassoSyncWizard extends Component
     public ?string $stepThreeSummary = null;
 
     // Étape 1 — Formulaires
+    public bool $showAllForms = false;
+
     public bool $formsLoading = false;
 
     public bool $formsLoaded = false;
@@ -467,10 +469,16 @@ final class HelloassoSyncWizard extends Component
 
         $p = HelloAssoParametres::where('association_id', 1)->first();
 
-        // DEBUG: filtre désactivé temporairement pour diagnostic
-        $formMappings = $p?->formMappings()
-            ->orderBy('form_title')
-            ->get() ?? collect();
+        $query = $p?->formMappings()->orderBy('form_title');
+
+        if ($query && ! $this->showAllForms) {
+            $query->where(function ($q) use ($exerciceStart) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $exerciceStart);
+            });
+        }
+
+        $formMappings = $query?->get() ?? collect();
 
         return view('livewire.banques.helloasso-sync-wizard', [
             'formMappings' => $formMappings,
