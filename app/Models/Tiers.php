@@ -26,14 +26,17 @@ final class Tiers extends Model
         'date_naissance',
         'pour_depenses',
         'pour_recettes',
-        'helloasso_id',
+        'est_helloasso',
+        'helloasso_nom',
+        'helloasso_prenom',
     ];
 
     protected function casts(): array
     {
         return [
-            'pour_depenses'  => 'boolean',
-            'pour_recettes'  => 'boolean',
+            'pour_depenses' => 'boolean',
+            'pour_recettes' => 'boolean',
+            'est_helloasso' => 'boolean',
             'date_naissance' => 'date',
         ];
     }
@@ -44,17 +47,7 @@ final class Tiers extends Model
             return $this->entreprise ?? $this->nom;
         }
 
-        return trim(($this->prenom ? $this->prenom . ' ' : '') . $this->nom);
-    }
-
-    public function dons(): HasMany
-    {
-        return $this->hasMany(Don::class);
-    }
-
-    public function cotisations(): HasMany
-    {
-        return $this->hasMany(Cotisation::class);
+        return trim(($this->prenom ? $this->prenom.' ' : '').$this->nom);
     }
 
     public function transactions(): HasMany

@@ -50,15 +50,11 @@ final class CompteBancaireController extends Controller
     {
         // Vérifier les transactions actives et archivées (soft-deleted)
         $actives = $comptesBancaire->transactions()->count()
-            + $comptesBancaire->dons()->count()
-            + $comptesBancaire->cotisations()->count()
             + VirementInterne::where('compte_source_id', $comptesBancaire->id)
                 ->orWhere('compte_destination_id', $comptesBancaire->id)
                 ->count();
 
         $archivees = $comptesBancaire->transactions()->onlyTrashed()->count()
-            + $comptesBancaire->dons()->onlyTrashed()->count()
-            + $comptesBancaire->cotisations()->onlyTrashed()->count()
             + VirementInterne::onlyTrashed()
                 ->where(fn ($q) => $q->where('compte_source_id', $comptesBancaire->id)
                     ->orWhere('compte_destination_id', $comptesBancaire->id))

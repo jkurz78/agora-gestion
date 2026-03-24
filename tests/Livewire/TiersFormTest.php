@@ -56,10 +56,10 @@ it('can create a particulier with all fields', function () {
         ->assertHasNoErrors();
 
     $this->assertDatabaseHas('tiers', [
-        'nom'         => 'Martin',
-        'prenom'      => 'Jean',
+        'nom' => 'Martin',
+        'prenom' => 'Jean',
         'code_postal' => '78500',
-        'ville'       => 'Sartrouville',
+        'ville' => 'Sartrouville',
     ]);
 
     $tiers = Tiers::where('nom', 'Martin')->firstOrFail();
@@ -139,10 +139,10 @@ it('validates at least one usage flag', function () {
 
 it('loads existing tiers for editing', function () {
     $tiers = Tiers::factory()->create([
-        'nom'        => 'Leclerc',
-        'type'       => 'entreprise',
+        'nom' => 'Leclerc',
+        'type' => 'entreprise',
         'entreprise' => 'Leclerc SA',
-        'ville'      => 'Bordeaux',
+        'ville' => 'Bordeaux',
     ]);
 
     Livewire::test(TiersForm::class)
@@ -177,7 +177,7 @@ it('can update a tiers', function () {
 it('opens with prefill from open-tiers-form event', function () {
     Livewire::test(TiersForm::class)
         ->dispatch('open-tiers-form', prefill: [
-            'nom'           => 'Jean Dupont',
+            'nom' => 'Jean Dupont',
             'pour_recettes' => true,
             'pour_depenses' => false,
         ])

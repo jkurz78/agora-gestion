@@ -42,10 +42,11 @@ it('import success sets successMessage and dispatches event', function () {
     $fakeResult = new CsvImportResult(true, transactionsCreated: 2, lignesCreated: 3);
 
     // CsvImportService is final so we bind a duck-typed fake to the container
-    $fake = new class($fakeResult) {
+    $fake = new class($fakeResult)
+    {
         public function __construct(private CsvImportResult $fakeResult) {}
 
-        public function import(\Illuminate\Http\UploadedFile $file, string $type): CsvImportResult
+        public function import(UploadedFile $file, string $type): CsvImportResult
         {
             return $this->fakeResult;
         }
@@ -65,10 +66,11 @@ it('import success sets successMessage and dispatches event', function () {
 it('import error sets importErrors array', function () {
     $fakeResult = new CsvImportResult(false, errors: [['line' => 4, 'message' => 'Erreur test']]);
 
-    $fake = new class($fakeResult) {
+    $fake = new class($fakeResult)
+    {
         public function __construct(private CsvImportResult $fakeResult) {}
 
-        public function import(\Illuminate\Http\UploadedFile $file, string $type): CsvImportResult
+        public function import(UploadedFile $file, string $type): CsvImportResult
         {
             return $this->fakeResult;
         }

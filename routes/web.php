@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\CsvImportController;
@@ -8,7 +9,9 @@ use App\Http\Controllers\OperationController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
+use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
+use App\Models\Tiers;
 use App\Services\ExerciceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -25,11 +28,11 @@ Route::middleware('auth')->group(function () {
     Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
     Route::view('/membres', 'membres.index')->name('membres.index');
     Route::view('/tiers', 'tiers.index')->name('tiers.index');
-    Route::get('/tiers/{tiers}/transactions', function (\App\Models\Tiers $tiers) {
+    Route::get('/tiers/{tiers}/transactions', function (Tiers $tiers) {
         return view('tiers.transactions', compact('tiers'));
     })->name('tiers.transactions');
     Route::view('/budget', 'budget.index')->name('budget.index');
-    Route::get('/budget/export', \App\Http\Controllers\BudgetExportController::class)->name('budget.export');
+    Route::get('/budget/export', BudgetExportController::class)->name('budget.export');
     Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
     Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
         return view('rapprochement.detail', compact('rapprochement'));
@@ -37,7 +40,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
         ->name('rapprochement.pdf');
     Route::view('/virements', 'virements.index')->name('virements.index');
-    Route::get('comptes-bancaires/{compte}/transactions', function (\App\Models\CompteBancaire $compte) {
+    Route::view('/banques/helloasso-sync', 'banques.helloasso-sync')->name('banques.helloasso-sync');
+    Route::get('comptes-bancaires/{compte}/transactions', function (CompteBancaire $compte) {
         return view('comptes-bancaires.transactions', compact('compte'));
     })->name('comptes-bancaires.transactions');
     Route::view('/rapports', 'rapports.index')->name('rapports.index');

@@ -26,11 +26,11 @@ it('monte sans configuration existante', function () {
 
 it('monte avec configuration existante et ne pré-remplit pas le secret', function () {
     HelloAssoParametres::create([
-        'association_id'    => 1,
-        'client_id'         => 'cid-123',
-        'client_secret'     => 'secret-xyz',
+        'association_id' => 1,
+        'client_id' => 'cid-123',
+        'client_secret' => 'secret-xyz',
         'organisation_slug' => 'association-svs',
-        'environnement'     => 'production',
+        'environnement' => 'production',
     ]);
 
     Livewire::test(HelloassoForm::class)
@@ -58,11 +58,11 @@ it('sauvegarde une nouvelle configuration', function () {
 
 it('conserve le secret existant si le champ est laissé vide à la sauvegarde', function () {
     HelloAssoParametres::create([
-        'association_id'    => 1,
-        'client_id'         => 'cid',
-        'client_secret'     => 'ancien-secret',
+        'association_id' => 1,
+        'client_id' => 'cid',
+        'client_secret' => 'ancien-secret',
         'organisation_slug' => 'asso',
-        'environnement'     => 'production',
+        'environnement' => 'production',
     ]);
 
     Livewire::test(HelloassoForm::class)
@@ -118,11 +118,11 @@ it('stocke l\'erreur en tableau si le test échoue', function () {
 
 it('utilise le secret en base si clientSecret est vide pour le test', function () {
     HelloAssoParametres::create([
-        'association_id'    => 1,
-        'client_id'         => 'cid',
-        'client_secret'     => 'secret-en-base',
+        'association_id' => 1,
+        'client_id' => 'cid',
+        'client_secret' => 'secret-en-base',
         'organisation_slug' => 'asso-svs',
-        'environnement'     => 'production',
+        'environnement' => 'production',
     ]);
 
     $mock = Mockery::mock(HelloAssoService::class);

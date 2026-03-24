@@ -7,17 +7,14 @@ namespace App\Livewire;
 use App\Enums\ModePaiement;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
-use App\Services\CotisationService;
-use App\Services\DonService;
 use App\Services\ExerciceService;
 use App\Services\TransactionService;
 use App\Services\TransactionUniverselleService;
 use App\Services\VirementInterneService;
 use Illuminate\View\View;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -43,6 +40,9 @@ final class TransactionUniverselle extends Component
     public string $pageTitleIcon = 'list-ul'; // icône Bootstrap du titre
 
     public bool $showImport = false;      // affiche les boutons import CSV dans le header
+
+    #[Locked]
+    public ?string $sousCategorieFilter = null; // filtre sous-catégorie (pour_dons, pour_cotisations, pour_inscriptions)
 
     // === Filtres libres (manipulables par l'utilisateur) ===
     /** @var array<string> */
@@ -83,6 +83,7 @@ final class TransactionUniverselle extends Component
         ?string $pageTitle = null,
         string $pageTitleIcon = 'list-ul',
         bool $showImport = false,
+        ?string $sousCategorieFilter = null,
     ): void {
         $this->compteId = $compteId;
         $this->tiersId = $tiersId;
@@ -91,6 +92,7 @@ final class TransactionUniverselle extends Component
         $this->pageTitle = $pageTitle;
         $this->pageTitleIcon = $pageTitleIcon;
         $this->showImport = $showImport;
+        $this->sousCategorieFilter = $sousCategorieFilter;
 
         // Initialiser plage dates sur l'exercice courant
         $exerciceService = app(ExerciceService::class);
@@ -136,7 +138,7 @@ final class TransactionUniverselle extends Component
             $this->filterTypes = array_values(array_filter($this->filterTypes, fn ($t) => $t !== $type));
         } else {
             $this->filterTypes[] = $type;
-            $allTypes = $this->lockedTypes ?? ['depense', 'recette', 'don', 'cotisation', 'virement'];
+            $allTypes = $this->lockedTypes ?? ['depense', 'recette', 'virement'];
             if (! array_diff($allTypes, $this->filterTypes)) {
                 $this->filterTypes = [];
             }
@@ -214,14 +216,12 @@ final class TransactionUniverselle extends Component
 
     public function openEdit(string $sourceType, int $id): void
     {
-        $allowed = ['depense', 'recette', 'don', 'cotisation', 'virement_sortant', 'virement_entrant'];
+        $allowed = ['depense', 'recette', 'virement_sortant', 'virement_entrant'];
         if (! in_array($sourceType, $allowed, true)) {
             return;
         }
         match ($sourceType) {
-            'depense', 'recette' => $this->dispatch('open-transaction-form', type: $sourceType, id: $id),
-            'don' => $this->dispatch('open-don-form', id: $id),
-            'cotisation' => $this->dispatch('open-cotisation-form', id: $id),
+            'depense', 'recette' => $this->dispatch('open-transaction-form', type: $sourceType, id: $id, sousCategorieFilter: $this->sousCategorieFilter),
             'virement_sortant', 'virement_entrant' => $this->dispatch('open-virement-form', id: $id),
         };
     }
@@ -241,8 +241,6 @@ final class TransactionUniverselle extends Component
     {
         return match ($sourceType) {
             'depense', 'recette' => $this->fetchTransactionDetail($id),
-            'don' => $this->fetchDonDetail($id),
-            'cotisation' => $this->fetchCotisationDetail($id),
             'virement_sortant', 'virement_entrant' => [],
             default => [],
         };
@@ -266,45 +264,15 @@ final class TransactionUniverselle extends Component
         ];
     }
 
-    private function fetchDonDetail(int $id): array
-    {
-        $don = Don::with(['sousCategorie', 'operation'])->find($id);
-        if (! $don) {
-            return [];
-        }
-
-        return [
-            'sous_categorie' => $don->sousCategorie?->nom,
-            'operation' => $don->operation?->nom,
-            'seance' => $don->seance,
-            'objet' => $don->objet,
-        ];
-    }
-
-    private function fetchCotisationDetail(int $id): array
-    {
-        $cot = Cotisation::with('sousCategorie')->find($id);
-        if (! $cot) {
-            return [];
-        }
-
-        return [
-            'sous_categorie' => $cot->sousCategorie?->nom,
-            'exercice' => $cot->exercice,
-        ];
-    }
-
     // Suppression
     public function deleteRow(string $sourceType, int $id): void
     {
-        $allowed = ['depense', 'recette', 'don', 'cotisation', 'virement_sortant', 'virement_entrant'];
+        $allowed = ['depense', 'recette', 'virement_sortant', 'virement_entrant'];
         if (! in_array($sourceType, $allowed, true)) {
             return;
         }
         match ($sourceType) {
             'depense', 'recette' => $this->deleteTransaction($id),
-            'don' => $this->deleteDon($id),
-            'cotisation' => $this->deleteCotisation($id),
             'virement_sortant', 'virement_entrant' => $this->deleteVirement($id),
             default => null,
         };
@@ -323,24 +291,6 @@ final class TransactionUniverselle extends Component
         }
     }
 
-    private function deleteDon(int $id): void
-    {
-        $don = Don::find($id);
-        if (! $don || $don->isLockedByRapprochement()) {
-            return;
-        }
-        app(DonService::class)->delete($don);
-    }
-
-    private function deleteCotisation(int $id): void
-    {
-        $cot = Cotisation::find($id);
-        if (! $cot || $cot->isLockedByRapprochement()) {
-            return;
-        }
-        app(CotisationService::class)->delete($cot);
-    }
-
     private function deleteVirement(int $id): void
     {
         $v = VirementInterne::find($id);
@@ -353,12 +303,6 @@ final class TransactionUniverselle extends Component
     // Écouter les événements des modaux pour rafraîchir la liste
     #[On('transaction-saved')]
     public function onTransactionSaved(): void {}
-
-    #[On('don-saved')]
-    public function onDonSaved(): void {}
-
-    #[On('cotisation-saved')]
-    public function onCotisationSaved(): void {}
 
     #[On('virement-saved')]
     public function onVirementSaved(): void {}
@@ -404,6 +348,7 @@ final class TransactionUniverselle extends Component
             searchNumeroPiece: $this->filterNumeroPiece ?: null,
             modePaiement: $this->filterModePaiement ?: null,
             pointe: $this->filterPointe !== '' ? ($this->filterPointe === '1') : null,
+            sousCategorieFilter: $this->sousCategorieFilter,
             computeSolde: $showSolde,
             sortColumn: $this->sortColumn,
             sortDirection: $sortDirection,
@@ -426,7 +371,8 @@ final class TransactionUniverselle extends Component
             'showSolde' => $showSolde,
             'comptes' => $this->compteId === null ? CompteBancaire::orderBy('nom')->get() : collect(),
             'modesPaiement' => ModePaiement::cases(),
-            'availableTypes' => $this->lockedTypes ?? ['depense', 'recette', 'don', 'cotisation', 'virement'],
+            'availableTypes' => $this->lockedTypes ?? ['depense', 'recette', 'virement'],
+            'sousCategorieFilter' => $this->sousCategorieFilter,
             'showCompteCol' => $this->compteId === null,
             'showTiersCol' => $this->tiersId === null,
         ]);

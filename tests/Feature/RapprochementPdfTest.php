@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\StatutRapprochement;
 use App\Models\Association;
 use App\Models\CompteBancaire;
-use App\Models\Don;
 use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -20,12 +19,12 @@ beforeEach(function () {
     ]);
 
     $this->rapprochement = RapprochementBancaire::factory()->create([
-        'compte_id'       => $this->compte->id,
-        'date_fin'        => now()->format('Y-m-d'),
+        'compte_id' => $this->compte->id,
+        'date_fin' => now()->format('Y-m-d'),
         'solde_ouverture' => 1000.00,
-        'solde_fin'       => 1200.00,
-        'saisi_par'       => $this->user->id,
-        'statut'          => StatutRapprochement::Verrouille,
+        'solde_fin' => 1200.00,
+        'saisi_par' => $this->user->id,
+        'statut' => StatutRapprochement::Verrouille,
     ]);
 });
 
@@ -57,7 +56,7 @@ it('generates PDF even when association is not configured', function () {
 });
 
 it('generates PDF even when logo file is missing', function () {
-    $assoc = Association::find(1) ?? new Association();
+    $assoc = Association::find(1) ?? new Association;
     $assoc->id = 1;
     $assoc->fill(['nom' => 'Test', 'logo_path' => 'association/logo-inexistant.png'])->save();
 
@@ -69,19 +68,19 @@ it('generates PDF even when logo file is missing', function () {
 
 it('passes only pointed transactions to PDF view', function () {
     Transaction::factory()->asDepense()->create([
-        'compte_id'        => $this->compte->id,
+        'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
-        'libelle'          => 'Dépense pointée',
-        'montant_total'    => 100.00,
-        'date'             => now()->format('Y-m-d'),
+        'libelle' => 'Dépense pointée',
+        'montant_total' => 100.00,
+        'date' => now()->format('Y-m-d'),
     ]);
 
     Transaction::factory()->asDepense()->create([
-        'compte_id'        => $this->compte->id,
+        'compte_id' => $this->compte->id,
         'rapprochement_id' => null,
-        'libelle'          => 'Dépense non pointée',
-        'montant_total'    => 50.00,
-        'date'             => now()->subDay()->format('Y-m-d'),
+        'libelle' => 'Dépense non pointée',
+        'montant_total' => 50.00,
+        'date' => now()->subDay()->format('Y-m-d'),
     ]);
 
     Pdf::shouldReceive('loadView')
@@ -89,6 +88,7 @@ it('passes only pointed transactions to PDF view', function () {
         ->withArgs(function (string $view, array $data): bool {
             expect($data['transactions'])->toHaveCount(1);
             expect($data['transactions'][0]['label'])->toBe('Dépense pointée');
+
             return true;
         })
         ->andReturnSelf();
@@ -103,7 +103,7 @@ it('passes only pointed transactions to PDF view', function () {
 });
 
 it('télécharge le PDF avec un nom de fichier structuré', function () {
-    $assoc = Association::find(1) ?? new Association();
+    $assoc = Association::find(1) ?? new Association;
     $assoc->id = 1;
     $assoc->fill(['nom' => 'SVS Association'])->save();
 
@@ -129,21 +129,22 @@ it('ouvre le PDF inline avec ?mode=inline', function () {
 
 it('inclut l\'id et le tiers dans les données PDF', function () {
     $tiers = Tiers::factory()->create(['nom' => 'Test Tiers']);
-    Don::factory()->create([
-        'compte_id'        => $this->compte->id,
+    Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
-        'tiers_id'         => $tiers->id,
-        'montant'          => 75.00,
-        'date'             => now()->format('Y-m-d'),
+        'tiers_id' => $tiers->id,
+        'montant_total' => 75.00,
+        'date' => now()->format('Y-m-d'),
     ]);
 
     Pdf::shouldReceive('loadView')
         ->once()
         ->withArgs(function (string $view, array $data): bool {
-            $don = collect($data['transactions'])->first(fn ($t) => $t['type'] === 'Don');
-            expect($don)->not->toBeNull();
-            expect($don)->toHaveKey('id');
-            expect($don)->toHaveKey('tiers');
+            $recette = collect($data['transactions'])->first(fn ($t) => $t['type'] === 'Recette');
+            expect($recette)->not->toBeNull();
+            expect($recette)->toHaveKey('id');
+            expect($recette)->toHaveKey('tiers');
+
             return true;
         })
         ->andReturnSelf();

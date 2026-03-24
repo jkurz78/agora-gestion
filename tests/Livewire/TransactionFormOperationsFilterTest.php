@@ -18,10 +18,10 @@ beforeEach(function () {
 it('n\'affiche pas une opération hors exercice dans le formulaire de transaction', function () {
     // Opération passée (exercice 2024)
     Operation::factory()->create([
-        'nom'        => 'Op passée',
+        'nom' => 'Op passée',
         'date_debut' => '2024-09-01',
-        'date_fin'   => '2025-08-31',
-        'statut'     => StatutOperation::EnCours,
+        'date_fin' => '2025-08-31',
+        'statut' => StatutOperation::EnCours,
     ]);
 
     Livewire::test(TransactionForm::class)
@@ -31,10 +31,10 @@ it('n\'affiche pas une opération hors exercice dans le formulaire de transactio
 
 it('affiche une opération dans l\'exercice courant', function () {
     Operation::factory()->create([
-        'nom'        => 'Op courante',
+        'nom' => 'Op courante',
         'date_debut' => '2025-10-01',
-        'date_fin'   => '2026-03-31',
-        'statut'     => StatutOperation::EnCours,
+        'date_fin' => '2026-03-31',
+        'statut' => StatutOperation::EnCours,
     ]);
 
     Livewire::test(TransactionForm::class)
@@ -44,10 +44,10 @@ it('affiche une opération dans l\'exercice courant', function () {
 
 it('n\'affiche pas une opération clôturée même dans l\'exercice', function () {
     Operation::factory()->create([
-        'nom'        => 'Op clôturée',
+        'nom' => 'Op clôturée',
         'date_debut' => '2025-10-01',
-        'date_fin'   => '2026-03-31',
-        'statut'     => StatutOperation::Cloturee,
+        'date_fin' => '2026-03-31',
+        'statut' => StatutOperation::Cloturee,
     ]);
 
     Livewire::test(TransactionForm::class)

@@ -52,7 +52,7 @@ final class SousCategorieController extends Controller
     public function toggleFlag(Request $request, SousCategorie $sousCategory): RedirectResponse
     {
         $flag = $request->input('flag');
-        if (! in_array($flag, ['pour_dons', 'pour_cotisations'], true)) {
+        if (! in_array($flag, ['pour_dons', 'pour_cotisations', 'pour_inscriptions'], true)) {
             abort(422);
         }
 

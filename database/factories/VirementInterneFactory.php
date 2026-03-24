@@ -19,13 +19,13 @@ class VirementInterneFactory extends Factory
     public function definition(): array
     {
         return [
-            'date'                  => fake()->dateTimeBetween('-1 year', 'now'),
-            'montant'               => fake()->randomFloat(2, 10, 5000),
-            'compte_source_id'      => CompteBancaire::factory(),
+            'date' => fake()->dateTimeBetween('-1 year', 'now'),
+            'montant' => fake()->randomFloat(2, 10, 5000),
+            'compte_source_id' => CompteBancaire::factory(),
             'compte_destination_id' => CompteBancaire::factory(),
-            'reference'             => fake()->optional()->numerify('VIR-####'),
-            'notes'                 => fake()->optional()->sentence(),
-            'saisi_par'             => User::factory(),
+            'reference' => fake()->optional()->numerify('VIR-####'),
+            'notes' => fake()->optional()->sentence(),
+            'saisi_par' => User::factory(),
         ];
     }
 }

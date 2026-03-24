@@ -29,8 +29,8 @@ it('se rend sans erreur', function () {
 
 it('affiche les catégories et sous-catégories', function () {
     $cat = Categorie::factory()->depense()->create(['nom' => 'Charges admin']);
-    $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Fournitures']);
-    $d   = Transaction::factory()->asDepense()->create(['date' => '2025-11-15', 'saisi_par' => $this->user->id]);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Fournitures']);
+    $d = Transaction::factory()->asDepense()->create(['date' => '2025-11-15', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
     TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 250.00]);
 
@@ -43,8 +43,8 @@ it('affiche les catégories et sous-catégories', function () {
 it('affiche EXCÉDENT quand recettes > dépenses', function () {
     $catD = Categorie::factory()->depense()->create();
     $catR = Categorie::factory()->recette()->create();
-    $scD  = SousCategorie::factory()->create(['categorie_id' => $catD->id, 'nom' => 'Frais']);
-    $scR  = SousCategorie::factory()->create(['categorie_id' => $catR->id, 'nom' => 'Adhésions']);
+    $scD = SousCategorie::factory()->create(['categorie_id' => $catD->id, 'nom' => 'Frais']);
+    $scR = SousCategorie::factory()->create(['categorie_id' => $catR->id, 'nom' => 'Adhésions']);
 
     $d = Transaction::factory()->asDepense()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
@@ -59,8 +59,8 @@ it('affiche EXCÉDENT quand recettes > dépenses', function () {
 
 it('affiche DÉFICIT quand dépenses > recettes', function () {
     $cat = Categorie::factory()->depense()->create();
-    $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Lourdes charges']);
-    $d   = Transaction::factory()->asDepense()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Lourdes charges']);
+    $d = Transaction::factory()->asDepense()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
     TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 5000.00]);
 
@@ -69,7 +69,7 @@ it('affiche DÉFICIT quand dépenses > recettes', function () {
 
 it('affiche la barre de budget quand un budget existe', function () {
     $cat = Categorie::factory()->depense()->create();
-    $sc  = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Salle']);
+    $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Salle']);
     BudgetLine::factory()->create(['sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 1000.00]);
     $d = Transaction::factory()->asDepense()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();

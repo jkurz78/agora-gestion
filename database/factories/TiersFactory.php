@@ -28,6 +28,7 @@ final class TiersFactory extends Factory
             'ville' => fake()->optional()->city(),
             'pour_depenses' => fake()->boolean(60),
             'pour_recettes' => fake()->boolean(40),
+            'est_helloasso' => false,
         ];
     }
 
@@ -44,8 +45,8 @@ final class TiersFactory extends Factory
     public function membre(): static
     {
         return $this->state([
-            'type'          => 'particulier',
-            'prenom'        => fake()->firstName(),
+            'type' => 'particulier',
+            'prenom' => fake()->firstName(),
             'pour_depenses' => false,
             'pour_recettes' => false,
         ]);
@@ -54,17 +55,19 @@ final class TiersFactory extends Factory
     public function entreprise(): static
     {
         return $this->state([
-            'type'       => 'entreprise',
-            'nom'        => null,
-            'prenom'     => null,
+            'type' => 'entreprise',
+            'nom' => null,
+            'prenom' => null,
             'entreprise' => fake()->company(),
         ]);
     }
 
     public function avecHelloasso(): static
     {
-        return $this->state([
-            'helloasso_id' => fake()->uuid(),
-        ]);
+        return $this->state(['est_helloasso' => true])
+            ->afterMaking(function (Tiers $tiers) {
+                $tiers->helloasso_nom ??= $tiers->nom;
+                $tiers->helloasso_prenom ??= $tiers->prenom;
+            });
     }
 }

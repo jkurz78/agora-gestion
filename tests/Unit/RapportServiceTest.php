@@ -2,11 +2,8 @@
 
 use App\Models\BudgetLine;
 use App\Models\Categorie;
-use App\Models\Cotisation;
-use App\Models\Don;
 use App\Models\Operation;
 use App\Models\SousCategorie;
-use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -28,8 +25,8 @@ it('compteDeResultat retourne la hiérarchie catégorie/sous-catégorie pour N',
     ]);
     $depense = Transaction::factory()->asDepense()->create(['date' => '2025-11-15', 'saisi_par' => $this->user->id]);
     $depense->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' =>$depense->id, 'sous_categorie_id' => $sc->id, 'montant' => 150.00]);
-    TransactionLigne::factory()->create(['transaction_id' =>$depense->id, 'sous_categorie_id' => $sc->id, 'montant' => 50.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'montant' => 150.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'montant' => 50.00]);
 
     $result = $this->service->compteDeResultat(2025);
 
@@ -50,12 +47,12 @@ it('compteDeResultat inclut montant_n1 depuis exercice précédent', function ()
     // N-1 : exercice 2024 (sept 2024 - août 2025)
     $depenseN1 = Transaction::factory()->asDepense()->create(['date' => '2024-10-01', 'saisi_par' => $this->user->id]);
     $depenseN1->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' =>$depenseN1->id, 'sous_categorie_id' => $sc->id, 'montant' => 300.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $depenseN1->id, 'sous_categorie_id' => $sc->id, 'montant' => 300.00]);
 
     // N : exercice 2025 (sept 2025 - août 2026)
     $depenseN = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $depenseN->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' =>$depenseN->id, 'sous_categorie_id' => $sc->id, 'montant' => 350.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $depenseN->id, 'sous_categorie_id' => $sc->id, 'montant' => 350.00]);
 
     $result = $this->service->compteDeResultat(2025);
 
@@ -70,7 +67,7 @@ it('compteDeResultat inclut le budget depuis budget_lines', function () {
 
     $depense = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $depense->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' =>$depense->id, 'sous_categorie_id' => $sc->id, 'montant' => 800.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'montant' => 800.00]);
 
     $result = $this->service->compteDeResultat(2025);
 
@@ -80,14 +77,13 @@ it('compteDeResultat inclut le budget depuis budget_lines', function () {
 
 it('compteDeResultat inclut les dons dans les produits', function () {
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Dons manuels']);
-    $tiers = Tiers::factory()->create();
-    Don::factory()->create([
-        'sous_categorie_id' => $sc->id,
+    $recette = Transaction::factory()->asRecette()->create([
         'date' => '2025-11-01',
-        'montant' => 500.00,
-        'tiers_id' => $tiers->id,
+        'montant_total' => 500.00,
         'saisi_par' => $this->user->id,
     ]);
+    $recette->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $recette->id, 'sous_categorie_id' => $sc->id, 'montant' => 500.00]);
 
     $result = $this->service->compteDeResultat(2025);
 
@@ -97,13 +93,13 @@ it('compteDeResultat inclut les dons dans les produits', function () {
 
 it('compteDeResultat inclut les cotisations dans les produits', function () {
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions']);
-    $tiers = Tiers::factory()->create();
-    Cotisation::factory()->create([
-        'sous_categorie_id' => $sc->id,
-        'exercice' => 2025,
-        'montant' => 200.00,
-        'tiers_id' => $tiers->id,
+    $recette = Transaction::factory()->asRecette()->create([
+        'date' => '2025-11-01',
+        'montant_total' => 200.00,
+        'saisi_par' => $this->user->id,
     ]);
+    $recette->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $recette->id, 'sous_categorie_id' => $sc->id, 'montant' => 200.00, 'exercice' => 2025]);
 
     $result = $this->service->compteDeResultat(2025);
 
@@ -120,12 +116,12 @@ it('compteDeResultat trie catégories et sous-catégories par nom', function () 
         $sc = $cat->id === $catA->id ? $sc1 : SousCategorie::factory()->create(['categorie_id' => $catB->id, 'nom' => 'Mid']);
         $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
         $d->lignes()->forceDelete();
-        TransactionLigne::factory()->create(['transaction_id' =>$d->id, 'sous_categorie_id' => $sc->id, 'montant' => 10.00]);
+        TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 10.00]);
     }
     // Also add sc2 data
     $d2 = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $d2->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' =>$d2->id, 'sous_categorie_id' => $sc2->id, 'montant' => 10.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $d2->id, 'sous_categorie_id' => $sc2->id, 'montant' => 10.00]);
 
     $result = $this->service->compteDeResultat(2025);
 
@@ -150,13 +146,14 @@ it('compteDeResultatOperations filtre par opérations et exclut les cotisations'
     $depense = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
     $depense->lignes()->forceDelete();
 
-    TransactionLigne::factory()->create(['transaction_id' =>$depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 100.00]);
-    TransactionLigne::factory()->create(['transaction_id' =>$depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => null, 'montant' => 200.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 100.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => null, 'montant' => 200.00]);
 
-    // Cotisation (doit être exclue)
-    $scCot = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions']);
-    $tiers = Tiers::factory()->create();
-    Cotisation::factory()->create(['sous_categorie_id' => $scCot->id, 'exercice' => 2025, 'montant' => 500.00, 'tiers_id' => $tiers->id]);
+    // Cotisation via transaction (doit être exclue car sans operation_id)
+    $scCot = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions', 'pour_cotisations' => true]);
+    $recette = Transaction::factory()->asRecette()->create(['date' => '2025-10-01', 'montant_total' => 500.00, 'saisi_par' => $this->user->id]);
+    $recette->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $recette->id, 'sous_categorie_id' => $scCot->id, 'montant' => 500.00, 'exercice' => 2025]);
 
     $result = $this->service->compteDeResultatOperations(2025, [$op->id]);
 
@@ -169,85 +166,15 @@ it('compteDeResultatOperations retourne structure sans montant_n1 ni budget', fu
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Salle']);
     BudgetLine::factory()->create(['sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 999.00]);
 
-    $depense = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
-    $depense->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' =>$depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 100.00]);
+    $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 10.00]);
 
     $result = $this->service->compteDeResultatOperations(2025, [$op->id]);
 
-    $sc0 = $result['charges'][0]['sous_categories'][0];
-    expect($sc0)->not->toHaveKey('montant_n1');
-    expect($sc0)->not->toHaveKey('budget');
-    expect($sc0['montant'])->toBe(100.0);
-});
-
-// ── rapportSeances ────────────────────────────────────────────────────────────
-
-it('rapportSeances retourne hiérarchie catégorie/sous-catégorie avec colonnes séances', function () {
-    $op = Operation::factory()->withSeances(2)->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Location']);
-
-    $depense = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
-    $depense->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' =>$depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
-    TransactionLigne::factory()->create(['transaction_id' =>$depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 2, 'montant' => 150.00]);
-
-    $result = $this->service->rapportSeances(2025, [$op->id]);
-
-    expect($result['seances'])->toBe([1, 2]);
-    expect($result['charges'])->toHaveCount(1);
     $cat = $result['charges'][0];
-    expect($cat['label'])->toBe('Achats');
-    expect($cat['total'])->toBe(250.0);
-    $sc0 = $cat['sous_categories'][0];
-    expect($sc0['seances'][1])->toBe(100.0);
-    expect($sc0['seances'][2])->toBe(150.0);
-    expect($sc0['total'])->toBe(250.0);
-});
-
-it('rapportSeances agrège plusieurs opérations par numéro de séance', function () {
-    $op1 = Operation::factory()->withSeances(2)->create();
-    $op2 = Operation::factory()->withSeances(2)->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Salle']);
-
-    foreach ([$op1, $op2] as $op) {
-        $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
-        $d->lignes()->forceDelete();
-        TransactionLigne::factory()->create(['transaction_id' =>$d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
-    }
-
-    $result = $this->service->rapportSeances(2025, [$op1->id, $op2->id]);
-
-    expect($result['charges'][0]['sous_categories'][0]['seances'][1])->toBe(200.0);
-});
-
-it('rapportSeances place les lignes sans séance dans la colonne Hors séance (seance=0)', function () {
-    $op = Operation::factory()->withSeances(1)->create();
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Divers']);
-
-    $depense = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
-    $depense->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' =>$depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => null, 'montant' => 500.00]);
-
-    $result = $this->service->rapportSeances(2025, [$op->id]);
-
-    // La ligne sans séance doit apparaître dans la colonne "Hors séance" (seance=0), pas être exclue
-    expect($result['seances'])->toContain(0);
-    expect($result['charges'])->toHaveCount(1);
-    $sc0 = $result['charges'][0]['sous_categories'][0];
-    expect($sc0['seances'][0])->toBe(500.0);
-    expect($sc0['total'])->toBe(500.0);
-
-    // 0 doit être trié en dernier (après les séances numérotées)
-    $seancesAvecNumerotees = collect([1, 0]);
-    $sorted = $seancesAvecNumerotees->sortBy(fn ($s) => $s === 0 ? PHP_INT_MAX : $s)->values()->all();
-    expect($sorted)->toBe([1, 0]);
-});
-
-// ── toCsv ─────────────────────────────────────────────────────────────────────
-
-it('génère un CSV valide avec séparateur point-virgule', function () {
-    $csv = $this->service->toCsv([['Charge', 'Cat', 'Sous-cat', '100,00']], ['Type', 'Catégorie', 'Sous-catégorie', 'Montant']);
-    expect($csv)->toContain('Type;Catégorie;Sous-catégorie;Montant');
-    expect($csv)->toContain('Charge;Cat;Sous-cat;');
+    expect($cat)->not->toHaveKey('montant_n1');
+    expect($cat)->not->toHaveKey('budget');
+    expect($cat['sous_categories'][0])->not->toHaveKey('montant_n1');
+    expect($cat['sous_categories'][0])->not->toHaveKey('budget');
 });

@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Don;
 use App\Models\Operation;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -76,12 +75,6 @@ it('can view show page with financial summary', function () {
     TransactionLigne::factory()->create([
         'operation_id' => $operation->id,
         'montant' => 200.00,
-    ]);
-
-    // Create linked don
-    Don::factory()->create([
-        'operation_id' => $operation->id,
-        'montant' => 75.00,
     ]);
 
     $this->actingAs($this->user)

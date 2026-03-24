@@ -167,8 +167,6 @@
                             @switch($tx['type'])
                                 @case('depense') <span class="badge bg-danger" style="font-size:.7rem">Dépense</span> @break
                                 @case('recette') <span class="badge bg-success" style="font-size:.7rem">Recette</span> @break
-                                @case('don') <span class="badge bg-info text-dark" style="font-size:.7rem">Don</span> @break
-                                @case('cotisation') <span class="badge bg-warning text-dark" style="font-size:.7rem">Cotisation</span> @break
                                 @case('virement_source') <span class="badge bg-secondary" style="font-size:.7rem">Virement ↑</span> @break
                                 @case('virement_destination') <span class="badge bg-secondary" style="font-size:.7rem">Virement ↓</span> @break
                             @endswitch

@@ -1,10 +1,10 @@
 <div>
     {{-- Toolbar --}}
     <div class="mb-3">
-        <button wire:click="$dispatch('open-cotisation-form', { id: null })"
-                class="btn btn-primary btn-sm">
+        <a href="{{ route('transactions.index') }}"
+           class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg"></i> Nouvelle cotisation
-        </button>
+        </a>
     </div>
 
     {{-- Barre de filtres --}}
@@ -55,7 +55,7 @@
                         </td>
                         <td class="small text-nowrap">
                             @if($cot)
-                                {{ $cot->date_paiement->format('d/m/Y') }}
+                                {{ $cot->transaction->date->format('d/m/Y') }}
                                 <span class="text-muted">({{ $cot->exercice }})</span>
                             @else
                                 <span class="text-muted">—</span>
@@ -69,15 +69,15 @@
                             @endif
                         </td>
                         <td>
-                            @if($cot)
-                                <span class="badge bg-secondary" style="font-size:.7rem">{{ $cot->mode_paiement->label() }}</span>
+                            @if($cot && $cot->transaction->mode_paiement)
+                                <span class="badge bg-secondary" style="font-size:.7rem">{{ $cot->transaction->mode_paiement->label() }}</span>
                             @else
                                 —
                             @endif
                         </td>
-                        <td class="small text-muted">{{ $cot?->compte?->nom ?? '—' }}</td>
+                        <td class="small text-muted">{{ $cot?->transaction?->compte?->nom ?? '—' }}</td>
                         <td class="small">
-                            @if($cot && $cot->pointe)
+                            @if($cot && $cot->transaction->pointe)
                                 <i class="bi bi-check-lg text-success"></i>
                             @else
                                 <span class="text-muted">—</span>
@@ -90,12 +90,11 @@
                                    title="Voir les transactions">
                                     <i class="bi bi-clock-history"></i>
                                 </a>
-                                <button
-                                    wire:click="$dispatch('open-cotisation-for-tiers', { tiers_id: {{ $membre->id }} })"
-                                    class="btn btn-sm btn-outline-primary"
-                                    title="Nouvelle cotisation">
+                                <a href="{{ route('transactions.index') }}"
+                                   class="btn btn-sm btn-outline-primary"
+                                   title="Nouvelle cotisation">
                                     <i class="bi bi-plus-circle"></i>
-                                </button>
+                                </a>
                             </div>
                         </td>
                     </tr>

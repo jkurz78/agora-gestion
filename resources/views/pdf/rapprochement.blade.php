@@ -310,8 +310,6 @@
                         <td>@switch($tx['type'])
                             @case('Dépense') Dép @break
                             @case('Recette') Rec @break
-                            @case('Cotisation') Cot @break
-                            @case('Don') Don @break
                             @case('Virement sortant') Vir @break
                             @case('Virement entrant') Vir @break
                             @default {{ $tx['type'] }}

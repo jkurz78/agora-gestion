@@ -22,11 +22,11 @@ it('n\'affiche pas de colonne Notes dans l\'en-tête', function () {
 
 it('affiche bi-chat-left-text si le virement a des notes', function () {
     VirementInterne::factory()->create([
-        'compte_source_id'      => $this->source->id,
+        'compte_source_id' => $this->source->id,
         'compte_destination_id' => $this->destination->id,
-        'saisi_par'             => $this->user->id,
-        'date'                  => now(),
-        'notes'                 => 'Provision pour charges Q4',
+        'saisi_par' => $this->user->id,
+        'date' => now(),
+        'notes' => 'Provision pour charges Q4',
     ]);
 
     Livewire::test(VirementInterneList::class)
@@ -36,11 +36,11 @@ it('affiche bi-chat-left-text si le virement a des notes', function () {
 
 it('n\'affiche pas bi-chat-left-text si notes est null', function () {
     VirementInterne::factory()->create([
-        'compte_source_id'      => $this->source->id,
+        'compte_source_id' => $this->source->id,
         'compte_destination_id' => $this->destination->id,
-        'saisi_par'             => $this->user->id,
-        'date'                  => now(),
-        'notes'                 => null,
+        'saisi_par' => $this->user->id,
+        'date' => now(),
+        'notes' => null,
     ]);
 
     Livewire::test(VirementInterneList::class)
@@ -49,11 +49,11 @@ it('n\'affiche pas bi-chat-left-text si notes est null', function () {
 
 it('n\'affiche pas bi-chat-left-text si notes est une chaîne vide', function () {
     VirementInterne::factory()->create([
-        'compte_source_id'      => $this->source->id,
+        'compte_source_id' => $this->source->id,
         'compte_destination_id' => $this->destination->id,
-        'saisi_par'             => $this->user->id,
-        'date'                  => now(),
-        'notes'                 => '',
+        'saisi_par' => $this->user->id,
+        'date' => now(),
+        'notes' => '',
     ]);
 
     Livewire::test(VirementInterneList::class)
@@ -62,10 +62,10 @@ it('n\'affiche pas bi-chat-left-text si notes est une chaîne vide', function ()
 
 it('les boutons d\'action ont la classe btn-sm sans style inline de padding', function () {
     VirementInterne::factory()->create([
-        'compte_source_id'      => $this->source->id,
+        'compte_source_id' => $this->source->id,
         'compte_destination_id' => $this->destination->id,
-        'saisi_par'             => $this->user->id,
-        'date'                  => now(),
+        'saisi_par' => $this->user->id,
+        'date' => now(),
     ]);
 
     Livewire::test(VirementInterneList::class)

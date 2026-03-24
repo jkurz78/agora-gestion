@@ -13,8 +13,6 @@
             $type = $availableTypes[0];
             $newEvent = match($type) {
                 'depense', 'recette' => 'open-transaction-form',
-                'don'       => 'open-don-form',
-                'cotisation'=> 'open-cotisation-form',
                 'virement'  => 'open-virement-form',
                 default     => 'open-transaction-form',
             };
@@ -26,8 +24,6 @@
             $newLabel = match($type) {
                 'depense'    => 'Nouvelle dépense',
                 'recette'    => 'Nouvelle recette',
-                'don'        => 'Nouveau don',
-                'cotisation' => 'Nouvelle cotisation',
                 'virement'   => 'Nouveau virement',
                 default      => 'Nouveau',
             };
@@ -39,7 +35,7 @@
         <div class="mb-2 d-flex align-items-center justify-content-between gap-2 flex-wrap">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <h4 class="mb-0"><i class="bi bi-{{ $pageTitleIcon }} me-1"></i>{{ $pageTitle }}</h4>
-                @if(count($availableTypes) > 1)
+                @if(!$sousCategorieFilter && count($availableTypes) > 1)
                     <button type="button" wire:click="$set('filterTypes', [])"
                             class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
                         Toutes
@@ -49,8 +45,6 @@
                             [$btnClass, $label] = match($type) {
                                 'depense'    => ['danger',    'DÉP'],
                                 'recette'    => ['success',   'REC'],
-                                'don'        => ['primary',   'DON'],
-                                'cotisation' => ['secondary', 'COT'],
                                 'virement'   => ['warning',   'VIR'],
                                 default      => ['secondary', strtoupper($type)],
                             };
@@ -71,7 +65,21 @@
             @endif
         </div>
         <div class="mb-3">
-            @if(count($availableTypes) === 1)
+            @if($sousCategorieFilter)
+                @php
+                    $filterLabel = match($sousCategorieFilter) {
+                        'pour_dons'          => 'Nouveau don',
+                        'pour_cotisations'   => 'Nouvelle cotisation',
+                        'pour_inscriptions'  => 'Nouvelle inscription',
+                        default              => 'Nouvelle recette',
+                    };
+                @endphp
+                <button type="button"
+                        @click="$dispatch('open-transaction-form', { id: null, type: 'recette', sousCategorieFilter: '{{ $sousCategorieFilter }}' })"
+                        class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg"></i> {{ $filterLabel }}
+                </button>
+            @elseif(count($availableTypes) === 1)
                 <button type="button" @click="$dispatch('{{ $newEvent }}', {{ $newPayload }})"
                         class="btn btn-sm btn-primary">
                     <i class="bi bi-plus-lg"></i> {{ $newLabel }}
@@ -92,16 +100,6 @@
                                 wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'recette' })">
                                 <i class="bi bi-arrow-up-circle text-success me-1"></i> Recette</a></li>
                         @endif
-                        @if(in_array('don', $availableTypes))
-                            <li><a class="dropdown-item" href="#"
-                                wire:click.prevent="$dispatch('open-don-form', { id: null })">
-                                <i class="bi bi-heart text-primary me-1"></i> Don</a></li>
-                        @endif
-                        @if(in_array('cotisation', $availableTypes))
-                            <li><a class="dropdown-item" href="#"
-                                wire:click.prevent="$dispatch('open-cotisation-form', { id: null })">
-                                <i class="bi bi-person-check me-1"></i> Cotisation</a></li>
-                        @endif
                         @if(in_array('virement', $availableTypes))
                             <li><a class="dropdown-item" href="#"
                                 wire:click.prevent="$dispatch('open-virement-form', { id: null })">
@@ -115,7 +113,21 @@
     @else
         {{-- Layout standard : ligne 1 = Nouveau ; ligne 2 = toggles --}}
         <div class="mb-3 d-flex justify-content-between align-items-center">
-            @if(count($availableTypes) === 1)
+            @if($sousCategorieFilter)
+                @php
+                    $filterLabel = match($sousCategorieFilter) {
+                        'pour_dons'          => 'Nouveau don',
+                        'pour_cotisations'   => 'Nouvelle cotisation',
+                        'pour_inscriptions'  => 'Nouvelle inscription',
+                        default              => 'Nouvelle recette',
+                    };
+                @endphp
+                <button type="button"
+                        @click="$dispatch('open-transaction-form', { id: null, type: 'recette', sousCategorieFilter: '{{ $sousCategorieFilter }}' })"
+                        class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-lg"></i> {{ $filterLabel }}
+                </button>
+            @elseif(count($availableTypes) === 1)
                 <button type="button" @click="$dispatch('{{ $newEvent }}', {{ $newPayload }})"
                         class="btn btn-sm btn-primary">
                     <i class="bi bi-plus-lg"></i> {{ $newLabel }}
@@ -136,16 +148,6 @@
                                 wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'recette' })">
                                 <i class="bi bi-arrow-up-circle text-success me-1"></i> Recette</a></li>
                         @endif
-                        @if(in_array('don', $availableTypes))
-                            <li><a class="dropdown-item" href="#"
-                                wire:click.prevent="$dispatch('open-don-form', { id: null })">
-                                <i class="bi bi-heart text-primary me-1"></i> Don</a></li>
-                        @endif
-                        @if(in_array('cotisation', $availableTypes))
-                            <li><a class="dropdown-item" href="#"
-                                wire:click.prevent="$dispatch('open-cotisation-form', { id: null })">
-                                <i class="bi bi-person-check me-1"></i> Cotisation</a></li>
-                        @endif
                         @if(in_array('virement', $availableTypes))
                             <li><a class="dropdown-item" href="#"
                                 wire:click.prevent="$dispatch('open-virement-form', { id: null })">
@@ -155,7 +157,7 @@
                 </div>
             @endif
         </div>
-        @if(count($availableTypes) > 1)
+        @if(!$sousCategorieFilter && count($availableTypes) > 1)
         <div class="mb-3 d-flex gap-1 flex-wrap">
             <button type="button" wire:click="$set('filterTypes', [])"
                     class="btn btn-sm {{ empty($filterTypes) ? 'btn-secondary' : 'btn-outline-secondary' }}">
@@ -166,8 +168,6 @@
                     [$btnClass, $label] = match($type) {
                         'depense'    => ['danger',    'DÉP'],
                         'recette'    => ['success',   'REC'],
-                        'don'        => ['primary',   'DON'],
-                        'cotisation' => ['secondary', 'COT'],
                         'virement'   => ['warning',   'VIR'],
                         default      => ['secondary', strtoupper($type)],
                     };
@@ -258,7 +258,7 @@
                     </th>
 
                     {{-- Type header (only if multi) --}}
-                    @if(count($availableTypes) > 1)
+                    @if(count($availableTypes) > 1 && !$sousCategorieFilter)
                     <th>Type</th>
                     @endif
 
@@ -456,8 +456,6 @@
                     [$badgeClass, $badgeLabel] = match($tx->source_type) {
                         'depense'              => ['danger',    'DÉP'],
                         'recette'              => ['success',   'REC'],
-                        'don'                  => ['primary',   'DON'],
-                        'cotisation'           => ['secondary', 'COT'],
                         'virement_sortant',
                         'virement_entrant'     => ['warning',   'VIR'],
                         default                => ['secondary', '?'],
@@ -470,7 +468,7 @@
                     </td>
                     <td class="small text-muted text-nowrap">{{ $tx->numero_piece ?? '—' }}</td>
                     <td class="small text-nowrap">{{ \Carbon\Carbon::parse($tx->date)->format('d/m') }}</td>
-                    @if(count($availableTypes) > 1)
+                    @if(count($availableTypes) > 1 && !$sousCategorieFilter)
                         <td>
                             <span class="badge text-bg-{{ $badgeClass }}" style="font-size:.65rem">{{ $badgeLabel }}</span>
                         </td>
@@ -545,7 +543,7 @@
                             @else
                                 <button type="button"
                                         wire:click="deleteRow('{{ e($tx->source_type) }}', {{ $tx->id }})"
-                                        wire:confirm="Supprimer cette ligne ?"
+                                        wire:confirm="{{ $tx->is_helloasso ? 'Supprimer cette transaction HelloAsso ? Elle ne sera plus ré-importée lors des prochaines synchronisations.' : 'Supprimer cette ligne ?' }}"
                                         class="btn btn-sm btn-outline-danger"
                                         style="padding:.15rem .3rem;font-size:.7rem"
                                         title="Supprimer">
@@ -558,7 +556,7 @@
                 {{-- Expansion row --}}
                 @if($isExpanded && $detail)
                     <tr style="background:#f8f9fa">
-                        <td colspan="{{ 10 + (count($availableTypes) > 1 ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
+                        <td colspan="{{ 10 + (count($availableTypes) > 1 && !$sousCategorieFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
                             style="padding:0;border-top:none">
                             @if(!empty($detail['lignes']))
                                 <table class="table table-sm align-middle mb-0" style="margin-left:1.5rem;width:calc(100% - 1.5rem);--bs-table-bg:#f8f9fa;font-size:.78rem;--bs-table-cell-padding-y:.2rem">
@@ -583,21 +581,13 @@
                                         @endforeach
                                     </tbody>
                                 </table>
-                            @elseif(!empty($detail['sous_categorie']))
-                                {{-- Don ou Cotisation --}}
-                                <span class="small text-muted" style="display:block;padding:.3rem .75rem .3rem 1.5rem;background:#f8f9fa">
-                                    <strong>Sous-catégorie :</strong> {{ $detail['sous_categorie'] }}
-                                    @if(!empty($detail['operation'])) &nbsp;· <strong>Opération :</strong> {{ $detail['operation'] }} @endif
-                                    @if(!empty($detail['seance'])) &nbsp;· <strong>Séance :</strong> {{ $detail['seance'] }} @endif
-                                    @if(!empty($detail['exercice'])) &nbsp;· <strong>Exercice :</strong> {{ $detail['exercice'] }} @endif
-                                </span>
                             @endif
                         </td>
                     </tr>
                 @endif
             @empty
                 <tr>
-                    <td colspan="{{ 9 + (count($availableTypes) > 1 ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
+                    <td colspan="{{ 9 + (count($availableTypes) > 1 && !$sousCategorieFilter ? 1 : 0) + ($showTiersCol ? 1 : 0) + ($showCompteCol ? 1 : 0) + ($showSolde ? 1 : 0) }}"
                         class="text-center text-muted py-4">
                         Aucune transaction trouvée.
                     </td>

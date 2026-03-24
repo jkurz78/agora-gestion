@@ -14,6 +14,7 @@ function makeBudgetCsvFile(string $content): UploadedFile
 {
     $path = tempnam(sys_get_temp_dir(), 'budget_test_');
     file_put_contents($path, $content);
+
     return new UploadedFile($path, 'budget.csv', 'text/csv', null, true);
 }
 
@@ -21,15 +22,15 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
 
-    $catCharge  = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
+    $catCharge = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
     $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id]);
-    $this->scElec   = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id]);
+    $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id]);
 });
 
 it('importe un CSV valide et insère les lignes non nulles', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2025-2026;Charges;Loyers;1200.00\n"
-         . "2025-2026;Charges;Électricité;\n"; // vide → ignoré
+         ."2025-2026;Charges;Loyers;1200.00\n"
+         ."2025-2026;Charges;Électricité;\n"; // vide → ignoré
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -42,8 +43,8 @@ it('importe un CSV valide et insère les lignes non nulles', function () {
 
 it('ignore les lignes avec montant à zéro', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2025-2026;Charges;Loyers;0\n"
-         . "2025-2026;Charges;Électricité;0.00\n";
+         ."2025-2026;Charges;Loyers;0\n"
+         ."2025-2026;Charges;Électricité;0.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -58,7 +59,7 @@ it('supprime les lignes existantes de l\'exercice avant import', function () {
     BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2024, 'montant_prevu' => 500]); // autre exercice
 
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2025-2026;Charges;Électricité;300.00\n";
+         ."2025-2026;Charges;Électricité;300.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -80,7 +81,7 @@ it('rejette si l\'en-tête est invalide', function () {
 
 it('rejette si l\'exercice dans le fichier ne correspond pas', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2024-2025;Charges;Loyers;100.00\n";
+         ."2024-2025;Charges;Loyers;100.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -91,8 +92,8 @@ it('rejette si l\'exercice dans le fichier ne correspond pas', function () {
 
 it('liste tous les exercices incorrects distincts dans le message d\'erreur', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2024-2025;Charges;Loyers;100.00\n"
-         . "2023-2024;Charges;Électricité;200.00\n";
+         ."2024-2025;Charges;Loyers;100.00\n"
+         ."2023-2024;Charges;Électricité;200.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -103,7 +104,7 @@ it('liste tous les exercices incorrects distincts dans le message d\'erreur', fu
 
 it('rejette si une sous-catégorie est introuvable', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2025-2026;Charges;Inconnu;100.00\n";
+         ."2025-2026;Charges;Inconnu;100.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -117,7 +118,7 @@ it('rejette si une sous-catégorie est ambiguë (doublon de nom)', function () {
     SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat2->id]); // doublon !
 
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2025-2026;Charges;Loyers;100.00\n";
+         ."2025-2026;Charges;Loyers;100.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -127,7 +128,7 @@ it('rejette si une sous-catégorie est ambiguë (doublon de nom)', function () {
 
 it('rejette si un montant est invalide (négatif)', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2025-2026;Charges;Loyers;-50.00\n";
+         ."2025-2026;Charges;Loyers;-50.00\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -137,7 +138,7 @@ it('rejette si un montant est invalide (négatif)', function () {
 
 it('rejette si un montant est invalide (non numérique)', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2025-2026;Charges;Loyers;abc\n";
+         ."2025-2026;Charges;Loyers;abc\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -160,8 +161,8 @@ it('rejette un fichier sans lignes de données', function () {
 
 it('ignore les montants à zéro sous toutes les formes', function () {
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2025-2026;Charges;Loyers;0.0\n"
-         . "2025-2026;Charges;Électricité;0.000\n";
+         ."2025-2026;Charges;Loyers;0.0\n"
+         ."2025-2026;Charges;Électricité;0.000\n";
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 
@@ -173,8 +174,8 @@ it('n\'insère rien si validation échoue (atomicité)', function () {
     BudgetLine::factory()->create(['sous_categorie_id' => $this->scLoyers->id, 'exercice' => 2025, 'montant_prevu' => 999]);
 
     $csv = "exercice;categorie;sous_categorie;montant_prevu\n"
-         . "2025-2026;Charges;Loyers;100.00\n"
-         . "2025-2026;Charges;Inconnu;200.00\n"; // erreur
+         ."2025-2026;Charges;Loyers;100.00\n"
+         ."2025-2026;Charges;Inconnu;200.00\n"; // erreur
 
     $result = app(BudgetImportService::class)->import(makeBudgetCsvFile($csv), 2025);
 

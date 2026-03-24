@@ -10,7 +10,7 @@ final class CsvImportController extends Controller
 {
     public function template(string $type): Response
     {
-        if (!in_array($type, ['depense', 'recette'], true)) {
+        if (! in_array($type, ['depense', 'recette'], true)) {
             abort(404);
         }
 
@@ -31,12 +31,12 @@ final class CsvImportController extends Controller
             ];
         }
 
-        $content = $headers_csv . "\n" . implode("\n", $rows) . "\n";
-        $filename = 'modele-' . $type . '.csv';
+        $content = $headers_csv."\n".implode("\n", $rows)."\n";
+        $filename = 'modele-'.$type.'.csv';
 
         return response($content, 200, [
-            'Content-Type'        => 'text/csv;charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Type' => 'text/csv;charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 }
