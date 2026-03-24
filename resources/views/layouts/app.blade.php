@@ -345,6 +345,7 @@
             </div>
         </div>
     </nav>
+    <livewire:helloasso-notification-banner />
     @endauth
 
     <div class="container-fluid px-4 pb-5 mb-3">
