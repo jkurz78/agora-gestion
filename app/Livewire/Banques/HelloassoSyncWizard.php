@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Banques;
 
+use App\Enums\StatutOperation;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
@@ -40,6 +41,15 @@ final class HelloassoSyncWizard extends Component
     public array $formOperations = [];
 
     public ?string $formErreur = null;
+
+    // Création opération inline
+    public ?int $creatingOperationForMapping = null;
+
+    public string $newOperationNom = '';
+
+    public ?string $newOperationDateDebut = null;
+
+    public ?string $newOperationDateFin = null;
 
     public function mount(): void
     {
@@ -101,6 +111,44 @@ final class HelloassoSyncWizard extends Component
 
         $this->formsLoaded = true;
         $this->formsLoading = false;
+    }
+
+    public function openCreateOperation(int $mappingId): void
+    {
+        $mapping = HelloAssoFormMapping::find($mappingId);
+        $this->creatingOperationForMapping = $mappingId;
+        $this->newOperationNom = $mapping?->form_title ?? '';
+        $this->newOperationDateDebut = $mapping?->start_date?->format('Y-m-d');
+        $this->newOperationDateFin = $mapping?->end_date?->format('Y-m-d');
+    }
+
+    public function cancelCreateOperation(): void
+    {
+        $this->creatingOperationForMapping = null;
+        $this->reset('newOperationNom', 'newOperationDateDebut', 'newOperationDateFin');
+    }
+
+    public function storeOperation(): void
+    {
+        $this->validate([
+            'newOperationNom' => 'required|string|max:255',
+            'newOperationDateDebut' => 'required|date',
+            'newOperationDateFin' => 'nullable|date|after_or_equal:newOperationDateDebut',
+        ]);
+
+        $operation = Operation::create([
+            'nom' => $this->newOperationNom,
+            'date_debut' => $this->newOperationDateDebut,
+            'date_fin' => $this->newOperationDateFin,
+            'statut' => StatutOperation::EnCours,
+        ]);
+
+        // Auto-select in the dropdown
+        if ($this->creatingOperationForMapping !== null) {
+            $this->formOperations[$this->creatingOperationForMapping] = $operation->id;
+        }
+
+        $this->cancelCreateOperation();
     }
 
     public function sauvegarderEtSuite(): void
