@@ -10,7 +10,7 @@ beforeEach(function () {
 });
 
 it('rejette la création sans date_debut', function () {
-    $response = $this->actingAs($this->user)->post(route('operations.store'), [
+    $response = $this->actingAs($this->user)->post(route('compta.operations.store'), [
         'nom' => 'Test op',
         'statut' => 'en_cours',
     ]);
@@ -18,7 +18,7 @@ it('rejette la création sans date_debut', function () {
 });
 
 it('rejette la création sans date_fin', function () {
-    $response = $this->actingAs($this->user)->post(route('operations.store'), [
+    $response = $this->actingAs($this->user)->post(route('compta.operations.store'), [
         'nom' => 'Test op',
         'date_debut' => '2025-09-01',
         'statut' => 'en_cours',
@@ -27,7 +27,7 @@ it('rejette la création sans date_fin', function () {
 });
 
 it('accepte la création avec les deux dates', function () {
-    $response = $this->actingAs($this->user)->post(route('operations.store'), [
+    $response = $this->actingAs($this->user)->post(route('compta.operations.store'), [
         'nom' => 'Test op',
         'date_debut' => '2025-09-01',
         'date_fin' => '2026-03-31',
@@ -39,7 +39,7 @@ it('accepte la création avec les deux dates', function () {
 
 it('rejette la modification sans date_debut', function () {
     $op = Operation::factory()->create();
-    $response = $this->actingAs($this->user)->put(route('operations.update', $op), [
+    $response = $this->actingAs($this->user)->put(route('compta.operations.update', $op), [
         'nom' => 'Test op',
         'statut' => 'en_cours',
     ]);

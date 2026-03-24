@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Livewire\MembreList;
+use App\Livewire\AdherentList;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -36,7 +36,7 @@ function createCotisation(Tiers $tiers, int $exercice, int $cotScId): Transactio
 
 it('renders without error', function (): void {
     Livewire::actingAs($this->user)
-        ->test(MembreList::class)
+        ->test(AdherentList::class)
         ->assertOk();
 });
 
@@ -48,7 +48,7 @@ it('filtre a_jour retourne les tiers avec cotisation exercice courant', function
     createCotisation($retard, 2024, $this->cotSc->id);
 
     Livewire::actingAs($this->user)
-        ->test(MembreList::class)
+        ->test(AdherentList::class)
         ->set('filtre', 'a_jour')
         ->assertSee('AJour')
         ->assertDontSee('EnRetard');
@@ -63,7 +63,7 @@ it('filtre en_retard retourne les tiers avec cotisation N-1 sans cotisation N', 
     createCotisation($retard, 2024, $this->cotSc->id);
 
     Livewire::actingAs($this->user)
-        ->test(MembreList::class)
+        ->test(AdherentList::class)
         ->set('filtre', 'en_retard')
         ->assertSee('EnRetard')
         ->assertDontSee('AJour');
@@ -76,7 +76,7 @@ it('filtre tous retourne tous les tiers avec au moins une cotisation', function 
     createCotisation($avecCot, 2024, $this->cotSc->id);
 
     Livewire::actingAs($this->user)
-        ->test(MembreList::class)
+        ->test(AdherentList::class)
         ->set('filtre', 'tous')
         ->assertSee('AvecCot')
         ->assertDontSee('SansCot');
@@ -90,7 +90,7 @@ it('filtre par recherche texte sur le nom', function (): void {
     createCotisation($dupont, 2025, $this->cotSc->id);
 
     Livewire::actingAs($this->user)
-        ->test(MembreList::class)
+        ->test(AdherentList::class)
         ->set('filtre', 'a_jour')
         ->set('search', 'Martin')
         ->assertSee('Martin')
@@ -99,13 +99,13 @@ it('filtre par recherche texte sur le nom', function (): void {
 
 it('has default perPage of 20', function (): void {
     Livewire::actingAs($this->user)
-        ->test(MembreList::class)
+        ->test(AdherentList::class)
         ->assertSet('perPage', 20);
 });
 
 it('resets to page 1 when perPage changes', function (): void {
     Livewire::actingAs($this->user)
-        ->test(MembreList::class)
+        ->test(AdherentList::class)
         ->set('perPage', 50)
         ->assertSet('paginators.page', 1);
 });
