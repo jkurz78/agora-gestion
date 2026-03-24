@@ -9,7 +9,7 @@ beforeEach(function () {
 });
 
 it('requires authentication to access operations index', function () {
-    $this->get(route('operations.index'))
+    $this->get(route('compta.operations.index'))
         ->assertRedirect(route('login'));
 });
 
@@ -17,14 +17,14 @@ it('can list operations', function () {
     $operation = Operation::factory()->create();
 
     $this->actingAs($this->user)
-        ->get(route('operations.index'))
+        ->get(route('compta.operations.index'))
         ->assertOk()
         ->assertSee($operation->nom);
 });
 
 it('can store an operation with valid data', function () {
     $this->actingAs($this->user)
-        ->post(route('operations.store'), [
+        ->post(route('compta.operations.store'), [
             'nom' => 'Fête annuelle',
             'description' => 'Organisation de la fête',
             'date_debut' => '2025-06-01',
@@ -32,7 +32,7 @@ it('can store an operation with valid data', function () {
             'nombre_seances' => 5,
             'statut' => 'en_cours',
         ])
-        ->assertRedirect(route('operations.index'));
+        ->assertRedirect(route('compta.operations.index'));
 
     $this->assertDatabaseHas('operations', [
         'nom' => 'Fête annuelle',
@@ -43,13 +43,13 @@ it('can store an operation with valid data', function () {
 
 it('validates required fields when storing an operation', function () {
     $this->actingAs($this->user)
-        ->post(route('operations.store'), [])
+        ->post(route('compta.operations.store'), [])
         ->assertSessionHasErrors(['nom']);
 });
 
 it('validates date_fin must be after or equal to date_debut', function () {
     $this->actingAs($this->user)
-        ->post(route('operations.store'), [
+        ->post(route('compta.operations.store'), [
             'nom' => 'Test',
             'date_debut' => '2025-06-30',
             'date_fin' => '2025-06-01',
@@ -78,7 +78,7 @@ it('can view show page with financial summary', function () {
     ]);
 
     $this->actingAs($this->user)
-        ->get(route('operations.show', $operation))
+        ->get(route('compta.operations.show', $operation))
         ->assertOk()
         ->assertSee($operation->nom);
 });
@@ -87,13 +87,13 @@ it('can update an operation', function () {
     $operation = Operation::factory()->create(['nom' => 'Ancien nom']);
 
     $this->actingAs($this->user)
-        ->put(route('operations.update', $operation), [
+        ->put(route('compta.operations.update', $operation), [
             'nom' => 'Nouveau nom',
             'statut' => 'cloturee',
             'date_debut' => $operation->date_debut->toDateString(),
             'date_fin' => $operation->date_fin->toDateString(),
         ])
-        ->assertRedirect(route('operations.show', $operation));
+        ->assertRedirect(route('compta.operations.show', $operation));
 
     $this->assertDatabaseHas('operations', [
         'id' => $operation->id,
