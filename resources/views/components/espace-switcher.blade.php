@@ -4,7 +4,7 @@
     $currentEspace = $espace ?? Espace::Compta;
     $otherEspace = $currentEspace === Espace::Compta ? Espace::Gestion : Espace::Compta;
 @endphp
-<div class="dropdown d-inline-block">
+<div class="dropdown d-block">
     <a class="text-decoration-none dropdown-toggle" href="#"
        role="button" data-bs-toggle="dropdown" aria-expanded="false"
        style="color: rgba(255,255,255,0.85); font-size: .85rem;">

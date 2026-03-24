@@ -104,13 +104,16 @@
     @auth
     <nav class="navbar navbar-expand-lg navbar-svs mb-4">
         <div class="container-fluid">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.dashboard') }}">
-                <img src="{{ $logoAsset }}" alt="{{ $nomAsso }}" height="45">
+            <div class="navbar-brand d-flex align-items-center gap-2 mb-0">
+                <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.dashboard') }}">
+                    <img src="{{ $logoAsset }}" alt="{{ $nomAsso }}" height="45">
+                </a>
                 <span class="d-inline-block lh-sm">
-                    <span class="d-block">{{ $nomAsso }}</span>
+                    <a class="d-block text-decoration-none" href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.dashboard') }}"
+                       style="color: rgba(255,255,255,0.9);">{{ $nomAsso }}</a>
                     <x-espace-switcher />
                 </span>
-            </a>
+            </div>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                     data-bs-target="#navbarNav" aria-controls="navbarNav"
                     aria-expanded="false" aria-label="Ouvrir la navigation">
