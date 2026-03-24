@@ -96,14 +96,54 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <select wire:model="formOperations.{{ $fm->id }}" class="form-select form-select-sm">
-                                                    <option value="">Ne pas suivre</option>
-                                                    @foreach ($operations as $op)
-                                                        <option value="{{ $op->id }}">{{ $op->nom }}</option>
-                                                    @endforeach
-                                                </select>
+                                                <div class="d-flex gap-1">
+                                                    <select wire:model="formOperations.{{ $fm->id }}" class="form-select form-select-sm">
+                                                        <option value="">Ne pas suivre</option>
+                                                        @foreach ($operations as $op)
+                                                            <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <button wire:click="openCreateOperation({{ $fm->id }})"
+                                                            class="btn btn-sm btn-outline-primary" title="Créer une opération"
+                                                            style="padding:.15rem .5rem">
+                                                        <i class="bi bi-plus-lg"></i>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
+                                        @if ($creatingOperationForMapping === $fm->id)
+                                            <tr wire:key="create-op-{{ $fm->id }}">
+                                                <td colspan="5">
+                                                    <div class="bg-light rounded p-3">
+                                                        <h6 class="mb-2"><i class="bi bi-plus-circle me-1"></i> Nouvelle opération</h6>
+                                                        <div class="row g-2 align-items-end">
+                                                            <div class="col-md-4">
+                                                                <label class="form-label small">Nom *</label>
+                                                                <input type="text" wire:model="newOperationNom" class="form-control form-control-sm @error('newOperationNom') is-invalid @enderror">
+                                                                @error('newOperationNom') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <label class="form-label small">Date début *</label>
+                                                                <x-date-input name="new_op_debut" wire:model="newOperationDateDebut" :value="$newOperationDateDebut" />
+                                                                @error('newOperationDateDebut') <div class="text-danger small">{{ $message }}</div> @enderror
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <label class="form-label small">Date fin</label>
+                                                                <x-date-input name="new_op_fin" wire:model="newOperationDateFin" :value="$newOperationDateFin" />
+                                                            </div>
+                                                            <div class="col-md-2 d-flex gap-1">
+                                                                <button wire:click="storeOperation" class="btn btn-sm btn-success">
+                                                                    <i class="bi bi-check-lg"></i> Créer
+                                                                </button>
+                                                                <button wire:click="cancelCreateOperation" class="btn btn-sm btn-outline-secondary">
+                                                                    <i class="bi bi-x-lg"></i>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endif
                                     @endforeach
                                 </tbody>
                             </table>
