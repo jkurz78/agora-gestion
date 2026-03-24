@@ -21,7 +21,7 @@ enum Espace: string
     {
         return match ($this) {
             self::Compta => '#722281',
-            self::Gestion => '#63B2EA',
+            self::Gestion => '#A9014F',
         };
     }
 }
