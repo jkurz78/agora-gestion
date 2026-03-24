@@ -1,4 +1,3 @@
 <x-app-layout>
-    <h1>Dashboard Gestion</h1>
-    <p>A venir</p>
+    <livewire:gestion-dashboard />
 </x-app-layout>
