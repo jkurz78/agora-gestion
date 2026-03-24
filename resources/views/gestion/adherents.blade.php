@@ -1,3 +1,3 @@
 <x-app-layout>
-    <livewire:membre-list />
+    <livewire:adherent-list />
 </x-app-layout>

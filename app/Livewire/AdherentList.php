@@ -13,7 +13,7 @@ use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-final class MembreList extends Component
+final class AdherentList extends Component
 {
     use WithPagination;
     use WithPerPage;
@@ -83,6 +83,6 @@ final class MembreList extends Component
             $tiers->setAttribute('derniereCotisation', $derniereLigne);
         });
 
-        return view('livewire.membre-list', compact('membres'));
+        return view('livewire.adherent-list', compact('membres'));
     }
 }
