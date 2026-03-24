@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Banques;
 
 use App\Enums\StatutOperation;
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
@@ -21,7 +22,7 @@ use Livewire\Component;
 
 final class HelloassoSyncWizard extends Component
 {
-    use \App\Livewire\Concerns\RespectsExerciceCloture;
+    use RespectsExerciceCloture;
 
     public int $step = 1;
 

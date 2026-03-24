@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
@@ -17,7 +18,7 @@ use Livewire\Component;
 
 final class Dashboard extends Component
 {
-    use \App\Livewire\Concerns\RespectsExerciceCloture;
+    use RespectsExerciceCloture;
 
     public function render(): View
     {

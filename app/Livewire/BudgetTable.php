@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\TypeCategorie;
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
 use App\Models\Categorie;
 use App\Services\BudgetImportService;
@@ -18,8 +19,8 @@ use Livewire\WithFileUploads;
 
 final class BudgetTable extends Component
 {
+    use RespectsExerciceCloture;
     use WithFileUploads;
-    use \App\Livewire\Concerns\RespectsExerciceCloture;
 
     // ── Edition inline ────────────────────────────────────────────────────────
     public ?int $editingLineId = null;
@@ -50,7 +51,7 @@ final class BudgetTable extends Component
 
     public function addLine(int $sousCategorieId): void
     {
-        app(\App\Services\ExerciceService::class)->assertOuvert(app(\App\Services\ExerciceService::class)->current());
+        app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
         BudgetLine::create([
             'sous_categorie_id' => $sousCategorieId,
@@ -68,7 +69,7 @@ final class BudgetTable extends Component
 
     public function saveEdit(): void
     {
-        app(\App\Services\ExerciceService::class)->assertOuvert(app(\App\Services\ExerciceService::class)->current());
+        app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
         $this->validate(['editingMontant' => ['required', 'numeric', 'min:0']]);
 
@@ -84,7 +85,7 @@ final class BudgetTable extends Component
 
     public function deleteLine(int $lineId): void
     {
-        app(\App\Services\ExerciceService::class)->assertOuvert(app(\App\Services\ExerciceService::class)->current());
+        app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
         BudgetLine::findOrFail($lineId)->delete();
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\StatutRapprochement;
+use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
@@ -15,7 +16,7 @@ use Livewire\Component;
 
 final class RapprochementDetail extends Component
 {
-    use \App\Livewire\Concerns\RespectsExerciceCloture;
+    use RespectsExerciceCloture;
 
     public RapprochementBancaire $rapprochement;
 

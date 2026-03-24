@@ -8,6 +8,7 @@ use App\Models\Exercice;
 use App\Models\ExerciceAction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
@@ -23,7 +24,7 @@ describe('Exercice model', function () {
             'statut' => StatutExercice::Cloture,
             'date_cloture' => '2026-09-15 10:30:00',
         ]);
-        expect($exercice->date_cloture)->toBeInstanceOf(\Illuminate\Support\Carbon::class);
+        expect($exercice->date_cloture)->toBeInstanceOf(Carbon::class);
     });
 
     it('isCloture returns true when statut is Cloture', function () {
