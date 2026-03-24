@@ -3,7 +3,7 @@
 
     <div class="card">
         <div class="card-body">
-            <form action="{{ route('operations.update', $operation) }}" method="POST">
+            <form action="{{ route('compta.operations.update', $operation) }}" method="POST">
                 @csrf
                 @method('PUT')
 
@@ -83,7 +83,7 @@
 
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-success">Enregistrer</button>
-                    <a href="{{ route('operations.show', $operation) }}" class="btn btn-secondary">Annuler</a>
+                    <a href="{{ route('compta.operations.show', $operation) }}" class="btn btn-secondary">Annuler</a>
                 </div>
             </form>
         </div>

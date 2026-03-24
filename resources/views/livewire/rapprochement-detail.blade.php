@@ -34,13 +34,13 @@
             @endif
         </div>
         <div class="d-flex gap-2">
-            <a href="{{ route('rapprochement.pdf', $rapprochement) }}" class="btn btn-outline-primary btn-sm">
+            <a href="{{ route('compta.rapprochement.pdf', $rapprochement) }}" class="btn btn-outline-primary btn-sm">
                 <i class="bi bi-download"></i> Télécharger PDF
             </a>
-            <a href="{{ route('rapprochement.pdf', $rapprochement) }}?mode=inline" target="_blank" class="btn btn-outline-secondary btn-sm">
+            <a href="{{ route('compta.rapprochement.pdf', $rapprochement) }}?mode=inline" target="_blank" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-file-pdf"></i> Ouvrir PDF
             </a>
-            <a href="{{ route('rapprochement.index') }}" class="btn btn-outline-secondary btn-sm">
+            <a href="{{ route('compta.rapprochement.index') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-arrow-left"></i> Retour
             </a>
         </div>
@@ -112,7 +112,7 @@
     {{-- Actions --}}
     @if ($rapprochement->isEnCours() && ! $exerciceCloture)
         <div class="d-flex gap-2 mb-4">
-            <a href="{{ route('rapprochement.index') }}" class="btn btn-outline-secondary">
+            <a href="{{ route('compta.rapprochement.index') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-floppy"></i> Enregistrer et quitter
             </a>
             <button wire:click="supprimer"

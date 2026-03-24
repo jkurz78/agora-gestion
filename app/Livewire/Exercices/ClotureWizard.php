@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\ClotureCheckService;
 use App\Services\ExerciceService;
+use App\Services\RapprochementBancaireService;
 use App\Services\SoldeService;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -28,7 +29,7 @@ final class ClotureWizard extends Component
 
         $exercice = $exerciceService->exerciceAffiche();
         if ($exercice?->isCloture()) {
-            $this->redirect(route('exercices.changer'));
+            $this->redirect(route('compta.exercices.changer'));
 
             return;
         }
@@ -81,7 +82,7 @@ final class ClotureWizard extends Component
         $exerciceService->cloturer($exercice, auth()->user());
 
         session()->flash('success', "L'exercice {$exercice->label()} a été clôturé avec succès.");
-        $this->redirect(route('exercices.changer'));
+        $this->redirect(route('compta.exercices.changer'));
     }
 
     /**
@@ -92,7 +93,7 @@ final class ClotureWizard extends Component
     private function computeFinancialSummary(): array
     {
         $soldeService = app(SoldeService::class);
-        $rapprochementService = app(\App\Services\RapprochementBancaireService::class);
+        $rapprochementService = app(RapprochementBancaireService::class);
         $comptes = CompteBancaire::orderBy('nom')->get();
         $range = app(ExerciceService::class)->dateRange($this->annee);
         $start = $range['start']->toDateString();

@@ -13,7 +13,7 @@
                     {{ $showDetails ? 'Masquer les détails' : 'Voir les détails' }}
                 </button>
             </div>
-            <a href="{{ route('banques.helloasso-sync') }}" class="btn btn-warning btn-sm">
+            <a href="{{ route('compta.helloasso-sync') }}" class="btn btn-warning btn-sm">
                 <i class="bi bi-arrow-repeat"></i> Lancer la synchronisation
             </a>
         </div>

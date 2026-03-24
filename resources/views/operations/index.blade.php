@@ -3,15 +3,15 @@
         <h1>Opérations</h1>
         <div class="d-flex gap-2 align-items-center">
             @if ($showAll)
-                <a href="{{ route('operations.index') }}" class="btn btn-outline-secondary btn-sm">
+                <a href="{{ route('compta.operations.index') }}" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-funnel"></i> Exercice {{ $exercice }}-{{ $exercice + 1 }} seulement
                 </a>
             @else
-                <a href="{{ route('operations.index', ['all' => 1]) }}" class="btn btn-outline-secondary btn-sm">
+                <a href="{{ route('compta.operations.index', ['all' => 1]) }}" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-list-ul"></i> Toutes les opérations
                 </a>
             @endif
-            <a href="{{ route('operations.create') }}" class="btn btn-primary">
+            <a href="{{ route('compta.operations.create') }}" class="btn btn-primary">
                 <i class="bi bi-plus-lg"></i> Ajouter une opération
             </a>
         </div>
@@ -43,10 +43,10 @@
                                 </span>
                             </td>
                             <td>
-                                <a href="{{ route('operations.show', $operation) }}" class="btn btn-sm btn-outline-info">
+                                <a href="{{ route('compta.operations.show', $operation) }}" class="btn btn-sm btn-outline-info">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                <a href="{{ route('operations.edit', $operation) }}" class="btn btn-sm btn-outline-primary">
+                                <a href="{{ route('compta.operations.edit', $operation) }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-pencil"></i>
                                 </a>
                             </td>

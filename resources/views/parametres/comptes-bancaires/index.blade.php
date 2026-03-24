@@ -23,7 +23,7 @@
 
     <div class="collapse mb-3" id="addCompteForm">
         <div class="card card-body">
-            <form action="{{ route('parametres.comptes-bancaires.store') }}" method="POST" class="row g-2 align-items-end">
+            <form action="{{ route($espace->value . '.parametres.comptes-bancaires.store') }}" method="POST" class="row g-2 align-items-end">
                 @csrf
                 <div class="col-md-3">
                     <label for="cb_nom" class="form-label">Nom</label>
@@ -94,7 +94,7 @@
                         @endif
                     </td>
                     <td>
-                        <a href="{{ route('comptes-bancaires.transactions', $compte) }}"
+                        <a href="{{ route('compta.comptes-bancaires.transactions', $compte) }}"
                            class="btn btn-sm btn-outline-secondary"
                            data-bs-toggle="tooltip" title="Voir les transactions">
                             <i class="bi bi-list-ul"></i>
@@ -102,7 +102,7 @@
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 data-bs-toggle="modal"
                                 data-bs-target="#editCompteModal"
-                                data-update-url="{{ route('parametres.comptes-bancaires.update', $compte) }}"
+                                data-update-url="{{ route($espace->value . '.parametres.comptes-bancaires.update', $compte) }}"
                                 data-nom="{{ $compte->nom }}"
                                 data-iban="{{ $compte->iban ?? '' }}"
                                 data-solde="{{ $compte->solde_initial }}"
@@ -112,7 +112,7 @@
                                 onclick="fillEditModal(this)">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <form action="{{ route('parametres.comptes-bancaires.destroy', $compte) }}" method="POST" class="d-inline"
+                        <form action="{{ route($espace->value . '.parametres.comptes-bancaires.destroy', $compte) }}" method="POST" class="d-inline"
                               onsubmit="return confirm('Supprimer ce compte bancaire ?')">
                             @csrf
                             @method('DELETE')

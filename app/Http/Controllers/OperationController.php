@@ -45,7 +45,7 @@ final class OperationController extends Controller
         $data['statut'] = StatutOperation::EnCours;
         Operation::create($data);
 
-        $redirectTo = $request->input('_redirect_back', route('operations.index'));
+        $redirectTo = $request->input('_redirect_back', route('compta.operations.index'));
 
         return redirect($redirectTo)
             ->with('success', 'Opération créée avec succès.');
@@ -87,7 +87,7 @@ final class OperationController extends Controller
     {
         $operation->update($request->validated());
 
-        return redirect()->route('operations.show', $operation)
+        return redirect()->route('compta.operations.show', $operation)
             ->with('success', 'Opération mise à jour avec succès.');
     }
 }

@@ -1,7 +1,7 @@
 <x-app-layout>
     <div class="container-fluid py-3">
         <div class="mb-2">
-            <a href="{{ route('tiers.index') }}" class="btn btn-sm btn-outline-secondary">
+            <a href="{{ route('compta.tiers.index') }}" class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-arrow-left"></i> Tiers
             </a>
         </div>

@@ -37,7 +37,7 @@
 
     <div class="collapse mb-3" id="addSousCategorieForm">
         <div class="card card-body">
-            <form action="{{ route('parametres.sous-categories.store') }}" method="POST" class="row g-2 align-items-end">
+            <form action="{{ route($espace->value . '.parametres.sous-categories.store') }}" method="POST" class="row g-2 align-items-end">
                 @csrf
                 <div class="col-md-4">
                     <label for="sc_categorie" class="form-label">Catégorie</label>
@@ -97,7 +97,7 @@
                 <tr data-type="{{ $sc->categorie->type->value }}" data-categorie="{{ $sc->categorie_id }}">
                     @if (request('edit') == $sc->id)
                         {{-- Inline edit row --}}
-                        <form action="{{ route('parametres.sous-categories.update', $sc) }}" method="POST"
+                        <form action="{{ route($espace->value . '.parametres.sous-categories.update', $sc) }}" method="POST"
                               id="edit-form-{{ $sc->id }}">
                             @csrf
                             @method('PUT')
@@ -140,7 +140,7 @@
                                     style="padding:.15rem .4rem;font-size:.75rem">
                                 <i class="bi bi-check-lg"></i>
                             </button>
-                            <a href="{{ route('parametres.sous-categories.index') }}" class="btn btn-sm btn-outline-secondary"
+                            <a href="{{ route($espace->value . '.parametres.sous-categories.index') }}" class="btn btn-sm btn-outline-secondary"
                                style="padding:.15rem .4rem;font-size:.75rem">
                                 <i class="bi bi-x-lg"></i>
                             </a>
@@ -150,7 +150,7 @@
                         <td>{{ $sc->nom }}</td>
                         <td>{{ $sc->code_cerfa ?? '—' }}</td>
                         <td class="text-center">
-                            <form action="{{ route('parametres.sous-categories.toggle-flag', $sc) }}" method="POST" class="d-inline">
+                            <form action="{{ route($espace->value . '.parametres.sous-categories.toggle-flag', $sc) }}" method="POST" class="d-inline">
                                 @csrf
                                 <input type="hidden" name="flag" value="pour_dons">
                                 <button type="submit"
@@ -162,7 +162,7 @@
                             </form>
                         </td>
                         <td class="text-center">
-                            <form action="{{ route('parametres.sous-categories.toggle-flag', $sc) }}" method="POST" class="d-inline">
+                            <form action="{{ route($espace->value . '.parametres.sous-categories.toggle-flag', $sc) }}" method="POST" class="d-inline">
                                 @csrf
                                 <input type="hidden" name="flag" value="pour_cotisations">
                                 <button type="submit"
@@ -174,7 +174,7 @@
                             </form>
                         </td>
                         <td class="text-center">
-                            <form action="{{ route('parametres.sous-categories.toggle-flag', $sc) }}" method="POST" class="d-inline">
+                            <form action="{{ route($espace->value . '.parametres.sous-categories.toggle-flag', $sc) }}" method="POST" class="d-inline">
                                 @csrf
                                 <input type="hidden" name="flag" value="pour_inscriptions">
                                 <button type="submit"
@@ -186,12 +186,12 @@
                             </form>
                         </td>
                         <td>
-                            <a href="{{ route('parametres.sous-categories.index') }}?edit={{ $sc->id }}"
+                            <a href="{{ route($espace->value . '.parametres.sous-categories.index') }}?edit={{ $sc->id }}"
                                class="btn btn-sm btn-outline-primary"
                                style="padding:.15rem .35rem;font-size:.75rem" title="Modifier">
                                 <i class="bi bi-pencil"></i>
                             </a>
-                            <form action="{{ route('parametres.sous-categories.destroy', $sc) }}" method="POST" class="d-inline"
+                            <form action="{{ route($espace->value . '.parametres.sous-categories.destroy', $sc) }}" method="POST" class="d-inline"
                                   onsubmit="return confirm('Supprimer cette sous-catégorie ?')">
                                 @csrf
                                 @method('DELETE')
