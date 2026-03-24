@@ -92,13 +92,18 @@ final class ClotureWizard extends Component
     private function computeFinancialSummary(): array
     {
         $soldeService = app(SoldeService::class);
+        $rapprochementService = app(\App\Services\RapprochementBancaireService::class);
         $comptes = CompteBancaire::orderBy('nom')->get();
+        $range = app(ExerciceService::class)->dateRange($this->annee);
+        $start = $range['start']->toDateString();
+        $end = $range['end']->toDateString();
 
         // Per-account data
         $comptesData = [];
         $totalSoldeOuverture = 0.0;
         $totalSoldeReel = 0.0;
         $totalMouvements = 0.0;
+        $totalSoldeRapprochement = 0.0;
 
         foreach ($comptes as $compte) {
             $soldeReel = $soldeService->solde($compte);
@@ -115,38 +120,40 @@ final class ClotureWizard extends Component
                 ->forExercice($this->annee)
                 ->sum('montant');
 
-            // Opening balance = current - recettes + depenses - virements_in + virements_out
+            // Opening balance = current - all exercice movements
             $soldeOuverture = round($soldeReel - $recettesCompte + $depensesCompte - $virementsIn + $virementsOut, 2);
             $mouvements = round($recettesCompte - $depensesCompte + $virementsIn - $virementsOut, 2);
+
+            // Solde dernier rapprochement verrouillé
+            $soldeRapprochement = $rapprochementService->calculerSoldeOuverture($compte);
 
             $comptesData[] = [
                 'nom' => $compte->nom,
                 'solde_ouverture' => $soldeOuverture,
                 'mouvements' => $mouvements,
                 'solde_reel' => $soldeReel,
+                'solde_rapprochement' => $soldeRapprochement,
             ];
 
             $totalSoldeOuverture += $soldeOuverture;
             $totalSoldeReel += $soldeReel;
             $totalMouvements += $mouvements;
+            $totalSoldeRapprochement += $soldeRapprochement;
         }
 
         $totalSoldeOuverture = round($totalSoldeOuverture, 2);
         $totalSoldeReel = round($totalSoldeReel, 2);
         $totalMouvements = round($totalMouvements, 2);
+        $totalSoldeRapprochement = round($totalSoldeRapprochement, 2);
 
         // Total recettes / dépenses of the exercice (across all accounts)
         $totalRecettes = (float) Transaction::where('type', 'recette')->forExercice($this->annee)->sum('montant_total');
         $totalDepenses = (float) Transaction::where('type', 'depense')->forExercice($this->annee)->sum('montant_total');
         $resultat = round($totalRecettes - $totalDepenses, 2);
 
-        // Solde théorique = opening balances + résultat (virements cancel out, so result drives the change from pure recettes/depenses)
-        // But mouvements include virements too, so: solde_theorique = totalSoldeOuverture + totalMouvements
-        $soldeTheorique = round($totalSoldeOuverture + $totalMouvements, 2);
-
         // Écritures non pointées (transactions)
         $nonPointeesTx = Transaction::whereNull('rapprochement_id')
-            ->forExercice($this->annee)
+            ->whereBetween('date', [$start, $end])
             ->selectRaw("
                 COUNT(*) as nombre,
                 SUM(CASE WHEN type = 'recette' THEN montant_total ELSE 0 END) as total_recettes,
@@ -157,46 +164,30 @@ final class ClotureWizard extends Component
         $nombreNonPointeesTx = (int) $nonPointeesTx->nombre;
         $montantNetNonPointeesTx = round((float) $nonPointeesTx->total_recettes - (float) $nonPointeesTx->total_depenses, 2);
 
-        // Écritures non pointées (virements) - a virement can be non-pointed on source, destination, or both
+        // Virements non pointés (côté source ou destination)
         $virementsNonPointesSource = VirementInterne::whereNull('rapprochement_source_id')
-            ->forExercice($this->annee)
-            ->count();
+            ->forExercice($this->annee)->count();
         $virementsNonPointesDest = VirementInterne::whereNull('rapprochement_destination_id')
-            ->forExercice($this->annee)
-            ->count();
+            ->forExercice($this->annee)->count();
         $nombreNonPointeesVir = $virementsNonPointesSource + $virementsNonPointesDest;
 
-        // Net impact of non-pointed virements on bank balance:
-        // Non-pointed source-side: money left the account but bank doesn't see it yet → bank has more (+montant)
-        // Non-pointed dest-side: money arrived but bank doesn't see it yet → bank has less (-montant)
-        $montantNonPointesVirSource = (float) VirementInterne::whereNull('rapprochement_source_id')
-            ->forExercice($this->annee)
-            ->sum('montant');
-        $montantNonPointesVirDest = (float) VirementInterne::whereNull('rapprochement_destination_id')
-            ->forExercice($this->annee)
-            ->sum('montant');
-        // Virements are internal transfers, they net to 0 in aggregate. The non-pointed ones just explain
-        // per-account discrepancies but don't affect the total reconciliation.
-        $montantNetNonPointeesVir = 0.0;
-
         $nombreNonPointees = $nombreNonPointeesTx + $nombreNonPointeesVir;
-        $montantNetNonPointees = round($montantNetNonPointeesTx + $montantNetNonPointeesVir, 2);
 
-        // Écart résiduel: solde_theorique - (solde_reel + non_pointees_net)
-        $ecartResiduel = round($soldeTheorique - $totalSoldeReel - $montantNetNonPointees, 2);
+        // Réconciliation : solde rapprochement + non pointées = solde comptable actuel
+        $ecartReconciliation = round($totalSoldeReel - $totalSoldeRapprochement - $montantNetNonPointeesTx, 2);
 
         return [
             'comptesData' => $comptesData,
             'totalSoldeOuverture' => $totalSoldeOuverture,
             'totalSoldeReel' => $totalSoldeReel,
             'totalMouvements' => $totalMouvements,
+            'totalSoldeRapprochement' => $totalSoldeRapprochement,
             'totalRecettes' => $totalRecettes,
             'totalDepenses' => $totalDepenses,
             'resultat' => $resultat,
-            'soldeTheorique' => $soldeTheorique,
             'nombreNonPointees' => $nombreNonPointees,
-            'montantNetNonPointees' => $montantNetNonPointees,
-            'ecartResiduel' => $ecartResiduel,
+            'montantNetNonPointeesTx' => $montantNetNonPointeesTx,
+            'ecartReconciliation' => $ecartReconciliation,
         ];
     }
 
