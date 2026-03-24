@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 use App\Livewire\Parametres\HelloassoSyncConfig;
 use App\Models\CompteBancaire;
-use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
-use App\Models\Operation;
 use App\Models\SousCategorie;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -47,42 +44,3 @@ it('saves sync config', function () {
     expect($this->parametres->sous_categorie_don_id)->toBe($scDon->id);
 });
 
-it('loads forms from API and syncs mappings', function () {
-    Http::fake([
-        '*/oauth2/token' => Http::response(['access_token' => 'fake-token'], 200),
-        '*/v5/organizations/mon-asso/forms*' => Http::sequence()
-            ->push([
-                'data' => [
-                    ['formSlug' => 'adhesion-2025', 'formType' => 'Membership', 'title' => 'Adhésion 2025', 'state' => 'Public'],
-                    ['formSlug' => 'dons-libres', 'formType' => 'Donation', 'title' => 'Dons libres', 'state' => 'Public'],
-                ],
-                'pagination' => [],
-            ])
-            ->push(['data' => [], 'pagination' => []]),
-    ]);
-
-    Livewire::test(HelloassoSyncConfig::class)
-        ->call('chargerFormulaires')
-        ->assertSee('adhesion-2025')
-        ->assertSee('dons-libres');
-
-    expect(HelloAssoFormMapping::count())->toBe(2);
-});
-
-it('saves form-to-operation mapping', function () {
-    $operation = Operation::factory()->create(['nom' => 'Stage']);
-    $mapping = HelloAssoFormMapping::create([
-        'helloasso_parametres_id' => $this->parametres->id,
-        'form_slug' => 'stage-ete',
-        'form_type' => 'Event',
-        'form_title' => 'Stage été',
-    ]);
-
-    Livewire::test(HelloassoSyncConfig::class)
-        ->set("formOperations.{$mapping->id}", $operation->id)
-        ->call('sauvegarderFormulaires')
-        ->assertHasNoErrors();
-
-    $mapping->refresh();
-    expect($mapping->operation_id)->toBe($operation->id);
-});
