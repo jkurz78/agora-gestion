@@ -31,8 +31,13 @@ return new class extends Migration
 
     private function seedCreationActions(): void
     {
+        $adminId = DB::table('users')->value('id');
+
+        if ($adminId === null) {
+            return;
+        }
+
         $exercices = DB::table('exercices')->get();
-        $adminId = DB::table('users')->value('id') ?? 1;
 
         foreach ($exercices as $exercice) {
             DB::table('exercice_actions')->insert([
