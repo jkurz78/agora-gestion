@@ -34,7 +34,7 @@
                                     @endphp
                                     <tr>
                                         <td>
-                                            <a href="{{ route('compta.operations.show', $op) }}" class="text-decoration-none">
+                                            <a href="{{ route('gestion.operations', ['id' => $op->id]) }}" class="text-decoration-none">
                                                 {{ $op->nom }}
                                             </a>
                                         </td>
