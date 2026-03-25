@@ -94,3 +94,21 @@ it('has participant and seance relationships', function () {
     expect($participant->reglements)->toHaveCount(1);
     expect($seance->reglements)->toHaveCount(1);
 });
+
+it('provides trigramme and reglement cases', function () {
+    expect(ModePaiement::Cheque->trigramme())->toBe('CHQ');
+    expect(ModePaiement::Virement->trigramme())->toBe('VMT');
+    expect(ModePaiement::Especes->trigramme())->toBe('ESP');
+
+    $cases = ModePaiement::reglementCases();
+    expect($cases)->toHaveCount(3);
+    expect($cases)->toContain(ModePaiement::Cheque);
+    expect($cases)->not->toContain(ModePaiement::Cb);
+});
+
+it('cycles through reglement payment modes', function () {
+    expect(ModePaiement::nextReglementMode(null))->toBe(ModePaiement::Cheque);
+    expect(ModePaiement::nextReglementMode(ModePaiement::Cheque))->toBe(ModePaiement::Virement);
+    expect(ModePaiement::nextReglementMode(ModePaiement::Virement))->toBe(ModePaiement::Especes);
+    expect(ModePaiement::nextReglementMode(ModePaiement::Especes))->toBeNull();
+});
