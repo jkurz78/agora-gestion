@@ -16,6 +16,8 @@ final class ParticipantDonneesMedicales extends Model
         'date_naissance',
         'sexe',
         'poids',
+        'taille',
+        'notes',
     ];
 
     protected function casts(): array
@@ -24,6 +26,8 @@ final class ParticipantDonneesMedicales extends Model
             'date_naissance' => 'encrypted',
             'sexe' => 'encrypted',
             'poids' => 'encrypted',
+            'taille' => 'encrypted',
+            'notes' => 'encrypted',
         ];
     }
 
