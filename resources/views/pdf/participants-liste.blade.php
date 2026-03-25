@@ -10,7 +10,7 @@
             font-size: 10px;
             color: #212529;
             line-height: 1.4;
-            margin: 20mm;
+            margin: 15mm;
         }
         table { width: 100%; border-collapse: collapse; }
 
