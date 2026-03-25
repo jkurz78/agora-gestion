@@ -23,6 +23,7 @@ final class HelloAssoSimulateCallback extends Command
 
         if ($parametres === null || $parametres->callback_token === null) {
             $this->error('Aucun token callback configuré. Sauvegardez d\'abord les paramètres HelloAsso.');
+
             return self::FAILURE;
         }
 
@@ -45,16 +46,18 @@ final class HelloAssoSimulateCallback extends Command
 
         $url = url("/api/helloasso/callback/{$parametres->callback_token}");
         $this->info("Envoi vers : {$url}");
-        $this->info('Payload : ' . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $this->info('Payload : '.json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         $response = Http::post($url, $payload);
 
         if ($response->successful()) {
-            $this->info('Callback simulé avec succès (HTTP ' . $response->status() . ')');
+            $this->info('Callback simulé avec succès (HTTP '.$response->status().')');
+
             return self::SUCCESS;
         }
 
-        $this->error('Erreur HTTP ' . $response->status() . ' : ' . $response->body());
+        $this->error('Erreur HTTP '.$response->status().' : '.$response->body());
+
         return self::FAILURE;
     }
 }

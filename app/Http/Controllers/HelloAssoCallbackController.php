@@ -35,7 +35,7 @@ final class HelloAssoCallbackController extends Controller
 
     private static function buildLibelle(string $eventType, array $data): string
     {
-        $name = trim(($data['payer']['firstName'] ?? $data['name'] ?? '') . ' ' . ($data['payer']['lastName'] ?? ''));
+        $name = trim(($data['payer']['firstName'] ?? $data['name'] ?? '').' '.($data['payer']['lastName'] ?? ''));
 
         $formType = $data['formType'] ?? '';
         $formName = $data['formName'] ?? $data['formSlug'] ?? '';

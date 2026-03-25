@@ -43,4 +43,3 @@ it('saves sync config', function () {
     expect($this->parametres->compte_helloasso_id)->toBe($compte->id);
     expect($this->parametres->sous_categorie_don_id)->toBe($scDon->id);
 });
-

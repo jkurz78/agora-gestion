@@ -63,4 +63,9 @@ final class Operation extends Model
     {
         return $this->hasMany(TransactionLigne::class);
     }
+
+    public function participants(): HasMany
+    {
+        return $this->hasMany(Participant::class);
+    }
 }
