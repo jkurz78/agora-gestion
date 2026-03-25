@@ -71,6 +71,34 @@
             </dl>
         </div>
     </div>
+
+    <div class="card mt-3">
+        <div class="card-header">
+            <h6 class="mb-0">Bilan financier</h6>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm mb-0">
+                <tbody>
+                    <tr>
+                        <td>Total dépenses</td>
+                        <td class="text-end text-danger fw-bold">{{ number_format($totalDepenses, 2, ',', ' ') }} &euro;</td>
+                    </tr>
+                    <tr>
+                        <td>Total recettes</td>
+                        <td class="text-end text-success fw-bold">{{ number_format($totalRecettes, 2, ',', ' ') }} &euro;</td>
+                    </tr>
+                    <tr>
+                        <td>Total dons</td>
+                        <td class="text-end text-success fw-bold">{{ number_format($totalDons, 2, ',', ' ') }} &euro;</td>
+                    </tr>
+                    <tr class="table-active">
+                        <td class="fw-bold">Solde</td>
+                        <td class="text-end fw-bold {{ $solde >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format($solde, 2, ',', ' ') }} &euro;</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
     @endif
 
     @if($activeTab === 'participants')
