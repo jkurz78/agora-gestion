@@ -179,7 +179,7 @@
     </table>
 
     <div style="margin-top: 8px; font-size: 7px; color: #999;">
-        P = Présent · E = Excusé · A = Abs. non justif. · X = Arrêt · K = Kiné
+        Abs. = Absence non justifiée
         <span style="float:right">Généré le {{ now()->format('d/m/Y à H:i') }}</span>
     </div>
 </body>
