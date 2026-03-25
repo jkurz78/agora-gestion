@@ -8,7 +8,7 @@
             @endforeach
         </select>
         <button class="btn btn-sm btn-primary text-nowrap" title="Nouvelle opération"
-                onclick="window.location='{{ route('operations.create') }}'">
+                onclick="window.location='{{ route('compta.operations.create') }}'">
             <i class="bi bi-plus-lg"></i>
         </button>
     </div>
