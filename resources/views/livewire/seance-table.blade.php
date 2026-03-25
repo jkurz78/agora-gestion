@@ -20,7 +20,7 @@
         </div>
     @else
         <div class="table-responsive">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 150 + ($seances->count() * 180) }}px">
                 {{-- Header: Titles --}}
                 <thead>
                     <tr style="background:#3d5473;color:#fff">
