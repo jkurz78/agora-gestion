@@ -7,6 +7,7 @@ use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OperationController;
+use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
@@ -90,7 +91,7 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
         Route::view('/dashboard', 'gestion.dashboard')->name('dashboard');
         Route::view('/adherents', 'gestion.adherents')->name('adherents');
         Route::view('/operations', 'gestion.operations')->name('operations');
-        Route::get('/operations/{operation}/participants/export', \App\Http\Controllers\ParticipantExportController::class)
+        Route::get('/operations/{operation}/participants/export', ParticipantExportController::class)
             ->name('operations.participants.export');
 
         // Shared registrations
