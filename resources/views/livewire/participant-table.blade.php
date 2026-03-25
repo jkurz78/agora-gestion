@@ -65,7 +65,7 @@
                         <th>Taille</th>
                         <th>Poids</th>
                     @endif
-                    <th>Référé par</th>
+                    <th class="sortable" data-col="refere_par" style="cursor:pointer">Référé par <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     @if($canSeeSensible)
                         <th>Notes</th>
                     @endif
@@ -261,7 +261,7 @@
                         @endif
 
                         {{-- Référé par --}}
-                        <td class="small">
+                        <td class="small" data-sort="{{ $p->referePar?->displayName() ?? '' }}">
                             {{ $p->referePar?->displayName() ?? '—' }}
                         </td>
 
