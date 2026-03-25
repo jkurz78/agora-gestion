@@ -424,10 +424,10 @@
                 if (existing) existing.dispose();
                 new bootstrap.Tooltip(el, { delay: { show: 0, hide: 100 } });
             });
-            document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
+            document.querySelectorAll('[data-notes-popover]').forEach(el => {
                 const existing = bootstrap.Popover.getInstance(el);
                 if (existing) existing.dispose();
-                new bootstrap.Popover(el, { delay: { show: 200, hide: 100 }, sanitize: false });
+                new bootstrap.Popover(el, { trigger: 'hover', html: true, sanitize: false, delay: { show: 300, hide: 100 } });
             });
         }
         document.addEventListener('DOMContentLoaded', initTooltips);
