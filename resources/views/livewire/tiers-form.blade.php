@@ -33,33 +33,33 @@
 
                     {{-- Entreprise (type = entreprise) --}}
                     @if ($type === 'entreprise')
-                        <div class="col-12">
+                        <div class="col-12" wire:key="field-entreprise">
                             <label class="form-label">Raison sociale <span class="text-danger">*</span></label>
                             <input type="text" wire:model="entreprise"
                                    class="form-control @error('entreprise') is-invalid @enderror"
                                    placeholder="Raison sociale">
                             @error('entreprise') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4" wire:key="field-ent-nom">
                             <label class="form-label text-muted">Nom du contact</label>
                             <input type="text" wire:model="nom" class="form-control"
                                    placeholder="Nom (optionnel)">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4" wire:key="field-ent-prenom">
                             <label class="form-label text-muted">Prénom du contact</label>
                             <input type="text" wire:model="prenom" class="form-control"
                                    placeholder="Prénom (optionnel)">
                         </div>
                     @else
                         {{-- Particulier --}}
-                        <div class="col-md-4">
+                        <div class="col-md-4" wire:key="field-part-nom">
                             <label class="form-label">Nom <span class="text-danger">*</span></label>
                             <input type="text" wire:model="nom"
                                    class="form-control @error('nom') is-invalid @enderror"
                                    placeholder="Nom de famille">
                             @error('nom') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4" wire:key="field-part-prenom">
                             <label class="form-label">Prénom</label>
                             <input type="text" wire:model="prenom" class="form-control" placeholder="Prénom">
                         </div>

@@ -204,19 +204,22 @@
                                     $dateNaisDisplay = $dateNais;
                                 }
                             @endphp
-                            <td x-data="{ editing: false, value: @js($dateNais), display: @js($dateNaisDisplay) }"
+                            <td x-data="{ editing: false, value: @js($dateNaisDisplay) }"
                                 @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
                                 data-sort="{{ $dateNais }}"
                                 class="small text-nowrap" style="cursor:pointer">
                                 <template x-if="!editing">
-                                    <span x-text="display || '—'"></span>
+                                    <span x-text="value || '—'"></span>
                                 </template>
                                 <template x-if="editing">
                                     <input type="text" x-ref="input" x-model="value"
                                            placeholder="jj/mm/aaaa"
-                                           @blur="editing=false; $wire.updateMedicalField({{ $p->id }}, 'date_naissance', value)"
+                                           @blur="editing=false;
+                                               let parts = value.split('/');
+                                               let iso = parts.length===3 ? parts[2]+'-'+parts[1]+'-'+parts[0] : value;
+                                               $wire.updateMedicalField({{ $p->id }}, 'date_naissance', iso)"
                                            @keydown.enter="$refs.input.blur()"
-                                           @keydown.escape="editing=false; value=@js($dateNais)"
+                                           @keydown.escape="editing=false; value=@js($dateNaisDisplay)"
                                            class="form-control form-control-sm" style="min-width:100px">
                                 </template>
                             </td>
