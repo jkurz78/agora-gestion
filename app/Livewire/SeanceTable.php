@@ -101,7 +101,7 @@ final class SeanceTable extends Component
                     return true; // show dateless seances
                 }
 
-                return abs($s->date->diffInDays($now)) <= 14;
+                return abs($s->date->diffInDays($now)) <= 30;
             })->values();
         }
 
