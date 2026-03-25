@@ -24,7 +24,7 @@
                 {{-- Header: Titles --}}
                 <thead>
                     <tr style="background:#3d5473;color:#fff">
-                        <td style="position:sticky;left:0;z-index:2;background:#fff;border:none"></td>
+                        <td style="position:sticky;left:0;z-index:2;background:#fff"></td>
                         @foreach($seances as $seance)
                             <th style="min-width:170px;text-align:center;font-size:12px">
                                 <div class="d-flex align-items-center justify-content-center gap-2">
@@ -41,7 +41,7 @@
                     </tr>
                     {{-- Titre row --}}
                     <tr>
-                        <td style="position:sticky;left:0;z-index:1;background:#fff;border:none"></td>
+                        <td style="position:sticky;left:0;z-index:1;background:#fff"></td>
                         @foreach($seances as $seance)
                             <td style="background:#f8f9fa;text-align:center">
                                 <input type="text" value="{{ $seance->titre }}"
@@ -54,7 +54,7 @@
                     </tr>
                     {{-- Date row --}}
                     <tr>
-                        <td style="position:sticky;left:0;z-index:1;background:#fff;border:none"></td>
+                        <td style="position:sticky;left:0;z-index:1;background:#fff"></td>
                         @foreach($seances as $seance)
                             <td style="background:#f8f9fa;text-align:center">
                                 <input type="text" value="{{ $seance->date?->format('d/m/Y') }}"
