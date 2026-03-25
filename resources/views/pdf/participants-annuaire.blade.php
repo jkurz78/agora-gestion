@@ -55,16 +55,6 @@
         .card-value {
             font-size: 9px;
         }
-        .card-grid {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 8px 0;
-        }
-        .card-grid td {
-            width: 50%;
-            vertical-align: top;
-            padding: 0;
-        }
         .confidentiel-badge {
             font-size: 7px;
             color: #A9014F;
@@ -115,20 +105,16 @@
         </tr>
     </table>
 
-    {{-- Cards in 2 columns --}}
-    <table class="card-grid">
-        @foreach($participants->chunk(2) as $pair)
-            <tr>
-                @foreach($pair as $p)
-                    @php
-                        $med = $confidentiel ? $p->donneesMedicales : null;
-                        $age = null;
-                        if ($med?->date_naissance) {
-                            try { $age = \Carbon\Carbon::parse($med->date_naissance)->age; } catch (\Throwable) {}
-                        }
-                    @endphp
-                    <td>
-                        <div class="card">
+    {{-- Cards in single column --}}
+    @foreach($participants->sortBy(fn ($p) => mb_strtolower(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''))) as $p)
+        @php
+            $med = $confidentiel ? $p->donneesMedicales : null;
+            $age = null;
+            if ($med?->date_naissance) {
+                try { $age = \Carbon\Carbon::parse($med->date_naissance)->age; } catch (\Throwable) {}
+            }
+        @endphp
+        <div class="card">
                             <div class="card-name">
                                 {{ $p->tiers->prenom }} {{ $p->tiers->nom }}
                             </div>
@@ -184,15 +170,8 @@
                                     </span>
                                 @endif
                             @endif
-                        </div>
-                    </td>
-                @endforeach
-                @if($pair->count() === 1)
-                    <td></td>
-                @endif
-            </tr>
-        @endforeach
-    </table>
+        </div>
+    @endforeach
 
     <div style="margin-top: 8px; font-size: 8px; color: #999; text-align: right;">
         Généré le {{ now()->format('d/m/Y à H:i') }}
