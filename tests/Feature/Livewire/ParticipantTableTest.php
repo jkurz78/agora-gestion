@@ -35,15 +35,12 @@ it('shows participants in table', function () {
         ->assertSee('Marie');
 });
 
-it('can add participant via modal', function () {
+it('can add participant by selecting a tiers', function () {
     $tiers = Tiers::factory()->create();
 
     Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
         ->call('openAddModal')
-        ->set('addTiersId', $tiers->id)
-        ->set('addDateInscription', '2026-03-25')
-        ->call('addParticipant')
-        ->assertHasNoErrors();
+        ->set('addTiersId', $tiers->id);
 
     expect(Participant::where('tiers_id', $tiers->id)
         ->where('operation_id', $this->operation->id)
@@ -61,8 +58,6 @@ it('prevents duplicate participant', function () {
     Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
         ->call('openAddModal')
         ->set('addTiersId', $tiers->id)
-        ->set('addDateInscription', '2026-03-25')
-        ->call('addParticipant')
         ->assertHasErrors('addTiersId');
 });
 
@@ -156,21 +151,19 @@ it('blocks medical field update when not permitted', function () {
     expect($med)->toBeNull();
 });
 
-it('pre-fills add form fields from selected tiers', function () {
-    $tiers = Tiers::factory()->create([
-        'nom' => 'Martin',
-        'prenom' => 'Sophie',
-        'telephone' => '0612345678',
-        'email' => 'sophie@test.fr',
-    ]);
+it('auto-inscribes with today date when tiers is selected', function () {
+    $tiers = Tiers::factory()->create();
 
     Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
         ->call('openAddModal')
-        ->set('addTiersId', $tiers->id)
-        ->assertSet('addNom', 'Martin')
-        ->assertSet('addPrenom', 'Sophie')
-        ->assertSet('addTelephone', '0612345678')
-        ->assertSet('addEmail', 'sophie@test.fr');
+        ->set('addTiersId', $tiers->id);
+
+    $participant = Participant::where('tiers_id', $tiers->id)
+        ->where('operation_id', $this->operation->id)
+        ->first();
+
+    expect($participant)->not->toBeNull();
+    expect($participant->date_inscription->format('Y-m-d'))->toBe(now()->format('Y-m-d'));
 });
 
 it('can open and save edit modal', function () {
