@@ -47,12 +47,41 @@ final class SeanceExportController extends Controller
         $writer = new Writer();
         $options = $writer->getOptions();
 
-        $bold = (new Style())->withFontBold(true);
-        $boldCenter = (new Style())->withFontBold(true)->withCellAlignment(CellAlignment::CENTER);
-        $kineOui = (new Style())->withBackgroundColor('D4EDDA');
-        $kineNon = (new Style())->withBackgroundColor('F8D7DA');
-        $commentStyle = (new Style())->withFontSize(9)->withCellAlignment(CellAlignment::CENTER);
-        $centerStyle = (new Style())->withCellAlignment(CellAlignment::CENTER);
+        $border = new \OpenSpout\Common\Entity\Style\Border(
+            new \OpenSpout\Common\Entity\Style\BorderPart(
+                \OpenSpout\Common\Entity\Style\BorderName::BOTTOM,
+                '000000',
+                \OpenSpout\Common\Entity\Style\BorderWidth::THIN,
+                \OpenSpout\Common\Entity\Style\BorderStyle::SOLID
+            ),
+            new \OpenSpout\Common\Entity\Style\BorderPart(
+                \OpenSpout\Common\Entity\Style\BorderName::TOP,
+                '000000',
+                \OpenSpout\Common\Entity\Style\BorderWidth::THIN,
+                \OpenSpout\Common\Entity\Style\BorderStyle::SOLID
+            ),
+            new \OpenSpout\Common\Entity\Style\BorderPart(
+                \OpenSpout\Common\Entity\Style\BorderName::LEFT,
+                '000000',
+                \OpenSpout\Common\Entity\Style\BorderWidth::THIN,
+                \OpenSpout\Common\Entity\Style\BorderStyle::SOLID
+            ),
+            new \OpenSpout\Common\Entity\Style\BorderPart(
+                \OpenSpout\Common\Entity\Style\BorderName::RIGHT,
+                '000000',
+                \OpenSpout\Common\Entity\Style\BorderWidth::THIN,
+                \OpenSpout\Common\Entity\Style\BorderStyle::SOLID
+            ),
+        );
+
+        $base = (new Style())->withBorder($border);
+        $bold = (new Style())->withFontBold(true)->withBorder($border);
+        $boldCenter = (new Style())->withFontBold(true)->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $kineOuiCenter = (new Style())->withBackgroundColor('D4EDDA')->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $kineNonCenter = (new Style())->withBackgroundColor('F8D7DA')->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $commentStyle = (new Style())->withFontSize(9)->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $centerStyle = (new Style())->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $nameStyle = (new Style())->withCellVerticalAlignment(\OpenSpout\Common\Entity\Style\CellVerticalAlignment::CENTER)->withBorder($border);
 
         // 1-based indices for mergeCells(colStart, rowStart, colEnd, rowEnd, sheetIndex)
         // Col A=1 (Participant), then per séance: col 2+i*2 (Présence), col 3+i*2 (Kiné)
@@ -64,7 +93,7 @@ final class SeanceExportController extends Controller
         $cells = [Cell::fromValue('Participant', $bold)];
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue('S'.$seance->numero, $boldCenter);
-            $cells[] = Cell::fromValue('');
+            $cells[] = Cell::fromValue('', $base);
             $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
@@ -72,10 +101,10 @@ final class SeanceExportController extends Controller
         $rowNum++;
 
         // Row 2: Titres (merged)
-        $cells = [Cell::fromValue('')];
+        $cells = [Cell::fromValue('', $base)];
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->titre ?? '', $centerStyle);
-            $cells[] = Cell::fromValue('');
+            $cells[] = Cell::fromValue('', $base);
             $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
@@ -83,10 +112,10 @@ final class SeanceExportController extends Controller
         $rowNum++;
 
         // Row 3: Dates (merged)
-        $cells = [Cell::fromValue('')];
+        $cells = [Cell::fromValue('', $base)];
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->date?->format('d/m/Y') ?? '', $centerStyle);
-            $cells[] = Cell::fromValue('');
+            $cells[] = Cell::fromValue('', $base);
             $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
@@ -94,7 +123,7 @@ final class SeanceExportController extends Controller
         $rowNum++;
 
         // Row 4: Sub-headers Présence / Kiné
-        $cells = [Cell::fromValue('')];
+        $cells = [Cell::fromValue('', $base)];
         foreach ($seances as $seance) {
             $cells[] = Cell::fromValue('Présence', $bold);
             $cells[] = Cell::fromValue('Kiné', $bold);
@@ -105,7 +134,7 @@ final class SeanceExportController extends Controller
         // Participants
         foreach ($participants as $p) {
             // Ligne 1: Présence + Kiné
-            $cells = [Cell::fromValue(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''))];
+            $cells = [Cell::fromValue(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''), $nameStyle)];
             foreach ($seances as $seance) {
                 $key = $seance->id.'-'.$p->id;
                 $presence = $presenceMap[$key] ?? null;
@@ -120,7 +149,7 @@ final class SeanceExportController extends Controller
                     default => '',
                 };
 
-                $cells[] = Cell::fromValue($statusLabel);
+                $cells[] = Cell::fromValue($statusLabel, $base);
 
                 $kineLabel = match ($kine) {
                     'oui' => 'Oui',
@@ -128,23 +157,23 @@ final class SeanceExportController extends Controller
                     default => '',
                 };
                 $kineStyle = match ($kine) {
-                    'oui' => $kineOui,
-                    'non' => $kineNon,
+                    'oui' => $kineOuiCenter,
+                    'non' => $kineNonCenter,
                     default => null,
                 };
-                $cells[] = $kineStyle ? Cell::fromValue($kineLabel, $kineStyle) : Cell::fromValue($kineLabel);
+                $cells[] = Cell::fromValue($kineLabel, $kineStyle ?? $centerStyle);
             }
             $writer->addRow(new Row($cells));
             $rowNum++;
 
             // Ligne 2: Commentaires (merged)
-            $cells = [Cell::fromValue('')];
+            $cells = [Cell::fromValue('', $base)];
             foreach ($seances as $i => $seance) {
                 $key = $seance->id.'-'.$p->id;
                 $presence = $presenceMap[$key] ?? null;
                 $commentaire = $presence?->commentaire ?? '';
                 $cells[] = Cell::fromValue($commentaire, $commentStyle);
-                $cells[] = Cell::fromValue('');
+                $cells[] = Cell::fromValue('', $base);
                 $colStart = 1 + $i * 2;
                 $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
             }
@@ -163,7 +192,7 @@ final class SeanceExportController extends Controller
                 }
             }
             $cells[] = Cell::fromValue($presents.'/'.$participants->count(), $boldCenter);
-            $cells[] = Cell::fromValue('');
+            $cells[] = Cell::fromValue('', $base);
             $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
