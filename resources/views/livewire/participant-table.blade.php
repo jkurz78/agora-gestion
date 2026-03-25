@@ -40,7 +40,7 @@
             </thead>
             <tbody style="color:#555">
                 @forelse($participants as $p)
-                    <tr>
+                    <tr wire:key="participant-row-{{ $p->id }}-{{ $p->updated_at?->timestamp }}-{{ $p->tiers?->updated_at?->timestamp }}-{{ $p->donneesMedicales?->updated_at?->timestamp }}">
                         {{-- Nom --}}
                         <td x-data="{ editing: false, value: @js($p->tiers->nom ?? '') }"
                             @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
