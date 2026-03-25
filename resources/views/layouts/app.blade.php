@@ -422,8 +422,7 @@
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
                 const existing = bootstrap.Tooltip.getInstance(el);
                 if (existing) existing.dispose();
-                const isHtml = el.hasAttribute('data-bs-html');
-                new bootstrap.Tooltip(el, { delay: { show: 0, hide: 100 }, html: isHtml, sanitize: !isHtml });
+                new bootstrap.Tooltip(el, { delay: { show: 0, hide: 100 } });
             });
         }
         document.addEventListener('DOMContentLoaded', initTooltips);
