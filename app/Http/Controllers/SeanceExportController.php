@@ -89,6 +89,13 @@ final class SeanceExportController extends Controller
 
         $writer->openToFile($tempPath);
 
+        // Column widths: A=Participant (25), then alternating Présence (18) + Kiné (8)
+        $options->setColumnWidth(25.0, 1);
+        for ($i = 0; $i < $seances->count(); $i++) {
+            $options->setColumnWidth(18.0, 2 + $i * 2);  // Présence
+            $options->setColumnWidth(8.0, 3 + $i * 2);    // Kiné
+        }
+
         // Row 1: Séance numbers (merged across 2 cols each)
         $cells = [Cell::fromValue('Participant', $bold)];
         foreach ($seances as $i => $seance) {
@@ -175,7 +182,7 @@ final class SeanceExportController extends Controller
                 $presence = $presenceMap[$key] ?? null;
                 $commentaire = $presence?->commentaire ?? '';
                 $cells[] = Cell::fromValue($commentaire, $commentStyle);
-                $cells[] = Cell::fromValue('', $base);
+                $cells[] = Cell::fromValue('', $commentStyle);
                 $colStart = 1 + $i * 2;
                 $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
             }
