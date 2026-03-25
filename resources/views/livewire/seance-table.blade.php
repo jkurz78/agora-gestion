@@ -1,4 +1,4 @@
-<div>
+<div style="max-width:100%;overflow:hidden">
     {{-- Toolbar --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="d-flex align-items-center gap-3">
