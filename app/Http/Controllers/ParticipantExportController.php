@@ -35,9 +35,9 @@ final class ParticipantExportController extends Controller
         $writer->openToFile($tempPath);
 
         $headerStyle = (new Style())->withFontBold(true);
-        $headers = ['Nom', 'Prénom', 'Adresse', 'Code postal', 'Ville', 'Téléphone', 'Email', 'Date inscription', 'Référé par'];
+        $headers = ['Nom', 'Prénom', 'Adresse', 'Code postal', 'Ville', 'Téléphone', 'Email', 'Date inscription'];
         if ($confidentiel) {
-            $headers = array_merge($headers, ['Date naissance', 'Âge', 'Sexe', 'Taille', 'Poids', 'Notes']);
+            $headers = array_merge($headers, ['Référé par', 'Date naissance', 'Âge', 'Sexe', 'Taille', 'Poids', 'Notes']);
         }
         $writer->addRow(Row::fromValuesWithStyle($headers, $headerStyle));
 
@@ -51,9 +51,9 @@ final class ParticipantExportController extends Controller
                 $p->tiers->telephone ?? '',
                 $p->tiers->email ?? '',
                 $p->date_inscription?->format('d/m/Y') ?? '',
-                $p->referePar?->displayName() ?? '',
             ];
             if ($confidentiel) {
+                $row[] = $p->referePar?->displayName() ?? '';
                 $med = $p->donneesMedicales;
                 $dateNaisRaw = $med?->date_naissance ?? '';
                 $dateNaisFormatted = '';
