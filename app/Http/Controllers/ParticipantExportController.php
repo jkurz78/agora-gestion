@@ -33,7 +33,7 @@ final class ParticipantExportController extends Controller
         $writer = new Writer();
         $writer->openToFile($tempPath);
 
-        $headerStyle = (new Style())->withFontBold();
+        $headerStyle = (new Style())->withFontBold(true);
         $headers = ['Nom', 'Prénom', 'Téléphone', 'Email', 'Date inscription', 'Référé par'];
         if ($canSeeSensible) {
             $headers = array_merge($headers, ['Date naissance', 'Sexe', 'Taille', 'Poids']);
