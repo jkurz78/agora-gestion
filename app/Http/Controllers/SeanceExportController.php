@@ -181,12 +181,10 @@ final class SeanceExportController extends Controller
                 $key = $seance->id.'-'.$p->id;
                 $presence = $presenceMap[$key] ?? null;
                 $commentaire = $presence?->commentaire ?? '';
-                $cells[] = Cell::fromValue($commentaire, $commentStyle);
-                $cells[] = Cell::fromValue('', $commentStyle);
-                if ($commentaire !== '') {
-                    $colStart = 1 + $i * 2;
-                    $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
-                }
+                $cells[] = Cell::fromValue($commentaire !== '' ? $commentaire : ' ', $commentStyle);
+                $cells[] = Cell::fromValue(' ', $commentStyle);
+                $colStart = 1 + $i * 2;
+                $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
             }
             $writer->addRow(new Row($cells));
             $rowNum++;
