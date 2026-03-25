@@ -7,10 +7,16 @@
                 <option value="{{ $op->id }}">{{ $op->nom }} ({{ $op->date_debut?->format('d/m/Y') }} → {{ $op->date_fin?->format('d/m/Y') ?? '...' }})</option>
             @endforeach
         </select>
-        <button class="btn btn-sm btn-primary text-nowrap" title="Nouvelle opération"
-                onclick="window.location='{{ route('compta.operations.create') }}'">
+        @if($selectedOperation)
+            <a class="btn btn-sm btn-outline-secondary text-nowrap" title="Modifier l'opération"
+               href="{{ route('compta.operations.edit', $selectedOperation) }}">
+                <i class="bi bi-pencil"></i>
+            </a>
+        @endif
+        <a class="btn btn-sm btn-primary text-nowrap" title="Nouvelle opération"
+           href="{{ route('compta.operations.create') }}">
             <i class="bi bi-plus-lg"></i>
-        </button>
+        </a>
     </div>
 
     @if(!$selectedOperation)
