@@ -153,13 +153,13 @@
                                             <span class="card-label">Inscrit le</span>
                                             <span class="card-value">{{ $p->date_inscription?->format('d/m/Y') }}</span>
                                         </span>
+                                        @if($confidentiel)
                                         @if($p->referePar)
                                             <span class="card-row">
                                                 <span class="card-label">Référé par</span>
                                                 <span class="card-value">{{ $p->referePar->displayName() }}</span>
                                             </span>
                                         @endif
-                                        @if($confidentiel)
                                             @if($med?->date_naissance)
                                                 <span class="card-row">
                                                     <span class="card-label">Naissance</span>
