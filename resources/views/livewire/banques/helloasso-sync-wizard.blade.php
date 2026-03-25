@@ -296,6 +296,9 @@
                             <ul class="mb-0 mt-2">
                                 <li>Transactions : <strong>{{ $syncResult['transactionsCreated'] }} créée(s)</strong>, <strong>{{ $syncResult['transactionsUpdated'] }} mise(s) à jour</strong></li>
                                 <li>Lignes : <strong>{{ $syncResult['lignesCreated'] }} créée(s)</strong>, <strong>{{ $syncResult['lignesUpdated'] }} mise(s) à jour</strong></li>
+                                @if (($syncResult['participantsCreated'] ?? 0) > 0)
+                                    <li>Participants (inscriptions) : <strong>{{ $syncResult['participantsCreated'] }} créé(s)</strong></li>
+                                @endif
                                 @if ($syncResult['ordersSkipped'] > 0)
                                     <li>Commandes ignorées : <strong>{{ $syncResult['ordersSkipped'] }}</strong></li>
                                 @endif
