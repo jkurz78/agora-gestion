@@ -41,6 +41,12 @@
             </button>
         </li>
         <li class="nav-item">
+            <button class="nav-link {{ $activeTab === 'compte_resultat' ? 'active' : '' }}" wire:click="setTab('compte_resultat')">Compte résultat</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link {{ $activeTab === 'compte_resultat_seances' ? 'active' : '' }}" wire:click="setTab('compte_resultat_seances')">Résultat par séances</button>
+        </li>
+        <li class="nav-item">
             <button class="nav-link disabled" disabled>Séances</button>
         </li>
         <li class="nav-item">
@@ -103,6 +109,14 @@
 
     @if($activeTab === 'participants')
         <livewire:participant-table :operation="$selectedOperation" :key="'pt-'.$selectedOperation->id" />
+    @endif
+
+    @if($activeTab === 'compte_resultat')
+        <livewire:rapport-compte-resultat-operations :selectedOperationIds="[$selectedOperation->id]" :key="'cr-'.$selectedOperation->id" />
+    @endif
+
+    @if($activeTab === 'compte_resultat_seances')
+        <livewire:rapport-seances :selectedOperationIds="[$selectedOperation->id]" :key="'rs-'.$selectedOperation->id" />
     @endif
     @endif
 </div>
