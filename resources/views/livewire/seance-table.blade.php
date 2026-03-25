@@ -19,7 +19,7 @@
             <p class="mt-2">Aucune séance. Cliquez sur "Ajouter une séance" pour commencer.</p>
         </div>
     @else
-        <div style="overflow-x:auto;width:0;min-width:100%">
+        <div class="table-responsive">
             <table class="table table-sm table-bordered mb-0" style="font-size:12px">
                 {{-- Header: Titles --}}
                 <thead>
