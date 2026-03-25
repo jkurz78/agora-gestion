@@ -8,9 +8,14 @@
                 <label class="form-check-label small" for="toggleProches">Séances proches</label>
             </div>
         </div>
-        <button class="btn btn-sm btn-primary" wire:click="addSeance">
-            <i class="bi bi-plus-lg"></i> Ajouter une séance
-        </button>
+        <div class="d-flex gap-2">
+            <a href="{{ route('gestion.operations.seances.matrice-pdf', $operation) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-file-earmark-pdf"></i> Matrice PDF
+            </a>
+            <button class="btn btn-sm btn-primary" wire:click="addSeance">
+                <i class="bi bi-plus-lg"></i> Ajouter une séance
+            </button>
+        </div>
     </div>
 
     @if($seances->isEmpty())
@@ -88,9 +93,15 @@
                         <td style="position:sticky;left:0;z-index:1;background:#f0f0f0"></td>
                         @foreach($seances as $seance)
                             <td style="background:#f0f0f0;padding:2px 0;font-size:12px;color:#888">
-                                <div class="d-flex">
+                                <div class="d-flex align-items-center">
                                     <span style="flex:1;text-align:center">Présence</span>
                                     <span style="width:40px;text-align:center;border-left:1px solid #ddd">Kiné</span>
+                                    <a href="{{ route('gestion.operations.seances.emargement-pdf', [$operation, $seance]) }}"
+                                       target="_blank"
+                                       style="width:28px;text-align:center;border-left:1px solid #ddd;color:#A9014F;text-decoration:none"
+                                       title="Feuille d'émargement">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                    </a>
                                 </div>
                             </td>
                         @endforeach
