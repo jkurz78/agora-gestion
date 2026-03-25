@@ -24,11 +24,11 @@
                 {{-- Header: Titles --}}
                 <thead>
                     <tr style="background:#3d5473;color:#fff">
-                        <th style="position:sticky;left:0;z-index:2;background:#3d5473;min-width:150px">Participant</th>
+                        <td style="position:sticky;left:0;z-index:2;background:#fff;border:none"></td>
                         @foreach($seances as $seance)
-                            <th style="min-width:170px;text-align:center">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <span class="opacity-75">S{{ $seance->numero }}</span>
+                            <th style="min-width:170px;text-align:center;font-size:12px">
+                                <div class="d-flex align-items-center justify-content-center gap-2">
+                                    <span>S{{ $seance->numero }}</span>
                                     <button class="btn btn-sm p-0 text-white opacity-50"
                                             wire:click="removeSeance({{ $seance->id }})"
                                             wire:confirm="Supprimer la séance {{ $seance->numero }} et toutes ses présences ?"
@@ -41,26 +41,26 @@
                     </tr>
                     {{-- Titre row --}}
                     <tr>
-                        <td style="position:sticky;left:0;z-index:1;background:#f8f9fa;font-weight:600;font-size:9px;color:#888">Titre</td>
+                        <td style="position:sticky;left:0;z-index:1;background:#fff;border:none"></td>
                         @foreach($seances as $seance)
-                            <td style="background:#f8f9fa">
+                            <td style="background:#f8f9fa;text-align:center">
                                 <input type="text" value="{{ $seance->titre }}"
                                        placeholder="Titre..."
-                                       class="form-control form-control-sm border-0 bg-transparent"
-                                       style="font-size:10px;padding:1px 4px"
+                                       class="form-control form-control-sm border-0 bg-transparent text-center"
+                                       style="font-size:12px;padding:2px 4px"
                                        onblur="@this.call('updateSeanceField', {{ $seance->id }}, 'titre', this.value)">
                             </td>
                         @endforeach
                     </tr>
                     {{-- Date row --}}
                     <tr>
-                        <td style="position:sticky;left:0;z-index:1;background:#f8f9fa;font-weight:600;font-size:9px;color:#888">Date</td>
+                        <td style="position:sticky;left:0;z-index:1;background:#fff;border:none"></td>
                         @foreach($seances as $seance)
-                            <td style="background:#f8f9fa">
+                            <td style="background:#f8f9fa;text-align:center">
                                 <input type="text" value="{{ $seance->date?->format('d/m/Y') }}"
                                        placeholder="jj/mm/aaaa"
-                                       class="form-control form-control-sm border-0 bg-transparent"
-                                       style="font-size:10px;padding:1px 4px"
+                                       class="form-control form-control-sm border-0 bg-transparent text-center"
+                                       style="font-size:12px;padding:2px 4px"
                                        onblur="@this.call('updateSeanceField', {{ $seance->id }}, 'date', this.value)">
                             </td>
                         @endforeach
