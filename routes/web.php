@@ -99,6 +99,8 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
             ->name('operations.seances.matrice-pdf');
         Route::get('/operations/{operation}/seances/{seance}/emargement-pdf', [\App\Http\Controllers\SeancePdfController::class, 'emargement'])
             ->name('operations.seances.emargement-pdf');
+        Route::get('/operations/{operation}/seances/export', \App\Http\Controllers\SeanceExportController::class)
+            ->name('operations.seances.export');
 
         // Shared registrations
         $registerParametres();
