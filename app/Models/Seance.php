@@ -35,4 +35,9 @@ final class Seance extends Model
     {
         return $this->hasMany(Presence::class);
     }
+
+    public function reglements(): HasMany
+    {
+        return $this->hasMany(Reglement::class);
+    }
 }
