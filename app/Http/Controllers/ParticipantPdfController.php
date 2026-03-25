@@ -55,6 +55,6 @@ final class ParticipantPdfController extends Controller
 
         $pdf = Pdf::loadView($view, $data)->setPaper('a4', $format === 'annuaire' ? 'portrait' : 'landscape');
 
-        return $pdf->download($filename);
+        return $pdf->stream($filename);
     }
 }
