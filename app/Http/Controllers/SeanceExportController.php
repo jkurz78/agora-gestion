@@ -52,6 +52,7 @@ final class SeanceExportController extends Controller
         $kineOui = (new Style())->withBackgroundColor('D4EDDA');
         $kineNon = (new Style())->withBackgroundColor('F8D7DA');
         $commentStyle = (new Style())->withFontColor(Color::rgb(136, 136, 136))->withFontSize(9);
+        $centerStyle = (new Style())->withCellAlignment(CellAlignment::CENTER);
 
         // 1-based indices for mergeCells(colStart, rowStart, colEnd, rowEnd, sheetIndex)
         // Col A=1 (Participant), then per séance: col 2+i*2 (Présence), col 3+i*2 (Kiné)
@@ -73,7 +74,7 @@ final class SeanceExportController extends Controller
         // Row 2: Titres (merged)
         $cells = [Cell::fromValue('')];
         foreach ($seances as $i => $seance) {
-            $cells[] = Cell::fromValue($seance->titre ?? '');
+            $cells[] = Cell::fromValue($seance->titre ?? '', $centerStyle);
             $cells[] = Cell::fromValue('');
             $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
@@ -84,7 +85,7 @@ final class SeanceExportController extends Controller
         // Row 3: Dates (merged)
         $cells = [Cell::fromValue('')];
         foreach ($seances as $i => $seance) {
-            $cells[] = Cell::fromValue($seance->date?->format('d/m/Y') ?? '');
+            $cells[] = Cell::fromValue($seance->date?->format('d/m/Y') ?? '', $centerStyle);
             $cells[] = Cell::fromValue('');
             $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
