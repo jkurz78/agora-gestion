@@ -26,10 +26,10 @@ final class ParticipantExportController extends Controller
         $filename = 'participants-'.Str::slug($operation->nom).'-'.now()->format('Y-m-d').'.xlsx';
 
         return response()->streamDownload(function () use ($participants, $canSeeSensible): void {
-            $writer = new Writer();
+            $writer = new Writer;
             $writer->openToOutput();
 
-            $headerStyle = (new Style())->setFontBold();
+            $headerStyle = (new Style)->setFontBold();
             $headers = ['Nom', 'Prénom', 'Téléphone', 'Email', 'Date inscription', 'Référé par'];
             if ($canSeeSensible) {
                 $headers = array_merge($headers, ['Date naissance', 'Sexe', 'Taille', 'Poids']);
