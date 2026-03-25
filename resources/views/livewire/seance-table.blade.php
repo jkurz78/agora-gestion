@@ -54,12 +54,32 @@
                     {{-- Date row --}}
                     <tr>
                         @foreach($seances as $seance)
-                            <td style="background:#f8f9fa;text-align:center">
-                                <input type="text" value="{{ $seance->date?->format('d/m/Y') }}"
-                                       placeholder="jj/mm/aaaa"
-                                       class="form-control form-control-sm border-0 bg-transparent text-center"
-                                       style="font-size:12px;padding:2px 4px"
-                                       onblur="@this.call('updateSeanceField', {{ $seance->id }}, 'date', this.value)">
+                            <td style="background:#f8f9fa;text-align:center" wire:ignore>
+                                <div x-data="{
+                                    fp: null,
+                                    init() {
+                                        this.fp = flatpickr(this.$refs.dateInput, {
+                                            locale: 'fr',
+                                            dateFormat: 'd/m/Y',
+                                            allowInput: true,
+                                            disableMobile: true,
+                                            defaultDate: @js($seance->date?->format('d/m/Y')),
+                                            parseDate(str) { return window.svsParseFlatpickrDate(str); },
+                                            onChange: (dates) => {
+                                                if (!dates.length) return;
+                                                const d = dates[0];
+                                                const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+                                                $wire.call('updateSeanceField', {{ $seance->id }}, 'date', iso);
+                                            }
+                                        });
+                                    },
+                                    destroy() { if (this.fp) this.fp.destroy(); }
+                                }">
+                                    <input type="text" x-ref="dateInput"
+                                           placeholder="jj/mm/aaaa"
+                                           class="form-control form-control-sm border-0 bg-transparent text-center"
+                                           style="font-size:12px;padding:2px 4px">
+                                </div>
                             </td>
                         @endforeach
                     </tr>
