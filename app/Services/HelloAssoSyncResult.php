@@ -14,6 +14,7 @@ final class HelloAssoSyncResult
         public readonly int $transactionsUpdated = 0,
         public readonly int $lignesCreated = 0,
         public readonly int $lignesUpdated = 0,
+        public readonly int $participantsCreated = 0,
         public readonly int $ordersSkipped = 0,
         public readonly array $errors = [],
     ) {}

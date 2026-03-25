@@ -361,6 +361,7 @@ final class HelloassoSyncWizard extends Component
             'transactionsUpdated' => $syncResult->transactionsUpdated,
             'lignesCreated' => $syncResult->lignesCreated,
             'lignesUpdated' => $syncResult->lignesUpdated,
+            'participantsCreated' => $syncResult->participantsCreated,
             'ordersSkipped' => $syncResult->ordersSkipped,
             'errors' => $syncResult->errors,
             'virementsCreated' => 0,
@@ -407,6 +408,10 @@ final class HelloassoSyncWizard extends Component
         $total = $this->syncResult['transactionsCreated'] + $this->syncResult['transactionsUpdated'];
         if ($total > 0) {
             $parts[] = "{$total} transactions";
+        }
+        $participants = $this->syncResult['participantsCreated'] ?? 0;
+        if ($participants > 0) {
+            $parts[] = "{$participants} participant(s)";
         }
         $rap = $this->syncResult['rapprochementsCreated'] ?? 0;
         if ($rap > 0) {
