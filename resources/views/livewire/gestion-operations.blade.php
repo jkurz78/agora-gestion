@@ -62,11 +62,7 @@
     @endif
 
     @if($activeTab === 'participants')
-        {{-- ParticipantTable component will be added in Task 5 --}}
-        <div class="text-center text-muted py-4">
-            <i class="bi bi-people" style="font-size:2rem;opacity:0.3"></i>
-            <p class="mt-2">Composant participants à venir.</p>
-        </div>
+        <livewire:participant-table :operation="$selectedOperation" :key="'pt-'.$selectedOperation->id" />
     @endif
     @endif
 </div>
