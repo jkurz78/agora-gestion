@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class Participant extends Model
@@ -47,5 +48,10 @@ final class Participant extends Model
     public function donneesMedicales(): HasOne
     {
         return $this->hasOne(ParticipantDonneesMedicales::class);
+    }
+
+    public function presences(): HasMany
+    {
+        return $this->hasMany(Presence::class);
     }
 }
