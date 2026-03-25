@@ -93,15 +93,9 @@
                         <td style="position:sticky;left:0;z-index:1;background:#f0f0f0"></td>
                         @foreach($seances as $seance)
                             <td style="background:#f0f0f0;padding:2px 0;font-size:12px;color:#888">
-                                <div class="d-flex align-items-center">
+                                <div class="d-flex">
                                     <span style="flex:1;text-align:center">Présence</span>
                                     <span style="width:40px;text-align:center;border-left:1px solid #ddd">Kiné</span>
-                                    <a href="{{ route('gestion.operations.seances.emargement-pdf', [$operation, $seance]) }}"
-                                       target="_blank"
-                                       style="width:28px;text-align:center;border-left:1px solid #ddd;color:#A9014F;text-decoration:none"
-                                       title="Feuille d'émargement">
-                                        <i class="bi bi-file-earmark-pdf"></i>
-                                    </a>
                                 </div>
                             </td>
                         @endforeach
@@ -201,6 +195,19 @@
                                 }
                             @endphp
                             <td style="text-align:center">{{ $presents }} / {{ $total }}</td>
+                        @endforeach
+                    </tr>
+                    <tr style="background:#f8f8f8;font-size:12px">
+                        <td style="position:sticky;left:0;z-index:1;background:#f8f8f8;color:#888">Feuilles de présence</td>
+                        @foreach($seances as $seance)
+                            <td style="text-align:center">
+                                <a href="{{ route('gestion.operations.seances.emargement-pdf', [$operation, $seance]) }}"
+                                   target="_blank"
+                                   style="color:#A9014F;text-decoration:none"
+                                   title="Feuille d'émargement S{{ $seance->numero }}">
+                                    <i class="bi bi-file-earmark-pdf"></i> PDF
+                                </a>
+                            </td>
                         @endforeach
                     </tr>
                 </tfoot>
