@@ -14,7 +14,7 @@
             </a>
         @endif
         <a class="btn btn-sm btn-primary text-nowrap" title="Nouvelle opération"
-           href="{{ route('compta.operations.create') }}">
+           href="{{ route('compta.operations.create') }}?_redirect_back={{ urlencode(route('gestion.operations')) }}">
             <i class="bi bi-plus-lg"></i>
         </a>
     </div>
