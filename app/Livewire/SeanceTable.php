@@ -21,6 +21,22 @@ final class SeanceTable extends Component
     public function mount(Operation $operation): void
     {
         $this->operation = $operation;
+        $this->initSeances();
+    }
+
+    private function initSeances(): void
+    {
+        $existingCount = Seance::where('operation_id', $this->operation->id)->count();
+        $nombreSeances = $this->operation->nombre_seances ?? 0;
+
+        if ($existingCount === 0 && $nombreSeances > 0) {
+            for ($i = 1; $i <= $nombreSeances; $i++) {
+                Seance::create([
+                    'operation_id' => $this->operation->id,
+                    'numero' => $i,
+                ]);
+            }
+        }
     }
 
     public function addSeance(): void
@@ -30,6 +46,8 @@ final class SeanceTable extends Component
             'operation_id' => $this->operation->id,
             'numero' => $maxNumero + 1,
         ]);
+
+        $this->operation->update(['nombre_seances' => $maxNumero + 1]);
     }
 
     public function removeSeance(int $seanceId): void
