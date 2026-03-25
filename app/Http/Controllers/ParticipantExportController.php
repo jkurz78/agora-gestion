@@ -5,14 +5,61 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\Operation;
+use App\Models\Participant;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Str;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Common\Entity\Style\Style;
+use OpenSpout\Writer\XLSX\Writer;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class ParticipantExportController extends Controller
 {
-    public function __invoke(Request $request, Operation $operation): Response
+    public function __invoke(Request $request, Operation $operation): StreamedResponse
     {
-        // TODO: implement with openspout in Task 6
-        abort(501, 'Export not yet implemented');
+        $canSeeSensible = (bool) ($request->user()->peut_voir_donnees_sensibles ?? false);
+
+        $participants = Participant::where('operation_id', $operation->id)
+            ->with(['tiers', 'referePar', 'donneesMedicales'])
+            ->get();
+
+        $filename = 'participants-'.Str::slug($operation->nom).'-'.now()->format('Y-m-d').'.xlsx';
+
+        return response()->streamDownload(function () use ($participants, $canSeeSensible): void {
+            $writer = new Writer();
+            $writer->openToOutput();
+
+            $headerStyle = (new Style())->setFontBold();
+            $headers = ['Nom', 'Prénom', 'Téléphone', 'Email', 'Date inscription', 'Référé par'];
+            if ($canSeeSensible) {
+                $headers = array_merge($headers, ['Date naissance', 'Sexe', 'Taille', 'Poids']);
+            }
+            $writer->addRow(Row::fromValues($headers, $headerStyle));
+
+            foreach ($participants as $p) {
+                $row = [
+                    $p->tiers->nom ?? '',
+                    $p->tiers->prenom ?? '',
+                    $p->tiers->telephone ?? '',
+                    $p->tiers->email ?? '',
+                    $p->date_inscription?->format('d/m/Y') ?? '',
+                    $p->referePar?->displayName() ?? '',
+                ];
+                if ($canSeeSensible) {
+                    $med = $p->donneesMedicales;
+                    $row = array_merge($row, [
+                        $med?->date_naissance ?? '',
+                        $med?->sexe ?? '',
+                        $med?->taille ?? '',
+                        $med?->poids ?? '',
+                    ]);
+                }
+                $writer->addRow(Row::fromValues($row));
+            }
+
+            $writer->close();
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 }
