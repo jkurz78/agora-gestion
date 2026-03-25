@@ -104,6 +104,7 @@ final class TiersAutocomplete extends Component
         $this->selectedLabel = $tiers->displayName();
         $this->selectedType = $tiers->type;
         $this->search = '';
+        $this->dispatch('tiers-selected', id: $tiers->id);
         $this->open = false;
         $this->results = [];
     }
