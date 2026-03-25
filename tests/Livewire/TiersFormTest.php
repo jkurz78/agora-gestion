@@ -50,7 +50,6 @@ it('can create a particulier with all fields', function () {
         ->set('code_postal', '78500')
         ->set('ville', 'Sartrouville')
         ->set('pays', 'France')
-        ->set('date_naissance', '1980-06-15')
         ->set('pour_recettes', true)
         ->call('save')
         ->assertHasNoErrors();
@@ -61,9 +60,6 @@ it('can create a particulier with all fields', function () {
         'code_postal' => '78500',
         'ville' => 'Sartrouville',
     ]);
-
-    $tiers = Tiers::where('nom', 'Martin')->firstOrFail();
-    expect($tiers->date_naissance->format('Y-m-d'))->toBe('1980-06-15');
 });
 
 // --- Création entreprise ---

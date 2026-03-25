@@ -35,8 +35,6 @@ final class TiersForm extends Component
 
     public string $pays = 'France';
 
-    public ?string $date_naissance = null;
-
     public bool $pour_depenses = false;
 
     public bool $pour_recettes = false;
@@ -47,11 +45,13 @@ final class TiersForm extends Component
 
     public bool $est_helloasso = false;
 
+    public string $context = ''; // 'participant' adapts the form
+
     public function showNewForm(): void
     {
         $this->reset([
             'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
-            'adresse_ligne1', 'code_postal', 'ville', 'pays', 'date_naissance',
+            'adresse_ligne1', 'code_postal', 'ville', 'pays',
             'pour_depenses', 'pour_recettes', 'est_helloasso', 'showDetails',
         ]);
         $this->type = 'particulier';
@@ -85,7 +85,6 @@ final class TiersForm extends Component
         $this->code_postal = $tiers->code_postal;
         $this->ville = $tiers->ville;
         $this->pays = $tiers->pays ?? 'France';
-        $this->date_naissance = $tiers->date_naissance?->format('Y-m-d');
         $this->pour_depenses = $tiers->pour_depenses;
         $this->pour_recettes = $tiers->pour_recettes;
 
@@ -94,7 +93,7 @@ final class TiersForm extends Component
         $this->showDetails = (bool) ($tiers->email || $tiers->telephone
             || $tiers->adresse_ligne1 || $tiers->code_postal
             || $tiers->ville || ($tiers->pays && $tiers->pays !== 'France')
-            || $tiers->date_naissance);
+            );
 
         $this->showForm = true;
     }
@@ -104,14 +103,21 @@ final class TiersForm extends Component
     {
         $this->reset([
             'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
-            'adresse_ligne1', 'code_postal', 'ville', 'pays', 'date_naissance',
-            'pour_depenses', 'pour_recettes', 'est_helloasso', 'showDetails',
+            'adresse_ligne1', 'code_postal', 'ville', 'pays',
+            'pour_depenses', 'pour_recettes', 'est_helloasso', 'showDetails', 'context',
         ]);
         $this->type = 'particulier';
         $this->pays = 'France';
         $this->nom = $prefill['nom'] ?? '';
         $this->pour_recettes = (bool) ($prefill['pour_recettes'] ?? false);
         $this->pour_depenses = (bool) ($prefill['pour_depenses'] ?? false);
+        $this->context = $prefill['context'] ?? '';
+
+        if ($this->context === 'participant') {
+            $this->pour_recettes = true;
+            $this->showDetails = true;
+        }
+
         $this->resetValidation();
         $this->showForm = true;
     }
@@ -120,7 +126,7 @@ final class TiersForm extends Component
     {
         $this->reset([
             'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
-            'adresse_ligne1', 'code_postal', 'ville', 'pays', 'date_naissance',
+            'adresse_ligne1', 'code_postal', 'ville', 'pays',
             'pour_depenses', 'pour_recettes', 'est_helloasso', 'showForm', 'showDetails',
         ]);
         $this->pays = 'France';
@@ -144,7 +150,6 @@ final class TiersForm extends Component
             'code_postal' => ['nullable', 'string', 'max:10'],
             'ville' => ['nullable', 'string', 'max:100'],
             'pays' => ['nullable', 'string', 'max:100'],
-            'date_naissance' => ['nullable', 'date'],
             'pour_depenses' => ['boolean'],
             'pour_recettes' => ['boolean'],
         ];
@@ -153,6 +158,10 @@ final class TiersForm extends Component
             'nom.required' => 'Le nom est obligatoire.',
             'entreprise.required' => 'La raison sociale est obligatoire.',
         ]);
+
+        if ($this->context === 'participant') {
+            $this->pour_recettes = true;
+        }
 
         if (! $this->pour_depenses && ! $this->pour_recettes) {
             $this->addError('pour_depenses', 'Cochez au moins une utilisation (dépenses ou recettes).');

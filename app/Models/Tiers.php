@@ -23,7 +23,6 @@ final class Tiers extends Model
         'code_postal',
         'ville',
         'pays',
-        'date_naissance',
         'pour_depenses',
         'pour_recettes',
         'est_helloasso',
@@ -37,7 +36,6 @@ final class Tiers extends Model
             'pour_depenses' => 'boolean',
             'pour_recettes' => 'boolean',
             'est_helloasso' => 'boolean',
-            'date_naissance' => 'date',
         ];
     }
 

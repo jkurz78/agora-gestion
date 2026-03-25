@@ -19,6 +19,8 @@ final class TiersAutocomplete extends Component
 
     public string $typeFiltre = ''; // '' | 'particulier' | 'entreprise'
 
+    public string $context = ''; // passed to TiersForm when creating new tiers
+
     public string $search = '';
 
     public bool $open = false;
@@ -146,6 +148,7 @@ final class TiersAutocomplete extends Component
                 'nom' => $this->search,
                 'pour_recettes' => in_array($this->filtre, ['recettes', 'dons']),
                 'pour_depenses' => $this->filtre === 'depenses',
+                'context' => $this->context,
             ])->to(TiersForm::class);
             $this->open = false;
         }
