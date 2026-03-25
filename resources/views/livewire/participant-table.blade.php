@@ -59,11 +59,11 @@
                     <th>Email</th>
                     <th class="sortable" data-col="date_inscription" style="cursor:pointer">Date inscription <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     @if($canSeeSensible)
-                        <th>Date naissance</th>
-                        <th>Âge</th>
-                        <th>Sexe</th>
-                        <th>Taille</th>
-                        <th>Poids</th>
+                        <th class="sortable" data-col="date_naissance" style="cursor:pointer">Date naissance <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
+                        <th class="sortable" data-col="age" style="cursor:pointer">Âge <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
+                        <th class="sortable" data-col="sexe" style="cursor:pointer">Sexe <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
+                        <th class="sortable" data-col="taille" style="cursor:pointer">Taille <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
+                        <th class="sortable" data-col="poids" style="cursor:pointer">Poids <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     @endif
                     <th class="sortable" data-col="refere_par" style="cursor:pointer">Référé par <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     @if($canSeeSensible)
@@ -173,6 +173,7 @@
                             @endphp
                             <td x-data="{ editing: false, value: @js($dateNais), display: @js($dateNaisDisplay) }"
                                 @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
+                                data-sort="{{ $dateNais }}"
                                 class="small text-nowrap" style="cursor:pointer">
                                 <template x-if="!editing">
                                     <span x-text="display || '—'"></span>
@@ -188,25 +189,21 @@
                             </td>
 
                             {{-- Âge (calculé, non éditable) --}}
-                            <td class="small text-muted">
-                                @if($dateNais)
-                                    @php
-                                        try {
-                                            $age = \Carbon\Carbon::parse($dateNais)->age;
-                                        } catch (\Throwable) {
-                                            $age = null;
-                                        }
-                                    @endphp
-                                    {{ $age !== null ? $age.' ans' : '—' }}
-                                @else
-                                    —
-                                @endif
+                            @php
+                                $age = null;
+                                if ($dateNais) {
+                                    try { $age = \Carbon\Carbon::parse($dateNais)->age; } catch (\Throwable) {}
+                                }
+                            @endphp
+                            <td class="small text-muted" data-sort="{{ $age ?? '' }}">
+                                {{ $age !== null ? $age.' ans' : '—' }}
                             </td>
 
                             {{-- Sexe --}}
                             @php $sexe = $med?->sexe ?? ''; @endphp
                             <td x-data="{ editing: false, value: @js($sexe) }"
                                 @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
+                                data-sort="{{ $sexe }}"
                                 class="small" style="cursor:pointer">
                                 <template x-if="!editing">
                                     <span x-text="value || '—'"></span>
@@ -227,6 +224,7 @@
                             @php $taille = $med?->taille ?? ''; @endphp
                             <td x-data="{ editing: false, value: @js($taille) }"
                                 @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
+                                data-sort="{{ $taille }}"
                                 class="small" style="cursor:pointer">
                                 <template x-if="!editing">
                                     <span x-text="value ? value + ' cm' : '—'"></span>
@@ -245,6 +243,7 @@
                             @php $poids = $med?->poids ?? ''; @endphp
                             <td x-data="{ editing: false, value: @js($poids) }"
                                 @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
+                                data-sort="{{ $poids }}"
                                 class="small" style="cursor:pointer">
                                 <template x-if="!editing">
                                     <span x-text="value ? value + ' kg' : '—'"></span>
