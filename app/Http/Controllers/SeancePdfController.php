@@ -19,7 +19,7 @@ final class SeancePdfController extends Controller
 {
     public function emargement(Request $request, Operation $operation, Seance $seance): Response
     {
-        abort_unless($seance->operation_id === $operation->id, 404);
+        abort_unless((int) $seance->operation_id === $operation->id, 404);
 
         $participants = Participant::where('operation_id', $operation->id)
             ->with('tiers')
