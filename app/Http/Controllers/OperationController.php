@@ -87,7 +87,9 @@ final class OperationController extends Controller
     {
         $operation->update($request->validated());
 
-        return redirect()->route('compta.operations.show', $operation)
+        $redirectTo = $request->input('_redirect_back', route('compta.operations.show', $operation));
+
+        return redirect($redirectTo)
             ->with('success', 'Opération mise à jour avec succès.');
     }
 }

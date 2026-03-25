@@ -9,7 +9,7 @@
         </select>
         @if($selectedOperation)
             <a class="btn btn-sm btn-outline-secondary text-nowrap" title="Modifier l'opération"
-               href="{{ route('compta.operations.edit', $selectedOperation) }}">
+               href="{{ route('compta.operations.edit', $selectedOperation) }}?_redirect_back={{ urlencode(route('gestion.operations', ['id' => $selectedOperation->id])) }}">
                 <i class="bi bi-pencil"></i>
             </a>
         @endif
