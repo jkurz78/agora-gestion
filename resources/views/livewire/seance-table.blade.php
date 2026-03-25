@@ -20,7 +20,7 @@
         </div>
     @else
         <div style="overflow-x:auto">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px;min-width:{{ 200 + ($seances->count() * 180) }}px">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px">
                 {{-- Header: Titles --}}
                 <thead>
                     <tr style="background:#3d5473;color:#fff">
