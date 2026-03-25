@@ -93,6 +93,8 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
         Route::view('/operations', 'gestion.operations')->name('operations');
         Route::get('/operations/{operation}/participants/export', ParticipantExportController::class)
             ->name('operations.participants.export');
+        Route::get('/operations/{operation}/participants/pdf', \App\Http\Controllers\ParticipantPdfController::class)
+            ->name('operations.participants.pdf');
 
         // Shared registrations
         $registerParametres();
