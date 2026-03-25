@@ -7,6 +7,7 @@ use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 
 test('participant belongs to tiers and operation', function (): void {
     $tiers = Tiers::factory()->create();
@@ -25,7 +26,7 @@ test('participant unique constraint on tiers and operation', function (): void {
     $operation = Operation::factory()->create();
     Participant::create(['tiers_id' => $tiers->id, 'operation_id' => $operation->id, 'date_inscription' => now()->toDateString()]);
     Participant::create(['tiers_id' => $tiers->id, 'operation_id' => $operation->id, 'date_inscription' => now()->toDateString()]);
-})->throws(\Illuminate\Database\QueryException::class);
+})->throws(QueryException::class);
 
 test('tiers can participate in multiple operations', function (): void {
     $tiers = Tiers::factory()->create();
@@ -61,7 +62,7 @@ test('donnees medicales are encrypted and linked to participant', function (): v
     expect($donnees->date_naissance)->toBe('1985-06-15');
     expect($donnees->sexe)->toBe('F');
     expect($donnees->poids)->toBe('65');
-    $raw = \DB::table('participant_donnees_medicales')->where('id', $donnees->id)->first();
+    $raw = DB::table('participant_donnees_medicales')->where('id', $donnees->id)->first();
     expect($raw->date_naissance)->not->toBe('1985-06-15');
 });
 
@@ -94,4 +95,4 @@ test('participant donnees medicales has unique constraint on participant_id', fu
     ]);
     ParticipantDonneesMedicales::create(['participant_id' => $participant->id]);
     ParticipantDonneesMedicales::create(['participant_id' => $participant->id]);
-})->throws(\Illuminate\Database\QueryException::class);
+})->throws(QueryException::class);

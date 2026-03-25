@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -125,7 +126,7 @@ final class ParticipantList extends Component
 
     public function render(): View
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = Auth::user();
         $canSeeSensible = (bool) $user->peut_voir_donnees_sensibles;
 
