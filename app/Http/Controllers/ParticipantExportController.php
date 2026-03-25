@@ -17,7 +17,8 @@ final class ParticipantExportController extends Controller
 {
     public function __invoke(Request $request, Operation $operation): BinaryFileResponse
     {
-        $canSeeSensible = (bool) ($request->user()->peut_voir_donnees_sensibles ?? false);
+        $confidentiel = $request->boolean('confidentiel')
+            && ($request->user()->peut_voir_donnees_sensibles ?? false);
 
         $participants = Participant::where('operation_id', $operation->id)
             ->with(['tiers', 'referePar', 'donneesMedicales'])
@@ -34,8 +35,8 @@ final class ParticipantExportController extends Controller
         $writer->openToFile($tempPath);
 
         $headerStyle = (new Style())->withFontBold(true);
-        $headers = ['Nom', 'Prénom', 'Téléphone', 'Email', 'Date inscription', 'Référé par'];
-        if ($canSeeSensible) {
+        $headers = ['Nom', 'Prénom', 'Adresse', 'Code postal', 'Ville', 'Téléphone', 'Email', 'Date inscription', 'Référé par'];
+        if ($confidentiel) {
             $headers = array_merge($headers, ['Date naissance', 'Âge', 'Sexe', 'Taille', 'Poids', 'Notes']);
         }
         $writer->addRow(Row::fromValuesWithStyle($headers, $headerStyle));
@@ -44,12 +45,15 @@ final class ParticipantExportController extends Controller
             $row = [
                 $p->tiers->nom ?? '',
                 $p->tiers->prenom ?? '',
+                $p->tiers->adresse_ligne1 ?? '',
+                $p->tiers->code_postal ?? '',
+                $p->tiers->ville ?? '',
                 $p->tiers->telephone ?? '',
                 $p->tiers->email ?? '',
                 $p->date_inscription?->format('d/m/Y') ?? '',
                 $p->referePar?->displayName() ?? '',
             ];
-            if ($canSeeSensible) {
+            if ($confidentiel) {
                 $med = $p->donneesMedicales;
                 $dateNaisRaw = $med?->date_naissance ?? '';
                 $dateNaisFormatted = '';
