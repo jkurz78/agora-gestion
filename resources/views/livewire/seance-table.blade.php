@@ -15,6 +15,11 @@
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li>
+                        <a class="dropdown-item" href="{{ route('gestion.operations.seances.export', $operation) }}">
+                            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Matrice Excel
+                        </a>
+                    </li>
+                    <li>
                         <a class="dropdown-item" target="_blank" href="{{ route('gestion.operations.seances.matrice-pdf', $operation) }}">
                             <i class="bi bi-file-earmark-pdf me-2"></i>Matrice PDF
                         </a>
