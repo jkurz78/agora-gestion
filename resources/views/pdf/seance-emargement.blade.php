@@ -21,7 +21,14 @@
         .doc-title { font-size: 15px; font-weight: bold; color: #A9014F; text-align: right; }
         .doc-subtitle { font-size: 10px; color: #6c757d; text-align: right; margin-top: 2px; }
 
-        .data-table { margin-top: 14px; }
+        .emargement-title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin: 16px 0 10px 0;
+        }
+        .data-table { margin-top: 0; border: 1px solid #999; }
         .data-table th {
             background-color: #fff;
             color: #333;
@@ -30,18 +37,20 @@
             text-align: left;
             font-weight: 600;
             border-bottom: 2px solid #333;
+            border-left: 1px solid #ddd;
         }
+        .data-table th:first-child { border-left: none; }
         .data-table td {
-            padding: 18px 12px;
+            padding: 22px 12px;
             border-bottom: 1px solid #dee2e6;
             font-size: 13px;
             vertical-align: middle;
         }
         .data-table tr:nth-child(even) td { background-color: #f8f9fa; }
-        .data-table .col-signature { width: 35%; border-left: 1px solid #999; border-right: 1px solid #999; }
-        .data-table .col-kine { width: 8%; text-align: center; }
-        .data-table .col-obs { width: 20%; }
-        }
+        .data-table .col-name { width: 25%; }
+        .data-table .col-signature { width: 30%; border-left: 1px solid #999; border-right: 1px solid #999; }
+        .data-table .col-kine { width: 10%; text-align: center; }
+        .data-table .col-obs { width: 35%; }
 
         .checkbox-empty {
             display: inline-block;
@@ -93,10 +102,12 @@
         </tr>
     </table>
 
+    <div class="emargement-title">Feuille d'émargement</div>
+
     <table class="data-table">
         <thead>
             <tr>
-                <th>Participant</th>
+                <th class="col-name">Participant</th>
                 <th class="col-signature">Signature</th>
                 <th class="col-kine">Kiné</th>
                 <th class="col-obs">Observations</th>
