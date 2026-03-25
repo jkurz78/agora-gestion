@@ -51,12 +51,12 @@
                     <li><hr class="dropdown-divider"></li>
                     <li class="dropdown-header small text-muted">PDF</li>
                     <li>
-                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'liste']) }}' + (confidentiel ? '?confidentiel=1' : '')">
+                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'liste']) }}' + (confidentiel ? '&confidentiel=1' : '')">
                             <i class="bi bi-list-ul me-2"></i>Liste
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'annuaire']) }}' + (confidentiel ? '?confidentiel=1' : '')">
+                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'annuaire']) }}' + (confidentiel ? '&confidentiel=1' : '')">
                             <i class="bi bi-person-vcard me-2"></i>Annuaire
                         </a>
                     </li>
