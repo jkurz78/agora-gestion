@@ -10,6 +10,7 @@ use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 final class ParticipantTable extends Component
@@ -108,13 +109,14 @@ final class ParticipantTable extends Component
         $this->showAddModal = true;
     }
 
-    public function updatedAddTiersId(?int $value): void
+    #[On('tiers-selected')]
+    public function onTiersSelected(int $id): void
     {
-        if ($value === null) {
+        if (! $this->showAddModal) {
             return;
         }
 
-        $this->quickAddParticipant($value);
+        $this->quickAddParticipant($id);
     }
 
     public function addParticipant(): void
