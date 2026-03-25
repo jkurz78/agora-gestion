@@ -25,6 +25,7 @@ final class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'dernier_espace',
+        'peut_voir_donnees_sensibles',
     ];
 
     /**
@@ -41,6 +42,7 @@ final class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'dernier_espace' => Espace::class,
+            'peut_voir_donnees_sensibles' => 'boolean',
         ];
     }
 
