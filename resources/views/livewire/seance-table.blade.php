@@ -9,9 +9,18 @@
             </div>
         </div>
         <div class="d-flex gap-2">
-            <a href="{{ route('gestion.operations.seances.matrice-pdf', $operation) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-file-earmark-pdf"></i> Matrice PDF
-            </a>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-download"></i> Exporter
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <a class="dropdown-item" target="_blank" href="{{ route('gestion.operations.seances.matrice-pdf', $operation) }}">
+                            <i class="bi bi-file-earmark-pdf me-2"></i>Matrice PDF
+                        </a>
+                    </li>
+                </ul>
+            </div>
             <button class="btn btn-sm btn-primary" wire:click="addSeance">
                 <i class="bi bi-plus-lg"></i> Ajouter une séance
             </button>
