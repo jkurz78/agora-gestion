@@ -32,7 +32,7 @@ Le modèle participants (tables `participants` et `participant_donnees_medicales
 - Si aucune opération sélectionnée : message invitant à en choisir ou en créer une
 
 **Onglets Bootstrap (en dessous) :**
-- **Détails** — informations de l'opération en lecture seule (nom, description, dates, séances, statut). Pas de bilan financier (celui-ci reste côté compta).
+- **Détails** — informations de l'opération en lecture seule (nom, description, date début, date fin, nombre de séances, statut). Pas de bilan financier (celui-ci reste côté compta).
 - **Participants** — tableau éditable inline + barre d'outils
 - **Séances** — grisé, non cliquable (lot futur)
 - **Finances** — grisé, non cliquable (lot futur)
@@ -64,6 +64,8 @@ Au-dessus du tableau :
 | Notes méd. | données médicales | modale WYSIWYG | non | oui (HTML) | flag sensible |
 | Actions | — | éditer (modale) / supprimer | — | — | toujours |
 
+**Note :** Le champ `participants.notes` (texte libre, non chiffré) n'est pas affiché dans ce tableau — il est réservé à l'usage comptable. Les notes affichées ici sont les notes médicales chiffrées de `participant_donnees_medicales.notes`.
+
 **Comportement édition inline (style click-to-edit) :**
 - Clic sur une cellule → elle se transforme en input (text, date, select selon le type)
 - Sauvegarde automatique au blur (sortie du champ) ou Entrée
@@ -71,7 +73,7 @@ Au-dessus du tableau :
 - Le curseur change au survol des cellules éditables
 - Sexe : select (F/M)
 - Date naissance, date inscription : composant `<x-date-input>` avec Flatpickr
-- Référé par : autocomplete tiers (composant léger inline)
+- Référé par : en inline, un simple input text avec le nom affiché ; la modale d'édition utilise le composant `TiersAutocomplete` complet pour une sélection riche
 - Notes médicales : icône dans la cellule, survol → aperçu en bulle (tooltip HTML), clic → modale avec éditeur Quill
 
 **Tri :**
@@ -121,7 +123,7 @@ Bouton supprimer (icône poubelle) par ligne avec confirmation (`wire:confirm`).
 
 ## Notes médicales — Éditeur WYSIWYG
 
-**Lib CDN :** Quill.js (Snow theme)
+**Lib CDN :** Quill.js 2.x (Snow theme)
 
 **Barre d'outils minimale :** Gras, Italique, Liste à puces, Liste numérotée
 
