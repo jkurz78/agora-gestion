@@ -19,7 +19,14 @@
             <p class="mt-2">Aucune séance. Cliquez sur "Ajouter une séance" pour commencer.</p>
         </div>
     @else
-        <div class="table-responsive">
+        <style>
+            .seance-scroll::-webkit-scrollbar { height: 12px; }
+            .seance-scroll::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 6px; }
+            .seance-scroll::-webkit-scrollbar-thumb { background: #bbb; border-radius: 6px; }
+            .seance-scroll::-webkit-scrollbar-thumb:hover { background: #888; }
+            .seance-scroll { scrollbar-width: thin; }
+        </style>
+        <div class="table-responsive seance-scroll">
             <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 150 + ($seances->count() * 180) }}px">
                 {{-- Header: Titles --}}
                 <thead>
