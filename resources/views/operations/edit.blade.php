@@ -6,6 +6,9 @@
             <form action="{{ route('compta.operations.update', $operation) }}" method="POST">
                 @csrf
                 @method('PUT')
+                @if(request('_redirect_back'))
+                    <input type="hidden" name="_redirect_back" value="{{ request('_redirect_back') }}">
+                @endif
 
                 <div class="mb-3">
                     <label for="nom" class="form-label">Nom <span class="text-danger">*</span></label>
@@ -83,7 +86,7 @@
 
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-success">Enregistrer</button>
-                    <a href="{{ route('compta.operations.show', $operation) }}" class="btn btn-secondary">Annuler</a>
+                    <a href="{{ request('_redirect_back', route('compta.operations.show', $operation)) }}" class="btn btn-secondary">Annuler</a>
                 </div>
             </form>
         </div>
