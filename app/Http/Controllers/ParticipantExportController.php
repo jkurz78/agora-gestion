@@ -36,7 +36,7 @@ final class ParticipantExportController extends Controller
         $headerStyle = (new Style())->withFontBold(true);
         $headers = ['Nom', 'Prénom', 'Téléphone', 'Email', 'Date inscription', 'Référé par'];
         if ($canSeeSensible) {
-            $headers = array_merge($headers, ['Date naissance', 'Sexe', 'Taille', 'Poids']);
+            $headers = array_merge($headers, ['Date naissance', 'Âge', 'Sexe', 'Taille', 'Poids', 'Notes']);
         }
         $writer->addRow(Row::fromValuesWithStyle($headers, $headerStyle));
 
@@ -51,11 +51,24 @@ final class ParticipantExportController extends Controller
             ];
             if ($canSeeSensible) {
                 $med = $p->donneesMedicales;
+                $dateNais = $med?->date_naissance ?? '';
+                $age = '';
+                if ($dateNais !== '') {
+                    try {
+                        $age = (string) \Carbon\Carbon::parse($dateNais)->age;
+                    } catch (\Throwable) {
+                    }
+                }
+                $notes = $med?->notes ?? '';
+                $notesPlain = $notes !== '' ? html_entity_decode(strip_tags($notes)) : '';
+
                 $row = array_merge($row, [
-                    $med?->date_naissance ?? '',
+                    $dateNais,
+                    $age,
                     $med?->sexe ?? '',
                     $med?->taille ?? '',
                     $med?->poids ?? '',
+                    $notesPlain,
                 ]);
             }
             $writer->addRow(Row::fromValues($row));
