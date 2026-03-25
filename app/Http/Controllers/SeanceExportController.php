@@ -63,8 +63,10 @@ final class SeanceExportController extends Controller
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue('S'.$seance->numero, $boldCenter);
             $cells[] = Cell::fromValue('');
-            // Merge: col (1 + i*2) to (1 + i*2 + 1), row 0
-            // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+            // Test merge: only first séance
+            if ($i === 0) {
+                $options->mergeCells(1, 0, 2, 0, 0);
+            }
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
