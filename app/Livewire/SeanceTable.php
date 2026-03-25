@@ -96,13 +96,11 @@ final class SeanceTable extends Component
 
         if ($this->showProches) {
             $now = now();
-            $seances = $seances->filter(function ($s) use ($now) {
-                if (! $s->date) {
-                    return true; // show dateless seances
-                }
-
-                return abs($s->date->diffInDays($now)) <= 30;
-            })->values();
+            $withDates = $seances->filter(fn ($s) => $s->date !== null);
+            $before = $withDates->filter(fn ($s) => $s->date->lte($now))->sortByDesc('date')->take(2);
+            $after = $withDates->filter(fn ($s) => $s->date->gt($now))->sortBy('date')->take(2);
+            $withoutDates = $seances->filter(fn ($s) => $s->date === null);
+            $seances = $before->merge($after)->merge($withoutDates)->sortBy('numero')->values();
         }
 
         $participants = $this->operation->participants()
