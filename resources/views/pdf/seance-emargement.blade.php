@@ -38,14 +38,9 @@
             vertical-align: middle;
         }
         .data-table tr:nth-child(even) td { background-color: #f8f9fa; }
-        .data-table .col-signature { width: 30%; }
+        .data-table .col-signature { width: 35%; border-left: 1px solid #999; border-right: 1px solid #999; }
         .data-table .col-kine { width: 8%; text-align: center; }
         .data-table .col-obs { width: 20%; }
-        .signature-box {
-            border: 1px solid #ccc;
-            border-radius: 3px;
-            height: 35px;
-            width: 100%;
         }
 
         .checkbox-empty {
@@ -101,19 +96,17 @@
     <table class="data-table">
         <thead>
             <tr>
-                <th>Nom</th>
-                <th>Prénom</th>
+                <th>Participant</th>
                 <th class="col-signature">Signature</th>
                 <th class="col-kine">Kiné</th>
                 <th class="col-obs">Observations</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($participants as $p)
+            @foreach($participants->sortBy(fn ($p) => mb_strtolower(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''))) as $p)
                 <tr>
-                    <td style="font-weight:600">{{ $p->tiers->nom ?? '' }}</td>
-                    <td>{{ $p->tiers->prenom ?? '' }}</td>
-                    <td><div class="signature-box"></div></td>
+                    <td style="font-weight:600">{{ $p->tiers->nom ?? '' }} {{ $p->tiers->prenom ?? '' }}</td>
+                    <td class="col-signature"></td>
                     <td class="col-kine"><span class="checkbox-empty"></span></td>
                     <td></td>
                 </tr>
