@@ -83,32 +83,38 @@
 
     <table class="matrix">
         <thead>
+            {{-- Séance numbers --}}
             <tr>
-                <th class="col-name">Participant</th>
+                <th rowspan="4" class="col-name" style="vertical-align:middle">Participant</th>
                 @foreach($seances as $seance)
-                    <th>S{{ $seance->numero }}</th>
+                    <th colspan="2" style="text-align:center">S{{ $seance->numero }}</th>
                 @endforeach
             </tr>
-        </thead>
-        <tbody>
             {{-- Titre row --}}
             <tr class="header-row">
-                <td class="col-name" style="color:#888;font-style:italic">Titre</td>
                 @foreach($seances as $seance)
-                    <td>{{ Str::limit($seance->titre, 15) }}</td>
+                    <td colspan="2" style="text-align:center">{{ Str::limit($seance->titre, 18) }}</td>
                 @endforeach
             </tr>
             {{-- Date row --}}
             <tr class="header-row">
-                <td class="col-name" style="color:#888;font-style:italic">Date</td>
                 @foreach($seances as $seance)
-                    <td>{{ $seance->date?->format('d/m') }}</td>
+                    <td colspan="2" style="text-align:center">{{ $seance->date?->format('d/m/Y') }}</td>
                 @endforeach
             </tr>
-            {{-- Participants --}}
-            @foreach($participants as $p)
+            {{-- Sub-header: Présence / Kiné --}}
+            <tr class="header-row">
+                @foreach($seances as $seance)
+                    <td style="text-align:center;font-size:6px;color:#888">Présence</td>
+                    <td style="text-align:center;font-size:6px;color:#888;width:18px">K</td>
+                @endforeach
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($participants->sortBy(fn ($p) => mb_strtolower(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''))) as $p)
+                {{-- Ligne 1 : Présence + Kiné --}}
                 <tr>
-                    <td class="col-name">{{ $p->tiers->displayName() }}</td>
+                    <td rowspan="2" class="col-name" style="vertical-align:middle">{{ $p->tiers->nom }} {{ $p->tiers->prenom }}</td>
                     @foreach($seances as $seance)
                         @php
                             $key = $seance->id . '-' . $p->id;
@@ -125,23 +131,33 @@
                                 default => '',
                             };
                             $statusLabel = match($statut) {
-                                'present' => 'P',
-                                'excuse' => 'E',
-                                'absence_non_justifiee' => 'A',
-                                'arret' => 'X',
+                                'present' => 'Présent',
+                                'excuse' => 'Excusé',
+                                'absence_non_justifiee' => 'Abs.',
+                                'arret' => 'Arrêt',
                                 default => '',
                             };
-                            $kineClass = match($kine) {
-                                'oui' => 'kine-oui',
-                                'non' => 'kine-non',
-                                default => '',
+                            $kineBg = match($kine) {
+                                'oui' => '#d4edda',
+                                'non' => '#f8d7da',
+                                default => '#fff',
                             };
                         @endphp
-                        <td class="{{ $statusClass }} {{ $kineClass }}">
-                            {{ $statusLabel }}
-                            @if($kine === 'oui') K @elseif($kine === 'non') — @endif
-                            @if($commentaire) <br><span style="font-size:6px;color:#888">{{ Str::limit($commentaire, 20) }}</span> @endif
+                        <td class="{{ $statusClass }}" style="font-size:7px">{{ $statusLabel }}</td>
+                        <td style="background:{{ $kineBg }};width:18px">
+                            @if($kine === 'oui') <span style="color:#198754">✓</span> @elseif($kine === 'non') <span style="color:#dc3545">✗</span> @endif
                         </td>
+                    @endforeach
+                </tr>
+                {{-- Ligne 2 : Commentaire sur toute la largeur --}}
+                <tr>
+                    @foreach($seances as $seance)
+                        @php
+                            $key = $seance->id . '-' . $p->id;
+                            $presence = $presenceMap[$key] ?? null;
+                            $commentaire = $presence?->commentaire ?? '';
+                        @endphp
+                        <td colspan="2" style="font-size:6px;color:#888;padding:1px 3px;border-top:none">{{ Str::limit($commentaire, 25) }}</td>
                     @endforeach
                 </tr>
             @endforeach
@@ -156,7 +172,7 @@
                             if (isset($presenceMap[$k]) && $presenceMap[$k]->statut === 'present') $presents++;
                         }
                     @endphp
-                    <td>{{ $presents }}/{{ $participants->count() }}</td>
+                    <td colspan="2" style="text-align:center">{{ $presents }}/{{ $participants->count() }}</td>
                 @endforeach
             </tr>
         </tbody>
