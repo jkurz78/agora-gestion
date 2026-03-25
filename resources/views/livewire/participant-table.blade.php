@@ -1,4 +1,37 @@
 <div>
+    <style>
+        .notes-preview-wrap { position: relative; display: inline-block; }
+        .notes-preview-bubble {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.4;
+            width: 280px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1050;
+            box-shadow: 0 4px 12px rgba(0,0,0,.3);
+            text-align: left;
+        }
+        .notes-preview-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #333;
+        }
+        .notes-preview-wrap:hover .notes-preview-bubble { display: block; }
+    </style>
+
     {{-- Toolbar --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
         <span class="text-muted">{{ $participants->count() }} participants</span>
@@ -233,15 +266,17 @@
 
                         {{-- Notes icon --}}
                         @if($canSeeSensible)
-                            <td class="small text-center">
+                            <td class="small text-center" style="position:relative">
                                 @php $hasNotes = $p->donneesMedicales?->notes; @endphp
-                                <button class="btn btn-sm btn-link p-0 {{ $hasNotes ? 'text-primary' : 'text-muted' }}"
-                                        wire:click="openNotesModal({{ $p->id }})"
-                                        data-bs-toggle="tooltip"
-                                        data-bs-html="true"
-                                        data-bs-title="{{ $hasNotes ? e(Str::limit($hasNotes, 300)) : 'Ajouter des notes' }}">
-                                    <i class="bi bi-journal-text"></i>
-                                </button>
+                                <span class="notes-preview-wrap">
+                                    <button class="btn btn-sm btn-link p-0 {{ $hasNotes ? 'text-primary' : 'text-muted' }}"
+                                            wire:click="openNotesModal({{ $p->id }})">
+                                        <i class="bi bi-journal-text"></i>
+                                    </button>
+                                    @if($hasNotes)
+                                        <span class="notes-preview-bubble">{!! Str::limit($hasNotes, 300) !!}</span>
+                                    @endif
+                                </span>
                             </td>
                         @endif
 
