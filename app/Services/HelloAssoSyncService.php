@@ -8,6 +8,7 @@ use App\Enums\ModePaiement;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
+use App\Models\Participant;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -45,6 +46,7 @@ final class HelloAssoSyncService
         $txUpdated = 0;
         $lignesCreated = 0;
         $lignesUpdated = 0;
+        $participantsCreated = 0;
         $skipped = 0;
         $errors = [];
 
@@ -55,6 +57,7 @@ final class HelloAssoSyncService
                 $txUpdated += $result['tx_updated'];
                 $lignesCreated += $result['lignes_created'];
                 $lignesUpdated += $result['lignes_updated'];
+                $participantsCreated += $result['participants_created'];
                 $skipped += $result['skipped'];
             } catch (\Throwable $e) {
                 $errors[] = "Commande #{$order['id']} : {$e->getMessage()}";
@@ -67,19 +70,20 @@ final class HelloAssoSyncService
             transactionsUpdated: $txUpdated,
             lignesCreated: $lignesCreated,
             lignesUpdated: $lignesUpdated,
+            participantsCreated: $participantsCreated,
             ordersSkipped: $skipped,
             errors: $errors,
         );
     }
 
     /**
-     * @return array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, skipped: int}
+     * @return array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int}
      */
     private function processOrder(array $order, int $exercice): array
     {
         // Group items by beneficiary nom+prénom
         $groups = $this->groupItemsByBeneficiary($order);
-        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'skipped' => 0];
+        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'participants_created' => 0, 'skipped' => 0];
 
         $orderDate = Carbon::parse($order['date'])->toDateString();
         $modePaiement = $this->resolveModePaiement($order['payments'] ?? []);
@@ -182,6 +186,30 @@ final class HelloAssoSyncService
                             'exercice' => $resolved['exercice'] === 'use_sync_exercice' ? $exercice : null,
                         ]);
                         $result['lignes_created']++;
+                    }
+                }
+
+                // Create Participant for Registration items
+                foreach ($resolvedItems as $resolved) {
+                    $item = $resolved['item'];
+                    $type = $item['type'] ?? 'Donation';
+
+                    if ($type === 'Registration' && $resolved['operation_id'] !== null) {
+                        $created = Participant::firstOrCreate(
+                            [
+                                'tiers_id' => $tiers->id,
+                                'operation_id' => $resolved['operation_id'],
+                            ],
+                            [
+                                'date_inscription' => $orderDate,
+                                'est_helloasso' => true,
+                                'helloasso_item_id' => $item['id'],
+                                'helloasso_order_id' => $order['id'],
+                            ],
+                        );
+                        if ($created->wasRecentlyCreated) {
+                            $result['participants_created']++;
+                        }
                     }
                 }
 

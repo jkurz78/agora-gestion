@@ -7,6 +7,7 @@ use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
+use App\Models\Participant;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -230,9 +231,18 @@ it('resolves operation from form mapping for Registration items', function () {
     $result = $service->synchroniser($orders, 2025);
 
     expect($result->transactionsCreated)->toBe(1);
+    expect($result->participantsCreated)->toBe(1);
     $ligne = TransactionLigne::where('helloasso_item_id', 1007)->first();
     expect($ligne->sous_categorie_id)->toBe($scInscr->id);
     expect($ligne->operation_id)->toBe($operation->id);
+
+    $participant = Participant::where('tiers_id', $this->tiers->id)
+        ->where('operation_id', $operation->id)->first();
+    expect($participant)->not->toBeNull();
+    expect($participant->est_helloasso)->toBeTrue();
+    expect($participant->helloasso_item_id)->toBe(1007);
+    expect($participant->helloasso_order_id)->toBe(105);
+    expect($participant->date_inscription->format('Y-m-d'))->toBe('2025-10-15');
 });
 
 it('reports error for Registration item without mapped operation', function () {
@@ -397,4 +407,67 @@ it('stores helloasso_payment_id on transaction', function () {
 
     $tx = Transaction::where('helloasso_order_id', 120)->first();
     expect($tx->helloasso_payment_id)->toBe(555);
+});
+
+it('does not create participant for Donation items', function () {
+    $orders = [
+        [
+            'id' => 130,
+            'date' => '2025-10-15T10:00:00+02:00',
+            'amount' => 5000,
+            'formSlug' => 'dons-libres',
+            'formType' => 'Donation',
+            'items' => [
+                ['id' => 1030, 'amount' => 5000, 'state' => 'Processed', 'type' => 'Donation', 'name' => 'Don'],
+            ],
+            'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payments' => [['id' => 230, 'amount' => 5000, 'date' => '2025-10-15T10:00:00+02:00', 'paymentMeans' => 'Card']],
+        ],
+    ];
+
+    $service = new HelloAssoSyncService($this->parametres);
+    $result = $service->synchroniser($orders, 2025);
+
+    expect($result->participantsCreated)->toBe(0);
+    expect(Participant::count())->toBe(0);
+});
+
+it('does not duplicate participant on re-sync', function () {
+    $scInscr = SousCategorie::factory()->create(['pour_inscriptions' => true, 'nom' => 'Inscription']);
+    $this->parametres->update(['sous_categorie_inscription_id' => $scInscr->id]);
+
+    $operation = Operation::factory()->create(['nom' => 'Stage']);
+    HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => $this->parametres->id,
+        'form_slug' => 'stage-resync',
+        'form_type' => 'Event',
+        'form_title' => 'Stage Resync',
+        'operation_id' => $operation->id,
+    ]);
+
+    $orders = [
+        [
+            'id' => 131,
+            'date' => '2025-10-15T10:00:00+02:00',
+            'amount' => 10000,
+            'formSlug' => 'stage-resync',
+            'formType' => 'Event',
+            'items' => [
+                ['id' => 1031, 'amount' => 10000, 'state' => 'Processed', 'type' => 'Registration', 'name' => 'Stage'],
+            ],
+            'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payments' => [['id' => 231, 'amount' => 10000, 'date' => '2025-10-15T10:00:00+02:00', 'paymentMeans' => 'Card']],
+        ],
+    ];
+
+    $service = new HelloAssoSyncService($this->parametres);
+    $result1 = $service->synchroniser($orders, 2025);
+    expect($result1->participantsCreated)->toBe(1);
+
+    $service2 = new HelloAssoSyncService($this->parametres->fresh());
+    $result2 = $service2->synchroniser($orders, 2025);
+    expect($result2->participantsCreated)->toBe(0);
+    expect(Participant::where('operation_id', $operation->id)->count())->toBe(1);
 });
