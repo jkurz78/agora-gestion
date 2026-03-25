@@ -198,7 +198,11 @@
                             {{-- Date naissance --}}
                             @php
                                 $dateNais = $med?->date_naissance ?? '';
-                                $dateNaisDisplay = $dateNais ? \Carbon\Carbon::parse($dateNais)->format('d/m/Y') : '';
+                                try {
+                                    $dateNaisDisplay = $dateNais ? \Carbon\Carbon::parse($dateNais)->format('d/m/Y') : '';
+                                } catch (\Throwable) {
+                                    $dateNaisDisplay = $dateNais;
+                                }
                             @endphp
                             <td x-data="{ editing: false, value: @js($dateNais), display: @js($dateNaisDisplay) }"
                                 @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"

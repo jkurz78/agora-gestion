@@ -8,6 +8,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
@@ -243,6 +244,14 @@ final class ParticipantTable extends Component
             return;
         }
 
+        if ($field === 'date_inscription' && $value !== '') {
+            try {
+                $value = Carbon::parse($value)->toDateString();
+            } catch (\Throwable) {
+                return;
+            }
+        }
+
         $participant = Participant::where('operation_id', $this->operation->id)
             ->findOrFail($participantId);
 
@@ -266,6 +275,14 @@ final class ParticipantTable extends Component
         $med = $participant->donneesMedicales ?? ParticipantDonneesMedicales::create([
             'participant_id' => $participant->id,
         ]);
+
+        if ($field === 'date_naissance' && $value !== '') {
+            try {
+                Carbon::parse($value);
+            } catch (\Throwable) {
+                return;
+            }
+        }
 
         $med->update([$field => $value !== '' ? $value : null]);
         $participant->touch();
