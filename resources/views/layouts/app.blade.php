@@ -424,6 +424,11 @@
                 if (existing) existing.dispose();
                 new bootstrap.Tooltip(el, { delay: { show: 0, hide: 100 } });
             });
+            document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
+                const existing = bootstrap.Popover.getInstance(el);
+                if (existing) existing.dispose();
+                new bootstrap.Popover(el, { delay: { show: 200, hide: 100 }, sanitize: false });
+            });
         }
         document.addEventListener('DOMContentLoaded', initTooltips);
         document.addEventListener('livewire:updated', initTooltips);
