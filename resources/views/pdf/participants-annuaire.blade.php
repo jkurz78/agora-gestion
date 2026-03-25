@@ -118,58 +118,74 @@
                             <div class="card-name">
                                 {{ $p->tiers->prenom }} {{ $p->tiers->nom }}
                             </div>
-
-                            @if($p->tiers->telephone)
-                                <span class="card-row">
-                                    <span class="card-label">Tél.</span>
-                                    <span class="card-value">{{ $p->tiers->telephone }}</span>
-                                </span>
-                            @endif
-
-                            @if($p->tiers->email)
-                                <span class="card-row">
-                                    <span class="card-label">Email</span>
-                                    <span class="card-value">{{ $p->tiers->email }}</span>
-                                </span>
-                            @endif
-
-                            <span class="card-row">
-                                <span class="card-label">Inscrit le</span>
-                                <span class="card-value">{{ $p->date_inscription?->format('d/m/Y') }}</span>
-                            </span>
-
-                            @if($confidentiel)
-                                @if($med?->date_naissance)
-                                    <span class="card-row">
-                                        <span class="card-label">Naissance</span>
-                                        <span class="card-value">{{ \Carbon\Carbon::parse($med->date_naissance)->format('d/m/Y') }}{{ $age !== null ? ' ('.$age.' ans)' : '' }}</span>
-                                    </span>
-                                @endif
-                                @if($med?->sexe)
-                                    <span class="card-row">
-                                        <span class="card-label">Sexe</span>
-                                        <span class="card-value">{{ $med->sexe === 'F' ? 'Féminin' : 'Masculin' }}</span>
-                                    </span>
-                                @endif
-                                @if($med?->taille)
-                                    <span class="card-row">
-                                        <span class="card-label">Taille</span>
-                                        <span class="card-value">{{ $med->taille }} cm</span>
-                                    </span>
-                                @endif
-                                @if($med?->poids)
-                                    <span class="card-row">
-                                        <span class="card-label">Poids</span>
-                                        <span class="card-value">{{ $med->poids }} kg</span>
-                                    </span>
-                                @endif
-                                @if($p->referePar)
-                                    <span class="card-row">
-                                        <span class="card-label">Référé par</span>
-                                        <span class="card-value">{{ $p->referePar->displayName() }}</span>
-                                    </span>
-                                @endif
-                            @endif
+                            <table style="width:100%;border-collapse:collapse">
+                                <tr>
+                                    <td style="width:50%;vertical-align:top;padding-right:10px">
+                                        {{-- Colonne gauche : coordonnées --}}
+                                        @if($p->tiers->adresse_ligne1)
+                                            <span class="card-row">
+                                                <span class="card-label">Adresse</span>
+                                                <span class="card-value">{{ $p->tiers->adresse_ligne1 }}</span>
+                                            </span>
+                                        @endif
+                                        @if($p->tiers->code_postal || $p->tiers->ville)
+                                            <span class="card-row">
+                                                <span class="card-label">Ville</span>
+                                                <span class="card-value">{{ $p->tiers->code_postal }} {{ $p->tiers->ville }}</span>
+                                            </span>
+                                        @endif
+                                        @if($p->tiers->telephone)
+                                            <span class="card-row">
+                                                <span class="card-label">Tél.</span>
+                                                <span class="card-value">{{ $p->tiers->telephone }}</span>
+                                            </span>
+                                        @endif
+                                        @if($p->tiers->email)
+                                            <span class="card-row">
+                                                <span class="card-label">Email</span>
+                                                <span class="card-value">{{ $p->tiers->email }}</span>
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td style="width:50%;vertical-align:top;padding-left:10px">
+                                        {{-- Colonne droite : inscription + données sensibles --}}
+                                        <span class="card-row">
+                                            <span class="card-label">Inscrit le</span>
+                                            <span class="card-value">{{ $p->date_inscription?->format('d/m/Y') }}</span>
+                                        </span>
+                                        @if($p->referePar)
+                                            <span class="card-row">
+                                                <span class="card-label">Référé par</span>
+                                                <span class="card-value">{{ $p->referePar->displayName() }}</span>
+                                            </span>
+                                        @endif
+                                        @if($confidentiel)
+                                            @if($med?->date_naissance)
+                                                <span class="card-row">
+                                                    <span class="card-label">Naissance</span>
+                                                    <span class="card-value">{{ \Carbon\Carbon::parse($med->date_naissance)->format('d/m/Y') }}{{ $age !== null ? ' ('.$age.' ans)' : '' }}</span>
+                                                </span>
+                                            @endif
+                                            @if($med?->sexe)
+                                                <span class="card-row">
+                                                    <span class="card-label">Sexe</span>
+                                                    <span class="card-value">{{ $med->sexe === 'F' ? 'Féminin' : 'Masculin' }}</span>
+                                                </span>
+                                            @endif
+                                            @if($med?->taille || $med?->poids)
+                                                <span class="card-row">
+                                                    <span class="card-label">Morpho.</span>
+                                                    <span class="card-value">
+                                                        {{ $med?->taille ? $med->taille.' cm' : '' }}
+                                                        {{ $med?->taille && $med?->poids ? ' / ' : '' }}
+                                                        {{ $med?->poids ? $med->poids.' kg' : '' }}
+                                                    </span>
+                                                </span>
+                                            @endif
+                                        @endif
+                                    </td>
+                                </tr>
+                            </table>
         </div>
     @endforeach
 
