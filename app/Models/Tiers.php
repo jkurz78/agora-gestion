@@ -54,4 +54,9 @@ final class Tiers extends Model
     {
         return $this->hasMany(Transaction::class);
     }
+
+    public function participants(): HasMany
+    {
+        return $this->hasMany(Participant::class);
+    }
 }
