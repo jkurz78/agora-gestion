@@ -106,7 +106,7 @@
                         {{-- Ligne 1 : Présence + Kiné --}}
                         <tr>
                             <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;font-weight:500;white-space:nowrap;vertical-align:middle;font-size:11px">
-                                {{ $participant->tiers->displayName() }}
+                                {{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}
                             </td>
                             @foreach($seances as $seance)
                                 @php

@@ -105,8 +105,9 @@ final class SeanceTable extends Component
 
         $participants = $this->operation->participants()
             ->with('tiers')
-            ->orderBy('id')
-            ->get();
+            ->get()
+            ->sortBy(fn ($p) => mb_strtolower(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? '')))
+            ->values();
 
         // Load all presences for this operation's seances in one query
         $seanceIds = $seances->pluck('id');
