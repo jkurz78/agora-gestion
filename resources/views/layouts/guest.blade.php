@@ -11,7 +11,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? $nomAsso.' Comptabilité - Connexion' }}</title>
+    <title>{{ $title ?? $nomAsso.' Gestion et comptabilité - Connexion' }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </head>
@@ -22,7 +22,7 @@
                 <div class="text-center mb-4">
                     <img src="{{ $logoAsset }}" alt="{{ $nomAsso }}" height="100" class="mb-3">
                     <h2 class="mb-0">{{ $nomAsso }}</h2>
-                    <p class="text-muted mb-0">Comptabilité</p>
+                    <p class="text-muted mb-0">Gestion et comptabilité</p>
                 </div>
                 <div class="card shadow-sm">
                     <div class="card-body p-4">
