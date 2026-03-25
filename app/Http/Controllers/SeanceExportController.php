@@ -132,8 +132,8 @@ final class SeanceExportController extends Controller
         // Row 4: Sub-headers Présence / Kiné
         $cells = [Cell::fromValue('', $base)];
         foreach ($seances as $seance) {
-            $cells[] = Cell::fromValue('Présence', $bold);
-            $cells[] = Cell::fromValue('Kiné', $bold);
+            $cells[] = Cell::fromValue('Présence', $boldCenter);
+            $cells[] = Cell::fromValue('Kiné', $boldCenter);
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
@@ -158,7 +158,7 @@ final class SeanceExportController extends Controller
                     default => '',
                 };
 
-                $cells[] = Cell::fromValue($statusLabel, $base);
+                $cells[] = Cell::fromValue($statusLabel, $centerStyle);
 
                 $kineLabel = match ($kine) {
                     'oui' => 'Oui',
