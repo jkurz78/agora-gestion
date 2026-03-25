@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <title>Participants — {{ $operation->nom }}</title>
     <style>
-        @page { margin: 20mm; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
             font-size: 10px;
             color: #212529;
             line-height: 1.4;
+            margin: 20mm;
         }
         table { width: 100%; border-collapse: collapse; }
 
