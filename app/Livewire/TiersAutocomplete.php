@@ -17,6 +17,8 @@ final class TiersAutocomplete extends Component
 
     public string $filtre = 'tous'; // 'depenses' | 'recettes' | 'dons' | 'tous'
 
+    public string $typeFiltre = ''; // '' | 'particulier' | 'entreprise'
+
     public string $search = '';
 
     public bool $open = false;
@@ -71,6 +73,10 @@ final class TiersAutocomplete extends Component
             'dons' => $query->where('pour_recettes', true),
             default => null,
         };
+
+        if ($this->typeFiltre !== '') {
+            $query->where('type', $this->typeFiltre);
+        }
 
         if ($this->search !== '') {
             $query->where(function ($q): void {
