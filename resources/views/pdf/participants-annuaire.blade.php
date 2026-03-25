@@ -186,6 +186,12 @@
                                     </td>
                                 </tr>
                             </table>
+                            @if($confidentiel && $med?->notes)
+                                <div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee">
+                                    <span class="card-label">Notes</span>
+                                    <div class="card-value" style="font-size:8px;color:#444;line-height:1.3">{!! $med->notes !!}</div>
+                                </div>
+                            @endif
         </div>
     @endforeach
 
