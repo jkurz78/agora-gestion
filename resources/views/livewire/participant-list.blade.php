@@ -139,9 +139,8 @@
 
                 <form wire:submit="saveMedicalData">
                     <div class="mb-3">
-                        <label for="medDateNaissance" class="form-label">Date de naissance</label>
-                        <input type="date" wire:model="medDateNaissance" id="medDateNaissance"
-                               class="form-control @error('medDateNaissance') is-invalid @enderror">
+                        <label class="form-label">Date de naissance</label>
+                        <x-date-input wire:model="medDateNaissance" :value="$medDateNaissance" />
                         @error('medDateNaissance')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
