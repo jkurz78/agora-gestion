@@ -55,9 +55,33 @@ final class GestionOperations extends Component
             ? Operation::find($this->selectedOperationId)
             : null;
 
+        $totalDepenses = 0;
+        $totalRecettes = 0;
+        $totalDons = 0;
+        $solde = 0;
+
+        if ($selectedOperation) {
+            $totalDepenses = (float) $selectedOperation->transactionLignes()
+                ->whereHas('transaction', fn ($q) => $q->where('type', 'depense'))
+                ->sum('montant');
+            $totalRecettes = (float) $selectedOperation->transactionLignes()
+                ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
+                ->whereDoesntHave('sousCategorie', fn ($q) => $q->where('pour_dons', true))
+                ->sum('montant');
+            $totalDons = (float) $selectedOperation->transactionLignes()
+                ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
+                ->whereHas('sousCategorie', fn ($q) => $q->where('pour_dons', true))
+                ->sum('montant');
+            $solde = ($totalRecettes + $totalDons) - $totalDepenses;
+        }
+
         return view('livewire.gestion-operations', [
             'operations' => $operations,
             'selectedOperation' => $selectedOperation,
+            'totalDepenses' => $totalDepenses,
+            'totalRecettes' => $totalRecettes,
+            'totalDons' => $totalDons,
+            'solde' => $solde,
         ]);
     }
 }
