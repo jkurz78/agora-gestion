@@ -41,5 +41,5 @@ it('login page shows logo and new app name', function () {
 it('login page title is updated', function () {
     $response = $this->get('/login');
 
-    $response->assertSee('Soigner•Vivre•Sourire Comptabilité - Connexion', false);
+    $response->assertSee('Soigner•Vivre•Sourire Gestion et comptabilité - Connexion', false);
 });
