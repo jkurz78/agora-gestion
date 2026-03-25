@@ -51,23 +51,28 @@ final class ParticipantExportController extends Controller
             ];
             if ($canSeeSensible) {
                 $med = $p->donneesMedicales;
-                $dateNais = $med?->date_naissance ?? '';
-                $age = '';
-                if ($dateNais !== '') {
+                $dateNaisRaw = $med?->date_naissance ?? '';
+                $dateNaisFormatted = '';
+                $age = null;
+                if ($dateNaisRaw !== '') {
                     try {
-                        $age = (string) \Carbon\Carbon::parse($dateNais)->age;
+                        $carbon = \Carbon\Carbon::parse($dateNaisRaw);
+                        $dateNaisFormatted = $carbon->format('d/m/Y');
+                        $age = $carbon->age;
                     } catch (\Throwable) {
                     }
                 }
+                $taille = $med?->taille !== null && $med->taille !== '' ? (int) $med->taille : null;
+                $poids = $med?->poids !== null && $med->poids !== '' ? (int) $med->poids : null;
                 $notes = $med?->notes ?? '';
                 $notesPlain = $notes !== '' ? html_entity_decode(strip_tags($notes)) : '';
 
                 $row = array_merge($row, [
-                    $dateNais,
+                    $dateNaisFormatted,
                     $age,
                     $med?->sexe ?? '',
-                    $med?->taille ?? '',
-                    $med?->poids ?? '',
+                    $taille,
+                    $poids,
                     $notesPlain,
                 ]);
             }
