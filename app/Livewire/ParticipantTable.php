@@ -305,7 +305,9 @@ final class ParticipantTable extends Component
 
         $med->update(['notes' => $this->medNotes !== '' ? $this->medNotes : null]);
 
+        $participant->touch();
         $this->showNotesModal = false;
+        $this->js('window._quillNotesInstance = null;');
     }
 
     // ── Helpers ────────────────────────────────────────────────
