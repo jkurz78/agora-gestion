@@ -64,7 +64,7 @@ final class SeanceExportController extends Controller
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue('S'.$seance->numero, $boldCenter);
             $cells[] = Cell::fromValue('');
-            $colStart = 2 + $i * 2;
+            $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
@@ -75,7 +75,7 @@ final class SeanceExportController extends Controller
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->titre ?? '');
             $cells[] = Cell::fromValue('');
-            $colStart = 2 + $i * 2;
+            $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
@@ -86,7 +86,7 @@ final class SeanceExportController extends Controller
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->date?->format('d/m/Y') ?? '');
             $cells[] = Cell::fromValue('');
-            $colStart = 2 + $i * 2;
+            $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
@@ -144,7 +144,7 @@ final class SeanceExportController extends Controller
                 $commentaire = $presence?->commentaire ?? '';
                 $cells[] = Cell::fromValue($commentaire, $commentStyle);
                 $cells[] = Cell::fromValue('');
-                $colStart = 2 + $i * 2;
+                $colStart = 1 + $i * 2;
                 $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
             }
             $writer->addRow(new Row($cells));
@@ -163,7 +163,7 @@ final class SeanceExportController extends Controller
             }
             $cells[] = Cell::fromValue($presents.'/'.$participants->count(), $bold);
             $cells[] = Cell::fromValue('');
-            $colStart = 2 + $i * 2;
+            $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
