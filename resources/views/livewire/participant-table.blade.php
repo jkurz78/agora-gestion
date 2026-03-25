@@ -264,7 +264,7 @@
                 {{-- Tiers autocomplete --}}
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Tiers</label>
-                    <livewire:tiers-autocomplete wire:model="addTiersId" filtre="tous" :key="'add-tiers-ac'" />
+                    <livewire:tiers-autocomplete wire:model="addTiersId" filtre="tous" typeFiltre="particulier" context="participant" :key="'add-tiers-ac'" />
                     @error('addTiersId') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                 </div>
 

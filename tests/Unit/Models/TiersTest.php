@@ -76,7 +76,6 @@ it('can create tiers with all new fields', function () {
         'code_postal' => '75001',
         'ville' => 'Paris',
         'pays' => 'France',
-        'date_naissance' => '1990-05-15',
         'est_helloasso' => true,
         'pour_depenses' => true,
     ]);
@@ -84,5 +83,4 @@ it('can create tiers with all new fields', function () {
     expect($tiers->code_postal)->toBe('75001');
     expect($tiers->pays)->toBe('France');
     expect($tiers->est_helloasso)->toBeTrue();
-    expect($tiers->date_naissance)->toBeInstanceOf(Carbon::class);
 });

@@ -65,7 +65,8 @@
                         </div>
                     @endif
 
-                    {{-- Usage --}}
+                    {{-- Usage (hidden in participant context) --}}
+                    @if($context !== 'participant')
                     <div class="col-12">
                         <label class="form-label fw-semibold">
                             Utilisation <span class="text-danger">*</span>
@@ -86,12 +87,13 @@
                             <div class="text-danger small mt-1">{{ $message }}</div>
                         @enderror
                     </div>
+                    @endif
 
                     {{-- Toggle détails --}}
                     <div class="col-12">
                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                 wire:click="$toggle('showDetails')">
-                            {{ $showDetails ? '▲ Masquer les détails' : '▼ Détails (adresse, contact, date de naissance…)' }}
+                            {{ $showDetails ? '▲ Masquer les détails' : '▼ Détails (adresse, contact…)' }}
                         </button>
                     </div>
 
@@ -131,10 +133,6 @@
                             <input type="text" wire:model="pays" class="form-control" placeholder="France">
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label">Date de naissance</label>
-                            <input type="date" wire:model="date_naissance" class="form-control">
-                        </div>
                     @endif
 
                 </div>
