@@ -39,8 +39,36 @@
         <div class="d-flex gap-2">
             @if(Route::has('gestion.operations.participants.export'))
                 <a href="{{ route('gestion.operations.participants.export', $operation) }}" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-file-earmark-spreadsheet"></i> Exporter Excel
+                    <i class="bi bi-file-earmark-spreadsheet"></i> Excel
                 </a>
+            @endif
+            @if(Route::has('gestion.operations.participants.pdf'))
+                <div class="dropdown" x-data="{ confidentiel: false }">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" style="min-width:220px">
+                        <li>
+                            <a class="dropdown-item" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'liste']) }}' + (confidentiel ? '&confidentiel=1' : '')">
+                                <i class="bi bi-list-ul me-2"></i>Liste
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'annuaire']) }}' + (confidentiel ? '&confidentiel=1' : '')">
+                                <i class="bi bi-person-vcard me-2"></i>Annuaire
+                            </a>
+                        </li>
+                        @if($canSeeSensible)
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="px-3 py-1">
+                                <div class="form-check mb-0">
+                                    <input type="checkbox" class="form-check-input" id="pdfConfidentiel" x-model="confidentiel">
+                                    <label class="form-check-label small" for="pdfConfidentiel">Données confidentielles</label>
+                                </div>
+                            </li>
+                        @endif
+                    </ul>
+                </div>
             @endif
             <button class="btn btn-sm btn-primary" wire:click="openAddModal">
                 <i class="bi bi-plus-lg"></i> Ajouter un participant
