@@ -37,39 +37,40 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <span class="text-muted">{{ $participants->count() }} participants</span>
         <div class="d-flex gap-2">
-            @if(Route::has('gestion.operations.participants.export'))
-                <a href="{{ route('gestion.operations.participants.export', $operation) }}" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-file-earmark-spreadsheet"></i> Excel
-                </a>
-            @endif
-            @if(Route::has('gestion.operations.participants.pdf'))
-                <div class="dropdown" x-data="{ confidentiel: false }">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-file-earmark-pdf"></i> PDF
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" style="min-width:220px">
-                        <li>
-                            <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'liste']) }}' + (confidentiel ? '&confidentiel=1' : '')">
-                                <i class="bi bi-list-ul me-2"></i>Liste
-                            </a>
+            <div class="dropdown" x-data="{ confidentiel: false }">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="bi bi-download"></i> Exporter
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" style="min-width:240px">
+                    <li class="dropdown-header small text-muted">Excel</li>
+                    <li>
+                        <a class="dropdown-item" :href="'{{ route('gestion.operations.participants.export', $operation) }}' + (confidentiel ? '?confidentiel=1' : '')">
+                            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Télécharger .xlsx
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li class="dropdown-header small text-muted">PDF</li>
+                    <li>
+                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'liste']) }}' + (confidentiel ? '?confidentiel=1' : '')">
+                            <i class="bi bi-list-ul me-2"></i>Liste
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'annuaire']) }}' + (confidentiel ? '?confidentiel=1' : '')">
+                            <i class="bi bi-person-vcard me-2"></i>Annuaire
+                        </a>
+                    </li>
+                    @if($canSeeSensible)
+                        <li><hr class="dropdown-divider"></li>
+                        <li class="px-3 py-1">
+                            <div class="form-check mb-0">
+                                <input type="checkbox" class="form-check-input" id="exportConfidentiel" x-model="confidentiel">
+                                <label class="form-check-label small" for="exportConfidentiel">Données confidentielles</label>
+                            </div>
                         </li>
-                        <li>
-                            <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'annuaire']) }}' + (confidentiel ? '&confidentiel=1' : '')">
-                                <i class="bi bi-person-vcard me-2"></i>Annuaire
-                            </a>
-                        </li>
-                        @if($canSeeSensible)
-                            <li><hr class="dropdown-divider"></li>
-                            <li class="px-3 py-1">
-                                <div class="form-check mb-0">
-                                    <input type="checkbox" class="form-check-input" id="pdfConfidentiel" x-model="confidentiel">
-                                    <label class="form-check-label small" for="pdfConfidentiel">Données confidentielles</label>
-                                </div>
-                            </li>
-                        @endif
-                    </ul>
-                </div>
-            @endif
+                    @endif
+                </ul>
+            </div>
             <button class="btn btn-sm btn-primary" wire:click="openAddModal">
                 <i class="bi bi-plus-lg"></i> Ajouter un participant
             </button>
