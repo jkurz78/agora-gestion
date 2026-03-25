@@ -83,4 +83,7 @@
             </div>
         </div>
     </div>
+
+    {{-- Participants --}}
+    <livewire:participant-list :operation="$operation" />
 </x-app-layout>
