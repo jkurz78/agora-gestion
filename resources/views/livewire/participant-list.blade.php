@@ -95,7 +95,7 @@
                 <form wire:submit="addParticipant">
                     <div class="mb-3">
                         <label class="form-label">Participant <span class="text-danger">*</span></label>
-                        <livewire:tiers-autocomplete wire:model="selectedTiersId" filtre="tous" />
+                        <livewire:tiers-autocomplete wire:model="selectedTiersId" filtre="tous" typeFiltre="particulier" />
                         @error('selectedTiersId')
                             <div class="text-danger small mt-1">{{ $message }}</div>
                         @enderror
