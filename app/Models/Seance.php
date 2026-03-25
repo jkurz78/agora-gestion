@@ -20,6 +20,7 @@ final class Seance extends Model
     protected function casts(): array
     {
         return [
+            'operation_id' => 'integer',
             'date' => 'date',
             'numero' => 'integer',
         ];
