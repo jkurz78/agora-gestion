@@ -53,7 +53,7 @@ final class SeanceExportController extends Controller
         $commentStyle = (new Style())->withFontColor(Color::rgb(136, 136, 136))->withFontSize(9);
 
         // Track row numbers (1-indexed for openspout merge)
-        $rowNum = 0;
+        $rowNum = 1;
         $seanceCount = $seances->count();
 
         $writer->openToFile($tempPath);
@@ -64,7 +64,7 @@ final class SeanceExportController extends Controller
             $cells[] = Cell::fromValue('S'.$seance->numero, $boldCenter);
             $cells[] = Cell::fromValue('');
             // Merge: col (1 + i*2) to (1 + i*2 + 1), row 0
-            $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+            // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
@@ -74,7 +74,7 @@ final class SeanceExportController extends Controller
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->titre ?? '');
             $cells[] = Cell::fromValue('');
-            $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+            // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
@@ -84,7 +84,7 @@ final class SeanceExportController extends Controller
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->date?->format('d/m/Y') ?? '');
             $cells[] = Cell::fromValue('');
-            $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+            // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
@@ -141,7 +141,7 @@ final class SeanceExportController extends Controller
                 $commentaire = $presence?->commentaire ?? '';
                 $cells[] = Cell::fromValue($commentaire, $commentStyle);
                 $cells[] = Cell::fromValue('');
-                $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+                // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
             }
             $writer->addRow(new Row($cells));
             $rowNum++;
@@ -159,7 +159,7 @@ final class SeanceExportController extends Controller
             }
             $cells[] = Cell::fromValue($presents.'/'.$participants->count(), $bold);
             $cells[] = Cell::fromValue('');
-            $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+            // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
 
