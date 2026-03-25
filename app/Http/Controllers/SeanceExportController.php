@@ -65,7 +65,7 @@ final class SeanceExportController extends Controller
             $cells[] = Cell::fromValue('');
             // Test merge: only first séance
             if ($i === 0) {
-                $options->mergeCells(1, 0, 2, 0, 0);
+                $options->mergeCells(2, 1, 3, 1, 0);
             }
         }
         $writer->addRow(new Row($cells));
