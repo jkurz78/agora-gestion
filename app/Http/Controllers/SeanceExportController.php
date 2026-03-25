@@ -135,6 +135,8 @@ final class SeanceExportController extends Controller
         foreach ($participants as $p) {
             // Ligne 1: Présence + Kiné
             $cells = [Cell::fromValue(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''), $nameStyle)];
+            // Merge participant name vertically across 2 rows (présence + commentaire)
+            $options->mergeCells(0, $rowNum, 0, $rowNum + 1, 0);
             foreach ($seances as $seance) {
                 $key = $seance->id.'-'.$p->id;
                 $presence = $presenceMap[$key] ?? null;
