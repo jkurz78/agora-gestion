@@ -19,13 +19,19 @@
         <p class="mt-3">Sélectionnez une opération ci-dessus ou créez-en une nouvelle.</p>
     </div>
     @else
-    <ul class="nav nav-tabs mb-3">
+    <style>
+        .nav-gestion .nav-link { color: #666; }
+        .nav-gestion .nav-link:hover:not(.disabled) { color: #A9014F; }
+        .nav-gestion .nav-link.active { color: #A9014F; font-weight: 600; border-color: #dee2e6 #dee2e6 #fff; }
+        .nav-gestion .nav-link.disabled { color: #bbb; font-style: italic; }
+    </style>
+    <ul class="nav nav-tabs nav-gestion mb-3">
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'details' ? 'active' : '' }}" wire:click="setTab('details')">Détails</button>
         </li>
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'participants' ? 'active' : '' }}" wire:click="setTab('participants')">
-                Participants
+                Participants ({{ $selectedOperation->participants()->count() }})
             </button>
         </li>
         <li class="nav-item">
