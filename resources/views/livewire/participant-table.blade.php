@@ -258,64 +258,17 @@
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2000"
              wire:click.self="$set('showAddModal', false)">
-            <div class="bg-white rounded p-4 shadow" style="width:580px;max-width:95vw;max-height:90vh;overflow-y:auto">
+            <div class="bg-white rounded p-4 shadow" style="width:480px;max-width:95vw">
                 <h5 class="fw-bold mb-3">Ajouter un participant</h5>
+                <p class="text-muted small mb-3">Recherchez un tiers existant ou créez-en un nouveau. L'inscription sera enregistrée à la date du jour.</p>
 
-                {{-- Tiers autocomplete --}}
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Tiers</label>
                     <livewire:tiers-autocomplete wire:model="addTiersId" filtre="tous" typeFiltre="particulier" context="participant" :key="'add-tiers-ac'" />
                     @error('addTiersId') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                 </div>
 
-                @if($addTiersId)
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label small">Nom</label>
-                            <input type="text" wire:model="addNom" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">Prénom</label>
-                            <input type="text" wire:model="addPrenom" class="form-control form-control-sm">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small">Adresse</label>
-                        <input type="text" wire:model="addAdresse" class="form-control form-control-sm">
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label small">Code postal</label>
-                            <input type="text" wire:model="addCodePostal" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-md-8">
-                            <label class="form-label small">Ville</label>
-                            <input type="text" wire:model="addVille" class="form-control form-control-sm">
-                        </div>
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label small">Téléphone</label>
-                            <input type="text" wire:model="addTelephone" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small">Email</label>
-                            <input type="text" wire:model="addEmail" class="form-control form-control-sm">
-                        </div>
-                    </div>
-                @endif
-
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Date d'inscription</label>
-                    <x-date-input name="addDateInscription" :value="$addDateInscription" wire:model="addDateInscription" />
-                    @error('addDateInscription') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
-                </div>
-
-                <div class="d-flex gap-2 justify-content-end mt-4">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showAddModal', false)">Annuler</button>
-                    <button type="button" class="btn btn-sm btn-primary" wire:click="addParticipant">
-                        <i class="bi bi-plus-lg"></i> Inscrire
-                    </button>
+                <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showAddModal', false)">Fermer</button>
                 </div>
             </div>
         </div>

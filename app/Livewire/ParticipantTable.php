@@ -114,29 +114,23 @@ final class ParticipantTable extends Component
             return;
         }
 
-        $tiers = Tiers::find($value);
-        if (! $tiers) {
-            return;
-        }
-
-        $this->addNom = $tiers->nom ?? '';
-        $this->addPrenom = $tiers->prenom ?? '';
-        $this->addAdresse = $tiers->adresse_ligne1 ?? '';
-        $this->addCodePostal = $tiers->code_postal ?? '';
-        $this->addVille = $tiers->ville ?? '';
-        $this->addTelephone = $tiers->telephone ?? '';
-        $this->addEmail = $tiers->email ?? '';
+        $this->quickAddParticipant($value);
     }
 
     public function addParticipant(): void
     {
-        $this->validate([
-            'addTiersId' => ['required', 'exists:tiers,id'],
-            'addDateInscription' => ['required', 'date'],
-        ]);
+        if ($this->addTiersId === null) {
+            $this->addError('addTiersId', 'Veuillez sélectionner un tiers.');
 
-        // Check uniqueness
-        $exists = Participant::where('tiers_id', $this->addTiersId)
+            return;
+        }
+
+        $this->quickAddParticipant($this->addTiersId);
+    }
+
+    private function quickAddParticipant(int $tiersId): void
+    {
+        $exists = Participant::where('tiers_id', $tiersId)
             ->where('operation_id', $this->operation->id)
             ->exists();
 
@@ -146,24 +140,11 @@ final class ParticipantTable extends Component
             return;
         }
 
-        // Create participant
         Participant::create([
-            'tiers_id' => $this->addTiersId,
+            'tiers_id' => $tiersId,
             'operation_id' => $this->operation->id,
-            'date_inscription' => $this->addDateInscription,
+            'date_inscription' => now()->toDateString(),
         ]);
-
-        // Update tiers fields if changed
-        $tiers = Tiers::findOrFail($this->addTiersId);
-        $tiers->update(array_filter([
-            'nom' => $this->addNom !== '' ? $this->addNom : null,
-            'prenom' => $this->addPrenom !== '' ? $this->addPrenom : null,
-            'adresse_ligne1' => $this->addAdresse !== '' ? $this->addAdresse : null,
-            'code_postal' => $this->addCodePostal !== '' ? $this->addCodePostal : null,
-            'ville' => $this->addVille !== '' ? $this->addVille : null,
-            'telephone' => $this->addTelephone !== '' ? $this->addTelephone : null,
-            'email' => $this->addEmail !== '' ? $this->addEmail : null,
-        ], fn ($v) => $v !== null));
 
         $this->showAddModal = false;
         $this->resetAddFields();
