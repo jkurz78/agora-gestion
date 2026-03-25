@@ -26,6 +26,7 @@
                     <th class="sortable" data-col="date_inscription" style="cursor:pointer">Date inscription <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     @if($canSeeSensible)
                         <th>Date naissance</th>
+                        <th>Âge</th>
                         <th>Sexe</th>
                         <th>Taille</th>
                         <th>Poids</th>
@@ -149,6 +150,22 @@
                                 </template>
                             </td>
 
+                            {{-- Âge (calculé, non éditable) --}}
+                            <td class="small text-muted">
+                                @if($dateNais)
+                                    @php
+                                        try {
+                                            $age = \Carbon\Carbon::parse($dateNais)->age;
+                                        } catch (\Throwable) {
+                                            $age = null;
+                                        }
+                                    @endphp
+                                    {{ $age !== null ? $age.' ans' : '—' }}
+                                @else
+                                    —
+                                @endif
+                            </td>
+
                             {{-- Sexe --}}
                             @php $sexe = $med?->sexe ?? ''; @endphp
                             <td x-data="{ editing: false, value: @js($sexe) }"
@@ -242,7 +259,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $canSeeSensible ? 12 : 7 }}" class="text-center text-muted py-4">
+                        <td colspan="{{ $canSeeSensible ? 13 : 7 }}" class="text-center text-muted py-4">
                             Aucun participant inscrit.
                         </td>
                     </tr>
