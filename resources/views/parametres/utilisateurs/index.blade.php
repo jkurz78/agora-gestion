@@ -46,6 +46,12 @@
                     <label class="form-label">Confirmer</label>
                     <input type="password" name="password_confirmation" class="form-control" required>
                 </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="form-check mb-2">
+                        <input type="checkbox" class="form-check-input" name="peut_voir_donnees_sensibles" value="1" id="addSensible">
+                        <label class="form-check-label small" for="addSensible">Données sensibles</label>
+                    </div>
+                </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-success w-100">Enregistrer</button>
                 </div>
@@ -105,6 +111,14 @@
                             <div class="col-md-2">
                                 <label class="form-label">Confirmer</label>
                                 <input type="password" name="password_confirmation" class="form-control">
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <div class="form-check mb-2">
+                                    <input type="checkbox" class="form-check-input" name="peut_voir_donnees_sensibles" value="1"
+                                           id="editSensible{{ $utilisateur->id }}"
+                                           {{ $utilisateur->peut_voir_donnees_sensibles ? 'checked' : '' }}>
+                                    <label class="form-check-label small" for="editSensible{{ $utilisateur->id }}">Données sensibles</label>
+                                </div>
                             </div>
                             <div class="col-md-2">
                                 <button type="submit" class="btn btn-success w-100">Mettre à jour</button>

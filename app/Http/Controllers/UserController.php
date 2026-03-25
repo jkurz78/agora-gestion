@@ -25,12 +25,14 @@ final class UserController extends Controller
             'nom' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::defaults()],
+            'peut_voir_donnees_sensibles' => ['boolean'],
         ]);
 
         User::create([
             'nom' => $validated['nom'],
             'email' => $validated['email'],
             'password' => $validated['password'],
+            'peut_voir_donnees_sensibles' => $request->boolean('peut_voir_donnees_sensibles'),
         ]);
 
         return redirect()->route(request()->attributes->get('espace')->value.'.parametres.utilisateurs.index')
@@ -51,6 +53,8 @@ final class UserController extends Controller
         if (! empty($validated['password'])) {
             $utilisateur->password = $validated['password'];
         }
+
+        $utilisateur->peut_voir_donnees_sensibles = $request->boolean('peut_voir_donnees_sensibles');
 
         $utilisateur->save();
 
