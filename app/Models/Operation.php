@@ -68,4 +68,9 @@ final class Operation extends Model
     {
         return $this->hasMany(Participant::class);
     }
+
+    public function seances(): HasMany
+    {
+        return $this->hasMany(Seance::class)->orderBy('numero');
+    }
 }
