@@ -5,6 +5,9 @@
         <div class="card-body">
             <form action="{{ route('compta.operations.store') }}" method="POST">
                 @csrf
+                @if(request('_redirect_back'))
+                    <input type="hidden" name="_redirect_back" value="{{ request('_redirect_back') }}">
+                @endif
 
                 <div class="mb-3">
                     <label for="nom" class="form-label">Nom <span class="text-danger">*</span></label>
@@ -82,7 +85,7 @@
 
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-success">Enregistrer</button>
-                    <a href="{{ route('compta.operations.index') }}" class="btn btn-secondary">Annuler</a>
+                    <a href="{{ request('_redirect_back', route('compta.operations.index')) }}" class="btn btn-secondary">Annuler</a>
                 </div>
             </form>
         </div>
