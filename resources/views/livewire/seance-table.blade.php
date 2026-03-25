@@ -20,7 +20,7 @@
         </div>
     @else
         <div style="overflow-x:auto">
-            <table class="table table-sm table-bordered mb-0" style="font-size:10px;min-width:{{ 200 + ($seances->count() * 180) }}px">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px;min-width:{{ 200 + ($seances->count() * 180) }}px">
                 {{-- Header: Titles --}}
                 <thead>
                     <tr style="background:#3d5473;color:#fff">
@@ -33,7 +33,7 @@
                                             wire:click="removeSeance({{ $seance->id }})"
                                             wire:confirm="Supprimer la séance {{ $seance->numero }} et toutes ses présences ?"
                                             title="Supprimer">
-                                        <i class="bi bi-x-lg" style="font-size:10px"></i>
+                                        <i class="bi bi-x-lg" style="font-size:12px"></i>
                                     </button>
                                 </div>
                             </th>
@@ -87,7 +87,7 @@
                     <tr>
                         <td style="position:sticky;left:0;z-index:1;background:#f0f0f0"></td>
                         @foreach($seances as $seance)
-                            <td style="background:#f0f0f0;padding:2px 0;font-size:9px;color:#888">
+                            <td style="background:#f0f0f0;padding:2px 0;font-size:12px;color:#888">
                                 <div class="d-flex">
                                     <span style="flex:1;text-align:center">Présence</span>
                                     <span style="width:40px;text-align:center;border-left:1px solid #ddd">Kiné</span>
@@ -120,7 +120,7 @@
                                     <div class="d-flex" style="min-height:28px">
                                         <div style="flex:1;padding:2px 4px">
                                             <select class="form-select form-select-sm border-0"
-                                                    style="font-size:10px;padding:1px 2px;background-color:transparent"
+                                                    style="font-size:12px;padding:1px 2px;background-color:transparent"
                                                     onchange="@this.call('updatePresence', {{ $seance->id }}, {{ $participant->id }}, 'statut', this.value)">
                                                 <option value="" {{ $statut === '' ? 'selected' : '' }}>—</option>
                                                 @foreach($statuts as $s)
@@ -159,7 +159,7 @@
                                     @click="if(!editing){editing=true;$nextTick(()=>$refs.input.focus())}"
                                     class="small" style="cursor:pointer">
                                     <template x-if="!editing">
-                                        <span style="font-size:9px;color:#888" x-text="value ? value.substring(0,30) + (value.length > 30 ? '...' : '') : '—'"></span>
+                                        <span style="font-size:12px;color:#888" x-text="value ? value.substring(0,30) + (value.length > 30 ? '...' : '') : '—'"></span>
                                     </template>
                                     <template x-if="editing">
                                         <input type="text" x-ref="input" x-model="value" maxlength="200"
@@ -167,7 +167,7 @@
                                                @blur="editing=false; @this.call('updatePresence', {{ $seance->id }}, {{ $participant->id }}, 'commentaire', value)"
                                                @keydown.enter="$refs.input.blur()"
                                                @keydown.escape="editing=false"
-                                               class="form-control form-control-sm border-0" style="font-size:9px;padding:1px 4px;width:100%">
+                                               class="form-control form-control-sm border-0" style="font-size:12px;padding:1px 4px;width:100%">
                                     </template>
                                 </td>
                             @endforeach
@@ -176,7 +176,7 @@
                 </tbody>
                 {{-- Footer: totals --}}
                 <tfoot>
-                    <tr style="background:#f0f0f0;font-weight:600;font-size:9px">
+                    <tr style="background:#f0f0f0;font-weight:600;font-size:12px">
                         <td style="position:sticky;left:0;z-index:1;background:#f0f0f0">Présents</td>
                         @foreach($seances as $seance)
                             @php
