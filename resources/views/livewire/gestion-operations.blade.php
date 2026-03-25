@@ -40,17 +40,17 @@
                 Participants ({{ $selectedOperation->participants()->count() }})
             </button>
         </li>
+        @if(auth()->user()?->peut_voir_donnees_sensibles)
+        <li class="nav-item">
+            <button class="nav-link {{ $activeTab === 'seances' ? 'active' : '' }}" wire:click="setTab('seances')">Séances</button>
+        </li>
+        @endif
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'compte_resultat' ? 'active' : '' }}" wire:click="setTab('compte_resultat')">Compte résultat</button>
         </li>
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'compte_resultat_seances' ? 'active' : '' }}" wire:click="setTab('compte_resultat_seances')">Résultat par séances</button>
         </li>
-        @if(auth()->user()?->peut_voir_donnees_sensibles)
-        <li class="nav-item">
-            <button class="nav-link {{ $activeTab === 'seances' ? 'active' : '' }}" wire:click="setTab('seances')">Séances</button>
-        </li>
-        @endif
         <li class="nav-item">
             <button class="nav-link disabled" disabled>Finances</button>
         </li>
