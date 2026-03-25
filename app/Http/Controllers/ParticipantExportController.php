@@ -38,7 +38,7 @@ final class ParticipantExportController extends Controller
         if ($canSeeSensible) {
             $headers = array_merge($headers, ['Date naissance', 'Sexe', 'Taille', 'Poids']);
         }
-        $writer->addRow(Row::fromValues($headers, $headerStyle));
+        $writer->addRow(Row::fromValuesWithStyle($headers, $headerStyle));
 
         foreach ($participants as $p) {
             $row = [
