@@ -235,22 +235,16 @@
                         @if($canSeeSensible)
                             <td class="small text-center">
                                 @php $hasNotes = $p->donneesMedicales?->notes; @endphp
-                                @if($hasNotes)
-                                    <button class="btn btn-sm btn-link p-0 text-primary"
-                                            wire:click="openNotesModal({{ $p->id }})"
-                                            data-bs-toggle="popover"
-                                            data-bs-trigger="hover"
-                                            data-bs-html="true"
-                                            data-bs-content="{{ e(Str::limit($hasNotes, 300)) }}">
-                                        <i class="bi bi-journal-text"></i>
-                                    </button>
-                                @else
-                                    <button class="btn btn-sm btn-link p-0 text-muted"
-                                            wire:click="openNotesModal({{ $p->id }})"
-                                            title="Ajouter des notes">
-                                        <i class="bi bi-journal-text"></i>
-                                    </button>
-                                @endif
+                                <button class="btn btn-sm btn-link p-0 {{ $hasNotes ? 'text-primary' : 'text-muted' }}"
+                                        wire:click="openNotesModal({{ $p->id }})"
+                                        @if($hasNotes)
+                                            data-notes-popover
+                                            data-bs-content="{{ e(Str::limit($hasNotes, 300)) }}"
+                                        @else
+                                            title="Ajouter des notes"
+                                        @endif>
+                                    <i class="bi bi-journal-text"></i>
+                                </button>
                             </td>
                         @endif
 
