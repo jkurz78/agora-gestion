@@ -391,47 +391,52 @@
          NOTES MODAL
          ═══════════════════════════════════════════════════════════ --}}
     @if($showNotesModal)
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css">
-        <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2000"
              wire:click.self="$set('showNotesModal', false)">
-            <div class="bg-white rounded p-4 shadow" style="width:750px;max-width:95vw;max-height:90vh;overflow-y:auto"
-                 x-data="{
-                     quill: null,
-                     initQuill() {
-                         if (typeof Quill === 'undefined') {
-                             setTimeout(() => this.initQuill(), 100);
-                             return;
-                         }
-                         this.quill = new Quill(this.$refs.editor, {
-                             theme: 'snow',
-                             placeholder: 'Saisissez vos notes ici…',
-                             modules: {
-                                 toolbar: [['bold', 'italic'], [{ list: 'bullet' }, { list: 'ordered' }]]
-                             }
-                         });
-                         this.quill.root.innerHTML = @js($medNotes);
-                         this.quill.on('text-change', () => {
-                             $wire.set('medNotes', this.quill.root.innerHTML);
-                         });
-                         this.quill.focus();
-                     },
-                     init() { this.$nextTick(() => this.initQuill()); }
-                 }"
-                 wire:ignore.self>
+            <div class="bg-white rounded p-4 shadow" style="width:750px;max-width:95vw;max-height:90vh;overflow-y:auto">
                 <h6 class="mb-3 text-muted">Notes sécurisées</h6>
 
-                <div x-ref="editor" style="min-height:300px"></div>
+                <div wire:ignore>
+                    <div id="quill-notes-editor" style="min-height:300px"></div>
+                </div>
+                <input type="hidden" id="quill-notes-hidden" value="{{ $medNotes }}">
 
                 <div class="d-flex gap-2 justify-content-end mt-3">
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showNotesModal', false)">Annuler</button>
-                    <button type="button" class="btn btn-sm btn-primary" wire:click="saveNotes">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="
+                        var hidden = document.getElementById('quill-notes-hidden');
+                        if (window._quillNotesInstance) {
+                            hidden.value = window._quillNotesInstance.root.innerHTML;
+                        }
+                        @this.set('medNotes', hidden.value);
+                        @this.call('saveNotes');
+                    ">
                         <i class="bi bi-check-lg"></i> Enregistrer
                     </button>
                 </div>
             </div>
         </div>
+        <script>
+            (function initNotesQuill() {
+                if (typeof Quill === 'undefined') {
+                    setTimeout(initNotesQuill, 100);
+                    return;
+                }
+                var el = document.getElementById('quill-notes-editor');
+                if (!el || window._quillNotesInstance) return;
+                window._quillNotesInstance = new Quill(el, {
+                    theme: 'snow',
+                    placeholder: 'Saisissez vos notes ici…',
+                    modules: {
+                        toolbar: [['bold', 'italic'], [{ list: 'bullet' }, { list: 'ordered' }]]
+                    }
+                });
+                var initial = document.getElementById('quill-notes-hidden').value;
+                if (initial) window._quillNotesInstance.root.innerHTML = initial;
+                window._quillNotesInstance.focus();
+            })();
+        </script>
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════
