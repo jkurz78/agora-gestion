@@ -133,12 +133,15 @@
                             @php $med = $p->donneesMedicales; @endphp
 
                             {{-- Date naissance --}}
-                            @php $dateNais = $med?->date_naissance ?? ''; @endphp
-                            <td x-data="{ editing: false, value: @js($dateNais) }"
+                            @php
+                                $dateNais = $med?->date_naissance ?? '';
+                                $dateNaisDisplay = $dateNais ? \Carbon\Carbon::parse($dateNais)->format('d/m/Y') : '';
+                            @endphp
+                            <td x-data="{ editing: false, value: @js($dateNais), display: @js($dateNaisDisplay) }"
                                 @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
                                 class="small text-nowrap" style="cursor:pointer">
                                 <template x-if="!editing">
-                                    <span x-text="value || '—'"></span>
+                                    <span x-text="display || '—'"></span>
                                 </template>
                                 <template x-if="editing">
                                     <input type="text" x-ref="input" x-model="value"
