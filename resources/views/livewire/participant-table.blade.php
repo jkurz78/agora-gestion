@@ -336,7 +336,7 @@
                     <div class="row g-2 mb-3">
                         <div class="col-md-4">
                             <label class="form-label small">Date naissance</label>
-                            <input type="text" wire:model="editDateNaissance" class="form-control form-control-sm" placeholder="jj/mm/aaaa">
+                            <x-date-input name="editDateNaissance" :value="$editDateNaissance" wire:model="editDateNaissance" />
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small">Sexe</label>

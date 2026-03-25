@@ -203,16 +203,15 @@ final class ParticipantTable extends Component
 
         // Update medical data if user has permission
         if (Auth::user()?->peut_voir_donnees_sensibles) {
-            $med = $participant->donneesMedicales ?? new ParticipantDonneesMedicales([
-                'participant_id' => $participant->id,
-            ]);
-            $med->fill([
-                'date_naissance' => $this->editDateNaissance !== '' ? $this->editDateNaissance : null,
-                'sexe' => $this->editSexe !== '' ? $this->editSexe : null,
-                'taille' => $this->editTaille !== '' ? $this->editTaille : null,
-                'poids' => $this->editPoids !== '' ? $this->editPoids : null,
-            ]);
-            $med->save();
+            ParticipantDonneesMedicales::updateOrCreate(
+                ['participant_id' => $participant->id],
+                [
+                    'date_naissance' => $this->editDateNaissance !== '' ? $this->editDateNaissance : null,
+                    'sexe' => $this->editSexe !== '' ? $this->editSexe : null,
+                    'taille' => $this->editTaille !== '' ? $this->editTaille : null,
+                    'poids' => $this->editPoids !== '' ? $this->editPoids : null,
+                ]
+            );
         }
 
         $this->showEditModal = false;
