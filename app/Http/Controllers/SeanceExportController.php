@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Row;
+use OpenSpout\Common\Entity\Style\CellAlignment;
 use OpenSpout\Common\Entity\Style\Color;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Writer\XLSX\Writer;
@@ -47,14 +48,14 @@ final class SeanceExportController extends Controller
         $options = $writer->getOptions();
 
         $bold = (new Style())->withFontBold(true);
-        $boldCenter = (new Style())->withFontBold(true)->withCellAlignment(\OpenSpout\Common\Entity\Style\CellAlignment::CENTER);
+        $boldCenter = (new Style())->withFontBold(true)->withCellAlignment(CellAlignment::CENTER);
         $kineOui = (new Style())->withBackgroundColor('D4EDDA');
         $kineNon = (new Style())->withBackgroundColor('F8D7DA');
         $commentStyle = (new Style())->withFontColor(Color::rgb(136, 136, 136))->withFontSize(9);
 
-        // Track row numbers (1-indexed for openspout merge)
+        // 1-based indices for mergeCells(colStart, rowStart, colEnd, rowEnd, sheetIndex)
+        // Col A=1 (Participant), then per séance: col 2+i*2 (Présence), col 3+i*2 (Kiné)
         $rowNum = 1;
-        $seanceCount = $seances->count();
 
         $writer->openToFile($tempPath);
 
@@ -63,30 +64,30 @@ final class SeanceExportController extends Controller
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue('S'.$seance->numero, $boldCenter);
             $cells[] = Cell::fromValue('');
-            // Test merge: only first séance
-            if ($i === 0) {
-                $options->mergeCells(2, 1, 3, 1, 0);
-            }
+            $colStart = 2 + $i * 2;
+            $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
 
-        // Row 2: Titres (merged across 2 cols each)
+        // Row 2: Titres (merged)
         $cells = [Cell::fromValue('')];
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->titre ?? '');
             $cells[] = Cell::fromValue('');
-            // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+            $colStart = 2 + $i * 2;
+            $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
 
-        // Row 3: Dates (merged across 2 cols each)
+        // Row 3: Dates (merged)
         $cells = [Cell::fromValue('')];
         foreach ($seances as $i => $seance) {
             $cells[] = Cell::fromValue($seance->date?->format('d/m/Y') ?? '');
             $cells[] = Cell::fromValue('');
-            // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+            $colStart = 2 + $i * 2;
+            $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
         $rowNum++;
@@ -135,7 +136,7 @@ final class SeanceExportController extends Controller
             $writer->addRow(new Row($cells));
             $rowNum++;
 
-            // Ligne 2: Commentaires (merged across 2 cols each)
+            // Ligne 2: Commentaires (merged)
             $cells = [Cell::fromValue('')];
             foreach ($seances as $i => $seance) {
                 $key = $seance->id.'-'.$p->id;
@@ -143,13 +144,14 @@ final class SeanceExportController extends Controller
                 $commentaire = $presence?->commentaire ?? '';
                 $cells[] = Cell::fromValue($commentaire, $commentStyle);
                 $cells[] = Cell::fromValue('');
-                // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+                $colStart = 2 + $i * 2;
+                $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
             }
             $writer->addRow(new Row($cells));
             $rowNum++;
         }
 
-        // Totaux (merged across 2 cols each)
+        // Totaux (merged)
         $cells = [Cell::fromValue('Présents', $bold)];
         foreach ($seances as $i => $seance) {
             $presents = 0;
@@ -161,7 +163,8 @@ final class SeanceExportController extends Controller
             }
             $cells[] = Cell::fromValue($presents.'/'.$participants->count(), $bold);
             $cells[] = Cell::fromValue('');
-            // $options->mergeCells(1 + $i * 2, $rowNum, 2 + $i * 2, $rowNum, 0);
+            $colStart = 2 + $i * 2;
+            $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
         }
         $writer->addRow(new Row($cells));
 
