@@ -16,7 +16,7 @@ enum StatutPresence: string
         return match ($this) {
             self::Present => 'Présent',
             self::Excuse => 'Excusé',
-            self::AbsenceNonJustifiee => 'Absence non justifiée',
+            self::AbsenceNonJustifiee => 'Abs. non justif.',
             self::Arret => 'Arrêt',
         };
     }
