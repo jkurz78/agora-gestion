@@ -23,22 +23,30 @@
 
         .data-table { margin-top: 14px; }
         .data-table th {
-            background-color: #3d5473;
-            color: #fff;
-            padding: 8px 10px;
-            font-size: 10px;
+            background-color: #fff;
+            color: #333;
+            padding: 10px 12px;
+            font-size: 13px;
             text-align: left;
             font-weight: 600;
+            border-bottom: 2px solid #333;
         }
         .data-table td {
-            padding: 12px 10px;
+            padding: 18px 12px;
             border-bottom: 1px solid #dee2e6;
-            font-size: 11px;
+            font-size: 13px;
+            vertical-align: middle;
         }
         .data-table tr:nth-child(even) td { background-color: #f8f9fa; }
-        .data-table .col-signature { width: 35%; }
+        .data-table .col-signature { width: 30%; }
         .data-table .col-kine { width: 8%; text-align: center; }
-        .data-table .col-obs { width: 22%; }
+        .data-table .col-obs { width: 20%; }
+        .signature-box {
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            height: 35px;
+            width: 100%;
+        }
 
         .checkbox-empty {
             display: inline-block;
@@ -105,7 +113,7 @@
                 <tr>
                     <td style="font-weight:600">{{ $p->tiers->nom ?? '' }}</td>
                     <td>{{ $p->tiers->prenom ?? '' }}</td>
-                    <td></td>
+                    <td><div class="signature-box"></div></td>
                     <td class="col-kine"><span class="checkbox-empty"></span></td>
                     <td></td>
                 </tr>
