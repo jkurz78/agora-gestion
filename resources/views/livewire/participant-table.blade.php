@@ -7,17 +7,18 @@
             bottom: 100%;
             left: 50%;
             transform: translateX(-50%);
-            background: #333;
-            color: #fff;
-            padding: 8px 12px;
-            border-radius: 6px;
+            background: #fff;
+            color: #333;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
             font-size: 12px;
             line-height: 1.4;
             width: 280px;
             max-height: 200px;
             overflow-y: auto;
             z-index: 1050;
-            box-shadow: 0 4px 12px rgba(0,0,0,.3);
+            box-shadow: 0 4px 16px rgba(0,0,0,.12);
             text-align: left;
         }
         .notes-preview-bubble::after {
@@ -27,7 +28,7 @@
             left: 50%;
             transform: translateX(-50%);
             border: 6px solid transparent;
-            border-top-color: #333;
+            border-top-color: #ddd;
         }
         .notes-preview-wrap:hover .notes-preview-bubble { display: block; }
     </style>
