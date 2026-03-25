@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Annuaire participants — {{ $operation->nom }}</title>
     <style>
-        @page { margin: 15mm; }
+        @page { margin: 20mm; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
@@ -106,9 +106,8 @@
                 @endif
             </td>
             <td style="width:40%">
-                <div class="doc-title">Annuaire des participants</div>
+                <div class="doc-title">{{ $operation->nom }}</div>
                 <div class="doc-subtitle">
-                    {{ $operation->nom }}<br>
                     {{ $operation->date_debut?->format('d/m/Y') }} → {{ $operation->date_fin?->format('d/m/Y') ?? '...' }}
                     · {{ $participants->count() }} participants
                 </div>
