@@ -394,49 +394,34 @@
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2000"
              wire:click.self="$set('showNotesModal', false)">
-            <div class="bg-white rounded p-4 shadow" style="width:750px;max-width:95vw;max-height:90vh;overflow-y:auto">
+            <div class="bg-white rounded p-4 shadow" style="width:750px;max-width:95vw;max-height:90vh;overflow-y:auto"
+                 x-data x-init="$nextTick(() => $refs.notesArea.focus())">
                 <h6 class="mb-3 text-muted">Notes sécurisées</h6>
 
-                <div wire:ignore>
-                    <div id="quill-notes-editor" style="min-height:300px"></div>
+                <div class="btn-group btn-group-sm mb-2">
+                    <button type="button" class="btn btn-outline-secondary" title="Gras"
+                            onclick="document.execCommand('bold')"><i class="bi bi-type-bold"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" title="Italique"
+                            onclick="document.execCommand('italic')"><i class="bi bi-type-italic"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" title="Liste à puces"
+                            onclick="document.execCommand('insertUnorderedList')"><i class="bi bi-list-ul"></i></button>
+                    <button type="button" class="btn btn-outline-secondary" title="Liste numérotée"
+                            onclick="document.execCommand('insertOrderedList')"><i class="bi bi-list-ol"></i></button>
                 </div>
-                <input type="hidden" id="quill-notes-hidden" value="{{ $medNotes }}">
+
+                <div x-ref="notesArea" contenteditable="true"
+                     class="form-control" style="min-height:300px;overflow-y:auto"
+                     wire:ignore>{!! $medNotes !!}</div>
 
                 <div class="d-flex gap-2 justify-content-end mt-3">
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showNotesModal', false)">Annuler</button>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="
-                        var hidden = document.getElementById('quill-notes-hidden');
-                        if (window._quillNotesInstance) {
-                            hidden.value = window._quillNotesInstance.root.innerHTML;
-                        }
-                        @this.set('medNotes', hidden.value);
-                        @this.call('saveNotes');
-                    ">
+                    <button type="button" class="btn btn-sm btn-primary"
+                            x-on:click="$wire.set('medNotes', $refs.notesArea.innerHTML); $wire.call('saveNotes');">
                         <i class="bi bi-check-lg"></i> Enregistrer
                     </button>
                 </div>
             </div>
         </div>
-        <script>
-            (function initNotesQuill() {
-                if (typeof Quill === 'undefined') {
-                    setTimeout(initNotesQuill, 100);
-                    return;
-                }
-                var el = document.getElementById('quill-notes-editor');
-                if (!el || window._quillNotesInstance) return;
-                window._quillNotesInstance = new Quill(el, {
-                    theme: 'snow',
-                    placeholder: 'Saisissez vos notes ici…',
-                    modules: {
-                        toolbar: [['bold', 'italic'], [{ list: 'bullet' }, { list: 'ordered' }]]
-                    }
-                });
-                var initial = document.getElementById('quill-notes-hidden').value;
-                if (initial) window._quillNotesInstance.root.innerHTML = initial;
-                window._quillNotesInstance.focus();
-            })();
-        </script>
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════
