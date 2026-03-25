@@ -51,7 +51,7 @@ final class SeanceExportController extends Controller
         $boldCenter = (new Style())->withFontBold(true)->withCellAlignment(CellAlignment::CENTER);
         $kineOui = (new Style())->withBackgroundColor('D4EDDA');
         $kineNon = (new Style())->withBackgroundColor('F8D7DA');
-        $commentStyle = (new Style())->withFontColor(Color::rgb(136, 136, 136))->withFontSize(9);
+        $commentStyle = (new Style())->withFontSize(9)->withCellAlignment(CellAlignment::CENTER);
         $centerStyle = (new Style())->withCellAlignment(CellAlignment::CENTER);
 
         // 1-based indices for mergeCells(colStart, rowStart, colEnd, rowEnd, sheetIndex)
@@ -162,7 +162,7 @@ final class SeanceExportController extends Controller
                     $presents++;
                 }
             }
-            $cells[] = Cell::fromValue($presents.'/'.$participants->count(), $bold);
+            $cells[] = Cell::fromValue($presents.'/'.$participants->count(), $boldCenter);
             $cells[] = Cell::fromValue('');
             $colStart = 1 + $i * 2;
             $options->mergeCells($colStart, $rowNum, $colStart + 1, $rowNum, 0);
