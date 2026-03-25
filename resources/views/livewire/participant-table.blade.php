@@ -351,7 +351,7 @@
 
                 @if($canSeeSensible)
                     <hr>
-                    <h6 class="fw-bold text-muted mb-3">Données médicales</h6>
+                    <h6 class="fw-bold text-muted mb-3">Données sécurisées</h6>
 
                     <div class="row g-2 mb-3">
                         <div class="col-md-4">
@@ -391,15 +391,22 @@
          NOTES MODAL
          ═══════════════════════════════════════════════════════════ --}}
     @if($showNotesModal)
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css">
+        <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2000"
              wire:click.self="$set('showNotesModal', false)">
-            <div class="bg-white rounded p-4 shadow" style="width:560px;max-width:95vw;max-height:90vh;overflow-y:auto"
+            <div class="bg-white rounded p-4 shadow" style="width:750px;max-width:95vw;max-height:90vh;overflow-y:auto"
                  x-data="{
                      quill: null,
-                     init() {
+                     initQuill() {
+                         if (typeof Quill === 'undefined') {
+                             setTimeout(() => this.initQuill(), 100);
+                             return;
+                         }
                          this.quill = new Quill(this.$refs.editor, {
                              theme: 'snow',
+                             placeholder: 'Saisissez vos notes ici…',
                              modules: {
                                  toolbar: [['bold', 'italic'], [{ list: 'bullet' }, { list: 'ordered' }]]
                              }
@@ -408,15 +415,16 @@
                          this.quill.on('text-change', () => {
                              $wire.set('medNotes', this.quill.root.innerHTML);
                          });
-                     }
+                         this.quill.focus();
+                     },
+                     init() { this.$nextTick(() => this.initQuill()); }
                  }"
                  wire:ignore.self>
-                <h5 class="fw-bold mb-3">Notes médicales</h5>
+                <h6 class="mb-3 text-muted">Notes sécurisées</h6>
 
-                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css">
-                <div x-ref="editor" style="min-height:150px"></div>
+                <div x-ref="editor" style="min-height:300px"></div>
 
-                <div class="d-flex gap-2 justify-content-end mt-4">
+                <div class="d-flex gap-2 justify-content-end mt-3">
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showNotesModal', false)">Annuler</button>
                     <button type="button" class="btn btn-sm btn-primary" wire:click="saveNotes">
                         <i class="bi bi-check-lg"></i> Enregistrer
@@ -424,7 +432,6 @@
                 </div>
             </div>
         </div>
-        <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════
