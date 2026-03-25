@@ -286,6 +286,14 @@
                         </a>
                     </li>
 
+                    {{-- Opérations --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('gestion.operations*') ? 'active' : '' }}"
+                           href="{{ route('gestion.operations') }}">
+                            <i class="bi bi-calendar-event"></i> Opérations
+                        </a>
+                    </li>
+
                     {{-- Sync HelloAsso --}}
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('gestion.helloasso-sync') ? 'active' : '' }}"
@@ -336,6 +344,7 @@
                                 </a>
                             </li>
                             @endif
+                            @if(($espace ?? null) === \App\Enums\Espace::Compta)
                             @if (Route::has('compta.operations.index'))
                             <li>
                                 <a class="dropdown-item {{ request()->routeIs('compta.operations.*') ? 'active' : '' }}"
@@ -343,6 +352,7 @@
                                     <i class="bi bi-calendar-event"></i> Opérations
                                 </a>
                             </li>
+                            @endif
                             @endif
                             <li><hr class="dropdown-divider"></li>
                             @if (Route::has($espacePrefix . '.parametres.utilisateurs.index'))

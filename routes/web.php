@@ -89,6 +89,9 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
     ->group(function () use ($registerParametres): void {
         Route::view('/dashboard', 'gestion.dashboard')->name('dashboard');
         Route::view('/adherents', 'gestion.adherents')->name('adherents');
+        Route::view('/operations', 'gestion.operations')->name('operations');
+        Route::get('/operations/{operation}/participants/export', \App\Http\Controllers\ParticipantExportController::class)
+            ->name('operations.participants.export');
 
         // Shared registrations
         $registerParametres();

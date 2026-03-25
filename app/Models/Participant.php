@@ -18,6 +18,7 @@ final class Participant extends Model
         'helloasso_item_id',
         'helloasso_order_id',
         'notes',
+        'refere_par_id',
     ];
 
     protected function casts(): array
@@ -36,6 +37,11 @@ final class Participant extends Model
     public function operation(): BelongsTo
     {
         return $this->belongsTo(Operation::class);
+    }
+
+    public function referePar(): BelongsTo
+    {
+        return $this->belongsTo(Tiers::class, 'refere_par_id');
     }
 
     public function donneesMedicales(): HasOne
