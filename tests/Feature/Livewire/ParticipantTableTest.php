@@ -35,12 +35,12 @@ it('shows participants in table', function () {
         ->assertSee('Marie');
 });
 
-it('can add participant by selecting a tiers', function () {
+it('can add participant via tiers-selected event', function () {
     $tiers = Tiers::factory()->create();
 
     Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
         ->call('openAddModal')
-        ->set('addTiersId', $tiers->id);
+        ->dispatch('tiers-selected', id: $tiers->id);
 
     expect(Participant::where('tiers_id', $tiers->id)
         ->where('operation_id', $this->operation->id)
@@ -57,7 +57,7 @@ it('prevents duplicate participant', function () {
 
     Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
         ->call('openAddModal')
-        ->set('addTiersId', $tiers->id)
+        ->dispatch('tiers-selected', id: $tiers->id)
         ->assertHasErrors('addTiersId');
 });
 
@@ -156,7 +156,7 @@ it('auto-inscribes with today date when tiers is selected', function () {
 
     Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
         ->call('openAddModal')
-        ->set('addTiersId', $tiers->id);
+        ->dispatch('tiers-selected', id: $tiers->id);
 
     $participant = Participant::where('tiers_id', $tiers->id)
         ->where('operation_id', $this->operation->id)
