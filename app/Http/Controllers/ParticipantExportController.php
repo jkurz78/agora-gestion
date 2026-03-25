@@ -65,7 +65,11 @@ final class ParticipantExportController extends Controller
                 $taille = $med?->taille !== null && $med->taille !== '' ? (int) $med->taille : null;
                 $poids = $med?->poids !== null && $med->poids !== '' ? (int) $med->poids : null;
                 $notes = $med?->notes ?? '';
-                $notesPlain = $notes !== '' ? html_entity_decode(strip_tags($notes)) : '';
+                $notesPlain = '';
+                if ($notes !== '') {
+                    $text = str_replace(['</p>', '</li>', '<br>', '<br/>', '<br />'], "\n", $notes);
+                    $notesPlain = trim(html_entity_decode(strip_tags($text)));
+                }
 
                 $row = array_merge($row, [
                     $dateNaisFormatted,
