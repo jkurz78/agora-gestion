@@ -260,7 +260,7 @@
              wire:click.self="$set('showAddModal', false)">
             <div class="bg-white rounded p-4 shadow" style="width:480px;max-width:95vw">
                 <h5 class="fw-bold mb-3">Ajouter un participant</h5>
-                <p class="text-muted small mb-3">Recherchez un tiers existant ou créez-en un nouveau. L'inscription sera enregistrée à la date du jour.</p>
+                <p class="text-muted small mb-3">Recherchez un tiers existant ou créez-en un nouveau.</p>
 
                 <div class="mb-3">
                     <livewire:tiers-autocomplete wire:model="addTiersId" filtre="tous" typeFiltre="particulier" context="participant" :key="'add-tiers-ac'" />
@@ -268,7 +268,7 @@
                 </div>
 
                 <div class="d-flex justify-content-end">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showAddModal', false)">Fermer</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showAddModal', false)">Annuler</button>
                 </div>
             </div>
         </div>
