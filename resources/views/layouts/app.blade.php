@@ -422,12 +422,8 @@
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
                 const existing = bootstrap.Tooltip.getInstance(el);
                 if (existing) existing.dispose();
-                new bootstrap.Tooltip(el, { delay: { show: 0, hide: 100 } });
-            });
-            document.querySelectorAll('[data-notes-popover]').forEach(el => {
-                const existing = bootstrap.Popover.getInstance(el);
-                if (existing) existing.dispose();
-                new bootstrap.Popover(el, { trigger: 'hover', html: true, sanitize: false, delay: { show: 300, hide: 100 } });
+                const isHtml = el.hasAttribute('data-bs-html');
+                new bootstrap.Tooltip(el, { delay: { show: 0, hide: 100 }, html: isHtml, sanitize: !isHtml });
             });
         }
         document.addEventListener('DOMContentLoaded', initTooltips);

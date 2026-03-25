@@ -237,12 +237,9 @@
                                 @php $hasNotes = $p->donneesMedicales?->notes; @endphp
                                 <button class="btn btn-sm btn-link p-0 {{ $hasNotes ? 'text-primary' : 'text-muted' }}"
                                         wire:click="openNotesModal({{ $p->id }})"
-                                        @if($hasNotes)
-                                            data-notes-popover
-                                            data-bs-content="{{ e(Str::limit($hasNotes, 300)) }}"
-                                        @else
-                                            title="Ajouter des notes"
-                                        @endif>
+                                        data-bs-toggle="tooltip"
+                                        data-bs-html="true"
+                                        data-bs-title="{{ $hasNotes ? e(Str::limit($hasNotes, 300)) : 'Ajouter des notes' }}">
                                     <i class="bi bi-journal-text"></i>
                                 </button>
                             </td>
