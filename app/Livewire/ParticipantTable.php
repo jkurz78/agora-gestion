@@ -214,6 +214,9 @@ final class ParticipantTable extends Component
             );
         }
 
+        // Touch participant to bust wire:key cache
+        $participant->touch();
+
         $this->showEditModal = false;
     }
 
@@ -230,6 +233,7 @@ final class ParticipantTable extends Component
             ->findOrFail($participantId);
 
         $participant->tiers->update([$field => $value]);
+        $participant->touch();
     }
 
     public function updateParticipantField(int $participantId, string $field, string $value): void
@@ -264,6 +268,7 @@ final class ParticipantTable extends Component
         ]);
 
         $med->update([$field => $value !== '' ? $value : null]);
+        $participant->touch();
     }
 
     // ── Remove ─────────────────────────────────────────────────
