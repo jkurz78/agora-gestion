@@ -46,6 +46,9 @@
         </li>
         @endif
         <li class="nav-item">
+            <button class="nav-link {{ $activeTab === 'reglements' ? 'active' : '' }}" wire:click="setTab('reglements')">Règlements</button>
+        </li>
+        <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'compte_resultat' ? 'active' : '' }}" wire:click="setTab('compte_resultat')">Compte résultat</button>
         </li>
         <li class="nav-item">
@@ -115,6 +118,10 @@
 
     @if($activeTab === 'seances')
         <livewire:seance-table :operation="$selectedOperation" :key="'st-'.$selectedOperation->id" />
+    @endif
+
+    @if($activeTab === 'reglements')
+        <livewire:reglement-table :operation="$selectedOperation" :key="'rt-'.$selectedOperation->id" />
     @endif
 
     @if($activeTab === 'compte_resultat')
