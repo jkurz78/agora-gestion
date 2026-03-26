@@ -8,6 +8,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
+use App\Services\FormulaireTokenService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -78,6 +79,17 @@ final class ParticipantTable extends Component
 
     public string $medNotes = '';
 
+    // ── Token modal ────────────────────────────────────────────
+    public bool $showTokenModal = false;
+
+    public ?string $tokenCode = null;
+
+    public ?string $tokenUrl = null;
+
+    public ?string $tokenExpireAt = null;
+
+    public ?int $tokenParticipantId = null;
+
     public function mount(Operation $operation): void
     {
         $this->operation = $operation;
@@ -88,7 +100,7 @@ final class ParticipantTable extends Component
         $canSeeSensible = (bool) Auth::user()?->peut_voir_donnees_sensibles;
 
         $query = Participant::where('operation_id', $this->operation->id)
-            ->with(['tiers', 'referePar']);
+            ->with(['tiers', 'referePar', 'formulaireToken']);
 
         if ($canSeeSensible) {
             $query->with('donneesMedicales');
@@ -325,6 +337,48 @@ final class ParticipantTable extends Component
         $participant->touch();
         $this->showNotesModal = false;
         $this->js('window._quillNotesInstance = null;');
+    }
+
+    // ── Token modal ────────────────────────────────────────────
+
+    public function genererToken(int $participantId): void
+    {
+        $participant = Participant::where('operation_id', $this->operation->id)
+            ->findOrFail($participantId);
+
+        $token = app(FormulaireTokenService::class)->generate($participant, $this->tokenExpireAt);
+
+        $this->tokenCode = $token->token;
+        $this->tokenUrl = route('formulaire.index', ['token' => $token->token]);
+        $this->tokenExpireAt = $token->expire_at->format('Y-m-d');
+        $this->tokenParticipantId = $participantId;
+        $this->showTokenModal = true;
+    }
+
+    public function genererTokenAvecDate(): void
+    {
+        if ($this->tokenParticipantId === null) {
+            return;
+        }
+        $this->genererToken($this->tokenParticipantId);
+    }
+
+    public function ouvrirToken(int $participantId): void
+    {
+        $participant = Participant::where('operation_id', $this->operation->id)
+            ->with('formulaireToken')
+            ->findOrFail($participantId);
+
+        $token = $participant->formulaireToken;
+        if ($token === null) {
+            return;
+        }
+
+        $this->tokenCode = $token->token;
+        $this->tokenUrl = route('formulaire.index', ['token' => $token->token]);
+        $this->tokenExpireAt = $token->expire_at->format('Y-m-d');
+        $this->tokenParticipantId = $participantId;
+        $this->showTokenModal = true;
     }
 
     // ── Helpers ────────────────────────────────────────────────
