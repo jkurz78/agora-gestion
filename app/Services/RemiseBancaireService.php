@@ -65,7 +65,7 @@ final class RemiseBancaireService
                 ->firstOrFail();
 
             $prefix = $remise->referencePrefix();
-            $numeroPadded = str_pad((string) $remise->numero, 3, '0', STR_PAD_LEFT);
+            $numeroPadded = str_pad((string) $remise->numero, 5, '0', STR_PAD_LEFT);
             $totalMontant = 0;
             $index = 0;
 
@@ -82,7 +82,7 @@ final class RemiseBancaireService
                     );
                 }
 
-                $indexPadded = str_pad((string) $index, 2, '0', STR_PAD_LEFT);
+                $indexPadded = str_pad((string) $index, 3, '0', STR_PAD_LEFT);
                 $reference = "{$prefix}-{$numeroPadded}-{$indexPadded}";
                 $libelle = "Règlement {$tiers->displayName()} - {$operation->nom} S{$seance->numero}";
 
@@ -181,7 +181,7 @@ final class RemiseBancaireService
                     ->firstOrFail();
 
                 $prefix = $remise->referencePrefix();
-                $numeroPadded = str_pad((string) $remise->numero, 3, '0', STR_PAD_LEFT);
+                $numeroPadded = str_pad((string) $remise->numero, 5, '0', STR_PAD_LEFT);
 
                 // Current max index
                 $currentCount = Transaction::where('remise_id', $remise->id)->count();
@@ -200,7 +200,7 @@ final class RemiseBancaireService
                         );
                     }
 
-                    $indexPadded = str_pad((string) $index, 2, '0', STR_PAD_LEFT);
+                    $indexPadded = str_pad((string) $index, 3, '0', STR_PAD_LEFT);
                     $reference = "{$prefix}-{$numeroPadded}-{$indexPadded}";
                     $libelle = "Règlement {$tiers->displayName()} - {$operation->nom} S{$seance->numero}";
 
