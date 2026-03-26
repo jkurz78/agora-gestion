@@ -59,7 +59,20 @@ jobs:
             | grep "${{ steps.ip.outputs.ipv4 }}"
 
       - name: Wait for firewall to apply
-        run: sleep 30
+        run: sleep 60
+
+      - name: Test SSH connectivity
+        run: |
+          for i in 1 2 3 4 5; do
+            if nc -z -w 5 ${{ secrets.CPANEL_SERVER }} 22 2>/dev/null; then
+              echo "SSH port reachable on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i: SSH port not yet reachable, waiting 15s..."
+            sleep 15
+          done
+          echo "SSH port still not reachable after 5 attempts"
+          exit 1
 
       - name: Install SSH key
         run: |

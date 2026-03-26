@@ -7,6 +7,7 @@ use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
 use App\Models\Tiers;
+use Illuminate\Database\QueryException;
 
 test('seance belongs to operation', function (): void {
     $operation = Operation::factory()->create();
@@ -23,7 +24,7 @@ test('seance unique constraint on operation and numero', function (): void {
     $operation = Operation::factory()->create();
     Seance::create(['operation_id' => $operation->id, 'numero' => 1]);
     Seance::create(['operation_id' => $operation->id, 'numero' => 1]);
-})->throws(\Illuminate\Database\QueryException::class);
+})->throws(QueryException::class);
 
 test('operation has many seances ordered by numero', function (): void {
     $operation = Operation::factory()->create();
@@ -54,7 +55,7 @@ test('presence data is encrypted', function (): void {
     expect($presence->kine)->toBe('1');
     expect($presence->commentaire)->toBe('5 min de retard');
 
-    $raw = \DB::table('presences')->where('id', $presence->id)->first();
+    $raw = DB::table('presences')->where('id', $presence->id)->first();
     expect($raw->statut)->not->toBe('present');
 });
 
@@ -85,4 +86,4 @@ test('presence unique constraint on seance and participant', function (): void {
     ]);
     Presence::create(['seance_id' => $seance->id, 'participant_id' => $participant->id]);
     Presence::create(['seance_id' => $seance->id, 'participant_id' => $participant->id]);
-})->throws(\Illuminate\Database\QueryException::class);
+})->throws(QueryException::class);

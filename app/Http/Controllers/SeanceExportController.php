@@ -12,8 +12,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Row;
+use OpenSpout\Common\Entity\Style\Border;
+use OpenSpout\Common\Entity\Style\BorderName;
+use OpenSpout\Common\Entity\Style\BorderPart;
+use OpenSpout\Common\Entity\Style\BorderStyle;
+use OpenSpout\Common\Entity\Style\BorderWidth;
 use OpenSpout\Common\Entity\Style\CellAlignment;
-use OpenSpout\Common\Entity\Style\Color;
+use OpenSpout\Common\Entity\Style\CellVerticalAlignment;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Writer\XLSX\Writer;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -44,44 +49,44 @@ final class SeanceExportController extends Controller
             mkdir(storage_path('app/temp'), 0755, true);
         }
 
-        $writer = new Writer();
+        $writer = new Writer;
         $options = $writer->getOptions();
 
-        $border = new \OpenSpout\Common\Entity\Style\Border(
-            new \OpenSpout\Common\Entity\Style\BorderPart(
-                \OpenSpout\Common\Entity\Style\BorderName::BOTTOM,
+        $border = new Border(
+            new BorderPart(
+                BorderName::BOTTOM,
                 '000000',
-                \OpenSpout\Common\Entity\Style\BorderWidth::THIN,
-                \OpenSpout\Common\Entity\Style\BorderStyle::SOLID
+                BorderWidth::THIN,
+                BorderStyle::SOLID
             ),
-            new \OpenSpout\Common\Entity\Style\BorderPart(
-                \OpenSpout\Common\Entity\Style\BorderName::TOP,
+            new BorderPart(
+                BorderName::TOP,
                 '000000',
-                \OpenSpout\Common\Entity\Style\BorderWidth::THIN,
-                \OpenSpout\Common\Entity\Style\BorderStyle::SOLID
+                BorderWidth::THIN,
+                BorderStyle::SOLID
             ),
-            new \OpenSpout\Common\Entity\Style\BorderPart(
-                \OpenSpout\Common\Entity\Style\BorderName::LEFT,
+            new BorderPart(
+                BorderName::LEFT,
                 '000000',
-                \OpenSpout\Common\Entity\Style\BorderWidth::THIN,
-                \OpenSpout\Common\Entity\Style\BorderStyle::SOLID
+                BorderWidth::THIN,
+                BorderStyle::SOLID
             ),
-            new \OpenSpout\Common\Entity\Style\BorderPart(
-                \OpenSpout\Common\Entity\Style\BorderName::RIGHT,
+            new BorderPart(
+                BorderName::RIGHT,
                 '000000',
-                \OpenSpout\Common\Entity\Style\BorderWidth::THIN,
-                \OpenSpout\Common\Entity\Style\BorderStyle::SOLID
+                BorderWidth::THIN,
+                BorderStyle::SOLID
             ),
         );
 
-        $base = (new Style())->withBorder($border);
-        $bold = (new Style())->withFontBold(true)->withBorder($border);
-        $boldCenter = (new Style())->withFontBold(true)->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
-        $kineOuiCenter = (new Style())->withBackgroundColor('D4EDDA')->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
-        $kineNonCenter = (new Style())->withBackgroundColor('F8D7DA')->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
-        $commentStyle = (new Style())->withFontSize(9)->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
-        $centerStyle = (new Style())->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
-        $nameStyle = (new Style())->withCellVerticalAlignment(\OpenSpout\Common\Entity\Style\CellVerticalAlignment::CENTER)->withBorder($border);
+        $base = (new Style)->withBorder($border);
+        $bold = (new Style)->withFontBold(true)->withBorder($border);
+        $boldCenter = (new Style)->withFontBold(true)->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $kineOuiCenter = (new Style)->withBackgroundColor('D4EDDA')->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $kineNonCenter = (new Style)->withBackgroundColor('F8D7DA')->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $commentStyle = (new Style)->withFontSize(9)->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $centerStyle = (new Style)->withCellAlignment(CellAlignment::CENTER)->withBorder($border);
+        $nameStyle = (new Style)->withCellVerticalAlignment(CellVerticalAlignment::CENTER)->withBorder($border);
 
         // 1-based indices for mergeCells(colStart, rowStart, colEnd, rowEnd, sheetIndex)
         // Col A=1 (Participant), then per séance: col 2+i*2 (Présence), col 3+i*2 (Kiné)
