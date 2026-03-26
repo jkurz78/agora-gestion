@@ -126,6 +126,8 @@ Pas de nouvelle route — la génération et le suivi se font dans le composant 
   - `notes` : nullable, string, max 1000 caractères
   - `telephone` : nullable, string, max 30
   - `email` : nullable, email, max 255
+  - `documents.*` : nullable, file, mimes:pdf,jpg,jpeg,png, max 5120 (5 Mo)
+  - `documents` : nullable, array, max 3
 - Marque le token : `rempli_at = now()`, `rempli_ip = $request->ip()`
 - Redirige vers une page de remerciement
 
@@ -168,6 +170,13 @@ Page autonome (pas `<x-app-layout>`) — layout minimal avec :
 - Poids (kg)
 - Informations complémentaires (textarea, ex : allergies, traitements)
 
+**Section Documents :**
+- Invite : "Vous pouvez joindre jusqu'à 3 documents (certificat médical, attestation, etc.) — formats PDF, JPG ou PNG, 5 Mo maximum par fichier."
+- 3 champs file input
+- Stockage : `storage/app/private/participants/{participant_id}/` (disk `local`, pas public)
+- Accessible uniquement par les utilisateurs avec `peut_voir_donnees_sensibles`
+- Supprimés en cascade avec le participant (RGPD)
+
 **Bouton** : "Envoyer" → ouvre une modale Bootstrap de confirmation
 
 **Modale de confirmation (JavaScript côté client) :**
@@ -204,6 +213,14 @@ Dans le tableau participants, une colonne "Formulaire" avec badge :
 | Formulaire rempli | `Rempli` (vert) + date | `bi-check-circle` |
 
 Clic sur le badge "En attente" → rouvre la modale avec le lien/code (pour recopier).
+
+### Documents joints
+
+Dans la fiche participant (modale d'édition ou section dédiée), si `peut_voir_donnees_sensibles` :
+- Liste des documents joints avec nom de fichier et taille
+- Bouton de téléchargement par fichier (route interne protégée par auth + permission)
+- Les fichiers sont stockés dans `storage/app/private/participants/{participant_id}/`
+- Route de téléchargement : `GET /gestion/participants/{participant}/documents/{filename}` avec vérification de permission
 
 ## Sécurité
 
