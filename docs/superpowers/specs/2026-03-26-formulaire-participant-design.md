@@ -113,10 +113,19 @@ Pas de nouvelle route — la génération et le suivi se font dans le composant 
 - **Coordonnées (Tiers)** — merge intelligent :
   - Pour chaque champ : si la nouvelle valeur est non vide ET différente de l'ancienne → mettre à jour
   - Un champ vidé par le participant est ignoré (on garde l'ancienne valeur)
-  - Champs concernés : `telephone`, `email`, `adresse_ligne1`, `code_postal`, `ville`
+  - Champs concernés : `telephone`, `email`, `adresse_ligne1`, `code_postal`, `ville` (le champ `pays` n'est pas exposé dans le formulaire public)
 - **Données médicales** — `updateOrCreate` sur `ParticipantDonneesMedicales` :
   - Champs : `date_naissance`, `sexe`, `taille`, `poids`, `notes`
   - Les champs laissés vides restent null
+  - Si le participant re-soumet via un token regénéré, les nouvelles données remplacent les anciennes
+- **Validation** :
+  - `date_naissance` : date, nullable, format `Y-m-d`, avant aujourd'hui
+  - `sexe` : nullable, in `M,F`
+  - `taille` : nullable, numeric, entre 50 et 250 (cm)
+  - `poids` : nullable, numeric, entre 20 et 300 (kg)
+  - `notes` : nullable, string, max 1000 caractères
+  - `telephone` : nullable, string, max 30
+  - `email` : nullable, email, max 255
 - Marque le token : `rempli_at = now()`, `rempli_ip = $request->ip()`
 - Redirige vers une page de remerciement
 
@@ -157,18 +166,19 @@ Page autonome (pas `<x-app-layout>`) — layout minimal avec :
 - Poids (kg)
 - Informations complémentaires (textarea, ex : allergies, traitements)
 
-**Bouton** : "Vérifier et envoyer" → écran de confirmation
+**Bouton** : "Envoyer" → ouvre une modale Bootstrap de confirmation
 
-### Confirmation (`formulaire/confirmer.blade.php`)
+**Modale de confirmation (JavaScript côté client) :**
+- Récapitulatif des données saisies (construit en JS depuis les champs du formulaire)
+- Bouton "Confirmer" → soumet le POST
+- Bouton "Modifier" → ferme la modale, retour au formulaire
 
-- Récapitulatif des données saisies
-- Bouton "Confirmer" (POST réel)
-- Bouton "Modifier" (retour au formulaire)
+Pas de page séparée ni de données en session — tout se passe sur une seule page.
 
 ### Remerciement
 
-- "Merci ! Vos informations ont bien été enregistrées."
-- "Vous pouvez fermer cette page."
+Après soumission réussie, le contrôleur redirige vers `formulaire.index` avec un flash `success` :
+- "Merci ! Vos informations ont bien été enregistrées. Vous pouvez fermer cette page."
 
 ## Intégration dans l'onglet Participants
 
@@ -177,7 +187,7 @@ Page autonome (pas `<x-app-layout>`) — layout minimal avec :
 Nouvelle action dans `ParticipantTable` :
 
 - **`genererToken(int $participantId)`** : crée ou remplace le token pour ce participant
-  - Calcule l'expiration par défaut : `operation.date_debut - 1 jour` (si date_debut existe), sinon 30 jours
+  - Calcule l'expiration par défaut : `operation.date_debut - 1 jour` (si date_debut existe et est dans le futur), sinon 30 jours à partir d'aujourd'hui
   - Ouvre une modale avec : le lien complet, le code seul, l'expiration (éditable), bouton copier
 
 ### Colonne de suivi
