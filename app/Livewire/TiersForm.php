@@ -93,7 +93,7 @@ final class TiersForm extends Component
         $this->showDetails = (bool) ($tiers->email || $tiers->telephone
             || $tiers->adresse_ligne1 || $tiers->code_postal
             || $tiers->ville || ($tiers->pays && $tiers->pays !== 'France')
-            );
+        );
 
         $this->showForm = true;
     }
