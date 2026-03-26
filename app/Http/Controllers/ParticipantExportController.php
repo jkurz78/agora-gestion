@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Operation;
 use App\Models\Participant;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use OpenSpout\Common\Entity\Row;
@@ -31,10 +32,10 @@ final class ParticipantExportController extends Controller
             mkdir(storage_path('app/temp'), 0755, true);
         }
 
-        $writer = new Writer();
+        $writer = new Writer;
         $writer->openToFile($tempPath);
 
-        $headerStyle = (new Style())->withFontBold(true);
+        $headerStyle = (new Style)->withFontBold(true);
         $headers = ['Nom', 'Prénom', 'Adresse', 'Code postal', 'Ville', 'Téléphone', 'Email', 'Date inscription'];
         if ($confidentiel) {
             $headers = array_merge($headers, ['Référé par', 'Date naissance', 'Âge', 'Sexe', 'Taille', 'Poids', 'Notes']);
@@ -60,7 +61,7 @@ final class ParticipantExportController extends Controller
                 $age = null;
                 if ($dateNaisRaw !== '') {
                     try {
-                        $carbon = \Carbon\Carbon::parse($dateNaisRaw);
+                        $carbon = Carbon::parse($dateNaisRaw);
                         $dateNaisFormatted = $carbon->format('d/m/Y');
                         $age = $carbon->age;
                     } catch (\Throwable) {

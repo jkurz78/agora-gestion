@@ -30,6 +30,8 @@ final class Transaction extends Model
         'notes',
         'saisi_par',
         'rapprochement_id',
+        'remise_id',
+        'reglement_id',
         'numero_piece',
         'helloasso_order_id',
         'helloasso_cashout_id',
@@ -48,6 +50,8 @@ final class Transaction extends Model
             'compte_id' => 'integer',
             'saisi_par' => 'integer',
             'rapprochement_id' => 'integer',
+            'remise_id' => 'integer',
+            'reglement_id' => 'integer',
             'helloasso_order_id' => 'integer',
             'helloasso_cashout_id' => 'integer',
             'helloasso_payment_id' => 'integer',
@@ -79,6 +83,16 @@ final class Transaction extends Model
         return $this->belongsTo(RapprochementBancaire::class, 'rapprochement_id');
     }
 
+    public function remise(): BelongsTo
+    {
+        return $this->belongsTo(RemiseBancaire::class, 'remise_id');
+    }
+
+    public function reglement(): BelongsTo
+    {
+        return $this->belongsTo(Reglement::class, 'reglement_id');
+    }
+
     public function lignes(): HasMany
     {
         return $this->hasMany(TransactionLigne::class);
@@ -95,6 +109,11 @@ final class Transaction extends Model
     {
         return $this->rapprochement_id !== null
             && $this->rapprochement?->isVerrouille() === true;
+    }
+
+    public function isLockedByRemise(): bool
+    {
+        return $this->remise_id !== null;
     }
 
     /**
