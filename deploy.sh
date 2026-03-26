@@ -5,7 +5,7 @@
 APPDIR="/home/***CPANEL_USER***/public_html/***DEPLOY_SUBDOMAIN***"
 LOGFILE="${APPDIR}/deploy.log"
 PHP="/usr/local/bin/php"
-COMPOSER="HOME=/home/***CPANEL_USER*** /opt/cpanel/composer/bin/composer"
+COMPOSER="HOME=/home/***CPANEL_USER*** /usr/local/bin/composer"
 MAILTO="***DEPLOY_EMAIL***"
 
 cd "$APPDIR" || exit 1
