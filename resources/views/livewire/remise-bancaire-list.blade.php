@@ -129,7 +129,7 @@
                                         </button>
                                     @endif
                                     @if ($remise->virement_id !== null)
-                                        <a href="{{ route('gestion.remises-bancaires.pdf', $remise) }}"
+                                        <a href="{{ route('gestion.remises-bancaires.pdf', $remise) }}?mode=inline"
                                            class="btn btn-sm btn-outline-dark" title="PDF" target="_blank">
                                             <i class="bi bi-file-pdf"></i>
                                         </a>
