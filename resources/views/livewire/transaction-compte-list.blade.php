@@ -98,22 +98,32 @@
                             @endif
                             <td>
                                 <div class="d-flex gap-1">
-                                    <button type="button"
-                                            wire:click="redirectToEdit('{{ $tx->source_type }}', {{ $tx->id }})"
-                                            class="btn btn-sm btn-outline-primary"
-                                            title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}"
-                                            style="padding:.15rem .35rem;font-size:.75rem">
-                                        <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
-                                    </button>
-                                    @if (! $exerciceCloture)
-                                    <button type="button"
-                                            wire:click="deleteTransaction('{{ $tx->source_type }}', {{ $tx->id }})"
-                                            wire:confirm="{{ $tx->is_helloasso ? 'Supprimer cette transaction HelloAsso ? Elle ne sera plus ré-importée lors des prochaines synchronisations.' : 'Supprimer cette transaction ?' }}"
-                                            class="btn btn-sm btn-outline-danger"
-                                            title="Supprimer"
-                                            style="padding:.15rem .35rem;font-size:.75rem">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+                                    @if ($tx->pointe)
+                                        <button type="button"
+                                                wire:click="redirectToEdit('{{ $tx->source_type }}', {{ $tx->id }})"
+                                                class="btn btn-sm btn-outline-secondary"
+                                                title="Visualiser"
+                                                style="padding:.15rem .35rem;font-size:.75rem">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                    @else
+                                        <button type="button"
+                                                wire:click="redirectToEdit('{{ $tx->source_type }}', {{ $tx->id }})"
+                                                class="btn btn-sm btn-outline-primary"
+                                                title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}"
+                                                style="padding:.15rem .35rem;font-size:.75rem">
+                                            <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
+                                        </button>
+                                        @if (! $exerciceCloture)
+                                        <button type="button"
+                                                wire:click="deleteTransaction('{{ $tx->source_type }}', {{ $tx->id }})"
+                                                wire:confirm="{{ $tx->is_helloasso ? 'Supprimer cette transaction HelloAsso ? Elle ne sera plus ré-importée lors des prochaines synchronisations.' : 'Supprimer cette transaction ?' }}"
+                                                class="btn btn-sm btn-outline-danger"
+                                                title="Supprimer"
+                                                style="padding:.15rem .35rem;font-size:.75rem">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
