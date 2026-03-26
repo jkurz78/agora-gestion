@@ -7,7 +7,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: DejaVu Sans, sans-serif;
-            font-size: 10px;
+            font-size: 14px;
             color: #212529;
             line-height: 1.4;
             margin: 15mm;
@@ -16,26 +16,28 @@
 
         /* Header */
         .header { margin-bottom: 14px; }
-        .header .logo { max-height: 50px; max-width: 100px; }
-        .association-name { font-size: 13px; font-weight: bold; margin-bottom: 2px; }
-        .association-address { font-size: 9px; color: #6c757d; }
-        .doc-title { font-size: 15px; font-weight: bold; color: #A9014F; text-align: right; }
-        .doc-subtitle { font-size: 10px; color: #6c757d; text-align: right; margin-top: 2px; }
+        .header .logo { max-height: 96px; max-width: 192px; }
+        .association-name { font-size: 16px; font-weight: bold; margin-bottom: 2px; }
+        .association-address { font-size: 12px; color: #6c757d; }
+        .doc-title { font-size: 18px; font-weight: bold; color: #A9014F; text-align: right; }
+        .doc-subtitle { font-size: 13px; color: #6c757d; text-align: right; margin-top: 2px; }
 
         /* Table */
         .data-table { margin-top: 10px; }
         .data-table th {
-            background-color: #3d5473;
-            color: #fff;
+            background-color: #fff;
+            color: #212529;
             padding: 5px 6px;
-            font-size: 9px;
+            font-size: 12px;
+            font-family: DejaVu Sans, sans-serif;
             text-align: left;
-            font-weight: 600;
+            font-weight: bold;
+            border-bottom: 2px solid #212529;
         }
         .data-table td {
             padding: 4px 6px;
             border-bottom: 1px solid #dee2e6;
-            font-size: 9px;
+            font-size: 12px;
         }
         .data-table tr:nth-child(even) td { background-color: #f8f9fa; }
 
@@ -51,7 +53,7 @@
             left: 0;
             right: 0;
             text-align: center;
-            font-size: 8px;
+            font-size: 10px;
             color: #999;
         }
     </style>
