@@ -102,6 +102,20 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
         Route::get('/operations/{operation}/seances/export', \App\Http\Controllers\SeanceExportController::class)
             ->name('operations.seances.export');
 
+        // Remises en banque
+        Route::view('/remises-bancaires', 'gestion.remises-bancaires.index')->name('remises-bancaires');
+        Route::get('/remises-bancaires/{remise}', function (\App\Models\RemiseBancaire $remise) {
+            return view('gestion.remises-bancaires.show', compact('remise'));
+        })->name('remises-bancaires.show');
+        Route::get('/remises-bancaires/{remise}/selection', function (\App\Models\RemiseBancaire $remise) {
+            return view('gestion.remises-bancaires.selection', compact('remise'));
+        })->name('remises-bancaires.selection');
+        Route::get('/remises-bancaires/{remise}/validation', function (\App\Models\RemiseBancaire $remise) {
+            return view('gestion.remises-bancaires.validation', compact('remise'));
+        })->name('remises-bancaires.validation');
+        Route::get('/remises-bancaires/{remise}/pdf', \App\Http\Controllers\RemiseBancairePdfController::class)
+            ->name('remises-bancaires.pdf');
+
         // Shared registrations
         $registerParametres();
     });

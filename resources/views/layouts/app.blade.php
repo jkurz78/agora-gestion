@@ -294,6 +294,14 @@
                         </a>
                     </li>
 
+                    {{-- Remises en banque --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('gestion.remises-bancaires*') ? 'active' : '' }}"
+                           href="{{ route('gestion.remises-bancaires') }}">
+                            <i class="bi bi-bank"></i> Remises en banque
+                        </a>
+                    </li>
+
                     {{-- Sync HelloAsso --}}
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('gestion.helloasso-sync') ? 'active' : '' }}"
