@@ -39,7 +39,7 @@
         @endphp
 
         <div class="table-responsive">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 160 + 45 + ($seances->count() * 130) + 100 }}px">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 160 + 22 + ($seances->count() * 130) + 100 }}px">
                 <thead>
                     {{-- Row 1: S# headers --}}
                     <tr style="background:#3d5473;color:#fff">
@@ -81,7 +81,7 @@
                                             title="Recopier la 1re séance sur toute la ligne">→</button>
                                 </div>
                             </td>
-                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 4px;white-space:nowrap;vertical-align:middle;text-align:right;width:45px">Prévu</td>
+                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 4px;white-space:nowrap;vertical-align:middle;text-align:right;width:22px">Prévu</td>
                             @foreach($seances as $seance)
                                 @php
                                     $key = $participant->id . '-' . $seance->id;
@@ -140,7 +140,7 @@
                         </tr>
                         {{-- Row 2: Réalisé --}}
                         <tr>
-                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 4px;white-space:nowrap;vertical-align:middle;text-align:right;width:45px">Réalisé</td>
+                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 4px;white-space:nowrap;vertical-align:middle;text-align:right;width:22px">Réalisé</td>
                             @foreach($seances as $seance)
                                 @php
                                     $key = $participant->id . '-' . $seance->id;
