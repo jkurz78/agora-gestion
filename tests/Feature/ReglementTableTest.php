@@ -8,6 +8,7 @@ use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
+use App\Models\RemiseBancaire;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -194,12 +195,21 @@ it('refuses modification on locked reglement', function () {
         'date_inscription' => now(),
     ]);
 
+    $remise = RemiseBancaire::create([
+        'numero' => 1,
+        'date' => now()->toDateString(),
+        'mode_paiement' => 'cheque',
+        'compte_cible_id' => CompteBancaire::factory()->create()->id,
+        'libelle' => 'Test remise',
+        'saisi_par' => $this->user->id,
+    ]);
+
     Reglement::create([
         'participant_id' => $participant->id,
         'seance_id' => $seance->id,
         'mode_paiement' => ModePaiement::Cheque->value,
         'montant_prevu' => 30.00,
-        'remise_id' => 999,
+        'remise_id' => $remise->id,
     ]);
 
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
@@ -218,6 +228,15 @@ it('copier ligne skips locked cells', function () {
         'date_inscription' => now(),
     ]);
 
+    $remise = RemiseBancaire::create([
+        'numero' => 1,
+        'date' => now()->toDateString(),
+        'mode_paiement' => 'cheque',
+        'compte_cible_id' => CompteBancaire::factory()->create()->id,
+        'libelle' => 'Test remise',
+        'saisi_par' => $this->user->id,
+    ]);
+
     Reglement::create([
         'participant_id' => $participant->id,
         'seance_id' => $s1->id,
@@ -229,7 +248,7 @@ it('copier ligne skips locked cells', function () {
         'seance_id' => $s2->id,
         'mode_paiement' => ModePaiement::Especes->value,
         'montant_prevu' => 10.00,
-        'remise_id' => 999,
+        'remise_id' => $remise->id,
     ]);
 
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
@@ -248,12 +267,21 @@ it('refuses cycle on locked reglement', function () {
         'date_inscription' => now(),
     ]);
 
+    $remise = RemiseBancaire::create([
+        'numero' => 1,
+        'date' => now()->toDateString(),
+        'mode_paiement' => 'cheque',
+        'compte_cible_id' => CompteBancaire::factory()->create()->id,
+        'libelle' => 'Test remise',
+        'saisi_par' => $this->user->id,
+    ]);
+
     Reglement::create([
         'participant_id' => $participant->id,
         'seance_id' => $seance->id,
         'mode_paiement' => ModePaiement::Cheque->value,
         'montant_prevu' => 30.00,
-        'remise_id' => 999,
+        'remise_id' => $remise->id,
     ]);
 
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
