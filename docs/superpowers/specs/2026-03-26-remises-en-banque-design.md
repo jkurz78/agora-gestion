@@ -55,7 +55,7 @@ Côté comptabilité, on a besoin d'une transaction individuelle par chèque/esp
 
 ### Modifications sur les modèles existants
 
-**`Transaction`** — ajout de `remise_id` (foreignId, nullable) pointant vers `remises_bancaires`. Permet de retrouver toutes les transactions d'une remise.
+**`Transaction`** — ajout de `remise_id` (foreignId, nullable) pointant vers `remises_bancaires` et de `reglement_id` (foreignId, nullable) pointant vers `reglements`. Le `remise_id` permet de retrouver toutes les transactions d'une remise. Le `reglement_id` crée un lien direct entre la transaction et le règlement qui l'a générée, simplifiant la modification d'une remise.
 
 **`Reglement`** — le champ `remise_id` existant pointe désormais vers `remises_bancaires` avec une vraie contrainte FK (nullOnDelete pour permettre la suppression d'une remise sans casser les règlements).
 
@@ -305,7 +305,7 @@ Le filtrage se fait via `where('est_systeme', false)` dans les requêtes des sé
 1. **Ajouter `est_systeme` sur `comptes_bancaires`** : boolean, default false
 2. **Créer le compte intermédiaire** : dans la même migration, insérer le compte "Remises en banque" avec `est_systeme = true`
 3. **Créer la table `remises_bancaires`** : structure décrite ci-dessus
-4. **Ajouter `remise_id` sur `transactions`** : foreignId nullable, constrained → `remises_bancaires`, nullOnDelete
+4. **Ajouter `remise_id` et `reglement_id` sur `transactions`** : foreignId nullable, constrained → `remises_bancaires`/`reglements`, nullOnDelete
 5. **Ajouter la contrainte FK sur `reglements.remise_id`** : constrained → `remises_bancaires`, nullOnDelete (le champ existe déjà mais sans FK)
 
 ## Tests
