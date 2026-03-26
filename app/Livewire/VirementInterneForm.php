@@ -109,7 +109,7 @@ final class VirementInterneForm extends Component
     public function render(): View
     {
         return view('livewire.virement-interne-form', [
-            'comptes' => CompteBancaire::orderBy('nom')->get(),
+            'comptes' => CompteBancaire::where('est_systeme', false)->orderBy('nom')->get(),
         ]);
     }
 }
