@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Storage;
 
 final class Participant extends Model
 {
@@ -58,5 +59,20 @@ final class Participant extends Model
     public function reglements(): HasMany
     {
         return $this->hasMany(Reglement::class);
+    }
+
+    public function formulaireToken(): HasOne
+    {
+        return $this->hasOne(FormulaireToken::class);
+    }
+
+    protected static function booted(): void
+    {
+        self::deleting(function (Participant $participant) {
+            $dir = "participants/{$participant->id}";
+            if (Storage::disk('local')->exists($dir)) {
+                Storage::disk('local')->deleteDirectory($dir);
+            }
+        });
     }
 }
