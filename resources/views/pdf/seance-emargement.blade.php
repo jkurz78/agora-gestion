@@ -15,7 +15,7 @@
         table { width: 100%; border-collapse: collapse; }
 
         .header { margin-bottom: 14px; }
-        .header .logo { max-height: 50px; max-width: 100px; }
+        .header .logo { max-height: 96px; max-width: 192px; }
         .association-name { font-size: 13px; font-weight: bold; margin-bottom: 2px; }
         .association-address { font-size: 9px; color: #6c757d; }
         .doc-title { font-size: 15px; font-weight: bold; color: #A9014F; text-align: right; }
