@@ -39,11 +39,11 @@
         @endphp
 
         <div class="table-responsive">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 160 + ($seances->count() * 130) + 100 }}px">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 160 + 55 + ($seances->count() * 130) + 100 }}px">
                 <thead>
                     {{-- Row 1: S# headers --}}
                     <tr style="background:#3d5473;color:#fff">
-                        <td rowspan="3" style="position:sticky;left:0;z-index:2;background:#fff;vertical-align:middle;font-weight:600;color:#555;font-size:11px;min-width:160px">Participant</td>
+                        <td colspan="2" rowspan="3" style="position:sticky;left:0;z-index:2;background:#fff;vertical-align:middle;font-weight:600;color:#555;font-size:11px;min-width:160px">Participant</td>
                         @foreach($seances as $seance)
                             <th style="min-width:120px;text-align:center;font-size:12px">S{{ $seance->numero }}</th>
                         @endforeach
@@ -81,6 +81,7 @@
                                             title="Recopier la 1re séance sur toute la ligne">→</button>
                                 </div>
                             </td>
+                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 4px;white-space:nowrap;vertical-align:middle">Prévu</td>
                             @foreach($seances as $seance)
                                 @php
                                     $key = $participant->id . '-' . $seance->id;
@@ -96,7 +97,7 @@
                                     $triStyle = $mode ? ($triColors[$mode->value] ?? 'background:#f0f0f0;color:#adb5bd') : 'background:#f0f0f0;color:#adb5bd';
                                     $triLabel = $mode ? $mode->trigramme() : '—';
                                 @endphp
-                                <td style="padding:4px 6px;vertical-align:middle;border-bottom:none;white-space:nowrap">
+                                <td style="padding:4px 6px;vertical-align:middle;white-space:nowrap">
                                     <div class="d-flex align-items-center justify-content-center gap-1">
                                         @if($locked)
                                             <i class="bi bi-lock-fill" style="font-size:10px;color:#6c757d" title="Remise en banque effectuée"></i>
@@ -139,6 +140,7 @@
                         </tr>
                         {{-- Row 2: Réalisé --}}
                         <tr>
+                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 4px;white-space:nowrap;vertical-align:middle">Réalisé</td>
                             @foreach($seances as $seance)
                                 @php
                                     $key = $participant->id . '-' . $seance->id;
@@ -146,7 +148,7 @@
                                     $prevu = (float) ($reglementMap[$key]?->montant_prevu ?? 0);
                                     $color = $prevu == 0 && $realise == 0 ? '#6c757d' : ($realise >= $prevu && $prevu > 0 ? '#198754' : '#dc3545');
                                 @endphp
-                                <td style="padding:2px 6px;background:#f8f9fa;border-top:none;text-align:center">
+                                <td style="padding:2px 6px;background:#f8f9fa;text-align:center">
                                     <span style="font-size:11px;color:{{ $color }}">
                                         {{ $realise > 0 ? number_format($realise, 2, ',', '') : ($prevu > 0 ? '0,00' : '—') }}
                                     </span>
@@ -158,7 +160,7 @@
                 <tfoot>
                     {{-- Total prévu --}}
                     <tr style="background:#eef1f5;font-weight:600;font-size:12px">
-                        <td style="position:sticky;left:0;z-index:1;background:#eef1f5;padding:6px 12px">Total prévu</td>
+                        <td colspan="2" style="position:sticky;left:0;z-index:1;background:#eef1f5;padding:6px 12px">Total prévu</td>
                         @foreach($seances as $seance)
                             <td style="text-align:center">{{ number_format($totalPrevuParSeance[$seance->id], 2, ',', ' ') }}</td>
                         @endforeach
@@ -166,7 +168,7 @@
                     </tr>
                     {{-- Total réalisé --}}
                     <tr style="background:#eef1f5;font-size:12px;color:#198754">
-                        <td style="position:sticky;left:0;z-index:1;background:#eef1f5;padding:4px 12px">Total réalisé</td>
+                        <td colspan="2" style="position:sticky;left:0;z-index:1;background:#eef1f5;padding:4px 12px">Total réalisé</td>
                         @foreach($seances as $seance)
                             <td style="text-align:center">{{ number_format($totalRealiseParSeance[$seance->id], 2, ',', ' ') }}</td>
                         @endforeach
@@ -175,7 +177,7 @@
                     {{-- Écart --}}
                     @php $grandEcart = $grandTotalRealise - $grandTotalPrevu; @endphp
                     <tr style="background:#eef1f5;font-size:11px;color:#6c757d">
-                        <td style="position:sticky;left:0;z-index:1;background:#eef1f5;padding:4px 12px">Écart</td>
+                        <td colspan="2" style="position:sticky;left:0;z-index:1;background:#eef1f5;padding:4px 12px">Écart</td>
                         @foreach($seances as $seance)
                             @php $ecart = ($totalRealiseParSeance[$seance->id]) - ($totalPrevuParSeance[$seance->id]); @endphp
                             <td style="text-align:center;{{ $ecart < -0.01 ? 'color:#dc3545' : '' }}">
