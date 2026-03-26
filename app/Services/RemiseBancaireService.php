@@ -97,6 +97,7 @@ final class RemiseBancaireService
                     'compte_id' => $compteIntermediaire->id,
                     'remise_id' => $remise->id,
                     'reglement_id' => $reglement->id,
+                    'pointe' => true,
                 ], [
                     [
                         'sous_categorie_id' => $operation->sous_categorie_id,
@@ -215,6 +216,7 @@ final class RemiseBancaireService
                         'compte_id' => $compteIntermediaire->id,
                         'remise_id' => $remise->id,
                         'reglement_id' => $reglement->id,
+                        'pointe' => true,
                     ], [
                         [
                             'sous_categorie_id' => $operation->sous_categorie_id,
