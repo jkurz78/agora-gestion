@@ -48,14 +48,14 @@
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'reglements' ? 'active' : '' }}" wire:click="setTab('reglements')">Règlements</button>
         </li>
+        <li class="nav-item d-flex align-items-end" style="padding:0 4px">
+            <span style="border-left:1px solid #ccc;height:20px;display:inline-block;margin-bottom:8px"></span>
+        </li>
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'compte_resultat' ? 'active' : '' }}" wire:click="setTab('compte_resultat')">Compte résultat</button>
         </li>
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'compte_resultat_seances' ? 'active' : '' }}" wire:click="setTab('compte_resultat_seances')">Résultat par séances</button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link disabled" disabled>Finances</button>
         </li>
     </ul>
 
