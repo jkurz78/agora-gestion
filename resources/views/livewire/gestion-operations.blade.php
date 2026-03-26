@@ -33,32 +33,32 @@
     </style>
     <ul class="nav nav-tabs nav-gestion mb-3">
         <li class="nav-item">
-            <button class="nav-link {{ $activeTab === 'details' ? 'active' : '' }}" wire:click="setTab('details')">Détails</button>
+            <button class="nav-link {{ $activeTab === 'details' ? 'active' : '' }}" wire:click="setTab('details')"><i class="bi bi-card-text me-1"></i>Détails</button>
         </li>
         <li class="nav-item d-flex align-items-end" style="padding:0 4px">
             <span style="border-left:1px solid #ccc;height:20px;display:inline-block;margin-bottom:8px"></span>
         </li>
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'participants' ? 'active' : '' }}" wire:click="setTab('participants')">
-                Participants ({{ $selectedOperation->participants()->count() }})
+                <i class="bi bi-people me-1"></i>Participants ({{ $selectedOperation->participants()->count() }})
             </button>
         </li>
         @if(auth()->user()?->peut_voir_donnees_sensibles)
         <li class="nav-item">
-            <button class="nav-link {{ $activeTab === 'seances' ? 'active' : '' }}" wire:click="setTab('seances')">Séances</button>
+            <button class="nav-link {{ $activeTab === 'seances' ? 'active' : '' }}" wire:click="setTab('seances')"><i class="bi bi-calendar-week me-1"></i>Séances</button>
         </li>
         @endif
         <li class="nav-item">
-            <button class="nav-link {{ $activeTab === 'reglements' ? 'active' : '' }}" wire:click="setTab('reglements')">Règlements</button>
+            <button class="nav-link {{ $activeTab === 'reglements' ? 'active' : '' }}" wire:click="setTab('reglements')"><i class="bi bi-wallet2 me-1"></i>Règlements</button>
         </li>
         <li class="nav-item d-flex align-items-end" style="padding:0 4px">
             <span style="border-left:1px solid #ccc;height:20px;display:inline-block;margin-bottom:8px"></span>
         </li>
         <li class="nav-item">
-            <button class="nav-link {{ $activeTab === 'compte_resultat' ? 'active' : '' }}" wire:click="setTab('compte_resultat')">Compte résultat</button>
+            <button class="nav-link {{ $activeTab === 'compte_resultat' ? 'active' : '' }}" wire:click="setTab('compte_resultat')"><i class="bi bi-bar-chart-line me-1"></i>Compte résultat</button>
         </li>
         <li class="nav-item">
-            <button class="nav-link {{ $activeTab === 'compte_resultat_seances' ? 'active' : '' }}" wire:click="setTab('compte_resultat_seances')">Résultat par séances</button>
+            <button class="nav-link {{ $activeTab === 'compte_resultat_seances' ? 'active' : '' }}" wire:click="setTab('compte_resultat_seances')"><i class="bi bi-grid-3x3-gap me-1"></i>Résultat par séances</button>
         </li>
     </ul>
 
