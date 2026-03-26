@@ -42,8 +42,8 @@
             <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 160 + ($seances->count() * 130) + 100 }}px">
                 <thead>
                     {{-- Row 1: S# headers --}}
-                    <tr style="background:#3d5473;color:#fff;--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                        <th style="position:sticky;left:0;z-index:2;background:#3d5473;min-width:160px;vertical-align:middle;font-size:11px">Participant</th>
+                    <tr style="background:#3d5473;color:#fff">
+                        <td rowspan="3" style="position:sticky;left:0;z-index:2;background:#fff;vertical-align:middle;font-weight:600;color:#555;font-size:11px;min-width:160px">Participant</td>
                         @foreach($seances as $seance)
                             <th style="min-width:120px;text-align:center;font-size:12px">S{{ $seance->numero }}</th>
                         @endforeach
@@ -51,7 +51,6 @@
                     </tr>
                     {{-- Row 2: Titles --}}
                     <tr>
-                        <td style="position:sticky;left:0;z-index:1;background:#f8f9fa"></td>
                         @foreach($seances as $seance)
                             <td style="background:#f8f9fa;text-align:center;font-size:11px;color:#6c757d">{{ $seance->titre ?? '' }}</td>
                         @endforeach
@@ -59,7 +58,6 @@
                     </tr>
                     {{-- Row 3: Dates --}}
                     <tr>
-                        <td style="position:sticky;left:0;z-index:1;background:#f8f9fa"></td>
                         @foreach($seances as $seance)
                             <td style="background:#f8f9fa;text-align:center;font-size:11px;color:#6c757d">{{ $seance->date?->format('d/m') ?? '' }}</td>
                         @endforeach
