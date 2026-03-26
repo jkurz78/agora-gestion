@@ -90,7 +90,7 @@ final class RapprochementList extends Component
 
     public function render(): View
     {
-        $comptes = CompteBancaire::orderBy('nom')->get();
+        $comptes = CompteBancaire::where('est_systeme', false)->orderBy('nom')->get();
         $rapprochements = collect();
         $aEnCours = false;
         $soldeOuverture = null;
