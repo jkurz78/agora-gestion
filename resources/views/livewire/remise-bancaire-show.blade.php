@@ -116,7 +116,7 @@
     {{-- Actions --}}
     <div class="d-flex gap-2 mt-3">
         @if ($remise->virement_id !== null)
-            <a href="{{ route('gestion.remises-bancaires.pdf', $remise) }}"
+            <a href="{{ route('gestion.remises-bancaires.pdf', $remise) }}?mode=inline"
                class="btn btn-outline-dark" target="_blank">
                 <i class="bi bi-file-pdf"></i> PDF
             </a>
