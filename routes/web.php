@@ -8,12 +8,17 @@ use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OperationController;
 use App\Http\Controllers\ParticipantExportController;
+use App\Http\Controllers\ParticipantPdfController;
 use App\Http\Controllers\RapprochementPdfController;
+use App\Http\Controllers\RemiseBancairePdfController;
+use App\Http\Controllers\SeanceExportController;
+use App\Http\Controllers\SeancePdfController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\DetecteEspace;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
+use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use Illuminate\Support\Facades\Route;
 
@@ -93,27 +98,27 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
         Route::view('/operations', 'gestion.operations')->name('operations');
         Route::get('/operations/{operation}/participants/export', ParticipantExportController::class)
             ->name('operations.participants.export');
-        Route::get('/operations/{operation}/participants/pdf', \App\Http\Controllers\ParticipantPdfController::class)
+        Route::get('/operations/{operation}/participants/pdf', ParticipantPdfController::class)
             ->name('operations.participants.pdf');
-        Route::get('/operations/{operation}/seances/matrice-pdf', [\App\Http\Controllers\SeancePdfController::class, 'matrice'])
+        Route::get('/operations/{operation}/seances/matrice-pdf', [SeancePdfController::class, 'matrice'])
             ->name('operations.seances.matrice-pdf');
-        Route::get('/operations/{operation}/seances/{seance}/emargement-pdf', [\App\Http\Controllers\SeancePdfController::class, 'emargement'])
+        Route::get('/operations/{operation}/seances/{seance}/emargement-pdf', [SeancePdfController::class, 'emargement'])
             ->name('operations.seances.emargement-pdf');
-        Route::get('/operations/{operation}/seances/export', \App\Http\Controllers\SeanceExportController::class)
+        Route::get('/operations/{operation}/seances/export', SeanceExportController::class)
             ->name('operations.seances.export');
 
         // Remises en banque
         Route::view('/remises-bancaires', 'gestion.remises-bancaires.index')->name('remises-bancaires');
-        Route::get('/remises-bancaires/{remise}', function (\App\Models\RemiseBancaire $remise) {
+        Route::get('/remises-bancaires/{remise}', function (RemiseBancaire $remise) {
             return view('gestion.remises-bancaires.show', compact('remise'));
         })->name('remises-bancaires.show');
-        Route::get('/remises-bancaires/{remise}/selection', function (\App\Models\RemiseBancaire $remise) {
+        Route::get('/remises-bancaires/{remise}/selection', function (RemiseBancaire $remise) {
             return view('gestion.remises-bancaires.selection', compact('remise'));
         })->name('remises-bancaires.selection');
-        Route::get('/remises-bancaires/{remise}/validation', function (\App\Models\RemiseBancaire $remise) {
+        Route::get('/remises-bancaires/{remise}/validation', function (RemiseBancaire $remise) {
             return view('gestion.remises-bancaires.validation', compact('remise'));
         })->name('remises-bancaires.validation');
-        Route::get('/remises-bancaires/{remise}/pdf', \App\Http\Controllers\RemiseBancairePdfController::class)
+        Route::get('/remises-bancaires/{remise}/pdf', RemiseBancairePdfController::class)
             ->name('remises-bancaires.pdf');
 
         // Shared registrations

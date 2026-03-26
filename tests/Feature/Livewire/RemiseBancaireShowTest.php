@@ -8,7 +8,6 @@ use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
-use App\Models\RemiseBancaire;
 use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;

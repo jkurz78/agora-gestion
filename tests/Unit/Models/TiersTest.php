@@ -4,7 +4,6 @@
 declare(strict_types=1);
 
 use App\Models\Tiers;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 it('displayName returns nom as fallback when entreprise field is null', function () {
