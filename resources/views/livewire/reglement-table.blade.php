@@ -39,10 +39,10 @@
         @endphp
 
         <div class="table-responsive">
-            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 160 + 45 + ($seances->count() * 130) + 100 }}px">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 160 + 55 + ($seances->count() * 130) + 100 }}px">
                 <colgroup>
                     <col style="width:160px">
-                    <col style="width:45px">
+                    <col style="width:55px">
                     @foreach($seances as $s)<col style="width:130px">@endforeach
                     <col style="width:100px">
                 </colgroup>
@@ -79,15 +79,17 @@
                         @endphp
                         {{-- Row 1: Mode + Montant prévu --}}
                         <tr>
-                            <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;vertical-align:middle;font-size:11px;padding:4px 6px">
-                                <div class="d-flex align-items-center justify-content-between" style="white-space:nowrap">
-                                    <span style="font-weight:500">{{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}</span>
-                                    <button class="btn btn-sm p-0 ms-2" style="color:#0d6efd;font-size:11px;border:1px solid #0d6efd;border-radius:3px;padding:0 4px !important;line-height:1.4;flex-shrink:0"
+                            <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;vertical-align:middle;font-size:11px;font-weight:500;padding:4px 6px;white-space:nowrap">
+                                {{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}
+                            </td>
+                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 3px;white-space:nowrap;vertical-align:middle;text-align:right;width:55px">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <button class="btn btn-sm p-0" style="color:#0d6efd;font-size:10px;border:1px solid #0d6efd;border-radius:3px;padding:0 3px !important;line-height:1.3;flex-shrink:0"
                                             wire:click="copierLigne({{ $participant->id }})"
                                             title="Recopier la 1re séance sur toute la ligne">→</button>
+                                    <span>Prévu</span>
                                 </div>
                             </td>
-                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 4px;white-space:nowrap;vertical-align:middle;text-align:right;width:45px">Prévu</td>
                             @foreach($seances as $seance)
                                 @php
                                     $key = $participant->id . '-' . $seance->id;
@@ -146,7 +148,7 @@
                         </tr>
                         {{-- Row 2: Réalisé --}}
                         <tr>
-                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 4px;white-space:nowrap;vertical-align:middle;text-align:right;width:45px">Réalisé</td>
+                            <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 4px;white-space:nowrap;vertical-align:middle;text-align:right;width:55px">Réalisé</td>
                             @foreach($seances as $seance)
                                 @php
                                     $key = $participant->id . '-' . $seance->id;
