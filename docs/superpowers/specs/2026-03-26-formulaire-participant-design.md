@@ -149,8 +149,10 @@ Page autonome (pas `<x-app-layout>`) — layout minimal avec :
 
 ### Formulaire (`formulaire/remplir.blade.php`)
 
-- Titre : "Vos informations — {nom de l'opération}"
-- Sous-titre : "Bonjour {prénom} {nom}"
+- Logo de l'association (centré, comme sur la page d'accueil)
+- Titre : "Bonjour {prénom} {nom}"
+- Sous-titre : "Votre inscription à **{nom de l'opération}**, du {date_debut} au {date_fin}, {nombre_seances} séances."
+- Si date_debut ou date_fin est null, adapter le texte (omettre les dates manquantes)
 
 **Section Coordonnées :**
 - Téléphone (pré-rempli)
