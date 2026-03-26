@@ -111,6 +111,11 @@ final class Transaction extends Model
             && $this->rapprochement?->isVerrouille() === true;
     }
 
+    public function isLockedByRemise(): bool
+    {
+        return $this->remise_id !== null;
+    }
+
     /**
      * @param  Builder<Transaction>  $query
      */

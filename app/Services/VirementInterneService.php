@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\RemiseBancaire;
 use App\Models\VirementInterne;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -50,6 +51,10 @@ final class VirementInterneService
 
         if ($virement->rapprochement_source_id !== null || $virement->rapprochement_destination_id !== null) {
             throw new \RuntimeException('Ce virement est pointé dans un rapprochement et ne peut pas être supprimé.');
+        }
+
+        if (RemiseBancaire::where('virement_id', $virement->id)->exists()) {
+            throw new \RuntimeException('Ce virement est lié à une remise bancaire et ne peut pas être supprimé.');
         }
 
         DB::transaction(function () use ($virement) {

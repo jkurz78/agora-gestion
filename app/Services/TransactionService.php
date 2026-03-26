@@ -48,6 +48,10 @@ final class TransactionService
         return DB::transaction(function () use ($transaction, $data, $lignes) {
             $transaction->load(['rapprochement' => fn ($q) => $q->lockForUpdate()]);
 
+            if ($transaction->isLockedByRemise()) {
+                throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être modifiée.');
+            }
+
             if ($transaction->isLockedByRapprochement()) {
                 $this->assertLockedInvariants($transaction, $data, $lignes);
             }
@@ -112,6 +116,9 @@ final class TransactionService
 
         if ($transaction->rapprochement_id !== null) {
             throw new \RuntimeException('Cette transaction est pointée dans un rapprochement et ne peut pas être supprimée.');
+        }
+        if ($transaction->isLockedByRemise()) {
+            throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être supprimée.');
         }
         DB::transaction(function () use ($transaction) {
             $transaction->lignes()->each(function (TransactionLigne $ligne) {
