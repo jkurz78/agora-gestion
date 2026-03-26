@@ -6,6 +6,7 @@ use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FormulaireController;
 use App\Http\Controllers\OperationController;
 use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantPdfController;
@@ -148,6 +149,13 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/exercices/changer', '/compta/exercices/changer');
     Route::permanentRedirect('/exercices/reouvrir', '/compta/exercices/reouvrir');
     Route::permanentRedirect('/exercices/audit', '/compta/exercices/audit');
+});
+
+// Public formulaire (no auth required)
+Route::prefix('formulaire')->middleware('throttle:10,1')->group(function (): void {
+    Route::get('/', [FormulaireController::class, 'index'])->name('formulaire.index');
+    Route::get('/remplir', [FormulaireController::class, 'show'])->name('formulaire.show');
+    Route::post('/remplir', [FormulaireController::class, 'store'])->name('formulaire.store');
 });
 
 require __DIR__.'/auth.php';
