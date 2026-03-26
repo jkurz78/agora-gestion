@@ -35,6 +35,9 @@
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'details' ? 'active' : '' }}" wire:click="setTab('details')">Détails</button>
         </li>
+        <li class="nav-item d-flex align-items-end" style="padding:0 4px">
+            <span style="border-left:1px solid #ccc;height:20px;display:inline-block;margin-bottom:8px"></span>
+        </li>
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'participants' ? 'active' : '' }}" wire:click="setTab('participants')">
                 Participants ({{ $selectedOperation->participants()->count() }})
