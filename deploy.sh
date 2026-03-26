@@ -5,7 +5,7 @@
 APPDIR="/home/nqgu6487/public_html/compta.soigner-vivre-sourire.fr"
 LOGFILE="${APPDIR}/deploy.log"
 PHP="/usr/local/bin/php"
-COMPOSER="HOME=/home/nqgu6487 /opt/cpanel/composer/bin/composer"
+COMPOSER="HOME=/home/nqgu6487 /usr/local/bin/composer"
 MAILTO="jurgen.kurz@soigner-vivre-sourire.fr"
 
 cd "$APPDIR" || exit 1
