@@ -36,4 +36,9 @@ final class Reglement extends Model
     {
         return $this->belongsTo(Seance::class);
     }
+
+    public function remise(): BelongsTo
+    {
+        return $this->belongsTo(RemiseBancaire::class, 'remise_id');
+    }
 }
