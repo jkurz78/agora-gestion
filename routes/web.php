@@ -8,6 +8,7 @@ use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FormulaireController;
 use App\Http\Controllers\OperationController;
+use App\Http\Controllers\ParticipantDocumentController;
 use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantPdfController;
 use App\Http\Controllers\RapprochementPdfController;
@@ -107,6 +108,10 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
             ->name('operations.seances.emargement-pdf');
         Route::get('/operations/{operation}/seances/export', SeanceExportController::class)
             ->name('operations.seances.export');
+
+        // Participant documents
+        Route::get('/participants/{participant}/documents/{filename}', ParticipantDocumentController::class)
+            ->name('participants.documents.download');
 
         // Remises en banque
         Route::view('/remises-bancaires', 'gestion.remises-bancaires.index')->name('remises-bancaires');
