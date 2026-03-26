@@ -98,7 +98,7 @@ describe('comptabiliser()', function () {
         expect($remise->virement_id)->not->toBeNull();
         $virement = $remise->virement;
         expect((float) $virement->montant)->toBe(30.0)
-            ->and($virement->reference)->toBe('RBC-001');
+            ->and($virement->reference)->toBe('RBC-00001');
 
         // Transaction created on intermediary account
         $transactions = Transaction::where('remise_id', $remise->id)->get();
@@ -107,7 +107,7 @@ describe('comptabiliser()', function () {
         expect($tx->type)->toBe(TypeTransaction::Recette)
             ->and((float) $tx->montant_total)->toBe(30.0)
             ->and($tx->tiers_id)->toBe($this->tiers->id)
-            ->and($tx->reference)->toBe('RBC-001-01')
+            ->and($tx->reference)->toBe('RBC-00001-001')
             ->and($tx->numero_piece)->not->toBeNull();
 
         // Transaction has one ligne with correct operation/seance/sous_categorie
