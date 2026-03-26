@@ -49,7 +49,7 @@ Côté comptabilité, on a besoin d'une transaction individuelle par chèque/esp
 - `declare(strict_types=1)`, `final class`, `SoftDeletes`
 - Relations : `belongsTo CompteBancaire` (compte_cible), `belongsTo VirementInterne`, `belongsTo User` (saisi_par), `hasMany Reglement`, `hasMany Transaction`
 - Cast `mode_paiement` → `ModePaiement`, `date` → `date`
-- Méthode `isVerrouillee(): bool` — true si le virement est pointé dans un rapprochement verrouillé
+- Méthode `isVerrouillee(): bool` — délègue à `$this->virement->isLockedByRapprochement()` (vérifie les deux côtés source/destination)
 - Méthode `montantTotal(): float` — somme des montants des règlements liés
 - Méthode `referencePrefix(): string` — `RBC` pour chèque, `RBE` pour espèces
 
@@ -221,7 +221,7 @@ Dans une `DB::transaction()` :
 **Contenu** :
 - Récapitulatif : date, banque cible, type (Chèques/Espèces), nombre de règlements, montant total
 - Tableau récapitulatif des règlements sélectionnés (même colonnes que la sélection, sans case à cocher)
-- Bouton "Comptabiliser" → appelle `RemiseBancaireService::comptabiliser()`, redirige vers la liste
+- Bouton "Comptabiliser" → appelle `RemiseBancaireService::comptabiliser()` si première comptabilisation (`virement_id` null), ou `modifier()` si la remise est déjà comptabilisée. Redirige vers la liste.
 - Bouton "Retour" → retour à l'écran de sélection
 
 ### `RemiseBancaireShow`
@@ -280,7 +280,7 @@ Route::prefix('gestion/remises-bancaires')->name('gestion.remises-bancaires')->g
 
 | Condition | Modifiable | Supprimable |
 |-----------|------------|-------------|
-| Remise brouillon (pas encore comptabilisée) | Oui | Oui (simple suppression) |
+| Remise brouillon (pas encore comptabilisée) | Oui | Oui (suppression simple de l'enregistrement, pas de cascade car aucune écriture comptable) |
 | Remise comptabilisée, virement non rapproché | Oui (ajout/retrait de règlements) | Oui (cascade) |
 | Remise comptabilisée, virement rapproché (verrouillé) | Non | Non |
 
