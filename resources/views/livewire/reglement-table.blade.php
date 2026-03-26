@@ -73,11 +73,13 @@
                         @endphp
                         {{-- Row 1: Mode + Montant prévu --}}
                         <tr>
-                            <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;font-weight:500;white-space:nowrap;vertical-align:middle;font-size:11px">
-                                {{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}
-                                <button class="btn btn-sm p-0 ms-1" style="color:#0d6efd;font-size:11px;border:1px solid #0d6efd;border-radius:3px;padding:0 4px !important;line-height:1.4"
-                                        wire:click="copierLigne({{ $participant->id }})"
-                                        title="Recopier la 1re séance sur toute la ligne">→</button>
+                            <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;vertical-align:middle;font-size:11px;padding:4px 6px">
+                                <div class="d-flex align-items-center justify-content-between" style="white-space:nowrap">
+                                    <span style="font-weight:500">{{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}</span>
+                                    <button class="btn btn-sm p-0 ms-2" style="color:#0d6efd;font-size:11px;border:1px solid #0d6efd;border-radius:3px;padding:0 4px !important;line-height:1.4;flex-shrink:0"
+                                            wire:click="copierLigne({{ $participant->id }})"
+                                            title="Recopier la 1re séance sur toute la ligne">→</button>
+                                </div>
                             </td>
                             @foreach($seances as $seance)
                                 @php
