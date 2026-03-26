@@ -98,6 +98,7 @@
                     @if($canSeeSensible)
                         <th>Notes</th>
                     @endif
+                    <th class="text-center">Formulaire</th>
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -316,6 +317,27 @@
                             </td>
                         @endif
 
+                        {{-- Formulaire badge --}}
+                        <td class="text-center small">
+                            @if ($p->formulaireToken === null)
+                                <button wire:click="genererToken({{ $p->id }})" class="btn btn-sm btn-outline-secondary" title="Générer un lien">
+                                    <i class="bi bi-link-45deg"></i>
+                                </button>
+                            @elseif ($p->formulaireToken->isUtilise())
+                                <span class="badge bg-success" title="Rempli le {{ $p->formulaireToken->rempli_at->format('d/m/Y') }}">
+                                    <i class="bi bi-check-circle"></i> Rempli
+                                </span>
+                            @elseif ($p->formulaireToken->isExpire())
+                                <span class="badge bg-secondary" role="button" wire:click="genererToken({{ $p->id }})" title="Expiré — cliquer pour regénérer">
+                                    <i class="bi bi-clock-history"></i> Expiré
+                                </span>
+                            @else
+                                <span class="badge bg-warning text-dark" role="button" wire:click="ouvrirToken({{ $p->id }})" title="En attente — cliquer pour voir le code">
+                                    <i class="bi bi-hourglass"></i> En attente
+                                </span>
+                            @endif
+                        </td>
+
                         {{-- Actions --}}
                         <td class="text-end">
                             <div class="d-flex gap-1 justify-content-end">
@@ -335,7 +357,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $canSeeSensible ? 13 : 7 }}" class="text-center text-muted py-4">
+                        <td colspan="{{ $canSeeSensible ? 14 : 8 }}" class="text-center text-muted py-4">
                             Aucun participant inscrit.
                         </td>
                     </tr>
@@ -492,6 +514,55 @@
                             x-on:click="$wire.set('medNotes', $refs.notesArea.innerHTML); $wire.call('saveNotes');">
                         <i class="bi bi-check-lg"></i> Enregistrer
                     </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════
+         TOKEN MODAL
+         ═══════════════════════════════════════════════════════════ --}}
+    @if($showTokenModal)
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+             style="background:rgba(0,0,0,.4);z-index:2000"
+             wire:click.self="$set('showTokenModal', false)">
+            <div class="bg-white rounded p-4 shadow" style="width:520px;max-width:95vw"
+                 x-data="{ copied: false }">
+                <h5 class="fw-bold mb-3">Lien formulaire participant</h5>
+
+                {{-- Token code --}}
+                <div class="text-center mb-3">
+                    <span class="d-inline-block px-3 py-2 rounded bg-light border" style="font-size:1.6rem;font-family:monospace;letter-spacing:3px">
+                        {{ $tokenCode }}
+                    </span>
+                </div>
+
+                {{-- Full URL --}}
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Lien complet</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control form-control-sm" value="{{ $tokenUrl }}" readonly id="tokenUrlField">
+                        <button class="btn btn-outline-secondary" type="button"
+                                x-on:click="navigator.clipboard.writeText(document.getElementById('tokenUrlField').value); copied = true; setTimeout(() => copied = false, 2000)">
+                            <template x-if="!copied"><i class="bi bi-clipboard"></i></template>
+                            <template x-if="copied"><i class="bi bi-check-lg text-success"></i></template>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Expiration date --}}
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Date d'expiration</label>
+                    <div class="input-group input-group-sm">
+                        <input type="date" class="form-control form-control-sm" wire:model="tokenExpireAt">
+                        <button class="btn btn-outline-primary" type="button" wire:click="genererTokenAvecDate" title="Regénérer avec cette date">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 justify-content-end mt-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showTokenModal', false)">Fermer</button>
                 </div>
             </div>
         </div>
