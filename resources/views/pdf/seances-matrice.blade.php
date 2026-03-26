@@ -15,7 +15,7 @@
         table { width: 100%; border-collapse: collapse; }
 
         .header { margin-bottom: 10px; }
-        .header .logo { max-height: 40px; max-width: 80px; }
+        .header .logo { max-height: 96px; max-width: 192px; }
         .association-name { font-size: 11px; font-weight: bold; margin-bottom: 2px; }
         .association-address { font-size: 8px; color: #6c757d; }
         .doc-title { font-size: 13px; font-weight: bold; color: #A9014F; text-align: right; }
@@ -28,7 +28,7 @@
             text-align: center;
             font-size: 7px;
         }
-        .matrix th { background-color: #3d5473; color: #fff; font-weight: 600; }
+        .matrix th { background-color: #fff; color: #212529; font-weight: bold; font-family: DejaVu Sans, sans-serif; border-bottom: 2px solid #212529; }
         .matrix .col-name { text-align: left; font-weight: 500; min-width: 80px; }
         .matrix .header-row td { background: #f8f9fa; font-size: 7px; }
         .matrix .footer-row td { background: #f0f0f0; font-weight: 600; }
