@@ -61,5 +61,5 @@ it('displays remise details', function () {
         ->assertSee('Remise chèques n°1')
         ->assertSee('Banque Pop')
         ->assertSee('Jean Dupont')
-        ->assertSee('RBC-001-01');
+        ->assertSee('RBC-00001-001');
 });
