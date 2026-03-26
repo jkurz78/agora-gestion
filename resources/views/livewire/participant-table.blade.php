@@ -472,6 +472,21 @@
                     </div>
                 @endif
 
+                @if ($canSeeSensible && count($editDocuments) > 0)
+                    <hr>
+                    <h6 class="fw-bold text-muted mb-3">Documents joints</h6>
+                    <ul class="list-group list-group-sm">
+                        @foreach ($editDocuments as $doc)
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span class="small">{{ $doc['name'] }} ({{ number_format($doc['size'] / 1024, 0) }} Ko)</span>
+                                <a href="{{ $doc['url'] }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-download"></i>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+
                 <div class="d-flex gap-2 justify-content-end mt-4">
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showEditModal', false)">Annuler</button>
                     <button type="button" class="btn btn-sm btn-primary" wire:click="saveEdit">
