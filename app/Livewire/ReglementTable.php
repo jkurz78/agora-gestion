@@ -9,6 +9,7 @@ use App\Models\Operation;
 use App\Models\Reglement;
 use App\Models\Seance;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
@@ -134,7 +135,7 @@ final class ReglementTable extends Component
     /**
      * @return array<string, float> keyed by "participantId-seanceId"
      */
-    private function computeRealise($seances, $participants): array
+    private function computeRealise(\Illuminate\Database\Eloquent\Collection $seances, Collection $participants): array
     {
         if ($seances->isEmpty() || $participants->isEmpty()) {
             return [];
