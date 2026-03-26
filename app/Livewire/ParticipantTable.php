@@ -11,6 +11,7 @@ use App\Models\Tiers;
 use App\Services\FormulaireTokenService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -89,6 +90,10 @@ final class ParticipantTable extends Component
     public ?string $tokenExpireAt = null;
 
     public ?int $tokenParticipantId = null;
+
+    // ── Edit modal documents ──────────────────────────────────
+    /** @var array<int, array{name: string, size: int, url: string}> */
+    public array $editDocuments = [];
 
     public function mount(Operation $operation): void
     {
@@ -189,6 +194,11 @@ final class ParticipantTable extends Component
         $this->editSexe = $med?->sexe ?? '';
         $this->editTaille = $med?->taille ?? '';
         $this->editPoids = $med?->poids ?? '';
+
+        // Documents (only if user can see sensitive data)
+        $this->editDocuments = Auth::user()?->peut_voir_donnees_sensibles
+            ? $this->getParticipantDocuments($participant->id)
+            : [];
 
         $this->showEditModal = true;
     }
@@ -379,6 +389,30 @@ final class ParticipantTable extends Component
         $this->tokenExpireAt = $token->expire_at->format('Y-m-d');
         $this->tokenParticipantId = $participantId;
         $this->showTokenModal = true;
+    }
+
+    // ── Document helper ─────────────────────────────────────────
+
+    /**
+     * @return array<int, array{name: string, size: int, url: string}>
+     */
+    private function getParticipantDocuments(int $participantId): array
+    {
+        $dir = "participants/{$participantId}";
+        if (! Storage::disk('local')->exists($dir)) {
+            return [];
+        }
+
+        return collect(Storage::disk('local')->files($dir))
+            ->map(fn (string $path) => [
+                'name' => basename($path),
+                'size' => Storage::disk('local')->size($path),
+                'url' => route('gestion.participants.documents.download', [
+                    'participant' => $participantId,
+                    'filename' => basename($path),
+                ]),
+            ])
+            ->toArray();
     }
 
     // ── Helpers ────────────────────────────────────────────────
