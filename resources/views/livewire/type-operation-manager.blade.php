@@ -56,7 +56,7 @@
                             @if($type->confidentiel)
                                 <i class="bi bi-circle-fill text-success" style="font-size:.6rem"></i>
                             @else
-                                <i class="bi bi-circle-fill text-secondary" style="font-size:.6rem"></i>
+                                <i class="bi bi-circle-fill" style="font-size:.6rem;color:#ccc"></i>
                             @endif
                         </td>
                         {{-- Adhérents --}}
@@ -64,7 +64,7 @@
                             @if($type->reserve_adherents)
                                 <i class="bi bi-circle-fill text-success" style="font-size:.6rem"></i>
                             @else
-                                <i class="bi bi-circle-fill text-secondary" style="font-size:.6rem"></i>
+                                <i class="bi bi-circle-fill" style="font-size:.6rem;color:#ccc"></i>
                             @endif
                         </td>
                         {{-- Actif --}}
