@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Models\SousCategorie;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
@@ -43,6 +44,8 @@ final class TypeOperationManager extends Component
     /** @var TemporaryUploadedFile|null */
     public $logo = null;
 
+    public string $existingLogoPath = '';
+
     // ── Tarifs management ────────────────────────────────────────
     /** @var array<int, array{id: int|null, libelle: string, montant: string}> */
     public array $tarifs = [];
@@ -56,7 +59,7 @@ final class TypeOperationManager extends Component
 
     // ── Tarifs flagged for deletion ──────────────────────────────
     /** @var array<int, int> */
-    private array $tarifsToDelete = [];
+    public array $tarifsToDelete = [];
 
     public function render(): View
     {
@@ -105,6 +108,7 @@ final class TypeOperationManager extends Component
         $this->reserve_adherents = $type->reserve_adherents;
         $this->actif = $type->actif;
         $this->logo = null;
+        $this->existingLogoPath = $type->logo_path ?? '';
         $this->tarifs = $type->tarifs->map(fn (TypeOperationTarif $t) => [
             'id' => $t->id,
             'libelle' => $t->libelle,
@@ -120,6 +124,7 @@ final class TypeOperationManager extends Component
         $rules = [
             'code' => 'required|string|max:20|unique:type_operations,code'.($this->editingId ? ','.$this->editingId : ''),
             'nom' => 'required|string|max:150|unique:type_operations,nom'.($this->editingId ? ','.$this->editingId : ''),
+            'description' => 'nullable|string|max:1000',
             'sous_categorie_id' => 'required|exists:sous_categories,id',
             'nombre_seances' => 'nullable|integer|min:1',
             'logo' => 'nullable|image|max:512',
@@ -127,45 +132,46 @@ final class TypeOperationManager extends Component
 
         $this->validate($rules);
 
-        $logoPath = null;
+        $type = DB::transaction(function (): TypeOperation {
+            $logoPath = null;
 
-        if ($this->logo) {
-            $logoPath = $this->logo->store('type-operations', 'public');
-        }
-
-        $data = [
-            'code' => $this->code,
-            'nom' => $this->nom,
-            'description' => $this->description !== '' ? $this->description : null,
-            'sous_categorie_id' => (int) $this->sous_categorie_id,
-            'nombre_seances' => $this->nombre_seances !== '' ? (int) $this->nombre_seances : null,
-            'confidentiel' => $this->confidentiel,
-            'reserve_adherents' => $this->reserve_adherents,
-            'actif' => $this->actif,
-        ];
-
-        if ($logoPath !== null) {
-            $data['logo_path'] = $logoPath;
-        }
-
-        if ($this->editingId) {
-            $type = TypeOperation::findOrFail($this->editingId);
-
-            // Delete old logo if a new one is uploaded
-            if ($logoPath !== null && $type->logo_path) {
-                Storage::disk('public')->delete($type->logo_path);
+            if ($this->logo) {
+                $logoPath = $this->logo->store('type-operations', 'public');
             }
 
-            $type->update($data);
-        } else {
+            $data = [
+                'code' => $this->code,
+                'nom' => $this->nom,
+                'description' => $this->description !== '' ? $this->description : null,
+                'sous_categorie_id' => (int) $this->sous_categorie_id,
+                'nombre_seances' => $this->nombre_seances !== '' ? (int) $this->nombre_seances : null,
+                'confidentiel' => $this->confidentiel,
+                'reserve_adherents' => $this->reserve_adherents,
+                'actif' => $this->actif,
+            ];
+
             if ($logoPath !== null) {
                 $data['logo_path'] = $logoPath;
             }
-            $type = TypeOperation::create($data);
-        }
 
-        // ── Sync tarifs ──────────────────────────────────────────
-        $this->syncTarifs($type);
+            if ($this->editingId) {
+                $type = TypeOperation::findOrFail($this->editingId);
+
+                // Delete old logo if a new one is uploaded
+                if ($logoPath !== null && $type->logo_path) {
+                    Storage::disk('public')->delete($type->logo_path);
+                }
+
+                $type->update($data);
+            } else {
+                $type = TypeOperation::create($data);
+            }
+
+            // ── Sync tarifs ──────────────────────────────────────
+            $this->syncTarifs($type);
+
+            return $type;
+        });
 
         $this->showModal = false;
         $this->resetForm();
@@ -196,6 +202,13 @@ final class TypeOperationManager extends Component
     public function addTarif(): void
     {
         if ($this->newTarifLibelle === '' || $this->newTarifMontant === '') {
+            return;
+        }
+
+        $normalized = str_replace(',', '.', $this->newTarifMontant);
+        if (! is_numeric($normalized)) {
+            $this->addError('newTarifMontant', 'Le montant doit être un nombre valide.');
+
             return;
         }
 
@@ -238,7 +251,14 @@ final class TypeOperationManager extends Component
             }
 
             if ($tarif->participants()->exists()) {
-                // Don't delete, re-add to the list
+                // Re-add to the visible tarifs array so the UI stays consistent
+                $this->tarifs[] = [
+                    'id' => $tarif->id,
+                    'libelle' => $tarif->libelle,
+                    'montant' => (string) $tarif->montant,
+                ];
+                $this->dispatch('toast', message: "Le tarif \"{$tarif->libelle}\" ne peut pas être supprimé car des participants l'utilisent.", type: 'warning');
+
                 continue;
             }
 
@@ -276,6 +296,7 @@ final class TypeOperationManager extends Component
         $this->reserve_adherents = false;
         $this->actif = true;
         $this->logo = null;
+        $this->existingLogoPath = '';
         $this->tarifs = [];
         $this->newTarifLibelle = '';
         $this->newTarifMontant = '';
