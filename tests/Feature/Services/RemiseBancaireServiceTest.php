@@ -13,6 +13,7 @@ use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\TypeOperation;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\RemiseBancaireService;
@@ -63,7 +64,8 @@ describe('creer()', function () {
 describe('comptabiliser()', function () {
     beforeEach(function () {
         $this->sousCategorie = SousCategorie::factory()->create();
-        $this->operation = Operation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
+        $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
+        $this->operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
         $this->tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
         $this->participant = Participant::create([
             'operation_id' => $this->operation->id,
@@ -184,7 +186,7 @@ describe('comptabiliser()', function () {
     })->throws(RuntimeException::class);
 
     it('throws when operation has no sous_categorie', function () {
-        $this->operation->update(['sous_categorie_id' => null]);
+        $this->operation->typeOperation->update(['sous_categorie_id' => null]);
 
         $remise = $this->service->creer([
             'date' => '2025-10-15',
@@ -199,7 +201,8 @@ describe('comptabiliser()', function () {
 describe('modifier()', function () {
     beforeEach(function () {
         $this->sousCategorie = SousCategorie::factory()->create();
-        $this->operation = Operation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
+        $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
+        $this->operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
         $this->tiers1 = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
         $this->tiers2 = Tiers::factory()->create(['nom' => 'Martin', 'prenom' => 'Sophie']);
         $this->participant1 = Participant::create([
@@ -277,7 +280,8 @@ describe('modifier()', function () {
 describe('supprimer()', function () {
     beforeEach(function () {
         $this->sousCategorie = SousCategorie::factory()->create();
-        $this->operation = Operation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
+        $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
+        $this->operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
         $this->tiers = Tiers::factory()->create();
         $this->participant = Participant::create([
             'operation_id' => $this->operation->id,

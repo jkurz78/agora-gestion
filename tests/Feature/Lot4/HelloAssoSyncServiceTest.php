@@ -12,6 +12,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\TypeOperation;
 use App\Services\HelloAssoSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -202,7 +203,8 @@ it('resolves operation from form mapping for Registration items', function () {
     $scInscr = SousCategorie::factory()->create(['pour_inscriptions' => true, 'nom' => 'Inscription']);
     $this->parametres->update(['sous_categorie_inscription_id' => $scInscr->id]);
 
-    $operation = Operation::factory()->create(['nom' => 'Stage été 2026']);
+    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scInscr->id]);
+    $operation = Operation::factory()->create(['nom' => 'Stage été 2026', 'type_operation_id' => $typeOp->id]);
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,
         'form_slug' => 'stage-ete-2026',

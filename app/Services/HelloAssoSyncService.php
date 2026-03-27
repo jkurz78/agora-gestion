@@ -295,7 +295,10 @@ final class HelloAssoSyncService
     private function getOperationSousCategorieId(int $operationId): ?int
     {
         if (! array_key_exists($operationId, $this->operationSousCategorieCache)) {
-            $this->operationSousCategorieCache[$operationId] = Operation::where('id', $operationId)->value('sous_categorie_id');
+            $this->operationSousCategorieCache[$operationId] = Operation::with('typeOperation')
+                ->find($operationId)
+                ?->typeOperation
+                ?->sous_categorie_id;
         }
 
         return $this->operationSousCategorieCache[$operationId];
