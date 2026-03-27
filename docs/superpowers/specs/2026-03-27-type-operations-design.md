@@ -103,7 +103,7 @@ Cette modale est réutilisée depuis le bouton "+" du formulaire d'opération.
   - Si `reserve_adherents = false` : badge vert (adhérent) ou vide
   - Adhérent = cotisation active sur l'exercice en cours pour le tiers
 - Colonne Tarif avec le libellé du tarif choisi à l'inscription
-- Masquage du bouton "Créer token" si `confidentiel = true` (les opérations avec données sensibles ne doivent pas exposer de formulaire public)
+- Affichage du bouton "Créer token" uniquement si `confidentiel = true` (le formulaire auto-déclaratif sert à saisir les données médicales ; les opérations non confidentielles passent par HelloAsso)
 - Masquage des colonnes médicales si `confidentiel = false`
 
 #### Modale inscription participant

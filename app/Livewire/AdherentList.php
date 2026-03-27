@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\ExerciceService;
 use Illuminate\View\View;
@@ -43,11 +44,11 @@ final class AdherentList extends Component
 
         // "cotisations" scope: tiers having transaction_lignes with pour_cotisations sous-categories
         $hasCotisation = fn ($q, ?int $ex = null) => $q->whereHas('transactions', function ($tq) use ($cotSousCategorieIds, $ex) {
-            $tq->whereHas('lignes', function ($lq) use ($cotSousCategorieIds, $ex) {
+            if ($ex !== null) {
+                $tq->forExercice($ex);
+            }
+            $tq->whereHas('lignes', function ($lq) use ($cotSousCategorieIds) {
                 $lq->whereIn('sous_categorie_id', $cotSousCategorieIds);
-                if ($ex !== null) {
-                    $lq->where('exercice', $ex);
-                }
             });
         });
 
@@ -55,10 +56,10 @@ final class AdherentList extends Component
             'a_jour' => $hasCotisation($query, $exercice),
             'en_retard' => $hasCotisation($query, $exercice - 1)
                 ->whereDoesntHave('transactions', function ($tq) use ($cotSousCategorieIds, $exercice) {
-                    $tq->whereHas('lignes', function ($lq) use ($cotSousCategorieIds, $exercice) {
-                        $lq->whereIn('sous_categorie_id', $cotSousCategorieIds)
-                            ->where('exercice', $exercice);
-                    });
+                    $tq->forExercice($exercice)
+                        ->whereHas('lignes', function ($lq) use ($cotSousCategorieIds) {
+                            $lq->whereIn('sous_categorie_id', $cotSousCategorieIds);
+                        });
                 }),
             default => $hasCotisation($query),
         };
@@ -77,7 +78,11 @@ final class AdherentList extends Component
             $derniereLigne = TransactionLigne::whereIn('sous_categorie_id', $cotSousCategorieIds)
                 ->whereHas('transaction', fn ($q) => $q->where('tiers_id', $tiers->id))
                 ->with('transaction.compte')
-                ->orderByDesc('exercice')
+                ->orderByDesc(
+                    Transaction::select('date')
+                        ->whereColumn('transactions.id', 'transaction_lignes.transaction_id')
+                        ->limit(1)
+                )
                 ->first();
 
             $tiers->setAttribute('derniereCotisation', $derniereLigne);

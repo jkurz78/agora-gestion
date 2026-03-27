@@ -1,0 +1,321 @@
+<div>
+    @if($flashMessage)
+        <div class="alert alert-{{ $flashType }} alert-dismissible fade show">
+            {{ $flashMessage }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" wire:click="$set('flashMessage', '')"></button>
+        </div>
+    @endif
+
+    @if(!$modalOnly)
+    {{-- Toolbar --}}
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+        <div class="d-flex gap-2 align-items-center">
+            <label class="form-label mb-0 small text-muted">Filtre :</label>
+            <select wire:model.live="filter" class="form-select form-select-sm" style="width:auto">
+                <option value="tous">Tous</option>
+                <option value="actif">Actifs</option>
+                <option value="inactif">Inactifs</option>
+            </select>
+        </div>
+        <button class="btn btn-primary btn-sm" wire:click="openCreate">
+            <i class="bi bi-plus-lg"></i> Nouveau type
+        </button>
+    </div>
+
+    {{-- Table --}}
+    <div class="table-responsive">
+        <table class="table table-sm table-striped table-hover" id="type-operation-table">
+            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                <tr>
+                    <th>Logo</th>
+                    <th class="sortable" data-col="code" style="cursor:pointer">Code <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
+                    <th class="sortable" data-col="nom" style="cursor:pointer">Nom <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
+                    <th>Sous-catégorie</th>
+                    <th class="text-center">Séances</th>
+                    <th class="text-center">Confidentiel</th>
+                    <th class="text-center">Adhérents</th>
+                    <th class="text-center">Actif</th>
+                    <th class="text-center">Tarifs</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody style="color:#555">
+                @forelse($types as $type)
+                    <tr class="{{ !$type->actif ? 'opacity-50' : '' }}">
+                        {{-- Logo --}}
+                        <td>
+                            @if($type->logo_path)
+                                <img src="{{ Storage::disk('public')->url($type->logo_path) }}"
+                                     alt="{{ $type->nom }}" style="width:32px;height:32px;object-fit:cover;border-radius:4px">
+                            @else
+                                <span class="text-muted"><i class="bi bi-image" style="font-size:1.2rem"></i></span>
+                            @endif
+                        </td>
+                        {{-- Code --}}
+                        <td class="small fw-semibold" data-sort="{{ $type->code }}">{{ $type->code }}</td>
+                        {{-- Nom --}}
+                        <td class="small" data-sort="{{ $type->nom }}">{{ $type->nom }}</td>
+                        {{-- Sous-catégorie --}}
+                        <td class="small">{{ $type->sousCategorie?->nom ?? '—' }}</td>
+                        {{-- Séances --}}
+                        <td class="text-center small">{{ $type->nombre_seances ?? '—' }}</td>
+                        {{-- Confidentiel --}}
+                        <td class="text-center">
+                            @if($type->confidentiel)
+                                <i class="bi bi-circle-fill text-success" style="font-size:.6rem"></i>
+                            @else
+                                <i class="bi bi-circle-fill" style="font-size:.6rem;color:#ccc"></i>
+                            @endif
+                        </td>
+                        {{-- Adhérents --}}
+                        <td class="text-center">
+                            @if($type->reserve_adherents)
+                                <i class="bi bi-circle-fill text-success" style="font-size:.6rem"></i>
+                            @else
+                                <i class="bi bi-circle-fill" style="font-size:.6rem;color:#ccc"></i>
+                            @endif
+                        </td>
+                        {{-- Actif --}}
+                        <td class="text-center">
+                            @if($type->actif)
+                                <span class="badge bg-success">Actif</span>
+                            @else
+                                <span class="badge bg-secondary">Inactif</span>
+                            @endif
+                        </td>
+                        {{-- Tarifs count --}}
+                        <td class="text-center">
+                            <span class="badge bg-info text-dark">{{ $type->tarifs->count() }}</span>
+                        </td>
+                        {{-- Actions --}}
+                        <td class="text-end">
+                            <div class="d-flex gap-1 justify-content-end">
+                                <button class="btn btn-sm btn-outline-primary"
+                                        wire:click="openEdit({{ $type->id }})"
+                                        title="Modifier">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger"
+                                        wire:click="delete({{ $type->id }})"
+                                        wire:confirm="Supprimer ce type d'opération ?"
+                                        title="Supprimer">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="10" class="text-center text-muted py-4">
+                            Aucun type d'opération enregistré.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════
+         MODAL CREATE/EDIT
+         ═══════════════════════════════════════════════════════════ --}}
+    @if($showModal)
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+             style="background:rgba(0,0,0,.4);z-index:2000"
+             wire:click.self="$set('showModal', false)">
+            <div class="bg-white rounded p-4 shadow" style="width:700px;max-width:95vw;max-height:90vh;overflow-y:auto">
+                <h5 class="fw-bold mb-3">
+                    {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
+                </h5>
+
+                {{-- Code + Nom --}}
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small">Code <span class="text-danger">*</span></label>
+                        <input type="text" wire:model="code" class="form-control form-control-sm @error('code') is-invalid @enderror" maxlength="20">
+                        @error('code') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label small">Nom <span class="text-danger">*</span></label>
+                        <input type="text" wire:model="nom" class="form-control form-control-sm @error('nom') is-invalid @enderror" maxlength="150">
+                        @error('nom') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                </div>
+
+                {{-- Description --}}
+                <div class="mb-3">
+                    <label class="form-label small">Description</label>
+                    <textarea wire:model="description" class="form-control form-control-sm" rows="2"></textarea>
+                </div>
+
+                {{-- Sous-catégorie + Nb séances --}}
+                <div class="row g-2 mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label small">Sous-catégorie comptable <span class="text-danger">*</span></label>
+                        <select wire:model="sous_categorie_id" class="form-select form-select-sm @error('sous_categorie_id') is-invalid @enderror">
+                            <option value="">— Choisir —</option>
+                            @foreach($sousCategories as $sc)
+                                <option value="{{ $sc->id }}">{{ $sc->nom }} ({{ $sc->categorie?->nom }})</option>
+                            @endforeach
+                        </select>
+                        @error('sous_categorie_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small">Nb séances</label>
+                        <input type="number" wire:model="nombre_seances" class="form-control form-control-sm @error('nombre_seances') is-invalid @enderror" min="1">
+                        @error('nombre_seances') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                </div>
+
+                {{-- Options --}}
+                <div class="mb-3">
+                    <div class="border rounded p-3 mb-2">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" wire:model="confidentiel" class="form-check-input" id="optConfidentiel">
+                            <label class="form-check-label fw-semibold" for="optConfidentiel">Données confidentielles</label>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            Active les champs médicaux (kiné, date de naissance, taille, poids) dans la fiche participant et les séances.
+                            Masque la fonction de création de token pour le formulaire d'auto-saisie.
+                        </small>
+                    </div>
+                    <div class="border rounded p-3 mb-2">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" wire:model="reserve_adherents" class="form-check-input" id="optAdherents">
+                            <label class="form-check-label fw-semibold" for="optAdherents">Réservé aux adhérents</label>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            Seuls les membres ayant une cotisation active sur l'exercice en cours peuvent s'inscrire.
+                            Les participants non adhérents sont signalés en rouge dans la liste.
+                        </small>
+                    </div>
+                    <div class="border rounded p-3">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" wire:model="actif" class="form-check-input" id="optActif">
+                            <label class="form-check-label fw-semibold" for="optActif">Actif</label>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            Un type inactif n'apparaît plus dans les sélecteurs lors de la création d'une opération.
+                            Les opérations existantes conservent leur type.
+                        </small>
+                    </div>
+                </div>
+
+                {{-- Logo upload --}}
+                <div class="mb-3">
+                    <label class="form-label small">Logo</label>
+                    <input type="file" wire:model="logo" class="form-control form-control-sm @error('logo') is-invalid @enderror" accept="image/*">
+                    @error('logo') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    @if($logo)
+                        <div class="mt-2">
+                            <img src="{{ $logo->temporaryUrl() }}" alt="Aperçu" style="max-height:64px;border-radius:4px">
+                        </div>
+                    @elseif($existingLogoPath !== '')
+                        <div class="mt-2">
+                            <img src="{{ Storage::disk('public')->url($existingLogoPath) }}" alt="Logo actuel" style="max-height:64px;border-radius:4px">
+                            <span class="text-muted small ms-2">Logo actuel</span>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Tarifs section --}}
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Tarifs</label>
+                    @if(count($tarifs) > 0)
+                        <ul class="list-group list-group-sm mb-2">
+                            @foreach($tarifs as $index => $tarif)
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-1">
+                                    <span class="small">
+                                        {{ $tarif['libelle'] }}
+                                        <span class="text-muted ms-2">{{ number_format((float) str_replace(',', '.', $tarif['montant']), 2, ',', ' ') }} &euro;</span>
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                            wire:click="removeTarif({{ $index }})" title="Retirer">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+
+                    <div class="row g-2 align-items-end">
+                        <div class="col">
+                            <input type="text" wire:model="newTarifLibelle" class="form-control form-control-sm" placeholder="Libellé">
+                        </div>
+                        <div class="col-auto" style="width:120px">
+                            <input type="text" wire:model="newTarifMontant" class="form-control form-control-sm" placeholder="Montant">
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="addTarif">
+                                <i class="bi bi-plus"></i> Ajouter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Actions --}}
+                <div class="d-flex gap-2 justify-content-end mt-4">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Annuler</button>
+                    <button type="button" class="btn btn-sm btn-primary" wire:click="save">
+                        <i class="bi bi-check-lg"></i> Enregistrer
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════
+         JS SORTING
+         ═══════════════════════════════════════════════════════════ --}}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const table = document.getElementById('type-operation-table');
+            if (!table) return;
+
+            const headers = table.querySelectorAll('th.sortable');
+            let currentCol = null;
+            let ascending = true;
+
+            headers.forEach(function (th) {
+                th.addEventListener('click', function () {
+                    const col = th.dataset.col;
+                    if (currentCol === col) {
+                        ascending = !ascending;
+                    } else {
+                        currentCol = col;
+                        ascending = true;
+                    }
+
+                    const tbody = table.querySelector('tbody');
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    const colIndex = Array.from(th.parentElement.children).indexOf(th);
+
+                    rows.sort(function (a, b) {
+                        const aCell = a.children[colIndex];
+                        const bCell = b.children[colIndex];
+                        if (!aCell || !bCell) return 0;
+
+                        const aVal = (aCell.dataset.sort || aCell.textContent || '').trim().toLowerCase();
+                        const bVal = (bCell.dataset.sort || bCell.textContent || '').trim().toLowerCase();
+
+                        const result = aVal.localeCompare(bVal, 'fr');
+                        return ascending ? result : -result;
+                    });
+
+                    rows.forEach(function (row) { tbody.appendChild(row); });
+
+                    // Update sort indicators
+                    headers.forEach(function (h) {
+                        const icon = h.querySelector('i');
+                        if (icon) icon.className = 'bi bi-arrow-down-up';
+                    });
+                    const icon = th.querySelector('i');
+                    if (icon) {
+                        icon.className = ascending ? 'bi bi-arrow-down' : 'bi bi-arrow-up';
+                    }
+                });
+            });
+        });
+    </script>
+</div>

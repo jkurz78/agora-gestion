@@ -26,7 +26,6 @@ final class TransactionLigne extends Model
         'montant',
         'notes',
         'helloasso_item_id',
-        'exercice',
     ];
 
     protected function casts(): array
@@ -38,7 +37,6 @@ final class TransactionLigne extends Model
             'operation_id' => 'integer',
             'seance' => 'integer',
             'helloasso_item_id' => 'integer',
-            'exercice' => 'integer',
         ];
     }
 

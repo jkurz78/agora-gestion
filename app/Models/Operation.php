@@ -23,7 +23,7 @@ final class Operation extends Model
         'date_fin',
         'nombre_seances',
         'statut',
-        'sous_categorie_id',
+        'type_operation_id',
     ];
 
     protected function casts(): array
@@ -33,7 +33,7 @@ final class Operation extends Model
             'date_debut' => 'date',
             'date_fin' => 'date',
             'nombre_seances' => 'integer',
-            'sous_categorie_id' => 'integer',
+            'type_operation_id' => 'integer',
         ];
     }
 
@@ -54,9 +54,9 @@ final class Operation extends Model
             ->where('date_fin', '>=', $range['start']->toDateString());
     }
 
-    public function sousCategorie(): BelongsTo
+    public function typeOperation(): BelongsTo
     {
-        return $this->belongsTo(SousCategorie::class);
+        return $this->belongsTo(TypeOperation::class);
     }
 
     public function transactionLignes(): HasMany

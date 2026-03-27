@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Models\Operation;
+use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
@@ -14,6 +15,9 @@ final class GestionOperations extends Component
 {
     #[Url(as: 'id')]
     public ?int $selectedOperationId = null;
+
+    #[Url(as: 'type')]
+    public ?int $filterTypeId = null;
 
     public string $activeTab = 'details';
 
@@ -34,7 +38,8 @@ final class GestionOperations extends Component
         $exercice = $exerciceService->current();
         $range = $exerciceService->dateRange($exercice);
 
-        $operations = Operation::query()
+        $operationsQuery = Operation::query()
+            ->with('typeOperation')
             ->where(function ($q) use ($range): void {
                 $q->where(function ($inner) use ($range): void {
                     $inner->whereNotNull('date_debut')
@@ -47,9 +52,23 @@ final class GestionOperations extends Component
                         ->where('date_debut', '<=', $range['end']->toDateString())
                         ->where('date_debut', '>=', $range['start']->toDateString());
                 });
-            })
-            ->orderBy('date_debut')
-            ->get();
+            });
+
+        if ($this->filterTypeId !== null) {
+            $operationsQuery->where('type_operation_id', $this->filterTypeId);
+        }
+
+        $operations = $operationsQuery->orderBy('date_debut')->get();
+
+        $groupedOperations = $operations->groupBy(function (Operation $op): string {
+            return $op->typeOperation
+                ? $op->typeOperation->code.' — '.$op->typeOperation->nom
+                : 'Sans type';
+        })->sortKeys();
+
+        $hasMissingTypes = Operation::whereNull('type_operation_id')->exists();
+
+        $typeOperations = TypeOperation::actif()->orderBy('nom')->get();
 
         $selectedOperation = $this->selectedOperationId
             ? Operation::find($this->selectedOperationId)
@@ -77,6 +96,9 @@ final class GestionOperations extends Component
 
         return view('livewire.gestion-operations', [
             'operations' => $operations,
+            'groupedOperations' => $groupedOperations,
+            'hasMissingTypes' => $hasMissingTypes,
+            'typeOperations' => $typeOperations,
             'selectedOperation' => $selectedOperation,
             'totalDepenses' => $totalDepenses,
             'totalRecettes' => $totalRecettes,

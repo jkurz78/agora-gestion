@@ -27,7 +27,6 @@ function createCotisation(Tiers $tiers, int $exercice, int $cotScId): Transactio
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $cotScId,
-        'exercice' => $exercice,
         'montant' => 30.00,
     ]);
 

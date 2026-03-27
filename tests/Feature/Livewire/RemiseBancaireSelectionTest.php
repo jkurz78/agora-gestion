@@ -12,6 +12,7 @@ use App\Models\RemiseBancaire;
 use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -29,9 +30,10 @@ beforeEach(function () {
     ]);
 
     $this->sousCategorie = SousCategorie::factory()->create();
+    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
     $this->operation = Operation::factory()->create([
         'nom' => 'Gym Seniors',
-        'sous_categorie_id' => $this->sousCategorie->id,
+        'type_operation_id' => $typeOp->id,
     ]);
     $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
     $participant = Participant::create([

@@ -8,7 +8,7 @@ use App\Enums\StatutOperation;
 use App\Http\Requests\StoreOperationRequest;
 use App\Http\Requests\UpdateOperationRequest;
 use App\Models\Operation;
-use App\Models\SousCategorie;
+use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,22 +20,34 @@ final class OperationController extends Controller
     {
         $showAll = $request->boolean('all');
         $exercice = app(ExerciceService::class)->current();
+        $typeOperationId = $request->integer('type_operation_id') ?: null;
 
-        $operations = $showAll
-            ? Operation::orderByDesc('date_debut')->get()
-            : Operation::forExercice($exercice)->orderByDesc('date_debut')->get();
+        $query = $showAll
+            ? Operation::query()
+            : Operation::forExercice($exercice);
+
+        $query->with('typeOperation')->orderByDesc('date_debut');
+
+        if ($typeOperationId !== null) {
+            $query->where('type_operation_id', $typeOperationId);
+        }
+
+        $operations = $query->get();
+        $typeOperations = TypeOperation::actif()->orderBy('nom')->get();
 
         return view('operations.index', [
             'operations' => $operations,
             'showAll' => $showAll,
             'exercice' => $exercice,
+            'typeOperations' => $typeOperations,
+            'typeOperationId' => $typeOperationId,
         ]);
     }
 
     public function create(): View
     {
         return view('operations.create', [
-            'sousCategories' => SousCategorie::where('pour_inscriptions', true)->orderBy('nom')->get(),
+            'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
         ]);
     }
 
@@ -79,7 +91,8 @@ final class OperationController extends Controller
     {
         return view('operations.edit', [
             'operation' => $operation,
-            'sousCategories' => SousCategorie::where('pour_inscriptions', true)->orderBy('nom')->get(),
+            'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
+            'hasParticipants' => $operation->participants()->exists(),
         ]);
     }
 
