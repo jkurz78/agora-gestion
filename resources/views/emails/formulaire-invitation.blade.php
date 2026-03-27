@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .token { display: inline-block; padding: 8px 16px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 6px; font-size: 1.4rem; font-family: monospace; letter-spacing: 3px; }
+        .btn { display: inline-block; padding: 10px 24px; background: #3d5473; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold; }
+        .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; font-size: 0.85rem; color: #888; }
+    </style>
+</head>
+<body>
+    <p>Bonjour {{ $prenomParticipant }},</p>
+
+    <p>Nous vous invitons à compléter votre formulaire pour <strong>{{ $nomOperation }}</strong>.</p>
+
+    <p style="text-align: center; margin: 25px 0;">
+        <a href="{{ $formulaireUrl }}" class="btn">Accéder au formulaire</a>
+    </p>
+
+    <p>Vous pouvez aussi saisir ce code sur la page d'accueil du formulaire :</p>
+    <p style="text-align: center;">
+        <span class="token">{{ $tokenCode }}</span>
+    </p>
+
+    <div class="footer">
+        <p>Ce lien est valable jusqu'au {{ $dateExpiration }}.</p>
+        <p>Si vous n'êtes pas concerné par ce message, vous pouvez l'ignorer.</p>
+    </div>
+</body>
+</html>

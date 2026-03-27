@@ -624,7 +624,26 @@
                     </div>
                 </div>
 
+                {{-- Email sending --}}
+                @if($tokenEmailMessage)
+                    <div class="alert alert-{{ $tokenEmailType }} py-1 small mt-3 mb-0">{{ $tokenEmailMessage }}</div>
+                @endif
+
                 <div class="d-flex gap-2 justify-content-end mt-3">
+                    @php
+                        $participantTiers = $tokenParticipantId ? \App\Models\Participant::find($tokenParticipantId)?->tiers : null;
+                        $hasEmail = (bool) $participantTiers?->email;
+                        $hasFromEmail = (bool) $operation->typeOperation?->email_from;
+                        $canSendEmail = $hasEmail && $hasFromEmail;
+                    @endphp
+                    <button type="button"
+                            class="btn btn-sm btn-outline-primary"
+                            wire:click="envoyerTokenParEmail"
+                            {{ $canSendEmail ? '' : 'disabled' }}
+                            title="{{ !$hasFromEmail ? 'Email expéditeur non configuré sur le type d\'opération' : (!$hasEmail ? 'Pas d\'email sur la fiche du participant' : 'Envoyer le lien par email à ' . $participantTiers->email) }}">
+                        <span wire:loading.remove wire:target="envoyerTokenParEmail"><i class="bi bi-envelope"></i> Envoyer par email</span>
+                        <span wire:loading wire:target="envoyerTokenParEmail">Envoi...</span>
+                    </button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showTokenModal', false)">Fermer</button>
                 </div>
             </div>

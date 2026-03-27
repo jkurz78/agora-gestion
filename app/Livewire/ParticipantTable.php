@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Mail\FormulaireInvitation;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
@@ -13,6 +14,7 @@ use App\Services\ExerciceService;
 use App\Services\FormulaireTokenService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
@@ -94,6 +96,10 @@ final class ParticipantTable extends Component
     public ?string $tokenExpireAt = null;
 
     public ?int $tokenParticipantId = null;
+
+    public string $tokenEmailMessage = '';
+
+    public string $tokenEmailType = '';
 
     // ── Edit modal documents ──────────────────────────────────
     /** @var array<int, array{name: string, size: int, url: string}> */
@@ -371,6 +377,8 @@ final class ParticipantTable extends Component
         $this->tokenUrl = route('formulaire.index', ['token' => $token->token]);
         $this->tokenExpireAt = $token->expire_at->format('Y-m-d');
         $this->tokenParticipantId = $participantId;
+        $this->tokenEmailMessage = '';
+        $this->tokenEmailType = '';
         $this->showTokenModal = true;
     }
 
@@ -397,7 +405,55 @@ final class ParticipantTable extends Component
         $this->tokenUrl = route('formulaire.index', ['token' => $token->token]);
         $this->tokenExpireAt = $token->expire_at->format('Y-m-d');
         $this->tokenParticipantId = $participantId;
+        $this->tokenEmailMessage = '';
+        $this->tokenEmailType = '';
         $this->showTokenModal = true;
+    }
+
+    public function envoyerTokenParEmail(): void
+    {
+        if ($this->tokenParticipantId === null || $this->tokenUrl === null) {
+            return;
+        }
+
+        $participant = Participant::with('tiers', 'operation.typeOperation')
+            ->findOrFail($this->tokenParticipantId);
+
+        $email = $participant->tiers?->email;
+        if (! $email) {
+            $this->tokenEmailMessage = 'Ce participant n\'a pas d\'adresse email renseignée.';
+            $this->tokenEmailType = 'danger';
+
+            return;
+        }
+
+        $typeOp = $participant->operation?->typeOperation;
+        if (! $typeOp?->email_from) {
+            $this->tokenEmailMessage = 'L\'adresse d\'expédition n\'est pas configurée sur le type d\'opération.';
+            $this->tokenEmailType = 'danger';
+
+            return;
+        }
+
+        try {
+            $mail = new FormulaireInvitation(
+                prenomParticipant: $participant->tiers->prenom ?? $participant->tiers->nom ?? 'Participant',
+                nomOperation: $participant->operation->nom,
+                formulaireUrl: $this->tokenUrl,
+                tokenCode: $this->tokenCode ?? '',
+                dateExpiration: Carbon::parse($this->tokenExpireAt)->format('d/m/Y'),
+            );
+
+            Mail::mailer()
+                ->to($email)
+                ->send($mail->from($typeOp->email_from, $typeOp->email_from_name ?? null));
+
+            $this->tokenEmailMessage = "Email envoyé à {$email}.";
+            $this->tokenEmailType = 'success';
+        } catch (\Throwable $e) {
+            $this->tokenEmailMessage = 'Erreur lors de l\'envoi : '.$e->getMessage();
+            $this->tokenEmailType = 'danger';
+        }
     }
 
     // ── Document helper ─────────────────────────────────────────
