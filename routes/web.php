@@ -41,6 +41,7 @@ $registerParametres = function (): void {
         Route::post('sous-categories/{sousCategory}/toggle-flag', [SousCategorieController::class, 'toggleFlag'])->name('sous-categories.toggle-flag');
         Route::resource('comptes-bancaires', CompteBancaireController::class)->except(['show']);
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::view('type-operations', 'parametres.type-operations.index')->name('type-operations.index');
     });
     Route::view('/helloasso-sync', 'banques.helloasso-sync')->name('helloasso-sync');
 };

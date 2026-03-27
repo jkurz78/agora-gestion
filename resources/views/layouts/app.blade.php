@@ -352,6 +352,14 @@
                                 </a>
                             </li>
                             @endif
+                            @if (Route::has($espacePrefix . '.parametres.type-operations.index'))
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.type-operations.*') ? 'active' : '' }}"
+                                   href="{{ route($espacePrefix . '.parametres.type-operations.index') }}">
+                                    <i class="bi bi-collection"></i> Types d'opération
+                                </a>
+                            </li>
+                            @endif
                             @if(($espace ?? null) === \App\Enums\Espace::Compta)
                             @if (Route::has('compta.operations.index'))
                             <li>
@@ -437,6 +445,7 @@
         document.addEventListener('livewire:updated', initTooltips);
     </script>
 
+    @stack('scripts')
     @php $footerBg = app()->environment('production') ? ($espaceColor ?? '#722281') : '#b45309'; @endphp
     <footer class="text-center small py-2" style="position:fixed;bottom:0;left:0;right:0;background-color:{{ $footerBg }};color:rgba(255,255,255,0.85);z-index:1030;">
         &copy; {{ config('version.year', date('Y')) }} Jürgen Kurz &middot; SVS Accounting &middot; {{ config('version.tag', app()->environment()) }} &middot; {{ config('version.date', '') }}

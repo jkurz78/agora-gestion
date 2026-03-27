@@ -109,7 +109,9 @@
                             <td style="background:#f0f0f0;padding:2px 0;font-size:12px;color:#888">
                                 <div class="d-flex">
                                     <span style="flex:1;text-align:center">Présence</span>
-                                    <span style="width:40px;text-align:center;border-left:1px solid #ddd">Kiné</span>
+                                    @if($operation->typeOperation?->confidentiel)
+                                        <span style="width:40px;text-align:center;border-left:1px solid #ddd">Kiné</span>
+                                    @endif
                                 </div>
                             </td>
                         @endforeach
@@ -147,20 +149,22 @@
                                                 @endforeach
                                             </select>
                                         </div>
-                                        <div style="width:40px;border-left:1px solid #dee2e6;background:{{ $kineBg }};cursor:pointer;display:flex;align-items:center;justify-content:center"
-                                             onclick="
-                                                var vals = ['', 'oui', 'non'];
-                                                var cur = '{{ $kine }}';
-                                                var next = vals[(vals.indexOf(cur) + 1) % vals.length];
-                                                @this.call('updatePresence', {{ $seance->id }}, {{ $participant->id }}, 'kine', next);
-                                             "
-                                             title="{{ $kine === 'oui' ? 'Oui' : ($kine === 'non' ? 'Non' : 'Non renseigné') }} — clic pour changer">
-                                            @if($kine === 'oui')
-                                                <i class="bi bi-check-lg" style="color:#198754;font-size:14px"></i>
-                                            @elseif($kine === 'non')
-                                                <i class="bi bi-x-lg" style="color:#dc3545;font-size:12px"></i>
-                                            @endif
-                                        </div>
+                                        @if($operation->typeOperation?->confidentiel)
+                                            <div style="width:40px;border-left:1px solid #dee2e6;background:{{ $kineBg }};cursor:pointer;display:flex;align-items:center;justify-content:center"
+                                                 onclick="
+                                                    var vals = ['', 'oui', 'non'];
+                                                    var cur = '{{ $kine }}';
+                                                    var next = vals[(vals.indexOf(cur) + 1) % vals.length];
+                                                    @this.call('updatePresence', {{ $seance->id }}, {{ $participant->id }}, 'kine', next);
+                                                 "
+                                                 title="{{ $kine === 'oui' ? 'Oui' : ($kine === 'non' ? 'Non' : 'Non renseigné') }} — clic pour changer">
+                                                @if($kine === 'oui')
+                                                    <i class="bi bi-check-lg" style="color:#198754;font-size:14px"></i>
+                                                @elseif($kine === 'non')
+                                                    <i class="bi bi-x-lg" style="color:#dc3545;font-size:12px"></i>
+                                                @endif
+                                            </div>
+                                        @endif
                                     </div>
                                 </td>
                             @endforeach

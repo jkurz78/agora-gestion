@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Models\Operation;
+use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use App\Services\RapportService;
 use Livewire\Component;
@@ -13,6 +14,8 @@ final class RapportSeances extends Component
 {
     /** @var array<int, int> */
     public array $selectedOperationIds = [];
+
+    public ?int $filterTypeId = null;
 
     public function exportCsv(): mixed
     {
@@ -51,13 +54,23 @@ final class RapportSeances extends Component
         }, 'rapport_seances_'.$exercice.'.csv', ['Content-Type' => 'text/csv']);
     }
 
+    public function updatedFilterTypeId(): void
+    {
+        $this->selectedOperationIds = [];
+    }
+
     public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();
-        $operations = Operation::forExercice($exercice)->whereNotNull('nombre_seances')
+        $typeOperations = TypeOperation::actif()->orderBy('code')->get();
+
+        $query = Operation::forExercice($exercice)->whereNotNull('nombre_seances')
             ->where('nombre_seances', '>', 0)
-            ->orderBy('nom')
-            ->get();
+            ->orderBy('nom');
+        if ($this->filterTypeId !== null) {
+            $query->where('type_operation_id', $this->filterTypeId);
+        }
+        $operations = $query->get();
 
         $seances = [];
         $charges = [];
@@ -76,6 +89,7 @@ final class RapportSeances extends Component
 
         return view('livewire.rapport-seances', [
             'operations' => $operations,
+            'typeOperations' => $typeOperations,
             'seances' => $seances,
             'charges' => $charges,
             'produits' => $produits,

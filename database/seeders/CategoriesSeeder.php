@@ -25,8 +25,8 @@ class CategoriesSeeder extends Seeder
                 'nom' => '70 - Ventes et prestations',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Formations',              'code_cerfa' => '706A'],
-                    ['nom' => 'Parcours thérapeutiques', 'code_cerfa' => '706B'],
+                    ['nom' => 'Formations',              'code_cerfa' => '706A', 'pour_inscriptions' => true],
+                    ['nom' => 'Parcours thérapeutiques', 'code_cerfa' => '706B', 'pour_inscriptions' => true],
                     ['nom' => 'Ventes de produits',      'code_cerfa' => '707'],
                 ],
             ],

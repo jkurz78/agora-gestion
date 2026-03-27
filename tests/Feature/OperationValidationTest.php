@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Operation;
+use App\Models\TypeOperation;
 use App\Models\User;
 
 beforeEach(function () {
@@ -27,11 +28,13 @@ it('rejette la création sans date_fin', function () {
 });
 
 it('accepte la création avec les deux dates', function () {
+    $typeOp = TypeOperation::factory()->create();
     $response = $this->actingAs($this->user)->post(route('compta.operations.store'), [
         'nom' => 'Test op',
         'date_debut' => '2025-09-01',
         'date_fin' => '2026-03-31',
         'statut' => 'en_cours',
+        'type_operation_id' => $typeOp->id,
     ]);
     $response->assertRedirect();
     $response->assertSessionHasNoErrors();

@@ -74,12 +74,17 @@
 </head>
 <body>
     <div class="footer"><span class="page-number"></span></div>
+    @if($footerLogoBase64)
+        <div style="position: fixed; bottom: 10mm; left: 10mm;">
+            <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height: 15mm;" alt="">
+        </div>
+    @endif
 
     <table class="header">
         <tr>
             <td style="width:60%">
-                @if($logoBase64)
-                    <img class="logo" src="data:{{ $logoMime }};base64,{{ $logoBase64 }}" alt="Logo">
+                @if($headerLogoBase64)
+                    <img class="logo" src="data:{{ $headerLogoMime }};base64,{{ $headerLogoBase64 }}" alt="Logo">
                 @endif
                 @if($association)
                     <div class="association-name">{{ $association->nom }}</div>
@@ -109,7 +114,9 @@
             <tr>
                 <th class="col-name">Participant</th>
                 <th class="col-signature">Signature</th>
-                <th class="col-kine">Kiné</th>
+                @if($isConfidentiel)
+                    <th class="col-kine">Kiné</th>
+                @endif
                 <th class="col-obs">Observations</th>
             </tr>
         </thead>
@@ -118,7 +125,9 @@
                 <tr>
                     <td style="font-weight:600">{{ $p->tiers->nom ?? '' }} {{ $p->tiers->prenom ?? '' }}</td>
                     <td class="col-signature"></td>
-                    <td class="col-kine"><span class="checkbox-empty"></span></td>
+                    @if($isConfidentiel)
+                        <td class="col-kine"><span class="checkbox-empty"></span></td>
+                    @endif
                     <td></td>
                 </tr>
             @endforeach
