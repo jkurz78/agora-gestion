@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Models\Operation;
+use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use App\Services\RapportService;
 use Livewire\Component;
@@ -13,6 +14,8 @@ final class RapportCompteResultatOperations extends Component
 {
     /** @var array<int, int> */
     public array $selectedOperationIds = [];
+
+    public ?int $filterTypeId = null;
 
     public function exportCsv(): mixed
     {
@@ -42,10 +45,22 @@ final class RapportCompteResultatOperations extends Component
         }, 'cr_operations_'.$exercice.'.csv', ['Content-Type' => 'text/csv']);
     }
 
+    public function updatedFilterTypeId(): void
+    {
+        $this->selectedOperationIds = [];
+    }
+
     public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();
-        $operations = Operation::forExercice($exercice)->orderBy('nom')->get();
+        $typeOperations = TypeOperation::actif()->orderBy('code')->get();
+
+        $query = Operation::forExercice($exercice)->orderBy('nom');
+        if ($this->filterTypeId !== null) {
+            $query->where('type_operation_id', $this->filterTypeId);
+        }
+        $operations = $query->get();
+
         $charges = [];
         $produits = [];
         $totalChargesN = 0.0;
@@ -61,6 +76,7 @@ final class RapportCompteResultatOperations extends Component
 
         return view('livewire.rapport-compte-resultat-operations', [
             'operations' => $operations,
+            'typeOperations' => $typeOperations,
             'charges' => $charges,
             'produits' => $produits,
             'totalChargesN' => $totalChargesN,
