@@ -437,9 +437,11 @@ final class ParticipantTable extends Component
 
         $exercice = app(ExerciceService::class)->current();
 
-        return TransactionLigne::where('exercice', $exercice)
+        return TransactionLigne::query()
             ->whereHas('sousCategorie', fn ($q) => $q->where('pour_cotisations', true))
-            ->whereHas('transaction', fn ($q) => $q->where('tiers_id', $participant->tiers_id))
+            ->whereHas('transaction', fn ($q) => $q
+                ->where('tiers_id', $participant->tiers_id)
+                ->forExercice($exercice))
             ->exists();
     }
 
