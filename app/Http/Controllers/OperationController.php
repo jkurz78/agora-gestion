@@ -8,7 +8,7 @@ use App\Enums\StatutOperation;
 use App\Http\Requests\StoreOperationRequest;
 use App\Http\Requests\UpdateOperationRequest;
 use App\Models\Operation;
-use App\Models\SousCategorie;
+use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,7 +35,7 @@ final class OperationController extends Controller
     public function create(): View
     {
         return view('operations.create', [
-            'sousCategories' => SousCategorie::where('pour_inscriptions', true)->orderBy('nom')->get(),
+            'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
         ]);
     }
 
@@ -79,7 +79,8 @@ final class OperationController extends Controller
     {
         return view('operations.edit', [
             'operation' => $operation,
-            'sousCategories' => SousCategorie::where('pour_inscriptions', true)->orderBy('nom')->get(),
+            'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
+            'hasParticipants' => $operation->participants()->exists(),
         ]);
     }
 
