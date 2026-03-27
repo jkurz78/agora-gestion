@@ -29,7 +29,7 @@ Introduire une entité **Type d'opération** qui catégorise les opérations (pa
 |----------------------|----------------|---------------------------------|---------------------|
 | `id`                 | bigint PK      | auto-increment                  |                     |
 | `type_operation_id`  | foreignId      | required, FK cascade delete     |                     |
-| `libelle`            | varchar(100)   | required                        | Ex: "Plein tarif"   |
+| `libelle`            | varchar(100)   | required, unique par type       | Ex: "Plein tarif"   |
 | `montant`            | decimal(10,2)  | required                        | Montant en €        |
 | `created_at`         | timestamp      |                                 |                     |
 | `updated_at`         | timestamp      |                                 |                     |
@@ -79,6 +79,8 @@ Composant Livewire `TypeOperationManager` réutilisé dans les deux espaces (com
 
 Cette modale est réutilisée depuis le bouton "+" du formulaire d'opération.
 
+**Note technique :** Les formulaires de création/édition d'opération côté compta sont actuellement des vues Blade classiques (pas Livewire). Le bouton "+" ouvrira la modale Livewire `TypeOperationManager` embarquée dans la page Blade via `@livewire`.
+
 ### Impacts sur les écrans existants
 
 #### Formulaire création/édition d'opération (compta)
@@ -101,7 +103,7 @@ Cette modale est réutilisée depuis le bouton "+" du formulaire d'opération.
   - Si `reserve_adherents = false` : badge vert (adhérent) ou vide
   - Adhérent = cotisation active sur l'exercice en cours pour le tiers
 - Colonne Tarif avec le libellé du tarif choisi à l'inscription
-- Masquage du bouton "Créer token" si `confidentiel = false`
+- Masquage du bouton "Créer token" si `confidentiel = true` (les opérations avec données sensibles ne doivent pas exposer de formulaire public)
 - Masquage des colonnes médicales si `confidentiel = false`
 
 #### Modale inscription participant
@@ -121,6 +123,9 @@ Cette modale est réutilisée depuis le bouton "+" du formulaire d'opération.
 - Logo du type en en-tête (remplace le logo de l'association)
 - Logo de l'association en pied de page (petit, ~15 mm)
 - Case "données confidentielles" masquée si le type ne le prévoit pas
+
+#### Remise en banque (RemiseBancaireService)
+- Utilise `operation->typeOperation->sousCategorie` au lieu de `operation->sousCategorie` pour créer les lignes de transaction lors de la validation d'une remise
 
 #### Sync HelloAsso
 - Utilise `operation->typeOperation->sousCategorie` au lieu de `operation->sousCategorie`
