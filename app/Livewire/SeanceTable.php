@@ -31,9 +31,17 @@ final class SeanceTable extends Component
 
         if ($existingCount === 0 && $nombreSeances > 0) {
             for ($i = 1; $i <= $nombreSeances; $i++) {
+                $date = null;
+                if ($i === 1 && $this->operation->date_debut) {
+                    $date = $this->operation->date_debut->toDateString();
+                } elseif ($i === $nombreSeances && $this->operation->date_fin) {
+                    $date = $this->operation->date_fin->toDateString();
+                }
+
                 Seance::create([
                     'operation_id' => $this->operation->id,
                     'numero' => $i,
+                    'date' => $date,
                 ]);
             }
         }
