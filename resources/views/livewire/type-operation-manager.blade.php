@@ -1,4 +1,11 @@
 <div>
+    @if($flashMessage)
+        <div class="alert alert-{{ $flashType }} alert-dismissible fade show">
+            {{ $flashMessage }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" wire:click="$set('flashMessage', '')"></button>
+        </div>
+    @endif
+
     @if(!$modalOnly)
     {{-- Toolbar --}}
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">

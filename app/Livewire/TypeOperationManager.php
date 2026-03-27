@@ -60,6 +60,11 @@ final class TypeOperationManager extends Component
     // ── Filter ───────────────────────────────────────────────────
     public string $filter = 'tous';
 
+    // ── Flash message ───────────────────────────────────────────
+    public string $flashMessage = '';
+
+    public string $flashType = '';
+
     // ── Tarifs flagged for deletion ──────────────────────────────
     /** @var array<int, int> */
     public array $tarifsToDelete = [];
@@ -187,7 +192,8 @@ final class TypeOperationManager extends Component
         $type = TypeOperation::withCount('operations')->findOrFail($id);
 
         if ($type->operations_count > 0) {
-            $this->dispatch('toast', message: 'Impossible de supprimer : des opérations utilisent ce type.', type: 'error');
+            $this->flashMessage = 'Impossible de supprimer : des opérations utilisent ce type.';
+            $this->flashType = 'danger';
 
             return;
         }
@@ -260,7 +266,8 @@ final class TypeOperationManager extends Component
                     'libelle' => $tarif->libelle,
                     'montant' => (string) $tarif->montant,
                 ];
-                $this->dispatch('toast', message: "Le tarif \"{$tarif->libelle}\" ne peut pas être supprimé car des participants l'utilisent.", type: 'warning');
+                $this->flashMessage = "Le tarif \"{$tarif->libelle}\" ne peut pas être supprimé car des participants l'utilisent.";
+                $this->flashType = 'warning';
 
                 continue;
             }
