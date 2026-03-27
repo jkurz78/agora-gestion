@@ -26,6 +26,8 @@ final class TypeOperation extends Model
         'logo_path',
         'email_from',
         'email_from_name',
+        'email_formulaire_objet',
+        'email_formulaire_corps',
     ];
 
     protected function casts(): array
