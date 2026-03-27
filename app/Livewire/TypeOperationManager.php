@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Mail\TestEmail;
 use App\Models\SousCategorie;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
@@ -48,6 +50,13 @@ final class TypeOperationManager extends Component
     public $logo = null;
 
     public string $existingLogoPath = '';
+
+    // ── Email fields ──────────────────────────────────────────────
+    public string $email_from = '';
+
+    public string $email_from_name = '';
+
+    public string $testEmailTo = '';
 
     // ── Tarifs management ────────────────────────────────────────
     /** @var array<int, array{id: int|null, libelle: string, montant: string}> */
@@ -117,6 +126,9 @@ final class TypeOperationManager extends Component
         $this->actif = $type->actif;
         $this->logo = null;
         $this->existingLogoPath = $type->logo_path ?? '';
+        $this->email_from = $type->email_from ?? '';
+        $this->email_from_name = $type->email_from_name ?? '';
+        $this->testEmailTo = '';
         $this->tarifs = $type->tarifs->map(fn (TypeOperationTarif $t) => [
             'id' => $t->id,
             'libelle' => $t->libelle,
@@ -136,6 +148,8 @@ final class TypeOperationManager extends Component
             'sous_categorie_id' => 'required|exists:sous_categories,id',
             'nombre_seances' => 'nullable|integer|min:1',
             'logo' => 'nullable|image|max:512',
+            'email_from' => 'nullable|email|max:255',
+            'email_from_name' => 'nullable|string|max:255',
         ];
 
         $this->validate($rules);
@@ -156,6 +170,8 @@ final class TypeOperationManager extends Component
                 'confidentiel' => $this->confidentiel,
                 'reserve_adherents' => $this->reserve_adherents,
                 'actif' => $this->actif,
+                'email_from' => $this->email_from !== '' ? $this->email_from : null,
+                'email_from_name' => $this->email_from_name !== '' ? $this->email_from_name : null,
             ];
 
             if ($logoPath !== null) {
@@ -248,6 +264,34 @@ final class TypeOperationManager extends Component
         $this->tarifs = array_values($this->tarifs);
     }
 
+    // ── Test email ────────────────────────────────────────────────
+
+    public function sendTestEmail(): void
+    {
+        $this->validate([
+            'email_from' => 'required|email',
+            'testEmailTo' => 'required|email',
+        ], [
+            'email_from.required' => 'L\'adresse d\'expédition est requise pour envoyer un test.',
+            'testEmailTo.required' => 'Veuillez saisir une adresse destinataire.',
+            'testEmailTo.email' => 'L\'adresse destinataire n\'est pas valide.',
+        ]);
+
+        try {
+            $mail = new TestEmail($this->nom ?: 'Sans nom');
+
+            Mail::mailer()
+                ->to($this->testEmailTo)
+                ->send($mail->from($this->email_from, $this->email_from_name ?: null));
+
+            $this->flashMessage = "Email de test envoyé à {$this->testEmailTo}.";
+            $this->flashType = 'success';
+        } catch (\Throwable $e) {
+            $this->flashMessage = 'Erreur lors de l\'envoi : '.$e->getMessage();
+            $this->flashType = 'danger';
+        }
+    }
+
     // ── Private helpers ──────────────────────────────────────────
 
     private function syncTarifs(TypeOperation $type): void
@@ -307,6 +351,9 @@ final class TypeOperationManager extends Component
         $this->actif = true;
         $this->logo = null;
         $this->existingLogoPath = '';
+        $this->email_from = '';
+        $this->email_from_name = '';
+        $this->testEmailTo = '';
         $this->tarifs = [];
         $this->newTarifLibelle = '';
         $this->newTarifMontant = '';

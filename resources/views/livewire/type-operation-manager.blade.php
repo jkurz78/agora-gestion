@@ -254,6 +254,40 @@
                     </div>
                 </div>
 
+                {{-- Email section --}}
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Email d'expédition</label>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <input type="text" wire:model="email_from_name" class="form-control form-control-sm"
+                                   placeholder="Nom expéditeur">
+                        </div>
+                        <div class="col-md-8">
+                            <input type="email" wire:model="email_from" class="form-control form-control-sm @error('email_from') is-invalid @enderror"
+                                   placeholder="adresse@exemple.fr">
+                            @error('email_from')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+                    @if($email_from)
+                        <div class="row g-2 mt-2 align-items-end">
+                            <div class="col">
+                                <input type="email" wire:model="testEmailTo" class="form-control form-control-sm @error('testEmailTo') is-invalid @enderror"
+                                       placeholder="Adresse destinataire pour le test">
+                                @error('testEmailTo')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col-auto">
+                                <button type="button" class="btn btn-sm btn-outline-primary" wire:click="sendTestEmail">
+                                    <i class="bi bi-envelope"></i> Tester
+                                </button>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+
                 {{-- Actions --}}
                 <div class="d-flex gap-2 justify-content-end mt-4">
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Annuler</button>

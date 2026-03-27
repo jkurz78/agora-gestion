@@ -24,6 +24,8 @@ final class TypeOperation extends Model
         'reserve_adherents',
         'actif',
         'logo_path',
+        'email_from',
+        'email_from_name',
     ];
 
     protected function casts(): array
