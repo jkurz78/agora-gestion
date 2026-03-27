@@ -7,6 +7,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -113,7 +114,10 @@ it('hides medical columns when user lacks permission', function () {
 it('shows medical columns when user has permission', function () {
     $this->user->update(['peut_voir_donnees_sensibles' => true]);
 
-    Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
+    $type = TypeOperation::factory()->confidentiel()->create();
+    $operation = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    Livewire::test(ParticipantTable::class, ['operation' => $operation])
         ->assertSee('Date naissance')
         ->assertSee('Taille');
 });
