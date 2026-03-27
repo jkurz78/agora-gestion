@@ -20,6 +20,45 @@ final class ReglementTable extends Component
     public function mount(Operation $operation): void
     {
         $this->operation = $operation;
+        $this->preFillFromTarif();
+    }
+
+    private function preFillFromTarif(): void
+    {
+        $seances = Seance::where('operation_id', $this->operation->id)
+            ->orderBy('numero')
+            ->get();
+
+        if ($seances->isEmpty()) {
+            return;
+        }
+
+        $participants = $this->operation->participants()
+            ->with('typeOperationTarif')
+            ->get();
+
+        foreach ($participants as $participant) {
+            $tarif = $participant->typeOperationTarif?->montant;
+
+            if ($tarif === null) {
+                continue;
+            }
+
+            foreach ($seances as $seance) {
+                $existing = Reglement::where('participant_id', $participant->id)
+                    ->where('seance_id', $seance->id)
+                    ->first();
+
+                if ($existing !== null && $existing->montant_prevu !== null) {
+                    continue;
+                }
+
+                Reglement::updateOrCreate(
+                    ['participant_id' => $participant->id, 'seance_id' => $seance->id],
+                    ['montant_prevu' => $tarif]
+                );
+            }
+        }
     }
 
     public function cycleModePaiement(int $participantId, int $seanceId): void
