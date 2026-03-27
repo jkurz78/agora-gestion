@@ -10,6 +10,7 @@ use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use App\Models\User;
 use App\Services\RemiseBancaireService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,7 +22,8 @@ it('generates a PDF for a comptabilised remise', function () {
     $this->actingAs($user);
     $compteCible = CompteBancaire::factory()->create();
     $sc = SousCategorie::factory()->create();
-    $operation = Operation::factory()->create(['sous_categorie_id' => $sc->id]);
+    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sc->id]);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
     $tiers = Tiers::factory()->create();
     $participant = Participant::create([
         'operation_id' => $operation->id,
@@ -59,7 +61,8 @@ it('streams PDF inline when mode=inline', function () {
     $this->actingAs($user);
     $compteCible = CompteBancaire::factory()->create();
     $sc = SousCategorie::factory()->create();
-    $operation = Operation::factory()->create(['sous_categorie_id' => $sc->id]);
+    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sc->id]);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
     $tiers = Tiers::factory()->create();
     $participant = Participant::create([
         'operation_id' => $operation->id,
