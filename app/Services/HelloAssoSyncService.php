@@ -108,7 +108,7 @@ final class HelloAssoSyncService
                 $resolvedItems[] = $resolved;
             }
 
-            DB::transaction(function () use ($order, $orderDate, $modePaiement, $tiers, $resolvedItems, $exercice, &$result) {
+            DB::transaction(function () use ($order, $orderDate, $modePaiement, $tiers, $resolvedItems, &$result) {
                 // Upsert Transaction (montant_total recalculated after lignes)
                 $existing = Transaction::withTrashed()
                     ->where('helloasso_order_id', $order['id'])
@@ -173,7 +173,6 @@ final class HelloAssoSyncService
                             'sous_categorie_id' => $resolved['sous_categorie_id'],
                             'operation_id' => $resolved['operation_id'],
                             'montant' => $montantEuros,
-                            'exercice' => $resolved['exercice'] === 'use_sync_exercice' ? $exercice : null,
                         ]);
                         $result['lignes_updated']++;
                     } else {
@@ -183,7 +182,6 @@ final class HelloAssoSyncService
                             'operation_id' => $resolved['operation_id'],
                             'montant' => $montantEuros,
                             'helloasso_item_id' => $item['id'],
-                            'exercice' => $resolved['exercice'] === 'use_sync_exercice' ? $exercice : null,
                         ]);
                         $result['lignes_created']++;
                     }
@@ -260,7 +258,7 @@ final class HelloAssoSyncService
     /**
      * Resolve sous-catégorie and opération for an item.
      *
-     * @return array{item: array, sous_categorie_id: int, operation_id: ?int, exercice: string|null}
+     * @return array{item: array, sous_categorie_id: int, operation_id: ?int}
      */
     private function resolveItem(array $item, string $formSlug): array
     {
@@ -281,14 +279,10 @@ final class HelloAssoSyncService
             $sousCategorieId = $this->resolveSousCategorie($type);
         }
 
-        // Exercice: only for Membership items (null = don't set exercice on the ligne)
-        $exercice = ($type === 'Membership') ? 'use_sync_exercice' : null;
-
         return [
             'item' => $item,
             'sous_categorie_id' => $sousCategorieId,
             'operation_id' => $operationId,
-            'exercice' => $exercice,
         ];
     }
 

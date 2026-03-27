@@ -62,7 +62,6 @@ describe('contrôles bloquants', function () {
         $transaction->lignes()->create([
             'montant' => 50,
             'sous_categorie_id' => null,
-            'exercice' => 2025,
         ]);
 
         $result = $this->service->executer(2025);
