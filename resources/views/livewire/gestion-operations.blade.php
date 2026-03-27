@@ -1,10 +1,32 @@
 <div>
+    @if($hasMissingTypes)
+        <div class="alert alert-warning d-flex align-items-center mb-3">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div>
+                Des opérations ne sont pas encore associées à un type.
+                <a href="{{ route('compta.operations.index') }}">Mettre à jour</a>
+            </div>
+        </div>
+    @endif
+
     <div class="d-flex gap-3 align-items-center mb-3">
+        <label class="fw-semibold text-muted text-nowrap">Type :</label>
+        <select class="form-select" style="max-width:250px" wire:model.live="filterTypeId">
+            <option value="">— Tous les types —</option>
+            @foreach($typeOperations as $type)
+                <option value="{{ $type->id }}">{{ $type->code }} — {{ $type->nom }}</option>
+            @endforeach
+        </select>
+
         <label class="fw-semibold text-muted text-nowrap">Opération :</label>
         <select class="form-select" wire:model.live="selectedOperationId">
             <option value="">— Sélectionner une opération —</option>
-            @foreach($operations as $op)
-                <option value="{{ $op->id }}">{{ $op->nom }} ({{ $op->date_debut?->format('d/m/Y') }} → {{ $op->date_fin?->format('d/m/Y') ?? '...' }})</option>
+            @foreach($groupedOperations as $groupLabel => $ops)
+                <optgroup label="{{ $groupLabel }}">
+                    @foreach($ops as $op)
+                        <option value="{{ $op->id }}">{{ $op->nom }} ({{ $op->date_debut?->format('d/m/Y') }} → {{ $op->date_fin?->format('d/m/Y') ?? '...' }})</option>
+                    @endforeach
+                </optgroup>
             @endforeach
         </select>
         @if($selectedOperation)
