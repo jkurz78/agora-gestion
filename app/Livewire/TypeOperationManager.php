@@ -266,6 +266,13 @@ final class TypeOperationManager extends Component
 
     // ── Test email ────────────────────────────────────────────────
 
+    public function openTestEmailModal(): void
+    {
+        $this->flashMessage = '';
+        $this->flashType = '';
+        $this->testEmailTo = '';
+    }
+
     public function sendTestEmail(): void
     {
         $this->validate([
