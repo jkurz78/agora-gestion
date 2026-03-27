@@ -60,13 +60,18 @@
 </head>
 <body>
     <div class="footer"><span class="page-number"></span></div>
+    @if($footerLogoBase64)
+        <div style="position: fixed; bottom: 10mm; left: 10mm;">
+            <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height: 15mm;" alt="">
+        </div>
+    @endif
 
     {{-- Header --}}
     <table class="header">
         <tr>
             <td style="width:60%">
-                @if($logoBase64)
-                    <img class="logo" src="data:{{ $logoMime }};base64,{{ $logoBase64 }}" alt="Logo">
+                @if($headerLogoBase64)
+                    <img class="logo" src="data:{{ $headerLogoMime }};base64,{{ $headerLogoBase64 }}" alt="Logo">
                 @endif
                 @if($association)
                     <div class="association-name">{{ $association->nom }}</div>

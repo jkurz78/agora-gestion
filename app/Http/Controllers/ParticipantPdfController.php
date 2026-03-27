@@ -18,7 +18,12 @@ final class ParticipantPdfController extends Controller
     public function __invoke(Request $request, Operation $operation): Response
     {
         $format = $request->query('format', 'liste'); // 'liste' or 'annuaire'
-        $confidentiel = $request->boolean('confidentiel')
+
+        $operation->loadMissing('typeOperation');
+
+        $isConfidentiel = $operation->typeOperation?->confidentiel ?? false;
+        $confidentiel = $isConfidentiel
+            && $request->boolean('confidentiel')
             && ($request->user()->peut_voir_donnees_sensibles ?? false);
 
         $participants = Participant::where('operation_id', $operation->id)
@@ -29,21 +34,18 @@ final class ParticipantPdfController extends Controller
 
         $association = Association::find(1);
 
-        $logoBase64 = null;
-        $logoMime = 'image/png';
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $logoBase64 = base64_encode(Storage::disk('public')->get($association->logo_path));
-            $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
-            $logoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
-        }
+        [$headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime] = $this->resolveLogos($association, $operation);
 
         $data = [
             'operation' => $operation,
             'participants' => $participants,
             'confidentiel' => $confidentiel,
+            'isConfidentiel' => $isConfidentiel,
             'association' => $association,
-            'logoBase64' => $logoBase64,
-            'logoMime' => $logoMime,
+            'headerLogoBase64' => $headerLogoBase64,
+            'headerLogoMime' => $headerLogoMime,
+            'footerLogoBase64' => $footerLogoBase64,
+            'footerLogoMime' => $footerLogoMime,
         ];
 
         $view = $format === 'annuaire' ? 'pdf.participants-annuaire' : 'pdf.participants-liste';
@@ -56,5 +58,34 @@ final class ParticipantPdfController extends Controller
         $pdf = Pdf::loadView($view, $data)->setPaper('a4', $format === 'annuaire' ? 'portrait' : 'landscape');
 
         return $pdf->stream($filename);
+    }
+
+    /**
+     * Resolve header and footer logos.
+     * Header: type logo if defined, else association logo.
+     * Footer: association logo only when header uses the type logo.
+     *
+     * @return array{0: ?string, 1: string, 2: ?string, 3: string}
+     */
+    private function resolveLogos(?Association $association, Operation $operation): array
+    {
+        $assoBase64 = null;
+        $assoMime = 'image/png';
+        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
+            $assoBase64 = base64_encode(Storage::disk('public')->get($association->logo_path));
+            $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+            $assoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+        }
+
+        $typeLogo = $operation->typeOperation?->logo_path;
+        if ($typeLogo && Storage::disk('public')->exists($typeLogo)) {
+            $typeBase64 = base64_encode(Storage::disk('public')->get($typeLogo));
+            $ext = strtolower(pathinfo($typeLogo, PATHINFO_EXTENSION));
+            $typeMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+
+            return [$typeBase64, $typeMime, $assoBase64, $assoMime];
+        }
+
+        return [$assoBase64, $assoMime, null, 'image/png'];
     }
 }

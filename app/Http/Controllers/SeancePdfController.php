@@ -21,12 +21,15 @@ final class SeancePdfController extends Controller
     {
         abort_unless((int) $seance->operation_id === $operation->id, 404);
 
+        $operation->loadMissing('typeOperation');
+        $isConfidentiel = $operation->typeOperation?->confidentiel ?? false;
+
         $participants = Participant::where('operation_id', $operation->id)
             ->with('tiers')
             ->orderBy('id')
             ->get();
 
-        [$association, $logoBase64, $logoMime] = $this->getAssociationData();
+        [$association, $headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime] = $this->getAssociationData($operation);
 
         $filename = Str::ascii($operation->nom).' - Emargement S'.$seance->numero.'.pdf';
 
@@ -35,8 +38,11 @@ final class SeancePdfController extends Controller
             'seance' => $seance,
             'participants' => $participants,
             'association' => $association,
-            'logoBase64' => $logoBase64,
-            'logoMime' => $logoMime,
+            'isConfidentiel' => $isConfidentiel,
+            'headerLogoBase64' => $headerLogoBase64,
+            'headerLogoMime' => $headerLogoMime,
+            'footerLogoBase64' => $footerLogoBase64,
+            'footerLogoMime' => $footerLogoMime,
         ])->setPaper('a4', 'portrait');
 
         return $pdf->stream($filename);
@@ -44,6 +50,9 @@ final class SeancePdfController extends Controller
 
     public function matrice(Request $request, Operation $operation): Response
     {
+        $operation->loadMissing('typeOperation');
+        $isConfidentiel = $operation->typeOperation?->confidentiel ?? false;
+
         $seances = Seance::where('operation_id', $operation->id)
             ->orderBy('numero')
             ->get();
@@ -60,7 +69,7 @@ final class SeancePdfController extends Controller
             $presenceMap[$p->seance_id.'-'.$p->participant_id] = $p;
         }
 
-        [$association, $logoBase64, $logoMime] = $this->getAssociationData();
+        [$association, $headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime] = $this->getAssociationData($operation);
 
         $filename = Str::ascii($operation->nom).' - Matrice presences.pdf';
 
@@ -70,28 +79,42 @@ final class SeancePdfController extends Controller
             'participants' => $participants,
             'presenceMap' => $presenceMap,
             'association' => $association,
-            'logoBase64' => $logoBase64,
-            'logoMime' => $logoMime,
+            'isConfidentiel' => $isConfidentiel,
+            'headerLogoBase64' => $headerLogoBase64,
+            'headerLogoMime' => $headerLogoMime,
+            'footerLogoBase64' => $footerLogoBase64,
+            'footerLogoMime' => $footerLogoMime,
         ])->setPaper('a4', 'landscape');
 
         return $pdf->stream($filename);
     }
 
     /**
-     * @return array{0: ?Association, 1: ?string, 2: string}
+     * Resolve association + header/footer logos.
+     *
+     * @return array{0: ?Association, 1: ?string, 2: string, 3: ?string, 4: string}
      */
-    private function getAssociationData(): array
+    private function getAssociationData(Operation $operation): array
     {
         $association = Association::find(1);
-        $logoBase64 = null;
-        $logoMime = 'image/png';
+        $assoBase64 = null;
+        $assoMime = 'image/png';
 
         if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $logoBase64 = base64_encode(Storage::disk('public')->get($association->logo_path));
+            $assoBase64 = base64_encode(Storage::disk('public')->get($association->logo_path));
             $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
-            $logoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+            $assoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
-        return [$association, $logoBase64, $logoMime];
+        $typeLogo = $operation->typeOperation?->logo_path;
+        if ($typeLogo && Storage::disk('public')->exists($typeLogo)) {
+            $typeBase64 = base64_encode(Storage::disk('public')->get($typeLogo));
+            $ext = strtolower(pathinfo($typeLogo, PATHINFO_EXTENSION));
+            $typeMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
+
+            return [$association, $typeBase64, $typeMime, $assoBase64, $assoMime];
+        }
+
+        return [$association, $assoBase64, $assoMime, null, 'image/png'];
     }
 }
