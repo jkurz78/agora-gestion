@@ -1,4 +1,5 @@
 <div>
+    @if(!$modalOnly)
     {{-- Toolbar --}}
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
         <div class="d-flex gap-2 align-items-center">
@@ -106,6 +107,8 @@
             </tbody>
         </table>
     </div>
+
+    @endif
 
     {{-- ═══════════════════════════════════════════════════════════
          MODAL CREATE/EDIT

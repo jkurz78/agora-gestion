@@ -111,7 +111,7 @@
     </div>
 
     {{-- Modal Livewire pour créer un type d'opération --}}
-    @livewire('type-operation-manager')
+    @livewire('type-operation-manager', ['modalOnly' => true])
 
     @push('scripts')
     <script>
