@@ -273,8 +273,7 @@
                             <button type="button"
                                     class="btn btn-sm btn-outline-primary w-100"
                                     {{ $email_from ? '' : 'disabled' }}
-                                    wire:click="openTestEmailModal"
-                                    x-on:click="$nextTick(() => document.getElementById('testEmailModal').style.display='flex')">
+                                    wire:click="openTestEmailModal">
                                 <i class="bi bi-envelope"></i> Tester
                             </button>
                         </div>
@@ -282,9 +281,10 @@
                 </div>
 
                 {{-- Mini-modale test email --}}
-                <div id="testEmailModal" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-                     style="background:rgba(0,0,0,.3);z-index:2100;display:none"
-                     onclick="if(event.target===this){this.style.display='none';this.classList.remove('show')}">
+                @if($showTestEmailModal)
+                <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+                     style="background:rgba(0,0,0,.3);z-index:2100"
+                     wire:click.self="$set('showTestEmailModal', false)">
                     <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
                         <h6 class="mb-3"><i class="bi bi-envelope me-1"></i> Envoyer un email de test</h6>
                         <p class="small text-muted mb-2">Expéditeur : {{ $email_from_name ? $email_from_name . ' <' . $email_from . '>' : $email_from }}</p>
@@ -301,7 +301,7 @@
                         @endif
                         <div class="d-flex gap-2 justify-content-end">
                             <button type="button" class="btn btn-sm btn-outline-secondary"
-                                    onclick="document.getElementById('testEmailModal').style.display='none'">
+                                    wire:click="$set('showTestEmailModal', false)">
                                 Fermer
                             </button>
                             <button type="button" class="btn btn-sm btn-primary" wire:click="sendTestEmail">
@@ -311,6 +311,7 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
                 {{-- Actions --}}
                 <div class="d-flex gap-2 justify-content-end mt-4">
