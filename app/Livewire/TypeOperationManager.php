@@ -58,6 +58,8 @@ final class TypeOperationManager extends Component
 
     public string $testEmailTo = '';
 
+    public bool $showTestEmailModal = false;
+
     // ── Tarifs management ────────────────────────────────────────
     /** @var array<int, array{id: int|null, libelle: string, montant: string}> */
     public array $tarifs = [];
@@ -271,6 +273,7 @@ final class TypeOperationManager extends Component
         $this->flashMessage = '';
         $this->flashType = '';
         $this->testEmailTo = '';
+        $this->showTestEmailModal = true;
     }
 
     public function sendTestEmail(): void
@@ -361,6 +364,7 @@ final class TypeOperationManager extends Component
         $this->email_from = '';
         $this->email_from_name = '';
         $this->testEmailTo = '';
+        $this->showTestEmailModal = false;
         $this->tarifs = [];
         $this->newTarifLibelle = '';
         $this->newTarifMontant = '';
