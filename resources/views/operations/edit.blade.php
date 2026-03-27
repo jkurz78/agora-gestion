@@ -30,7 +30,8 @@
 
                 <div class="mb-3">
                     <label for="type_operation_id" class="form-label">Type d'opération <span class="text-danger">*</span></label>
-                    @if ($hasParticipants)
+                    @php $typeLocked = $hasParticipants && $operation->type_operation_id !== null; @endphp
+                    @if ($typeLocked)
                         <div class="alert alert-warning py-2 mb-2">
                             <i class="bi bi-lock-fill me-1"></i>Le type ne peut plus être modifié car des participants sont inscrits.
                         </div>
@@ -38,7 +39,7 @@
                     <div class="input-group">
                         <select name="type_operation_id" id="type_operation_id"
                                 class="form-select @error('type_operation_id') is-invalid @enderror"
-                                required {{ $hasParticipants ? 'disabled' : '' }}>
+                                required {{ $typeLocked ? 'disabled' : '' }}>
                             <option value="">— Sélectionner —</option>
                             @foreach ($typeOperations as $type)
                                 <option value="{{ $type->id }}" data-nombre-seances="{{ $type->nombre_seances }}"
@@ -47,14 +48,14 @@
                                 </option>
                             @endforeach
                         </select>
-                        @unless ($hasParticipants)
+                        @unless ($typeLocked)
                             <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#typeOperationModal"
                                     onclick="Livewire.dispatch('openTypeOperationModal')">
                                 <i class="bi bi-plus-lg"></i>
                             </button>
                         @endunless
                     </div>
-                    @if ($hasParticipants)
+                    @if ($typeLocked)
                         <input type="hidden" name="type_operation_id" value="{{ $operation->type_operation_id }}">
                     @endif
                     @error('type_operation_id')
