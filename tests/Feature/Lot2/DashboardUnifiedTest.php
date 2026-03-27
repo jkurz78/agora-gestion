@@ -52,7 +52,6 @@ it('shows tiers without cotisation for current exercice', function () {
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $scCot->id,
         'montant' => 50.00,
-        'exercice' => $exercice,
     ]);
 
     // Tiers who has had cotisations before but not this exercice
@@ -67,7 +66,6 @@ it('shows tiers without cotisation for current exercice', function () {
         'transaction_id' => $txOld->id,
         'sous_categorie_id' => $scCot->id,
         'montant' => 50.00,
-        'exercice' => $exercice - 1,
     ]);
 
     Livewire::test(Dashboard::class)

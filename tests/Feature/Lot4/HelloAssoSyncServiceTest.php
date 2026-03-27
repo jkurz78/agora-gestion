@@ -85,7 +85,7 @@ it('imports a simple donation order', function () {
     expect($ligne->sous_categorie_id)->toBe($this->scDon->id);
 });
 
-it('imports a membership order with exercice', function () {
+it('imports a membership order', function () {
     $orders = [
         [
             'id' => 101,
@@ -111,7 +111,6 @@ it('imports a membership order with exercice', function () {
 
     $ligne = TransactionLigne::where('helloasso_item_id', 1002)->first();
     expect($ligne->sous_categorie_id)->toBe($this->scCot->id);
-    expect($ligne->exercice)->toBe(2025);
 });
 
 it('groups items by beneficiary into one transaction', function () {

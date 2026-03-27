@@ -99,7 +99,7 @@ it('compteDeResultat inclut les cotisations dans les produits', function () {
         'saisi_par' => $this->user->id,
     ]);
     $recette->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' => $recette->id, 'sous_categorie_id' => $sc->id, 'montant' => 200.00, 'exercice' => 2025]);
+    TransactionLigne::factory()->create(['transaction_id' => $recette->id, 'sous_categorie_id' => $sc->id, 'montant' => 200.00]);
 
     $result = $this->service->compteDeResultat(2025);
 
@@ -153,7 +153,7 @@ it('compteDeResultatOperations filtre par opérations et exclut les cotisations'
     $scCot = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions', 'pour_cotisations' => true]);
     $recette = Transaction::factory()->asRecette()->create(['date' => '2025-10-01', 'montant_total' => 500.00, 'saisi_par' => $this->user->id]);
     $recette->lignes()->forceDelete();
-    TransactionLigne::factory()->create(['transaction_id' => $recette->id, 'sous_categorie_id' => $scCot->id, 'montant' => 500.00, 'exercice' => 2025]);
+    TransactionLigne::factory()->create(['transaction_id' => $recette->id, 'sous_categorie_id' => $scCot->id, 'montant' => 500.00]);
 
     $result = $this->service->compteDeResultatOperations(2025, [$op->id]);
 
