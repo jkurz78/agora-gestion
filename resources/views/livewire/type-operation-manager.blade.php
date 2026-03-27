@@ -201,14 +201,11 @@
                         <div class="mt-2">
                             <img src="{{ $logo->temporaryUrl() }}" alt="Aperçu" style="max-height:64px;border-radius:4px">
                         </div>
-                    @elseif($editingId)
-                        @php $existingType = \App\Models\TypeOperation::find($editingId); @endphp
-                        @if($existingType?->logo_path)
-                            <div class="mt-2">
-                                <img src="{{ Storage::disk('public')->url($existingType->logo_path) }}" alt="Logo actuel" style="max-height:64px;border-radius:4px">
-                                <span class="text-muted small ms-2">Logo actuel</span>
-                            </div>
-                        @endif
+                    @elseif($existingLogoPath !== '')
+                        <div class="mt-2">
+                            <img src="{{ Storage::disk('public')->url($existingLogoPath) }}" alt="Logo actuel" style="max-height:64px;border-radius:4px">
+                            <span class="text-muted small ms-2">Logo actuel</span>
+                        </div>
                     @endif
                 </div>
 
