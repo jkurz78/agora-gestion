@@ -10,9 +10,7 @@
     </style>
 </head>
 <body>
-    <p>Bonjour {{ $prenomParticipant }},</p>
-
-    <p>Nous vous invitons à compléter votre formulaire pour <strong>{{ $nomOperation }}</strong>.</p>
+    <div>{!! $corpsHtml !!}</div>
 
     <p style="text-align: center; margin: 25px 0;">
         <a href="{{ $formulaireUrl }}" class="btn">Accéder au formulaire</a>
