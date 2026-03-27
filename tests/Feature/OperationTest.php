@@ -1,11 +1,15 @@
 <?php
 
 use App\Models\Operation;
+use App\Models\Participant;
+use App\Models\Tiers;
 use App\Models\TransactionLigne;
+use App\Models\TypeOperation;
 use App\Models\User;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
+    $this->typeOperation = TypeOperation::factory()->create();
 });
 
 it('requires authentication to access operations index', function () {
@@ -30,7 +34,7 @@ it('can store an operation with valid data', function () {
             'date_debut' => '2025-06-01',
             'date_fin' => '2025-06-30',
             'nombre_seances' => 5,
-            'statut' => 'en_cours',
+            'type_operation_id' => $this->typeOperation->id,
         ])
         ->assertRedirect(route('compta.operations.index'));
 
@@ -38,13 +42,14 @@ it('can store an operation with valid data', function () {
         'nom' => 'Fête annuelle',
         'nombre_seances' => 5,
         'statut' => 'en_cours',
+        'type_operation_id' => $this->typeOperation->id,
     ]);
 });
 
 it('validates required fields when storing an operation', function () {
     $this->actingAs($this->user)
         ->post(route('compta.operations.store'), [])
-        ->assertSessionHasErrors(['nom']);
+        ->assertSessionHasErrors(['nom', 'type_operation_id']);
 });
 
 it('validates date_fin must be after or equal to date_debut', function () {
@@ -53,7 +58,7 @@ it('validates date_fin must be after or equal to date_debut', function () {
             'nom' => 'Test',
             'date_debut' => '2025-06-30',
             'date_fin' => '2025-06-01',
-            'statut' => 'en_cours',
+            'type_operation_id' => $this->typeOperation->id,
         ])
         ->assertSessionHasErrors(['date_fin']);
 });
@@ -92,6 +97,7 @@ it('can update an operation', function () {
             'statut' => 'cloturee',
             'date_debut' => $operation->date_debut->toDateString(),
             'date_fin' => $operation->date_fin->toDateString(),
+            'type_operation_id' => $operation->type_operation_id,
         ])
         ->assertRedirect(route('compta.operations.show', $operation));
 
@@ -100,4 +106,28 @@ it('can update an operation', function () {
         'nom' => 'Nouveau nom',
         'statut' => 'cloturee',
     ]);
+});
+
+it('locks type when participants exist', function () {
+    $operation = Operation::factory()->create();
+    $otherType = TypeOperation::factory()->create();
+
+    // Create a participant for this operation
+    Tiers::factory()->create();
+    $tiers = Tiers::factory()->create();
+    Participant::create([
+        'tiers_id' => $tiers->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => now(),
+    ]);
+
+    $this->actingAs($this->user)
+        ->put(route('compta.operations.update', $operation), [
+            'nom' => $operation->nom,
+            'statut' => $operation->statut->value,
+            'date_debut' => $operation->date_debut->toDateString(),
+            'date_fin' => $operation->date_fin->toDateString(),
+            'type_operation_id' => $otherType->id,
+        ])
+        ->assertSessionHasErrors(['type_operation_id']);
 });
