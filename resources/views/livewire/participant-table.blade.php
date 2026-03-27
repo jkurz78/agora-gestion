@@ -104,7 +104,7 @@
                     @if($canSeeSensible && $operation->typeOperation?->confidentiel)
                         <th>Notes</th>
                     @endif
-                    @if(!$operation->typeOperation?->confidentiel)
+                    @if($operation->typeOperation?->confidentiel)
                         <th class="text-center">Formulaire</th>
                     @endif
                     <th class="text-end">Actions</th>
@@ -344,7 +344,7 @@
                         @endif
 
                         {{-- Formulaire badge --}}
-                        @if(!$operation->typeOperation?->confidentiel)
+                        @if($operation->typeOperation?->confidentiel)
                         <td class="text-center small">
                             @if ($p->formulaireToken === null)
                                 <button wire:click="genererToken({{ $p->id }})" class="btn btn-sm btn-outline-secondary" title="Générer un lien">
