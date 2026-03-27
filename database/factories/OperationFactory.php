@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Enums\StatutOperation;
 use App\Models\Operation;
+use App\Models\TypeOperation;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -27,6 +28,7 @@ class OperationFactory extends Factory
             'date_fin' => $end,
             'nombre_seances' => null,
             'statut' => StatutOperation::EnCours,
+            'type_operation_id' => TypeOperation::factory(),
         ];
     }
 

@@ -46,7 +46,7 @@ final class RemiseBancaireService
         }
 
         DB::transaction(function () use ($remise, $reglementIds) {
-            $reglements = Reglement::with(['participant.tiers', 'seance.operation'])
+            $reglements = Reglement::with(['participant.tiers', 'seance.operation.typeOperation'])
                 ->whereIn('id', $reglementIds)
                 ->get();
 
@@ -76,9 +76,10 @@ final class RemiseBancaireService
                 $seance = $reglement->seance;
                 $operation = $seance->operation;
 
-                if ($operation->sous_categorie_id === null) {
+                $sousCategorieId = $operation->typeOperation?->sous_categorie_id;
+                if ($sousCategorieId === null) {
                     throw new \RuntimeException(
-                        "L'opération \"{$operation->nom}\" n'a pas de sous-catégorie définie."
+                        "L'opération \"{$operation->nom}\" n'a pas de sous-catégorie définie (type opération manquant ou sans sous-catégorie)."
                     );
                 }
 
@@ -100,7 +101,7 @@ final class RemiseBancaireService
                     'pointe' => true,
                 ], [
                     [
-                        'sous_categorie_id' => $operation->sous_categorie_id,
+                        'sous_categorie_id' => $sousCategorieId,
                         'operation_id' => $operation->id,
                         'seance' => $seance->numero,
                         'montant' => $reglement->montant_prevu,
@@ -164,7 +165,7 @@ final class RemiseBancaireService
 
             // Add new reglements
             if (count($toAdd) > 0) {
-                $newReglements = Reglement::with(['participant.tiers', 'seance.operation'])
+                $newReglements = Reglement::with(['participant.tiers', 'seance.operation.typeOperation'])
                     ->whereIn('id', $toAdd)
                     ->get();
 
@@ -195,9 +196,10 @@ final class RemiseBancaireService
                     $seance = $reglement->seance;
                     $operation = $seance->operation;
 
-                    if ($operation->sous_categorie_id === null) {
+                    $sousCategorieId = $operation->typeOperation?->sous_categorie_id;
+                    if ($sousCategorieId === null) {
                         throw new \RuntimeException(
-                            "L'opération \"{$operation->nom}\" n'a pas de sous-catégorie définie."
+                            "L'opération \"{$operation->nom}\" n'a pas de sous-catégorie définie (type opération manquant ou sans sous-catégorie)."
                         );
                     }
 
@@ -219,7 +221,7 @@ final class RemiseBancaireService
                         'pointe' => true,
                     ], [
                         [
-                            'sous_categorie_id' => $operation->sous_categorie_id,
+                            'sous_categorie_id' => $sousCategorieId,
                             'operation_id' => $operation->id,
                             'seance' => $seance->numero,
                             'montant' => $reglement->montant_prevu,

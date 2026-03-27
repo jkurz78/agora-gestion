@@ -54,12 +54,17 @@
 </head>
 <body>
     <div class="footer"><span class="page-number"></span></div>
+    @if($footerLogoBase64)
+        <div style="position: fixed; bottom: 10mm; left: 10mm;">
+            <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height: 15mm;" alt="">
+        </div>
+    @endif
 
     <table class="header">
         <tr>
             <td style="width:60%">
-                @if($logoBase64)
-                    <img class="logo" src="data:{{ $logoMime }};base64,{{ $logoBase64 }}" alt="Logo">
+                @if($headerLogoBase64)
+                    <img class="logo" src="data:{{ $headerLogoMime }};base64,{{ $headerLogoBase64 }}" alt="Logo">
                 @endif
                 @if($association)
                     <div class="association-name">{{ $association->nom }}</div>
@@ -83,32 +88,35 @@
 
     <table class="matrix">
         <thead>
+            @php $colSpan = $isConfidentiel ? 2 : 1; @endphp
             {{-- Séance numbers --}}
             <tr>
-                <th rowspan="4" class="col-name" style="vertical-align:middle">Participant</th>
+                <th rowspan="{{ $isConfidentiel ? 4 : 3 }}" class="col-name" style="vertical-align:middle">Participant</th>
                 @foreach($seances as $seance)
-                    <th colspan="2" style="text-align:center">S{{ $seance->numero }}</th>
+                    <th colspan="{{ $colSpan }}" style="text-align:center">S{{ $seance->numero }}</th>
                 @endforeach
             </tr>
             {{-- Titre row --}}
             <tr class="header-row">
                 @foreach($seances as $seance)
-                    <td colspan="2" style="text-align:center">{{ Str::limit($seance->titre, 18) }}</td>
+                    <td colspan="{{ $colSpan }}" style="text-align:center">{{ Str::limit($seance->titre, 18) }}</td>
                 @endforeach
             </tr>
             {{-- Date row --}}
             <tr class="header-row">
                 @foreach($seances as $seance)
-                    <td colspan="2" style="text-align:center">{{ $seance->date?->format('d/m/Y') }}</td>
+                    <td colspan="{{ $colSpan }}" style="text-align:center">{{ $seance->date?->format('d/m/Y') }}</td>
                 @endforeach
             </tr>
-            {{-- Sub-header: Présence / Kiné --}}
-            <tr class="header-row">
-                @foreach($seances as $seance)
-                    <td style="text-align:center;font-size:6px;color:#888">Présence</td>
-                    <td style="text-align:center;font-size:6px;color:#888;width:18px">K</td>
-                @endforeach
-            </tr>
+            @if($isConfidentiel)
+                {{-- Sub-header: Présence / Kiné --}}
+                <tr class="header-row">
+                    @foreach($seances as $seance)
+                        <td style="text-align:center;font-size:6px;color:#888">Présence</td>
+                        <td style="text-align:center;font-size:6px;color:#888;width:18px">K</td>
+                    @endforeach
+                </tr>
+            @endif
         </thead>
         <tbody>
             @foreach($participants->sortBy(fn ($p) => mb_strtolower(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''))) as $p)
@@ -144,9 +152,11 @@
                             };
                         @endphp
                         <td class="{{ $statusClass }}" style="font-size:7px">{{ $statusLabel }}</td>
-                        <td style="background:{{ $kineBg }};width:18px">
-                            @if($kine === 'oui') <span style="color:#198754">✓</span> @elseif($kine === 'non') <span style="color:#dc3545">✗</span> @endif
-                        </td>
+                        @if($isConfidentiel)
+                            <td style="background:{{ $kineBg }};width:18px">
+                                @if($kine === 'oui') <span style="color:#198754">✓</span> @elseif($kine === 'non') <span style="color:#dc3545">✗</span> @endif
+                            </td>
+                        @endif
                     @endforeach
                 </tr>
                 {{-- Ligne 2 : Commentaire sur toute la largeur --}}
@@ -157,7 +167,7 @@
                             $presence = $presenceMap[$key] ?? null;
                             $commentaire = $presence?->commentaire ?? '';
                         @endphp
-                        <td colspan="2" style="font-size:6px;color:#888;padding:1px 3px;border-top:none">{{ Str::limit($commentaire, 25) }}</td>
+                        <td colspan="{{ $colSpan }}" style="font-size:6px;color:#888;padding:1px 3px;border-top:none">{{ Str::limit($commentaire, 25) }}</td>
                     @endforeach
                 </tr>
             @endforeach
@@ -172,7 +182,7 @@
                             if (isset($presenceMap[$k]) && $presenceMap[$k]->statut === 'present') $presents++;
                         }
                     @endphp
-                    <td colspan="2" style="text-align:center">{{ $presents }}/{{ $participants->count() }}</td>
+                    <td colspan="{{ $colSpan }}" style="text-align:center">{{ $presents }}/{{ $participants->count() }}</td>
                 @endforeach
             </tr>
         </tbody>

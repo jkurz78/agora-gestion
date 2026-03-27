@@ -75,10 +75,10 @@ final class Dashboard extends Component
             $q->whereHas('lignes', fn ($lq) => $lq->whereIn('sous_categorie_id', $cotSousCategorieIds));
         })
             ->whereDoesntHave('transactions', function ($q) use ($cotSousCategorieIds, $exercice) {
-                $q->whereHas('lignes', function ($lq) use ($cotSousCategorieIds, $exercice) {
-                    $lq->whereIn('sous_categorie_id', $cotSousCategorieIds)
-                        ->where('exercice', $exercice);
-                });
+                $q->forExercice($exercice)
+                    ->whereHas('lignes', function ($lq) use ($cotSousCategorieIds) {
+                        $lq->whereIn('sous_categorie_id', $cotSousCategorieIds);
+                    });
             })
             ->orderBy('nom')
             ->get();

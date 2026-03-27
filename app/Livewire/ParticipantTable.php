@@ -8,6 +8,8 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
+use App\Models\TransactionLigne;
+use App\Services\ExerciceService;
 use App\Services\FormulaireTokenService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -64,6 +66,8 @@ final class ParticipantTable extends Component
 
     public ?int $editReferePar = null;
 
+    public ?int $editTypeOperationTarifId = null;
+
     // Medical fields (edit modal)
     public string $editDateNaissance = '';
 
@@ -104,8 +108,10 @@ final class ParticipantTable extends Component
     {
         $canSeeSensible = (bool) Auth::user()?->peut_voir_donnees_sensibles;
 
+        $this->operation->loadMissing('typeOperation.tarifs');
+
         $query = Participant::where('operation_id', $this->operation->id)
-            ->with(['tiers', 'referePar', 'formulaireToken']);
+            ->with(['tiers', 'referePar', 'formulaireToken', 'typeOperationTarif']);
 
         if ($canSeeSensible) {
             $query->with('donneesMedicales');
@@ -164,6 +170,7 @@ final class ParticipantTable extends Component
             'tiers_id' => $tiersId,
             'operation_id' => $this->operation->id,
             'date_inscription' => now()->toDateString(),
+            'type_operation_tarif_id' => $this->editTypeOperationTarifId,
         ]);
 
         $this->showAddModal = false;
@@ -187,6 +194,7 @@ final class ParticipantTable extends Component
         $this->editEmail = $participant->tiers->email ?? '';
         $this->editDateInscription = $participant->date_inscription->format('Y-m-d');
         $this->editReferePar = $participant->refere_par_id;
+        $this->editTypeOperationTarifId = $participant->type_operation_tarif_id;
 
         // Medical data
         $med = $participant->donneesMedicales;
@@ -222,6 +230,7 @@ final class ParticipantTable extends Component
         $participant->update([
             'date_inscription' => $this->editDateInscription,
             'refere_par_id' => $this->editReferePar,
+            'type_operation_tarif_id' => $this->editTypeOperationTarifId,
         ]);
 
         // Update medical data if user has permission
@@ -415,6 +424,27 @@ final class ParticipantTable extends Component
             ->toArray();
     }
 
+    // ── Adhérent check ────────────────────────────────────────
+
+    /**
+     * Check if the participant's tiers has an active cotisation for the current exercice.
+     */
+    public function isAdherent(Participant $participant): bool
+    {
+        if ($participant->tiers_id === null) {
+            return false;
+        }
+
+        $exercice = app(ExerciceService::class)->current();
+
+        return TransactionLigne::query()
+            ->whereHas('sousCategorie', fn ($q) => $q->where('pour_cotisations', true))
+            ->whereHas('transaction', fn ($q) => $q
+                ->where('tiers_id', $participant->tiers_id)
+                ->forExercice($exercice))
+            ->exists();
+    }
+
     // ── Helpers ────────────────────────────────────────────────
 
     private function resetAddFields(): void
@@ -428,5 +458,6 @@ final class ParticipantTable extends Component
         $this->addVille = '';
         $this->addTelephone = '';
         $this->addEmail = '';
+        $this->editTypeOperationTarifId = null;
     }
 }

@@ -72,7 +72,6 @@ it('shows membres without cotisation', function () {
     TransactionLigne::factory()->create([
         'transaction_id' => $txCurrent->id,
         'sous_categorie_id' => $cotSc->id,
-        'exercice' => $this->exercice,
         'montant' => 30.00,
     ]);
 
@@ -90,7 +89,6 @@ it('shows membres without cotisation', function () {
     TransactionLigne::factory()->create([
         'transaction_id' => $txPrev->id,
         'sous_categorie_id' => $cotSc->id,
-        'exercice' => $this->exercice - 1,
         'montant' => 30.00,
     ]);
 
