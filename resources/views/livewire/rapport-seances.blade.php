@@ -2,6 +2,15 @@
     {{-- Filtre opérations --}}
     <div class="card mb-3">
         <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Filtrer par type</label>
+                <select wire:model.live="filterTypeId" class="form-select form-select-sm" style="max-width: 250px;">
+                    <option value="">Tous les types</option>
+                    @foreach($typeOperations as $type)
+                        <option value="{{ $type->id }}">{{ $type->code }} — {{ $type->nom }}</option>
+                    @endforeach
+                </select>
+            </div>
             <div class="d-flex flex-wrap gap-3 align-items-center">
                 @foreach ($operations as $op)
                     <div class="form-check">
