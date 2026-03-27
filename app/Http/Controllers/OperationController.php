@@ -20,15 +20,27 @@ final class OperationController extends Controller
     {
         $showAll = $request->boolean('all');
         $exercice = app(ExerciceService::class)->current();
+        $typeOperationId = $request->integer('type_operation_id') ?: null;
 
-        $operations = $showAll
-            ? Operation::orderByDesc('date_debut')->get()
-            : Operation::forExercice($exercice)->orderByDesc('date_debut')->get();
+        $query = $showAll
+            ? Operation::query()
+            : Operation::forExercice($exercice);
+
+        $query->with('typeOperation')->orderByDesc('date_debut');
+
+        if ($typeOperationId !== null) {
+            $query->where('type_operation_id', $typeOperationId);
+        }
+
+        $operations = $query->get();
+        $typeOperations = TypeOperation::actif()->orderBy('nom')->get();
 
         return view('operations.index', [
             'operations' => $operations,
             'showAll' => $showAll,
             'exercice' => $exercice,
+            'typeOperations' => $typeOperations,
+            'typeOperationId' => $typeOperationId,
         ]);
     }
 
