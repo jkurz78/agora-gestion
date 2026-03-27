@@ -30,8 +30,9 @@ final class UpdateOperationRequest extends FormRequest
             'type_operation_id' => ['required', 'exists:type_operations,id'],
         ];
 
-        if ($this->route('operation')->participants()->exists()) {
-            $rules['type_operation_id'] = ['required', 'integer', Rule::in([$this->route('operation')->type_operation_id])];
+        $operation = $this->route('operation');
+        if ($operation->participants()->exists() && $operation->type_operation_id !== null) {
+            $rules['type_operation_id'] = ['required', 'integer', Rule::in([$operation->type_operation_id])];
         }
 
         return $rules;
