@@ -87,7 +87,13 @@
                     <th>Téléphone</th>
                     <th>Email</th>
                     <th class="sortable" data-col="date_inscription" style="cursor:pointer">Date inscription <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    @if($canSeeSensible)
+                    @if($operation->typeOperation?->reserve_adherents)
+                        <th>Adhérent</th>
+                    @endif
+                    @if($operation->typeOperation?->tarifs->count())
+                        <th class="sortable" data-col="tarif" style="cursor:pointer">Tarif <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
+                    @endif
+                    @if($canSeeSensible && $operation->typeOperation?->confidentiel)
                         <th class="sortable" data-col="date_naissance" style="cursor:pointer">Date naissance <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                         <th class="sortable" data-col="age" style="cursor:pointer">Âge <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                         <th class="sortable" data-col="sexe" style="cursor:pointer">Sexe <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
@@ -95,10 +101,12 @@
                         <th class="sortable" data-col="poids" style="cursor:pointer">Poids <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     @endif
                     <th class="sortable" data-col="refere_par" style="cursor:pointer">Référé par <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    @if($canSeeSensible)
+                    @if($canSeeSensible && $operation->typeOperation?->confidentiel)
                         <th>Notes</th>
                     @endif
-                    <th class="text-center">Formulaire</th>
+                    @if(!$operation->typeOperation?->confidentiel)
+                        <th class="text-center">Formulaire</th>
+                    @endif
                     <th class="text-end">Actions</th>
                 </tr>
             </thead>
@@ -193,7 +201,25 @@
                             </template>
                         </td>
 
-                        @if($canSeeSensible)
+                        {{-- Adhérent --}}
+                        @if($operation->typeOperation?->reserve_adherents)
+                            <td class="small">
+                                @if($p->tiers && $this->isAdherent($p))
+                                    <span class="badge bg-success">Oui</span>
+                                @else
+                                    <span class="badge bg-danger">Non</span>
+                                @endif
+                            </td>
+                        @endif
+
+                        {{-- Tarif --}}
+                        @if($operation->typeOperation?->tarifs->count())
+                            <td class="small" data-sort="{{ $p->typeOperationTarif?->libelle ?? '' }}">
+                                {{ $p->typeOperationTarif?->libelle ?? '—' }}
+                            </td>
+                        @endif
+
+                        @if($canSeeSensible && $operation->typeOperation?->confidentiel)
                             @php $med = $p->donneesMedicales; @endphp
 
                             {{-- Date naissance --}}
@@ -302,7 +328,7 @@
                         </td>
 
                         {{-- Notes icon --}}
-                        @if($canSeeSensible)
+                        @if($canSeeSensible && $operation->typeOperation?->confidentiel)
                             <td class="small text-center" style="position:relative">
                                 @php $hasNotes = $p->donneesMedicales?->notes; @endphp
                                 <span class="notes-preview-wrap">
@@ -318,6 +344,7 @@
                         @endif
 
                         {{-- Formulaire badge --}}
+                        @if(!$operation->typeOperation?->confidentiel)
                         <td class="text-center small">
                             @if ($p->formulaireToken === null)
                                 <button wire:click="genererToken({{ $p->id }})" class="btn btn-sm btn-outline-secondary" title="Générer un lien">
@@ -337,6 +364,7 @@
                                 </span>
                             @endif
                         </td>
+                        @endif
 
                         {{-- Actions --}}
                         <td class="text-end">
@@ -357,7 +385,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $canSeeSensible ? 14 : 8 }}" class="text-center text-muted py-4">
+                        <td colspan="99" class="text-center text-muted py-4">
                             Aucun participant inscrit.
                         </td>
                     </tr>
@@ -381,6 +409,18 @@
                     <livewire:tiers-autocomplete wire:model="addTiersId" filtre="tous" typeFiltre="particulier" context="participant" :key="'add-tiers-ac'" />
                     @error('addTiersId') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                 </div>
+
+                @if($operation->typeOperation?->tarifs->count())
+                    <div class="mb-3">
+                        <label class="form-label">Tarif</label>
+                        <select wire:model="editTypeOperationTarifId" class="form-select form-select-sm">
+                            <option value="">— Aucun —</option>
+                            @foreach($operation->typeOperation->tarifs as $tarif)
+                                <option value="{{ $tarif->id }}">{{ $tarif->libelle }} — {{ number_format($tarif->montant, 2, ',', ' ') }} €</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
 
                 <div class="d-flex justify-content-end">
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showAddModal', false)">Annuler</button>
@@ -443,6 +483,18 @@
                     <label class="form-label fw-semibold">Référé par</label>
                     <livewire:tiers-autocomplete wire:model="editReferePar" filtre="tous" :key="'edit-refere-par-'.$editParticipantId" />
                 </div>
+
+                @if($operation->typeOperation?->tarifs->count())
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Tarif</label>
+                        <select wire:model="editTypeOperationTarifId" class="form-select form-select-sm">
+                            <option value="">— Aucun —</option>
+                            @foreach($operation->typeOperation->tarifs as $tarif)
+                                <option value="{{ $tarif->id }}">{{ $tarif->libelle }} — {{ number_format($tarif->montant, 2, ',', ' ') }} €</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
 
                 @if($canSeeSensible)
                     <hr>
