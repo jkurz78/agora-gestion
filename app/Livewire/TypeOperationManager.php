@@ -19,6 +19,9 @@ final class TypeOperationManager extends Component
 {
     use WithFileUploads;
 
+    // ── Display mode ──────────────────────────────────────────────
+    public bool $modalOnly = false;
+
     // ── Modal state ──────────────────────────────────────────────
     public bool $showModal = false;
 
