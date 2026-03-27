@@ -28,32 +28,6 @@
                     @enderror
                 </div>
 
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label for="date_debut" class="form-label">Date début <span class="text-danger">*</span></label>
-                        <x-date-input name="date_debut" :value="old('date_debut', $operation->date_debut?->format('Y-m-d') ?? '')" />
-                        @error('date_debut')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                    <div class="col-md-4">
-                        <label for="date_fin" class="form-label">Date fin <span class="text-danger">*</span></label>
-                        <x-date-input name="date_fin" :value="old('date_fin', $operation->date_fin?->format('Y-m-d') ?? '')" />
-                        @error('date_fin')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                    <div class="col-md-4">
-                        <label for="nombre_seances" class="form-label">Nombre de séances</label>
-                        <input type="number" name="nombre_seances" id="nombre_seances" min="1"
-                               class="form-control @error('nombre_seances') is-invalid @enderror"
-                               value="{{ old('nombre_seances', $operation->nombre_seances) }}">
-                        @error('nombre_seances')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
-                </div>
-
                 <div class="mb-3">
                     <label for="type_operation_id" class="form-label">Type d'opération <span class="text-danger">*</span></label>
                     @if ($hasParticipants)
@@ -86,6 +60,32 @@
                     @error('type_operation_id')
                         <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="date_debut" class="form-label">Date début <span class="text-danger">*</span></label>
+                        <x-date-input name="date_debut" :value="old('date_debut', $operation->date_debut?->format('Y-m-d') ?? '')" />
+                        @error('date_debut')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="col-md-4">
+                        <label for="date_fin" class="form-label">Date fin <span class="text-danger">*</span></label>
+                        <x-date-input name="date_fin" :value="old('date_fin', $operation->date_fin?->format('Y-m-d') ?? '')" />
+                        @error('date_fin')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="col-md-4">
+                        <label for="nombre_seances" class="form-label">Nombre de séances</label>
+                        <input type="number" name="nombre_seances" id="nombre_seances" min="1"
+                               class="form-control @error('nombre_seances') is-invalid @enderror"
+                               value="{{ old('nombre_seances', $operation->nombre_seances) }}">
+                        @error('nombre_seances')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -123,7 +123,7 @@
             typeSelect.addEventListener('change', function () {
                 const selected = typeSelect.options[typeSelect.selectedIndex];
                 const seances = selected.getAttribute('data-nombre-seances');
-                if (seances && !seancesInput.value) {
+                if (seances) {
                     seancesInput.value = seances;
                 }
             });
