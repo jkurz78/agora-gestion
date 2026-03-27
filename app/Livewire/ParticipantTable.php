@@ -436,13 +436,17 @@ final class ParticipantTable extends Component
         }
 
         try {
+            $op = $participant->operation;
             $mail = new FormulaireInvitation(
                 prenomParticipant: $participant->tiers->prenom ?? 'Participant',
                 nomParticipant: $participant->tiers->nom ?? '',
-                nomOperation: $participant->operation->nom,
+                nomOperation: $op->nom,
                 formulaireUrl: $this->tokenUrl,
                 tokenCode: $this->tokenCode ?? '',
                 dateExpiration: Carbon::parse($this->tokenExpireAt)->format('d/m/Y'),
+                dateDebut: $op->date_debut?->format('d/m/Y') ?? '',
+                dateFin: $op->date_fin?->format('d/m/Y') ?? '',
+                nombreSeances: $op->nombre_seances !== null ? (string) $op->nombre_seances : '',
                 customObjet: $typeOp->email_formulaire_objet,
                 customCorps: $typeOp->email_formulaire_corps,
             );
