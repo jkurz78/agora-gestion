@@ -257,35 +257,59 @@
                 {{-- Email section --}}
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Email d'expédition</label>
-                    <div class="row g-2">
-                        <div class="col-md-4">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-3">
                             <input type="text" wire:model="email_from_name" class="form-control form-control-sm"
                                    placeholder="Nom expéditeur">
                         </div>
-                        <div class="col-md-8">
-                            <input type="email" wire:model="email_from" class="form-control form-control-sm @error('email_from') is-invalid @enderror"
+                        <div class="col-md-6">
+                            <input type="email" wire:model.live.debounce.500ms="email_from" class="form-control form-control-sm @error('email_from') is-invalid @enderror"
                                    placeholder="adresse@exemple.fr">
                             @error('email_from')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                    </div>
-                    @if($email_from)
-                        <div class="row g-2 mt-2 align-items-end">
-                            <div class="col">
-                                <input type="email" wire:model="testEmailTo" class="form-control form-control-sm @error('testEmailTo') is-invalid @enderror"
-                                       placeholder="Adresse destinataire pour le test">
-                                @error('testEmailTo')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                            <div class="col-auto">
-                                <button type="button" class="btn btn-sm btn-outline-primary" wire:click="sendTestEmail">
-                                    <i class="bi bi-envelope"></i> Tester
-                                </button>
-                            </div>
+                        <div class="col-md-3">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-primary w-100"
+                                    {{ $email_from ? '' : 'disabled' }}
+                                    wire:click="openTestEmailModal"
+                                    x-on:click="$nextTick(() => document.getElementById('testEmailModal').style.display='flex')">
+                                <i class="bi bi-envelope"></i> Tester
+                            </button>
                         </div>
-                    @endif
+                    </div>
+                </div>
+
+                {{-- Mini-modale test email --}}
+                <div id="testEmailModal" class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+                     style="background:rgba(0,0,0,.3);z-index:2100;display:none"
+                     onclick="if(event.target===this){this.style.display='none';this.classList.remove('show')}">
+                    <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
+                        <h6 class="mb-3"><i class="bi bi-envelope me-1"></i> Envoyer un email de test</h6>
+                        <p class="small text-muted mb-2">Expéditeur : {{ $email_from_name ? $email_from_name . ' <' . $email_from . '>' : $email_from }}</p>
+                        <div class="mb-3">
+                            <label class="form-label small">Adresse destinataire</label>
+                            <input type="email" wire:model="testEmailTo" class="form-control form-control-sm @error('testEmailTo') is-invalid @enderror"
+                                   placeholder="votre@email.fr">
+                            @error('testEmailTo')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        @if($flashMessage && ($flashType === 'success' || $flashType === 'danger'))
+                            <div class="alert alert-{{ $flashType }} py-1 small">{{ $flashMessage }}</div>
+                        @endif
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="document.getElementById('testEmailModal').style.display='none'">
+                                Fermer
+                            </button>
+                            <button type="button" class="btn btn-sm btn-primary" wire:click="sendTestEmail">
+                                <span wire:loading.remove wire:target="sendTestEmail">Envoyer</span>
+                                <span wire:loading wire:target="sendTestEmail">Envoi...</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Actions --}}
