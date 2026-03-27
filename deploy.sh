@@ -32,6 +32,7 @@ run_cmd() {
 }
 
 run_cmd "$PHP artisan optimize:clear"
+run_cmd "git checkout -- ."
 run_cmd "git pull origin main"
 run_cmd "git fetch --tags"
 run_cmd "$COMPOSER install --no-dev --optimize-autoloader --no-interaction"
