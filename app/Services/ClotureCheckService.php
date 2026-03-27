@@ -56,7 +56,7 @@ final class ClotureCheckService
 
     private function checkLignesSansSousCategorie(int $annee): CheckItem
     {
-        $count = TransactionLigne::where('exercice', $annee)
+        $count = TransactionLigne::whereHas('transaction', fn ($q) => $q->forExercice($annee))
             ->whereNull('sous_categorie_id')
             ->count();
 

@@ -56,7 +56,7 @@
                         <td class="small text-nowrap">
                             @if($cot)
                                 {{ $cot->transaction->date->format('d/m/Y') }}
-                                <span class="text-muted">({{ $cot->exercice }})</span>
+                                <span class="text-muted">({{ app(\App\Services\ExerciceService::class)->anneeForDate($cot->transaction->date) }})</span>
                             @else
                                 <span class="text-muted">—</span>
                             @endif

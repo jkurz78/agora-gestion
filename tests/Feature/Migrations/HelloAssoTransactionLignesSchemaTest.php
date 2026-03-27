@@ -17,11 +17,11 @@ it('transaction_lignes table has helloasso_item_id column', function () {
     expect(Schema::hasColumn('transaction_lignes', 'helloasso_item_id'))->toBeTrue();
 });
 
-it('transaction_lignes table has exercice column', function () {
-    expect(Schema::hasColumn('transaction_lignes', 'exercice'))->toBeTrue();
+it('transaction_lignes table no longer has exercice column', function () {
+    expect(Schema::hasColumn('transaction_lignes', 'exercice'))->toBeFalse();
 });
 
-it('both helloasso columns are nullable', function () {
+it('helloasso_item_id is nullable', function () {
     $user = User::factory()->create();
     $compte = CompteBancaire::factory()->create();
     $sousCat = SousCategorie::factory()->create();
@@ -44,10 +44,9 @@ it('both helloasso columns are nullable', function () {
     ]);
 
     expect($ligne->helloasso_item_id)->toBeNull();
-    expect($ligne->exercice)->toBeNull();
 });
 
-it('can store helloasso_item_id and exercice on a transaction ligne', function () {
+it('can store helloasso_item_id on a transaction ligne', function () {
     $user = User::factory()->create();
     $compte = CompteBancaire::factory()->create();
     $sousCat = SousCategorie::factory()->create();
@@ -68,13 +67,11 @@ it('can store helloasso_item_id and exercice on a transaction ligne', function (
         'sous_categorie_id' => $sousCat->id,
         'montant' => 50.00,
         'helloasso_item_id' => 123456789,
-        'exercice' => 2025,
     ]);
 
     $ligne->refresh();
 
     expect($ligne->helloasso_item_id)->toBe(123456789);
-    expect($ligne->exercice)->toBe(2025);
 });
 
 it('helloasso_item_id is unique and rejects duplicates', function () {
@@ -98,7 +95,6 @@ it('helloasso_item_id is unique and rejects duplicates', function () {
         'sous_categorie_id' => $sousCat->id,
         'montant' => 50.00,
         'helloasso_item_id' => 999888777,
-        'exercice' => 2025,
     ]);
 
     TransactionLigne::create([
@@ -106,6 +102,5 @@ it('helloasso_item_id is unique and rejects duplicates', function () {
         'sous_categorie_id' => $sousCat->id,
         'montant' => 50.00,
         'helloasso_item_id' => 999888777,
-        'exercice' => 2025,
     ]);
 })->throws(QueryException::class);

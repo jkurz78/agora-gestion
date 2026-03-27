@@ -25,7 +25,6 @@ it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée',
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $this->cotSc->id,
-        'exercice' => 2025,
         'montant' => 30.00,
     ]);
 
@@ -44,7 +43,6 @@ it('n\'affiche pas le caractère unicode ✓', function () {
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $this->cotSc->id,
-        'exercice' => 2025,
         'montant' => 30.00,
     ]);
 
@@ -60,7 +58,6 @@ it('affiche un bouton bi-clock-history lié aux transactions du membre', functio
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $this->cotSc->id,
-        'exercice' => 2025,
         'montant' => 30.00,
     ]);
 
@@ -77,7 +74,6 @@ it('les boutons d\'action ont la classe btn-sm sans style inline de padding', fu
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $this->cotSc->id,
-        'exercice' => 2025,
         'montant' => 30.00,
     ]);
 
