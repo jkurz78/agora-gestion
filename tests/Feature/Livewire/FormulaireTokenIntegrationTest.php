@@ -7,13 +7,15 @@ use App\Models\FormulaireToken;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use App\Models\User;
 use Livewire\Livewire;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
-    $this->operation = Operation::factory()->create();
+    $typeOp = TypeOperation::factory()->confidentiel()->create();
+    $this->operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
     $this->tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
     $this->participant = Participant::create([
         'tiers_id' => $this->tiers->id,
