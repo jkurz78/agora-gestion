@@ -15,6 +15,7 @@ final class Participant extends Model
     protected $fillable = [
         'tiers_id',
         'operation_id',
+        'type_operation_tarif_id',
         'date_inscription',
         'est_helloasso',
         'helloasso_item_id',
@@ -28,6 +29,7 @@ final class Participant extends Model
         return [
             'date_inscription' => 'date',
             'est_helloasso' => 'boolean',
+            'type_operation_tarif_id' => 'integer',
         ];
     }
 
@@ -39,6 +41,11 @@ final class Participant extends Model
     public function operation(): BelongsTo
     {
         return $this->belongsTo(Operation::class);
+    }
+
+    public function typeOperationTarif(): BelongsTo
+    {
+        return $this->belongsTo(TypeOperationTarif::class);
     }
 
     public function referePar(): BelongsTo
