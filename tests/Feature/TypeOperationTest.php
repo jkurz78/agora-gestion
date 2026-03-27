@@ -94,9 +94,8 @@ it('prevents deletion when operations exist', function () {
 
     Livewire::test(TypeOperationManager::class)
         ->call('delete', $type->id)
-        ->assertDispatched('toast', function ($name, $params) {
-            return str_contains($params['message'] ?? '', 'opérations');
-        });
+        ->assertSet('flashMessage', 'Impossible de supprimer : des opérations utilisent ce type.')
+        ->assertSet('flashType', 'danger');
 
     expect(TypeOperation::find($type->id))->not->toBeNull();
 });
