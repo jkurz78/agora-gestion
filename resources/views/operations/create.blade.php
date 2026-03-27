@@ -27,6 +27,28 @@
                     @enderror
                 </div>
 
+                <div class="mb-3">
+                    <label for="type_operation_id" class="form-label">Type d'opération <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <select name="type_operation_id" id="type_operation_id" class="form-select @error('type_operation_id') is-invalid @enderror" required>
+                            <option value="">— Sélectionner —</option>
+                            @foreach ($typeOperations as $type)
+                                <option value="{{ $type->id }}" data-nombre-seances="{{ $type->nombre_seances }}"
+                                    {{ old('type_operation_id') == $type->id ? 'selected' : '' }}>
+                                    {{ $type->code }} — {{ $type->nom }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#typeOperationModal"
+                                onclick="Livewire.dispatch('openTypeOperationModal')">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                    @error('type_operation_id')
+                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                    @enderror
+                </div>
+
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label for="date_debut" class="form-label">Date début <span class="text-danger">*</span></label>
@@ -53,28 +75,6 @@
                     </div>
                 </div>
 
-                <div class="mb-3">
-                    <label for="type_operation_id" class="form-label">Type d'opération <span class="text-danger">*</span></label>
-                    <div class="input-group">
-                        <select name="type_operation_id" id="type_operation_id" class="form-select @error('type_operation_id') is-invalid @enderror" required>
-                            <option value="">— Sélectionner —</option>
-                            @foreach ($typeOperations as $type)
-                                <option value="{{ $type->id }}" data-nombre-seances="{{ $type->nombre_seances }}"
-                                    {{ old('type_operation_id') == $type->id ? 'selected' : '' }}>
-                                    {{ $type->code }} — {{ $type->nom }}
-                                </option>
-                            @endforeach
-                        </select>
-                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#typeOperationModal"
-                                onclick="Livewire.dispatch('openTypeOperationModal')">
-                            <i class="bi bi-plus-lg"></i>
-                        </button>
-                    </div>
-                    @error('type_operation_id')
-                        <div class="invalid-feedback d-block">{{ $message }}</div>
-                    @enderror
-                </div>
-
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-success">Enregistrer</button>
                     <a href="{{ request('_redirect_back', route('compta.operations.index')) }}" class="btn btn-secondary">Annuler</a>
@@ -96,7 +96,7 @@
             typeSelect.addEventListener('change', function () {
                 const selected = typeSelect.options[typeSelect.selectedIndex];
                 const seances = selected.getAttribute('data-nombre-seances');
-                if (seances && !seancesInput.value) {
+                if (seances) {
                     seancesInput.value = seances;
                 }
             });
