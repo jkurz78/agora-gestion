@@ -87,9 +87,7 @@
                     <th>Téléphone</th>
                     <th>Email</th>
                     <th class="sortable" data-col="date_inscription" style="cursor:pointer">Date inscription <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    @if($operation->typeOperation?->reserve_adherents)
-                        <th>Adhérent</th>
-                    @endif
+                    <th>Adhérent</th>
                     @if($operation->typeOperation?->tarifs->count())
                         <th class="sortable" data-col="tarif" style="cursor:pointer">Tarif <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     @endif
@@ -202,15 +200,13 @@
                         </td>
 
                         {{-- Adhérent --}}
-                        @if($operation->typeOperation?->reserve_adherents)
-                            <td class="small">
-                                @if($p->tiers && $this->isAdherent($p))
-                                    <span class="badge bg-success">Oui</span>
-                                @else
-                                    <span class="badge bg-danger">Non</span>
-                                @endif
-                            </td>
-                        @endif
+                        <td class="small">
+                            @if($p->tiers && $this->isAdherent($p))
+                                <span class="badge bg-success">Oui</span>
+                            @elseif($operation->typeOperation?->reserve_adherents)
+                                <span class="badge bg-danger">Non</span>
+                            @endif
+                        </td>
 
                         {{-- Tarif --}}
                         @if($operation->typeOperation?->tarifs->count())
