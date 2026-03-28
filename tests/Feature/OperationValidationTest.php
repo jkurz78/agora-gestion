@@ -30,6 +30,7 @@ it('rejette la création sans date_fin', function () {
 it('accepte la création avec les deux dates', function () {
     $typeOp = TypeOperation::factory()->create();
     $response = $this->actingAs($this->user)->post(route('compta.operations.store'), [
+        'code' => 'TEST-2025',
         'nom' => 'Test op',
         'date_debut' => '2025-09-01',
         'date_fin' => '2026-03-31',
