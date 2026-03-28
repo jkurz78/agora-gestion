@@ -526,6 +526,7 @@
     <script>
         // Sync TinyMCE content then call Livewire save
         window.syncTinyMCEAndSave = function (btn) {
+            const content = {};
             if (typeof tinymce !== 'undefined') {
                 tinymce.get().forEach(editor => {
                     const textarea = editor.getElement();
@@ -534,12 +535,12 @@
                         const key = wrap.getAttribute('wire:key');
                         const match = key.match(/^tinymce-(\w+)-/);
                         if (match) {
-                            $wire.set('emailTemplates.' + match[1] + '.corps', editor.getContent());
+                            content[match[1]] = editor.getContent();
                         }
                     }
                 });
             }
-            $wire.call('save');
+            $wire.call('saveWithEditorContent', content);
         };
 
         const emailVariables = {
