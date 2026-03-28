@@ -22,6 +22,7 @@ class OperationFactory extends Factory
         $end = fake()->dateTimeBetween($start, '+6 months');
 
         return [
+            'code' => fake()->unique()->lexify('OP-????'),
             'nom' => fake()->sentence(3),
             'description' => fake()->optional()->paragraph(),
             'date_debut' => $start,
