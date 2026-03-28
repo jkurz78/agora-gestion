@@ -15,10 +15,10 @@ test('gestion operations page loads', function (): void {
 
 test('operations are listed in selector', function (): void {
     $user = User::factory()->create();
-    $op = Operation::factory()->create(['nom' => 'Art-thérapie test']);
+    $op = Operation::factory()->create(['code' => 'ART-TEST', 'nom' => 'Art-thérapie test']);
     $this->actingAs($user)
         ->get('/gestion/operations')
-        ->assertSee('Art-thérapie test');
+        ->assertSee('ART-TEST');
 });
 
 test('operation can be pre-selected via URL parameter', function (): void {
