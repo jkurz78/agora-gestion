@@ -112,8 +112,12 @@
                                                 <div class="d-flex gap-1">
                                                     <select wire:model="formOperations.{{ $fm->id }}" class="form-select form-select-sm">
                                                         <option value="">Ne pas suivre</option>
-                                                        @foreach ($operations as $op)
-                                                            <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                                        @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
+                                                            <optgroup label="{{ $typeName }}">
+                                                                @foreach ($ops as $op)
+                                                                    <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                                                @endforeach
+                                                            </optgroup>
                                                         @endforeach
                                                     </select>
                                                     <button wire:click="openCreateOperation({{ $fm->id }})"
@@ -145,13 +149,14 @@
                                                                 <x-date-input name="new_op_fin" wire:model="newOperationDateFin" :value="$newOperationDateFin" />
                                                             </div>
                                                             <div class="col-md-3">
-                                                                <label class="form-label small">Sous-catégorie</label>
-                                                                <select wire:model="newOperationSousCategorieId" class="form-select form-select-sm">
-                                                                    <option value="">Par défaut</option>
-                                                                    @foreach ($sousCategoriesInscription as $sc)
-                                                                        <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
+                                                                <label class="form-label small">Type d'opération <span class="text-danger">*</span></label>
+                                                                <select wire:model="newOperationTypeOperationId" class="form-select form-select-sm @error('newOperationTypeOperationId') is-invalid @enderror">
+                                                                    <option value="">— Sélectionner —</option>
+                                                                    @foreach ($typeOperations as $type)
+                                                                        <option value="{{ $type->id }}">{{ $type->nom }}</option>
                                                                     @endforeach
                                                                 </select>
+                                                                @error('newOperationTypeOperationId') <div class="invalid-feedback">{{ $message }}</div> @enderror
                                                             </div>
                                                             <div class="col-md-2 d-flex gap-1">
                                                                 <button wire:click="storeOperation" class="btn btn-sm btn-success">
