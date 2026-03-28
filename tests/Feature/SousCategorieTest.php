@@ -1,24 +1,39 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Livewire\SousCategorieList;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
+    $this->actingAs($this->user);
     $this->categorie = Categorie::factory()->create();
 });
 
-it('can store a sous-categorie', function () {
-    $this->actingAs($this->user)
-        ->post(route('compta.parametres.sous-categories.store'), [
-            'categorie_id' => $this->categorie->id,
-            'nom' => 'Électricité',
-            'code_cerfa' => '1234',
-        ])
-        ->assertRedirect(route('compta.parametres.sous-categories.index'));
+it('renders the sous-categorie list component', function () {
+    Livewire::test(SousCategorieList::class)
+        ->assertStatus(200);
+});
+
+it('can create a sous-categorie via modal', function () {
+    Livewire::test(SousCategorieList::class)
+        ->call('openCreate')
+        ->assertSet('showModal', true)
+        ->assertSet('editingId', null)
+        ->set('categorie_id', (string) $this->categorie->id)
+        ->set('nom', 'Électricité')
+        ->set('code_cerfa', '1234')
+        ->set('pour_dons', false)
+        ->set('pour_cotisations', false)
+        ->set('pour_inscriptions', false)
+        ->call('save')
+        ->assertSet('showModal', false);
 
     $this->assertDatabaseHas('sous_categories', [
         'categorie_id' => $this->categorie->id,
@@ -27,47 +42,50 @@ it('can store a sous-categorie', function () {
     ]);
 });
 
-it('validates required fields when storing a sous-categorie', function () {
-    $this->actingAs($this->user)
-        ->post(route('compta.parametres.sous-categories.store'), [])
-        ->assertSessionHasErrors(['categorie_id', 'nom']);
+it('validates required fields when creating', function () {
+    Livewire::test(SousCategorieList::class)
+        ->call('openCreate')
+        ->set('categorie_id', '')
+        ->set('nom', '')
+        ->call('save')
+        ->assertHasErrors(['categorie_id', 'nom']);
 });
 
 it('validates categorie_id exists', function () {
-    $this->actingAs($this->user)
-        ->post(route('compta.parametres.sous-categories.store'), [
-            'categorie_id' => 99999,
-            'nom' => 'Test',
-        ])
-        ->assertSessionHasErrors(['categorie_id']);
+    Livewire::test(SousCategorieList::class)
+        ->call('openCreate')
+        ->set('categorie_id', '99999')
+        ->set('nom', 'Test')
+        ->call('save')
+        ->assertHasErrors(['categorie_id']);
 });
 
-it('validates nom max length for sous-categorie', function () {
-    $this->actingAs($this->user)
-        ->post(route('compta.parametres.sous-categories.store'), [
-            'categorie_id' => $this->categorie->id,
-            'nom' => str_repeat('a', 101),
-        ])
-        ->assertSessionHasErrors(['nom']);
+it('validates nom max length', function () {
+    Livewire::test(SousCategorieList::class)
+        ->call('openCreate')
+        ->set('categorie_id', (string) $this->categorie->id)
+        ->set('nom', str_repeat('a', 101))
+        ->call('save')
+        ->assertHasErrors(['nom']);
 });
 
 it('validates code_cerfa max length', function () {
-    $this->actingAs($this->user)
-        ->post(route('compta.parametres.sous-categories.store'), [
-            'categorie_id' => $this->categorie->id,
-            'nom' => 'Test',
-            'code_cerfa' => str_repeat('a', 11),
-        ])
-        ->assertSessionHasErrors(['code_cerfa']);
+    Livewire::test(SousCategorieList::class)
+        ->call('openCreate')
+        ->set('categorie_id', (string) $this->categorie->id)
+        ->set('nom', 'Test')
+        ->set('code_cerfa', str_repeat('a', 11))
+        ->call('save')
+        ->assertHasErrors(['code_cerfa']);
 });
 
-it('can store a sous-categorie without code_cerfa', function () {
-    $this->actingAs($this->user)
-        ->post(route('compta.parametres.sous-categories.store'), [
-            'categorie_id' => $this->categorie->id,
-            'nom' => 'Sans CERFA',
-        ])
-        ->assertRedirect(route('compta.parametres.sous-categories.index'));
+it('can create without code_cerfa', function () {
+    Livewire::test(SousCategorieList::class)
+        ->call('openCreate')
+        ->set('categorie_id', (string) $this->categorie->id)
+        ->set('nom', 'Sans CERFA')
+        ->call('save')
+        ->assertSet('showModal', false);
 
     $this->assertDatabaseHas('sous_categories', [
         'nom' => 'Sans CERFA',
@@ -75,16 +93,18 @@ it('can store a sous-categorie without code_cerfa', function () {
     ]);
 });
 
-it('can update a sous-categorie', function () {
+it('can update a sous-categorie via modal', function () {
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
 
-    $this->actingAs($this->user)
-        ->put(route('compta.parametres.sous-categories.update', $sc), [
-            'categorie_id' => $this->categorie->id,
-            'nom' => 'Nom modifié',
-            'code_cerfa' => '9999',
-        ])
-        ->assertRedirect(route('compta.parametres.sous-categories.index'));
+    Livewire::test(SousCategorieList::class)
+        ->call('openEdit', $sc->id)
+        ->assertSet('showModal', true)
+        ->assertSet('editingId', $sc->id)
+        ->assertSet('nom', $sc->nom)
+        ->set('nom', 'Nom modifié')
+        ->set('code_cerfa', '9999')
+        ->call('save')
+        ->assertSet('showModal', false);
 
     $this->assertDatabaseHas('sous_categories', [
         'id' => $sc->id,
@@ -93,17 +113,60 @@ it('can update a sous-categorie', function () {
     ]);
 });
 
-it('can destroy a sous-categorie', function () {
+it('can toggle a flag', function () {
+    $sc = SousCategorie::factory()->create([
+        'categorie_id' => $this->categorie->id,
+        'pour_dons' => false,
+    ]);
+
+    Livewire::test(SousCategorieList::class)
+        ->call('toggleFlag', $sc->id, 'pour_dons');
+
+    expect($sc->fresh()->pour_dons)->toBeTrue();
+});
+
+it('rejects invalid flag names', function () {
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
 
-    $this->actingAs($this->user)
-        ->delete(route('compta.parametres.sous-categories.destroy', $sc))
-        ->assertRedirect(route('compta.parametres.sous-categories.index'));
+    Livewire::test(SousCategorieList::class)
+        ->call('toggleFlag', $sc->id, 'invalid_flag');
+});
+
+it('can update a field inline', function () {
+    $sc = SousCategorie::factory()->create([
+        'categorie_id' => $this->categorie->id,
+        'nom' => 'Ancien nom',
+    ]);
+
+    Livewire::test(SousCategorieList::class)
+        ->call('updateField', $sc->id, 'nom', 'Nouveau nom');
+
+    expect($sc->fresh()->nom)->toBe('Nouveau nom');
+});
+
+it('validates inline field update', function () {
+    $sc = SousCategorie::factory()->create([
+        'categorie_id' => $this->categorie->id,
+        'nom' => 'Ancien nom',
+    ]);
+
+    Livewire::test(SousCategorieList::class)
+        ->call('updateField', $sc->id, 'nom', '')
+        ->assertSet('flashType', 'danger');
+
+    expect($sc->fresh()->nom)->toBe('Ancien nom');
+});
+
+it('can delete a sous-categorie', function () {
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+
+    Livewire::test(SousCategorieList::class)
+        ->call('delete', $sc->id);
 
     $this->assertDatabaseMissing('sous_categories', ['id' => $sc->id]);
 });
 
-it('returns flash error when destroying a sous-categorie with linked lignes', function () {
+it('shows error when deleting a sous-categorie with linked lignes', function () {
     $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
 
     $depense = Transaction::factory()->asDepense()->create([
@@ -115,10 +178,9 @@ it('returns flash error when destroying a sous-categorie with linked lignes', fu
         'sous_categorie_id' => $sc->id,
     ]);
 
-    $this->actingAs($this->user)
-        ->delete(route('compta.parametres.sous-categories.destroy', $sc))
-        ->assertRedirect(route('compta.parametres.sous-categories.index'))
-        ->assertSessionHas('error');
+    Livewire::test(SousCategorieList::class)
+        ->call('delete', $sc->id)
+        ->assertSet('flashType', 'danger');
 
     $this->assertDatabaseHas('sous_categories', ['id' => $sc->id]);
 });
