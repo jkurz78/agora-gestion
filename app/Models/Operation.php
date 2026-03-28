@@ -17,6 +17,7 @@ final class Operation extends Model
     use HasFactory;
 
     protected $fillable = [
+        'code',
         'nom',
         'description',
         'date_debut',

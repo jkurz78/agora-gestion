@@ -21,6 +21,7 @@ final class UpdateOperationRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
+            'code' => ['required', 'string', 'max:50', Rule::unique('operations', 'code')->ignore($this->route('operation'))],
             'nom' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string'],
             'date_debut' => ['required', 'date'],
