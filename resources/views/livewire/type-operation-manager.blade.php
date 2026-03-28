@@ -129,6 +129,25 @@
                     {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
                 </h5>
 
+                {{-- Tab navigation --}}
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <button class="nav-link {{ $activeTab === 1 ? 'active' : '' }} {{ ($editingId !== null || $maxVisitedTab >= 1) ? '' : 'disabled' }}"
+                                wire:click="goToTab(1)" type="button">Général</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link {{ $activeTab === 2 ? 'active' : '' }} {{ ($editingId !== null || $maxVisitedTab >= 2) ? '' : 'disabled' }}"
+                                wire:click="goToTab(2)" type="button">Tarifs</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link {{ $activeTab === 3 ? 'active' : '' }} {{ ($editingId !== null || $maxVisitedTab >= 3) ? '' : 'disabled' }}"
+                                wire:click="goToTab(3)" type="button">Emails</button>
+                    </li>
+                </ul>
+
+                {{-- ── Onglet 1 : Général ─────────────────────────────────── --}}
+                @if($activeTab === 1)
+
                 {{-- Code + Nom --}}
                 <div class="row g-2 mb-3">
                     <div class="col-md-4">
@@ -219,6 +238,11 @@
                     @endif
                 </div>
 
+                @endif
+
+                {{-- ── Onglet 2 : Tarifs ──────────────────────────────────── --}}
+                @if($activeTab === 2)
+
                 {{-- Tarifs section --}}
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Tarifs</label>
@@ -254,32 +278,12 @@
                     </div>
                 </div>
 
-                {{-- Email section --}}
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Email d'expédition</label>
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-3">
-                            <input type="text" wire:model="email_from_name" class="form-control form-control-sm"
-                                   placeholder="Nom expéditeur">
-                        </div>
-                        <div class="col-md-6">
-                            <input type="email" wire:model.live.debounce.500ms="email_from" class="form-control form-control-sm @error('email_from') is-invalid @enderror"
-                                   placeholder="adresse@exemple.fr">
-                            @error('email_from')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="col-md-3">
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-primary w-100"
-                                    {{ $email_from ? '' : 'disabled' }}
-                                    wire:click="openTestEmailModal">
-                                <i class="bi bi-envelope"></i> Tester
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                @endif
 
+                {{-- ── Onglet 3 : Emails ──────────────────────────────────── --}}
+                @if($activeTab === 3)
+                <p class="text-muted py-4 text-center">Onglet Emails — Task 5</p>
+                @endif
 
                 {{-- Mini-modale test email --}}
                 @if($showTestEmailModal)
@@ -314,12 +318,33 @@
                 </div>
                 @endif
 
-                {{-- Actions --}}
-                <div class="d-flex gap-2 justify-content-end mt-4">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Annuler</button>
-                    <button type="button" class="btn btn-sm btn-primary" wire:click="save">
-                        <i class="bi bi-check-lg"></i> Enregistrer
-                    </button>
+                {{-- Navigation buttons --}}
+                <div class="d-flex justify-content-between mt-4">
+                    @if($activeTab > 1)
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="previousTab">
+                            <i class="bi bi-arrow-left"></i> Précédent
+                        </button>
+                    @else
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Annuler</button>
+                    @endif
+
+                    <div class="d-flex gap-2">
+                        @if($editingId !== null)
+                            <button type="button" class="btn btn-sm btn-primary" wire:click="save">
+                                <i class="bi bi-check-lg"></i> Enregistrer
+                            </button>
+                        @endif
+
+                        @if($activeTab < 3)
+                            <button type="button" class="btn btn-sm btn-primary" wire:click="nextTab">
+                                Suivant <i class="bi bi-arrow-right"></i>
+                            </button>
+                        @elseif($editingId === null)
+                            <button type="button" class="btn btn-sm btn-primary" wire:click="save">
+                                <i class="bi bi-check-lg"></i> Enregistrer
+                            </button>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>

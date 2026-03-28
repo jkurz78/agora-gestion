@@ -29,6 +29,11 @@ final class TypeOperationManager extends Component
 
     public ?int $editingId = null;
 
+    // ── Tab state ──────────────────────────────────────────────
+    public int $activeTab = 1;
+
+    public int $maxVisitedTab = 1;
+
     // ── Form fields ──────────────────────────────────────────────
     public string $code = '';
 
@@ -139,6 +144,7 @@ final class TypeOperationManager extends Component
         $this->tarifsToDelete = [];
 
         $this->showModal = true;
+        $this->maxVisitedTab = 3;
     }
 
     public function save(): void
@@ -222,6 +228,33 @@ final class TypeOperationManager extends Component
         }
 
         $type->delete();
+    }
+
+    // ── Tab navigation ───────────────────────────────────────────
+
+    public function goToTab(int $tab): void
+    {
+        if ($tab > $this->maxVisitedTab && $this->editingId === null) {
+            return;
+        }
+        $this->activeTab = $tab;
+    }
+
+    public function nextTab(): void
+    {
+        if ($this->activeTab < 3) {
+            $this->activeTab++;
+            if ($this->activeTab > $this->maxVisitedTab) {
+                $this->maxVisitedTab = $this->activeTab;
+            }
+        }
+    }
+
+    public function previousTab(): void
+    {
+        if ($this->activeTab > 1) {
+            $this->activeTab--;
+        }
     }
 
     // ── Tarifs ───────────────────────────────────────────────────
@@ -351,6 +384,8 @@ final class TypeOperationManager extends Component
     private function resetForm(): void
     {
         $this->editingId = null;
+        $this->activeTab = 1;
+        $this->maxVisitedTab = 1;
         $this->code = '';
         $this->nom = '';
         $this->description = '';
