@@ -280,20 +280,6 @@
                     </div>
                 </div>
 
-                {{-- Email formulaire template --}}
-                @if($email_from)
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Modèle email formulaire</label>
-                    <input type="text" wire:model="email_formulaire_objet" class="form-control form-control-sm mb-2"
-                           placeholder="Objet (défaut : Formulaire à compléter — {operation})">
-                    <textarea wire:model="email_formulaire_corps" class="form-control form-control-sm" rows="4"
-                              placeholder="Bonjour {prenom},&#10;&#10;Nous vous invitons à compléter votre formulaire pour {operation}."></textarea>
-                    <div class="form-text small">
-                        Variables : <code>{prenom}</code> <code>{nom}</code> <code>{operation}</code> <code>{date_debut}</code> <code>{date_fin}</code> <code>{nb_seances}</code>
-                        — Le lien, le code et la date d'expiration sont ajoutés automatiquement.
-                    </div>
-                </div>
-                @endif
 
                 {{-- Mini-modale test email --}}
                 @if($showTestEmailModal)

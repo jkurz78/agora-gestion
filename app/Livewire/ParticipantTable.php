@@ -447,8 +447,8 @@ final class ParticipantTable extends Component
                 dateDebut: $op->date_debut?->format('d/m/Y') ?? '',
                 dateFin: $op->date_fin?->format('d/m/Y') ?? '',
                 nombreSeances: $op->nombre_seances !== null ? (string) $op->nombre_seances : '',
-                customObjet: $typeOp->email_formulaire_objet,
-                customCorps: $typeOp->email_formulaire_corps,
+                customObjet: null,
+                customCorps: null,
             );
 
             Mail::mailer()
