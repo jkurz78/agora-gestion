@@ -18,6 +18,8 @@ final class FormulaireInvitation extends Mailable
 
     public readonly string $corpsHtml;
 
+    public readonly bool $showAutoBlock;
+
     public function __construct(
         public readonly string $prenomParticipant,
         public readonly string $nomParticipant,
@@ -37,9 +39,13 @@ final class FormulaireInvitation extends Mailable
         $corps = $this->customCorps
             ?? '<p>Bonjour <strong>{prenom}</strong>,</p><p>Nous vous invitons à compléter votre formulaire pour <strong>{operation}</strong>.</p>';
 
+        // If template uses {bloc_liens} or {url}, don't show the auto block
+        $this->showAutoBlock = ! str_contains($corps, '{bloc_liens}') && ! str_contains($corps, '{url}');
+
         $corps = str_replace(array_keys($vars), array_values($vars), $corps);
 
-        $this->corpsHtml = EmailTemplate::sanitizeCorps($corps);
+        // Allow the bloc_liens HTML through sanitization
+        $this->corpsHtml = strip_tags($corps, '<p><br><strong><em><u><ul><ol><li><a><h1><h2><h3><h4><span><div><table><tr><td><th>');
     }
 
     public function envelope(): Envelope
@@ -59,7 +65,19 @@ final class FormulaireInvitation extends Mailable
      */
     private function variables(): array
     {
+        $blocLiens = '<p style="text-align: center; margin: 25px 0;">'
+            .'<a href="'.$this->formulaireUrl.'" style="display:inline-block;padding:10px 24px;background:#3d5473;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Accéder au formulaire</a>'
+            .'</p>'
+            .'<p>Vous pouvez aussi saisir ce code sur la page d\'accueil du formulaire :</p>'
+            .'<p style="text-align: center;">'
+            .'<span style="display:inline-block;padding:8px 16px;background:#f0f0f0;border:1px solid #ddd;border-radius:6px;font-size:1.4rem;font-family:monospace;letter-spacing:3px;">'.$this->tokenCode.'</span>'
+            .'</p>';
+
         return [
+            '{bloc_liens}' => $blocLiens,
+            '{url}' => $this->formulaireUrl,
+            '{code}' => $this->tokenCode,
+            '{date_expiration}' => $this->dateExpiration,
             '{prenom}' => $this->prenomParticipant,
             '{nom}' => $this->nomParticipant,
             '{operation}' => $this->nomOperation,

@@ -35,7 +35,12 @@ enum CategorieEmail: string
         ];
 
         return match ($this) {
-            self::Formulaire => $common,
+            self::Formulaire => $common + [
+                '{bloc_liens}' => 'Bloc complet (bouton + code + expiration)',
+                '{url}' => 'URL du formulaire',
+                '{code}' => 'Code du formulaire',
+                '{date_expiration}' => 'Date d\'expiration du lien',
+            ],
             self::Attestation => $common + [
                 '{numero_seance}' => 'Numéro de la séance',
                 '{date_seance}' => 'Date de la séance',
