@@ -243,39 +243,52 @@
                 {{-- ── Onglet 2 : Tarifs ──────────────────────────────────── --}}
                 @if($activeTab === 2)
 
-                {{-- Tarifs section --}}
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Tarifs</label>
-                    @if(count($tarifs) > 0)
-                        <ul class="list-group list-group-sm mb-2">
-                            @foreach($tarifs as $index => $tarif)
-                                <li class="list-group-item d-flex justify-content-between align-items-center py-1">
-                                    <span class="small">
-                                        {{ $tarif['libelle'] }}
-                                        <span class="text-muted ms-2">{{ number_format((float) str_replace(',', '.', $tarif['montant']), 2, ',', ' ') }} &euro;</span>
-                                    </span>
-                                    <button type="button" class="btn btn-sm btn-link text-danger p-0"
-                                            wire:click="removeTarif({{ $index }})" title="Retirer">
-                                        <i class="bi bi-x-lg"></i>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                            <tr>
+                                <th>Libellé</th>
+                                <th class="text-end" style="width:140px">Montant</th>
+                                <th style="width:50px"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @php
+                                $sortedTarifs = collect($tarifs)->sortByDesc(fn ($t) => (float) str_replace(',', '.', $t['montant']));
+                            @endphp
+                            @forelse ($sortedTarifs as $index => $tarif)
+                                <tr>
+                                    <td class="small">{{ $tarif['libelle'] }}</td>
+                                    <td class="text-end small">{{ number_format((float) str_replace(',', '.', $tarif['montant']), 2, ',', ' ') }}&nbsp;&euro;</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                                wire:click="removeTarif({{ $index }})" title="Retirer">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="text-muted small text-center py-3">Aucun tarif défini.</td>
+                                </tr>
+                            @endforelse
+                            {{-- Add row --}}
+                            <tr class="table-light">
+                                <td>
+                                    <input type="text" wire:model="newTarifLibelle" class="form-control form-control-sm" placeholder="Libellé">
+                                </td>
+                                <td>
+                                    <input type="text" wire:model="newTarifMontant" class="form-control form-control-sm text-end" placeholder="0,00">
+                                    @error('newTarifMontant') <div class="text-danger small">{{ $message }}</div> @enderror
+                                </td>
+                                <td class="text-center align-middle">
+                                    <button type="button" class="btn btn-sm btn-outline-success" wire:click="addTarif" title="Ajouter">
+                                        <i class="bi bi-plus-lg"></i>
                                     </button>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-
-                    <div class="row g-2 align-items-end">
-                        <div class="col">
-                            <input type="text" wire:model="newTarifLibelle" class="form-control form-control-sm" placeholder="Libellé">
-                        </div>
-                        <div class="col-auto" style="width:120px">
-                            <input type="text" wire:model="newTarifMontant" class="form-control form-control-sm" placeholder="Montant">
-                        </div>
-                        <div class="col-auto">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="addTarif">
-                                <i class="bi bi-plus"></i> Ajouter
-                            </button>
-                        </div>
-                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 @endif
