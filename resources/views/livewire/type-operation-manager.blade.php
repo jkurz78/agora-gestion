@@ -370,8 +370,10 @@
                         <div class="mb-2">
                             <label class="form-label small fw-semibold">Corps</label>
                         </div>
-                        <div id="tinymce-wrap-{{ $emailSubTab }}" data-categorie="{{ $emailSubTab }}" data-readonly="{{ $tplData['is_default'] ? '1' : '0' }}">
-                            <textarea id="tinymce-{{ $emailSubTab }}">{!! $tplData['corps'] !!}</textarea>
+                        <div x-data="tinymceEditor(@js($emailSubTab), @js($tplData['is_default']), @js(\App\Enums\CategorieEmail::from($emailSubTab)->variables()))"
+                             x-init="init()"
+                             x-on:remove.window="destroy()">
+                            <textarea x-ref="editor">{!! $tplData['corps'] !!}</textarea>
                         </div>
 
                         <div class="form-text small mt-2">
@@ -505,49 +507,34 @@
         });
     </script>
 
-    @push('scripts')
-    <script src="{{ asset('vendor/tinymce/tinymce.min.js') }}"></script>
+    @script
     <script>
-        (function () {
-            const allVariables = @json(collect(\App\Enums\CategorieEmail::cases())->mapWithKeys(fn ($c) => [$c->value => $c->variables()])->toArray());
-            let editorInstance = null;
-            let lastInitId = null;
+        Alpine.data('tinymceEditor', (categorie, isReadonly, variables) => ({
+            editor: null,
 
-            function destroyEditor() {
-                if (editorInstance) {
-                    try { tinymce.remove(editorInstance); } catch (e) {}
-                    editorInstance = null;
-                    lastInitId = null;
+            init() {
+                this.$nextTick(() => this.setup());
+            },
+
+            setup() {
+                if (typeof tinymce === 'undefined') {
+                    setTimeout(() => this.setup(), 300);
+                    return;
                 }
-            }
 
-            function initEditor() {
-                // Find the wrapper div with data-categorie
-                const wrap = document.querySelector('[id^="tinymce-wrap-"]');
-                if (!wrap) { destroyEditor(); return; }
-
-                const categorie = wrap.dataset.categorie;
-                const isReadonly = wrap.dataset.readonly === '1';
-                const textareaId = 'tinymce-' + categorie;
-                const textarea = document.getElementById(textareaId);
-
+                const textarea = this.$refs.editor;
                 if (!textarea) return;
 
-                // Skip if already initialized for same textarea with same readonly state
-                const initKey = textareaId + '-' + (isReadonly ? 'ro' : 'rw');
-                if (lastInitId === initKey && editorInstance) return;
+                const self = this;
 
-                destroyEditor();
-
-                const variables = allVariables[categorie] || {};
                 const menuItems = Object.entries(variables).map(([key, label]) => ({
                     type: 'menuitem',
                     text: key + ' — ' + label,
-                    onAction: () => { if (editorInstance) editorInstance.insertContent(key); },
+                    onAction: () => { if (self.editor) self.editor.insertContent(key); },
                 }));
 
                 tinymce.init({
-                    selector: '#' + textareaId,
+                    target: textarea,
                     language: 'fr_FR',
                     language_url: '/vendor/tinymce/langs/fr_FR.js',
                     height: 250,
@@ -558,8 +545,7 @@
                     readonly: isReadonly ? 1 : 0,
                     content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }',
                     setup: function (editor) {
-                        editorInstance = editor;
-                        lastInitId = initKey;
+                        self.editor = editor;
 
                         if (!isReadonly) {
                             editor.ui.registry.addMenuButton('variablesButton', {
@@ -568,29 +554,20 @@
                             });
 
                             editor.on('Change KeyUp', function () {
-                                const component = Livewire.find(
-                                    document.querySelector('[wire\\:id]')?.getAttribute('wire:id')
-                                );
-                                if (component) {
-                                    component.set('emailTemplates.' + categorie + '.corps', editor.getContent());
-                                }
+                                $wire.set('emailTemplates.' + categorie + '.corps', editor.getContent());
                             });
                         }
                     },
                 });
-            }
+            },
 
-            // Init/re-init after Livewire morphs the DOM
-            Livewire.hook('morph.updated', ({ el }) => {
-                setTimeout(initEditor, 200);
-            });
-
-            // Also init on page load if modal is already open
-            document.addEventListener('DOMContentLoaded', () => setTimeout(initEditor, 500));
-
-            // Cleanup
-            document.addEventListener('livewire:navigating', destroyEditor);
-        })();
+            destroy() {
+                if (this.editor) {
+                    try { tinymce.remove(this.editor); } catch (e) {}
+                    this.editor = null;
+                }
+            },
+        }));
     </script>
-    @endpush
+    @endscript
 </div>
