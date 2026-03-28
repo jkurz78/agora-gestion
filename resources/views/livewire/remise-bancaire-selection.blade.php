@@ -27,7 +27,7 @@
                     <select wire:model.live="filterOperation" class="form-select form-select-sm">
                         <option value="">Toutes</option>
                         @foreach ($operations as $operation)
-                            <option value="{{ $operation->id }}">{{ $operation->nom }}</option>
+                            <option value="{{ $operation->id }}">{{ $operation->code }}</option>
                         @endforeach
                     </select>
                 </div>

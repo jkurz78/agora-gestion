@@ -81,7 +81,7 @@ final class RemiseBancaireSelection extends Component
         $totalSelected = $reglements->whereIn('id', $this->selectedIds)->sum('montant_prevu');
         $countSelected = count($this->selectedIds);
 
-        $operations = $reglements->map(fn ($r) => $r->seance->operation)->unique('id')->sortBy('nom')->values();
+        $operations = $reglements->map(fn ($r) => $r->seance->operation)->unique('id')->sortBy('code')->values();
 
         return view('livewire.remise-bancaire-selection', [
             'reglements' => $reglements,

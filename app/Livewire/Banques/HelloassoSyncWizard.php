@@ -497,7 +497,7 @@ final class HelloassoSyncWizard extends Component
 
         return view('livewire.banques.helloasso-sync-wizard', [
             'formMappings' => $formMappings,
-            'operations' => Operation::with('typeOperation')->orderBy('nom')->get(),
+            'operations' => Operation::with('typeOperation')->orderBy('code')->get(),
             'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
         ]);
     }

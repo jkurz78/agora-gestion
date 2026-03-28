@@ -54,7 +54,7 @@
                         @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
                             <optgroup label="{{ $typeName }}">
                                 @foreach ($ops as $op)
-                                    <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                    <option value="{{ $op->id }}">{{ $op->code }}</option>
                                 @endforeach
                             </optgroup>
                         @endforeach
