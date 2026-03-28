@@ -121,6 +121,13 @@
          MODAL CREATE/EDIT
          ═══════════════════════════════════════════════════════════ --}}
     @if($showModal)
+        <script>
+            if (typeof tinymce === 'undefined') {
+                var s = document.createElement('script');
+                s.src = '{{ asset("vendor/tinymce/tinymce.min.js") }}';
+                document.head.appendChild(s);
+            }
+        </script>
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2000"
              wire:click.self="$set('showModal', false)">
@@ -295,7 +302,91 @@
 
                 {{-- ── Onglet 3 : Emails ──────────────────────────────────── --}}
                 @if($activeTab === 3)
-                <p class="text-muted py-4 text-center">Onglet Emails — Task 5</p>
+
+                {{-- Adresse expéditeur --}}
+                <div class="mb-3 p-3 bg-light rounded border">
+                    <label class="form-label small fw-semibold">Adresse d'expédition</label>
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <input type="text" wire:model="email_from_name" class="form-control form-control-sm" placeholder="Nom expéditeur">
+                        </div>
+                        <div class="col-md-6">
+                            <input type="email" wire:model.live.debounce.500ms="email_from"
+                                   class="form-control form-control-sm @error('email_from') is-invalid @enderror"
+                                   placeholder="adresse@exemple.fr">
+                            @error('email_from') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" class="btn btn-sm btn-outline-secondary w-100"
+                                    {{ $email_from ? '' : 'disabled' }}
+                                    wire:click="openTestEmailModal">
+                                <i class="bi bi-envelope"></i> Tester
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Sous-onglets email --}}
+                <ul class="nav nav-pills nav-fill mb-3">
+                    @foreach (\App\Enums\CategorieEmail::cases() as $cat)
+                        <li class="nav-item">
+                            <button class="nav-link {{ $emailSubTab === $cat->value ? 'active' : '' }}"
+                                    wire:click="$set('emailSubTab', '{{ $cat->value }}')" type="button">
+                                {{ $cat->label() }}
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+
+                {{-- Template content --}}
+                @php $tplData = $emailTemplates[$emailSubTab] ?? null; @endphp
+                @if($tplData)
+                    <div class="border rounded p-3">
+                        {{-- Status + buttons --}}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="badge {{ $tplData['is_default'] ? 'bg-secondary' : 'bg-primary' }}">
+                                {{ $tplData['is_default'] ? 'Modèle par défaut' : 'Personnalisé' }}
+                            </span>
+                            @if($tplData['is_default'])
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                        wire:click="personnaliserTemplate('{{ $emailSubTab }}')">
+                                    <i class="bi bi-pencil"></i> Personnaliser
+                                </button>
+                            @else
+                                <button type="button" class="btn btn-sm btn-outline-warning"
+                                        wire:click="revenirAuDefaut('{{ $emailSubTab }}')">
+                                    <i class="bi bi-arrow-counterclockwise"></i> Revenir au défaut
+                                </button>
+                            @endif
+                        </div>
+
+                        {{-- Subject --}}
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Objet</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   wire:model="emailTemplates.{{ $emailSubTab }}.objet"
+                                   {{ $tplData['is_default'] ? 'readonly' : '' }}>
+                        </div>
+
+                        {{-- Body — TinyMCE --}}
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">Corps</label>
+                        </div>
+                        <div wire:ignore>
+                            <textarea id="tinymce-{{ $emailSubTab }}"
+                                      style="visibility:hidden">{!! $tplData['corps'] !!}</textarea>
+                        </div>
+
+                        <div class="form-text small mt-2">
+                            Variables :
+                            @foreach (\App\Enums\CategorieEmail::from($emailSubTab)->variables() as $var => $desc)
+                                <code title="{{ $desc }}">{{ $var }}</code>
+                            @endforeach
+                            — Les éléments automatiques (lien, code, expiration) sont ajoutés sous le corps.
+                        </div>
+                    </div>
+                @endif
+
                 @endif
 
                 {{-- Mini-modale test email --}}
@@ -416,4 +507,120 @@
             });
         });
     </script>
+
+    @script
+    <script>
+        // TinyMCE initialization for email templates
+        let currentTinyMCE = null;
+
+        function initTinyMCE(textareaId, isReadonly, variables, wireComponent) {
+            // Destroy existing instance
+            if (currentTinyMCE) {
+                tinymce.remove(currentTinyMCE);
+                currentTinyMCE = null;
+            }
+
+            const textarea = document.getElementById(textareaId);
+            if (!textarea) return;
+
+            const menuItems = Object.entries(variables).map(([key, label]) => ({
+                type: 'menuitem',
+                text: key + ' — ' + label,
+                onAction: () => {
+                    if (currentTinyMCE) {
+                        currentTinyMCE.insertContent(key);
+                    }
+                },
+            }));
+
+            tinymce.init({
+                target: textarea,
+                language: 'fr_FR',
+                language_url: '/vendor/tinymce/langs/fr_FR.js',
+                height: 250,
+                menubar: false,
+                statusbar: false,
+                plugins: 'lists link',
+                toolbar: isReadonly ? false : 'bold italic underline | bullist numlist | link | variablesButton',
+                readonly: isReadonly ? 1 : 0,
+                content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }',
+                setup: function (editor) {
+                    currentTinyMCE = editor;
+
+                    if (!isReadonly) {
+                        editor.ui.registry.addMenuButton('variablesButton', {
+                            text: 'Variables',
+                            fetch: function (callback) {
+                                callback(menuItems);
+                            },
+                        });
+                    }
+
+                    editor.on('Change KeyUp', function () {
+                        if (!isReadonly) {
+                            const categorie = textareaId.replace('tinymce-', '');
+                            wireComponent.set('emailTemplates.' + categorie + '.corps', editor.getContent());
+                        }
+                    });
+                },
+            });
+        }
+
+        // Watch for tab changes to init/destroy TinyMCE
+        $wire.on('$refresh', () => {
+            setTimeout(() => {
+                const activeTab = $wire.get('activeTab');
+                const emailSubTab = $wire.get('emailSubTab');
+                if (activeTab === 3) {
+                    const tplData = $wire.get('emailTemplates.' + emailSubTab);
+                    if (tplData) {
+                        const variables = @js(collect(\App\Enums\CategorieEmail::cases())->mapWithKeys(fn ($c) => [$c->value => $c->variables()])->toArray());
+                        initTinyMCE(
+                            'tinymce-' + emailSubTab,
+                            tplData.is_default,
+                            variables[emailSubTab] || {},
+                            $wire
+                        );
+                    }
+                } else {
+                    if (currentTinyMCE) {
+                        tinymce.remove(currentTinyMCE);
+                        currentTinyMCE = null;
+                    }
+                }
+            }, 100);
+        });
+
+        // Also handle initial load and sub-tab changes
+        const observer = new MutationObserver(() => {
+            const activeTab = $wire.get('activeTab');
+            const emailSubTab = $wire.get('emailSubTab');
+            if (activeTab === 3) {
+                const textareaId = 'tinymce-' + emailSubTab;
+                const textarea = document.getElementById(textareaId);
+                if (textarea && !textarea.closest('.tox-tinymce')) {
+                    const tplData = $wire.get('emailTemplates.' + emailSubTab);
+                    if (tplData) {
+                        const variables = @js(collect(\App\Enums\CategorieEmail::cases())->mapWithKeys(fn ($c) => [$c->value => $c->variables()])->toArray());
+                        initTinyMCE(textareaId, tplData.is_default, variables[emailSubTab] || {}, $wire);
+                    }
+                }
+            }
+        });
+
+        // Start observing when modal opens
+        if (document.querySelector('[wire\\:ignore]')) {
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+
+        // Cleanup on component destroy
+        document.addEventListener('livewire:navigating', () => {
+            if (currentTinyMCE) {
+                tinymce.remove(currentTinyMCE);
+                currentTinyMCE = null;
+            }
+            observer.disconnect();
+        });
+    </script>
+    @endscript
 </div>
