@@ -20,10 +20,10 @@ afterEach(function () {
 });
 
 it('se rend avec la liste des opérations', function () {
-    $op = Operation::factory()->create(['nom' => 'Festival été']);
+    $op = Operation::factory()->create(['code' => 'FEST-ETE', 'nom' => 'Festival été']);
     Livewire::test(RapportCompteResultatOperations::class)
         ->assertOk()
-        ->assertSee('Festival été');
+        ->assertSee('FEST-ETE');
 });
 
 it('affiche un message si aucune opération sélectionnée', function () {
