@@ -371,6 +371,7 @@
                             <label class="form-label small fw-semibold">Corps</label>
                         </div>
                         <div wire:key="tinymce-{{ $emailSubTab }}-{{ $tplData['is_default'] ? 'ro' : 'rw' }}"
+                             wire:ignore.self
                              x-data="tinymceEditor(@js($emailSubTab), @js($tplData['is_default']), @js(\App\Enums\CategorieEmail::from($emailSubTab)->variables()))"
                              x-init="init()">
                             <textarea x-ref="editor">{!! $tplData['corps'] !!}</textarea>
@@ -433,7 +434,7 @@
 
                     <div class="d-flex gap-2">
                         @if($editingId !== null)
-                            <button type="button" class="btn btn-sm btn-primary" wire:click="save">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="syncTinyMCEAndSave(this)">
                                 <i class="bi bi-check-lg"></i> Enregistrer
                             </button>
                         @endif
@@ -443,7 +444,7 @@
                                 Suivant <i class="bi bi-arrow-right"></i>
                             </button>
                         @elseif($editingId === null)
-                            <button type="button" class="btn btn-sm btn-primary" wire:click="save">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="syncTinyMCEAndSave(this)">
                                 <i class="bi bi-check-lg"></i> Enregistrer
                             </button>
                         @endif
@@ -509,6 +510,25 @@
 
     @script
     <script>
+        // Sync TinyMCE content then call Livewire save
+        window.syncTinyMCEAndSave = function (btn) {
+            if (typeof tinymce !== 'undefined') {
+                tinymce.get().forEach(editor => {
+                    const textarea = editor.getElement();
+                    const wrap = textarea?.closest('[wire\\:key]');
+                    if (wrap) {
+                        const key = wrap.getAttribute('wire:key');
+                        const match = key.match(/^tinymce-(\w+)-/);
+                        if (match) {
+                            $wire.set('emailTemplates.' + match[1] + '.corps', editor.getContent());
+                        }
+                    }
+                });
+            }
+            // Small delay to let $wire.set() propagate, then save
+            setTimeout(() => $wire.call('save'), 50);
+        };
+
         Alpine.data('tinymceEditor', (categorie, isReadonly, variables) => ({
             editor: null,
 
@@ -551,10 +571,6 @@
                             editor.ui.registry.addMenuButton('variablesButton', {
                                 text: 'Variables',
                                 fetch: function (callback) { callback(menuItems); },
-                            });
-
-                            editor.on('Change KeyUp', function () {
-                                $wire.set('emailTemplates.' + categorie + '.corps', editor.getContent());
                             });
                         }
                     },
