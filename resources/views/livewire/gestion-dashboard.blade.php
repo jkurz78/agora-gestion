@@ -35,7 +35,7 @@
                                     <tr>
                                         <td>
                                             <a href="{{ route('gestion.operations', ['id' => $op->id]) }}" class="text-decoration-none">
-                                                {{ $op->nom }}
+                                                {{ $op->code }}
                                             </a>
                                         </td>
                                         <td class="small text-nowrap">{{ $op->date_debut?->format('d/m/Y') ?? '—' }}</td>

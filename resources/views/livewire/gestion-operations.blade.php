@@ -24,7 +24,7 @@
             @foreach($groupedOperations as $groupLabel => $ops)
                 <optgroup label="{{ $groupLabel }}">
                     @foreach($ops as $op)
-                        <option value="{{ $op->id }}">{{ $op->nom }} ({{ $op->date_debut?->format('d/m/Y') }} → {{ $op->date_fin?->format('d/m/Y') ?? '...' }})</option>
+                        <option value="{{ $op->id }}">{{ $op->code }} ({{ $op->date_debut?->format('d/m/Y') }} → {{ $op->date_fin?->format('d/m/Y') ?? '...' }})</option>
                     @endforeach
                 </optgroup>
             @endforeach

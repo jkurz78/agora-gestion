@@ -16,7 +16,7 @@
                     <div class="form-check">
                         <input type="checkbox" wire:model.live="selectedOperationIds"
                                value="{{ $op->id }}" id="op-{{ $op->id }}" class="form-check-input">
-                        <label for="op-{{ $op->id }}" class="form-check-label">{{ $op->nom }}</label>
+                        <label for="op-{{ $op->id }}" class="form-check-label">{{ $op->code }}</label>
                     </div>
                 @endforeach
                 <button wire:click="exportCsv" class="btn btn-outline-secondary btn-sm ms-auto"
