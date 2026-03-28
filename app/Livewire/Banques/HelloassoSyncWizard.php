@@ -78,6 +78,8 @@ final class HelloassoSyncWizard extends Component
     // Création opération inline
     public ?int $creatingOperationForMapping = null;
 
+    public string $newOperationCode = '';
+
     public string $newOperationNom = '';
 
     public ?string $newOperationDateDebut = null;
@@ -165,12 +167,13 @@ final class HelloassoSyncWizard extends Component
     public function cancelCreateOperation(): void
     {
         $this->creatingOperationForMapping = null;
-        $this->reset('newOperationNom', 'newOperationDateDebut', 'newOperationDateFin', 'newOperationTypeOperationId');
+        $this->reset('newOperationCode', 'newOperationNom', 'newOperationDateDebut', 'newOperationDateFin', 'newOperationTypeOperationId');
     }
 
     public function storeOperation(): void
     {
         $this->validate([
+            'newOperationCode' => 'required|string|max:50|unique:operations,code',
             'newOperationNom' => 'required|string|max:255',
             'newOperationDateDebut' => 'required|date',
             'newOperationDateFin' => 'nullable|date|after_or_equal:newOperationDateDebut',
@@ -178,6 +181,7 @@ final class HelloassoSyncWizard extends Component
         ]);
 
         $operation = Operation::create([
+            'code' => $this->newOperationCode,
             'nom' => $this->newOperationNom,
             'date_debut' => $this->newOperationDateDebut,
             'date_fin' => $this->newOperationDateFin,

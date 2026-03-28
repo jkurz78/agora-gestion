@@ -134,6 +134,11 @@
                                                     <div class="bg-light rounded p-3">
                                                         <h6 class="mb-2"><i class="bi bi-plus-circle me-1"></i> Nouvelle opération</h6>
                                                         <div class="row g-2 align-items-end">
+                                                            <div class="col-md-2">
+                                                                <label class="form-label small">Code *</label>
+                                                                <input type="text" wire:model="newOperationCode" class="form-control form-control-sm @error('newOperationCode') is-invalid @enderror" maxlength="50">
+                                                                @error('newOperationCode') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                                            </div>
                                                             <div class="col-md-3">
                                                                 <label class="form-label small">Nom *</label>
                                                                 <input type="text" wire:model="newOperationNom" class="form-control form-control-sm @error('newOperationNom') is-invalid @enderror">
