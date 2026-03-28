@@ -157,6 +157,21 @@ final class TypeOperationManager extends Component
         $this->maxVisitedTab = 3;
     }
 
+    /**
+     * Called from JS — receives TinyMCE content before saving.
+     *
+     * @param  array<string, string>  $editorContent
+     */
+    public function saveWithEditorContent(array $editorContent = []): void
+    {
+        foreach ($editorContent as $categorie => $corps) {
+            if (isset($this->emailTemplates[$categorie])) {
+                $this->emailTemplates[$categorie]['corps'] = $corps;
+            }
+        }
+        $this->save();
+    }
+
     public function save(): void
     {
         $rules = [
@@ -255,6 +270,15 @@ final class TypeOperationManager extends Component
 
     public function nextTab(): void
     {
+        // Validate current tab before advancing (creation mode only)
+        if ($this->editingId === null && $this->activeTab === 1) {
+            $this->validate([
+                'code' => 'required|string|max:20|unique:type_operations,code',
+                'nom' => 'required|string|max:150|unique:type_operations,nom',
+                'sous_categorie_id' => 'required|exists:sous_categories,id',
+            ]);
+        }
+
         if ($this->activeTab < 3) {
             $this->activeTab++;
             if ($this->activeTab > $this->maxVisitedTab) {
