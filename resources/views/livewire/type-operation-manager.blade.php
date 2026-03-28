@@ -370,6 +370,8 @@
                         <div class="mb-2">
                             <label class="form-label small fw-semibold">Corps</label>
                         </div>
+                        {{-- z-index TinyMCE dropdowns above modal --}}
+                        <style>.tox-tinymce-aux { z-index: 2100 !important; }</style>
                         <div wire:key="tinymce-{{ $emailSubTab }}-{{ $tplData['is_default'] ? 'ro' : 'rw' }}"
                              wire:ignore.self
                              x-data="tinymceEditor('{{ $emailSubTab }}', {{ $tplData['is_default'] ? 'true' : 'false' }})"
