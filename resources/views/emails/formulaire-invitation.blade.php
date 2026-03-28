@@ -17,9 +17,9 @@
         <a href="{{ $formulaireUrl }}" class="btn">Accéder au formulaire</a>
     </p>
 
-    <p>Vous pouvez aussi saisir ce code sur la page d'accueil du formulaire :</p>
+    <p>Vous pouvez aussi saisir ce code sur <a href="{{ route('formulaire.index') }}">la page d'accueil du formulaire</a> :</p>
     <p style="text-align: center;">
-        <span class="token">{{ $tokenCode }}</span>
+        <span class="token" style="font-size: 1.1rem;">{{ $tokenCode }}</span>
     </p>
 
     <div class="footer">

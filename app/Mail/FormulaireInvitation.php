@@ -65,12 +65,14 @@ final class FormulaireInvitation extends Mailable
      */
     private function variables(): array
     {
+        $formulaireIndex = route('formulaire.index');
+
         $blocLiens = '<p style="text-align: center; margin: 25px 0;">'
             .'<a href="'.$this->formulaireUrl.'" style="display:inline-block;padding:10px 24px;background:#3d5473;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Accéder au formulaire</a>'
             .'</p>'
-            .'<p>Vous pouvez aussi saisir ce code sur la page d\'accueil du formulaire :</p>'
+            .'<p>Vous pouvez aussi saisir ce code sur <a href="'.$formulaireIndex.'">la page d\'accueil du formulaire</a> :</p>'
             .'<p style="text-align: center;">'
-            .'<span style="display:inline-block;padding:8px 16px;background:#f0f0f0;border:1px solid #ddd;border-radius:6px;font-size:1.4rem;font-family:monospace;letter-spacing:3px;">'.$this->tokenCode.'</span>'
+            .'<span style="display:inline-block;padding:8px 16px;background:#f0f0f0;border:1px solid #ddd;border-radius:6px;font-size:1.1rem;font-family:monospace;letter-spacing:3px;">'.$this->tokenCode.'</span>'
             .'</p>';
 
         return [
