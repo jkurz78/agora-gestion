@@ -584,7 +584,7 @@
                     statusbar: false,
                     plugins: 'lists link',
                     toolbar: isReadonly ? false : 'bold italic underline | bullist numlist | link | variablesButton',
-                    readonly: isReadonly ? 1 : 0,
+                    readonly: isReadonly,
                     content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }',
                     setup: function (editor) {
                         self.editor = editor;
