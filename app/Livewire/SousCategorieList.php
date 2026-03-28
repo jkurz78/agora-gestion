@@ -39,7 +39,12 @@ final class SousCategorieList extends Component
     {
         return view('livewire.sous-categorie-list', [
             'categories' => Categorie::orderBy('nom')->get(),
-            'sousCategories' => SousCategorie::with('categorie')->orderBy('nom')->get(),
+            'sousCategories' => SousCategorie::with('categorie')
+                ->join('categories', 'sous_categories.categorie_id', '=', 'categories.id')
+                ->orderBy('categories.nom')
+                ->orderBy('sous_categories.code_cerfa')
+                ->select('sous_categories.*')
+                ->get(),
         ]);
     }
 
