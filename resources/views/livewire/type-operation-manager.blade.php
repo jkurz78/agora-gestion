@@ -428,31 +428,32 @@
 
                 {{-- Navigation buttons --}}
                 <div class="d-flex justify-content-between mt-4">
-                    @if($activeTab > 1)
-                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="previousTab">
-                            <i class="bi bi-arrow-left"></i> Précédent
+                    @if($editingId !== null)
+                        {{-- Mode édition : Annuler + Enregistrer en permanence --}}
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Annuler</button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="syncTinyMCEAndSave(this)">
+                            <i class="bi bi-check-lg"></i> Enregistrer
                         </button>
                     @else
-                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Annuler</button>
-                    @endif
-
-                    <div class="d-flex gap-2">
-                        @if($editingId !== null)
-                            <button type="button" class="btn btn-sm btn-primary" onclick="syncTinyMCEAndSave(this)">
-                                <i class="bi bi-check-lg"></i> Enregistrer
+                        {{-- Mode création : Suivant/Précédent + Enregistrer sur dernier onglet --}}
+                        @if($activeTab > 1)
+                            <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="previousTab">
+                                <i class="bi bi-arrow-left"></i> Précédent
                             </button>
+                        @else
+                            <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Annuler</button>
                         @endif
 
                         @if($activeTab < 3)
                             <button type="button" class="btn btn-sm btn-primary" wire:click="nextTab">
                                 Suivant <i class="bi bi-arrow-right"></i>
                             </button>
-                        @elseif($editingId === null)
+                        @else
                             <button type="button" class="btn btn-sm btn-primary" onclick="syncTinyMCEAndSave(this)">
                                 <i class="bi bi-check-lg"></i> Enregistrer
                             </button>
                         @endif
-                    </div>
+                    @endif
                 </div>
             </div>
         </div>
