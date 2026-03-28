@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Mail\FormulaireInvitation;
+use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
@@ -435,20 +436,29 @@ final class ParticipantTable extends Component
             return;
         }
 
+        // Load email template (custom for this type, or default)
+        $template = EmailTemplate::where('categorie', 'formulaire')
+            ->where('type_operation_id', $typeOp->id)
+            ->first()
+            ?? EmailTemplate::where('categorie', 'formulaire')
+                ->whereNull('type_operation_id')
+                ->first();
+
         try {
             $op = $participant->operation;
             $mail = new FormulaireInvitation(
                 prenomParticipant: $participant->tiers->prenom ?? 'Participant',
                 nomParticipant: $participant->tiers->nom ?? '',
                 nomOperation: $op->nom,
+                nomTypeOperation: $typeOp->nom,
                 formulaireUrl: $this->tokenUrl,
                 tokenCode: $this->tokenCode ?? '',
                 dateExpiration: Carbon::parse($this->tokenExpireAt)->format('d/m/Y'),
                 dateDebut: $op->date_debut?->format('d/m/Y') ?? '',
                 dateFin: $op->date_fin?->format('d/m/Y') ?? '',
                 nombreSeances: $op->nombre_seances !== null ? (string) $op->nombre_seances : '',
-                customObjet: null,
-                customCorps: null,
+                customObjet: $template?->objet,
+                customCorps: $template?->corps,
             );
 
             Mail::mailer()

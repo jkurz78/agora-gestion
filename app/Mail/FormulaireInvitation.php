@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Models\EmailTemplate;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -21,6 +22,7 @@ final class FormulaireInvitation extends Mailable
         public readonly string $prenomParticipant,
         public readonly string $nomParticipant,
         public readonly string $nomOperation,
+        public readonly string $nomTypeOperation,
         public readonly string $formulaireUrl,
         public readonly string $tokenCode,
         public readonly string $dateExpiration,
@@ -33,11 +35,11 @@ final class FormulaireInvitation extends Mailable
         $vars = $this->variables();
 
         $corps = $this->customCorps
-            ?? "Bonjour {prenom},\n\nNous vous invitons à compléter votre formulaire pour {operation}.";
+            ?? '<p>Bonjour <strong>{prenom}</strong>,</p><p>Nous vous invitons à compléter votre formulaire pour <strong>{operation}</strong>.</p>';
 
         $corps = str_replace(array_keys($vars), array_values($vars), $corps);
 
-        $this->corpsHtml = nl2br(e($corps));
+        $this->corpsHtml = EmailTemplate::sanitizeCorps($corps);
     }
 
     public function envelope(): Envelope
@@ -61,6 +63,7 @@ final class FormulaireInvitation extends Mailable
             '{prenom}' => $this->prenomParticipant,
             '{nom}' => $this->nomParticipant,
             '{operation}' => $this->nomOperation,
+            '{type_operation}' => $this->nomTypeOperation,
             '{date_debut}' => $this->dateDebut,
             '{date_fin}' => $this->dateFin,
             '{nb_seances}' => $this->nombreSeances,
