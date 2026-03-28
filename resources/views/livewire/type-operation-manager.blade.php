@@ -125,9 +125,14 @@
              style="background:rgba(0,0,0,.4);z-index:2000">
             <div class="bg-white rounded p-4 shadow" style="width:700px;max-width:95vw;max-height:90vh;overflow-y:auto">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold mb-0">
-                        {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
-                    </h5>
+                    <div>
+                        <h5 class="fw-bold mb-0">
+                            {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
+                        </h5>
+                        @if($editingId && ($code || $nom))
+                            <small class="text-muted">{{ $code }}{{ $code && $nom ? ' — ' : '' }}{{ $nom }}</small>
+                        @endif
+                    </div>
                     <button type="button" class="btn-close" wire:click="$set('showModal', false)" title="Fermer"></button>
                 </div>
 
