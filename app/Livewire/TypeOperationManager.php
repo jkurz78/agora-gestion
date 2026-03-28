@@ -56,10 +56,6 @@ final class TypeOperationManager extends Component
 
     public string $email_from_name = '';
 
-    public string $email_formulaire_objet = '';
-
-    public string $email_formulaire_corps = '';
-
     public string $testEmailTo = '';
 
     public bool $showTestEmailModal = false;
@@ -134,8 +130,6 @@ final class TypeOperationManager extends Component
         $this->existingLogoPath = $type->logo_path ?? '';
         $this->email_from = $type->email_from ?? '';
         $this->email_from_name = $type->email_from_name ?? '';
-        $this->email_formulaire_objet = $type->email_formulaire_objet ?? '';
-        $this->email_formulaire_corps = $type->email_formulaire_corps ?? '';
         $this->testEmailTo = '';
         $this->tarifs = $type->tarifs->map(fn (TypeOperationTarif $t) => [
             'id' => $t->id,
@@ -180,8 +174,6 @@ final class TypeOperationManager extends Component
                 'actif' => $this->actif,
                 'email_from' => $this->email_from !== '' ? $this->email_from : null,
                 'email_from_name' => $this->email_from_name !== '' ? $this->email_from_name : null,
-                'email_formulaire_objet' => $this->email_formulaire_objet !== '' ? $this->email_formulaire_objet : null,
-                'email_formulaire_corps' => $this->email_formulaire_corps !== '' ? $this->email_formulaire_corps : null,
             ];
 
             if ($logoPath !== null) {
@@ -371,8 +363,6 @@ final class TypeOperationManager extends Component
         $this->existingLogoPath = '';
         $this->email_from = '';
         $this->email_from_name = '';
-        $this->email_formulaire_objet = '';
-        $this->email_formulaire_corps = '';
         $this->testEmailTo = '';
         $this->showTestEmailModal = false;
         $this->tarifs = [];
