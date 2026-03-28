@@ -14,12 +14,11 @@ class EmailTemplateSeeder extends Seeder
         EmailTemplate::updateOrCreate(
             ['categorie' => 'formulaire', 'type_operation_id' => null],
             [
-                'objet' => 'Formulaire à compléter — {operation}',
-                'corps' => '<p>Bonjour <strong>{prenom}</strong>,</p>'
-                    .'<p>Nous vous invitons à compléter votre formulaire d\'inscription pour <strong>{operation}</strong> ({type_operation}).</p>'
-                    .'<p>Dates : du {date_debut} au {date_fin}.</p>'
-                    .'<p>Merci de compléter ce formulaire dans les meilleurs délais.</p>'
-                    .'<p>Cordialement,<br>L\'équipe</p>',
+                'objet' => 'Action requise : Formulaire à compléter pour votre inscription au parcours {operation}',
+                'corps' => '<p>Bonjour {prenom},</p>'
+                    .'<p>Afin de compléter votre dossier d\'inscription au parcours {type_operation}, nous vous remercions de compléter le formulaire dont le lien est ci-dessous.</p>'
+                    .'<p>Rappel : ce parcours se déroulera sur {nb_seances} séances du {date_debut} au {date_fin}.</p>'
+                    .'<p>Cordialement,<br>L\'équipe encadrante {type_operation}</p>',
             ],
         );
 
