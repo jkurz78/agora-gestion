@@ -12,6 +12,7 @@
 <body>
     <div>{!! $corpsHtml !!}</div>
 
+    @if($showAutoBlock)
     <p style="text-align: center; margin: 25px 0;">
         <a href="{{ $formulaireUrl }}" class="btn">Accéder au formulaire</a>
     </p>
@@ -25,5 +26,6 @@
         <p>Ce lien est valable jusqu'au {{ $dateExpiration }}.</p>
         <p>Si vous n'êtes pas concerné par ce message, vous pouvez l'ignorer.</p>
     </div>
+    @endif
 </body>
 </html>
