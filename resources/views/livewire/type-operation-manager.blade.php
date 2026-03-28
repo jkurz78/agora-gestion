@@ -122,12 +122,14 @@
          ═══════════════════════════════════════════════════════════ --}}
     @if($showModal)
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-             style="background:rgba(0,0,0,.4);z-index:2000"
-             wire:click.self="$set('showModal', false)">
+             style="background:rgba(0,0,0,.4);z-index:2000">
             <div class="bg-white rounded p-4 shadow" style="width:700px;max-width:95vw;max-height:90vh;overflow-y:auto">
-                <h5 class="fw-bold mb-3">
-                    {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
-                </h5>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0">
+                        {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
+                    </h5>
+                    <button type="button" class="btn-close" wire:click="$set('showModal', false)" title="Fermer"></button>
+                </div>
 
                 {{-- Tab navigation --}}
                 <ul class="nav nav-tabs mb-3">
