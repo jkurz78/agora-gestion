@@ -372,7 +372,7 @@
                         </div>
                         <div wire:key="tinymce-{{ $emailSubTab }}-{{ $tplData['is_default'] ? 'ro' : 'rw' }}"
                              wire:ignore.self
-                             x-data="tinymceEditor(@js($emailSubTab), @js($tplData['is_default']), @js(\App\Enums\CategorieEmail::from($emailSubTab)->variables()))"
+                             x-data="tinymceEditor('{{ $emailSubTab }}', {{ $tplData['is_default'] ? 'true' : 'false' }})"
                              x-init="init()">
                             <textarea x-ref="editor">{!! $tplData['corps'] !!}</textarea>
                         </div>
@@ -529,7 +529,28 @@
             setTimeout(() => $wire.call('save'), 50);
         };
 
-        Alpine.data('tinymceEditor', (categorie, isReadonly, variables) => ({
+        const emailVariables = {
+            formulaire: {
+                '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
+                '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
+                '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
+            },
+            attestation: {
+                '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
+                '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
+                '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
+                '{numero_seance}': 'N° séance', '{date_seance}': 'Date séance',
+            },
+            facture: {
+                '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
+                '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
+                '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
+                '{numero_seance}': 'N° séance', '{date_seance}': 'Date séance',
+                '{date_facture}': 'Date facture', '{numero_facture}': 'N° facture',
+            },
+        };
+
+        Alpine.data('tinymceEditor', (categorie, isReadonly) => ({
             editor: null,
 
             init() {
@@ -547,6 +568,7 @@
 
                 const self = this;
 
+                const variables = emailVariables[categorie] || {};
                 const menuItems = Object.entries(variables).map(([key, label]) => ({
                     type: 'menuitem',
                     text: key + ' — ' + label,
