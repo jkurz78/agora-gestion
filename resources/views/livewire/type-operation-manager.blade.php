@@ -395,7 +395,11 @@
                             @foreach (\App\Enums\CategorieEmail::from($emailSubTab)->variables() as $var => $desc)
                                 <code title="{{ $desc }}">{{ $var }}</code>
                             @endforeach
-                            — Les éléments automatiques (lien, code, expiration) sont ajoutés sous le corps.
+                            @if($emailSubTab === 'formulaire')
+                                — Le lien, le code et la date d'expiration sont ajoutés automatiquement sous le corps.
+                            @else
+                                — Le document est joint automatiquement à l'email.
+                            @endif
                         </div>
                     </div>
                 @endif
