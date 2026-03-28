@@ -123,7 +123,7 @@
     @if($showModal)
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2000">
-            <div class="bg-white rounded p-4 shadow" style="width:700px;max-width:95vw;min-height:60vh;max-height:90vh;overflow-y:auto">
+            <div class="bg-white rounded p-4 shadow" style="width:700px;max-width:95vw;max-height:90vh;overflow-y:auto">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0">
                         {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
@@ -274,13 +274,15 @@
                                     <td colspan="3" class="text-muted small text-center py-3">Aucun tarif défini.</td>
                                 </tr>
                             @endforelse
+                            {{-- Separator --}}
+                            <tr><td colspan="3" class="border-0 py-2"></td></tr>
                             {{-- Add row --}}
-                            <tr class="table-light">
-                                <td colspan="3" class="text-muted small py-1 border-0">
+                            <tr>
+                                <td colspan="3" class="small py-1 border-0">
                                     <i class="bi bi-plus-circle me-1"></i> Ajouter un tarif
                                 </td>
                             </tr>
-                            <tr class="table-light">
+                            <tr>
                                 <td>
                                     <input type="text" wire:model="newTarifLibelle" class="form-control form-control-sm" placeholder="Libellé du tarif">
                                 </td>
