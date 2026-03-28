@@ -37,8 +37,7 @@ $registerParametres = function (): void {
         Route::view('/association', 'parametres.association')->name('association');
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::resource('categories', CategorieController::class)->except(['show']);
-        Route::resource('sous-categories', SousCategorieController::class)->except(['show']);
-        Route::post('sous-categories/{sousCategory}/toggle-flag', [SousCategorieController::class, 'toggleFlag'])->name('sous-categories.toggle-flag');
+        Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
         Route::resource('comptes-bancaires', CompteBancaireController::class)->except(['show']);
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::view('type-operations', 'parametres.type-operations.index')->name('type-operations.index');
