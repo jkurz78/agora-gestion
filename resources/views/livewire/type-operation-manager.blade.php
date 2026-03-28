@@ -129,7 +129,7 @@
                         <h5 class="fw-bold mb-0">
                             {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
                         </h5>
-                        @if($editingId && ($code || $nom))
+                        @if($editingId && $activeTab > 1 && ($code || $nom))
                             <small class="text-muted">{{ $code }}{{ $code && $nom ? ' — ' : '' }}{{ $nom }}</small>
                         @endif
                     </div>
