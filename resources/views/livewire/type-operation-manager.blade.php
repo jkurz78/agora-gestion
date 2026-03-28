@@ -121,13 +121,9 @@
          MODAL CREATE/EDIT
          ═══════════════════════════════════════════════════════════ --}}
     @if($showModal)
-        <script>
-            if (typeof tinymce === 'undefined') {
-                var s = document.createElement('script');
-                s.src = '{{ asset("vendor/tinymce/tinymce.min.js") }}';
-                document.head.appendChild(s);
-            }
-        </script>
+        @once
+        <script src="{{ asset('vendor/tinymce/tinymce.min.js') }}"></script>
+        @endonce
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2000"
              wire:click.self="$set('showModal', false)">
@@ -342,22 +338,15 @@
                 @php $tplData = $emailTemplates[$emailSubTab] ?? null; @endphp
                 @if($tplData)
                     <div class="border rounded p-3">
-                        {{-- Status + buttons --}}
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <span class="badge {{ $tplData['is_default'] ? 'bg-secondary' : 'bg-primary' }}">
-                                {{ $tplData['is_default'] ? 'Modèle par défaut' : 'Personnalisé' }}
-                            </span>
-                            @if($tplData['is_default'])
-                                <button type="button" class="btn btn-sm btn-outline-primary"
-                                        wire:click="personnaliserTemplate('{{ $emailSubTab }}')">
-                                    <i class="bi bi-pencil"></i> Personnaliser
-                                </button>
-                            @else
-                                <button type="button" class="btn btn-sm btn-outline-warning"
-                                        wire:click="revenirAuDefaut('{{ $emailSubTab }}')">
-                                    <i class="bi bi-arrow-counterclockwise"></i> Revenir au défaut
-                                </button>
-                            @endif
+                        {{-- Modèle select + action --}}
+                        <div class="d-flex gap-2 align-items-center mb-3">
+                            <label class="form-label small fw-semibold mb-0">Modèle</label>
+                            <select class="form-select form-select-sm" style="width:auto"
+                                    wire:change="$event.target.value === 'default' ? revenirAuDefaut('{{ $emailSubTab }}') : personnaliserTemplate('{{ $emailSubTab }}')"
+                                    {{ $editingId === null && $tplData['is_default'] ? 'disabled' : '' }}>
+                                <option value="default" {{ $tplData['is_default'] ? 'selected' : '' }}>Modèle par défaut</option>
+                                <option value="custom" {{ !$tplData['is_default'] ? 'selected' : '' }}>Personnalisé — {{ $nom ?: 'ce type' }}</option>
+                            </select>
                         </div>
 
                         {{-- Subject --}}
@@ -510,28 +499,41 @@
 
     @script
     <script>
-        // TinyMCE initialization for email templates
         let currentTinyMCE = null;
+        const allVariables = @js(collect(\App\Enums\CategorieEmail::cases())->mapWithKeys(fn ($c) => [$c->value => $c->variables()])->toArray());
 
-        function initTinyMCE(textareaId, isReadonly, variables, wireComponent) {
-            // Destroy existing instance
-            if (currentTinyMCE) {
-                tinymce.remove(currentTinyMCE);
-                currentTinyMCE = null;
+        function tryInitTinyMCE() {
+            if (typeof tinymce === 'undefined') {
+                setTimeout(tryInitTinyMCE, 200);
+                return;
             }
 
+            const activeTab = $wire.get('activeTab');
+            if (activeTab !== 3) {
+                destroyTinyMCE();
+                return;
+            }
+
+            const emailSubTab = $wire.get('emailSubTab');
+            const textareaId = 'tinymce-' + emailSubTab;
             const textarea = document.getElementById(textareaId);
+
             if (!textarea) return;
+            if (textarea.closest('.tox-tinymce')) return; // already initialized
+
+            const tplData = $wire.get('emailTemplates.' + emailSubTab);
+            if (!tplData) return;
+
+            const isReadonly = tplData.is_default;
+            const variables = allVariables[emailSubTab] || {};
 
             const menuItems = Object.entries(variables).map(([key, label]) => ({
                 type: 'menuitem',
                 text: key + ' — ' + label,
-                onAction: () => {
-                    if (currentTinyMCE) {
-                        currentTinyMCE.insertContent(key);
-                    }
-                },
+                onAction: () => { if (currentTinyMCE) currentTinyMCE.insertContent(key); },
             }));
+
+            destroyTinyMCE();
 
             tinymce.init({
                 target: textarea,
@@ -550,77 +552,33 @@
                     if (!isReadonly) {
                         editor.ui.registry.addMenuButton('variablesButton', {
                             text: 'Variables',
-                            fetch: function (callback) {
-                                callback(menuItems);
-                            },
+                            fetch: function (callback) { callback(menuItems); },
                         });
                     }
 
                     editor.on('Change KeyUp', function () {
                         if (!isReadonly) {
-                            const categorie = textareaId.replace('tinymce-', '');
-                            wireComponent.set('emailTemplates.' + categorie + '.corps', editor.getContent());
+                            $wire.set('emailTemplates.' + emailSubTab + '.corps', editor.getContent());
                         }
                     });
                 },
             });
         }
 
-        // Watch for tab changes to init/destroy TinyMCE
-        $wire.on('$refresh', () => {
-            setTimeout(() => {
-                const activeTab = $wire.get('activeTab');
-                const emailSubTab = $wire.get('emailSubTab');
-                if (activeTab === 3) {
-                    const tplData = $wire.get('emailTemplates.' + emailSubTab);
-                    if (tplData) {
-                        const variables = @js(collect(\App\Enums\CategorieEmail::cases())->mapWithKeys(fn ($c) => [$c->value => $c->variables()])->toArray());
-                        initTinyMCE(
-                            'tinymce-' + emailSubTab,
-                            tplData.is_default,
-                            variables[emailSubTab] || {},
-                            $wire
-                        );
-                    }
-                } else {
-                    if (currentTinyMCE) {
-                        tinymce.remove(currentTinyMCE);
-                        currentTinyMCE = null;
-                    }
-                }
-            }, 100);
-        });
-
-        // Also handle initial load and sub-tab changes
-        const observer = new MutationObserver(() => {
-            const activeTab = $wire.get('activeTab');
-            const emailSubTab = $wire.get('emailSubTab');
-            if (activeTab === 3) {
-                const textareaId = 'tinymce-' + emailSubTab;
-                const textarea = document.getElementById(textareaId);
-                if (textarea && !textarea.closest('.tox-tinymce')) {
-                    const tplData = $wire.get('emailTemplates.' + emailSubTab);
-                    if (tplData) {
-                        const variables = @js(collect(\App\Enums\CategorieEmail::cases())->mapWithKeys(fn ($c) => [$c->value => $c->variables()])->toArray());
-                        initTinyMCE(textareaId, tplData.is_default, variables[emailSubTab] || {}, $wire);
-                    }
-                }
-            }
-        });
-
-        // Start observing when modal opens
-        if (document.querySelector('[wire\\:ignore]')) {
-            observer.observe(document.body, { childList: true, subtree: true });
-        }
-
-        // Cleanup on component destroy
-        document.addEventListener('livewire:navigating', () => {
+        function destroyTinyMCE() {
             if (currentTinyMCE) {
                 tinymce.remove(currentTinyMCE);
                 currentTinyMCE = null;
             }
-            observer.disconnect();
+        }
+
+        // Re-init after every Livewire update
+        Livewire.hook('morph.updated', () => {
+            setTimeout(tryInitTinyMCE, 150);
         });
+
+        // Also try on initial render
+        setTimeout(tryInitTinyMCE, 300);
     </script>
     @endscript
 </div>
