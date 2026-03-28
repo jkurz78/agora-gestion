@@ -445,6 +445,7 @@
         document.addEventListener('livewire:updated', initTooltips);
     </script>
 
+    <script src="{{ asset('vendor/tinymce/tinymce.min.js') }}"></script>
     @stack('scripts')
     @php $footerBg = app()->environment('production') ? ($espaceColor ?? '#722281') : '#b45309'; @endphp
     <footer class="text-center small py-2" style="position:fixed;bottom:0;left:0;right:0;background-color:{{ $footerBg }};color:rgba(255,255,255,0.85);z-index:1030;">
