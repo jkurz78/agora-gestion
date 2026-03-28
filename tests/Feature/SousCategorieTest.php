@@ -126,10 +126,15 @@ it('can toggle a flag', function () {
 });
 
 it('rejects invalid flag names', function () {
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+    $sc = SousCategorie::factory()->create([
+        'categorie_id' => $this->categorie->id,
+        'pour_dons' => false,
+    ]);
 
     Livewire::test(SousCategorieList::class)
         ->call('toggleFlag', $sc->id, 'invalid_flag');
+
+    expect($sc->fresh()->pour_dons)->toBeFalse();
 });
 
 it('can update a field inline', function () {
