@@ -556,6 +556,9 @@
                 '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
                 '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
                 '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
+                '{bloc_liens}': 'Bloc liens (bouton + code + expiration)',
+                '{url}': 'URL du formulaire', '{code}': 'Code formulaire',
+                '{date_expiration}': 'Date expiration',
             },
             attestation: {
                 '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
