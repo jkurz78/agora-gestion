@@ -525,6 +525,10 @@
     @script
     <script>
         // Sync TinyMCE content then call Livewire save
+        function stripVariableSpans(html) {
+            return html.replace(/<span class="mce-variable[^"]*">(\{[^}]+\})<\/span>/g, '$1');
+        }
+
         window.syncTinyMCEAndSave = function (btn) {
             const content = {};
             if (typeof tinymce !== 'undefined') {
@@ -535,7 +539,7 @@
                         const key = wrap.getAttribute('wire:key');
                         const match = key.match(/^tinymce-(\w+)-/);
                         if (match) {
-                            content[match[1]] = editor.getContent();
+                            content[match[1]] = stripVariableSpans(editor.getContent());
                         }
                     }
                 });
@@ -586,7 +590,11 @@
                 const menuItems = Object.entries(variables).map(([key, label]) => ({
                     type: 'menuitem',
                     text: key + ' — ' + label,
-                    onAction: () => { if (self.editor) self.editor.insertContent(key); },
+                    onAction: () => {
+                        if (self.editor) {
+                            self.editor.insertContent('<span class="mce-variable mce-noneditable">' + key + '</span>&nbsp;');
+                        }
+                    },
                 }));
 
                 tinymce.init({
@@ -596,10 +604,11 @@
                     height: 250,
                     menubar: false,
                     statusbar: false,
-                    plugins: 'lists link',
+                    plugins: 'lists link noneditable',
                     toolbar: isReadonly ? false : 'bold italic underline | bullist numlist | link | variablesButton',
                     readonly: isReadonly,
-                    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; }',
+                    noneditable_class: 'mce-variable',
+                    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .mce-variable { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
                     setup: function (editor) {
                         self.editor = editor;
 
@@ -609,6 +618,18 @@
                                 fetch: function (callback) { callback(menuItems); },
                             });
                         }
+
+                        // On init: convert {variable} text to styled spans
+                        editor.on('init', function () {
+                            let content = editor.getContent();
+                            const allVarKeys = Object.keys(variables);
+                            allVarKeys.forEach(v => {
+                                const escaped = v.replace(/[{}]/g, '\\$&');
+                                const regex = new RegExp('(?!<span[^>]*>)' + escaped + '(?!</span>)', 'g');
+                                content = content.replace(regex, '<span class="mce-variable mce-noneditable">' + v + '</span>');
+                            });
+                            editor.setContent(content);
+                        });
                     },
                 });
             },
