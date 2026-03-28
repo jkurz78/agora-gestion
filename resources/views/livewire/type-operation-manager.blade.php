@@ -274,30 +274,27 @@
                                     <td colspan="3" class="text-muted small text-center py-3">Aucun tarif défini.</td>
                                 </tr>
                             @endforelse
-                            {{-- Separator --}}
-                            <tr><td colspan="3" class="border-0 py-2"></td></tr>
-                            {{-- Add row --}}
-                            <tr>
-                                <td colspan="3" class="small py-1 border-0">
-                                    <i class="bi bi-plus-circle me-1"></i> Ajouter un tarif
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>
-                                    <input type="text" wire:model="newTarifLibelle" class="form-control form-control-sm" placeholder="Libellé du tarif">
-                                </td>
-                                <td>
-                                    <input type="text" wire:model="newTarifMontant" class="form-control form-control-sm text-end" placeholder="0,00">
-                                    @error('newTarifMontant') <div class="text-danger small">{{ $message }}</div> @enderror
-                                </td>
-                                <td class="text-center align-middle">
-                                    <button type="button" class="btn btn-sm btn-outline-success" wire:click="addTarif" title="Ajouter">
-                                        <i class="bi bi-plus-lg"></i>
-                                    </button>
-                                </td>
-                            </tr>
                         </tbody>
                     </table>
+                </div>
+
+                {{-- Ajout d'un tarif (hors tableau) --}}
+                <div class="mt-4">
+                    <p class="small text-muted mb-2"><i class="bi bi-plus-circle me-1"></i> Ajouter un tarif</p>
+                    <div class="row g-2 align-items-end">
+                        <div class="col">
+                            <input type="text" wire:model="newTarifLibelle" class="form-control form-control-sm" placeholder="Libellé du tarif">
+                        </div>
+                        <div class="col-auto" style="width:140px">
+                            <input type="text" wire:model="newTarifMontant" class="form-control form-control-sm text-end" placeholder="0,00">
+                            @error('newTarifMontant') <div class="text-danger small">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-sm btn-outline-success" wire:click="addTarif" title="Ajouter">
+                                <i class="bi bi-plus-lg"></i> Ajouter
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 @endif
