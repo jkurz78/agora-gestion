@@ -139,7 +139,7 @@ final class TransactionList extends Component
         return view('livewire.transaction-list', [
             'transactions' => $query->paginate($this->effectivePerPage()),
             'categories' => $categories,
-            'operations' => Operation::with('typeOperation')->orderBy('nom')->get(),
+            'operations' => Operation::with('typeOperation')->orderBy('code')->get(),
             'comptes' => CompteBancaire::orderBy('nom')->get(),
             'typeLabels' => TypeTransaction::cases(),
         ]);
