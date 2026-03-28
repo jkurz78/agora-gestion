@@ -51,8 +51,12 @@
                     <label for="filter-operation" class="form-label">Opération</label>
                     <select wire:model.live="operation_id" id="filter-operation" class="form-select form-select-sm">
                         <option value="">Toutes</option>
-                        @foreach ($operations as $op)
-                            <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                        @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
+                            <optgroup label="{{ $typeName }}">
+                                @foreach ($ops as $op)
+                                    <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                @endforeach
+                            </optgroup>
                         @endforeach
                     </select>
                 </div>
