@@ -129,7 +129,7 @@
                         <h5 class="fw-bold mb-0">
                             {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
                         </h5>
-                        @if($editingId && $activeTab > 1 && ($code || $nom))
+                        @if($activeTab > 1 && ($code || $nom))
                             <small class="text-muted">{{ $code }}{{ $code && $nom ? ' — ' : '' }}{{ $nom }}</small>
                         @endif
                     </div>
@@ -539,8 +539,7 @@
                     }
                 });
             }
-            // Small delay to let $wire.set() propagate, then save
-            setTimeout(() => $wire.call('save'), 50);
+            $wire.call('save');
         };
 
         const emailVariables = {
