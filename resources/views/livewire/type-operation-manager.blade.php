@@ -370,9 +370,9 @@
                         <div class="mb-2">
                             <label class="form-label small fw-semibold">Corps</label>
                         </div>
-                        <div x-data="tinymceEditor(@js($emailSubTab), @js($tplData['is_default']), @js(\App\Enums\CategorieEmail::from($emailSubTab)->variables()))"
-                             x-init="init()"
-                             x-on:remove.window="destroy()">
+                        <div wire:key="tinymce-{{ $emailSubTab }}-{{ $tplData['is_default'] ? 'ro' : 'rw' }}"
+                             x-data="tinymceEditor(@js($emailSubTab), @js($tplData['is_default']), @js(\App\Enums\CategorieEmail::from($emailSubTab)->variables()))"
+                             x-init="init()">
                             <textarea x-ref="editor">{!! $tplData['corps'] !!}</textarea>
                         </div>
 
