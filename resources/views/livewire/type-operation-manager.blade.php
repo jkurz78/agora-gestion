@@ -608,7 +608,7 @@
                     toolbar: isReadonly ? false : 'bold italic underline | bullist numlist | link | variablesButton',
                     readonly: isReadonly,
                     noneditable_class: 'mce-variable',
-                    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .mce-variable { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 2px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
+                    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .mce-variable { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 1px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
                     setup: function (editor) {
                         self.editor = editor;
 
