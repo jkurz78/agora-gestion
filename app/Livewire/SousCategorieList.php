@@ -86,7 +86,7 @@ final class SousCategorieList extends Component
             'pour_inscriptions' => $this->pour_inscriptions,
         ];
 
-        if ($this->editingId) {
+        if ($this->editingId !== null) {
             SousCategorie::findOrFail($this->editingId)->update($data);
         } else {
             SousCategorie::create($data);
@@ -131,7 +131,7 @@ final class SousCategorieList extends Component
         }
 
         $sc = SousCategorie::findOrFail($id);
-        $sc->update([$field => $value !== '' ? $value : null]);
+        $sc->update([$field => ($field === 'code_cerfa' && $value === '') ? null : $value]);
     }
 
     // ── Delete ───────────────────────────────────────────────────
@@ -162,6 +162,8 @@ final class SousCategorieList extends Component
         $this->pour_dons = false;
         $this->pour_cotisations = false;
         $this->pour_inscriptions = false;
+        $this->flashMessage = '';
+        $this->flashType = '';
         $this->resetValidation();
     }
 }
