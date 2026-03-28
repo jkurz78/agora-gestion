@@ -31,6 +31,7 @@ it('n\'affiche pas une opération hors exercice dans le formulaire de transactio
 
 it('affiche une opération dans l\'exercice courant', function () {
     Operation::factory()->create([
+        'code' => 'OP-COURANTE',
         'nom' => 'Op courante',
         'date_debut' => '2025-10-01',
         'date_fin' => '2026-03-31',
@@ -39,7 +40,7 @@ it('affiche une opération dans l\'exercice courant', function () {
 
     Livewire::test(TransactionForm::class)
         ->call('showNewForm', 'depense')
-        ->assertSee('Op courante');
+        ->assertSee('OP-COURANTE');
 });
 
 it('n\'affiche pas une opération clôturée même dans l\'exercice', function () {
