@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\CategorieEmail;
 use App\Mail\TestEmail;
+use App\Models\EmailTemplate;
 use App\Models\SousCategorie;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
@@ -65,6 +67,12 @@ final class TypeOperationManager extends Component
 
     public bool $showTestEmailModal = false;
 
+    // ── Email template state ──────────────────────────────────────
+    public string $emailSubTab = 'formulaire';
+
+    /** @var array<string, array{id: int|null, objet: string, corps: string, is_default: bool}> */
+    public array $emailTemplates = [];
+
     // ── Tarifs management ────────────────────────────────────────
     /** @var array<int, array{id: int|null, libelle: string, montant: string}> */
     public array $tarifs = [];
@@ -116,6 +124,7 @@ final class TypeOperationManager extends Component
     {
         $this->resetForm();
         $this->showModal = true;
+        $this->loadEmailTemplates(null);
     }
 
     public function openEdit(int $id): void
@@ -135,6 +144,7 @@ final class TypeOperationManager extends Component
         $this->existingLogoPath = $type->logo_path ?? '';
         $this->email_from = $type->email_from ?? '';
         $this->email_from_name = $type->email_from_name ?? '';
+        $this->loadEmailTemplates($type->id);
         $this->testEmailTo = '';
         $this->tarifs = $type->tarifs->map(fn (TypeOperationTarif $t) => [
             'id' => $t->id,
@@ -201,6 +211,9 @@ final class TypeOperationManager extends Component
 
             // ── Sync tarifs ──────────────────────────────────────
             $this->syncTarifs($type);
+
+            // ── Sync email templates ────────────────────────────
+            $this->syncEmailTemplates($type);
 
             return $type;
         });
@@ -335,6 +348,71 @@ final class TypeOperationManager extends Component
         }
     }
 
+    // ── Email templates ──────────────────────────────────────────
+
+    public function loadEmailTemplates(?int $typeOperationId): void
+    {
+        foreach (CategorieEmail::cases() as $cat) {
+            $custom = $typeOperationId !== null
+                ? EmailTemplate::where('categorie', $cat->value)
+                    ->where('type_operation_id', $typeOperationId)
+                    ->first()
+                : null;
+
+            if ($custom) {
+                $this->emailTemplates[$cat->value] = [
+                    'id' => $custom->id,
+                    'objet' => $custom->objet,
+                    'corps' => $custom->corps,
+                    'is_default' => false,
+                ];
+            } else {
+                $default = EmailTemplate::where('categorie', $cat->value)
+                    ->whereNull('type_operation_id')
+                    ->first();
+
+                $this->emailTemplates[$cat->value] = [
+                    'id' => $default?->id,
+                    'objet' => $default?->objet ?? '',
+                    'corps' => $default?->corps ?? '',
+                    'is_default' => true,
+                ];
+            }
+        }
+    }
+
+    public function personnaliserTemplate(string $categorie): void
+    {
+        if (! isset($this->emailTemplates[$categorie]) || ! $this->emailTemplates[$categorie]['is_default']) {
+            return;
+        }
+
+        $this->emailTemplates[$categorie]['is_default'] = false;
+        $this->emailTemplates[$categorie]['id'] = null;
+    }
+
+    public function revenirAuDefaut(string $categorie): void
+    {
+        if (! isset($this->emailTemplates[$categorie]) || $this->emailTemplates[$categorie]['is_default']) {
+            return;
+        }
+
+        if ($this->emailTemplates[$categorie]['id'] !== null) {
+            EmailTemplate::where('id', $this->emailTemplates[$categorie]['id'])->delete();
+        }
+
+        $default = EmailTemplate::where('categorie', $categorie)
+            ->whereNull('type_operation_id')
+            ->first();
+
+        $this->emailTemplates[$categorie] = [
+            'id' => $default?->id,
+            'objet' => $default?->objet ?? '',
+            'corps' => $default?->corps ?? '',
+            'is_default' => true,
+        ];
+    }
+
     // ── Private helpers ──────────────────────────────────────────
 
     private function syncTarifs(TypeOperation $type): void
@@ -381,6 +459,23 @@ final class TypeOperationManager extends Component
         }
     }
 
+    private function syncEmailTemplates(TypeOperation $type): void
+    {
+        foreach ($this->emailTemplates as $categorie => $data) {
+            if ($data['is_default']) {
+                continue;
+            }
+
+            EmailTemplate::updateOrCreate(
+                ['categorie' => $categorie, 'type_operation_id' => $type->id],
+                [
+                    'objet' => $data['objet'],
+                    'corps' => EmailTemplate::sanitizeCorps($data['corps']),
+                ],
+            );
+        }
+    }
+
     private function resetForm(): void
     {
         $this->editingId = null;
@@ -400,6 +495,8 @@ final class TypeOperationManager extends Component
         $this->email_from_name = '';
         $this->testEmailTo = '';
         $this->showTestEmailModal = false;
+        $this->emailSubTab = 'formulaire';
+        $this->emailTemplates = [];
         $this->tarifs = [];
         $this->newTarifLibelle = '';
         $this->newTarifMontant = '';
