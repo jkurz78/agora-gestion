@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\DroitImage;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
@@ -96,3 +97,44 @@ test('participant donnees medicales has unique constraint on participant_id', fu
     ParticipantDonneesMedicales::create(['participant_id' => $participant->id]);
     ParticipantDonneesMedicales::create(['participant_id' => $participant->id]);
 })->throws(QueryException::class);
+
+test('medecin and therapeute fields are encrypted in database', function (): void {
+    $participant = Participant::create([
+        'tiers_id' => Tiers::factory()->create()->id,
+        'operation_id' => Operation::factory()->create()->id,
+        'date_inscription' => now()->toDateString(),
+    ]);
+    $donnees = ParticipantDonneesMedicales::create([
+        'participant_id' => $participant->id,
+        'medecin_nom' => 'Martin',
+        'medecin_prenom' => 'Jean',
+        'medecin_telephone' => '0601020304',
+        'medecin_email' => 'martin@exemple.fr',
+        'medecin_adresse' => '1 rue de la Paix',
+        'therapeute_nom' => 'Dupont',
+        'therapeute_prenom' => 'Marie',
+        'therapeute_telephone' => '0611223344',
+        'therapeute_email' => 'dupont@exemple.fr',
+        'therapeute_adresse' => '2 avenue des Fleurs',
+    ]);
+    $donnees->refresh();
+    expect($donnees->medecin_nom)->toBe('Martin');
+    expect($donnees->medecin_prenom)->toBe('Jean');
+    expect($donnees->therapeute_nom)->toBe('Dupont');
+    expect($donnees->therapeute_email)->toBe('dupont@exemple.fr');
+    $raw = DB::table('participant_donnees_medicales')->where('id', $donnees->id)->first();
+    expect($raw->medecin_nom)->not->toBe('Martin');
+    expect($raw->therapeute_nom)->not->toBe('Dupont');
+});
+
+test('participant stores droit_image as enum', function (): void {
+    $participant = Participant::create([
+        'tiers_id' => Tiers::factory()->create()->id,
+        'operation_id' => Operation::factory()->create()->id,
+        'date_inscription' => now()->toDateString(),
+        'droit_image' => DroitImage::UsagePropre,
+    ]);
+    $participant->refresh();
+    expect($participant->droit_image)->toBeInstanceOf(DroitImage::class);
+    expect($participant->droit_image)->toBe(DroitImage::UsagePropre);
+});

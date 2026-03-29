@@ -18,6 +18,7 @@ final class Exercice extends Model
         'statut',
         'date_cloture',
         'cloture_par_id',
+        'helloasso_url',
     ];
 
     protected function casts(): array

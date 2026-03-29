@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\DroitImage;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,6 +23,18 @@ final class Participant extends Model
         'helloasso_order_id',
         'notes',
         'refere_par_id',
+        'nom_jeune_fille',
+        'nationalite',
+        'adresse_par_nom',
+        'adresse_par_prenom',
+        'adresse_par_telephone',
+        'adresse_par_email',
+        'adresse_par_adresse',
+        'droit_image',
+        'mode_paiement_choisi',
+        'moyen_paiement_choisi',
+        'autorisation_contact_medecin',
+        'rgpd_accepte_at',
     ];
 
     protected function casts(): array
@@ -30,6 +43,9 @@ final class Participant extends Model
             'date_inscription' => 'date',
             'est_helloasso' => 'boolean',
             'type_operation_tarif_id' => 'integer',
+            'droit_image' => DroitImage::class,
+            'autorisation_contact_medecin' => 'boolean',
+            'rgpd_accepte_at' => 'datetime',
         ];
     }
 
