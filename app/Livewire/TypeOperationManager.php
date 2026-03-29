@@ -58,6 +58,11 @@ final class TypeOperationManager extends Component
 
     public string $existingLogoPath = '';
 
+    /** @var TemporaryUploadedFile|null */
+    public $attestationMedicale = null;
+
+    public string $existingAttestationPath = '';
+
     // ── Email fields ──────────────────────────────────────────────
     public string $email_from = '';
 
@@ -142,6 +147,8 @@ final class TypeOperationManager extends Component
         $this->actif = $type->actif;
         $this->logo = null;
         $this->existingLogoPath = $type->logo_path ?? '';
+        $this->attestationMedicale = null;
+        $this->existingAttestationPath = $type->attestation_medicale_path ?? '';
         $this->email_from = $type->email_from ?? '';
         $this->email_from_name = $type->email_from_name ?? '';
         $this->loadEmailTemplates($type->id);
@@ -181,6 +188,7 @@ final class TypeOperationManager extends Component
             'sous_categorie_id' => 'required|exists:sous_categories,id',
             'nombre_seances' => 'nullable|integer|min:1',
             'logo' => 'nullable|image|max:512',
+            'attestationMedicale' => 'nullable|file|mimes:pdf,doc,docx|max:5120',
             'email_from' => 'nullable|email|max:255',
             'email_from_name' => 'nullable|string|max:255',
         ];
@@ -192,6 +200,12 @@ final class TypeOperationManager extends Component
 
             if ($this->logo) {
                 $logoPath = $this->logo->store('type-operations', 'public');
+            }
+
+            $attestationPath = null;
+
+            if ($this->attestationMedicale) {
+                $attestationPath = $this->attestationMedicale->store('type-operations/attestations', 'public');
             }
 
             $data = [
@@ -211,12 +225,21 @@ final class TypeOperationManager extends Component
                 $data['logo_path'] = $logoPath;
             }
 
+            if ($attestationPath !== null) {
+                $data['attestation_medicale_path'] = $attestationPath;
+            }
+
             if ($this->editingId) {
                 $type = TypeOperation::findOrFail($this->editingId);
 
                 // Delete old logo if a new one is uploaded
                 if ($logoPath !== null && $type->logo_path) {
                     Storage::disk('public')->delete($type->logo_path);
+                }
+
+                // Delete old attestation if a new one is uploaded
+                if ($attestationPath !== null && $type->attestation_medicale_path) {
+                    Storage::disk('public')->delete($type->attestation_medicale_path);
                 }
 
                 $type->update($data);
@@ -515,6 +538,8 @@ final class TypeOperationManager extends Component
         $this->actif = true;
         $this->logo = null;
         $this->existingLogoPath = '';
+        $this->attestationMedicale = null;
+        $this->existingAttestationPath = '';
         $this->email_from = '';
         $this->email_from_name = '';
         $this->testEmailTo = '';
