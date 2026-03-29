@@ -15,6 +15,12 @@ final class ChangerExercice extends Component
 
     public ?int $nouvelleAnnee = null;
 
+    public bool $showEditModal = false;
+
+    public ?int $editingExerciceId = null;
+
+    public string $editHelloassoUrl = '';
+
     public function changer(int $annee): void
     {
         $exercice = Exercice::where('annee', $annee)->firstOrFail();
@@ -36,6 +42,34 @@ final class ChangerExercice extends Component
         $this->showCreateModal = false;
         $this->nouvelleAnnee = null;
         session()->flash('success', 'Exercice créé avec succès.');
+    }
+
+    public function ouvrirEdition(int $id): void
+    {
+        $exercice = Exercice::findOrFail($id);
+        $this->editingExerciceId = $id;
+        $this->editHelloassoUrl = $exercice->helloasso_url ?? '';
+        $this->showEditModal = true;
+    }
+
+    public function sauvegarderUrl(): void
+    {
+        $this->validate([
+            'editHelloassoUrl' => ['nullable', 'url', 'max:500'],
+        ], [
+            'editHelloassoUrl.url' => 'L\'URL saisie n\'est pas valide.',
+            'editHelloassoUrl.max' => 'L\'URL ne peut pas dépasser 500 caractères.',
+        ]);
+
+        $exercice = Exercice::findOrFail($this->editingExerciceId);
+        $exercice->update([
+            'helloasso_url' => $this->editHelloassoUrl !== '' ? $this->editHelloassoUrl : null,
+        ]);
+
+        $this->showEditModal = false;
+        $this->editingExerciceId = null;
+        $this->editHelloassoUrl = '';
+        session()->flash('success', 'URL HelloAsso mise à jour.');
     }
 
     public function render(): View
