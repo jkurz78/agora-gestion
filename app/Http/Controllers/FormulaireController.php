@@ -123,7 +123,9 @@ final class FormulaireController extends Controller
             // Engagements
             'engagement_presence' => ['required', 'accepted'],
             'engagement_certificat' => ['required', 'accepted'],
-            'engagement_reglement' => ['required', 'accepted'],
+            'engagement_reglement' => $participant->typeOperationTarif && (float) $participant->typeOperationTarif->montant > 0
+                ? ['required', 'accepted']
+                : ['nullable'],
             'engagement_rgpd' => ['required', 'accepted'],
             'autorisation_contact_medecin' => ['nullable'],
             // Confirmation token
