@@ -245,6 +245,20 @@
                     @endif
                 </div>
 
+                {{-- Attestation médicale --}}
+                <div class="mb-3">
+                    <label class="form-label small">Attestation médicale (PDF)</label>
+                    <input type="file" wire:model="attestationMedicale" class="form-control form-control-sm @error('attestationMedicale') is-invalid @enderror" accept=".pdf,.doc,.docx">
+                    @error('attestationMedicale') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    @if($existingAttestationPath)
+                        <div class="mt-1">
+                            <a href="{{ Storage::disk('public')->url($existingAttestationPath) }}" target="_blank" class="small">
+                                <i class="bi bi-file-earmark-pdf"></i> Voir le fichier actuel
+                            </a>
+                        </div>
+                    @endif
+                </div>
+
                 @endif
 
                 {{-- ── Onglet 2 : Tarifs ──────────────────────────────────── --}}
