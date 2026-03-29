@@ -1,118 +1,26 @@
 <div x-show="step === 4" x-cloak data-step="4">
-    <h5 class="mb-3"><i class="bi bi-info-circle"></i> Informations pratiques</h5>
+    <h5 class="mb-3"><i class="bi bi-lightbulb"></i> Le saviez-vous ?</h5>
 
-    <p class="text-muted mb-4">Merci de préciser les points suivants. Ces informations nous permettent de vous orienter vers les dispositifs d'aide dont vous pourriez bénéficier.</p>
+    <p class="text-muted mb-4">Plusieurs dispositifs peuvent vous aider à financer tout ou partie de vos séances. N'hésitez pas à vous renseigner !</p>
 
-    {{-- Coupons sport CE --}}
-    <div class="card mb-3">
+    <div class="card mb-3 border-start border-4 border-info">
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-                <span>Je peux disposer de <strong>coupons sport</strong> dans le cadre d'un CE</span>
-                <div class="d-flex gap-3">
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_coupons_sport_ce" value="oui" class="form-check-input" id="coupons_ce_oui">
-                        <label class="form-check-label" for="coupons_ce_oui">Oui</label>
-                    </div>
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_coupons_sport_ce" value="non" class="form-check-input" id="coupons_ce_non">
-                        <label class="form-check-label" for="coupons_ce_non">Non</label>
-                    </div>
-                </div>
-            </div>
+            <h6 class="card-title"><i class="bi bi-building me-1"></i> Coupons sport</h6>
+            <p class="card-text mb-0">Sachez que certains <strong>comités d'entreprise (CE)</strong> proposent des coupons sport qui peuvent couvrir une partie de vos frais d'inscription. Renseignez-vous auprès de votre employeur ou de votre CSE.</p>
         </div>
     </div>
 
-    {{-- Coupons sport-santé mutuelle --}}
-    <div class="card mb-3">
+    <div class="card mb-3 border-start border-4 border-info">
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center">
-                <span>Je peux disposer de <strong>coupons sport-santé</strong> dans le cadre de ma mutuelle</span>
-                <div class="d-flex gap-3">
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_coupons_sport_sante" value="oui" class="form-check-input" id="coupons_sante_oui">
-                        <label class="form-check-label" for="coupons_sante_oui">Oui</label>
-                    </div>
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_coupons_sport_sante" value="non" class="form-check-input" id="coupons_sante_non">
-                        <label class="form-check-label" for="coupons_sante_non">Non</label>
-                    </div>
-                </div>
-            </div>
+            <h6 class="card-title"><i class="bi bi-heart-pulse me-1"></i> Sport sur ordonnance</h6>
+            <p class="card-text mb-0">Votre médecin traitant peut vous prescrire une <strong>activité physique adaptée</strong> dans le cadre du dispositif Sport-Santé. Certaines mutuelles proposent des <strong>coupons sport-santé</strong> dans ce cadre. Pensez à en parler à votre médecin et à votre mutuelle.</p>
         </div>
     </div>
 
-    {{-- Prise en charge kiné/ostéo --}}
-    <div class="card mb-3">
+    <div class="card mb-3 border-start border-4 border-info">
         <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>Je peux disposer d'une prise en charge de séances de <strong>kiné / ostéopathie</strong> dans le cadre de ma mutuelle</span>
-                <div class="d-flex gap-3 align-items-center">
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_prise_charge_kine" value="oui" class="form-check-input" id="kine_oui"
-                               x-on:change="$refs.kine_nb.closest('.input-group').classList.remove('d-none')">
-                        <label class="form-check-label" for="kine_oui">Oui</label>
-                    </div>
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_prise_charge_kine" value="non" class="form-check-input" id="kine_non"
-                               x-on:change="$refs.kine_nb.closest('.input-group').classList.add('d-none')">
-                        <label class="form-check-label" for="kine_non">Non</label>
-                    </div>
-                </div>
-            </div>
-            <div class="input-group input-group-sm mt-2 d-none" style="max-width: 250px;">
-                <span class="input-group-text">Nombre de séances</span>
-                <input type="number" name="info_nb_seances_kine" class="form-control" min="0" x-ref="kine_nb">
-            </div>
-        </div>
-    </div>
-
-    {{-- Prise en charge sophrologie --}}
-    <div class="card mb-3">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>Je peux disposer d'une prise en charge de séances de <strong>sophrologie</strong> dans le cadre de ma mutuelle</span>
-                <div class="d-flex gap-3 align-items-center">
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_prise_charge_sophro" value="oui" class="form-check-input" id="sophro_oui"
-                               x-on:change="$refs.sophro_nb.closest('.input-group').classList.remove('d-none')">
-                        <label class="form-check-label" for="sophro_oui">Oui</label>
-                    </div>
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_prise_charge_sophro" value="non" class="form-check-input" id="sophro_non"
-                               x-on:change="$refs.sophro_nb.closest('.input-group').classList.add('d-none')">
-                        <label class="form-check-label" for="sophro_non">Non</label>
-                    </div>
-                </div>
-            </div>
-            <div class="input-group input-group-sm mt-2 d-none" style="max-width: 250px;">
-                <span class="input-group-text">Nombre de séances</span>
-                <input type="number" name="info_nb_seances_sophro" class="form-control" min="0" x-ref="sophro_nb">
-            </div>
-        </div>
-    </div>
-
-    {{-- Prise en charge thérapie --}}
-    <div class="card mb-3">
-        <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>Je peux disposer d'une prise en charge de séances de <strong>thérapie</strong> dans le cadre de ma mutuelle</span>
-                <div class="d-flex gap-3 align-items-center">
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_prise_charge_therapie" value="oui" class="form-check-input" id="therapie_oui"
-                               x-on:change="$refs.therapie_nb.closest('.input-group').classList.remove('d-none')">
-                        <label class="form-check-label" for="therapie_oui">Oui</label>
-                    </div>
-                    <div class="form-check form-check-inline mb-0">
-                        <input type="radio" name="info_prise_charge_therapie" value="non" class="form-check-input" id="therapie_non"
-                               x-on:change="$refs.therapie_nb.closest('.input-group').classList.add('d-none')">
-                        <label class="form-check-label" for="therapie_non">Non</label>
-                    </div>
-                </div>
-            </div>
-            <div class="input-group input-group-sm mt-2 d-none" style="max-width: 250px;">
-                <span class="input-group-text">Nombre de séances</span>
-                <input type="number" name="info_nb_seances_therapie" class="form-control" min="0" x-ref="therapie_nb">
-            </div>
+            <h6 class="card-title"><i class="bi bi-shield-check me-1"></i> Prise en charge par votre mutuelle</h6>
+            <p class="card-text mb-0">De nombreuses mutuelles prennent en charge un certain nombre de séances de <strong>kinésithérapie</strong>, <strong>ostéopathie</strong>, <strong>sophrologie</strong> ou <strong>thérapie</strong>. Vérifiez les conditions de votre contrat : vous pourriez bénéficier d'un remboursement partiel ou total de vos séances.</p>
         </div>
     </div>
 </div>
