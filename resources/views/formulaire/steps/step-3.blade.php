@@ -1,5 +1,5 @@
 <div x-show="step === 3" x-cloak data-step="3">
-    <h5 class="mb-3"><i class="bi bi-file-earmark-arrow-up"></i> Documents</h5>
+    <h5 class="mb-3"><i class="bi bi-file-earmark-arrow-up"></i> Vous souhaitez nous joindre des documents ?</h5>
 
     @if($typeOperation->attestation_medicale_path)
         <div class="alert alert-info d-flex align-items-center mb-3">
