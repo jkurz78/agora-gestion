@@ -16,6 +16,30 @@
 
     <h5 class="mb-3"><i class="bi bi-person"></i> Coordonnées</h5>
 
+    {{-- Nom/Prénom si manquants sur le tiers --}}
+    @if(!$tiers->nom || !$tiers->prenom)
+        <div class="row g-3 mb-3">
+            @if(!$tiers->nom)
+                <div class="col-md-6">
+                    <label class="form-label">Nom <span class="text-danger">*</span></label>
+                    <input type="text" name="tiers_nom" class="form-control" data-required
+                           :class="hasError('tiers_nom') && 'is-invalid'"
+                           value="{{ old('tiers_nom') }}" maxlength="255">
+                    <div class="invalid-feedback" x-text="errors.tiers_nom"></div>
+                </div>
+            @endif
+            @if(!$tiers->prenom)
+                <div class="col-md-6">
+                    <label class="form-label">Prénom <span class="text-danger">*</span></label>
+                    <input type="text" name="tiers_prenom" class="form-control" data-required
+                           :class="hasError('tiers_prenom') && 'is-invalid'"
+                           value="{{ old('tiers_prenom') }}" maxlength="255">
+                    <div class="invalid-feedback" x-text="errors.tiers_prenom"></div>
+                </div>
+            @endif
+        </div>
+    @endif
+
     <div class="row g-3">
         <div class="col-md-6">
             <label class="form-label">Téléphone <span class="text-danger">*</span></label>
@@ -69,21 +93,22 @@
     {{-- Adressé par --}}
     <h6 class="mt-4 mb-3"><i class="bi bi-person-plus"></i> Je vous suis adressé(e) par</h6>
 
+    <div class="mb-3">
+        <label class="form-label">Établissement</label>
+        <input type="text" name="adresse_par_etablissement" class="form-control"
+               value="{{ old('adresse_par_etablissement', $participant->adresse_par_etablissement) }}" maxlength="255">
+    </div>
+
     <div class="row g-3">
-        <div class="col-md-4">
+        <div class="col-md-6">
             <label class="form-label">Nom</label>
             <input type="text" name="adresse_par_nom" class="form-control"
                    value="{{ old('adresse_par_nom', $participant->adresse_par_nom) }}" maxlength="255">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-6">
             <label class="form-label">Prénom</label>
             <input type="text" name="adresse_par_prenom" class="form-control"
                    value="{{ old('adresse_par_prenom', $participant->adresse_par_prenom) }}" maxlength="255">
-        </div>
-        <div class="col-md-4">
-            <label class="form-label">Établissement</label>
-            <input type="text" name="adresse_par_etablissement" class="form-control"
-                   value="{{ old('adresse_par_etablissement', $participant->adresse_par_etablissement) }}" maxlength="255">
         </div>
     </div>
 

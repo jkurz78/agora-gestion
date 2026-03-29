@@ -136,9 +136,10 @@
     </div>
 
     {{-- Notes médicales --}}
-    <div class="mt-4">
-        <label class="form-label">Notes médicales</label>
-        <textarea name="notes" class="form-control" rows="3" maxlength="1000"
+    <h6 class="mt-4 mb-3"><i class="bi bi-journal-medical"></i> Notes médicales</h6>
+
+    <div>
+        <textarea name="notes" class="form-control" rows="5" maxlength="1000"
                   placeholder="Allergies, traitements en cours, particularités...">{{ old('notes', $donneesMedicales?->notes) }}</textarea>
     </div>
 </div>
