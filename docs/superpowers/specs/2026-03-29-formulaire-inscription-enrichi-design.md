@@ -56,9 +56,11 @@ Alternatives écartées :
 
 ### Page 5 — Engagement financier
 
-- Récap calculé automatiquement : nombre de séances, tarif unitaire, montant total
+- Récap calculé automatiquement : `montant_total = nombre_seances * typeOperationTarif.montant`
 - Choix du rythme de paiement (radio) : comptant / par séance
 - Choix du mode de règlement (radio) : espèces / chèque / virement
+- **Cas particuliers :**
+  - Si le participant n'a pas de `type_operation_tarif_id` ou si l'opération n'a pas de séances : la section affiche "Tarif à confirmer avec l'association" et les choix de paiement restent disponibles sans récap chiffré
 
 ### Page 6 — Droit à l'image
 
@@ -69,23 +71,23 @@ Alternatives écartées :
   - Les deux (usage propre + diffusion)
   - Refus
 
-### Page 7 — Engagements & signature
+### Page 7 — Engagements & confirmation
 
-Cases à cocher obligatoires :
+Cases à cocher obligatoires (validation-only, la soumission vaut acceptation) :
 - Présence à toutes les séances
 - Certificat médical de non contre-indication
 - Conditions de règlement (séances dues même en cas d'absence)
-- RGPD / traitement électronique des données / droit à l'oubli
+- RGPD / traitement électronique des données / droit à l'oubli → **persisté** : `rgpd_accepte_at` (datetime) sur Participant
 
-Case à cocher optionnelle :
-- Autorisation de contact entre l'association et le médecin/thérapeute
+Case à cocher optionnelle → **persistée** :
+- Autorisation de contact entre l'association et le médecin/thérapeute → `autorisation_contact_medecin` (boolean) sur Participant
 
-Re-saisie du token comme signature électronique + bouton "Valider et envoyer"
+Re-saisie du token comme confirmation d'engagement (acte volontaire de validation UX, non une signature électronique au sens légal) + bouton "Valider et envoyer"
 
 ### Page de remerciement (post-soumission)
 
 - Message de confirmation
-- Si l'exercice en cours a une `helloasso_url` et le type d'opération a `reserve_adherents` : affichage du lien/widget HelloAsso pour l'adhésion
+- Si l'exercice courant (résolu par date du jour via le scope `forExercice`) a une `helloasso_url` et le type d'opération a `reserve_adherents` : affichage du lien/widget HelloAsso pour l'adhésion
 
 ## Modèle de données
 
@@ -115,9 +117,11 @@ Re-saisie du token comme signature électronique + bouton "Valider et envoyer"
 | `adresse_par_telephone` | varchar, nullable | Stockage en clair |
 | `adresse_par_email` | varchar, nullable | Stockage en clair |
 | `adresse_par_adresse` | varchar, nullable | Stockage en clair |
-| `droit_image` | varchar, nullable | Enum : `usage_propre`, `diffusion_didactique`, `les_deux`, `refus` |
+| `droit_image` | varchar, nullable | Backed enum `DroitImage` : `usage_propre`, `diffusion_didactique`, `les_deux`, `refus` |
 | `mode_paiement_choisi` | varchar, nullable | `comptant` ou `par_seance` |
 | `moyen_paiement_choisi` | varchar, nullable | `especes`, `cheque`, `virement` |
+| `autorisation_contact_medecin` | boolean, default false | Consentement optionnel |
+| `rgpd_accepte_at` | datetime, nullable | Horodatage du consentement RGPD |
 
 ### Migration : `exercices` — nouveau champ
 
@@ -131,46 +135,70 @@ Re-saisie du token comme signature électronique + bouton "Valider et envoyer"
 |-------|------|-------|
 | `attestation_medicale_path` | varchar, nullable | Chemin vers le document téléchargeable |
 
+### Enum PHP : `DroitImage`
+
+Backed string enum, cohérent avec les enums existants (`ModePaiement`, `StatutExercice`, `StatutOperation`) :
+- `UsagePropre = 'usage_propre'`
+- `DiffusionDidactique = 'diffusion_didactique'`
+- `LesDeux = 'les_deux'`
+- `Refus = 'refus'`
+
+### Mises à jour modèles
+
+- `Participant` : ajouter les nouveaux champs à `$fillable`, casts pour `droit_image` (enum), `autorisation_contact_medecin` (boolean), `rgpd_accepte_at` (datetime)
+- `ParticipantDonneesMedicales` : ajouter les 10 champs médecin/thérapeute à `$fillable` avec cast `encrypted`
+- `Exercice` : ajouter `helloasso_url` à `$fillable`
+- `TypeOperation` : ajouter `attestation_medicale_path` à `$fillable`
+
 ### Pas de nouvelle table
 
 ## Flow technique
 
 ### Alpine.js
 
+Le script Alpine.js (CDN) doit être ajouté à `formulaire/layout.blade.php` (actuellement absent du layout public).
+
 Composant `x-data` englobant le formulaire :
 - `step: 1` — étape courante
+- `maxStep: 7` — nombre total d'étapes
 - `nextStep()` — valide les champs requis de l'étape, avance si OK
 - `prevStep()` — retour libre
 - `validateStep(n)` — validation front, retourne true/false, affiche erreurs inline
 
-Barre de progression Bootstrap en haut. Boutons "Précédent" / "Suivant" en bas, "Valider et envoyer" sur la page 7.
+Barre de progression Bootstrap en haut avec attributs ARIA (`role="progressbar"`, `aria-valuenow`). Boutons "Précédent" / "Suivant" en bas, "Valider et envoyer" sur la page 7.
 
 ### Blade
 
-Vue `formulaire/remplir.blade.php` refactorisée. Chaque page dans un partial :
+Vue `formulaire/remplir.blade.php` refactorisée. Largeur layout élargie de `col-md-7 col-lg-6` à `col-md-10 col-lg-8` pour accommoder le wizard. Chaque page dans un partial :
 - `@include('formulaire.steps.step-1')` à `@include('formulaire.steps.step-7')`
 - Affichage conditionnel : `x-show="step === 1"` etc.
+
+### FormulaireController::show()
+
+Charger les `donneesMedicales` du participant et les passer à la vue pour pré-remplir les champs existants en cas de rechargement (validation serveur échouée).
 
 ### FormulaireController::store()
 
 Validation serveur complète de tous les champs. Vérification que le token re-saisi correspond au token d'accès. Écriture en base dans une transaction DB :
 
 1. Mise à jour Tiers (merge intelligent existant — pas d'écrasement par du vide)
-2. Mise à jour Participant (nom de jeune fille, nationalité, adressé par, droit image, choix paiement)
+2. Mise à jour Participant (nom de jeune fille, nationalité, adressé par, droit image, choix paiement, autorisation contact, rgpd_accepte_at)
 3. Upsert ParticipantDonneesMedicales (champs existants + médecin + thérapeute)
 4. Stockage documents
-5. Création des lignes de Règlement si aucune n'existe pour ce participant :
-   - Comptant → 1 ligne avec montant total
-   - Par séance → 1 ligne par séance avec tarif unitaire
-   - Chaque ligne avec le moyen de paiement choisi
+5. Création des lignes de Règlement si aucune n'existe pour ce participant et si le tarif est connu :
+   - Toujours une ligne par séance (contrainte `seance_id NOT NULL` sur `reglements`)
+   - Comptant : `montant_prevu = total / nombre_seances` sur chaque ligne
+   - Par séance : `montant_prevu = tarif unitaire` sur chaque ligne
+   - Chaque ligne avec le moyen de paiement choisi (espèces/chèque/virement)
+   - Le choix comptant/par séance est stocké sur `Participant.mode_paiement_choisi` comme préférence
    - Si des règlements existent déjà : ne rien toucher
 6. Marquage token comme utilisé (`rempli_at`, `rempli_ip`)
 
-Redirect POST/GET vers `formulaire/merci` (nouvelle vue).
+Redirect POST/GET vers `formulaire/merci` (nouvelle vue, dans le groupe throttle existant).
 
 ### Page de remerciement
 
-Nouvelle vue `formulaire/merci.blade.php`. Affichage conditionnel du lien HelloAsso basé sur `Exercice::helloasso_url` + `TypeOperation::reserve_adherents`.
+Nouvelle vue `formulaire/merci.blade.php`. Affichage conditionnel du lien HelloAsso basé sur l'exercice courant (résolu via `Exercice::forExercice(now()->year)` ou équivalent) et `TypeOperation::reserve_adherents`.
 
 ## Périmètre V1 / V2
 
@@ -178,13 +206,16 @@ Nouvelle vue `formulaire/merci.blade.php`. Affichage conditionnel du lien HelloA
 
 - Formulaire multi-pages (7 étapes) avec Alpine.js
 - Tous les champs et sections décrits ci-dessus
+- Enum `DroitImage`
 - Attestation médicale téléchargeable par TypeOperation
 - URL HelloAsso sur Exercice + affichage conditionnel post-soumission
 - Report des choix de paiement sur les Règlements
 - Sections droit à l'image et engagements codées en dur
+- Persistance `autorisation_contact_medecin` et `rgpd_accepte_at`
 
 ### V2 (lot suivant)
 
 - Flags par TypeOperation pour activer/désactiver des sections du formulaire
 - Sections et cases d'engagement paramétrables par type
 - Historique des envois d'emails (chantier séparé existant)
+- Éventuel `sessionStorage` pour résilience des données en cas de rafraîchissement accidentel de page
