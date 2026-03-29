@@ -23,14 +23,19 @@
                 <div class="invalid-feedback" x-text="errors.engagement_certificat"></div>
             </div>
 
+            @if($tarif && (float) $tarif->montant > 0)
             <div class="form-check mb-3">
                 <input type="checkbox" name="engagement_reglement" value="1" class="form-check-input"
                        id="engagement_reglement" data-required :class="hasError('engagement_reglement') && 'is-invalid'">
                 <label class="form-check-label" for="engagement_reglement">
-                    J'accepte les conditions de règlement. Les séances sont dues dans tous les cas, même en cas d'absence.
+                    J'ai compris que mon inscription m'engage à régler
+                    <strong>{{ number_format((float) ($seancesCount * $tarif->montant), 2, ',', ' ') }} €</strong>
+                    ({{ $seancesCount }} séance(s) × {{ number_format((float) $tarif->montant, 2, ',', ' ') }} €).
+                    Les séances sont dues dans tous les cas, même en cas d'absence, sauf cas de force majeure dûment justifié.
                 </label>
                 <div class="invalid-feedback" x-text="errors.engagement_reglement"></div>
             </div>
+            @endif
 
             <div class="form-check mb-3">
                 <input type="checkbox" name="engagement_rgpd" value="1" class="form-check-input"
