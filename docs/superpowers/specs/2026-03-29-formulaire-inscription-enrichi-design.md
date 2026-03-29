@@ -65,11 +65,11 @@ Alternatives écartées :
 ### Page 6 — Droit à l'image
 
 - Texte explicatif complet (repris du document PDF d'autorisation existant)
-- 4 choix radio :
-  - Usage propre uniquement
-  - Diffusion didactique et confidentielle
-  - Les deux (usage propre + diffusion)
-  - Refus
+- 4 choix radio (niveaux croissants de diffusion) :
+  - Accord pour usage propre uniquement
+  - Accord pour usage propre + usage confidentiel au sein de l'équipe thérapeutique
+  - Accord pour usage propre + diffusion
+  - Refus de prise de photos/vidéos
 
 ### Page 7 — Engagements & confirmation
 
@@ -117,7 +117,7 @@ Re-saisie du token comme confirmation d'engagement (acte volontaire de validatio
 | `adresse_par_telephone` | varchar, nullable | Stockage en clair |
 | `adresse_par_email` | varchar, nullable | Stockage en clair |
 | `adresse_par_adresse` | varchar, nullable | Stockage en clair |
-| `droit_image` | varchar, nullable | Backed enum `DroitImage` : `usage_propre`, `diffusion_didactique`, `les_deux`, `refus` |
+| `droit_image` | varchar, nullable | Backed enum `DroitImage` : `usage_propre`, `usage_confidentiel`, `diffusion`, `refus` |
 | `mode_paiement_choisi` | varchar, nullable | `comptant` ou `par_seance` |
 | `moyen_paiement_choisi` | varchar, nullable | `especes`, `cheque`, `virement` |
 | `autorisation_contact_medecin` | boolean, default false | Consentement optionnel |
@@ -138,10 +138,10 @@ Re-saisie du token comme confirmation d'engagement (acte volontaire de validatio
 ### Enum PHP : `DroitImage`
 
 Backed string enum, cohérent avec les enums existants (`ModePaiement`, `StatutExercice`, `StatutOperation`) :
-- `UsagePropre = 'usage_propre'`
-- `DiffusionDidactique = 'diffusion_didactique'`
-- `LesDeux = 'les_deux'`
-- `Refus = 'refus'`
+- `UsagePropre = 'usage_propre'` — usage personnel uniquement
+- `UsageConfidentiel = 'usage_confidentiel'` — usage propre + usage confidentiel équipe thérapeutique
+- `Diffusion = 'diffusion'` — usage propre + diffusion
+- `Refus = 'refus'` — pas de prise de photos/vidéos
 
 ### Mises à jour modèles
 
