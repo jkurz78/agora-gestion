@@ -1,6 +1,11 @@
 <div x-show="step === 5" x-cloak data-step="5">
     <h5 class="mb-3"><i class="bi bi-currency-euro"></i> Engagement financier</h5>
 
+    <div class="alert alert-danger mb-4">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        <strong>Important :</strong> Votre participation est un engagement ferme. Le financement de l'opération repose sur la participation de chacun. Les séances sont dues dans leur intégralité, même en cas d'absence, sauf cas de force majeure dûment justifié. En cas de désistement, les sommes restent dues.
+    </div>
+
     @if($tarif && $seancesCount)
         @php
             $montantTotal = $seancesCount * $tarif->montant;
@@ -9,7 +14,7 @@
             <div class="card-body">
                 <table class="table table-sm mb-0">
                     <tr>
-                        <td>Tarif</td>
+                        <td>Tarif — {{ $tarif->libelle }}</td>
                         <td class="text-end fw-bold">{{ number_format((float) $tarif->montant, 2, ',', ' ') }} € / séance</td>
                     </tr>
                     <tr>
@@ -30,35 +35,37 @@
     @endif
 
     <div class="mb-4">
-        <label class="form-label fw-bold">Mode de paiement</label>
+        <label class="form-label fw-bold">Mode de paiement <span class="text-danger">*</span></label>
         <div class="form-check">
             <input type="radio" name="mode_paiement_choisi" value="comptant" class="form-check-input"
-                   id="paiement_comptant" @checked(old('mode_paiement_choisi') === 'comptant')>
+                   id="paiement_comptant" data-required-radio="mode_paiement_choisi" @checked(old('mode_paiement_choisi') === 'comptant')>
             <label class="form-check-label" for="paiement_comptant">Comptant (en une fois)</label>
         </div>
         <div class="form-check">
             <input type="radio" name="mode_paiement_choisi" value="par_seance" class="form-check-input"
-                   id="paiement_seance" @checked(old('mode_paiement_choisi') === 'par_seance')>
+                   id="paiement_seance" data-required-radio="mode_paiement_choisi" @checked(old('mode_paiement_choisi') === 'par_seance')>
             <label class="form-check-label" for="paiement_seance">Par séance</label>
         </div>
+        <div class="text-danger small mt-1" x-show="hasError('mode_paiement_choisi')" x-text="errors.mode_paiement_choisi"></div>
     </div>
 
     <div class="mb-3">
-        <label class="form-label fw-bold">Moyen de règlement</label>
+        <label class="form-label fw-bold">Moyen de règlement <span class="text-danger">*</span></label>
         <div class="form-check">
             <input type="radio" name="moyen_paiement_choisi" value="especes" class="form-check-input"
-                   id="moyen_especes" @checked(old('moyen_paiement_choisi') === 'especes')>
+                   id="moyen_especes" data-required-radio="moyen_paiement_choisi" @checked(old('moyen_paiement_choisi') === 'especes')>
             <label class="form-check-label" for="moyen_especes">Espèces</label>
         </div>
         <div class="form-check">
             <input type="radio" name="moyen_paiement_choisi" value="cheque" class="form-check-input"
-                   id="moyen_cheque" @checked(old('moyen_paiement_choisi') === 'cheque')>
+                   id="moyen_cheque" data-required-radio="moyen_paiement_choisi" @checked(old('moyen_paiement_choisi') === 'cheque')>
             <label class="form-check-label" for="moyen_cheque">Chèque</label>
         </div>
         <div class="form-check">
             <input type="radio" name="moyen_paiement_choisi" value="virement" class="form-check-input"
-                   id="moyen_virement" @checked(old('moyen_paiement_choisi') === 'virement')>
+                   id="moyen_virement" data-required-radio="moyen_paiement_choisi" @checked(old('moyen_paiement_choisi') === 'virement')>
             <label class="form-check-label" for="moyen_virement">Virement</label>
         </div>
+        <div class="text-danger small mt-1" x-show="hasError('moyen_paiement_choisi')" x-text="errors.moyen_paiement_choisi"></div>
     </div>
 </div>

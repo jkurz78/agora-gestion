@@ -55,17 +55,22 @@
 function formulaireWizard() {
     return {
         step: 1,
+        skipSteps: @json($tarif && (float) $tarif->montant > 0 ? [] : [5]),
         errors: {},
 
         nextStep() {
             if (this.validateStep(this.step)) {
-                this.step++;
+                let next = this.step + 1;
+                while (this.skipSteps.includes(next) && next < 7) next++;
+                this.step = next;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
         },
 
         prevStep() {
-            this.step--;
+            let prev = this.step - 1;
+            while (this.skipSteps.includes(prev) && prev > 1) prev--;
+            this.step = prev;
             window.scrollTo({ top: 0, behavior: 'smooth' });
         },
 
@@ -77,7 +82,7 @@ function formulaireWizard() {
             let valid = true;
 
             // Check required text/select/date inputs
-            const requiredInputs = section.querySelectorAll('input[data-required]:not([type="checkbox"]), select[data-required], textarea[data-required]');
+            const requiredInputs = section.querySelectorAll('input[data-required]:not([type="checkbox"]):not([type="radio"]), select[data-required], textarea[data-required]');
             requiredInputs.forEach(field => {
                 const name = field.getAttribute('name');
                 if (!field.value || field.value.trim() === '') {
@@ -93,6 +98,21 @@ function formulaireWizard() {
                 if (!field.checked) {
                     this.errors[name] = 'Cet engagement est obligatoire';
                     valid = false;
+                }
+            });
+
+            // Check required radio groups
+            const checkedGroups = new Set();
+            const requiredRadios = section.querySelectorAll('input[type="radio"][data-required-radio]');
+            requiredRadios.forEach(field => {
+                const group = field.getAttribute('data-required-radio');
+                if (!checkedGroups.has(group)) {
+                    const anyChecked = section.querySelector(`input[name="${group}"]:checked`);
+                    if (!anyChecked) {
+                        this.errors[group] = 'Veuillez faire un choix';
+                        valid = false;
+                    }
+                    checkedGroups.add(group);
                 }
             });
 
@@ -113,7 +133,7 @@ function formulaireWizard() {
         },
 
         submitForm(event) {
-            if (this.validateStep(7)) {
+            if (this.validateStep(this.step)) {
                 event.target.submit();
             }
         }
