@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\DroitImage;
+use App\Enums\ModePaiement;
 use App\Models\FormulaireToken;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
+use App\Models\Reglement;
+use App\Models\Seance;
 use App\Models\Tiers;
+use App\Models\TypeOperationTarif;
 use App\Models\User;
 use App\Services\FormulaireTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -134,10 +139,14 @@ describe('store', function () {
             'adresse_ligne1' => '',  // empty → should NOT overwrite existing
             'code_postal' => '75001', // same value → no change
             'ville' => 'Lyon',
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
         ]);
 
-        $response->assertRedirect(route('formulaire.index'));
-        $response->assertSessionHas('success');
+        $response->assertRedirectToRoute('formulaire.merci');
 
         $this->tiers->refresh();
         expect($this->tiers->telephone)->toBe('07 98 76 54 32')
@@ -157,6 +166,11 @@ describe('store', function () {
             'taille' => '168',
             'poids' => '62',
             'notes' => 'Allergie au pollen',
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
         ]);
 
         $dm = ParticipantDonneesMedicales::where('participant_id', $this->participant->id)->first();
@@ -178,6 +192,11 @@ describe('store', function () {
         $this->post(route('formulaire.store'), [
             'token' => $token->token,
             'documents' => [$file1, $file2],
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
         ]);
 
         $dir = "participants/{$this->participant->id}";
@@ -190,6 +209,11 @@ describe('store', function () {
 
         $this->post(route('formulaire.store'), [
             'token' => $token->token,
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
         ]);
 
         $token->refresh();
@@ -233,19 +257,193 @@ describe('store', function () {
             'sexe' => 'X',
             'taille' => '999',
             'poids' => '5',
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
         ]);
 
         $response->assertSessionHasErrors(['date_naissance', 'sexe', 'taille', 'poids']);
     });
 
-    it('redirects with success message after store', function () {
+    it('redirects to merci page after store', function () {
         $token = $this->service->generate($this->participant);
 
         $response = $this->post(route('formulaire.store'), [
             'token' => $token->token,
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
         ]);
 
-        $response->assertRedirect(route('formulaire.index'));
-        $response->assertSessionHas('success', 'Merci ! Vos informations ont bien été enregistrées. Vous pouvez fermer cette page.');
+        $response->assertRedirectToRoute('formulaire.merci');
+    });
+
+    it('stores enriched form data including medical contacts and engagements', function () {
+        Storage::fake('local');
+        $token = $this->service->generate($this->participant);
+
+        $response = $this->post(route('formulaire.store'), [
+            'token' => $token->token,
+            'telephone' => '0612345678',
+            'email' => 'test@example.com',
+            'nom_jeune_fille' => 'Martin',
+            'nationalite' => 'Française',
+            'adresse_par_nom' => 'Dupont',
+            'adresse_par_prenom' => 'Jean',
+            'date_naissance' => '1990-01-15',
+            'sexe' => 'F',
+            'taille' => '165',
+            'poids' => '60',
+            'medecin_nom' => 'Dr Legrand',
+            'medecin_telephone' => '0145678901',
+            'therapeute_nom' => 'Mme Moreau',
+            'droit_image' => 'usage_propre',
+            'mode_paiement_choisi' => 'par_seance',
+            'moyen_paiement_choisi' => 'cheque',
+            'autorisation_contact_medecin' => '1',
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
+        ]);
+
+        $response->assertRedirectToRoute('formulaire.merci');
+
+        $this->participant->refresh();
+        expect($this->participant->nom_jeune_fille)->toBe('Martin');
+        expect($this->participant->nationalite)->toBe('Française');
+        expect($this->participant->adresse_par_nom)->toBe('Dupont');
+        expect($this->participant->droit_image)->toBe(DroitImage::UsagePropre);
+        expect($this->participant->mode_paiement_choisi)->toBe('par_seance');
+        expect($this->participant->moyen_paiement_choisi)->toBe('cheque');
+        expect($this->participant->autorisation_contact_medecin)->toBeTrue();
+        expect($this->participant->rgpd_accepte_at)->not->toBeNull();
+
+        $medical = $this->participant->donneesMedicales;
+        expect($medical->medecin_nom)->toBe('Dr Legrand');
+        expect($medical->therapeute_nom)->toBe('Mme Moreau');
+    });
+
+    it('rejects submission when token_confirmation does not match', function () {
+        $token = $this->service->generate($this->participant);
+
+        $response = $this->post(route('formulaire.store'), [
+            'token' => $token->token,
+            'token_confirmation' => 'WRONG-CODE',
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+        ]);
+
+        $response->assertSessionHasErrors('token_confirmation');
+    });
+
+    it('creates reglement lines per seance when mode is par_seance', function () {
+        $token = $this->service->generate($this->participant);
+
+        $seance1 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1, 'date' => now()]);
+        $seance2 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 2, 'date' => now()->addWeek()]);
+
+        $tarif = TypeOperationTarif::create([
+            'type_operation_id' => $this->operation->typeOperation->id,
+            'libelle' => 'Tarif test',
+            'montant' => 50.00,
+        ]);
+        $this->participant->update(['type_operation_tarif_id' => $tarif->id]);
+
+        $this->post(route('formulaire.store'), [
+            'token' => $token->token,
+            'mode_paiement_choisi' => 'par_seance',
+            'moyen_paiement_choisi' => 'cheque',
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
+        ]);
+
+        expect(Reglement::where('participant_id', $this->participant->id)->count())->toBe(2);
+
+        $reglement = Reglement::where('participant_id', $this->participant->id)
+            ->where('seance_id', $seance1->id)->first();
+        expect($reglement->montant_prevu)->toBe('50.00');
+        expect($reglement->mode_paiement)->toBe(ModePaiement::Cheque);
+    });
+
+    it('creates reglement lines per seance when mode is comptant', function () {
+        $token = $this->service->generate($this->participant);
+
+        $seance1 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1, 'date' => now()]);
+        $seance2 = Seance::create(['operation_id' => $this->operation->id, 'numero' => 2, 'date' => now()->addWeek()]);
+
+        $tarif = TypeOperationTarif::create([
+            'type_operation_id' => $this->operation->typeOperation->id,
+            'libelle' => 'Tarif test',
+            'montant' => 50.00,
+        ]);
+        $this->participant->update(['type_operation_tarif_id' => $tarif->id]);
+
+        $this->post(route('formulaire.store'), [
+            'token' => $token->token,
+            'mode_paiement_choisi' => 'comptant',
+            'moyen_paiement_choisi' => 'virement',
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
+        ]);
+
+        // Comptant : même montant par séance (total/nb_seances = tarif car total = nb_seances * tarif)
+        expect(Reglement::where('participant_id', $this->participant->id)->count())->toBe(2);
+
+        $reglement = Reglement::where('participant_id', $this->participant->id)
+            ->where('seance_id', $seance1->id)->first();
+        expect($reglement->montant_prevu)->toBe('50.00');
+        expect($reglement->mode_paiement)->toBe(ModePaiement::Virement);
+    });
+
+    it('does not overwrite existing reglements', function () {
+        $token = $this->service->generate($this->participant);
+
+        $seance = Seance::create(['operation_id' => $this->operation->id, 'numero' => 1, 'date' => now()]);
+
+        $tarif = TypeOperationTarif::create([
+            'type_operation_id' => $this->operation->typeOperation->id,
+            'libelle' => 'Tarif test',
+            'montant' => 50.00,
+        ]);
+        $this->participant->update(['type_operation_tarif_id' => $tarif->id]);
+
+        // Pre-existing reglement
+        Reglement::create([
+            'participant_id' => $this->participant->id,
+            'seance_id' => $seance->id,
+            'mode_paiement' => ModePaiement::Virement,
+            'montant_prevu' => 75.00,
+        ]);
+
+        $this->post(route('formulaire.store'), [
+            'token' => $token->token,
+            'mode_paiement_choisi' => 'par_seance',
+            'moyen_paiement_choisi' => 'especes',
+            'engagement_presence' => '1',
+            'engagement_certificat' => '1',
+            'engagement_reglement' => '1',
+            'engagement_rgpd' => '1',
+            'token_confirmation' => $token->token,
+        ]);
+
+        $reglement = Reglement::where('participant_id', $this->participant->id)
+            ->where('seance_id', $seance->id)->first();
+        // Not overwritten
+        expect($reglement->montant_prevu)->toBe('75.00');
+        expect($reglement->mode_paiement)->toBe(ModePaiement::Virement);
     });
 });
