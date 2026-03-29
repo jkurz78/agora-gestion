@@ -161,6 +161,7 @@ Route::prefix('formulaire')->middleware('throttle:10,1')->group(function (): voi
     Route::get('/', [FormulaireController::class, 'index'])->name('formulaire.index');
     Route::get('/remplir', [FormulaireController::class, 'show'])->name('formulaire.show');
     Route::post('/remplir', [FormulaireController::class, 'store'])->name('formulaire.store');
+    Route::get('/merci', [FormulaireController::class, 'merci'])->name('formulaire.merci');
 });
 
 require __DIR__.'/auth.php';
