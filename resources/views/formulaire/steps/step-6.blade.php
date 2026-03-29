@@ -19,32 +19,33 @@
         <div class="card-body">
             <div class="form-check mb-3">
                 <input type="radio" name="droit_image" value="usage_propre" class="form-check-input"
-                       id="droit_usage_propre" @checked(old('droit_image') === 'usage_propre')>
+                       id="droit_usage_propre" data-required-radio="droit_image" @checked(old('droit_image') === 'usage_propre')>
                 <label class="form-check-label" for="droit_usage_propre">
                     Je donne mon accord pour la prise de photos/vidéos me concernant <strong>pour mon usage propre</strong>
                 </label>
             </div>
             <div class="form-check mb-3">
                 <input type="radio" name="droit_image" value="usage_confidentiel" class="form-check-input"
-                       id="droit_confidentiel" @checked(old('droit_image') === 'usage_confidentiel')>
+                       id="droit_confidentiel" data-required-radio="droit_image" @checked(old('droit_image') === 'usage_confidentiel')>
                 <label class="form-check-label" for="droit_confidentiel">
                     Je donne mon accord pour la prise de photos/vidéos me concernant <strong>et pour un usage confidentiel au sein de l'équipe thérapeutique</strong>
                 </label>
             </div>
             <div class="form-check mb-3">
                 <input type="radio" name="droit_image" value="diffusion" class="form-check-input"
-                       id="droit_diffusion" @checked(old('droit_image') === 'diffusion')>
+                       id="droit_diffusion" data-required-radio="droit_image" @checked(old('droit_image') === 'diffusion')>
                 <label class="form-check-label" for="droit_diffusion">
                     Je donne mon accord pour la prise de photos/vidéos me concernant <strong>et pour une diffusion</strong>
                 </label>
             </div>
             <div class="form-check">
                 <input type="radio" name="droit_image" value="refus" class="form-check-input"
-                       id="droit_refus" @checked(old('droit_image') === 'refus')>
+                       id="droit_refus" data-required-radio="droit_image" @checked(old('droit_image') === 'refus')>
                 <label class="form-check-label" for="droit_refus">
                     <strong>Je ne donne pas mon accord</strong> pour la prise de photos/vidéos
                 </label>
             </div>
         </div>
+        <div class="text-danger small mt-2" x-show="hasError('droit_image')" x-text="errors.droit_image"></div>
     </div>
 </div>

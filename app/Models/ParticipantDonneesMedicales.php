@@ -23,11 +23,15 @@ final class ParticipantDonneesMedicales extends Model
         'medecin_telephone',
         'medecin_email',
         'medecin_adresse',
+        'medecin_code_postal',
+        'medecin_ville',
         'therapeute_nom',
         'therapeute_prenom',
         'therapeute_telephone',
         'therapeute_email',
         'therapeute_adresse',
+        'therapeute_code_postal',
+        'therapeute_ville',
     ];
 
     protected function casts(): array
@@ -43,11 +47,15 @@ final class ParticipantDonneesMedicales extends Model
             'medecin_telephone' => 'encrypted',
             'medecin_email' => 'encrypted',
             'medecin_adresse' => 'encrypted',
+            'medecin_code_postal' => 'encrypted',
+            'medecin_ville' => 'encrypted',
             'therapeute_nom' => 'encrypted',
             'therapeute_prenom' => 'encrypted',
             'therapeute_telephone' => 'encrypted',
             'therapeute_email' => 'encrypted',
             'therapeute_adresse' => 'encrypted',
+            'therapeute_code_postal' => 'encrypted',
+            'therapeute_ville' => 'encrypted',
         ];
     }
 
