@@ -125,4 +125,13 @@ final class FormulaireController extends Controller
         return redirect()->route('formulaire.index')
             ->with('success', 'Merci ! Vos informations ont bien été enregistrées. Vous pouvez fermer cette page.');
     }
+
+    public function merci(Request $request): View
+    {
+        $helloassoUrl = session('helloasso_url');
+
+        return view('formulaire.merci', [
+            'helloassoUrl' => $helloassoUrl,
+        ]);
+    }
 }
