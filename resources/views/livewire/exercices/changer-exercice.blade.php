@@ -25,6 +25,7 @@
                     <th>Statut</th>
                     <th>Date clôture</th>
                     <th>Clôturé par</th>
+                    <th>URL HelloAsso</th>
                     <th class="text-end">Action</th>
                 </tr>
             </thead>
@@ -42,7 +43,23 @@
                         <td>
                             {{ $ex->cloturePar ? $ex->cloturePar->name : '—' }}
                         </td>
+                        <td>
+                            @if ($ex->helloasso_url)
+                                <a href="{{ $ex->helloasso_url }}" target="_blank" rel="noopener noreferrer"
+                                   class="text-truncate d-inline-block" style="max-width:200px"
+                                   title="{{ $ex->helloasso_url }}">
+                                    {{ $ex->helloasso_url }}
+                                </a>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
                         <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary me-1"
+                                    wire:click="ouvrirEdition({{ $ex->id }})"
+                                    title="Modifier l'URL HelloAsso">
+                                <i class="bi bi-pencil"></i>
+                            </button>
                             @if ($ex->annee === $exerciceActif)
                                 <span class="badge bg-primary">Affiché</span>
                             @elseif ($ex->isCloture())
@@ -61,7 +78,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="text-center text-muted">Aucun exercice trouvé.</td>
+                        <td colspan="7" class="text-center text-muted">Aucun exercice trouvé.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -73,6 +90,43 @@
             <i class="bi bi-plus-circle me-1"></i> Créer un exercice
         </button>
     </div>
+
+    @if ($showEditModal)
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">URL HelloAsso</h5>
+                        <button type="button" class="btn-close" wire:click="$set('showEditModal', false)"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="editHelloassoUrl" class="form-label">URL du formulaire HelloAsso</label>
+                            <input type="url"
+                                   id="editHelloassoUrl"
+                                   class="form-control @error('editHelloassoUrl') is-invalid @enderror"
+                                   wire:model="editHelloassoUrl"
+                                   placeholder="https://www.helloasso.com/…">
+                            @error('editHelloassoUrl')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">
+                                Laisser vide pour supprimer l'URL associée à cet exercice.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" wire:click="$set('showEditModal', false)">
+                            Annuler
+                        </button>
+                        <button type="button" class="btn btn-primary" wire:click="sauvegarderUrl">
+                            <i class="bi bi-check-lg me-1"></i> Enregistrer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     @if ($showCreateModal)
         <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.5)">
