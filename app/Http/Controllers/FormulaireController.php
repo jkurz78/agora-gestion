@@ -74,6 +74,8 @@ final class FormulaireController extends Controller
 
         $request->validate([
             // Coordonnées
+            'tiers_nom' => ['nullable', 'string', 'max:255'],
+            'tiers_prenom' => ['nullable', 'string', 'max:255'],
             'telephone' => ['nullable', 'string', 'max:30'],
             'email' => ['nullable', 'email', 'max:255'],
             'adresse_ligne1' => ['nullable', 'string', 'max:500'],
@@ -137,6 +139,13 @@ final class FormulaireController extends Controller
         DB::transaction(function () use ($request, $participant): void {
             // 1. Merge Tiers
             $tiers = $participant->tiers;
+            // Nom/prénom si collectés (champs conditionnels)
+            if ($request->filled('tiers_nom')) {
+                $tiers->nom = $request->input('tiers_nom');
+            }
+            if ($request->filled('tiers_prenom')) {
+                $tiers->prenom = $request->input('tiers_prenom');
+            }
             $coordFields = ['telephone', 'email', 'adresse_ligne1', 'code_postal', 'ville'];
             foreach ($coordFields as $field) {
                 $newValue = $request->input($field);
