@@ -26,6 +26,7 @@ final class TypeOperation extends Model
         'logo_path',
         'email_from',
         'email_from_name',
+        'attestation_medicale_path',
     ];
 
     protected function casts(): array
