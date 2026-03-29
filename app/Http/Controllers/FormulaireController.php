@@ -37,12 +37,19 @@ final class FormulaireController extends Controller
         }
 
         $participant = $result['participant'];
-        $participant->load(['tiers', 'operation']);
+        $participant->load(['tiers', 'operation.typeOperation', 'operation.seances', 'typeOperationTarif', 'donneesMedicales']);
+
+        $operation = $participant->operation;
+        $typeOperation = $operation->typeOperation;
 
         return view('formulaire.remplir', [
             'participant' => $participant,
             'tiers' => $participant->tiers,
-            'operation' => $participant->operation,
+            'operation' => $operation,
+            'typeOperation' => $typeOperation,
+            'tarif' => $participant->typeOperationTarif,
+            'donneesMedicales' => $participant->donneesMedicales,
+            'seancesCount' => $operation->nombre_seances,
             'token' => $request->input('token'),
         ]);
     }

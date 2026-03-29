@@ -110,6 +110,17 @@ describe('show', function () {
         $response->assertRedirect(route('formulaire.index'));
         $response->assertSessionHas('info', 'Ce formulaire a déjà été rempli. Merci.');
     });
+
+    it('passes typeOperation and tarif data to the view', function () {
+        $token = $this->service->generate($this->participant);
+
+        $response = $this->get(route('formulaire.show', ['token' => $token->token]));
+
+        $response->assertStatus(200);
+        $response->assertViewHas('participant');
+        $response->assertViewHas('operation');
+        $response->assertViewHas('typeOperation');
+    });
 });
 
 describe('store', function () {
