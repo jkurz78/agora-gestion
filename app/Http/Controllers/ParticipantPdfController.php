@@ -21,13 +21,13 @@ final class ParticipantPdfController extends Controller
 
         $operation->loadMissing('typeOperation');
 
-        $isConfidentiel = $operation->typeOperation?->formulaire_parcours_therapeutique ?? false;
-        $confidentiel = $isConfidentiel
-            && $request->boolean('confidentiel')
+        $typeOp = $operation->typeOperation;
+        $canSee = $request->boolean('confidentiel')
             && ($request->user()->peut_voir_donnees_sensibles ?? false);
 
-        $showPrescripteur = $confidentiel && ($operation->typeOperation?->formulaire_prescripteur ?? false);
-        $showDroitImage = $confidentiel && ($operation->typeOperation?->formulaire_droit_image ?? false);
+        $confidentiel = $canSee && ($typeOp?->formulaire_parcours_therapeutique ?? false);
+        $showPrescripteur = $canSee && ($typeOp?->formulaire_prescripteur ?? false);
+        $showDroitImage = $canSee && ($typeOp?->formulaire_droit_image ?? false);
 
         $participants = Participant::where('operation_id', $operation->id)
             ->with(['tiers', 'referePar', 'medecinTiers', 'therapeuteTiers', 'typeOperationTarif'])
@@ -43,7 +43,6 @@ final class ParticipantPdfController extends Controller
             'operation' => $operation,
             'participants' => $participants,
             'confidentiel' => $confidentiel,
-            'isConfidentiel' => $isConfidentiel,
             'showPrescripteur' => $showPrescripteur,
             'showDroitImage' => $showDroitImage,
             'association' => $association,
