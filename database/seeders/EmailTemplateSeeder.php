@@ -27,8 +27,8 @@ class EmailTemplateSeeder extends Seeder
             [
                 'objet' => 'Attestation de présence — {operation}',
                 'corps' => '<p>Bonjour <strong>{prenom}</strong>,</p>'
-                    .'<p>Veuillez trouver ci-joint votre attestation de présence pour <strong>{operation}</strong>.</p>'
-                    .'<p>Séance n°{numero_seance} du {date_seance}.</p>'
+                    .'<p>Veuillez trouver ci-joint votre attestation de présence pour {type_operation} « <strong>{operation}</strong> ».</p>'
+                    .'{bloc_seances}'
                     .'<p>Cordialement,<br>L\'équipe</p>',
             ],
         );
