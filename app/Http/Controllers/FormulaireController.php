@@ -74,6 +74,7 @@ final class FormulaireController extends Controller
         $participant->load('operation.typeOperation');
         $typeOperation = $participant->operation->typeOperation;
         $isParcours = $typeOperation?->formulaire_parcours_therapeutique ?? false;
+        $needsToken = $isParcours || ($typeOperation?->formulaire_droit_image ?? false);
 
         $request->validate([
             // Coordonnées
@@ -132,7 +133,7 @@ final class FormulaireController extends Controller
             'engagement_rgpd' => ['required', 'accepted'],
             'autorisation_contact_medecin' => ['nullable'],
             // Confirmation token
-            'token_confirmation' => $isParcours ? ['required', 'string', function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
+            'token_confirmation' => $needsToken ? ['required', 'string', function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
                 $normalized = strtoupper(str_replace(' ', '', $value));
                 $expected = strtoupper(str_replace(' ', '', $request->input('token', '')));
                 if ($normalized !== $expected) {
