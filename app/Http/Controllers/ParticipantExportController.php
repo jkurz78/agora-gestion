@@ -19,6 +19,7 @@ final class ParticipantExportController extends Controller
     public function __invoke(Request $request, Operation $operation): BinaryFileResponse
     {
         $confidentiel = $request->boolean('confidentiel')
+            && ($operation->typeOperation?->formulaire_parcours_therapeutique ?? false)
             && ($request->user()->peut_voir_donnees_sensibles ?? false);
 
         $participants = Participant::where('operation_id', $operation->id)

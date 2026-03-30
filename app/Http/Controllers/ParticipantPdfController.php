@@ -21,7 +21,7 @@ final class ParticipantPdfController extends Controller
 
         $operation->loadMissing('typeOperation');
 
-        $isConfidentiel = $operation->typeOperation?->confidentiel ?? false;
+        $isConfidentiel = $operation->typeOperation?->formulaire_parcours_therapeutique ?? false;
         $confidentiel = $isConfidentiel
             && $request->boolean('confidentiel')
             && ($request->user()->peut_voir_donnees_sensibles ?? false);

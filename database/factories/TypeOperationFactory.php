@@ -23,7 +23,8 @@ class TypeOperationFactory extends Factory
             'description' => fake()->optional()->paragraph(),
             'sous_categorie_id' => SousCategorie::factory(),
             'nombre_seances' => fake()->optional()->numberBetween(5, 30),
-            'confidentiel' => false,
+            'formulaire_parcours_therapeutique' => false,
+            'formulaire_actif' => false,
             'reserve_adherents' => false,
             'actif' => true,
             'logo_path' => null,
@@ -32,7 +33,10 @@ class TypeOperationFactory extends Factory
 
     public function confidentiel(): static
     {
-        return $this->state(['confidentiel' => true]);
+        return $this->state([
+            'formulaire_parcours_therapeutique' => true,
+            'formulaire_actif' => true,
+        ]);
     }
 
     public function reserveAdherents(): static
