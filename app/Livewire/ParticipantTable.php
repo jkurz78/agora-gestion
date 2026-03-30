@@ -110,7 +110,7 @@ final class ParticipantTable extends Component
             return;
         }
 
-        $this->quickAddParticipant($id);
+        $this->addTiersId = $id;
     }
 
     public function addParticipant(): void
