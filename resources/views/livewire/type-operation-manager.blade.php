@@ -173,6 +173,14 @@
                     </div>
                 </div>
 
+                {{-- Libellé article --}}
+                <div class="mb-3">
+                    <label class="form-label small">Libellé avec article</label>
+                    <input type="text" wire:model="libelle_article" class="form-control form-control-sm" maxlength="150"
+                           placeholder="Ex: le parcours, la formation, la journée de sensibilisation...">
+                    <div class="form-text" style="font-size:11px">Utilisé dans les attestations et emails : « dans le cadre <strong>du</strong> parcours... », « inscription <strong>à la</strong> formation... »</div>
+                </div>
+
                 {{-- Description --}}
                 <div class="mb-3">
                     <label class="form-label small">Description</label>

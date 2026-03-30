@@ -80,7 +80,7 @@ final class GestionOperations extends Component
 
         $groupedOperations = $operations->groupBy(function (Operation $op): string {
             return $op->typeOperation
-                ? $op->typeOperation->code.' — '.$op->typeOperation->nom
+                ? $op->typeOperation->nom
                 : 'Sans type';
         })->sortKeys();
 
