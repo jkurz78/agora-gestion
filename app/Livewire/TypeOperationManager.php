@@ -37,8 +37,6 @@ final class TypeOperationManager extends Component
     public int $maxVisitedTab = 1;
 
     // ── Form fields ──────────────────────────────────────────────
-    public string $code = '';
-
     public string $nom = '';
 
     public string $libelle_article = '';
@@ -121,7 +119,7 @@ final class TypeOperationManager extends Component
             $query->where('actif', false);
         }
 
-        $types = $query->orderBy('code')->get();
+        $types = $query->orderBy('nom')->get();
 
         $sousCategories = SousCategorie::where('pour_inscriptions', true)
             ->with('categorie')
@@ -149,7 +147,6 @@ final class TypeOperationManager extends Component
         $type = TypeOperation::with('tarifs')->findOrFail($id);
 
         $this->editingId = $type->id;
-        $this->code = $type->code;
         $this->nom = $type->nom;
         $this->libelle_article = $type->libelle_article ?? '';
         $this->description = $type->description ?? '';
@@ -200,7 +197,6 @@ final class TypeOperationManager extends Component
     public function save(): void
     {
         $rules = [
-            'code' => 'required|string|max:20|unique:type_operations,code'.($this->editingId ? ','.$this->editingId : ''),
             'nom' => 'required|string|max:150|unique:type_operations,nom'.($this->editingId ? ','.$this->editingId : ''),
             'description' => 'nullable|string|max:1000',
             'sous_categorie_id' => 'required|exists:sous_categories,id',
@@ -227,7 +223,6 @@ final class TypeOperationManager extends Component
             }
 
             $data = [
-                'code' => $this->code,
                 'nom' => $this->nom,
                 'libelle_article' => $this->libelle_article !== '' ? $this->libelle_article : null,
                 'description' => $this->description !== '' ? $this->description : null,
@@ -320,7 +315,6 @@ final class TypeOperationManager extends Component
         // Validate current tab before advancing (creation mode only)
         if ($this->editingId === null && $this->activeTab === 1) {
             $this->validate([
-                'code' => 'required|string|max:20|unique:type_operations,code',
                 'nom' => 'required|string|max:150|unique:type_operations,nom',
                 'sous_categorie_id' => 'required|exists:sous_categories,id',
             ]);
@@ -552,7 +546,6 @@ final class TypeOperationManager extends Component
         $this->editingId = null;
         $this->activeTab = 1;
         $this->maxVisitedTab = 1;
-        $this->code = '';
         $this->nom = '';
         $this->libelle_article = '';
         $this->description = '';
