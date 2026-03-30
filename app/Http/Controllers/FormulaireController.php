@@ -49,7 +49,7 @@ final class FormulaireController extends Controller
         $typeOperation = $operation->typeOperation;
 
         // Pre-fill adresse_par from referePar if text fields are empty
-        if (!$participant->adresse_par_nom && $participant->referePar) {
+        if (! $participant->adresse_par_nom && $participant->referePar) {
             $ref = $participant->referePar;
             $participant->adresse_par_nom = $ref->nom;
             $participant->adresse_par_prenom = $ref->prenom;

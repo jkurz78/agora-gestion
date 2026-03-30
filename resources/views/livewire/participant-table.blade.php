@@ -370,6 +370,25 @@
                                         title="Modifier">
                                     <i class="bi bi-pencil"></i>
                                 </button>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="PDF">
+                                        <i class="bi bi-printer"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $p]) }}" target="_blank">
+                                                <i class="bi bi-file-person me-2"></i>Fiche participant
+                                            </a>
+                                        </li>
+                                        @if($operation->typeOperation?->formulaire_droit_image && $p->droit_image)
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $p]) }}" target="_blank">
+                                                <i class="bi bi-camera me-2"></i>Autorisation photo
+                                            </a>
+                                        </li>
+                                        @endif
+                                    </ul>
+                                </div>
                                 <button class="btn btn-sm btn-outline-danger"
                                         wire:click="removeParticipant({{ $p->id }})"
                                         wire:confirm="Supprimer ce participant ?"
@@ -898,11 +917,23 @@
                 @endif
 
                 {{-- ── Footer buttons ─────────────────────────── --}}
-                <div class="d-flex gap-2 justify-content-end mt-4">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showEditModal', false)">Annuler</button>
-                    <button type="button" class="btn btn-sm btn-primary" wire:click="saveEdit">
-                        <i class="bi bi-check-lg"></i> Enregistrer
-                    </button>
+                <div class="d-flex justify-content-between mt-4">
+                    <div class="d-flex gap-2">
+                        <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $editParticipantId]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-file-person"></i> Fiche PDF
+                        </a>
+                        @if($operation->typeOperation?->formulaire_droit_image && $editParticipant?->droit_image)
+                        <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $editParticipantId]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-camera"></i> Autorisation photo
+                        </a>
+                        @endif
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showEditModal', false)">Annuler</button>
+                        <button type="button" class="btn btn-sm btn-primary" wire:click="saveEdit">
+                            <i class="bi bi-check-lg"></i> Enregistrer
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
