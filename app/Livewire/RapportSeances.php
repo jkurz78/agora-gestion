@@ -62,7 +62,7 @@ final class RapportSeances extends Component
     public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();
-        $typeOperations = TypeOperation::actif()->orderBy('code')->get();
+        $typeOperations = TypeOperation::actif()->orderBy('nom')->get();
 
         $query = Operation::forExercice($exercice)->whereNotNull('nombre_seances')
             ->where('nombre_seances', '>', 0)
