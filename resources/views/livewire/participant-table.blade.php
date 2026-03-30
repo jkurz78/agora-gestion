@@ -608,6 +608,38 @@
                             </div>
                         </div>
 
+                        {{-- Mapping Tiers — Médecin --}}
+                        @php $medecinTiers = $editParticipant?->medecinTiers ?? null; @endphp
+                        @if($medecinTiers)
+                            <div class="alert alert-success py-2 mt-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $medecinTiers->nom }} {{ $medecinTiers->prenom }}</span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkMedecinTiers">
+                                        <i class="bi bi-x-lg"></i> Dissocier
+                                    </button>
+                                </div>
+                            </div>
+                        @elseif($editMedecinNom || $editMedecinPrenom)
+                            <div class="mt-3 p-2 bg-light rounded">
+                                <label class="form-label small fw-bold">Associer à un tiers</label>
+                                <div class="d-flex gap-2 align-items-end">
+                                    <div class="flex-grow-1">
+                                        <livewire:tiers-autocomplete
+                                            wire:model.live="mapMedecinTiersId"
+                                            filtre="tous"
+                                            :key="'map-medecin-' . $editParticipantId"
+                                        />
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-success" wire:click="mapMedecinTiers" @disabled(!$mapMedecinTiersId)>
+                                        <i class="bi bi-link-45deg"></i> Associer
+                                    </button>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" wire:click="createMedecinTiers">
+                                    <i class="bi bi-plus-lg"></i> Créer un tiers depuis ces données
+                                </button>
+                            </div>
+                        @endif
+
                         <hr>
                         <h6 class="fw-bold text-muted mb-3"><i class="bi bi-person-badge me-1"></i> Thérapeute</h6>
                         <div class="row g-2 mb-3">
@@ -644,6 +676,38 @@
                                 <input type="text" wire:model="editTherapeuteVille" class="form-control form-control-sm">
                             </div>
                         </div>
+
+                        {{-- Mapping Tiers — Thérapeute --}}
+                        @php $therapeuteTiers = $editParticipant?->therapeuteTiers ?? null; @endphp
+                        @if($therapeuteTiers)
+                            <div class="alert alert-success py-2 mt-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $therapeuteTiers->nom }} {{ $therapeuteTiers->prenom }}</span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkTherapeuteTiers">
+                                        <i class="bi bi-x-lg"></i> Dissocier
+                                    </button>
+                                </div>
+                            </div>
+                        @elseif($editTherapeuteNom || $editTherapeutePrenom)
+                            <div class="mt-3 p-2 bg-light rounded">
+                                <label class="form-label small fw-bold">Associer à un tiers</label>
+                                <div class="d-flex gap-2 align-items-end">
+                                    <div class="flex-grow-1">
+                                        <livewire:tiers-autocomplete
+                                            wire:model.live="mapTherapeuteTiersId"
+                                            filtre="tous"
+                                            :key="'map-therapeute-' . $editParticipantId"
+                                        />
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-success" wire:click="mapTherapeuteTiers" @disabled(!$mapTherapeuteTiersId)>
+                                        <i class="bi bi-link-45deg"></i> Associer
+                                    </button>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" wire:click="createTherapeuteTiers">
+                                    <i class="bi bi-plus-lg"></i> Créer un tiers depuis ces données
+                                </button>
+                            </div>
+                        @endif
                     </div>
                 @endif
 
@@ -688,6 +752,38 @@
                                 <input type="text" wire:model="editAdresseParVille" class="form-control form-control-sm">
                             </div>
                         </div>
+
+                        {{-- Mapping Tiers — Adressé par --}}
+                        @php $refTiers = $editParticipant?->referePar ?? null; @endphp
+                        @if($refTiers)
+                            <div class="alert alert-success py-2 mt-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $refTiers->nom }} {{ $refTiers->prenom }}</span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkAdresseParTiers">
+                                        <i class="bi bi-x-lg"></i> Dissocier
+                                    </button>
+                                </div>
+                            </div>
+                        @elseif($editAdresseParNom || $editAdresseParPrenom)
+                            <div class="mt-3 p-2 bg-light rounded">
+                                <label class="form-label small fw-bold">Associer à un tiers</label>
+                                <div class="d-flex gap-2 align-items-end">
+                                    <div class="flex-grow-1">
+                                        <livewire:tiers-autocomplete
+                                            wire:model.live="mapAdresseParTiersId"
+                                            filtre="tous"
+                                            :key="'map-prescripteur-' . $editParticipantId"
+                                        />
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-success" wire:click="mapAdresseParTiers" @disabled(!$mapAdresseParTiersId)>
+                                        <i class="bi bi-link-45deg"></i> Associer
+                                    </button>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" wire:click="createAdresseParTiers">
+                                    <i class="bi bi-plus-lg"></i> Créer un tiers depuis ces données
+                                </button>
+                            </div>
+                        @endif
                     </div>
                 @endif
 
