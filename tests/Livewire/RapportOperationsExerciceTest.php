@@ -17,7 +17,6 @@ beforeEach(function () {
 
 it('RapportCompteResultatOperations n\'affiche pas les opérations hors exercice', function () {
     Operation::factory()->create([
-        'code' => 'OP-HORS',
         'nom' => 'Op hors exercice',
         'date_debut' => '2024-09-01',
         'date_fin' => '2025-08-30',
@@ -25,12 +24,11 @@ it('RapportCompteResultatOperations n\'affiche pas les opérations hors exercice
     ]);
 
     Livewire::test(RapportCompteResultatOperations::class)
-        ->assertDontSee('OP-HORS');
+        ->assertDontSee('Op hors exercice');
 });
 
 it('RapportCompteResultatOperations affiche les opérations clôturées dans l\'exercice', function () {
     Operation::factory()->create([
-        'code' => 'OP-CLOT-VIS',
         'nom' => 'Op clôturée visible',
         'date_debut' => '2025-10-01',
         'date_fin' => '2026-03-31',
@@ -38,7 +36,7 @@ it('RapportCompteResultatOperations affiche les opérations clôturées dans l\'
     ]);
 
     Livewire::test(RapportCompteResultatOperations::class)
-        ->assertSee('OP-CLOT-VIS');
+        ->assertSee('Op clôturée visible');
 });
 
 it('RapportSeances n\'affiche pas les opérations hors exercice', function () {
