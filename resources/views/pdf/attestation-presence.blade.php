@@ -195,7 +195,7 @@
         <table class="seance-table">
             <thead>
                 <tr>
-                    <th class="col-num">N°</th>
+                    <th class="col-num">Séance</th>
                     <th class="col-date">Date</th>
                     <th class="col-titre">Titre</th>
                 </tr>

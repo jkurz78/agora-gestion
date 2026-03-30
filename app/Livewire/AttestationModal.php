@@ -398,7 +398,7 @@ final class AttestationModal extends Component
         }
 
         $html = '<table style="border-collapse:collapse;width:100%;margin:10px 0;font-size:13px">'
-            .'<tr style="background:#f0f0f0"><th style="padding:6px 10px;text-align:left;border:1px solid #ddd">N°</th>'
+            .'<tr style="background:#f0f0f0"><th style="padding:6px 10px;text-align:left;border:1px solid #ddd">Séance</th>'
             .'<th style="padding:6px 10px;text-align:left;border:1px solid #ddd">Date</th>'
             .'<th style="padding:6px 10px;text-align:left;border:1px solid #ddd">Titre</th></tr>';
 
