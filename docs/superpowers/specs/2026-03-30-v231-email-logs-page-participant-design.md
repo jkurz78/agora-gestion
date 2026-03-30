@@ -40,8 +40,9 @@ email_logs
 - **`destinataire_email` et `destinataire_nom` en dur** — le log reflète ce qui a été réellement envoyé, même si le tiers change d'email ensuite
 - **`objet` stocké** — lecture rapide sans reconstituer depuis le template
 - **Pas de stockage du corps HTML** — trop volumineux, peu utile en consultation
-- **`categorie` en string** plutôt qu'enum PHP — extensible sans migration
+- **`categorie` en string** plutôt qu'enum PHP — extensible sans migration. Note : `EmailTemplate.categorie` utilise l'enum `CategorieEmail`, mais `email_logs.categorie` est volontairement un string libre pour pouvoir tracer des catégories futures sans migration
 - **`envoye_par`** — l'utilisateur connecté qui a déclenché l'envoi
+- **`Participant` n'a pas de SoftDeletes** — quand un participant est supprimé, `participant_id` passe à NULL mais le log reste avec `destinataire_email`/`destinataire_nom` en snapshot
 
 ### Modèle Eloquent
 
@@ -74,19 +75,19 @@ La réception du formulaire (côté participant) n'est pas loggée ici — `form
 
 ## Livrable 2 : Page participant imbriquée
 
-### Route
+### Architecture d'imbrication
 
-```
-GET /gestion/operations/{operation}/participants/{participant}
-```
+Le composant `GestionOperations` gère déjà la vue opération avec ses onglets. Quand `activeTab === 'participants'`, il rend `<livewire:participant-table>`.
 
-Route nommée : `gestion.operations.participants.show`
+**Mécanisme :** `GestionOperations` reçoit un paramètre URL optionnel `participant` (via `#[Url]`). Quand ce paramètre est présent et que `activeTab === 'participants'`, le composant rend `<livewire:participant-show>` à la place de `<livewire:participant-table>`. Pas de nouvelle route ni de nouveau contrôleur — tout reste dans `GestionOperations`.
+
+**URL résultante :** `/gestion/operations?id={operation_id}&participant={participant_id}` — utilise le mécanisme `#[Url]` existant de Livewire, cohérent avec le `#[Url(as: 'id')]` déjà en place pour `selectedOperationId`.
 
 ### Navigation
 
-- Dans `ParticipantTable`, clic sur le nom du participant → navigue vers cette URL (remplace l'ouverture du panneau plein écran)
+- Dans `ParticipantTable`, clic sur le nom du participant → met à jour l'URL avec `?participant={id}`, ce qui déclenche le rendu de `ParticipantShow` (remplace l'ouverture du panneau plein écran)
 - La page s'affiche **dans le contenu de l'onglet Participants** de la vue opération — le header opération et les onglets principaux restent visibles
-- Lien "← Retour à la liste des participants" en haut de la page
+- Lien "← Retour à la liste des participants" en haut → retire le paramètre `participant` de l'URL, ce qui revient à `ParticipantTable`
 
 ### Composant Livewire
 
