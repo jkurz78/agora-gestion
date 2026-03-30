@@ -78,7 +78,7 @@
     </div>
 
     {{-- Table --}}
-    <div class="table-responsive">
+    <div class="table-responsive" style="overflow-x: auto; overflow-y: visible;">
         <table class="table table-sm table-striped table-hover" id="participant-table">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
@@ -371,7 +371,7 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="PDF">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-display="static" title="PDF">
                                         <i class="bi bi-printer"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end">
