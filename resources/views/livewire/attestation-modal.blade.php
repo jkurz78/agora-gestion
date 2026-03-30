@@ -76,7 +76,7 @@
                     <p class="text-muted text-center py-3">Aucune présence enregistrée.</p>
                 @else
                     <table class="table table-sm small mb-3">
-                        <thead><tr><th>N°</th><th>Date</th><th>Titre</th></tr></thead>
+                        <thead><tr><th>Séance</th><th>Date</th><th>Titre</th></tr></thead>
                         <tbody>
                             @foreach($seancesPresent as $s)
                                 <tr><td>{{ $s['numero'] }}</td><td>{{ $s['date'] }}</td><td>{{ $s['titre'] ?? '—' }}</td></tr>
