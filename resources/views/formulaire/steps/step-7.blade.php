@@ -54,6 +54,9 @@
         </div>
     </div>
 
+    @endif
+
+    @if($typeOperation->formulaire_parcours_therapeutique || $typeOperation->formulaire_droit_image)
     {{-- Token re-entry --}}
     <div class="card border-primary mb-4">
         <div class="card-header fw-bold text-primary">
