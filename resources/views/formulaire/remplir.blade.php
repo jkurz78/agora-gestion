@@ -19,10 +19,9 @@ $totalActiveSteps = count($activeSteps);
 @section('content')
 <div x-data="formulaireWizard()" class="mb-4">
     {{-- Progress bar --}}
-    <div class="progress mb-4">
+    <div class="progress mb-4" style="height: 6px;">
         <div class="progress-bar" role="progressbar" :aria-valuenow="activeSteps.indexOf(step) + 1" aria-valuemin="1" :aria-valuemax="activeSteps.length"
              :style="'width: ' + Math.round(((activeSteps.indexOf(step) + 1) / activeSteps.length) * 100) + '%'">
-            Étape <span x-text="activeSteps.indexOf(step) + 1"></span> / <span x-text="activeSteps.length"></span>
         </div>
     </div>
 
