@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Livewire\ParticipantShow;
+use App\Models\EmailLog;
+use App\Models\FormulaireToken;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Tiers;
@@ -70,4 +72,41 @@ it('shows back link to participant list', function () {
         'participant' => $this->participant,
     ])
         ->assertSee('Retour à la liste des participants');
+});
+
+it('shows historique tab with email logs', function () {
+    EmailLog::create([
+        'participant_id' => $this->participant->id,
+        'tiers_id' => $this->tiers->id,
+        'operation_id' => $this->operation->id,
+        'categorie' => 'formulaire',
+        'destinataire_email' => 'marie@test.com',
+        'destinataire_nom' => 'Dupont Marie',
+        'objet' => 'Votre formulaire',
+        'statut' => 'envoye',
+    ]);
+
+    Livewire::test(ParticipantShow::class, [
+        'operation' => $this->operation,
+        'participant' => $this->participant,
+    ])
+        ->assertSee('Votre formulaire')
+        ->assertSee('marie@test.com');
+});
+
+it('shows formulaire rempli in historique', function () {
+    FormulaireToken::create([
+        'participant_id' => $this->participant->id,
+        'token' => 'ABCD-EFGH',
+        'expire_at' => '2026-12-31',
+        'rempli_at' => '2026-03-15 14:30:00',
+        'rempli_ip' => '82.123.45.67',
+    ]);
+
+    Livewire::test(ParticipantShow::class, [
+        'operation' => $this->operation,
+        'participant' => $this->participant,
+    ])
+        ->assertSee('Formulaire rempli')
+        ->assertSee('15/03/2026');
 });
