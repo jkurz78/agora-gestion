@@ -18,8 +18,12 @@
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Nationalité</label>
-                    <input type="text" name="nationalite" class="form-control"
-                           value="{{ old('nationalite', $participant->nationalite) }}" maxlength="100">
+                    <select name="nationalite" class="form-select">
+                        <option value="">—</option>
+                        @foreach(\App\Helpers\Pays::list() as $pays)
+                            <option value="{{ $pays }}" @selected(old('nationalite', $participant->nationalite) === $pays)>{{ $pays }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 
