@@ -55,12 +55,17 @@ GET /gestion/operations/{operation}/participants/{participant}/attestation-recap
 **Layout :**
 - En-tête : logo type opération (fallback logo association), nom de l'association, adresse
 - Titre : "Attestation de présence"
-- Corps variante séance : "L'association {nom} atteste que {prénom nom}, né(e) le {date naissance}, a participé à la séance n°{X} du {date} de l'opération {nom opération} ({date début} — {date fin})."
+- Corps variante séance : "L'association {nom} atteste que {prénom nom}, né(e) le {date naissance}, a participé à la séance n°{X} du {date} de l'opération {nom opération} ({date début} — {date fin})." — Si date de naissance absente, omettre la clause "né(e) le..."
 - Corps variante récap : même intro + tableau des séances (n°, date, titre) + total "{X} séance(s) sur {Y}"
+- **Note :** `date_naissance` est stockée chiffrée dans `participant_donnees_medicales` (relation `donneesMedicales()`). Charger la relation et gérer le cas null.
 - Pied : "Fait à {ville association}, le {date du jour}" + image cachet/signature (si configurée)
 - Footer : "Généré le {date heure}" (comme les autres PDFs)
 
-**Technique :** DomPDF (A4 portrait), même pattern que `ParticipantFichePdfController` pour la résolution des logos.
+**Technique :** DomPDF (A4 portrait), même pattern que `ParticipantFichePdfController` pour la résolution des logos. Le cachet/signature utilise le même encodage base64 que les logos (DomPDF ne peut pas charger d'URL directement).
+
+**Noms de fichiers :**
+- Par séance : `Attestation présence - {opération} - S{numéro}.pdf`
+- Récap : `Attestation présence - {opération} - {prénom} {nom}.pdf`
 
 ### Multi-pages (variante séance)
 
@@ -97,9 +102,19 @@ Chaque envoi crée un `EmailLog` avec :
 - `statut = 'envoye'` ou `'erreur'`
 - `envoye_par = auth()->id()`
 
+**Note :** `email_logs` n'a pas de `seance_id`. La séance concernée est identifiable via l'objet du mail (qui contient le numéro et la date). Pas d'ajout de colonne pour le moment — à reconsidérer si un besoin de filtrage par séance apparaît.
+
 ---
 
 ## 4. IHM — Écran Séances (SeanceTable)
+
+### Architecture
+
+La logique d'envoi et les modales vivent dans un **nouveau composant Livewire `AttestationModal`**, embarqué dans la vue de `SeanceTable`. Cela évite de surcharger `SeanceTable` (qui gère déjà les présences). `AttestationModal` reçoit l'opération en propriété et expose les méthodes d'envoi/téléchargement.
+
+### Validation des participants
+
+La route `?participants=1,2,3` valide que les IDs sont des entiers, que les participants appartiennent à l'opération, et qu'ils ont le statut `Present` pour la séance concernée.
 
 ### Bouton bas de colonne — attestation par séance
 
