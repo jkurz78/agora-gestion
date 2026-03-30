@@ -1,4 +1,6 @@
 <div style="max-width:100%;overflow:hidden">
+    <livewire:attestation-modal :operation="$operation" :key="'am-'.$operation->id" />
+
     {{-- Toolbar --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="d-flex align-items-center gap-3">
@@ -123,6 +125,12 @@
                         <tr>
                             <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;font-weight:500;white-space:nowrap;vertical-align:middle;font-size:11px">
                                 {{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-1"
+                                        style="color:#888;text-decoration:none"
+                                        wire:click="$dispatchTo('attestation-modal', 'open-recap-modal', { participantId: {{ $participant->id }} })"
+                                        title="Attestation récapitulative">
+                                    <i class="bi bi-file-earmark-text" style="font-size:11px"></i>
+                                </button>
                             </td>
                             @foreach($seances as $seance)
                                 @php
@@ -225,6 +233,19 @@
                                    title="Feuille d'émargement S{{ $seance->numero }}">
                                     <i class="bi bi-file-earmark-pdf"></i> PDF
                                 </a>
+                            </td>
+                        @endforeach
+                    </tr>
+                    <tr style="background:#f8f8f8;font-size:12px">
+                        <td style="position:sticky;left:0;z-index:1;background:#f8f8f8;color:#888">Attestations</td>
+                        @foreach($seances as $seance)
+                            <td style="text-align:center">
+                                <button type="button" class="btn btn-link btn-sm p-0"
+                                        style="color:#A9014F;text-decoration:none"
+                                        wire:click="$dispatchTo('attestation-modal', 'open-seance-modal', { seanceId: {{ $seance->id }} })"
+                                        title="Attestations séance S{{ $seance->numero }}">
+                                    <i class="bi bi-envelope-paper"></i>
+                                </button>
                             </td>
                         @endforeach
                     </tr>
