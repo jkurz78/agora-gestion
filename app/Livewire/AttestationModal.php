@@ -119,7 +119,7 @@ final class AttestationModal extends Component
             if ($presence && $presence->statut === StatutPresence::Present->value) {
                 $this->seancesPresent[] = [
                     'numero' => $s->numero,
-                    'date' => $s->date->format('d/m/Y'),
+                    'date' => $s->date?->format('d/m/Y') ?? '—',
                     'titre' => $s->titre,
                 ];
             }
