@@ -28,7 +28,6 @@
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
                     <th>Logo</th>
-                    <th class="sortable" data-col="code" style="cursor:pointer">Code <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th class="sortable" data-col="nom" style="cursor:pointer">Nom <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th>Sous-catégorie</th>
                     <th class="text-center">Séances</th>
@@ -51,8 +50,6 @@
                                 <span class="text-muted"><i class="bi bi-image" style="font-size:1.2rem"></i></span>
                             @endif
                         </td>
-                        {{-- Code --}}
-                        <td class="small fw-semibold" data-sort="{{ $type->code }}">{{ $type->code }}</td>
                         {{-- Nom --}}
                         <td class="small" data-sort="{{ $type->nom }}">{{ $type->nom }}</td>
                         {{-- Sous-catégorie --}}
@@ -106,7 +103,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="text-center text-muted py-4">
+                        <td colspan="9" class="text-center text-muted py-4">
                             Aucun type d'opération enregistré.
                         </td>
                     </tr>
@@ -129,8 +126,8 @@
                         <h5 class="fw-bold mb-0">
                             {{ $editingId ? 'Modifier le type d\'opération' : 'Nouveau type d\'opération' }}
                         </h5>
-                        @if($activeTab > 1 && ($code || $nom))
-                            <small class="text-muted">{{ $code }}{{ $code && $nom ? ' — ' : '' }}{{ $nom }}</small>
+                        @if($activeTab > 1 && $nom)
+                            <small class="text-muted">{{ $nom }}</small>
                         @endif
                     </div>
                     <button type="button" class="btn-close" wire:click="$set('showModal', false)" title="Fermer"></button>
@@ -159,18 +156,11 @@
                 {{-- ── Onglet 1 : Général ─────────────────────────────────── --}}
                 @if($activeTab === 1)
 
-                {{-- Code + Nom --}}
-                <div class="row g-2 mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label small">Code <span class="text-danger">*</span></label>
-                        <input type="text" wire:model="code" class="form-control form-control-sm @error('code') is-invalid @enderror" maxlength="20">
-                        @error('code') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-                    <div class="col-md-8">
-                        <label class="form-label small">Nom <span class="text-danger">*</span></label>
-                        <input type="text" wire:model="nom" class="form-control form-control-sm @error('nom') is-invalid @enderror" maxlength="150">
-                        @error('nom') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
+                {{-- Nom --}}
+                <div class="mb-3">
+                    <label class="form-label small">Nom <span class="text-danger">*</span></label>
+                    <input type="text" wire:model="nom" class="form-control form-control-sm @error('nom') is-invalid @enderror" maxlength="150">
+                    @error('nom') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
 
                 {{-- Libellé article --}}
