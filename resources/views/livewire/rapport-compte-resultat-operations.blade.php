@@ -7,7 +7,7 @@
                 <select wire:model.live="filterTypeId" class="form-select form-select-sm" style="max-width: 250px;">
                     <option value="">Tous les types</option>
                     @foreach($typeOperations as $type)
-                        <option value="{{ $type->id }}">{{ $type->code }} — {{ $type->nom }}</option>
+                        <option value="{{ $type->id }}">{{ $type->nom }}</option>
                     @endforeach
                 </select>
             </div>
@@ -16,7 +16,7 @@
                     <div class="form-check">
                         <input type="checkbox" wire:model.live="selectedOperationIds"
                                value="{{ $op->id }}" id="op-{{ $op->id }}" class="form-check-input">
-                        <label for="op-{{ $op->id }}" class="form-check-label">{{ $op->code }}</label>
+                        <label for="op-{{ $op->id }}" class="form-check-label">{{ $op->nom }}</label>
                     </div>
                 @endforeach
                 <button wire:click="exportCsv" class="btn btn-outline-secondary btn-sm ms-auto"
