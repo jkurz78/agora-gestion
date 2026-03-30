@@ -20,8 +20,7 @@
                             <label class="list-group-item d-flex align-items-center gap-2 {{ !$p['email'] ? 'text-muted' : '' }}">
                                 <input type="checkbox" class="form-check-input"
                                        wire:click="toggleParticipant({{ $p['id'] }})"
-                                       {{ $p['checked'] ? 'checked' : '' }}
-                                       {{ !$p['email'] ? 'disabled' : '' }}>
+                                       {{ $p['checked'] ? 'checked' : '' }}>
                                 <span>{{ $p['nom'] }} {{ $p['prenom'] }}</span>
                                 @if(!$p['email'])
                                     <small class="text-muted ms-auto fst-italic">pas d'email</small>

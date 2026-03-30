@@ -87,7 +87,7 @@ final class AttestationModal extends Component
                     'nom' => $p->tiers->nom ?? '',
                     'prenom' => $p->tiers->prenom ?? '',
                     'email' => $p->tiers->email,
-                    'checked' => (bool) $p->tiers->email,
+                    'checked' => true,
                 ];
             }
         }
@@ -132,7 +132,7 @@ final class AttestationModal extends Component
     public function toggleParticipant(int $id): void
     {
         foreach ($this->presentParticipants as &$p) {
-            if ($p['id'] === $id && $p['email']) {
+            if ($p['id'] === $id) {
                 $p['checked'] = ! $p['checked'];
                 break;
             }
