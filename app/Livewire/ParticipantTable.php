@@ -10,14 +10,12 @@ use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
-use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Services\ExerciceService;
 use App\Services\FormulaireTokenService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -47,111 +45,7 @@ final class ParticipantTable extends Component
 
     public string $addEmail = '';
 
-    // ── Edit modal ─────────────────────────────────────────────
-    public bool $showEditModal = false;
-
-    public ?int $editParticipantId = null;
-
-    public ?Participant $editParticipant = null;
-
-    // Tiers mapping — selected IDs for the three contact blocks
-    public ?int $mapAdresseParTiersId = null;
-
-    public ?int $mapMedecinTiersId = null;
-
-    public ?int $mapTherapeuteTiersId = null;
-
-    public string $editNom = '';
-
-    public string $editPrenom = '';
-
-    public string $editAdresse = '';
-
-    public string $editCodePostal = '';
-
-    public string $editVille = '';
-
-    public string $editTelephone = '';
-
-    public string $editEmail = '';
-
-    public string $editDateInscription = '';
-
-    public ?int $editReferePar = null;
-
-    public ?int $editTypeOperationTarifId = null;
-
-    // Medical fields (edit modal — Parcours tab)
-    public string $editDateNaissance = '';
-
-    public string $editSexe = '';
-
-    public string $editTaille = '';
-
-    public string $editPoids = '';
-
-    public string $editNomJeuneFille = '';
-
-    public string $editNationalite = '';
-
-    // Medical: médecin & thérapeute (Parcours tab)
-    public string $editMedecinNom = '';
-
-    public string $editMedecinPrenom = '';
-
-    public string $editMedecinTelephone = '';
-
-    public string $editMedecinEmail = '';
-
-    public string $editMedecinAdresse = '';
-
-    public string $editMedecinCodePostal = '';
-
-    public string $editMedecinVille = '';
-
-    public string $editTherapeuteNom = '';
-
-    public string $editTherapeutePrenom = '';
-
-    public string $editTherapeuteTelephone = '';
-
-    public string $editTherapeuteEmail = '';
-
-    public string $editTherapeuteAdresse = '';
-
-    public string $editTherapeuteCodePostal = '';
-
-    public string $editTherapeuteVille = '';
-
-    // Prescripteur / Adressé par (Adressé par tab)
-    public string $editAdresseParEtablissement = '';
-
-    public string $editAdresseParNom = '';
-
-    public string $editAdresseParPrenom = '';
-
-    public string $editAdresseParTelephone = '';
-
-    public string $editAdresseParEmail = '';
-
-    public string $editAdresseParAdresse = '';
-
-    public string $editAdresseParCodePostal = '';
-
-    public string $editAdresseParVille = '';
-
-    // Engagements (read-only display data)
-    public ?string $editDroitImageLabel = null;
-
-    public ?string $editModePaiement = null;
-
-    public ?string $editMoyenPaiement = null;
-
-    public ?bool $editAutorisationContactMedecin = null;
-
-    public ?string $editRgpdAccepteAt = null;
-
-    public ?string $editFormulaireRempliAt = null;
+    public ?int $addTypeOperationTarifId = null;
 
     // ── Notes modal ────────────────────────────────────────────
     public bool $showNotesModal = false;
@@ -174,10 +68,6 @@ final class ParticipantTable extends Component
     public string $tokenEmailMessage = '';
 
     public string $tokenEmailType = '';
-
-    // ── Edit modal documents ──────────────────────────────────
-    /** @var array<int, array{name: string, size: int, url: string}> */
-    public array $editDocuments = [];
 
     public function mount(Operation $operation): void
     {
@@ -250,159 +140,11 @@ final class ParticipantTable extends Component
             'tiers_id' => $tiersId,
             'operation_id' => $this->operation->id,
             'date_inscription' => now()->toDateString(),
-            'type_operation_tarif_id' => $this->editTypeOperationTarifId,
+            'type_operation_tarif_id' => $this->addTypeOperationTarifId,
         ]);
 
         $this->showAddModal = false;
         $this->resetAddFields();
-    }
-
-    // ── Edit modal ─────────────────────────────────────────────
-
-    public function openEditModal(int $participantId): void
-    {
-        $participant = Participant::with(['tiers', 'donneesMedicales', 'referePar', 'medecinTiers', 'therapeuteTiers', 'formulaireToken'])
-            ->findOrFail($participantId);
-
-        $this->editParticipantId = $participant->id;
-        $this->editNom = $participant->tiers->nom ?? '';
-        $this->editPrenom = $participant->tiers->prenom ?? '';
-        $this->editAdresse = $participant->tiers->adresse_ligne1 ?? '';
-        $this->editCodePostal = $participant->tiers->code_postal ?? '';
-        $this->editVille = $participant->tiers->ville ?? '';
-        $this->editTelephone = $participant->tiers->telephone ?? '';
-        $this->editEmail = $participant->tiers->email ?? '';
-        $this->editDateInscription = $participant->date_inscription->format('Y-m-d');
-        $this->editReferePar = $participant->refere_par_id;
-        $this->editTypeOperationTarifId = $participant->type_operation_tarif_id;
-
-        // Medical data (Parcours tab)
-        $med = $participant->donneesMedicales;
-        $this->editDateNaissance = $med?->date_naissance ?? '';
-        $this->editSexe = $med?->sexe ?? '';
-        $this->editTaille = $med?->taille ?? '';
-        $this->editPoids = $med?->poids ?? '';
-        $this->editNomJeuneFille = $participant->nom_jeune_fille ?? '';
-        $this->editNationalite = $participant->nationalite ?? '';
-
-        // Médecin & Thérapeute (Parcours tab)
-        $this->editMedecinNom = $med?->medecin_nom ?? '';
-        $this->editMedecinPrenom = $med?->medecin_prenom ?? '';
-        $this->editMedecinTelephone = $med?->medecin_telephone ?? '';
-        $this->editMedecinEmail = $med?->medecin_email ?? '';
-        $this->editMedecinAdresse = $med?->medecin_adresse ?? '';
-        $this->editMedecinCodePostal = $med?->medecin_code_postal ?? '';
-        $this->editMedecinVille = $med?->medecin_ville ?? '';
-
-        $this->editTherapeuteNom = $med?->therapeute_nom ?? '';
-        $this->editTherapeutePrenom = $med?->therapeute_prenom ?? '';
-        $this->editTherapeuteTelephone = $med?->therapeute_telephone ?? '';
-        $this->editTherapeuteEmail = $med?->therapeute_email ?? '';
-        $this->editTherapeuteAdresse = $med?->therapeute_adresse ?? '';
-        $this->editTherapeuteCodePostal = $med?->therapeute_code_postal ?? '';
-        $this->editTherapeuteVille = $med?->therapeute_ville ?? '';
-
-        // Adressé par (Prescripteur tab)
-        $this->editAdresseParEtablissement = $participant->adresse_par_etablissement ?? '';
-        $this->editAdresseParNom = $participant->adresse_par_nom ?? '';
-        $this->editAdresseParPrenom = $participant->adresse_par_prenom ?? '';
-        $this->editAdresseParTelephone = $participant->adresse_par_telephone ?? '';
-        $this->editAdresseParEmail = $participant->adresse_par_email ?? '';
-        $this->editAdresseParAdresse = $participant->adresse_par_adresse ?? '';
-        $this->editAdresseParCodePostal = $participant->adresse_par_code_postal ?? '';
-        $this->editAdresseParVille = $participant->adresse_par_ville ?? '';
-
-        // Notes (loaded into medNotes for reuse with saveNotes)
-        $this->medNotes = $med?->notes ?? '';
-        $this->notesParticipantId = $participant->id;
-
-        // Engagements (read-only)
-        $this->editDroitImageLabel = $participant->droit_image?->label();
-        $this->editModePaiement = $participant->mode_paiement_choisi;
-        $this->editMoyenPaiement = $participant->moyen_paiement_choisi;
-        $this->editAutorisationContactMedecin = $participant->autorisation_contact_medecin;
-        $this->editRgpdAccepteAt = $participant->rgpd_accepte_at?->format('d/m/Y à H:i');
-        $this->editFormulaireRempliAt = $participant->formulaireToken?->rempli_at?->format('d/m/Y à H:i');
-
-        // Documents (only if user can see sensitive data)
-        $this->editDocuments = Auth::user()?->peut_voir_donnees_sensibles
-            ? $this->getParticipantDocuments($participant->id)
-            : [];
-
-        $this->editParticipant = $participant;
-
-        // Reset mapping selectors
-        $this->mapAdresseParTiersId = null;
-        $this->mapMedecinTiersId = null;
-        $this->mapTherapeuteTiersId = null;
-
-        $this->showEditModal = true;
-    }
-
-    public function saveEdit(): void
-    {
-        $participant = Participant::with('tiers')->findOrFail($this->editParticipantId);
-
-        // Update tiers
-        $participant->tiers->update([
-            'nom' => $this->editNom,
-            'prenom' => $this->editPrenom,
-            'adresse_ligne1' => $this->editAdresse,
-            'code_postal' => $this->editCodePostal,
-            'ville' => $this->editVille,
-            'telephone' => $this->editTelephone,
-            'email' => $this->editEmail,
-        ]);
-
-        // Update participant (including prescripteur fields)
-        $participant->update([
-            'date_inscription' => $this->editDateInscription,
-            'refere_par_id' => $this->editReferePar,
-            'type_operation_tarif_id' => $this->editTypeOperationTarifId,
-            'nom_jeune_fille' => $this->editNomJeuneFille !== '' ? $this->editNomJeuneFille : null,
-            'nationalite' => $this->editNationalite !== '' ? $this->editNationalite : null,
-            'adresse_par_etablissement' => $this->editAdresseParEtablissement !== '' ? $this->editAdresseParEtablissement : null,
-            'adresse_par_nom' => $this->editAdresseParNom !== '' ? $this->editAdresseParNom : null,
-            'adresse_par_prenom' => $this->editAdresseParPrenom !== '' ? $this->editAdresseParPrenom : null,
-            'adresse_par_telephone' => $this->editAdresseParTelephone !== '' ? $this->editAdresseParTelephone : null,
-            'adresse_par_email' => $this->editAdresseParEmail !== '' ? $this->editAdresseParEmail : null,
-            'adresse_par_adresse' => $this->editAdresseParAdresse !== '' ? $this->editAdresseParAdresse : null,
-            'adresse_par_code_postal' => $this->editAdresseParCodePostal !== '' ? $this->editAdresseParCodePostal : null,
-            'adresse_par_ville' => $this->editAdresseParVille !== '' ? $this->editAdresseParVille : null,
-        ]);
-
-        // Update medical data if user has permission
-        if (Auth::user()?->peut_voir_donnees_sensibles) {
-            ParticipantDonneesMedicales::updateOrCreate(
-                ['participant_id' => $participant->id],
-                [
-                    'date_naissance' => $this->editDateNaissance !== '' ? $this->editDateNaissance : null,
-                    'sexe' => $this->editSexe !== '' ? $this->editSexe : null,
-                    'taille' => $this->editTaille !== '' ? $this->editTaille : null,
-                    'poids' => $this->editPoids !== '' ? $this->editPoids : null,
-                    'medecin_nom' => $this->editMedecinNom !== '' ? $this->editMedecinNom : null,
-                    'medecin_prenom' => $this->editMedecinPrenom !== '' ? $this->editMedecinPrenom : null,
-                    'medecin_telephone' => $this->editMedecinTelephone !== '' ? $this->editMedecinTelephone : null,
-                    'medecin_email' => $this->editMedecinEmail !== '' ? $this->editMedecinEmail : null,
-                    'medecin_adresse' => $this->editMedecinAdresse !== '' ? $this->editMedecinAdresse : null,
-                    'medecin_code_postal' => $this->editMedecinCodePostal !== '' ? $this->editMedecinCodePostal : null,
-                    'medecin_ville' => $this->editMedecinVille !== '' ? $this->editMedecinVille : null,
-                    'therapeute_nom' => $this->editTherapeuteNom !== '' ? $this->editTherapeuteNom : null,
-                    'therapeute_prenom' => $this->editTherapeutePrenom !== '' ? $this->editTherapeutePrenom : null,
-                    'therapeute_telephone' => $this->editTherapeuteTelephone !== '' ? $this->editTherapeuteTelephone : null,
-                    'therapeute_email' => $this->editTherapeuteEmail !== '' ? $this->editTherapeuteEmail : null,
-                    'therapeute_adresse' => $this->editTherapeuteAdresse !== '' ? $this->editTherapeuteAdresse : null,
-                    'therapeute_code_postal' => $this->editTherapeuteCodePostal !== '' ? $this->editTherapeuteCodePostal : null,
-                    'therapeute_ville' => $this->editTherapeuteVille !== '' ? $this->editTherapeuteVille : null,
-                    'notes' => $this->medNotes !== '' ? $this->medNotes : null,
-                ]
-            );
-        }
-
-        // Touch participant to bust wire:key cache
-        $participant->touch();
-
-        $this->showEditModal = false;
     }
 
     // ── Inline field updates ───────────────────────────────────
@@ -648,30 +390,6 @@ final class ParticipantTable extends Component
         }
     }
 
-    // ── Document helper ─────────────────────────────────────────
-
-    /**
-     * @return array<int, array{name: string, size: int, url: string}>
-     */
-    private function getParticipantDocuments(int $participantId): array
-    {
-        $dir = "participants/{$participantId}";
-        if (! Storage::disk('local')->exists($dir)) {
-            return [];
-        }
-
-        return collect(Storage::disk('local')->files($dir))
-            ->map(fn (string $path) => [
-                'name' => basename($path),
-                'size' => Storage::disk('local')->size($path),
-                'url' => route('gestion.participants.documents.download', [
-                    'participant' => $participantId,
-                    'filename' => basename($path),
-                ]),
-            ])
-            ->toArray();
-    }
-
     // ── Adhérent check ────────────────────────────────────────
 
     /**
@@ -693,127 +411,6 @@ final class ParticipantTable extends Component
             ->exists();
     }
 
-    // ── Mapping Tiers methods ──────────────────────────────────
-
-    public function mapAdresseParTiers(): void
-    {
-        if ($this->mapAdresseParTiersId === null) {
-            return;
-        }
-        $this->editingParticipant()->update(['refere_par_id' => $this->mapAdresseParTiersId]);
-        $this->dispatch('notify', message: 'Tiers associé au prescripteur.');
-        $this->openEditModal($this->editParticipantId);
-    }
-
-    public function createAdresseParTiers(): void
-    {
-        $p = $this->editingParticipant();
-        $tiers = Tiers::create([
-            'nom' => $p->adresse_par_nom,
-            'prenom' => $p->adresse_par_prenom,
-            'entreprise' => $p->adresse_par_etablissement,
-            'telephone' => $p->adresse_par_telephone,
-            'email' => $p->adresse_par_email,
-            'adresse_ligne1' => $p->adresse_par_adresse,
-            'code_postal' => $p->adresse_par_code_postal,
-            'ville' => $p->adresse_par_ville,
-            'type' => 'particulier',
-        ]);
-        $p->update(['refere_par_id' => $tiers->id]);
-        $this->dispatch('notify', message: 'Tiers créé et associé.');
-        $this->openEditModal($this->editParticipantId);
-    }
-
-    public function unlinkAdresseParTiers(): void
-    {
-        $this->editingParticipant()->update(['refere_par_id' => null]);
-        $this->dispatch('notify', message: 'Association supprimée.');
-        $this->openEditModal($this->editParticipantId);
-    }
-
-    public function mapMedecinTiers(): void
-    {
-        if ($this->mapMedecinTiersId === null) {
-            return;
-        }
-        $this->editingParticipant()->update(['medecin_tiers_id' => $this->mapMedecinTiersId]);
-        $this->dispatch('notify', message: 'Tiers associé au médecin traitant.');
-        $this->openEditModal($this->editParticipantId);
-    }
-
-    public function createMedecinTiers(): void
-    {
-        $p = $this->editingParticipant();
-        $med = $p->donneesMedicales;
-        if ($med === null) {
-            return;
-        }
-        $tiers = Tiers::create([
-            'nom' => $med->medecin_nom,
-            'prenom' => $med->medecin_prenom,
-            'telephone' => $med->medecin_telephone,
-            'email' => $med->medecin_email,
-            'adresse_ligne1' => $med->medecin_adresse,
-            'code_postal' => $med->medecin_code_postal,
-            'ville' => $med->medecin_ville,
-            'type' => 'particulier',
-        ]);
-        $p->update(['medecin_tiers_id' => $tiers->id]);
-        $this->dispatch('notify', message: 'Tiers créé et associé au médecin.');
-        $this->openEditModal($this->editParticipantId);
-    }
-
-    public function unlinkMedecinTiers(): void
-    {
-        $this->editingParticipant()->update(['medecin_tiers_id' => null]);
-        $this->dispatch('notify', message: 'Association supprimée.');
-        $this->openEditModal($this->editParticipantId);
-    }
-
-    public function mapTherapeuteTiers(): void
-    {
-        if ($this->mapTherapeuteTiersId === null) {
-            return;
-        }
-        $this->editingParticipant()->update(['therapeute_tiers_id' => $this->mapTherapeuteTiersId]);
-        $this->dispatch('notify', message: 'Tiers associé au thérapeute.');
-        $this->openEditModal($this->editParticipantId);
-    }
-
-    public function createTherapeuteTiers(): void
-    {
-        $p = $this->editingParticipant();
-        $med = $p->donneesMedicales;
-        if ($med === null) {
-            return;
-        }
-        $tiers = Tiers::create([
-            'nom' => $med->therapeute_nom,
-            'prenom' => $med->therapeute_prenom,
-            'telephone' => $med->therapeute_telephone,
-            'email' => $med->therapeute_email,
-            'adresse_ligne1' => $med->therapeute_adresse,
-            'code_postal' => $med->therapeute_code_postal,
-            'ville' => $med->therapeute_ville,
-            'type' => 'particulier',
-        ]);
-        $p->update(['therapeute_tiers_id' => $tiers->id]);
-        $this->dispatch('notify', message: 'Tiers créé et associé au thérapeute.');
-        $this->openEditModal($this->editParticipantId);
-    }
-
-    public function unlinkTherapeuteTiers(): void
-    {
-        $this->editingParticipant()->update(['therapeute_tiers_id' => null]);
-        $this->dispatch('notify', message: 'Association supprimée.');
-        $this->openEditModal($this->editParticipantId);
-    }
-
-    private function editingParticipant(): Participant
-    {
-        return Participant::findOrFail($this->editParticipantId);
-    }
-
     // ── Helpers ────────────────────────────────────────────────
 
     private function resetAddFields(): void
@@ -827,6 +424,6 @@ final class ParticipantTable extends Component
         $this->addVille = '';
         $this->addTelephone = '';
         $this->addEmail = '';
-        $this->editTypeOperationTarifId = null;
+        $this->addTypeOperationTarifId = null;
     }
 }

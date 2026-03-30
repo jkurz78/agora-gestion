@@ -170,20 +170,4 @@ it('auto-inscribes with today date when tiers is selected', function () {
     expect($participant->date_inscription->format('Y-m-d'))->toBe(now()->format('Y-m-d'));
 });
 
-it('can open and save edit modal', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Avant', 'prenom' => 'Test']);
-    $participant = Participant::create([
-        'tiers_id' => $tiers->id,
-        'operation_id' => $this->operation->id,
-        'date_inscription' => '2026-01-01',
-    ]);
-
-    Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
-        ->call('openEditModal', $participant->id)
-        ->assertSet('editNom', 'Avant')
-        ->set('editNom', 'Apres')
-        ->call('saveEdit');
-
-    $tiers->refresh();
-    expect($tiers->nom)->toBe('Apres');
-});
+// Edit modal test removed — editing now handled by ParticipantShow component
