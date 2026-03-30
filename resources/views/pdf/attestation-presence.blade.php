@@ -94,7 +94,7 @@
     </style>
 </head>
 <body>
-    <div class="footer"><span class="page-number"></span></div>
+    <div class="footer">Généré le {{ now()->translatedFormat('j F Y à H:i') }} — <span class="page-number"></span></div>
     @if($footerLogoBase64)
         <div style="position: fixed; bottom: 10mm; left: 10mm;">
             <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height: 15mm;" alt="">
@@ -148,9 +148,6 @@
                 @endif
             </div>
 
-            <div style="margin-top: 12px; font-size: 8px; color: #999; text-align: right;">
-                Généré le {{ now()->translatedFormat('j F Y à H:i') }}
-            </div>
 
             @if(!$loop->last)
                 <div class="page-break"></div>
