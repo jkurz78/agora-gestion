@@ -65,7 +65,7 @@
     {{-- Médecin traitant --}}
     <div class="card mb-4">
         <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="bi bi-hospital me-1"></i> Médecin traitant</h6>
+            <h6 class="mb-0"><i class="bi bi-hospital me-1"></i> Votre médecin traitant</h6>
         </div>
         <div class="card-body">
             <div class="row g-3">
@@ -118,7 +118,7 @@
     {{-- Thérapeute référent --}}
     <div class="card mb-4">
         <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="bi bi-person-badge me-1"></i> Thérapeute référent</h6>
+            <h6 class="mb-0"><i class="bi bi-person-badge me-1"></i> Vous avez un thérapeute référent ?</h6>
         </div>
         <div class="card-body">
             <div class="row g-3">
@@ -171,7 +171,7 @@
     {{-- Notes médicales --}}
     <div class="card mb-4">
         <div class="card-header bg-light">
-            <h6 class="mb-0"><i class="bi bi-journal-medical me-1"></i> Notes médicales</h6>
+            <h6 class="mb-0"><i class="bi bi-journal-medical me-1"></i> Vous avez des informations complémentaires à nous communiquer ?</h6>
         </div>
         <div class="card-body">
             <textarea name="notes" class="form-control" rows="5" maxlength="1000"
