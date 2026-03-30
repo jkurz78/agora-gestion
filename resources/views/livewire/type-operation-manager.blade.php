@@ -623,6 +623,7 @@
                 '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
                 '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
                 '{numero_seance}': 'N° séance', '{date_seance}': 'Date séance',
+                '{bloc_seances}': 'Bloc séance(s) : détail ou tableau récap',
             },
             facture: {
                 '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
