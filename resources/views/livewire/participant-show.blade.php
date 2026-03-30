@@ -504,7 +504,15 @@
                                 <div class="flex-grow-1">
                                     <div class="fw-semibold small">{{ $event['description'] }}</div>
                                     @if($event['detail'])
-                                        <div class="text-muted small">{{ $event['detail'] }}</div>
+                                        <div class="text-muted small d-flex align-items-center gap-1">
+                                            <span>{{ $event['detail'] }}</span>
+                                            @if($event['copyable'] ?? false)
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-muted" title="Copier"
+                                                    x-data x-on:click="navigator.clipboard.writeText('{{ $event['copyable'] }}'); $el.innerHTML = '<i class=\'bi bi-check-lg text-success\'></i>'; setTimeout(() => $el.innerHTML = '<i class=\'bi bi-clipboard\'></i>', 1500)">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                            @endif
+                                        </div>
                                     @endif
                                 </div>
                                 <div class="text-muted small text-nowrap">
