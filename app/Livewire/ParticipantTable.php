@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Mail\FormulaireInvitation;
+use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -589,6 +590,8 @@ final class ParticipantTable extends Component
                 ->whereNull('type_operation_id')
                 ->first();
 
+        $destinataireNom = trim(($participant->tiers->nom ?? '').' '.($participant->tiers->prenom ?? ''));
+
         try {
             $op = $participant->operation;
             $mail = new FormulaireInvitation(
@@ -610,9 +613,36 @@ final class ParticipantTable extends Component
                 ->to($email)
                 ->send($mail->from($typeOp->email_from, $typeOp->email_from_name ?? null));
 
+            EmailLog::create([
+                'tiers_id' => $participant->tiers_id,
+                'participant_id' => $participant->id,
+                'operation_id' => $participant->operation_id,
+                'categorie' => 'formulaire',
+                'email_template_id' => $template?->id,
+                'destinataire_email' => $email,
+                'destinataire_nom' => $destinataireNom,
+                'objet' => $template?->objet ?? 'Formulaire à compléter — '.$op->nom,
+                'statut' => 'envoye',
+                'envoye_par' => Auth::id(),
+            ]);
+
             $this->tokenEmailMessage = "Email envoyé à {$email}.";
             $this->tokenEmailType = 'success';
         } catch (\Throwable $e) {
+            EmailLog::create([
+                'tiers_id' => $participant->tiers_id,
+                'participant_id' => $participant->id,
+                'operation_id' => $participant->operation_id,
+                'categorie' => 'formulaire',
+                'email_template_id' => $template?->id,
+                'destinataire_email' => $email,
+                'destinataire_nom' => $destinataireNom,
+                'objet' => $template?->objet ?? 'Formulaire à compléter — '.($participant->operation?->nom ?? ''),
+                'statut' => 'erreur',
+                'erreur_message' => $e->getMessage(),
+                'envoye_par' => Auth::id(),
+            ]);
+
             $this->tokenEmailMessage = 'Erreur lors de l\'envoi : '.$e->getMessage();
             $this->tokenEmailType = 'danger';
         }
