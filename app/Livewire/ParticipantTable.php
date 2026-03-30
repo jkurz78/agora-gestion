@@ -51,6 +51,15 @@ final class ParticipantTable extends Component
 
     public ?int $editParticipantId = null;
 
+    public ?Participant $editParticipant = null;
+
+    // Tiers mapping — selected IDs for the three contact blocks
+    public ?int $mapAdresseParTiersId = null;
+
+    public ?int $mapMedecinTiersId = null;
+
+    public ?int $mapTherapeuteTiersId = null;
+
     public string $editNom = '';
 
     public string $editPrenom = '';
@@ -318,6 +327,13 @@ final class ParticipantTable extends Component
         $this->editDocuments = Auth::user()?->peut_voir_donnees_sensibles
             ? $this->getParticipantDocuments($participant->id)
             : [];
+
+        $this->editParticipant = $participant;
+
+        // Reset mapping selectors
+        $this->mapAdresseParTiersId = null;
+        $this->mapMedecinTiersId = null;
+        $this->mapTherapeuteTiersId = null;
 
         $this->showEditModal = true;
     }
@@ -645,6 +661,127 @@ final class ParticipantTable extends Component
                 ->where('tiers_id', $participant->tiers_id)
                 ->forExercice($exercice))
             ->exists();
+    }
+
+    // ── Mapping Tiers methods ──────────────────────────────────
+
+    public function mapAdresseParTiers(): void
+    {
+        if ($this->mapAdresseParTiersId === null) {
+            return;
+        }
+        $this->editingParticipant()->update(['refere_par_id' => $this->mapAdresseParTiersId]);
+        $this->dispatch('notify', message: 'Tiers associé au prescripteur.');
+        $this->openEditModal($this->editParticipantId);
+    }
+
+    public function createAdresseParTiers(): void
+    {
+        $p = $this->editingParticipant();
+        $tiers = Tiers::create([
+            'nom' => $p->adresse_par_nom,
+            'prenom' => $p->adresse_par_prenom,
+            'entreprise' => $p->adresse_par_etablissement,
+            'telephone' => $p->adresse_par_telephone,
+            'email' => $p->adresse_par_email,
+            'adresse_ligne1' => $p->adresse_par_adresse,
+            'code_postal' => $p->adresse_par_code_postal,
+            'ville' => $p->adresse_par_ville,
+            'type' => 'particulier',
+        ]);
+        $p->update(['refere_par_id' => $tiers->id]);
+        $this->dispatch('notify', message: 'Tiers créé et associé.');
+        $this->openEditModal($this->editParticipantId);
+    }
+
+    public function unlinkAdresseParTiers(): void
+    {
+        $this->editingParticipant()->update(['refere_par_id' => null]);
+        $this->dispatch('notify', message: 'Association supprimée.');
+        $this->openEditModal($this->editParticipantId);
+    }
+
+    public function mapMedecinTiers(): void
+    {
+        if ($this->mapMedecinTiersId === null) {
+            return;
+        }
+        $this->editingParticipant()->update(['medecin_tiers_id' => $this->mapMedecinTiersId]);
+        $this->dispatch('notify', message: 'Tiers associé au médecin traitant.');
+        $this->openEditModal($this->editParticipantId);
+    }
+
+    public function createMedecinTiers(): void
+    {
+        $p = $this->editingParticipant();
+        $med = $p->donneesMedicales;
+        if ($med === null) {
+            return;
+        }
+        $tiers = Tiers::create([
+            'nom' => $med->medecin_nom,
+            'prenom' => $med->medecin_prenom,
+            'telephone' => $med->medecin_telephone,
+            'email' => $med->medecin_email,
+            'adresse_ligne1' => $med->medecin_adresse,
+            'code_postal' => $med->medecin_code_postal,
+            'ville' => $med->medecin_ville,
+            'type' => 'particulier',
+        ]);
+        $p->update(['medecin_tiers_id' => $tiers->id]);
+        $this->dispatch('notify', message: 'Tiers créé et associé au médecin.');
+        $this->openEditModal($this->editParticipantId);
+    }
+
+    public function unlinkMedecinTiers(): void
+    {
+        $this->editingParticipant()->update(['medecin_tiers_id' => null]);
+        $this->dispatch('notify', message: 'Association supprimée.');
+        $this->openEditModal($this->editParticipantId);
+    }
+
+    public function mapTherapeuteTiers(): void
+    {
+        if ($this->mapTherapeuteTiersId === null) {
+            return;
+        }
+        $this->editingParticipant()->update(['therapeute_tiers_id' => $this->mapTherapeuteTiersId]);
+        $this->dispatch('notify', message: 'Tiers associé au thérapeute.');
+        $this->openEditModal($this->editParticipantId);
+    }
+
+    public function createTherapeuteTiers(): void
+    {
+        $p = $this->editingParticipant();
+        $med = $p->donneesMedicales;
+        if ($med === null) {
+            return;
+        }
+        $tiers = Tiers::create([
+            'nom' => $med->therapeute_nom,
+            'prenom' => $med->therapeute_prenom,
+            'telephone' => $med->therapeute_telephone,
+            'email' => $med->therapeute_email,
+            'adresse_ligne1' => $med->therapeute_adresse,
+            'code_postal' => $med->therapeute_code_postal,
+            'ville' => $med->therapeute_ville,
+            'type' => 'particulier',
+        ]);
+        $p->update(['therapeute_tiers_id' => $tiers->id]);
+        $this->dispatch('notify', message: 'Tiers créé et associé au thérapeute.');
+        $this->openEditModal($this->editParticipantId);
+    }
+
+    public function unlinkTherapeuteTiers(): void
+    {
+        $this->editingParticipant()->update(['therapeute_tiers_id' => null]);
+        $this->dispatch('notify', message: 'Association supprimée.');
+        $this->openEditModal($this->editParticipantId);
+    }
+
+    private function editingParticipant(): Participant
+    {
+        return Participant::findOrFail($this->editParticipantId);
     }
 
     // ── Helpers ────────────────────────────────────────────────
