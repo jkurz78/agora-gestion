@@ -224,7 +224,7 @@
                         @endforeach
                     </tr>
                     <tr style="background:#f8f8f8;font-size:12px">
-                        <td style="position:sticky;left:0;z-index:1;background:#f8f8f8;color:#888">Feuilles de présence</td>
+                        <td style="position:sticky;left:0;z-index:1;background:#f8f8f8;color:#888">Feuilles d'émargement</td>
                         @foreach($seances as $seance)
                             <td style="text-align:center">
                                 <a href="{{ route('gestion.operations.seances.emargement-pdf', [$operation, $seance]) }}"
