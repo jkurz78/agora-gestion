@@ -162,18 +162,18 @@
 
     @php
         $options = [
-            DroitImage::UsagePropre        => 'Je donne mon accord pour la prise de photos/vidéos me concernant pour mon usage propre',
-            DroitImage::UsageConfidentiel  => 'Je donne mon accord pour la prise de photos/vidéos me concernant et pour un usage confidentiel au sein de l\'équipe '.$qualificatif,
-            DroitImage::Diffusion          => 'Je donne mon accord pour la prise de photos/vidéos me concernant et pour une diffusion',
-            DroitImage::Refus              => 'Je ne donne pas mon accord pour la prise de photos/vidéos',
+            ['enum' => DroitImage::UsagePropre,       'label' => 'Je donne mon accord pour la prise de photos/vidéos me concernant pour mon usage propre'],
+            ['enum' => DroitImage::UsageConfidentiel, 'label' => 'Je donne mon accord pour la prise de photos/vidéos me concernant et pour un usage confidentiel au sein de l\'équipe '.$qualificatif],
+            ['enum' => DroitImage::Diffusion,         'label' => 'Je donne mon accord pour la prise de photos/vidéos me concernant et pour une diffusion'],
+            ['enum' => DroitImage::Refus,             'label' => 'Je ne donne pas mon accord pour la prise de photos/vidéos'],
         ];
     @endphp
 
-    @foreach($options as $value => $label)
-        @php $selected = ($choix === $value); @endphp
+    @foreach($options as $option)
+        @php $selected = ($choix === $option['enum']); @endphp
         <div class="choice-row {{ $selected ? 'choice-selected' : 'choice-unselected' }}">
             <span class="choice-bullet">{{ $selected ? '●' : '○' }}</span>
-            {!! $selected ? '<strong>'.$label.'</strong>' : $label !!}
+            {!! $selected ? '<strong>'.$option['label'].'</strong>' : $option['label'] !!}
         </div>
     @endforeach
 
