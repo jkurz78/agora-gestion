@@ -18,6 +18,7 @@ La modale d'édition existante dans ParticipantTable est enrichie avec des ongle
 | **Coordonnées** | Toujours | Nom, prénom, tel, email, adresse, CP, ville |
 | **Parcours** | `formulaire_parcours_therapeutique` + permission données sensibles | NJF, nationalité, date naissance, sexe, taille, poids, notes médicales, médecin, thérapeute — chacun avec bouton mapping Tiers |
 | **Adressé par** | `formulaire_prescripteur` | Établissement, nom, prénom, tel, email, adresse, CP, ville + bouton mapping Tiers |
+| **Notes** | `formulaire_parcours_therapeutique` + permission données sensibles | Textarea haute (min 15 rows) pour les notes médicales, éditable. Remplace la modale notes existante. |
 | **Engagements** | `formulaire_parcours_therapeutique` ou `formulaire_droit_image` | Récap des choix : présence, certificat, règlement, RGPD, autorisation contact, droit image, mode/moyen paiement, date soumission |
 | **Documents** | `formulaire_parcours_therapeutique` + permission données sensibles | Liste des fichiers uploadés avec lien de téléchargement |
 
