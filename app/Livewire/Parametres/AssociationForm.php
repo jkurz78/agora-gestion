@@ -30,6 +30,10 @@ final class AssociationForm extends Component
 
     public ?string $logo_path = null;
 
+    public $cachet = null;
+
+    public ?string $cachet_signature_path = null;
+
     public function mount(): void
     {
         $association = Association::find(1);
@@ -41,6 +45,7 @@ final class AssociationForm extends Component
             $this->email = $association->email ?? '';
             $this->telephone = $association->telephone ?? '';
             $this->logo_path = $association->logo_path;
+            $this->cachet_signature_path = $association->cachet_signature_path;
         }
     }
 
@@ -54,6 +59,7 @@ final class AssociationForm extends Component
             'email' => ['nullable', 'email', 'max:255'],
             'telephone' => ['nullable', 'string', 'max:30'],
             'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
+            'cachet' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
         ]);
 
         $data = [
@@ -85,6 +91,25 @@ final class AssociationForm extends Component
             $this->logo = null;
         }
 
+        if ($this->cachet !== null) {
+            $extension = $this->cachet->extension();
+            $path = Storage::disk('public')->putFileAs('association', $this->cachet, 'cachet.'.$extension);
+
+            if ($path === false) {
+                $this->addError('cachet', 'Impossible de sauvegarder le cachet.');
+
+                return;
+            }
+
+            if ($this->cachet_signature_path !== null && $this->cachet_signature_path !== $path && Storage::disk('public')->exists($this->cachet_signature_path)) {
+                Storage::disk('public')->delete($this->cachet_signature_path);
+            }
+
+            $data['cachet_signature_path'] = $path;
+            $this->cachet_signature_path = $path;
+            $this->cachet = null;
+        }
+
         // Direct assignment pattern (id not in fillable)
         $association = Association::find(1) ?? new Association;
         $association->id = 1;
@@ -100,6 +125,11 @@ final class AssociationForm extends Component
             $logoUrl = Storage::disk('public')->url($this->logo_path);
         }
 
-        return view('livewire.parametres.association-form', ['logoUrl' => $logoUrl]);
+        $cachetUrl = null;
+        if ($this->cachet_signature_path !== null && Storage::disk('public')->exists($this->cachet_signature_path)) {
+            $cachetUrl = Storage::disk('public')->url($this->cachet_signature_path);
+        }
+
+        return view('livewire.parametres.association-form', ['logoUrl' => $logoUrl, 'cachetUrl' => $cachetUrl]);
     }
 }

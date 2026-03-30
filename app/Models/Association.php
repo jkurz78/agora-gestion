@@ -18,6 +18,7 @@ final class Association extends Model
         'email',
         'telephone',
         'logo_path',
+        'cachet_signature_path',
     ];
 
     protected function casts(): array
@@ -31,6 +32,7 @@ final class Association extends Model
             'email' => 'string',
             'telephone' => 'string',
             'logo_path' => 'string',
+            'cachet_signature_path' => 'string',
         ];
     }
 }

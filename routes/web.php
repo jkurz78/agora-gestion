@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Espace;
+use App\Http\Controllers\AttestationPresencePdfController;
 use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
@@ -114,6 +115,10 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
             ->name('operations.seances.emargement-pdf');
         Route::get('/operations/{operation}/seances/export', SeanceExportController::class)
             ->name('operations.seances.export');
+        Route::get('/operations/{operation}/seances/{seance}/attestation-pdf', [AttestationPresencePdfController::class, 'seance'])
+            ->name('operations.seances.attestation-pdf');
+        Route::get('/operations/{operation}/participants/{participant}/attestation-recap-pdf', [AttestationPresencePdfController::class, 'recap'])
+            ->name('operations.participants.attestation-recap-pdf');
 
         // Participant documents
         Route::get('/participants/{participant}/documents/{filename}', ParticipantDocumentController::class)
