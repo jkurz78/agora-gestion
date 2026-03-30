@@ -27,7 +27,7 @@
             <option value="">— Tous les types —</option>
             @foreach ($typeOperations as $type)
                 <option value="{{ $type->id }}" @selected($typeOperationId === $type->id)>
-                    {{ $type->code }} — {{ $type->nom }}
+                    {{ $type->nom }}
                 </option>
             @endforeach
         </select>
@@ -44,20 +44,18 @@
             <table class="table table-striped table-hover mb-0" id="opsTable">
                 <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                     <tr>
-                        <th data-col="0" style="cursor:pointer;user-select:none;">Code <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon0"></i></th>
-                        <th data-col="1" style="cursor:pointer;user-select:none;">Nom <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon1"></i></th>
-                        <th data-col="2" style="cursor:pointer;user-select:none;">Type <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon2"></i></th>
-                        <th data-col="3" style="cursor:pointer;user-select:none;">Date début <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon3"></i></th>
-                        <th data-col="4" style="cursor:pointer;user-select:none;">Date fin <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon4"></i></th>
-                        <th data-col="5" style="cursor:pointer;user-select:none;">Séances <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon5"></i></th>
-                        <th data-col="6" style="cursor:pointer;user-select:none;">Statut <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon6"></i></th>
+                        <th data-col="0" style="cursor:pointer;user-select:none;">Nom <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon0"></i></th>
+                        <th data-col="1" style="cursor:pointer;user-select:none;">Type <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon1"></i></th>
+                        <th data-col="2" style="cursor:pointer;user-select:none;">Date début <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon2"></i></th>
+                        <th data-col="3" style="cursor:pointer;user-select:none;">Date fin <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon3"></i></th>
+                        <th data-col="4" style="cursor:pointer;user-select:none;">Séances <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon4"></i></th>
+                        <th data-col="5" style="cursor:pointer;user-select:none;">Statut <i class="bi bi-arrow-down-up text-secondary" id="opsSortIcon5"></i></th>
                         <th style="width: 150px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($operations as $operation)
                         <tr>
-                            <td>{{ $operation->code }}</td>
                             <td>{{ $operation->nom }}</td>
                             <td data-sort="{{ $operation->typeOperation?->nom ?? '' }}">
                                 @if ($operation->typeOperation)
@@ -85,7 +83,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-muted">Aucune opération enregistrée.</td>
+                            <td colspan="7" class="text-muted">Aucune opération enregistrée.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -96,7 +94,7 @@
     <script>
     (function () {
         var sortState = { col: null, dir: 'asc' };
-        var numCols = 7;
+        var numCols = 6;
 
         document.querySelectorAll('#opsTable thead th[data-col]').forEach(function (th) {
             th.addEventListener('click', function () {
