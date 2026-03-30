@@ -10,6 +10,7 @@ use App\Http\Controllers\FormulaireController;
 use App\Http\Controllers\OperationController;
 use App\Http\Controllers\ParticipantDocumentController;
 use App\Http\Controllers\ParticipantExportController;
+use App\Http\Controllers\DroitImagePdfController;
 use App\Http\Controllers\ParticipantFichePdfController;
 use App\Http\Controllers\ParticipantPdfController;
 use App\Http\Controllers\RapprochementPdfController;
@@ -105,6 +106,8 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
             ->name('operations.participants.pdf');
         Route::get('/operations/{operation}/participants/{participant}/pdf', ParticipantFichePdfController::class)
             ->name('operations.participants.fiche-pdf');
+        Route::get('/operations/{operation}/participants/{participant}/droit-image-pdf', DroitImagePdfController::class)
+            ->name('operations.participants.droit-image-pdf');
         Route::get('/operations/{operation}/seances/matrice-pdf', [SeancePdfController::class, 'matrice'])
             ->name('operations.seances.matrice-pdf');
         Route::get('/operations/{operation}/seances/{seance}/emargement-pdf', [SeancePdfController::class, 'emargement'])
