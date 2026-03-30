@@ -57,10 +57,16 @@ final class ArticleFr
      */
     public static function contracter(string $texte): string
     {
-        return str_replace(
-            ['à le ', 'à les ', 'de le ', 'de les ', 'À le ', 'À les ', 'De le ', 'De les '],
-            ['au ', 'aux ', 'du ', 'des ', 'Au ', 'Aux ', 'Du ', 'Des '],
-            $texte
-        );
+        // Capture HTML tags between preposition and article, preserve them
+        // "à <strong>le parcours" → "au <strong>parcours"
+        // "de le parcours" → "du parcours"
+        $tags = '((?:<[^>]+>\s*)*)';
+
+        $texte = preg_replace('/\bà\s+'.$tags.'le\s/iu', 'au $1', $texte) ?? $texte;
+        $texte = preg_replace('/\bà\s+'.$tags.'les\s/iu', 'aux $1', $texte) ?? $texte;
+        $texte = preg_replace('/\bde\s+'.$tags.'le\s/iu', 'du $1', $texte) ?? $texte;
+        $texte = preg_replace('/\bde\s+'.$tags.'les\s/iu', 'des $1', $texte) ?? $texte;
+
+        return $texte;
     }
 }
