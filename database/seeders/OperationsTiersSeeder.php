@@ -18,8 +18,8 @@ class OperationsTiersSeeder extends Seeder
         $typeForm = TypeOperation::where('code', 'FORM')->first();
 
         $operations = [
-            ['nom' => 'Parcours 1', 'nombre_seances' => 30, 'statut' => 'en_cours', 'type_operation_id' => $typePsa?->id],
-            ['nom' => 'Parcours 2', 'nombre_seances' => 12, 'statut' => 'en_cours', 'type_operation_id' => $typeForm?->id],
+            ['nom' => 'Parcours 1', 'code' => 'PARC1', 'nombre_seances' => 30, 'statut' => 'en_cours', 'type_operation_id' => $typePsa?->id],
+            ['nom' => 'Parcours 2', 'code' => 'PARC2', 'nombre_seances' => 12, 'statut' => 'en_cours', 'type_operation_id' => $typeForm?->id],
         ];
 
         foreach ($operations as $op) {
