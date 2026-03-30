@@ -125,11 +125,11 @@
                         <tr>
                             <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;font-weight:500;white-space:nowrap;vertical-align:middle;font-size:11px">
                                 {{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}
-                                <button type="button" class="btn btn-link btn-sm p-0 ms-1"
-                                        style="color:#888;text-decoration:none"
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                        style="color:#A9014F;text-decoration:none"
                                         wire:click="$dispatchTo('attestation-modal', 'open-recap-modal', { participantId: {{ $participant->id }} })"
                                         title="Attestation récapitulative">
-                                    <i class="bi bi-file-earmark-text" style="font-size:11px"></i>
+                                    <i class="bi bi-file-earmark-text"></i>
                                 </button>
                             </td>
                             @foreach($seances as $seance)
