@@ -256,7 +256,7 @@
         </div>
     @endforeach
 
-    <div style="margin-top: 8px; font-size: 8px; color: #999; text-align: right;">
+    <div style="position: fixed; bottom: 5mm; right: 10mm; font-size: 8px; color: #999;">
         Généré le {{ now()->format('d/m/Y à H:i') }}
         @if($confidentiel) — <span class="confidentiel-badge">CONFIDENTIEL</span>@endif
     </div>
