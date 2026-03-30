@@ -17,6 +17,7 @@ final class TypeOperation extends Model
     protected $fillable = [
         'code',
         'nom',
+        'libelle_article',
         'description',
         'sous_categorie_id',
         'nombre_seances',

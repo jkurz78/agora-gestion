@@ -59,9 +59,9 @@
                         <tr>
                             <td>{{ $operation->code }}</td>
                             <td>{{ $operation->nom }}</td>
-                            <td data-sort="{{ $operation->typeOperation?->code ?? '' }}">
+                            <td data-sort="{{ $operation->typeOperation?->nom ?? '' }}">
                                 @if ($operation->typeOperation)
-                                    <span class="badge bg-info text-dark">{{ $operation->typeOperation->code }}</span>
+                                    <span class="badge bg-info text-dark">{{ $operation->typeOperation->nom }}</span>
                                 @else
                                     <span class="text-muted">—</span>
                                 @endif
