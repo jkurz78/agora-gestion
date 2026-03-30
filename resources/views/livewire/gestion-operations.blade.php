@@ -14,7 +14,7 @@
         <select class="form-select" style="max-width:250px" wire:model.live="filterTypeId">
             <option value="">— Tous les types —</option>
             @foreach($typeOperations as $type)
-                <option value="{{ $type->id }}">{{ $type->code }} — {{ $type->nom }}</option>
+                <option value="{{ $type->id }}">{{ $type->nom }}</option>
             @endforeach
         </select>
 
