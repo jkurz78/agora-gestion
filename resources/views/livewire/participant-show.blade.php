@@ -109,7 +109,12 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small">Nationalité</label>
-                        <input type="text" wire:model="editNationalite" class="form-control form-control-sm">
+                        <select wire:model="editNationalite" class="form-select form-select-sm">
+                            <option value="">—</option>
+                            @foreach(\App\Helpers\Pays::list() as $pays)
+                                <option value="{{ $pays }}">{{ $pays }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label small">Date de naissance</label>
