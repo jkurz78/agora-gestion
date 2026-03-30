@@ -27,14 +27,12 @@ it('displays the type operations list', function () {
 
     Livewire::test(TypeOperationManager::class)
         ->assertOk()
-        ->assertSee($type->nom)
-        ->assertSee($type->code);
+        ->assertSee($type->nom);
 });
 
 it('creates a type operation with tarifs', function () {
     Livewire::test(TypeOperationManager::class)
         ->call('openCreate')
-        ->set('code', 'YOGA')
         ->set('nom', 'Yoga thérapeutique')
         ->set('sous_categorie_id', $this->sousCategorie->id)
         ->set('nombre_seances', 10)
@@ -50,8 +48,8 @@ it('creates a type operation with tarifs', function () {
         ->call('addTarif')
         ->call('save');
 
-    expect(TypeOperation::where('code', 'YOGA')->exists())->toBeTrue();
-    $type = TypeOperation::where('code', 'YOGA')->first();
+    expect(TypeOperation::where('nom', 'Yoga thérapeutique')->exists())->toBeTrue();
+    $type = TypeOperation::where('nom', 'Yoga thérapeutique')->first();
     expect($type->nom)->toBe('Yoga thérapeutique');
     expect($type->formulaire_parcours_therapeutique)->toBeTrue();
     expect($type->formulaire_actif)->toBeTrue();
@@ -63,28 +61,24 @@ it('creates a type operation with tarifs', function () {
 it('validates required fields', function () {
     Livewire::test(TypeOperationManager::class)
         ->call('openCreate')
-        ->set('code', '')
         ->set('nom', '')
         ->set('sous_categorie_id', '')
         ->call('save')
-        ->assertHasErrors(['code', 'nom', 'sous_categorie_id']);
+        ->assertHasErrors(['nom', 'sous_categorie_id']);
 });
 
 it('edits a type operation', function () {
     $type = TypeOperation::factory()->create([
         'sous_categorie_id' => $this->sousCategorie->id,
-        'code' => 'OLD',
         'nom' => 'Ancien nom',
     ]);
 
     Livewire::test(TypeOperationManager::class)
         ->call('openEdit', $type->id)
-        ->set('code', 'NEW')
         ->set('nom', 'Nouveau nom')
         ->call('save');
 
     $type->refresh();
-    expect($type->code)->toBe('NEW');
     expect($type->nom)->toBe('Nouveau nom');
 });
 
@@ -146,13 +140,12 @@ it('uploads a logo', function () {
 
     Livewire::test(TypeOperationManager::class)
         ->call('openCreate')
-        ->set('code', 'LOGO')
         ->set('nom', 'Test logo')
         ->set('sous_categorie_id', $this->sousCategorie->id)
         ->set('logo', $file)
         ->call('save');
 
-    $type = TypeOperation::where('code', 'LOGO')->first();
+    $type = TypeOperation::where('nom', 'Test logo')->first();
     expect($type->logo_path)->not->toBeNull();
     Storage::disk('public')->assertExists($type->logo_path);
 });
@@ -188,18 +181,16 @@ it('filters by active status', function () {
         ->assertSee('Type inactif test');
 });
 
-it('enforces unique code and nom', function () {
+it('enforces unique nom', function () {
     TypeOperation::factory()->create([
         'sous_categorie_id' => $this->sousCategorie->id,
-        'code' => 'DUPL',
         'nom' => 'Nom dupliqué',
     ]);
 
     Livewire::test(TypeOperationManager::class)
         ->call('openCreate')
-        ->set('code', 'DUPL')
         ->set('nom', 'Nom dupliqué')
         ->set('sous_categorie_id', $this->sousCategorie->id)
         ->call('save')
-        ->assertHasErrors(['code', 'nom']);
+        ->assertHasErrors(['nom']);
 });

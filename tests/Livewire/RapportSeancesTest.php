@@ -20,12 +20,12 @@ afterEach(function () {
 });
 
 it('se rend avec la liste des opérations ayant des séances', function () {
-    $opAvec = Operation::factory()->withSeances(2)->create(['code' => 'FEST', 'nom' => 'Festival']);
-    $opSans = Operation::factory()->create(['nombre_seances' => null, 'code' => 'INVIS', 'nom' => 'Invisible']);
+    $opAvec = Operation::factory()->withSeances(2)->create(['nom' => 'Festival']);
+    $opSans = Operation::factory()->create(['nombre_seances' => null, 'nom' => 'Invisible']);
 
     Livewire::test(RapportSeances::class)
-        ->assertSee('FEST')
-        ->assertDontSee('INVIS');
+        ->assertSee('Festival')
+        ->assertDontSee('Invisible');
 });
 
 it('affiche un message si aucune opération sélectionnée', function () {
