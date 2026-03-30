@@ -213,11 +213,11 @@
                                                     <span class="card-value">
                                                         {{-- mode --}}
                                                         @if($p->mode_paiement_choisi)
-                                                            {{ \App\Enums\ModePaiement::from($p->mode_paiement_choisi)->label() }}
+                                                            {{ $p->mode_paiement_choisi === 'comptant' ? 'Comptant' : 'Par séance' }}
                                                         @endif
                                                         {{-- moyen --}}
                                                         @if($p->moyen_paiement_choisi)
-                                                            @if($p->mode_paiement_choisi) · @endif{{ $p->moyen_paiement_choisi }}
+                                                            @if($p->mode_paiement_choisi) · @endif{{ ucfirst($p->moyen_paiement_choisi) }}
                                                         @endif
                                                         {{-- tarif --}}
                                                         @if($p->typeOperationTarif)
