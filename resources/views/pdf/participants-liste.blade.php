@@ -146,7 +146,13 @@
         </tbody>
     </table>
 
-    <div style="margin-top: 12px; font-size: 8px; color: #999; text-align: right;">
+    @if($showDroitImage)
+    <div style="margin-top: 8px; font-size: 9px; color: #6c757d;">
+        <strong>D.I.</strong> : U = Usage propre · C = Usage confidentiel · D = Diffusion · R = Refus
+    </div>
+    @endif
+
+    <div style="position: fixed; bottom: 5mm; right: 10mm; font-size: 8px; color: #999;">
         Généré le {{ now()->format('d/m/Y à H:i') }}
         @if($confidentiel) — <strong style="color:#A9014F">CONFIDENTIEL</strong>@endif
     </div>
