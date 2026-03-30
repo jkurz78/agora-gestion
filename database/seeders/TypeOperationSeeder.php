@@ -17,7 +17,7 @@ class TypeOperationSeeder extends Seeder
 
         // ── PSA — Parcours de soins A ───────────────────────────────────
         $psa = TypeOperation::firstOrCreate(
-            ['code' => 'PSA'],
+            ['nom' => 'Parcours de soins A'],
             [
                 'nom' => 'Parcours de soins A',
                 'libelle_article' => 'le parcours de soins thérapeutique',
@@ -42,7 +42,7 @@ class TypeOperationSeeder extends Seeder
 
         // ── FORM — Formation ────────────────────────────────────────────
         $form = TypeOperation::firstOrCreate(
-            ['code' => 'FORM'],
+            ['nom' => 'Formation'],
             [
                 'nom' => 'Formation',
                 'libelle_article' => 'la formation',
