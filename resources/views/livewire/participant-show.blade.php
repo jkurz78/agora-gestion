@@ -104,11 +104,6 @@
                 <x-date-input name="editDateInscription" :value="$editDateInscription" wire:model="editDateInscription" />
             </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Référé par</label>
-                <livewire:tiers-autocomplete wire:model="editReferePar" filtre="tous" :key="'show-refere-par-'.$participant->id" />
-            </div>
-
             @if($operation->typeOperation?->tarifs->count())
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Tarif</label>
