@@ -41,6 +41,8 @@ final class TypeOperationManager extends Component
 
     public string $nom = '';
 
+    public string $libelle_article = '';
+
     public string $description = '';
 
     public string $sous_categorie_id = '';
@@ -149,6 +151,7 @@ final class TypeOperationManager extends Component
         $this->editingId = $type->id;
         $this->code = $type->code;
         $this->nom = $type->nom;
+        $this->libelle_article = $type->libelle_article ?? '';
         $this->description = $type->description ?? '';
         $this->sous_categorie_id = (string) $type->sous_categorie_id;
         $this->nombre_seances = $type->nombre_seances !== null ? (string) $type->nombre_seances : '';
@@ -226,6 +229,7 @@ final class TypeOperationManager extends Component
             $data = [
                 'code' => $this->code,
                 'nom' => $this->nom,
+                'libelle_article' => $this->libelle_article !== '' ? $this->libelle_article : null,
                 'description' => $this->description !== '' ? $this->description : null,
                 'sous_categorie_id' => (int) $this->sous_categorie_id,
                 'nombre_seances' => $this->nombre_seances !== '' ? (int) $this->nombre_seances : null,
@@ -550,6 +554,7 @@ final class TypeOperationManager extends Component
         $this->maxVisitedTab = 1;
         $this->code = '';
         $this->nom = '';
+        $this->libelle_article = '';
         $this->description = '';
         $this->sous_categorie_id = '';
         $this->nombre_seances = '';

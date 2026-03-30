@@ -137,7 +137,7 @@
                 <strong>{{ $p->tiers->prenom ?? '' }} {{ $p->tiers->nom ?? '' }}</strong>,
                 a participé à la séance n°{{ $seance->numero }}@if($seance->titre), « {{ $seance->titre }} »@endif
                 du {{ $seance->date ? $seance->date->translatedFormat('j F Y') : 'date non définie' }}
-                dans le cadre de {{ $operation->typeOperation?->nom ?? '' }} <strong>{{ $operation->nom }}</strong>.
+                dans le cadre {{ $operation->typeOperation?->libelle_article ? \App\Helpers\ArticleFr::de($operation->typeOperation->libelle_article) : 'de l\'opération' }} « <strong>{{ $operation->nom }}</strong> ».
             </div>
 
             <div class="signature-block">
@@ -189,7 +189,7 @@
             L'association <strong>{{ $association?->nom ?? '' }}</strong> atteste que
             <strong>{{ $participant->tiers->prenom ?? '' }} {{ $participant->tiers->nom ?? '' }}</strong>,
             a participé aux séances suivantes
-            dans le cadre de {{ $operation->typeOperation?->nom ?? '' }} <strong>{{ $operation->nom }}</strong> :
+            dans le cadre {{ $operation->typeOperation?->libelle_article ? \App\Helpers\ArticleFr::de($operation->typeOperation->libelle_article) : 'de l\'opération' }} « <strong>{{ $operation->nom }}</strong> » :
         </div>
 
         <table class="seance-table">

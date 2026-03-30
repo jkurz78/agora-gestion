@@ -20,6 +20,7 @@ class TypeOperationSeeder extends Seeder
             ['code' => 'PSA'],
             [
                 'nom' => 'Parcours de soins A',
+                'libelle_article' => 'le parcours de soins thérapeutique',
                 'description' => 'Parcours thérapeutique de 30 séances avec médiation animale.',
                 'sous_categorie_id' => $sousParcours->id,
                 'nombre_seances' => 30,
@@ -44,6 +45,7 @@ class TypeOperationSeeder extends Seeder
             ['code' => 'FORM'],
             [
                 'nom' => 'Formation',
+                'libelle_article' => 'la formation',
                 'description' => 'Formation ouverte à tous, 12 séances.',
                 'sous_categorie_id' => $sousFormation->id,
                 'nombre_seances' => 12,
