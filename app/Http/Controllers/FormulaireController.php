@@ -43,10 +43,23 @@ final class FormulaireController extends Controller
         }
 
         $participant = $result['participant'];
-        $participant->load(['tiers', 'operation.typeOperation', 'operation.seances', 'typeOperationTarif', 'donneesMedicales']);
+        $participant->load(['tiers', 'operation.typeOperation', 'operation.seances', 'typeOperationTarif', 'donneesMedicales', 'referePar']);
 
         $operation = $participant->operation;
         $typeOperation = $operation->typeOperation;
+
+        // Pre-fill adresse_par from referePar if text fields are empty
+        if (!$participant->adresse_par_nom && $participant->referePar) {
+            $ref = $participant->referePar;
+            $participant->adresse_par_nom = $ref->nom;
+            $participant->adresse_par_prenom = $ref->prenom;
+            $participant->adresse_par_telephone = $ref->telephone;
+            $participant->adresse_par_email = $ref->email;
+            $participant->adresse_par_adresse = $ref->adresse_ligne1;
+            $participant->adresse_par_code_postal = $ref->code_postal;
+            $participant->adresse_par_ville = $ref->ville;
+            $participant->adresse_par_etablissement = $ref->entreprise;
+        }
 
         return view('formulaire.remplir', [
             'participant' => $participant,
