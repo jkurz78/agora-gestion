@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Models\Operation;
+use App\Models\Participant;
 use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -18,6 +20,9 @@ final class GestionOperations extends Component
 
     #[Url(as: 'type')]
     public ?int $filterTypeId = null;
+
+    #[Url(as: 'participant')]
+    public ?int $selectedParticipantId = null;
 
     public string $activeTab = 'details';
 
@@ -30,6 +35,19 @@ final class GestionOperations extends Component
     public function setTab(string $tab): void
     {
         $this->activeTab = $tab;
+    }
+
+    #[On('open-participant')]
+    public function openParticipant(int $id): void
+    {
+        $this->selectedParticipantId = $id;
+        $this->activeTab = 'participants';
+    }
+
+    #[On('close-participant')]
+    public function closeParticipant(): void
+    {
+        $this->selectedParticipantId = null;
     }
 
     public function render(): View
@@ -74,6 +92,17 @@ final class GestionOperations extends Component
             ? Operation::find($this->selectedOperationId)
             : null;
 
+        $selectedParticipant = null;
+        if ($this->selectedParticipantId && $selectedOperation) {
+            $selectedParticipant = Participant::where('operation_id', $selectedOperation->id)
+                ->find($this->selectedParticipantId);
+            if ($selectedParticipant) {
+                $this->activeTab = 'participants';
+            } else {
+                $this->selectedParticipantId = null;
+            }
+        }
+
         $totalDepenses = 0;
         $totalRecettes = 0;
         $totalDons = 0;
@@ -100,6 +129,7 @@ final class GestionOperations extends Component
             'hasMissingTypes' => $hasMissingTypes,
             'typeOperations' => $typeOperations,
             'selectedOperation' => $selectedOperation,
+            'selectedParticipant' => $selectedParticipant,
             'totalDepenses' => $totalDepenses,
             'totalRecettes' => $totalRecettes,
             'totalDons' => $totalDons,

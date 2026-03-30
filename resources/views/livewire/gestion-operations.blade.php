@@ -138,7 +138,15 @@
     @endif
 
     @if($activeTab === 'participants')
-        <livewire:participant-table :operation="$selectedOperation" :key="'pt-'.$selectedOperation->id" />
+        @if($selectedParticipant)
+            <livewire:participant-show
+                :operation="$selectedOperation"
+                :participant="$selectedParticipant"
+                :key="'ps-'.$selectedParticipant->id"
+            />
+        @else
+            <livewire:participant-table :operation="$selectedOperation" :key="'pt-'.$selectedOperation->id" />
+        @endif
     @endif
 
     @if($activeTab === 'seances')
