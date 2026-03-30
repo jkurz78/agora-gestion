@@ -29,7 +29,6 @@ it('can list operations', function () {
 it('can store an operation with valid data', function () {
     $this->actingAs($this->user)
         ->post(route('compta.operations.store'), [
-            'code' => 'FETE-2025',
             'nom' => 'Fête annuelle',
             'description' => 'Organisation de la fête',
             'date_debut' => '2025-06-01',
@@ -94,7 +93,6 @@ it('can update an operation', function () {
 
     $this->actingAs($this->user)
         ->put(route('compta.operations.update', $operation), [
-            'code' => $operation->code,
             'nom' => 'Nouveau nom',
             'statut' => 'cloturee',
             'date_debut' => $operation->date_debut->toDateString(),
