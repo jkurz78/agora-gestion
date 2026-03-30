@@ -149,7 +149,7 @@
                         <td>{{ $p->droit_image ? mb_substr($p->droit_image->label(), 0, 1) : '' }}</td>
                     @endif
                     @if($confidentiel)
-                        <td>{{ $p->mode_paiement_choisi ? \App\Enums\ModePaiement::from($p->mode_paiement_choisi)->trigramme() : '' }}</td>
+                        <td>{{ $p->mode_paiement_choisi === 'comptant' ? 'CPT' : ($p->mode_paiement_choisi === 'par_seance' ? 'SÉA' : '') }}</td>
                     @endif
                 </tr>
             @endforeach

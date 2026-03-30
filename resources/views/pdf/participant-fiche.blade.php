@@ -428,13 +428,13 @@
                         @if($showParcours && $participant->mode_paiement_choisi)
                             <span class="field-row">
                                 <span class="field-label">Mode paiement</span>
-                                <span class="field-value">{{ $participant->mode_paiement_choisi }}</span>
+                                <span class="field-value">{{ $participant->mode_paiement_choisi === 'comptant' ? 'Comptant' : 'Par séance' }}</span>
                             </span>
                         @endif
                         @if($showParcours && $participant->moyen_paiement_choisi)
                             <span class="field-row">
                                 <span class="field-label">Moyen paiement</span>
-                                <span class="field-value">{{ $participant->moyen_paiement_choisi }}</span>
+                                <span class="field-value">{{ ucfirst($participant->moyen_paiement_choisi) }}</span>
                             </span>
                         @endif
                         @if($showParcours && $participant->typeOperationTarif)
