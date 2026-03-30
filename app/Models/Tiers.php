@@ -57,4 +57,9 @@ final class Tiers extends Model
     {
         return $this->hasMany(Participant::class);
     }
+
+    public function emailLogs(): HasMany
+    {
+        return $this->hasMany(EmailLog::class);
+    }
 }

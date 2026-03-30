@@ -104,6 +104,11 @@ final class Participant extends Model
         return $this->hasOne(FormulaireToken::class);
     }
 
+    public function emailLogs(): HasMany
+    {
+        return $this->hasMany(EmailLog::class);
+    }
+
     protected static function booted(): void
     {
         self::deleting(function (Participant $participant) {
