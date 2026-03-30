@@ -184,7 +184,7 @@
         </div>
     @endif
 
-    <div style="margin-top: 10px; font-size: 9px; color: #bbb; text-align: right;">
+    <div style="position: fixed; bottom: 5mm; right: 10mm; font-size: 8px; color: #bbb;">
         Généré le {{ now()->format('d/m/Y à H:i') }}
     </div>
 </body>

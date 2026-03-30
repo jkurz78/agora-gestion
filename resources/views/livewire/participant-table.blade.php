@@ -78,7 +78,7 @@
     </div>
 
     {{-- Table --}}
-    <div class="table-responsive" style="overflow-x: auto; overflow-y: visible;">
+    <div class="table-responsive">
         <table class="table table-sm table-striped table-hover" id="participant-table">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
@@ -370,25 +370,14 @@
                                         title="Modifier">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-display="static" title="PDF">
-                                        <i class="bi bi-printer"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li>
-                                            <a class="dropdown-item" href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $p]) }}" target="_blank">
-                                                <i class="bi bi-file-person me-2"></i>Fiche participant
-                                            </a>
-                                        </li>
-                                        @if($operation->typeOperation?->formulaire_droit_image && $p->droit_image)
-                                        <li>
-                                            <a class="dropdown-item" href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $p]) }}" target="_blank">
-                                                <i class="bi bi-camera me-2"></i>Autorisation photo
-                                            </a>
-                                        </li>
-                                        @endif
-                                    </ul>
-                                </div>
+                                <a class="btn btn-sm btn-outline-info" href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $p]) }}" target="_blank" title="Fiche PDF">
+                                    <i class="bi bi-file-person"></i>
+                                </a>
+                                @if($operation->typeOperation?->formulaire_droit_image && $p->droit_image)
+                                <a class="btn btn-sm btn-outline-info" href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $p]) }}" target="_blank" title="Autorisation photo">
+                                    <i class="bi bi-camera"></i>
+                                </a>
+                                @endif
                                 <button class="btn btn-sm btn-outline-danger"
                                         wire:click="removeParticipant({{ $p->id }})"
                                         wire:confirm="Supprimer ce participant ?"
