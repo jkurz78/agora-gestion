@@ -26,7 +26,7 @@
             font-size: 16px;
             font-weight: 600;
             color: #333;
-            margin: 24px 0 20px 0;
+            margin: 50px 0 40px 0;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -34,7 +34,7 @@
         .attestation-body {
             font-size: 12px;
             line-height: 1.8;
-            margin: 20px 10px;
+            margin: 40px 10px;
             text-align: justify;
         }
 
@@ -68,7 +68,7 @@
         }
 
         .signature-block {
-            margin-top: 40px;
+            margin-top: 60px;
             margin-left: 8cm;
             font-size: 12px;
             line-height: 1.8;
