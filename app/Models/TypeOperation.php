@@ -20,23 +20,31 @@ final class TypeOperation extends Model
         'description',
         'sous_categorie_id',
         'nombre_seances',
-        'confidentiel',
         'reserve_adherents',
         'actif',
         'logo_path',
         'email_from',
         'email_from_name',
         'attestation_medicale_path',
+        'formulaire_actif',
+        'formulaire_prescripteur',
+        'formulaire_parcours_therapeutique',
+        'formulaire_droit_image',
+        'formulaire_prescripteur_titre',
+        'formulaire_qualificatif_atelier',
     ];
 
     protected function casts(): array
     {
         return [
-            'confidentiel' => 'boolean',
             'reserve_adherents' => 'boolean',
             'actif' => 'boolean',
             'nombre_seances' => 'integer',
             'sous_categorie_id' => 'integer',
+            'formulaire_actif' => 'boolean',
+            'formulaire_prescripteur' => 'boolean',
+            'formulaire_parcours_therapeutique' => 'boolean',
+            'formulaire_droit_image' => 'boolean',
         ];
     }
 
