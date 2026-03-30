@@ -331,7 +331,7 @@
                             <input type="text" wire:model="email_from_name" class="form-control form-control-sm" placeholder="Nom expéditeur">
                         </div>
                         <div class="col-md-6">
-                            <input type="email" wire:model.live.debounce.500ms="email_from"
+                            <input type="email" wire:model.blur="email_from"
                                    class="form-control form-control-sm @error('email_from') is-invalid @enderror"
                                    placeholder="adresse@exemple.fr">
                             @error('email_from') <div class="invalid-feedback">{{ $message }}</div> @enderror
@@ -400,7 +400,7 @@
                         {{-- z-index TinyMCE dropdowns above modal --}}
                         <style>.tox-tinymce-aux { z-index: 2100 !important; }</style>
                         <div wire:key="tinymce-{{ $emailSubTab }}-{{ $tplData['is_default'] ? 'ro' : 'rw' }}"
-                             wire:ignore.self
+                             wire:ignore
                              x-data="tinymceEditor('{{ $emailSubTab }}', {{ $tplData['is_default'] ? 'true' : 'false' }})"
                              x-init="init()">
                             <textarea x-ref="editor">{!! $tplData['corps'] !!}</textarea>
@@ -639,6 +639,9 @@
 
             init() {
                 this.$nextTick(() => this.setup());
+
+                // Clean up TinyMCE when Alpine component is destroyed
+                this.$cleanup(() => this.destroy());
             },
 
             setup() {
