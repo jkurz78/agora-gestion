@@ -37,26 +37,26 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <span class="text-muted">{{ $participants->count() }} participants</span>
         <div class="d-flex gap-2">
-            <div class="dropdown" x-data="{ confidentiel: false }">
+            <div class="dropdown" x-data="{ sensible: false }">
                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                     <i class="bi bi-download"></i> Exporter
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" style="min-width:240px">
                     <li class="dropdown-header small text-muted">Excel</li>
                     <li>
-                        <a class="dropdown-item" :href="'{{ route('gestion.operations.participants.export', $operation) }}' + (confidentiel ? '?confidentiel=1' : '')">
+                        <a class="dropdown-item" :href="'{{ route('gestion.operations.participants.export', $operation) }}' + (sensible ? '?confidentiel=1' : '')">
                             <i class="bi bi-file-earmark-spreadsheet me-2"></i>Télécharger .xlsx
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li class="dropdown-header small text-muted">PDF</li>
                     <li>
-                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'liste']) }}' + (confidentiel ? '&confidentiel=1' : '')">
+                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'liste']) }}' + (sensible ? '&confidentiel=1' : '')">
                             <i class="bi bi-list-ul me-2"></i>Liste
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'annuaire']) }}' + (confidentiel ? '&confidentiel=1' : '')">
+                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'annuaire']) }}' + (sensible ? '&confidentiel=1' : '')">
                             <i class="bi bi-person-vcard me-2"></i>Annuaire
                         </a>
                     </li>
@@ -64,7 +64,7 @@
                         <li><hr class="dropdown-divider"></li>
                         <li class="px-3 py-1">
                             <div class="form-check mb-0">
-                                <input type="checkbox" class="form-check-input" id="exportConfidentiel" x-model="confidentiel">
+                                <input type="checkbox" class="form-check-input" id="exportConfidentiel" x-model="sensible">
                                 <label class="form-check-label small" for="exportConfidentiel">Données confidentielles</label>
                             </div>
                         </li>
@@ -91,7 +91,7 @@
                     @if($operation->typeOperation?->tarifs->count())
                         <th class="sortable" data-col="tarif" style="cursor:pointer">Tarif <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     @endif
-                    @if($canSeeSensible && $operation->typeOperation?->confidentiel)
+                    @if($canSeeSensible && $operation->typeOperation?->formulaire_parcours_therapeutique)
                         <th class="sortable" data-col="date_naissance" style="cursor:pointer">Date naissance <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                         <th class="sortable" data-col="age" style="cursor:pointer">Âge <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                         <th class="sortable" data-col="sexe" style="cursor:pointer">Sexe <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
@@ -99,10 +99,10 @@
                         <th class="sortable" data-col="poids" style="cursor:pointer">Poids <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     @endif
                     <th class="sortable" data-col="refere_par" style="cursor:pointer">Référé par <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    @if($canSeeSensible && $operation->typeOperation?->confidentiel)
+                    @if($canSeeSensible && $operation->typeOperation?->formulaire_parcours_therapeutique)
                         <th>Notes</th>
                     @endif
-                    @if($operation->typeOperation?->confidentiel)
+                    @if($operation->typeOperation?->formulaire_actif)
                         <th class="text-center">Formulaire</th>
                     @endif
                     <th class="text-end">Actions</th>
@@ -215,7 +215,7 @@
                             </td>
                         @endif
 
-                        @if($canSeeSensible && $operation->typeOperation?->confidentiel)
+                        @if($canSeeSensible && $operation->typeOperation?->formulaire_parcours_therapeutique)
                             @php $med = $p->donneesMedicales; @endphp
 
                             {{-- Date naissance --}}
@@ -324,7 +324,7 @@
                         </td>
 
                         {{-- Notes icon --}}
-                        @if($canSeeSensible && $operation->typeOperation?->confidentiel)
+                        @if($canSeeSensible && $operation->typeOperation?->formulaire_parcours_therapeutique)
                             <td class="small text-center" style="position:relative">
                                 @php $hasNotes = $p->donneesMedicales?->notes; @endphp
                                 <span class="notes-preview-wrap">
@@ -340,7 +340,7 @@
                         @endif
 
                         {{-- Formulaire badge --}}
-                        @if($operation->typeOperation?->confidentiel)
+                        @if($operation->typeOperation?->formulaire_actif)
                         <td class="text-center small">
                             @if ($p->formulaireToken === null)
                                 <button wire:click="genererToken({{ $p->id }})" class="btn btn-sm btn-outline-secondary" title="Générer un lien">

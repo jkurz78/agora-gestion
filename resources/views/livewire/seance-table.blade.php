@@ -109,7 +109,7 @@
                             <td style="background:#f0f0f0;padding:2px 0;font-size:12px;color:#888">
                                 <div class="d-flex">
                                     <span style="flex:1;text-align:center">Présence</span>
-                                    @if($operation->typeOperation?->confidentiel)
+                                    @if($operation->typeOperation?->formulaire_parcours_therapeutique)
                                         <span style="width:40px;text-align:center;border-left:1px solid #ddd">Kiné</span>
                                     @endif
                                 </div>
@@ -149,7 +149,7 @@
                                                 @endforeach
                                             </select>
                                         </div>
-                                        @if($operation->typeOperation?->confidentiel)
+                                        @if($operation->typeOperation?->formulaire_parcours_therapeutique)
                                             <div style="width:40px;border-left:1px solid #dee2e6;background:{{ $kineBg }};cursor:pointer;display:flex;align-items:center;justify-content:center"
                                                  onclick="
                                                     var vals = ['', 'oui', 'non'];
