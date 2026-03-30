@@ -128,3 +128,16 @@ it('tiers has emailLogs relationship', function () {
     expect($this->tiers->emailLogs)->toHaveCount(1)
         ->and($this->tiers->emailLogs->first()->categorie)->toBe('formulaire');
 });
+
+it('operation has emailLogs relationship', function () {
+    EmailLog::create([
+        'operation_id' => $this->operation->id,
+        'categorie' => 'formulaire',
+        'destinataire_email' => 'test@example.com',
+        'objet' => 'Test',
+        'statut' => 'envoye',
+    ]);
+
+    expect($this->operation->emailLogs)->toHaveCount(1)
+        ->and($this->operation->emailLogs->first()->categorie)->toBe('formulaire');
+});
