@@ -71,7 +71,7 @@ final class ParticipantTable extends Component
 
     public ?int $editTypeOperationTarifId = null;
 
-    // Medical fields (edit modal)
+    // Medical fields (edit modal — Parcours tab)
     public string $editDateNaissance = '';
 
     public string $editSexe = '';
@@ -79,6 +79,69 @@ final class ParticipantTable extends Component
     public string $editTaille = '';
 
     public string $editPoids = '';
+
+    public string $editNomJeuneFille = '';
+
+    public string $editNationalite = '';
+
+    // Medical: médecin & thérapeute (Parcours tab)
+    public string $editMedecinNom = '';
+
+    public string $editMedecinPrenom = '';
+
+    public string $editMedecinTelephone = '';
+
+    public string $editMedecinEmail = '';
+
+    public string $editMedecinAdresse = '';
+
+    public string $editMedecinCodePostal = '';
+
+    public string $editMedecinVille = '';
+
+    public string $editTherapeuteNom = '';
+
+    public string $editTherapeutePrenom = '';
+
+    public string $editTherapeuteTelephone = '';
+
+    public string $editTherapeuteEmail = '';
+
+    public string $editTherapeuteAdresse = '';
+
+    public string $editTherapeuteCodePostal = '';
+
+    public string $editTherapeuteVille = '';
+
+    // Prescripteur / Adressé par (Adressé par tab)
+    public string $editAdresseParEtablissement = '';
+
+    public string $editAdresseParNom = '';
+
+    public string $editAdresseParPrenom = '';
+
+    public string $editAdresseParTelephone = '';
+
+    public string $editAdresseParEmail = '';
+
+    public string $editAdresseParAdresse = '';
+
+    public string $editAdresseParCodePostal = '';
+
+    public string $editAdresseParVille = '';
+
+    // Engagements (read-only display data)
+    public ?string $editDroitImageLabel = null;
+
+    public ?string $editModePaiement = null;
+
+    public ?string $editMoyenPaiement = null;
+
+    public ?bool $editAutorisationContactMedecin = null;
+
+    public ?string $editRgpdAccepteAt = null;
+
+    public ?string $editFormulaireRempliAt = null;
 
     // ── Notes modal ────────────────────────────────────────────
     public bool $showNotesModal = false;
@@ -188,7 +251,7 @@ final class ParticipantTable extends Component
 
     public function openEditModal(int $participantId): void
     {
-        $participant = Participant::with(['tiers', 'donneesMedicales', 'referePar'])
+        $participant = Participant::with(['tiers', 'donneesMedicales', 'referePar', 'medecinTiers', 'therapeuteTiers', 'formulaireToken'])
             ->findOrFail($participantId);
 
         $this->editParticipantId = $participant->id;
@@ -203,12 +266,53 @@ final class ParticipantTable extends Component
         $this->editReferePar = $participant->refere_par_id;
         $this->editTypeOperationTarifId = $participant->type_operation_tarif_id;
 
-        // Medical data
+        // Medical data (Parcours tab)
         $med = $participant->donneesMedicales;
         $this->editDateNaissance = $med?->date_naissance ?? '';
         $this->editSexe = $med?->sexe ?? '';
         $this->editTaille = $med?->taille ?? '';
         $this->editPoids = $med?->poids ?? '';
+        $this->editNomJeuneFille = $participant->nom_jeune_fille ?? '';
+        $this->editNationalite = $participant->nationalite ?? '';
+
+        // Médecin & Thérapeute (Parcours tab)
+        $this->editMedecinNom = $med?->medecin_nom ?? '';
+        $this->editMedecinPrenom = $med?->medecin_prenom ?? '';
+        $this->editMedecinTelephone = $med?->medecin_telephone ?? '';
+        $this->editMedecinEmail = $med?->medecin_email ?? '';
+        $this->editMedecinAdresse = $med?->medecin_adresse ?? '';
+        $this->editMedecinCodePostal = $med?->medecin_code_postal ?? '';
+        $this->editMedecinVille = $med?->medecin_ville ?? '';
+
+        $this->editTherapeuteNom = $med?->therapeute_nom ?? '';
+        $this->editTherapeutePrenom = $med?->therapeute_prenom ?? '';
+        $this->editTherapeuteTelephone = $med?->therapeute_telephone ?? '';
+        $this->editTherapeuteEmail = $med?->therapeute_email ?? '';
+        $this->editTherapeuteAdresse = $med?->therapeute_adresse ?? '';
+        $this->editTherapeuteCodePostal = $med?->therapeute_code_postal ?? '';
+        $this->editTherapeuteVille = $med?->therapeute_ville ?? '';
+
+        // Adressé par (Prescripteur tab)
+        $this->editAdresseParEtablissement = $participant->adresse_par_etablissement ?? '';
+        $this->editAdresseParNom = $participant->adresse_par_nom ?? '';
+        $this->editAdresseParPrenom = $participant->adresse_par_prenom ?? '';
+        $this->editAdresseParTelephone = $participant->adresse_par_telephone ?? '';
+        $this->editAdresseParEmail = $participant->adresse_par_email ?? '';
+        $this->editAdresseParAdresse = $participant->adresse_par_adresse ?? '';
+        $this->editAdresseParCodePostal = $participant->adresse_par_code_postal ?? '';
+        $this->editAdresseParVille = $participant->adresse_par_ville ?? '';
+
+        // Notes (loaded into medNotes for reuse with saveNotes)
+        $this->medNotes = $med?->notes ?? '';
+        $this->notesParticipantId = $participant->id;
+
+        // Engagements (read-only)
+        $this->editDroitImageLabel = $participant->droit_image?->label();
+        $this->editModePaiement = $participant->mode_paiement_choisi;
+        $this->editMoyenPaiement = $participant->moyen_paiement_choisi;
+        $this->editAutorisationContactMedecin = $participant->autorisation_contact_medecin;
+        $this->editRgpdAccepteAt = $participant->rgpd_accepte_at?->format('d/m/Y à H:i');
+        $this->editFormulaireRempliAt = $participant->formulaireToken?->rempli_at?->format('d/m/Y à H:i');
 
         // Documents (only if user can see sensitive data)
         $this->editDocuments = Auth::user()?->peut_voir_donnees_sensibles
@@ -233,11 +337,21 @@ final class ParticipantTable extends Component
             'email' => $this->editEmail,
         ]);
 
-        // Update participant
+        // Update participant (including prescripteur fields)
         $participant->update([
             'date_inscription' => $this->editDateInscription,
             'refere_par_id' => $this->editReferePar,
             'type_operation_tarif_id' => $this->editTypeOperationTarifId,
+            'nom_jeune_fille' => $this->editNomJeuneFille !== '' ? $this->editNomJeuneFille : null,
+            'nationalite' => $this->editNationalite !== '' ? $this->editNationalite : null,
+            'adresse_par_etablissement' => $this->editAdresseParEtablissement !== '' ? $this->editAdresseParEtablissement : null,
+            'adresse_par_nom' => $this->editAdresseParNom !== '' ? $this->editAdresseParNom : null,
+            'adresse_par_prenom' => $this->editAdresseParPrenom !== '' ? $this->editAdresseParPrenom : null,
+            'adresse_par_telephone' => $this->editAdresseParTelephone !== '' ? $this->editAdresseParTelephone : null,
+            'adresse_par_email' => $this->editAdresseParEmail !== '' ? $this->editAdresseParEmail : null,
+            'adresse_par_adresse' => $this->editAdresseParAdresse !== '' ? $this->editAdresseParAdresse : null,
+            'adresse_par_code_postal' => $this->editAdresseParCodePostal !== '' ? $this->editAdresseParCodePostal : null,
+            'adresse_par_ville' => $this->editAdresseParVille !== '' ? $this->editAdresseParVille : null,
         ]);
 
         // Update medical data if user has permission
@@ -249,6 +363,21 @@ final class ParticipantTable extends Component
                     'sexe' => $this->editSexe !== '' ? $this->editSexe : null,
                     'taille' => $this->editTaille !== '' ? $this->editTaille : null,
                     'poids' => $this->editPoids !== '' ? $this->editPoids : null,
+                    'medecin_nom' => $this->editMedecinNom !== '' ? $this->editMedecinNom : null,
+                    'medecin_prenom' => $this->editMedecinPrenom !== '' ? $this->editMedecinPrenom : null,
+                    'medecin_telephone' => $this->editMedecinTelephone !== '' ? $this->editMedecinTelephone : null,
+                    'medecin_email' => $this->editMedecinEmail !== '' ? $this->editMedecinEmail : null,
+                    'medecin_adresse' => $this->editMedecinAdresse !== '' ? $this->editMedecinAdresse : null,
+                    'medecin_code_postal' => $this->editMedecinCodePostal !== '' ? $this->editMedecinCodePostal : null,
+                    'medecin_ville' => $this->editMedecinVille !== '' ? $this->editMedecinVille : null,
+                    'therapeute_nom' => $this->editTherapeuteNom !== '' ? $this->editTherapeuteNom : null,
+                    'therapeute_prenom' => $this->editTherapeutePrenom !== '' ? $this->editTherapeutePrenom : null,
+                    'therapeute_telephone' => $this->editTherapeuteTelephone !== '' ? $this->editTherapeuteTelephone : null,
+                    'therapeute_email' => $this->editTherapeuteEmail !== '' ? $this->editTherapeuteEmail : null,
+                    'therapeute_adresse' => $this->editTherapeuteAdresse !== '' ? $this->editTherapeuteAdresse : null,
+                    'therapeute_code_postal' => $this->editTherapeuteCodePostal !== '' ? $this->editTherapeuteCodePostal : null,
+                    'therapeute_ville' => $this->editTherapeuteVille !== '' ? $this->editTherapeuteVille : null,
+                    'notes' => $this->medNotes !== '' ? $this->medNotes : null,
                 ]
             );
         }

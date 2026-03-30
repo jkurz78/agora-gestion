@@ -426,115 +426,382 @@
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════
-         EDIT MODAL
+         EDIT MODAL (tabbed)
          ═══════════════════════════════════════════════════════════ --}}
     @if($showEditModal)
+        @php
+            $typeOp = $operation->typeOperation;
+            $hasParcours = $typeOp?->formulaire_parcours_therapeutique && $canSeeSensible;
+            $hasPrescripteur = (bool) $typeOp?->formulaire_prescripteur;
+            $hasEngagements = $typeOp?->formulaire_parcours_therapeutique || $typeOp?->formulaire_droit_image;
+            $hasDocuments = $canSeeSensible && $typeOp?->formulaire_parcours_therapeutique;
+        @endphp
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2000"
              wire:click.self="$set('showEditModal', false)">
-            <div class="bg-white rounded p-4 shadow" style="width:620px;max-width:95vw;max-height:90vh;overflow-y:auto">
+            <div class="bg-white rounded p-4 shadow" style="max-width:800px;width:95vw;max-height:90vh;overflow-y:auto"
+                 x-data="{ tab: 'coordonnees' }">
                 <h5 class="fw-bold mb-3">Modifier le participant</h5>
 
-                <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label small">Nom</label>
-                        <input type="text" wire:model="editNom" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small">Prénom</label>
-                        <input type="text" wire:model="editPrenom" class="form-control form-control-sm">
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small">Adresse</label>
-                    <input type="text" wire:model="editAdresse" class="form-control form-control-sm">
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label small">Code postal</label>
-                        <input type="text" wire:model="editCodePostal" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-md-8">
-                        <label class="form-label small">Ville</label>
-                        <input type="text" wire:model="editVille" class="form-control form-control-sm">
-                    </div>
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label small">Téléphone</label>
-                        <input type="text" wire:model="editTelephone" class="form-control form-control-sm">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label small">Email</label>
-                        <input type="text" wire:model="editEmail" class="form-control form-control-sm">
-                    </div>
-                </div>
+                {{-- ── Tab navigation ─────────────────────────── --}}
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <a class="nav-link" :class="tab === 'coordonnees' && 'active'" @click.prevent="tab = 'coordonnees'" href="#">Coordonnées</a>
+                    </li>
+                    @if($hasParcours)
+                        <li class="nav-item">
+                            <a class="nav-link" :class="tab === 'parcours' && 'active'" @click.prevent="tab = 'parcours'" href="#">Parcours</a>
+                        </li>
+                    @endif
+                    @if($hasPrescripteur)
+                        <li class="nav-item">
+                            <a class="nav-link" :class="tab === 'prescripteur' && 'active'" @click.prevent="tab = 'prescripteur'" href="#">Adressé par</a>
+                        </li>
+                    @endif
+                    @if($hasParcours)
+                        <li class="nav-item">
+                            <a class="nav-link" :class="tab === 'notes' && 'active'" @click.prevent="tab = 'notes'" href="#">Notes</a>
+                        </li>
+                    @endif
+                    @if($hasEngagements)
+                        <li class="nav-item">
+                            <a class="nav-link" :class="tab === 'engagements' && 'active'" @click.prevent="tab = 'engagements'" href="#">Engagements</a>
+                        </li>
+                    @endif
+                    @if($hasDocuments)
+                        <li class="nav-item">
+                            <a class="nav-link" :class="tab === 'documents' && 'active'" @click.prevent="tab = 'documents'" href="#">Documents</a>
+                        </li>
+                    @endif
+                </ul>
 
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Date d'inscription</label>
-                    <x-date-input name="editDateInscription" :value="$editDateInscription" wire:model="editDateInscription" />
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Référé par</label>
-                    <livewire:tiers-autocomplete wire:model="editReferePar" filtre="tous" :key="'edit-refere-par-'.$editParticipantId" />
-                </div>
-
-                @if($operation->typeOperation?->tarifs->count())
+                {{-- ── Tab: Coordonnées ───────────────────────── --}}
+                <div x-show="tab === 'coordonnees'" x-cloak>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">Nom</label>
+                            <input type="text" wire:model="editNom" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Prénom</label>
+                            <input type="text" wire:model="editPrenom" class="form-control form-control-sm">
+                        </div>
+                    </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Tarif</label>
-                        <select wire:model="editTypeOperationTarifId" class="form-select form-select-sm">
-                            <option value="">— Aucun —</option>
-                            @foreach($operation->typeOperation->tarifs as $tarif)
-                                <option value="{{ $tarif->id }}">{{ $tarif->libelle }} — {{ number_format($tarif->montant, 2, ',', ' ') }} €</option>
-                            @endforeach
-                        </select>
+                        <label class="form-label small">Adresse</label>
+                        <input type="text" wire:model="editAdresse" class="form-control form-control-sm">
                     </div>
-                @endif
-
-                @if($canSeeSensible)
-                    <hr>
-                    <h6 class="fw-bold text-muted mb-3">Données sécurisées</h6>
-
                     <div class="row g-2 mb-3">
                         <div class="col-md-4">
-                            <label class="form-label small">Date naissance</label>
-                            <x-date-input name="editDateNaissance" :value="$editDateNaissance" wire:model="editDateNaissance" />
+                            <label class="form-label small">Code postal</label>
+                            <input type="text" wire:model="editCodePostal" class="form-control form-control-sm">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small">Sexe</label>
-                            <select wire:model="editSexe" class="form-select form-select-sm">
-                                <option value="">—</option>
-                                <option value="F">F</option>
-                                <option value="M">M</option>
+                        <div class="col-md-8">
+                            <label class="form-label small">Ville</label>
+                            <input type="text" wire:model="editVille" class="form-control form-control-sm">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small">Téléphone</label>
+                            <input type="text" wire:model="editTelephone" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Email</label>
+                            <input type="text" wire:model="editEmail" class="form-control form-control-sm">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Date d'inscription</label>
+                        <x-date-input name="editDateInscription" :value="$editDateInscription" wire:model="editDateInscription" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Référé par</label>
+                        <livewire:tiers-autocomplete wire:model="editReferePar" filtre="tous" :key="'edit-refere-par-'.$editParticipantId" />
+                    </div>
+
+                    @if($operation->typeOperation?->tarifs->count())
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Tarif</label>
+                            <select wire:model="editTypeOperationTarifId" class="form-select form-select-sm">
+                                <option value="">— Aucun —</option>
+                                @foreach($operation->typeOperation->tarifs as $tarif)
+                                    <option value="{{ $tarif->id }}">{{ $tarif->libelle }} — {{ number_format($tarif->montant, 2, ',', ' ') }} €</option>
+                                @endforeach
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label small">Taille (cm)</label>
-                            <input type="text" wire:model="editTaille" class="form-control form-control-sm">
+                    @endif
+                </div>
+
+                {{-- ── Tab: Parcours thérapeutique ────────────── --}}
+                @if($hasParcours)
+                    <div x-show="tab === 'parcours'" x-cloak>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small">Nom de jeune fille</label>
+                                <input type="text" wire:model="editNomJeuneFille" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Nationalité</label>
+                                <input type="text" wire:model="editNationalite" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Date de naissance</label>
+                                <x-date-input name="editDateNaissance" :value="$editDateNaissance" wire:model="editDateNaissance" />
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small">Poids (kg)</label>
-                            <input type="text" wire:model="editPoids" class="form-control form-control-sm">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label small">Sexe</label>
+                                <select wire:model="editSexe" class="form-select form-select-sm">
+                                    <option value="">—</option>
+                                    <option value="F">F</option>
+                                    <option value="M">M</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Taille (cm)</label>
+                                <input type="text" wire:model="editTaille" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Poids (kg)</label>
+                                <input type="text" wire:model="editPoids" class="form-control form-control-sm">
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h6 class="fw-bold text-muted mb-3"><i class="bi bi-heart-pulse me-1"></i> Médecin traitant</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small">Nom</label>
+                                <input type="text" wire:model="editMedecinNom" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Prénom</label>
+                                <input type="text" wire:model="editMedecinPrenom" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small">Téléphone</label>
+                                <input type="text" wire:model="editMedecinTelephone" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Email</label>
+                                <input type="text" wire:model="editMedecinEmail" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Adresse</label>
+                            <input type="text" wire:model="editMedecinAdresse" class="form-control form-control-sm">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small">Code postal</label>
+                                <input type="text" wire:model="editMedecinCodePostal" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small">Ville</label>
+                                <input type="text" wire:model="editMedecinVille" class="form-control form-control-sm">
+                            </div>
+                        </div>
+
+                        <hr>
+                        <h6 class="fw-bold text-muted mb-3"><i class="bi bi-person-badge me-1"></i> Thérapeute</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small">Nom</label>
+                                <input type="text" wire:model="editTherapeuteNom" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Prénom</label>
+                                <input type="text" wire:model="editTherapeutePrenom" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small">Téléphone</label>
+                                <input type="text" wire:model="editTherapeuteTelephone" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Email</label>
+                                <input type="text" wire:model="editTherapeuteEmail" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Adresse</label>
+                            <input type="text" wire:model="editTherapeuteAdresse" class="form-control form-control-sm">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small">Code postal</label>
+                                <input type="text" wire:model="editTherapeuteCodePostal" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small">Ville</label>
+                                <input type="text" wire:model="editTherapeuteVille" class="form-control form-control-sm">
+                            </div>
                         </div>
                     </div>
                 @endif
 
-                @if ($canSeeSensible && count($editDocuments) > 0)
-                    <hr>
-                    <h6 class="fw-bold text-muted mb-3">Documents joints</h6>
-                    <ul class="list-group list-group-sm">
-                        @foreach ($editDocuments as $doc)
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <span class="small">{{ $doc['name'] }} ({{ number_format($doc['size'] / 1024, 0) }} Ko)</span>
-                                <a href="{{ $doc['url'] }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-download"></i>
-                                </a>
-                            </li>
-                        @endforeach
-                    </ul>
+                {{-- ── Tab: Adressé par (prescripteur) ────────── --}}
+                @if($hasPrescripteur)
+                    <div x-show="tab === 'prescripteur'" x-cloak>
+                        <div class="mb-3">
+                            <label class="form-label small">Établissement</label>
+                            <input type="text" wire:model="editAdresseParEtablissement" class="form-control form-control-sm">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small">Nom</label>
+                                <input type="text" wire:model="editAdresseParNom" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Prénom</label>
+                                <input type="text" wire:model="editAdresseParPrenom" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small">Téléphone</label>
+                                <input type="text" wire:model="editAdresseParTelephone" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small">Email</label>
+                                <input type="text" wire:model="editAdresseParEmail" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Adresse</label>
+                            <input type="text" wire:model="editAdresseParAdresse" class="form-control form-control-sm">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small">Code postal</label>
+                                <input type="text" wire:model="editAdresseParCodePostal" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small">Ville</label>
+                                <input type="text" wire:model="editAdresseParVille" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                    </div>
                 @endif
 
+                {{-- ── Tab: Notes ─────────────────────────────── --}}
+                @if($hasParcours)
+                    <div x-show="tab === 'notes'" x-cloak>
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Notes médicales sécurisées</label>
+                            <textarea wire:model="medNotes" class="form-control" rows="15" placeholder="Saisir les notes ici..."></textarea>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- ── Tab: Engagements ───────────────────────── --}}
+                @if($hasEngagements)
+                    <div x-show="tab === 'engagements'" x-cloak>
+                        @if($editFormulaireRempliAt)
+                            <div class="alert alert-info py-2 small mb-3">
+                                <i class="bi bi-check-circle-fill me-1"></i>
+                                Formulaire soumis le {{ $editFormulaireRempliAt }}
+                            </div>
+                        @else
+                            <div class="alert alert-secondary py-2 small mb-3">
+                                <i class="bi bi-hourglass me-1"></i>
+                                Formulaire non soumis
+                            </div>
+                        @endif
+
+                        <table class="table table-sm table-borderless">
+                            <tbody>
+                                @if($typeOp?->formulaire_droit_image)
+                                    <tr>
+                                        <td class="text-muted small" style="width:200px">Droit à l'image</td>
+                                        <td class="small">
+                                            @if($editDroitImageLabel)
+                                                {{ $editDroitImageLabel }}
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endif
+                                @if($typeOp?->formulaire_parcours_therapeutique)
+                                    <tr>
+                                        <td class="text-muted small">Mode de paiement</td>
+                                        <td class="small">
+                                            @if($editModePaiement)
+                                                {{ $editModePaiement }}
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted small">Moyen de paiement</td>
+                                        <td class="small">
+                                            @if($editMoyenPaiement)
+                                                {{ $editMoyenPaiement }}
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted small">Autorisation contact médecin</td>
+                                        <td class="small">
+                                            @if($editAutorisationContactMedecin !== null)
+                                                @if($editAutorisationContactMedecin)
+                                                    <i class="bi bi-check-lg text-success"></i> Oui
+                                                @else
+                                                    <i class="bi bi-x-lg text-danger"></i> Non
+                                                @endif
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endif
+                                <tr>
+                                    <td class="text-muted small">RGPD accepté</td>
+                                    <td class="small">
+                                        @if($editRgpdAccepteAt)
+                                            <i class="bi bi-check-lg text-success"></i> {{ $editRgpdAccepteAt }}
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
+                {{-- ── Tab: Documents ─────────────────────────── --}}
+                @if($hasDocuments)
+                    <div x-show="tab === 'documents'" x-cloak>
+                        @if(count($editDocuments) > 0)
+                            <ul class="list-group list-group-sm">
+                                @foreach ($editDocuments as $doc)
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span class="small">{{ $doc['name'] }} ({{ number_format($doc['size'] / 1024, 0) }} Ko)</span>
+                                        <a href="{{ $doc['url'] }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @else
+                            <p class="text-muted text-center py-4">Aucun document joint.</p>
+                        @endif
+                    </div>
+                @endif
+
+                {{-- ── Footer buttons ─────────────────────────── --}}
                 <div class="d-flex gap-2 justify-content-end mt-4">
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showEditModal', false)">Annuler</button>
                     <button type="button" class="btn btn-sm btn-primary" wire:click="saveEdit">
