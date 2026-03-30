@@ -529,8 +529,13 @@
         @else
             <span></span>
         @endif
-        <button type="button" class="btn btn-sm btn-primary" wire:click="save" x-on:click="isDirty = false">
-            <i class="bi bi-check-lg"></i> Enregistrer
-        </button>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" @click="confirmLeave(() => $wire.dispatch('close-participant'))">
+                Annuler
+            </button>
+            <button type="button" class="btn btn-sm btn-primary" wire:click="save" x-on:click="isDirty = false">
+                <i class="bi bi-check-lg"></i> Enregistrer
+            </button>
+        </div>
     </div>
 </div>
