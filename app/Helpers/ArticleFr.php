@@ -57,6 +57,9 @@ final class ArticleFr
      */
     public static function contracter(string $texte): string
     {
+        // Decode HTML entities first (TinyMCE encodes à as &agrave; etc.)
+        $texte = html_entity_decode($texte, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
         // Capture HTML tags between preposition and article, preserve them
         // "à <strong>le parcours" → "au <strong>parcours"
         // "de le parcours" → "du parcours"
