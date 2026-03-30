@@ -1,12 +1,28 @@
 @extends('formulaire.layout')
 
+@php
+$skipSteps = [];
+if (!$typeOperation->formulaire_parcours_therapeutique) {
+    $skipSteps = array_merge($skipSteps, [2, 3, 4, 5]);
+}
+if (!$typeOperation->formulaire_droit_image) {
+    $skipSteps[] = 6;
+}
+if (!$tarif || (float) $tarif->montant <= 0) {
+    $skipSteps[] = 5;
+}
+$skipSteps = array_values(array_unique($skipSteps));
+$activeSteps = array_values(array_diff([1,2,3,4,5,6,7], $skipSteps));
+$totalActiveSteps = count($activeSteps);
+@endphp
+
 @section('content')
 <div x-data="formulaireWizard()" class="mb-4">
     {{-- Progress bar --}}
     <div class="progress mb-4">
-        <div class="progress-bar" role="progressbar" :aria-valuenow="step" aria-valuemin="1" aria-valuemax="7"
-             :style="'width: ' + Math.round((step / 7) * 100) + '%'">
-            Étape <span x-text="step"></span> / 7
+        <div class="progress-bar" role="progressbar" :aria-valuenow="activeSteps.indexOf(step) + 1" aria-valuemin="1" :aria-valuemax="activeSteps.length"
+             :style="'width: ' + Math.round(((activeSteps.indexOf(step) + 1) / activeSteps.length) * 100) + '%'">
+            Étape <span x-text="activeSteps.indexOf(step) + 1"></span> / <span x-text="activeSteps.length"></span>
         </div>
     </div>
 
@@ -39,10 +55,10 @@
                 <i class="bi bi-arrow-left"></i> Précédent
             </button>
             <div x-show="step === 1"></div>
-            <button type="button" class="btn btn-primary" x-show="step < 7" @click="nextStep()">
+            <button type="button" class="btn btn-primary" x-show="step !== activeSteps[activeSteps.length - 1]" @click="nextStep()">
                 Suivant <i class="bi bi-arrow-right"></i>
             </button>
-            <button type="submit" class="btn btn-success" x-show="step === 7" x-cloak>
+            <button type="submit" class="btn btn-success" x-show="step === activeSteps[activeSteps.length - 1]" x-cloak>
                 <i class="bi bi-check-lg"></i> Valider et envoyer
             </button>
         </div>
@@ -55,7 +71,8 @@
 function formulaireWizard() {
     return {
         step: 1,
-        skipSteps: @json($tarif && (float) $tarif->montant > 0 ? [] : [5]),
+        skipSteps: @json($skipSteps),
+        activeSteps: @json($activeSteps),
         errors: {},
 
         nextStep() {

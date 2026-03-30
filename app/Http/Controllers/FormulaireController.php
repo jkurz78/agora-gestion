@@ -71,6 +71,9 @@ final class FormulaireController extends Controller
         }
 
         $participant = $result['participant'];
+        $participant->load('operation.typeOperation');
+        $typeOperation = $participant->operation->typeOperation;
+        $isParcours = $typeOperation?->formulaire_parcours_therapeutique ?? false;
 
         $request->validate([
             // Coordonnées
@@ -121,21 +124,21 @@ final class FormulaireController extends Controller
             // Droit à l'image
             'droit_image' => ['nullable', 'in:usage_propre,usage_confidentiel,diffusion,refus'],
             // Engagements
-            'engagement_presence' => ['required', 'accepted'],
-            'engagement_certificat' => ['required', 'accepted'],
-            'engagement_reglement' => $participant->typeOperationTarif && (float) $participant->typeOperationTarif->montant > 0
+            'engagement_presence' => $isParcours ? ['required', 'accepted'] : ['nullable'],
+            'engagement_certificat' => $isParcours ? ['required', 'accepted'] : ['nullable'],
+            'engagement_reglement' => ($isParcours && $participant->typeOperationTarif && (float) $participant->typeOperationTarif->montant > 0)
                 ? ['required', 'accepted']
                 : ['nullable'],
             'engagement_rgpd' => ['required', 'accepted'],
             'autorisation_contact_medecin' => ['nullable'],
             // Confirmation token
-            'token_confirmation' => ['required', 'string', function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
+            'token_confirmation' => $isParcours ? ['required', 'string', function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
                 $normalized = strtoupper(str_replace(' ', '', $value));
                 $expected = strtoupper(str_replace(' ', '', $request->input('token', '')));
                 if ($normalized !== $expected) {
                     $fail('Le code de confirmation ne correspond pas.');
                 }
-            }],
+            }] : ['nullable'],
         ]);
 
         DB::transaction(function () use ($request, $participant): void {
