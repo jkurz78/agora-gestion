@@ -187,6 +187,45 @@
                                                     </span>
                                                 </span>
                                             @endif
+                                            @php
+                                                $medecinNom = $p->medecinTiers
+                                                    ? trim(($p->medecinTiers->prenom ? $p->medecinTiers->prenom.' ' : '').$p->medecinTiers->nom)
+                                                    : trim(($med?->medecin_prenom ? $med->medecin_prenom.' ' : '').($med?->medecin_nom ?? ''));
+                                                $therapeuteNom = $p->therapeuteTiers
+                                                    ? trim(($p->therapeuteTiers->prenom ? $p->therapeuteTiers->prenom.' ' : '').$p->therapeuteTiers->nom)
+                                                    : trim(($med?->therapeute_prenom ? $med->therapeute_prenom.' ' : '').($med?->therapeute_nom ?? ''));
+                                            @endphp
+                                            @if($medecinNom)
+                                                <span class="card-row">
+                                                    <span class="card-label">Médecin</span>
+                                                    <span class="card-value">{{ $medecinNom }}</span>
+                                                </span>
+                                            @endif
+                                            @if($therapeuteNom)
+                                                <span class="card-row">
+                                                    <span class="card-label">Thérapeute</span>
+                                                    <span class="card-value">{{ $therapeuteNom }}</span>
+                                                </span>
+                                            @endif
+                                            @if($p->mode_paiement_choisi || $p->moyen_paiement_choisi || $p->typeOperationTarif)
+                                                <span class="card-row">
+                                                    <span class="card-label">Paiement</span>
+                                                    <span class="card-value">
+                                                        {{-- mode --}}
+                                                        @if($p->mode_paiement_choisi)
+                                                            {{ \App\Enums\ModePaiement::from($p->mode_paiement_choisi)->label() }}
+                                                        @endif
+                                                        {{-- moyen --}}
+                                                        @if($p->moyen_paiement_choisi)
+                                                            @if($p->mode_paiement_choisi) · @endif{{ $p->moyen_paiement_choisi }}
+                                                        @endif
+                                                        {{-- tarif --}}
+                                                        @if($p->typeOperationTarif)
+                                                            — {{ $p->typeOperationTarif->libelle }} ({{ number_format((float)$p->typeOperationTarif->montant, 2, ',', ' ') }} €)
+                                                        @endif
+                                                    </span>
+                                                </span>
+                                            @endif
                                         @endif
                                     </td>
                                 </tr>
@@ -195,6 +234,23 @@
                                 <div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee">
                                     <span class="card-label">Notes</span>
                                     <div class="card-value" style="font-size:8px;color:#444;line-height:1.3">{!! $med->notes !!}</div>
+                                </div>
+                            @endif
+                            @if($showPrescripteur && ($p->adresse_par_nom || $p->adresse_par_etablissement))
+                                <div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee">
+                                    <span class="card-label">Adressé par</span>
+                                    <span class="card-value">
+                                        {{ trim(($p->adresse_par_prenom ? $p->adresse_par_prenom.' ' : '').($p->adresse_par_nom ?? '')) }}
+                                        @if($p->adresse_par_etablissement)
+                                            @if($p->adresse_par_nom) — @endif{{ $p->adresse_par_etablissement }}
+                                        @endif
+                                    </span>
+                                </div>
+                            @endif
+                            @if($showDroitImage && $p->droit_image)
+                                <div style="margin-top:4px;padding-top:4px;border-top:1px solid #eee">
+                                    <span class="card-label">Droit image</span>
+                                    <span class="card-value">{{ $p->droit_image->label() }}</span>
                                 </div>
                             @endif
         </div>
