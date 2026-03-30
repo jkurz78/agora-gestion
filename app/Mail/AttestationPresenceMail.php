@@ -34,9 +34,10 @@ final class AttestationPresenceMail extends Mailable
         public readonly string $pdfContent,
         public readonly string $pdfFilename,
         public readonly ?string $libelleArticle = null,
+        public readonly ?string $blocSeances = null,
     ) {
         $corps = $this->customCorps ?? '<p>Bonjour {prenom}, veuillez trouver ci-joint votre attestation de présence.</p>';
-        $allowedTags = '<p><br><strong><em><u><ul><ol><li><a><h1><h2><h3><h4><span><div>';
+        $allowedTags = '<p><br><strong><em><u><ul><ol><li><a><h1><h2><h3><h4><span><div><table><tr><td><th>';
         $corps = str_replace(
             array_keys($this->variables()),
             array_values($this->variables()),
@@ -90,6 +91,7 @@ final class AttestationPresenceMail extends Mailable
             '{nb_seances}' => $this->nombreSeances,
             '{numero_seance}' => $this->numeroSeance ?? '',
             '{date_seance}' => $this->dateSeance ?? '',
+            '{bloc_seances}' => $this->blocSeances ?? '',
         ];
     }
 }

@@ -201,6 +201,7 @@ final class AttestationModal extends Component
                     pdfContent: $pdfData,
                     pdfFilename: "Attestation présence - S{$seance->numero}.pdf",
                     libelleArticle: $typeOp->libelle_article,
+                    blocSeances: $this->buildBlocSeances('seance', $seance),
                 );
 
                 Mail::mailer()
@@ -291,6 +292,7 @@ final class AttestationModal extends Component
                 pdfContent: $pdfData,
                 pdfFilename: "Attestation présence - {$prenom} {$nom}.pdf",
                 libelleArticle: $typeOp->libelle_article ?? null,
+                blocSeances: $this->buildBlocSeances('recap', null, $this->seancesPresent, $this->totalSeances),
             );
 
             Mail::mailer()
@@ -376,6 +378,42 @@ final class AttestationModal extends Component
             'cachetBase64' => $cachetBase64,
             'cachetMime' => $cachetMime,
         ])->setPaper('a4', 'portrait')->output();
+    }
+
+    /**
+     * Build HTML bloc for {bloc_seances} variable.
+     * Mode seance: single line. Mode recap: table of séances.
+     */
+    private function buildBlocSeances(string $mode, ?Seance $seance = null, array $seancesPresent = [], int $totalSeances = 0): string
+    {
+        if ($mode === 'seance' && $seance) {
+            $titre = $seance->titre ? ', « '.$seance->titre.' »' : '';
+            $date = $seance->date?->translatedFormat('j F Y') ?? '';
+
+            return '<p>Séance n°'.$seance->numero.$titre.' du '.$date.'.</p>';
+        }
+
+        if (empty($seancesPresent)) {
+            return '<p>Aucune séance.</p>';
+        }
+
+        $html = '<table style="border-collapse:collapse;width:100%;margin:10px 0;font-size:13px">'
+            .'<tr style="background:#f0f0f0"><th style="padding:6px 10px;text-align:left;border:1px solid #ddd">N°</th>'
+            .'<th style="padding:6px 10px;text-align:left;border:1px solid #ddd">Date</th>'
+            .'<th style="padding:6px 10px;text-align:left;border:1px solid #ddd">Titre</th></tr>';
+
+        foreach ($seancesPresent as $s) {
+            $html .= '<tr>'
+                .'<td style="padding:4px 10px;border:1px solid #ddd">'.$s['numero'].'</td>'
+                .'<td style="padding:4px 10px;border:1px solid #ddd">'.$s['date'].'</td>'
+                .'<td style="padding:4px 10px;border:1px solid #ddd">'.($s['titre'] ?? '—').'</td>'
+                .'</tr>';
+        }
+
+        $html .= '</table>';
+        $html .= '<p><strong>'.count($seancesPresent).' séance(s) sur '.$totalSeances.'</strong></p>';
+
+        return $html;
     }
 
     /** Same logo resolution as AttestationPresencePdfController::getAssociationData() */

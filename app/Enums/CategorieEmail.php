@@ -44,6 +44,7 @@ enum CategorieEmail: string
             self::Attestation => $common + [
                 '{numero_seance}' => 'Numéro de la séance',
                 '{date_seance}' => 'Date de la séance',
+                '{bloc_seances}' => 'Bloc séance(s) : détail unitaire ou tableau récapitulatif',
             ],
             self::Facture => $common + [
                 '{numero_seance}' => 'Numéro de la séance',
