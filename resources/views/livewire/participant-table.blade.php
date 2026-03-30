@@ -406,8 +406,11 @@
                     </div>
                 @endif
 
-                <div class="d-flex justify-content-end">
+                <div class="d-flex justify-content-end gap-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showAddModal', false)">Annuler</button>
+                    <button type="button" class="btn btn-sm btn-primary" wire:click="addParticipant">
+                        <i class="bi bi-plus-lg me-1"></i> Ajouter
+                    </button>
                 </div>
             </div>
         </div>
