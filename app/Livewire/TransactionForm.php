@@ -360,7 +360,7 @@ final class TransactionForm extends Component
             'operations' => Operation::with('typeOperation')
                 ->forExercice(app(ExerciceService::class)->current())
                 ->where('statut', StatutOperation::EnCours)
-                ->orderBy('code')
+                ->orderBy('nom')
                 ->get(),
             'modesPaiement' => ModePaiement::cases(),
             'transaction_numero_piece' => $this->transactionId
