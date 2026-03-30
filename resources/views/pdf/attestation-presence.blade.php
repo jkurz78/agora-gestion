@@ -69,6 +69,7 @@
 
         .signature-block {
             margin-top: 40px;
+            margin-left: 8cm;
             font-size: 12px;
             line-height: 1.8;
         }
