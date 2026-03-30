@@ -44,11 +44,9 @@
                 <a class="nav-link" :class="tab === 'notes' && 'active'" @click.prevent="tab = 'notes'" href="#">Notes</a>
             </li>
         @endif
-        @if($hasEngagements)
-            <li class="nav-item">
-                <a class="nav-link" :class="tab === 'engagements' && 'active'" @click.prevent="tab = 'engagements'" href="#">Engagements</a>
-            </li>
-        @endif
+        <li class="nav-item">
+            <a class="nav-link" :class="tab === 'engagements' && 'active'" @click.prevent="tab = 'engagements'" href="#">Engagements</a>
+        </li>
         @if($hasDocuments)
             <li class="nav-item">
                 <a class="nav-link" :class="tab === 'documents' && 'active'" @click.prevent="tab = 'documents'" href="#">Documents</a>
@@ -99,22 +97,6 @@
                 </div>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Date d'inscription</label>
-                <x-date-input name="editDateInscription" :value="$editDateInscription" wire:model="editDateInscription" />
-            </div>
-
-            @if($operation->typeOperation?->tarifs->count())
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Tarif</label>
-                    <select wire:model="editTypeOperationTarifId" class="form-select form-select-sm">
-                        <option value="">— Aucun —</option>
-                        @foreach($operation->typeOperation->tarifs as $tarif)
-                            <option value="{{ $tarif->id }}">{{ $tarif->libelle }} — {{ number_format($tarif->montant, 2, ',', ' ') }} €</option>
-                        @endforeach
-                    </select>
-                </div>
-            @endif
         </div>
 
         {{-- ── Tab: Données personnelles ────────────── --}}
@@ -388,84 +370,104 @@
         @endif
 
         {{-- ── Tab: Engagements ───────────────────────── --}}
-        @if($hasEngagements)
             <div x-show="tab === 'engagements'" x-cloak>
-                @if($editFormulaireRempliAt)
-                    <div class="alert alert-info py-2 small mb-3">
-                        <i class="bi bi-check-circle-fill me-1"></i>
-                        Formulaire soumis le {{ $editFormulaireRempliAt }}
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Date d'inscription</label>
+                        <x-date-input name="editDateInscription" :value="$editDateInscription" wire:model="editDateInscription" />
                     </div>
-                @else
-                    <div class="alert alert-secondary py-2 small mb-3">
-                        <i class="bi bi-hourglass me-1"></i>
-                        Formulaire non soumis
-                    </div>
-                @endif
+                    @if($operation->typeOperation?->tarifs->count())
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Tarif</label>
+                            <select wire:model="editTypeOperationTarifId" class="form-select form-select-sm">
+                                <option value="">— Aucun —</option>
+                                @foreach($operation->typeOperation->tarifs as $tarif)
+                                    <option value="{{ $tarif->id }}">{{ $tarif->libelle }} — {{ number_format($tarif->montant, 2, ',', ' ') }} €</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                </div>
 
-                <table class="table table-sm table-borderless">
-                    <tbody>
-                        @if($typeOp?->formulaire_droit_image)
-                            <tr>
-                                <td class="text-muted small" style="width:200px">Droit à l'image</td>
-                                <td class="small">
-                                    @if($editDroitImageLabel)
-                                        {{ $editDroitImageLabel }}
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endif
-                        @if($typeOp?->formulaire_parcours_therapeutique)
-                            <tr>
-                                <td class="text-muted small">Mode de paiement</td>
-                                <td class="small">
-                                    @if($editModePaiement)
-                                        {{ $editModePaiement }}
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="text-muted small">Moyen de paiement</td>
-                                <td class="small">
-                                    @if($editMoyenPaiement)
-                                        {{ $editMoyenPaiement }}
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="text-muted small">Autorisation contact médecin</td>
-                                <td class="small">
-                                    @if($editAutorisationContactMedecin !== null)
-                                        @if($editAutorisationContactMedecin)
-                                            <i class="bi bi-check-lg text-success"></i> Oui
+                @if($hasEngagements)
+                    <hr class="my-3">
+
+                    @if($editFormulaireRempliAt)
+                        <div class="alert alert-info py-2 small mb-3">
+                            <i class="bi bi-check-circle-fill me-1"></i>
+                            Formulaire soumis le {{ $editFormulaireRempliAt }}
+                        </div>
+                    @else
+                        <div class="alert alert-secondary py-2 small mb-3">
+                            <i class="bi bi-hourglass me-1"></i>
+                            Formulaire non soumis
+                        </div>
+                    @endif
+
+                    <table class="table table-sm table-borderless">
+                        <tbody>
+                            @if($typeOp?->formulaire_droit_image)
+                                <tr>
+                                    <td class="text-muted small" style="width:200px">Droit à l'image</td>
+                                    <td class="small">
+                                        @if($editDroitImageLabel)
+                                            {{ $editDroitImageLabel }}
                                         @else
-                                            <i class="bi bi-x-lg text-danger"></i> Non
+                                            <span class="text-muted">—</span>
                                         @endif
+                                    </td>
+                                </tr>
+                            @endif
+                            @if($typeOp?->formulaire_parcours_therapeutique)
+                                <tr>
+                                    <td class="text-muted small">Mode de paiement</td>
+                                    <td class="small">
+                                        @if($editModePaiement)
+                                            {{ $editModePaiement }}
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted small">Moyen de paiement</td>
+                                    <td class="small">
+                                        @if($editMoyenPaiement)
+                                            {{ $editMoyenPaiement }}
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted small">Autorisation contact médecin</td>
+                                    <td class="small">
+                                        @if($editAutorisationContactMedecin !== null)
+                                            @if($editAutorisationContactMedecin)
+                                                <i class="bi bi-check-lg text-success"></i> Oui
+                                            @else
+                                                <i class="bi bi-x-lg text-danger"></i> Non
+                                            @endif
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endif
+                            <tr>
+                                <td class="text-muted small">RGPD accepté</td>
+                                <td class="small">
+                                    @if($editRgpdAccepteAt)
+                                        <i class="bi bi-check-lg text-success"></i> {{ $editRgpdAccepteAt }}
                                     @else
                                         <span class="text-muted">—</span>
                                     @endif
                                 </td>
                             </tr>
-                        @endif
-                        <tr>
-                            <td class="text-muted small">RGPD accepté</td>
-                            <td class="small">
-                                @if($editRgpdAccepteAt)
-                                    <i class="bi bi-check-lg text-success"></i> {{ $editRgpdAccepteAt }}
-                                @else
-                                    <span class="text-muted">—</span>
-                                @endif
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                @endif
             </div>
-        @endif
 
         {{-- ── Tab: Documents ─────────────────────────── --}}
         @if($hasDocuments)
