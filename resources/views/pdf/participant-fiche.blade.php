@@ -313,44 +313,6 @@
                             </span>
                         @endif
                     </td>
-                    <td style="width:50%;vertical-align:top">
-                        {{-- Médecin --}}
-                        @php
-                            $medecinNom = $participant->medecinTiers?->nom ?? $med?->medecin_nom;
-                            $medecinPrenom = $participant->medecinTiers?->prenom ?? $med?->medecin_prenom;
-                            $medecinTel = $participant->medecinTiers?->telephone ?? $med?->medecin_telephone;
-                        @endphp
-                        @if($medecinNom || $medecinPrenom)
-                            <span class="field-row">
-                                <span class="field-label">Médecin</span>
-                                <span class="field-value">{{ $medecinPrenom }} {{ $medecinNom }}</span>
-                            </span>
-                        @endif
-                        @if($medecinTel)
-                            <span class="field-row">
-                                <span class="field-label" style="padding-left:10px">Tél. médecin</span>
-                                <span class="field-value">{{ $medecinTel }}</span>
-                            </span>
-                        @endif
-
-                        {{-- Thérapeute --}}
-                        @php
-                            $therNom = $participant->therapeuteTiers?->nom ?? $med?->therapeute_nom;
-                            $therPrenom = $participant->therapeuteTiers?->prenom ?? $med?->therapeute_prenom;
-                            $therTel = $participant->therapeuteTiers?->telephone ?? $med?->therapeute_telephone;
-                        @endphp
-                        @if($therNom || $therPrenom)
-                            <span class="field-row" style="margin-top:4px">
-                                <span class="field-label">Thérapeute</span>
-                                <span class="field-value">{{ $therPrenom }} {{ $therNom }}</span>
-                            </span>
-                        @endif
-                        @if($therTel)
-                            <span class="field-row">
-                                <span class="field-label" style="padding-left:10px">Tél. thérapeute</span>
-                                <span class="field-value">{{ $therTel }}</span>
-                            </span>
-                        @endif
                     </td>
                 </tr>
             </table>
@@ -361,6 +323,73 @@
             @endif
         </div>
     </div>
+
+    {{-- Section : Contacts médicaux --}}
+    @php
+        $medecinNom = $participant->medecinTiers?->nom ?? $med?->medecin_nom;
+        $medecinPrenom = $participant->medecinTiers?->prenom ?? $med?->medecin_prenom;
+        $medecinTel = $participant->medecinTiers?->telephone ?? $med?->medecin_telephone;
+        $medecinEmail = $participant->medecinTiers?->email ?? $med?->medecin_email;
+        $medecinAdresse = $participant->medecinTiers?->adresse_ligne1 ?? $med?->medecin_adresse;
+        $medecinCp = $participant->medecinTiers?->code_postal ?? $med?->medecin_code_postal;
+        $medecinVille = $participant->medecinTiers?->ville ?? $med?->medecin_ville;
+
+        $therNom = $participant->therapeuteTiers?->nom ?? $med?->therapeute_nom;
+        $therPrenom = $participant->therapeuteTiers?->prenom ?? $med?->therapeute_prenom;
+        $therTel = $participant->therapeuteTiers?->telephone ?? $med?->therapeute_telephone;
+        $therEmail = $participant->therapeuteTiers?->email ?? $med?->therapeute_email;
+        $therAdresse = $participant->therapeuteTiers?->adresse_ligne1 ?? $med?->therapeute_adresse;
+        $therCp = $participant->therapeuteTiers?->code_postal ?? $med?->therapeute_code_postal;
+        $therVille = $participant->therapeuteTiers?->ville ?? $med?->therapeute_ville;
+    @endphp
+    <table style="width:100%;border-collapse:separate;border-spacing:6px 0;">
+        <tr>
+            <td style="width:50%;vertical-align:top">
+                <div class="section" style="margin-top:0">
+                    <div class="section-title">Médecin traitant</div>
+                    <div class="section-body">
+                        @if($medecinNom || $medecinPrenom)
+                            <span class="field-row"><span class="field-label">Nom</span><span class="field-value">{{ $medecinPrenom }} {{ $medecinNom }}</span></span>
+                        @endif
+                        @if($medecinTel)
+                            <span class="field-row"><span class="field-label">Tél.</span><span class="field-value">{{ $medecinTel }}</span></span>
+                        @endif
+                        @if($medecinEmail)
+                            <span class="field-row"><span class="field-label">Email</span><span class="field-value">{{ $medecinEmail }}</span></span>
+                        @endif
+                        @if($medecinAdresse || $medecinCp || $medecinVille)
+                            <span class="field-row"><span class="field-label">Adresse</span><span class="field-value">{{ $medecinAdresse }} {{ $medecinCp }} {{ $medecinVille }}</span></span>
+                        @endif
+                        @if(!$medecinNom && !$medecinPrenom)
+                            <span style="color:#999;font-size:10px">Non renseigné</span>
+                        @endif
+                    </div>
+                </div>
+            </td>
+            <td style="width:50%;vertical-align:top">
+                <div class="section" style="margin-top:0">
+                    <div class="section-title">Thérapeute référent</div>
+                    <div class="section-body">
+                        @if($therNom || $therPrenom)
+                            <span class="field-row"><span class="field-label">Nom</span><span class="field-value">{{ $therPrenom }} {{ $therNom }}</span></span>
+                        @endif
+                        @if($therTel)
+                            <span class="field-row"><span class="field-label">Tél.</span><span class="field-value">{{ $therTel }}</span></span>
+                        @endif
+                        @if($therEmail)
+                            <span class="field-row"><span class="field-label">Email</span><span class="field-value">{{ $therEmail }}</span></span>
+                        @endif
+                        @if($therAdresse || $therCp || $therVille)
+                            <span class="field-row"><span class="field-label">Adresse</span><span class="field-value">{{ $therAdresse }} {{ $therCp }} {{ $therVille }}</span></span>
+                        @endif
+                        @if(!$therNom && !$therPrenom)
+                            <span style="color:#999;font-size:10px">Non renseigné</span>
+                        @endif
+                    </div>
+                </div>
+            </td>
+        </tr>
+    </table>
     @endif
 
     {{-- Section : Engagements --}}
