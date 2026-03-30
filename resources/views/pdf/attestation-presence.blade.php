@@ -133,14 +133,14 @@
 
             <div class="attestation-body">
                 L'association <strong>{{ $association?->nom ?? '' }}</strong> atteste que
-                <strong>{{ $p->tiers->prenom ?? '' }} {{ $p->tiers->nom ?? '' }}</strong>@if($p->donneesMedicales?->date_naissance), né{{ ($p->donneesMedicales?->sexe ?? '') === 'F' ? 'e' : '' }} le {{ \Carbon\Carbon::parse($p->donneesMedicales->date_naissance)->format('d/m/Y') }}@endif,
-                a participé à la séance n°{{ $seance->numero }} du {{ $seance->date?->format('d/m/Y') ?? 'date non définie' }}{{ $seance->titre ? ' — '.$seance->titre : '' }}
-                de l'opération <strong>{{ $operation->nom }}</strong>@if($operation->date_debut && $operation->date_fin)
-                    du {{ $operation->date_debut->format('d/m/Y') }} au {{ $operation->date_fin->format('d/m/Y') }}@endif.
+                <strong>{{ $p->tiers->prenom ?? '' }} {{ $p->tiers->nom ?? '' }}</strong>,
+                a participé à la séance n°{{ $seance->numero }}@if($seance->titre), « {{ $seance->titre }} »@endif
+                du {{ $seance->date ? $seance->date->translatedFormat('j F Y') : 'date non définie' }}
+                dans le cadre de {{ $operation->typeOperation?->nom ?? '' }} <strong>{{ $operation->nom }}</strong>.
             </div>
 
             <div class="signature-block">
-                Fait à {{ $association?->ville ?? '' }}, le {{ now()->format('d/m/Y') }}
+                Fait à {{ $association?->ville ?? '' }}, le {{ now()->translatedFormat('j F Y') }}
                 @if($cachetBase64)
                     <br>
                     <img class="cachet-img" src="data:{{ $cachetMime }};base64,{{ $cachetBase64 }}" alt="Cachet">
@@ -148,7 +148,7 @@
             </div>
 
             <div style="margin-top: 12px; font-size: 8px; color: #999; text-align: right;">
-                Généré le {{ now()->format('d/m/Y à H:i') }}
+                Généré le {{ now()->translatedFormat('j F Y à H:i') }}
             </div>
 
             @if(!$loop->last)
@@ -189,9 +189,9 @@
 
         <div class="attestation-body">
             L'association <strong>{{ $association?->nom ?? '' }}</strong> atteste que
-            <strong>{{ $participant->tiers->prenom ?? '' }} {{ $participant->tiers->nom ?? '' }}</strong>@if($participant->donneesMedicales?->date_naissance), né{{ ($participant->donneesMedicales?->sexe ?? '') === 'F' ? 'e' : '' }} le {{ \Carbon\Carbon::parse($participant->donneesMedicales->date_naissance)->format('d/m/Y') }}@endif,
-            a participé aux séances suivantes de l'opération <strong>{{ $operation->nom }}</strong>@if($operation->date_debut && $operation->date_fin)
-                du {{ $operation->date_debut->format('d/m/Y') }} au {{ $operation->date_fin->format('d/m/Y') }}@endif :
+            <strong>{{ $participant->tiers->prenom ?? '' }} {{ $participant->tiers->nom ?? '' }}</strong>,
+            a participé aux séances suivantes
+            dans le cadre de {{ $operation->typeOperation?->nom ?? '' }} <strong>{{ $operation->nom }}</strong> :
         </div>
 
         <table class="seance-table">
@@ -218,7 +218,7 @@
         </div>
 
         <div class="signature-block">
-            Fait à {{ $association?->ville ?? '' }}, le {{ now()->format('d/m/Y') }}
+            Fait à {{ $association?->ville ?? '' }}, le {{ now()->translatedFormat('j F Y') }}
             @if($cachetBase64)
                 <br>
                 <img class="cachet-img" src="data:{{ $cachetMime }};base64,{{ $cachetBase64 }}" alt="Cachet">
@@ -226,7 +226,7 @@
         </div>
 
         <div style="margin-top: 12px; font-size: 8px; color: #999; text-align: right;">
-            Généré le {{ now()->format('d/m/Y à H:i') }}
+            Généré le {{ now()->translatedFormat('j F Y à H:i') }}
         </div>
     @endif
 </body>
