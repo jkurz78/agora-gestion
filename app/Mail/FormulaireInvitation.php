@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Helpers\ArticleFr;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -32,6 +33,7 @@ final class FormulaireInvitation extends Mailable
         public readonly string $nombreSeances = '',
         public readonly ?string $customObjet = null,
         public readonly ?string $customCorps = null,
+        public readonly ?string $libelleArticle = null,
     ) {
         $vars = $this->variables();
 
@@ -42,6 +44,7 @@ final class FormulaireInvitation extends Mailable
         $this->showAutoBlock = ! str_contains($corps, '{bloc_liens}') && ! str_contains($corps, '{url}');
 
         $corps = str_replace(array_keys($vars), array_values($vars), $corps);
+        $corps = ArticleFr::contracter($corps);
 
         // Allow the bloc_liens HTML through sanitization
         $this->corpsHtml = strip_tags($corps, '<p><br><strong><em><u><ul><ol><li><a><h1><h2><h3><h4><span><div><table><tr><td><th>');
@@ -55,6 +58,7 @@ final class FormulaireInvitation extends Mailable
             ?? 'Formulaire à compléter — {operation}';
 
         $objet = str_replace(array_keys($vars), array_values($vars), $objet);
+        $objet = ArticleFr::contracter($objet);
 
         return new Envelope(subject: $objet);
     }
@@ -82,7 +86,7 @@ final class FormulaireInvitation extends Mailable
             '{prenom}' => $this->prenomParticipant,
             '{nom}' => $this->nomParticipant,
             '{operation}' => $this->nomOperation,
-            '{type_operation}' => $this->nomTypeOperation,
+            '{type_operation}' => $this->libelleArticle ?? $this->nomTypeOperation,
             '{date_debut}' => $this->dateDebut,
             '{date_fin}' => $this->dateFin,
             '{nb_seances}' => $this->nombreSeances,

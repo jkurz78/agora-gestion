@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Helpers\ArticleFr;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
@@ -32,14 +33,16 @@ final class AttestationPresenceMail extends Mailable
         public readonly ?string $customCorps,
         public readonly string $pdfContent,
         public readonly string $pdfFilename,
+        public readonly ?string $libelleArticle = null,
     ) {
         $corps = $this->customCorps ?? '<p>Bonjour {prenom}, veuillez trouver ci-joint votre attestation de présence.</p>';
         $allowedTags = '<p><br><strong><em><u><ul><ol><li><a><h1><h2><h3><h4><span><div>';
-        $this->corpsHtml = str_replace(
+        $corps = str_replace(
             array_keys($this->variables()),
             array_values($this->variables()),
             strip_tags($corps, $allowedTags)
         );
+        $this->corpsHtml = ArticleFr::contracter($corps);
     }
 
     public function envelope(): Envelope
@@ -51,7 +54,7 @@ final class AttestationPresenceMail extends Mailable
             $objet
         );
 
-        return new Envelope(subject: $subject);
+        return new Envelope(subject: ArticleFr::contracter($subject));
     }
 
     public function content(): Content
@@ -81,7 +84,7 @@ final class AttestationPresenceMail extends Mailable
             '{prenom}' => $this->prenomParticipant,
             '{nom}' => $this->nomParticipant,
             '{operation}' => $this->nomOperation,
-            '{type_operation}' => $this->nomTypeOperation,
+            '{type_operation}' => $this->libelleArticle ?? $this->nomTypeOperation,
             '{date_debut}' => $this->dateDebut,
             '{date_fin}' => $this->dateFin,
             '{nb_seances}' => $this->nombreSeances,

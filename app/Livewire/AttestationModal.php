@@ -200,6 +200,7 @@ final class AttestationModal extends Component
                     customCorps: $template?->corps,
                     pdfContent: $pdfData,
                     pdfFilename: "Attestation présence - S{$seance->numero}.pdf",
+                    libelleArticle: $typeOp->libelle_article,
                 );
 
                 Mail::mailer()
@@ -289,6 +290,7 @@ final class AttestationModal extends Component
                 customCorps: $template?->corps,
                 pdfContent: $pdfData,
                 pdfFilename: "Attestation présence - {$prenom} {$nom}.pdf",
+                libelleArticle: $typeOp->libelle_article ?? null,
             );
 
             Mail::mailer()
