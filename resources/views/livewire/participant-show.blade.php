@@ -1,6 +1,6 @@
 <div x-data="{ tab: @entangle('activeTab'), isDirty: false, confirmLeave(cb) { if (this.isDirty) { if (confirm('Des modifications non enregistrées seront perdues. Continuer ?')) { cb(); } } else { cb(); } } }"
      x-on:input="isDirty = true"
-     x-on:beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }"
+     x-on:beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }">
 
     {{-- Header with back link + PDF buttons --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
