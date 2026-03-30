@@ -205,7 +205,7 @@ final class ParticipantShow extends Component
         // Touch participant to bust wire:key cache
         $participant->touch();
 
-        $this->successMessage = 'Modifications enregistrées.';
+        $this->dispatch('close-participant');
     }
 
     // ── Mapping Tiers methods ──────────────────────────────────
