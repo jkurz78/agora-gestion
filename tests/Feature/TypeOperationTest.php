@@ -38,7 +38,8 @@ it('creates a type operation with tarifs', function () {
         ->set('nom', 'Yoga thérapeutique')
         ->set('sous_categorie_id', $this->sousCategorie->id)
         ->set('nombre_seances', 10)
-        ->set('confidentiel', true)
+        ->set('formulaireParcoursTherapeutique', true)
+        ->set('formulaireActif', true)
         ->set('reserve_adherents', false)
         ->set('actif', true)
         ->set('newTarifLibelle', 'Tarif normal')
@@ -52,7 +53,8 @@ it('creates a type operation with tarifs', function () {
     expect(TypeOperation::where('code', 'YOGA')->exists())->toBeTrue();
     $type = TypeOperation::where('code', 'YOGA')->first();
     expect($type->nom)->toBe('Yoga thérapeutique');
-    expect($type->confidentiel)->toBeTrue();
+    expect($type->formulaire_parcours_therapeutique)->toBeTrue();
+    expect($type->formulaire_actif)->toBeTrue();
     expect($type->nombre_seances)->toBe(10);
     expect($type->tarifs)->toHaveCount(2);
     expect($type->tarifs->pluck('libelle')->toArray())->toContain('Tarif normal', 'Tarif réduit');

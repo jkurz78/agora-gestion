@@ -30,7 +30,7 @@
                 @yield('content')
 
                 <p class="text-center text-muted small mt-4 mb-5">
-                    {{ $nomAsso }} &mdash; Formulaire confidentiel
+                    {{ $nomAsso }} &mdash; Formulaire
                 </p>
             </div>
         </div>

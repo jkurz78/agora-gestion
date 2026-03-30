@@ -22,7 +22,7 @@ final class SeancePdfController extends Controller
         abort_unless((int) $seance->operation_id === $operation->id, 404);
 
         $operation->loadMissing('typeOperation');
-        $isConfidentiel = $operation->typeOperation?->confidentiel ?? false;
+        $isConfidentiel = $operation->typeOperation?->formulaire_parcours_therapeutique ?? false;
 
         $participants = Participant::where('operation_id', $operation->id)
             ->with('tiers')
@@ -51,7 +51,7 @@ final class SeancePdfController extends Controller
     public function matrice(Request $request, Operation $operation): Response
     {
         $operation->loadMissing('typeOperation');
-        $isConfidentiel = $operation->typeOperation?->confidentiel ?? false;
+        $isConfidentiel = $operation->typeOperation?->formulaire_parcours_therapeutique ?? false;
 
         $seances = Seance::where('operation_id', $operation->id)
             ->orderBy('numero')
