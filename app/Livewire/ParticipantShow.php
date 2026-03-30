@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
+use App\Models\Tiers;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -204,6 +205,128 @@ final class ParticipantShow extends Component
         $participant->touch();
 
         $this->successMessage = 'Modifications enregistrées.';
+    }
+
+    // ── Mapping Tiers methods ──────────────────────────────────
+
+    public function mapAdresseParTiers(): void
+    {
+        if ($this->mapAdresseParTiersId === null) {
+            return;
+        }
+        $this->participant->update(['refere_par_id' => $this->mapAdresseParTiersId]);
+        $this->dispatch('notify', message: 'Tiers associé au prescripteur.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
+    }
+
+    public function createAdresseParTiers(): void
+    {
+        $tiers = Tiers::create([
+            'nom' => $this->participant->adresse_par_nom,
+            'prenom' => $this->participant->adresse_par_prenom,
+            'entreprise' => $this->participant->adresse_par_etablissement,
+            'telephone' => $this->participant->adresse_par_telephone,
+            'email' => $this->participant->adresse_par_email,
+            'adresse_ligne1' => $this->participant->adresse_par_adresse,
+            'code_postal' => $this->participant->adresse_par_code_postal,
+            'ville' => $this->participant->adresse_par_ville,
+            'type' => 'particulier',
+        ]);
+        $this->participant->update(['refere_par_id' => $tiers->id]);
+        $this->dispatch('notify', message: 'Tiers créé et associé.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
+    }
+
+    public function unlinkAdresseParTiers(): void
+    {
+        $this->participant->update(['refere_par_id' => null]);
+        $this->dispatch('notify', message: 'Association supprimée.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
+    }
+
+    public function mapMedecinTiers(): void
+    {
+        if ($this->mapMedecinTiersId === null) {
+            return;
+        }
+        $this->participant->update(['medecin_tiers_id' => $this->mapMedecinTiersId]);
+        $this->dispatch('notify', message: 'Tiers associé au médecin traitant.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
+    }
+
+    public function createMedecinTiers(): void
+    {
+        $med = $this->participant->donneesMedicales;
+        if ($med === null) {
+            return;
+        }
+        $tiers = Tiers::create([
+            'nom' => $med->medecin_nom,
+            'prenom' => $med->medecin_prenom,
+            'telephone' => $med->medecin_telephone,
+            'email' => $med->medecin_email,
+            'adresse_ligne1' => $med->medecin_adresse,
+            'code_postal' => $med->medecin_code_postal,
+            'ville' => $med->medecin_ville,
+            'type' => 'particulier',
+        ]);
+        $this->participant->update(['medecin_tiers_id' => $tiers->id]);
+        $this->dispatch('notify', message: 'Tiers créé et associé au médecin.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
+    }
+
+    public function unlinkMedecinTiers(): void
+    {
+        $this->participant->update(['medecin_tiers_id' => null]);
+        $this->dispatch('notify', message: 'Association supprimée.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
+    }
+
+    public function mapTherapeuteTiers(): void
+    {
+        if ($this->mapTherapeuteTiersId === null) {
+            return;
+        }
+        $this->participant->update(['therapeute_tiers_id' => $this->mapTherapeuteTiersId]);
+        $this->dispatch('notify', message: 'Tiers associé au thérapeute.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
+    }
+
+    public function createTherapeuteTiers(): void
+    {
+        $med = $this->participant->donneesMedicales;
+        if ($med === null) {
+            return;
+        }
+        $tiers = Tiers::create([
+            'nom' => $med->therapeute_nom,
+            'prenom' => $med->therapeute_prenom,
+            'telephone' => $med->therapeute_telephone,
+            'email' => $med->therapeute_email,
+            'adresse_ligne1' => $med->therapeute_adresse,
+            'code_postal' => $med->therapeute_code_postal,
+            'ville' => $med->therapeute_ville,
+            'type' => 'particulier',
+        ]);
+        $this->participant->update(['therapeute_tiers_id' => $tiers->id]);
+        $this->dispatch('notify', message: 'Tiers créé et associé au thérapeute.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
+    }
+
+    public function unlinkTherapeuteTiers(): void
+    {
+        $this->participant->update(['therapeute_tiers_id' => null]);
+        $this->dispatch('notify', message: 'Association supprimée.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
     }
 
     public function render(): View
