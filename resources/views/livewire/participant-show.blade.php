@@ -492,9 +492,32 @@
             </div>
         @endif
 
-        {{-- ── Tab: Historique (placeholder) ──────────── --}}
+        {{-- ── Tab: Historique ──────────────────────────── --}}
         <div x-show="tab === 'historique'" x-cloak>
-            <p class="text-muted text-center py-4">Aucun événement enregistré.</p>
+            @if($timeline->isEmpty())
+                <p class="text-muted text-center py-4">Aucun événement enregistré.</p>
+            @else
+                <div class="list-group list-group-flush">
+                    @foreach($timeline as $event)
+                        <div class="list-group-item px-0">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="text-{{ $event['color'] }}" style="font-size:1.2rem;">
+                                    <i class="bi {{ $event['icon'] }}"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold small">{{ $event['description'] }}</div>
+                                    @if($event['detail'])
+                                        <div class="text-muted small">{{ $event['detail'] }}</div>
+                                    @endif
+                                </div>
+                                <div class="text-muted small text-nowrap">
+                                    {{ $event['date']->format('d/m/Y à H:i') }}
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
 
     </div>

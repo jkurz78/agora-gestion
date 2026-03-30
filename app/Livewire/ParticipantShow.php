@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Models\EmailLog;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
@@ -340,6 +341,43 @@ final class ParticipantShow extends Component
 
         $this->operation->loadMissing('typeOperation.tarifs');
 
+        $emailLogs = EmailLog::where('participant_id', $this->participant->id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        $formulaireToken = $this->participant->formulaireToken;
+
+        // Build combined timeline
+        $timeline = collect();
+
+        foreach ($emailLogs as $log) {
+            $timeline->push([
+                'date' => $log->created_at,
+                'type' => 'email',
+                'categorie' => $log->categorie,
+                'icon' => 'bi-envelope',
+                'color' => $log->statut === 'envoye' ? 'success' : 'danger',
+                'description' => $log->statut === 'envoye'
+                    ? "Email {$log->categorie} envoyé à {$log->destinataire_email}"
+                    : "Erreur envoi {$log->categorie} à {$log->destinataire_email}",
+                'detail' => $log->objet,
+            ]);
+        }
+
+        if ($formulaireToken?->rempli_at) {
+            $timeline->push([
+                'date' => $formulaireToken->rempli_at,
+                'type' => 'formulaire_rempli',
+                'categorie' => 'formulaire',
+                'icon' => 'bi-check-circle-fill',
+                'color' => 'primary',
+                'description' => 'Formulaire rempli depuis '.$formulaireToken->rempli_ip,
+                'detail' => null,
+            ]);
+        }
+
+        $timeline = $timeline->sortByDesc('date')->values();
+
         return view('livewire.participant-show', [
             'typeOp' => $typeOp,
             'canSeeSensible' => $canSeeSensible,
@@ -347,6 +385,7 @@ final class ParticipantShow extends Component
             'hasPrescripteur' => $hasPrescripteur,
             'hasEngagements' => $hasEngagements,
             'hasDocuments' => $hasDocuments,
+            'timeline' => $timeline,
         ]);
     }
 
