@@ -19,7 +19,6 @@ final class StoreOperationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code' => ['required', 'string', 'max:50', 'unique:operations,code'],
             'nom' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string'],
             'date_debut' => ['required', 'date'],
