@@ -45,4 +45,22 @@ final class ArticleFr
 
         return 'à '.$libelleArticle;
     }
+
+    /**
+     * Contracte les articles dans un texte complet.
+     * "à le parcours" → "au parcours"
+     * "de le parcours" → "du parcours"
+     * "à les ateliers" → "aux ateliers"
+     * "de les ateliers" → "des ateliers"
+     * "à la formation" → inchangé
+     * "de la formation" → inchangé
+     */
+    public static function contracter(string $texte): string
+    {
+        return str_replace(
+            ['à le ', 'à les ', 'de le ', 'de les ', 'À le ', 'À les ', 'De le ', 'De les '],
+            ['au ', 'aux ', 'du ', 'des ', 'Au ', 'Aux ', 'Du ', 'Des '],
+            $texte
+        );
+    }
 }

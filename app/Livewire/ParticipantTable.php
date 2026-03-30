@@ -349,6 +349,7 @@ final class ParticipantTable extends Component
                 nombreSeances: $op->nombre_seances !== null ? (string) $op->nombre_seances : '',
                 customObjet: $template?->objet,
                 customCorps: $template?->corps,
+                libelleArticle: $typeOp->libelle_article,
             );
 
             Mail::mailer()
