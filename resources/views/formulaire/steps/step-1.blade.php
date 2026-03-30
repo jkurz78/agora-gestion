@@ -77,21 +77,9 @@
         </div>
     </div>
 
-    <div class="row g-3 mt-1">
-        <div class="col-md-6">
-            <label class="form-label">Nom de jeune fille</label>
-            <input type="text" name="nom_jeune_fille" class="form-control"
-                   value="{{ old('nom_jeune_fille', $participant->nom_jeune_fille) }}" maxlength="255">
-        </div>
-        <div class="col-md-6">
-            <label class="form-label">Nationalité</label>
-            <input type="text" name="nationalite" class="form-control"
-                   value="{{ old('nationalite', $participant->nationalite) }}" maxlength="100">
-        </div>
-    </div>
-
+    @if($typeOperation->formulaire_prescripteur)
     {{-- Adressé par --}}
-    <h6 class="mt-4 mb-3"><i class="bi bi-person-plus"></i> Je vous suis adressé(e) par</h6>
+    <h6 class="mt-4 mb-3"><i class="bi bi-person-plus"></i> {{ $typeOperation->formulaire_prescripteur_titre ?? 'Je vous suis adressé(e) par' }}</h6>
 
     <div class="mb-3">
         <label class="form-label">Établissement</label>
@@ -146,4 +134,5 @@
                    value="{{ old('adresse_par_ville', $participant->adresse_par_ville) }}" maxlength="100">
         </div>
     </div>
+    @endif
 </div>

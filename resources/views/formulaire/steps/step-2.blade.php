@@ -6,6 +6,19 @@
 
     <h5 class="mb-3"><i class="bi bi-heart-pulse"></i> Données de santé</h5>
 
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label">Nom de jeune fille</label>
+            <input type="text" name="nom_jeune_fille" class="form-control"
+                   value="{{ old('nom_jeune_fille', $participant->nom_jeune_fille) }}" maxlength="255">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Nationalité</label>
+            <input type="text" name="nationalite" class="form-control"
+                   value="{{ old('nationalite', $participant->nationalite) }}" maxlength="100">
+        </div>
+    </div>
+
     <div class="row g-3">
         <div class="col-md-4">
             <label class="form-label">Date de naissance <span class="text-danger">*</span></label>

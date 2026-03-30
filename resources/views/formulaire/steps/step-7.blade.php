@@ -1,6 +1,7 @@
 <div x-show="step === 7" x-cloak data-step="7">
     <h5 class="mb-3"><i class="bi bi-check2-square"></i> Engagements</h5>
 
+    @if($typeOperation->formulaire_parcours_therapeutique)
     {{-- Mandatory checkboxes --}}
     <div class="card mb-4">
         <div class="card-header fw-bold">Engagements obligatoires</div>
@@ -36,15 +37,6 @@
                 <div class="invalid-feedback" x-text="errors.engagement_reglement"></div>
             </div>
             @endif
-
-            <div class="form-check mb-3">
-                <input type="checkbox" name="engagement_rgpd" value="1" class="form-check-input"
-                       id="engagement_rgpd" data-required :class="hasError('engagement_rgpd') && 'is-invalid'">
-                <label class="form-check-label" for="engagement_rgpd">
-                    J'accepte le traitement électronique de mes données personnelles. Je dispose d'un droit d'accès, de modification et de suppression de mes données (droit à l'oubli) à l'issue de l'opération.
-                </label>
-                <div class="invalid-feedback" x-text="errors.engagement_rgpd"></div>
-            </div>
         </div>
     </div>
 
@@ -63,7 +55,7 @@
     </div>
 
     {{-- Token re-entry --}}
-    <div class="card border-primary">
+    <div class="card border-primary mb-4">
         <div class="card-header fw-bold text-primary">
             <i class="bi bi-pen"></i> Confirmation
         </div>
@@ -76,6 +68,21 @@
                            data-required :class="hasError('token_confirmation') && 'is-invalid'">
                     <div class="invalid-feedback" x-text="errors.token_confirmation"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- RGPD - always shown --}}
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="form-check">
+                <input type="checkbox" name="engagement_rgpd" value="1" class="form-check-input"
+                       id="engagement_rgpd" data-required :class="hasError('engagement_rgpd') && 'is-invalid'">
+                <label class="form-check-label" for="engagement_rgpd">
+                    J'accepte le traitement électronique de mes données personnelles. Je dispose d'un droit d'accès, de modification et de suppression de mes données (droit à l'oubli) à l'issue de l'opération.
+                </label>
+                <div class="invalid-feedback" x-text="errors.engagement_rgpd"></div>
             </div>
         </div>
     </div>
