@@ -59,6 +59,17 @@
                 @error('logo') <div class="invalid-feedback">{{ $message }}</div> @enderror
             </div>
 
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Cachet et signature du président</label>
+                @if($cachetUrl)
+                    <div class="mb-2">
+                        <img src="{{ $cachetUrl }}" alt="Cachet" style="max-height:100px" class="border rounded p-1">
+                    </div>
+                @endif
+                <input type="file" wire:model="cachet" class="form-control form-control-sm" accept="image/png,image/jpeg">
+                @error('cachet') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+            </div>
+
             <button type="button" class="btn btn-primary" wire:click="save" wire:loading.attr="disabled">
                 <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
                 <span wire:loading>Enregistrement…</span>
