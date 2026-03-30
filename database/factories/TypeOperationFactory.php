@@ -18,7 +18,6 @@ class TypeOperationFactory extends Factory
     public function definition(): array
     {
         return [
-            'code' => fake()->unique()->bothify('OP-####'),
             'nom' => fake()->unique()->sentence(3),
             'description' => fake()->optional()->paragraph(),
             'sous_categorie_id' => SousCategorie::factory(),
