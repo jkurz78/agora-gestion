@@ -458,7 +458,10 @@
                     </li>
                     @if($hasParcours)
                         <li class="nav-item">
-                            <a class="nav-link" :class="tab === 'parcours' && 'active'" @click.prevent="tab = 'parcours'" href="#">Parcours</a>
+                            <a class="nav-link" :class="tab === 'parcours' && 'active'" @click.prevent="tab = 'parcours'" href="#">Données personnelles</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" :class="tab === 'contacts_medicaux' && 'active'" @click.prevent="tab = 'contacts_medicaux'" href="#">Contacts médicaux</a>
                         </li>
                     @endif
                     @if($hasPrescripteur)
@@ -579,7 +582,10 @@
                             </div>
                         </div>
 
-                        <hr>
+                    </div>
+
+                {{-- ── Tab: Contacts médicaux ──────────────────── --}}
+                    <div x-show="tab === 'contacts_medicaux'" x-cloak>
                         <h6 class="fw-bold text-muted mb-3"><i class="bi bi-heart-pulse me-1"></i> Médecin traitant</h6>
                         <div class="row g-2 mb-3">
                             <div class="col-md-6">
@@ -619,7 +625,7 @@
                         {{-- Mapping Tiers — Médecin --}}
                         @php $medecinTiers = $editParticipant?->medecinTiers ?? null; @endphp
                         @if($medecinTiers)
-                            <div class="alert alert-success py-2 mt-3">
+                            <div class="alert alert-success py-2">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $medecinTiers->nom }} {{ $medecinTiers->prenom }}</span>
                                     <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkMedecinTiers">
@@ -627,8 +633,8 @@
                                     </button>
                                 </div>
                             </div>
-                        @elseif($editMedecinNom || $editMedecinPrenom)
-                            <div class="mt-3 p-2 bg-light rounded">
+                        @else
+                            <div class="p-2 bg-light rounded">
                                 <label class="form-label small fw-bold">Associer à un tiers</label>
                                 <div class="d-flex gap-2 align-items-end">
                                     <div class="flex-grow-1">
@@ -642,14 +648,16 @@
                                         <i class="bi bi-link-45deg"></i> Associer
                                     </button>
                                 </div>
+                                @if($editMedecinNom && $editMedecinPrenom)
                                 <button type="button" class="btn btn-sm btn-outline-primary mt-2" wire:click="createMedecinTiers">
                                     <i class="bi bi-plus-lg"></i> Créer un tiers depuis ces données
                                 </button>
+                                @endif
                             </div>
                         @endif
 
                         <hr>
-                        <h6 class="fw-bold text-muted mb-3"><i class="bi bi-person-badge me-1"></i> Thérapeute</h6>
+                        <h6 class="fw-bold text-muted mb-3"><i class="bi bi-person-badge me-1"></i> Thérapeute référent</h6>
                         <div class="row g-2 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small">Nom</label>
@@ -688,7 +696,7 @@
                         {{-- Mapping Tiers — Thérapeute --}}
                         @php $therapeuteTiers = $editParticipant?->therapeuteTiers ?? null; @endphp
                         @if($therapeuteTiers)
-                            <div class="alert alert-success py-2 mt-3">
+                            <div class="alert alert-success py-2">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $therapeuteTiers->nom }} {{ $therapeuteTiers->prenom }}</span>
                                     <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkTherapeuteTiers">
@@ -696,8 +704,8 @@
                                     </button>
                                 </div>
                             </div>
-                        @elseif($editTherapeuteNom || $editTherapeutePrenom)
-                            <div class="mt-3 p-2 bg-light rounded">
+                        @else
+                            <div class="p-2 bg-light rounded">
                                 <label class="form-label small fw-bold">Associer à un tiers</label>
                                 <div class="d-flex gap-2 align-items-end">
                                     <div class="flex-grow-1">
@@ -711,9 +719,11 @@
                                         <i class="bi bi-link-45deg"></i> Associer
                                     </button>
                                 </div>
+                                @if($editTherapeuteNom && $editTherapeutePrenom)
                                 <button type="button" class="btn btn-sm btn-outline-primary mt-2" wire:click="createTherapeuteTiers">
                                     <i class="bi bi-plus-lg"></i> Créer un tiers depuis ces données
                                 </button>
+                                @endif
                             </div>
                         @endif
                     </div>
@@ -764,7 +774,7 @@
                         {{-- Mapping Tiers — Adressé par --}}
                         @php $refTiers = $editParticipant?->referePar ?? null; @endphp
                         @if($refTiers)
-                            <div class="alert alert-success py-2 mt-3">
+                            <div class="alert alert-success py-2">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $refTiers->nom }} {{ $refTiers->prenom }}</span>
                                     <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkAdresseParTiers">
@@ -772,7 +782,7 @@
                                     </button>
                                 </div>
                             </div>
-                        @elseif($editAdresseParNom || $editAdresseParPrenom)
+                        @else
                             <div class="mt-3 p-2 bg-light rounded">
                                 <label class="form-label small fw-bold">Associer à un tiers</label>
                                 <div class="d-flex gap-2 align-items-end">
@@ -787,9 +797,11 @@
                                         <i class="bi bi-link-45deg"></i> Associer
                                     </button>
                                 </div>
+                                @if($editAdresseParNom && $editAdresseParPrenom)
                                 <button type="button" class="btn btn-sm btn-outline-primary mt-2" wire:click="createAdresseParTiers">
                                     <i class="bi bi-plus-lg"></i> Créer un tiers depuis ces données
                                 </button>
+                                @endif
                             </div>
                         @endif
                     </div>
