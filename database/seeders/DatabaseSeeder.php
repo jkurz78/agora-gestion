@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         User::factory()->create([
             'nom' => 'Marie Dupont',
             'email' => 'admin@svs.fr',
+            'peut_voir_donnees_sensibles' => true,
         ]);
 
         User::factory()->create([
