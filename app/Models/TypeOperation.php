@@ -15,7 +15,6 @@ final class TypeOperation extends Model
     use HasFactory;
 
     protected $fillable = [
-        'code',
         'nom',
         'libelle_article',
         'description',
