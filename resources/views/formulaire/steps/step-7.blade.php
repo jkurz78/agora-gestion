@@ -56,11 +56,25 @@
 
     @endif
 
+    {{-- RGPD - always shown --}}
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="form-check">
+                <input type="checkbox" name="engagement_rgpd" value="1" class="form-check-input"
+                       id="engagement_rgpd" data-required :class="hasError('engagement_rgpd') && 'is-invalid'">
+                <label class="form-check-label" for="engagement_rgpd">
+                    J'accepte le traitement électronique de mes données personnelles. Je dispose d'un droit d'accès, de modification et de suppression de mes données (droit à l'oubli) à l'issue de l'opération.
+                </label>
+                <div class="invalid-feedback" x-text="errors.engagement_rgpd"></div>
+            </div>
+        </div>
+    </div>
+
     @if($typeOperation->formulaire_parcours_therapeutique || $typeOperation->formulaire_droit_image)
-    {{-- Token re-entry --}}
+    {{-- Signature (token re-entry) --}}
     <div class="card border-primary mb-4">
         <div class="card-header fw-bold text-primary">
-            <i class="bi bi-pen"></i> Confirmation
+            <i class="bi bi-pen"></i> Signature
         </div>
         <div class="card-body">
             <p>Pour confirmer votre engagement, veuillez re-saisir le code qui vous a été communiqué :</p>
@@ -75,18 +89,4 @@
         </div>
     </div>
     @endif
-
-    {{-- RGPD - always shown --}}
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="form-check">
-                <input type="checkbox" name="engagement_rgpd" value="1" class="form-check-input"
-                       id="engagement_rgpd" data-required :class="hasError('engagement_rgpd') && 'is-invalid'">
-                <label class="form-check-label" for="engagement_rgpd">
-                    J'accepte le traitement électronique de mes données personnelles. Je dispose d'un droit d'accès, de modification et de suppression de mes données (droit à l'oubli) à l'issue de l'opération.
-                </label>
-                <div class="invalid-feedback" x-text="errors.engagement_rgpd"></div>
-            </div>
-        </div>
-    </div>
 </div>
