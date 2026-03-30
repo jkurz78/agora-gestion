@@ -26,8 +26,11 @@ final class ParticipantPdfController extends Controller
             && $request->boolean('confidentiel')
             && ($request->user()->peut_voir_donnees_sensibles ?? false);
 
+        $showPrescripteur = $confidentiel && ($operation->typeOperation?->formulaire_prescripteur ?? false);
+        $showDroitImage = $confidentiel && ($operation->typeOperation?->formulaire_droit_image ?? false);
+
         $participants = Participant::where('operation_id', $operation->id)
-            ->with(['tiers', 'referePar'])
+            ->with(['tiers', 'referePar', 'medecinTiers', 'therapeuteTiers', 'typeOperationTarif'])
             ->when($confidentiel, fn ($q) => $q->with('donneesMedicales'))
             ->orderBy('id')
             ->get();
@@ -41,6 +44,8 @@ final class ParticipantPdfController extends Controller
             'participants' => $participants,
             'confidentiel' => $confidentiel,
             'isConfidentiel' => $isConfidentiel,
+            'showPrescripteur' => $showPrescripteur,
+            'showDroitImage' => $showDroitImage,
             'association' => $association,
             'headerLogoBase64' => $headerLogoBase64,
             'headerLogoMime' => $headerLogoMime,

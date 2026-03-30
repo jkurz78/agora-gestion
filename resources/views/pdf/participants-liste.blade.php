@@ -109,6 +109,14 @@
                     <th>Taille</th>
                     <th>Poids</th>
                     <th>Référé par</th>
+                    <th>Médecin</th>
+                    <th>Thérapeute</th>
+                @endif
+                @if($showDroitImage)
+                    <th>D.I.</th>
+                @endif
+                @if($confidentiel)
+                    <th>Paiement</th>
                 @endif
             </tr>
         </thead>
@@ -134,6 +142,14 @@
                         <td>{{ $med?->taille ? $med->taille.' cm' : '' }}</td>
                         <td>{{ $med?->poids ? $med->poids.' kg' : '' }}</td>
                         <td>{{ $p->referePar?->displayName() ?? '' }}</td>
+                        <td>{{ $p->medecinTiers?->nom ?? $med?->medecin_nom ?? '' }}</td>
+                        <td>{{ $p->therapeuteTiers?->nom ?? $med?->therapeute_nom ?? '' }}</td>
+                    @endif
+                    @if($showDroitImage)
+                        <td>{{ $p->droit_image ? mb_substr($p->droit_image->label(), 0, 1) : '' }}</td>
+                    @endif
+                    @if($confidentiel)
+                        <td>{{ $p->mode_paiement_choisi ? \App\Enums\ModePaiement::from($p->mode_paiement_choisi)->trigramme() : '' }}</td>
                     @endif
                 </tr>
             @endforeach
