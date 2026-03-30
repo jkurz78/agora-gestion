@@ -361,6 +361,20 @@ final class ParticipantShow extends Component
                     ? "Email {$log->categorie} envoyé à {$log->destinataire_email}"
                     : "Erreur envoi {$log->categorie} à {$log->destinataire_email}",
                 'detail' => $log->objet,
+                'copyable' => null,
+            ]);
+        }
+
+        if ($formulaireToken) {
+            $timeline->push([
+                'date' => $formulaireToken->created_at,
+                'type' => 'token_genere',
+                'categorie' => 'formulaire',
+                'icon' => 'bi-key',
+                'color' => 'secondary',
+                'description' => 'Token généré',
+                'detail' => $formulaireToken->token,
+                'copyable' => $formulaireToken->token,
             ]);
         }
 
@@ -373,6 +387,7 @@ final class ParticipantShow extends Component
                 'color' => 'primary',
                 'description' => 'Formulaire rempli depuis '.$formulaireToken->rempli_ip,
                 'detail' => null,
+                'copyable' => null,
             ]);
         }
 
