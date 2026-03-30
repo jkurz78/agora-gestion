@@ -47,7 +47,17 @@ final class TypeOperationManager extends Component
 
     public string $nombre_seances = '';
 
-    public bool $confidentiel = false;
+    public bool $formulaireActif = false;
+
+    public bool $formulairePrescripteur = false;
+
+    public bool $formulaireParcoursTherapeutique = false;
+
+    public bool $formulaireDroitImage = false;
+
+    public string $formulairePrescripteurTitre = '';
+
+    public string $formulaireQualificatifAtelier = '';
 
     public bool $reserve_adherents = false;
 
@@ -142,7 +152,12 @@ final class TypeOperationManager extends Component
         $this->description = $type->description ?? '';
         $this->sous_categorie_id = (string) $type->sous_categorie_id;
         $this->nombre_seances = $type->nombre_seances !== null ? (string) $type->nombre_seances : '';
-        $this->confidentiel = $type->confidentiel;
+        $this->formulaireActif = $type->formulaire_actif;
+        $this->formulairePrescripteur = $type->formulaire_prescripteur;
+        $this->formulaireParcoursTherapeutique = $type->formulaire_parcours_therapeutique;
+        $this->formulaireDroitImage = $type->formulaire_droit_image;
+        $this->formulairePrescripteurTitre = $type->formulaire_prescripteur_titre ?? '';
+        $this->formulaireQualificatifAtelier = $type->formulaire_qualificatif_atelier ?? '';
         $this->reserve_adherents = $type->reserve_adherents;
         $this->actif = $type->actif;
         $this->logo = null;
@@ -161,7 +176,7 @@ final class TypeOperationManager extends Component
         $this->tarifsToDelete = [];
 
         $this->showModal = true;
-        $this->maxVisitedTab = 3;
+        $this->maxVisitedTab = 4;
     }
 
     /**
@@ -214,7 +229,12 @@ final class TypeOperationManager extends Component
                 'description' => $this->description !== '' ? $this->description : null,
                 'sous_categorie_id' => (int) $this->sous_categorie_id,
                 'nombre_seances' => $this->nombre_seances !== '' ? (int) $this->nombre_seances : null,
-                'confidentiel' => $this->confidentiel,
+                'formulaire_actif' => $this->formulaireActif,
+                'formulaire_prescripteur' => $this->formulairePrescripteur,
+                'formulaire_parcours_therapeutique' => $this->formulaireParcoursTherapeutique,
+                'formulaire_droit_image' => $this->formulaireDroitImage,
+                'formulaire_prescripteur_titre' => $this->formulairePrescripteurTitre !== '' ? $this->formulairePrescripteurTitre : null,
+                'formulaire_qualificatif_atelier' => $this->formulaireQualificatifAtelier !== '' ? $this->formulaireQualificatifAtelier : null,
                 'reserve_adherents' => $this->reserve_adherents,
                 'actif' => $this->actif,
                 'email_from' => $this->email_from !== '' ? $this->email_from : null,
@@ -302,7 +322,7 @@ final class TypeOperationManager extends Component
             ]);
         }
 
-        if ($this->activeTab < 3) {
+        if ($this->activeTab < 4) {
             $this->activeTab++;
             if ($this->activeTab > $this->maxVisitedTab) {
                 $this->maxVisitedTab = $this->activeTab;
@@ -533,7 +553,12 @@ final class TypeOperationManager extends Component
         $this->description = '';
         $this->sous_categorie_id = '';
         $this->nombre_seances = '';
-        $this->confidentiel = false;
+        $this->formulaireActif = false;
+        $this->formulairePrescripteur = false;
+        $this->formulaireParcoursTherapeutique = false;
+        $this->formulaireDroitImage = false;
+        $this->formulairePrescripteurTitre = '';
+        $this->formulaireQualificatifAtelier = '';
         $this->reserve_adherents = false;
         $this->actif = true;
         $this->logo = null;
