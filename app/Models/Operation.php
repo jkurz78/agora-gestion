@@ -74,4 +74,9 @@ final class Operation extends Model
     {
         return $this->hasMany(Seance::class)->orderBy('numero');
     }
+
+    public function emailLogs(): HasMany
+    {
+        return $this->hasMany(EmailLog::class);
+    }
 }
