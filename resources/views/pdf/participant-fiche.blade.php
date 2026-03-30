@@ -435,7 +435,7 @@
     </div>
     @endif
 
-    <div style="margin-top:8px;font-size:8px;color:#999;text-align:right">
+    <div style="position: fixed; bottom: 5mm; right: 10mm; font-size: 8px; color: #999;">
         Généré le {{ now()->format('d/m/Y à H:i') }}
         @if($showParcours) — <span class="badge-confidentiel">Confidentiel</span>@endif
     </div>
