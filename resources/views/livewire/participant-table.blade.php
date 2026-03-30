@@ -444,15 +444,18 @@
             $hasEngagements = $typeOp?->formulaire_parcours_therapeutique || $typeOp?->formulaire_droit_image;
             $hasDocuments = $canSeeSensible && $typeOp?->formulaire_parcours_therapeutique;
         @endphp
-        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-             style="background:rgba(0,0,0,.4);z-index:2000"
-             wire:click.self="$set('showEditModal', false)">
-            <div class="bg-white rounded p-4 shadow" style="max-width:800px;width:95vw;max-height:90vh;overflow-y:auto"
-                 x-data="{ tab: 'coordonnees' }">
-                <h5 class="fw-bold mb-3">Modifier le participant</h5>
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex flex-column bg-white"
+             style="z-index:2000"
+             x-data="{ tab: 'coordonnees' }">
+            {{-- Header fixe --}}
+            <div class="d-flex justify-content-between align-items-center px-4 py-3 border-bottom" style="background:#f8f9fa;">
+                <h5 class="fw-bold mb-0">Modifier le participant</h5>
+                <button type="button" class="btn-close" wire:click="$set('showEditModal', false)"></button>
+            </div>
 
-                {{-- ── Tab navigation ─────────────────────────── --}}
-                <ul class="nav nav-tabs mb-3">
+            {{-- Onglets fixes --}}
+            <div class="px-4 pt-2 border-bottom" style="background:#f8f9fa;">
+                <ul class="nav nav-tabs border-0 mb-0">
                     <li class="nav-item">
                         <a class="nav-link" :class="tab === 'coordonnees' && 'active'" @click.prevent="tab = 'coordonnees'" href="#">Coordonnées</a>
                     </li>
@@ -485,6 +488,11 @@
                         </li>
                     @endif
                 </ul>
+            </div>
+
+            {{-- Contenu scrollable --}}
+            <div class="flex-grow-1 overflow-y-auto px-4 py-3">
+                <div style="max-width:800px;">
 
                 {{-- ── Tab: Coordonnées ───────────────────────── --}}
                 <div x-show="tab === 'coordonnees'" x-cloak>
@@ -917,24 +925,26 @@
                     </div>
                 @endif
 
-                {{-- ── Footer buttons ─────────────────────────── --}}
-                <div class="d-flex justify-content-between mt-4">
-                    <div class="d-flex gap-2">
-                        <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $editParticipantId]) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                            <i class="bi bi-file-person"></i> Fiche PDF
-                        </a>
-                        @if($operation->typeOperation?->formulaire_droit_image && $editParticipant?->droit_image)
-                        <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $editParticipantId]) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                            <i class="bi bi-camera"></i> Autorisation photo
-                        </a>
-                        @endif
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showEditModal', false)">Annuler</button>
-                        <button type="button" class="btn btn-sm btn-primary" wire:click="saveEdit">
-                            <i class="bi bi-check-lg"></i> Enregistrer
-                        </button>
-                    </div>
+                </div>
+            </div>
+
+            {{-- Footer fixe --}}
+            <div class="d-flex justify-content-between align-items-center px-4 py-3 border-top" style="background:#f8f9fa;">
+                <div class="d-flex gap-2">
+                    <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $editParticipantId]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-file-person"></i> Fiche PDF
+                    </a>
+                    @if($operation->typeOperation?->formulaire_droit_image && $editParticipant?->droit_image)
+                    <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $editParticipantId]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-camera"></i> Autorisation photo
+                    </a>
+                    @endif
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showEditModal', false)">Fermer</button>
+                    <button type="button" class="btn btn-sm btn-primary" wire:click="saveEdit">
+                        <i class="bi bi-check-lg"></i> Enregistrer
+                    </button>
                 </div>
             </div>
         </div>
