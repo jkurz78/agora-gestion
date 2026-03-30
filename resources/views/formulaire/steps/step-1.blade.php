@@ -14,124 +14,134 @@
         </div>
     </div>
 
-    <h5 class="mb-3"><i class="bi bi-person"></i> Coordonnées</h5>
-
-    {{-- Nom/Prénom si manquants sur le tiers --}}
-    @if(!$tiers->nom || !$tiers->prenom)
-        <div class="row g-3 mb-3">
-            @if(!$tiers->nom)
-                <div class="col-md-6">
-                    <label class="form-label">Nom <span class="text-danger">*</span></label>
-                    <input type="text" name="tiers_nom" class="form-control" data-required
-                           :class="hasError('tiers_nom') && 'is-invalid'"
-                           value="{{ old('tiers_nom') }}" maxlength="255">
-                    <div class="invalid-feedback" x-text="errors.tiers_nom"></div>
+    {{-- Coordonnées --}}
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-person me-1"></i> Coordonnées</h6>
+        </div>
+        <div class="card-body">
+            @if(!$tiers->nom || !$tiers->prenom)
+                <div class="row g-3 mb-3">
+                    @if(!$tiers->nom)
+                        <div class="col-md-6">
+                            <label class="form-label">Nom <span class="text-danger">*</span></label>
+                            <input type="text" name="tiers_nom" class="form-control" data-required
+                                   :class="hasError('tiers_nom') && 'is-invalid'"
+                                   value="{{ old('tiers_nom') }}" maxlength="255">
+                            <div class="invalid-feedback" x-text="errors.tiers_nom"></div>
+                        </div>
+                    @endif
+                    @if(!$tiers->prenom)
+                        <div class="col-md-6">
+                            <label class="form-label">Prénom <span class="text-danger">*</span></label>
+                            <input type="text" name="tiers_prenom" class="form-control" data-required
+                                   :class="hasError('tiers_prenom') && 'is-invalid'"
+                                   value="{{ old('tiers_prenom') }}" maxlength="255">
+                            <div class="invalid-feedback" x-text="errors.tiers_prenom"></div>
+                        </div>
+                    @endif
                 </div>
             @endif
-            @if(!$tiers->prenom)
+
+            <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label">Prénom <span class="text-danger">*</span></label>
-                    <input type="text" name="tiers_prenom" class="form-control" data-required
-                           :class="hasError('tiers_prenom') && 'is-invalid'"
-                           value="{{ old('tiers_prenom') }}" maxlength="255">
-                    <div class="invalid-feedback" x-text="errors.tiers_prenom"></div>
+                    <label class="form-label">Téléphone <span class="text-danger">*</span></label>
+                    <input type="tel" name="telephone" class="form-control" :class="hasError('telephone') && 'is-invalid'"
+                           value="{{ old('telephone', $tiers->telephone) }}" maxlength="30" data-required
+                           pattern="[\d\s\+\-\.\(\)]{6,30}" title="Numéro de téléphone valide">
+                    <div class="invalid-feedback" x-text="errors.telephone"></div>
                 </div>
-            @endif
-        </div>
-    @endif
+                <div class="col-md-6">
+                    <label class="form-label">Email <span class="text-danger">*</span></label>
+                    <input type="email" name="email" class="form-control" :class="hasError('email') && 'is-invalid'"
+                           value="{{ old('email', $tiers->email) }}" maxlength="255" data-required>
+                    <div class="invalid-feedback" x-text="errors.email"></div>
+                </div>
+            </div>
 
-    <div class="row g-3">
-        <div class="col-md-6">
-            <label class="form-label">Téléphone <span class="text-danger">*</span></label>
-            <input type="tel" name="telephone" class="form-control" :class="hasError('telephone') && 'is-invalid'"
-                   value="{{ old('telephone', $tiers->telephone) }}" maxlength="30" data-required
-                   pattern="[\d\s\+\-\.\(\)]{6,30}" title="Numéro de téléphone valide">
-            <div class="invalid-feedback" x-text="errors.telephone"></div>
-        </div>
-        <div class="col-md-6">
-            <label class="form-label">Email <span class="text-danger">*</span></label>
-            <input type="email" name="email" class="form-control" :class="hasError('email') && 'is-invalid'"
-                   value="{{ old('email', $tiers->email) }}" maxlength="255" data-required>
-            <div class="invalid-feedback" x-text="errors.email"></div>
-        </div>
-    </div>
+            <div class="mt-3">
+                <label class="form-label">Adresse</label>
+                <input type="text" name="adresse_ligne1" class="form-control"
+                       value="{{ old('adresse_ligne1', $tiers->adresse_ligne1) }}" maxlength="500">
+            </div>
 
-    <div class="mt-3">
-        <label class="form-label">Adresse</label>
-        <input type="text" name="adresse_ligne1" class="form-control"
-               value="{{ old('adresse_ligne1', $tiers->adresse_ligne1) }}" maxlength="500">
-    </div>
-
-    <div class="row g-3 mt-1">
-        <div class="col-md-4">
-            <label class="form-label">Code postal</label>
-            <input type="text" name="code_postal" class="form-control" :class="hasError('code_postal') && 'is-invalid'"
-                   value="{{ old('code_postal', $tiers->code_postal) }}" maxlength="10"
-                   pattern="\d{4,10}" title="Code postal (chiffres uniquement)">
-            <div class="invalid-feedback" x-text="errors.code_postal"></div>
-        </div>
-        <div class="col-md-8">
-            <label class="form-label">Ville</label>
-            <input type="text" name="ville" class="form-control"
-                   value="{{ old('ville', $tiers->ville) }}" maxlength="100">
+            <div class="row g-3 mt-1">
+                <div class="col-md-4">
+                    <label class="form-label">Code postal</label>
+                    <input type="text" name="code_postal" class="form-control" :class="hasError('code_postal') && 'is-invalid'"
+                           value="{{ old('code_postal', $tiers->code_postal) }}" maxlength="10"
+                           pattern="\d{4,10}" title="Code postal (chiffres uniquement)">
+                    <div class="invalid-feedback" x-text="errors.code_postal"></div>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Ville</label>
+                    <input type="text" name="ville" class="form-control"
+                           value="{{ old('ville', $tiers->ville) }}" maxlength="100">
+                </div>
+            </div>
         </div>
     </div>
 
     @if($typeOperation->formulaire_prescripteur)
     {{-- Adressé par --}}
-    <h6 class="mt-4 mb-3"><i class="bi bi-person-plus"></i> {{ $typeOperation->formulaire_prescripteur_titre ?? 'Je vous suis adressé(e) par' }}</h6>
-
-    <div class="mb-3">
-        <label class="form-label">Établissement</label>
-        <input type="text" name="adresse_par_etablissement" class="form-control"
-               value="{{ old('adresse_par_etablissement', $participant->adresse_par_etablissement) }}" maxlength="255">
-    </div>
-
-    <div class="row g-3">
-        <div class="col-md-6">
-            <label class="form-label">Nom</label>
-            <input type="text" name="adresse_par_nom" class="form-control"
-                   value="{{ old('adresse_par_nom', $participant->adresse_par_nom) }}" maxlength="255">
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-person-plus me-1"></i> {{ $typeOperation->formulaire_prescripteur_titre ?? 'Je vous suis adressé(e) par' }}</h6>
         </div>
-        <div class="col-md-6">
-            <label class="form-label">Prénom</label>
-            <input type="text" name="adresse_par_prenom" class="form-control"
-                   value="{{ old('adresse_par_prenom', $participant->adresse_par_prenom) }}" maxlength="255">
-        </div>
-    </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">Établissement</label>
+                <input type="text" name="adresse_par_etablissement" class="form-control"
+                       value="{{ old('adresse_par_etablissement', $participant->adresse_par_etablissement) }}" maxlength="255">
+            </div>
 
-    <div class="row g-3 mt-1">
-        <div class="col-md-4">
-            <label class="form-label">Téléphone</label>
-            <input type="tel" name="adresse_par_telephone" class="form-control"
-                   value="{{ old('adresse_par_telephone', $participant->adresse_par_telephone) }}" maxlength="30"
-                   pattern="[\d\s\+\-\.\(\)]{6,30}" title="Numéro de téléphone valide">
-        </div>
-        <div class="col-md-8">
-            <label class="form-label">Email</label>
-            <input type="email" name="adresse_par_email" class="form-control" :class="hasError('adresse_par_email') && 'is-invalid'"
-                   value="{{ old('adresse_par_email', $participant->adresse_par_email) }}" maxlength="255">
-            <div class="invalid-feedback" x-text="errors.adresse_par_email"></div>
-        </div>
-    </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Nom</label>
+                    <input type="text" name="adresse_par_nom" class="form-control"
+                           value="{{ old('adresse_par_nom', $participant->adresse_par_nom) }}" maxlength="255">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Prénom</label>
+                    <input type="text" name="adresse_par_prenom" class="form-control"
+                           value="{{ old('adresse_par_prenom', $participant->adresse_par_prenom) }}" maxlength="255">
+                </div>
+            </div>
 
-    <div class="mt-3">
-        <label class="form-label">Adresse</label>
-        <input type="text" name="adresse_par_adresse" class="form-control"
-               value="{{ old('adresse_par_adresse', $participant->adresse_par_adresse) }}" maxlength="500">
-    </div>
+            <div class="row g-3 mt-1">
+                <div class="col-md-4">
+                    <label class="form-label">Téléphone</label>
+                    <input type="tel" name="adresse_par_telephone" class="form-control"
+                           value="{{ old('adresse_par_telephone', $participant->adresse_par_telephone) }}" maxlength="30"
+                           pattern="[\d\s\+\-\.\(\)]{6,30}" title="Numéro de téléphone valide">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="adresse_par_email" class="form-control" :class="hasError('adresse_par_email') && 'is-invalid'"
+                           value="{{ old('adresse_par_email', $participant->adresse_par_email) }}" maxlength="255">
+                    <div class="invalid-feedback" x-text="errors.adresse_par_email"></div>
+                </div>
+            </div>
 
-    <div class="row g-3 mt-1">
-        <div class="col-md-4">
-            <label class="form-label">Code postal</label>
-            <input type="text" name="adresse_par_code_postal" class="form-control"
-                   value="{{ old('adresse_par_code_postal', $participant->adresse_par_code_postal) }}" maxlength="10"
-                   pattern="\d{4,10}" title="Code postal (chiffres uniquement)">
-        </div>
-        <div class="col-md-8">
-            <label class="form-label">Ville</label>
-            <input type="text" name="adresse_par_ville" class="form-control"
-                   value="{{ old('adresse_par_ville', $participant->adresse_par_ville) }}" maxlength="100">
+            <div class="mt-3">
+                <label class="form-label">Adresse</label>
+                <input type="text" name="adresse_par_adresse" class="form-control"
+                       value="{{ old('adresse_par_adresse', $participant->adresse_par_adresse) }}" maxlength="500">
+            </div>
+
+            <div class="row g-3 mt-1">
+                <div class="col-md-4">
+                    <label class="form-label">Code postal</label>
+                    <input type="text" name="adresse_par_code_postal" class="form-control"
+                           value="{{ old('adresse_par_code_postal', $participant->adresse_par_code_postal) }}" maxlength="10"
+                           pattern="\d{4,10}" title="Code postal (chiffres uniquement)">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Ville</label>
+                    <input type="text" name="adresse_par_ville" class="form-control"
+                           value="{{ old('adresse_par_ville', $participant->adresse_par_ville) }}" maxlength="100">
+                </div>
+            </div>
         </div>
     </div>
     @endif
