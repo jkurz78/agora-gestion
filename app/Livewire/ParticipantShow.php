@@ -1,0 +1,326 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire;
+
+use App\Models\Operation;
+use App\Models\Participant;
+use App\Models\ParticipantDonneesMedicales;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\View\View;
+use Livewire\Component;
+
+final class ParticipantShow extends Component
+{
+    public Operation $operation;
+
+    public Participant $participant;
+
+    // ── State ────────────────────────────────────────────────────
+    public string $successMessage = '';
+
+    public string $activeTab = 'coordonnees';
+
+    // ── Coordonnées (Tiers) ─────────────────────────────────────
+    public string $editNom = '';
+
+    public string $editPrenom = '';
+
+    public string $editAdresse = '';
+
+    public string $editCodePostal = '';
+
+    public string $editVille = '';
+
+    public string $editTelephone = '';
+
+    public string $editEmail = '';
+
+    public string $editDateInscription = '';
+
+    public ?int $editReferePar = null;
+
+    public ?int $editTypeOperationTarifId = null;
+
+    // ── Données personnelles ────────────────────────────────────
+    public string $editNomJeuneFille = '';
+
+    public string $editNationalite = '';
+
+    public string $editDateNaissance = '';
+
+    public string $editSexe = '';
+
+    public string $editTaille = '';
+
+    public string $editPoids = '';
+
+    // ── Contacts médicaux ───────────────────────────────────────
+    public string $editMedecinNom = '';
+
+    public string $editMedecinPrenom = '';
+
+    public string $editMedecinTelephone = '';
+
+    public string $editMedecinEmail = '';
+
+    public string $editMedecinAdresse = '';
+
+    public string $editMedecinCodePostal = '';
+
+    public string $editMedecinVille = '';
+
+    public string $editTherapeuteNom = '';
+
+    public string $editTherapeutePrenom = '';
+
+    public string $editTherapeuteTelephone = '';
+
+    public string $editTherapeuteEmail = '';
+
+    public string $editTherapeuteAdresse = '';
+
+    public string $editTherapeuteCodePostal = '';
+
+    public string $editTherapeuteVille = '';
+
+    public ?int $mapMedecinTiersId = null;
+
+    public ?int $mapTherapeuteTiersId = null;
+
+    // ── Adressé par ─────────────────────────────────────────────
+    public string $editAdresseParEtablissement = '';
+
+    public string $editAdresseParNom = '';
+
+    public string $editAdresseParPrenom = '';
+
+    public string $editAdresseParTelephone = '';
+
+    public string $editAdresseParEmail = '';
+
+    public string $editAdresseParAdresse = '';
+
+    public string $editAdresseParCodePostal = '';
+
+    public string $editAdresseParVille = '';
+
+    public ?int $mapAdresseParTiersId = null;
+
+    // ── Notes ───────────────────────────────────────────────────
+    public string $medNotes = '';
+
+    // ── Engagements (read-only) ─────────────────────────────────
+    public ?string $editDroitImageLabel = null;
+
+    public ?string $editModePaiement = null;
+
+    public ?string $editMoyenPaiement = null;
+
+    public ?bool $editAutorisationContactMedecin = null;
+
+    public ?string $editRgpdAccepteAt = null;
+
+    public ?string $editFormulaireRempliAt = null;
+
+    // ── Documents ───────────────────────────────────────────────
+    /** @var array<int, array{name: string, size: int, url: string}> */
+    public array $editDocuments = [];
+
+    public function mount(Operation $operation, Participant $participant): void
+    {
+        $this->operation = $operation;
+        $this->participant = $participant->loadMissing([
+            'tiers', 'donneesMedicales', 'referePar',
+            'medecinTiers', 'therapeuteTiers', 'formulaireToken',
+        ]);
+
+        $this->loadParticipantData();
+    }
+
+    public function save(): void
+    {
+        $participant = $this->participant->loadMissing('tiers');
+
+        // Update tiers
+        $participant->tiers->update([
+            'nom' => $this->editNom,
+            'prenom' => $this->editPrenom,
+            'adresse_ligne1' => $this->editAdresse,
+            'code_postal' => $this->editCodePostal,
+            'ville' => $this->editVille,
+            'telephone' => $this->editTelephone,
+            'email' => $this->editEmail,
+        ]);
+
+        // Update participant (including prescripteur fields)
+        $participant->update([
+            'date_inscription' => $this->editDateInscription,
+            'refere_par_id' => $this->editReferePar,
+            'type_operation_tarif_id' => $this->editTypeOperationTarifId,
+            'nom_jeune_fille' => $this->editNomJeuneFille !== '' ? $this->editNomJeuneFille : null,
+            'nationalite' => $this->editNationalite !== '' ? $this->editNationalite : null,
+            'adresse_par_etablissement' => $this->editAdresseParEtablissement !== '' ? $this->editAdresseParEtablissement : null,
+            'adresse_par_nom' => $this->editAdresseParNom !== '' ? $this->editAdresseParNom : null,
+            'adresse_par_prenom' => $this->editAdresseParPrenom !== '' ? $this->editAdresseParPrenom : null,
+            'adresse_par_telephone' => $this->editAdresseParTelephone !== '' ? $this->editAdresseParTelephone : null,
+            'adresse_par_email' => $this->editAdresseParEmail !== '' ? $this->editAdresseParEmail : null,
+            'adresse_par_adresse' => $this->editAdresseParAdresse !== '' ? $this->editAdresseParAdresse : null,
+            'adresse_par_code_postal' => $this->editAdresseParCodePostal !== '' ? $this->editAdresseParCodePostal : null,
+            'adresse_par_ville' => $this->editAdresseParVille !== '' ? $this->editAdresseParVille : null,
+        ]);
+
+        // Update medical data if user has permission
+        if (Auth::user()?->peut_voir_donnees_sensibles) {
+            ParticipantDonneesMedicales::updateOrCreate(
+                ['participant_id' => $participant->id],
+                [
+                    'date_naissance' => $this->editDateNaissance !== '' ? $this->editDateNaissance : null,
+                    'sexe' => $this->editSexe !== '' ? $this->editSexe : null,
+                    'taille' => $this->editTaille !== '' ? $this->editTaille : null,
+                    'poids' => $this->editPoids !== '' ? $this->editPoids : null,
+                    'medecin_nom' => $this->editMedecinNom !== '' ? $this->editMedecinNom : null,
+                    'medecin_prenom' => $this->editMedecinPrenom !== '' ? $this->editMedecinPrenom : null,
+                    'medecin_telephone' => $this->editMedecinTelephone !== '' ? $this->editMedecinTelephone : null,
+                    'medecin_email' => $this->editMedecinEmail !== '' ? $this->editMedecinEmail : null,
+                    'medecin_adresse' => $this->editMedecinAdresse !== '' ? $this->editMedecinAdresse : null,
+                    'medecin_code_postal' => $this->editMedecinCodePostal !== '' ? $this->editMedecinCodePostal : null,
+                    'medecin_ville' => $this->editMedecinVille !== '' ? $this->editMedecinVille : null,
+                    'therapeute_nom' => $this->editTherapeuteNom !== '' ? $this->editTherapeuteNom : null,
+                    'therapeute_prenom' => $this->editTherapeutePrenom !== '' ? $this->editTherapeutePrenom : null,
+                    'therapeute_telephone' => $this->editTherapeuteTelephone !== '' ? $this->editTherapeuteTelephone : null,
+                    'therapeute_email' => $this->editTherapeuteEmail !== '' ? $this->editTherapeuteEmail : null,
+                    'therapeute_adresse' => $this->editTherapeuteAdresse !== '' ? $this->editTherapeuteAdresse : null,
+                    'therapeute_code_postal' => $this->editTherapeuteCodePostal !== '' ? $this->editTherapeuteCodePostal : null,
+                    'therapeute_ville' => $this->editTherapeuteVille !== '' ? $this->editTherapeuteVille : null,
+                    'notes' => $this->medNotes !== '' ? $this->medNotes : null,
+                ]
+            );
+        }
+
+        // Touch participant to bust wire:key cache
+        $participant->touch();
+
+        $this->successMessage = 'Modifications enregistrées.';
+    }
+
+    public function render(): View
+    {
+        $typeOp = $this->operation->typeOperation;
+        $canSeeSensible = (bool) Auth::user()?->peut_voir_donnees_sensibles;
+        $hasParcours = $typeOp?->formulaire_parcours_therapeutique && $canSeeSensible;
+        $hasPrescripteur = (bool) $typeOp?->formulaire_prescripteur;
+        $hasEngagements = $typeOp?->formulaire_parcours_therapeutique || $typeOp?->formulaire_droit_image;
+        $hasDocuments = $canSeeSensible && $typeOp?->formulaire_parcours_therapeutique;
+
+        $this->operation->loadMissing('typeOperation.tarifs');
+
+        return view('livewire.participant-show', [
+            'typeOp' => $typeOp,
+            'canSeeSensible' => $canSeeSensible,
+            'hasParcours' => $hasParcours,
+            'hasPrescripteur' => $hasPrescripteur,
+            'hasEngagements' => $hasEngagements,
+            'hasDocuments' => $hasDocuments,
+        ]);
+    }
+
+    private function loadParticipantData(): void
+    {
+        $participant = $this->participant;
+        $tiers = $participant->tiers;
+
+        // Coordonnées
+        $this->editNom = $tiers->nom ?? '';
+        $this->editPrenom = $tiers->prenom ?? '';
+        $this->editAdresse = $tiers->adresse_ligne1 ?? '';
+        $this->editCodePostal = $tiers->code_postal ?? '';
+        $this->editVille = $tiers->ville ?? '';
+        $this->editTelephone = $tiers->telephone ?? '';
+        $this->editEmail = $tiers->email ?? '';
+        $this->editDateInscription = $participant->date_inscription->format('Y-m-d');
+        $this->editReferePar = $participant->refere_par_id;
+        $this->editTypeOperationTarifId = $participant->type_operation_tarif_id;
+
+        // Données personnelles
+        $med = $participant->donneesMedicales;
+        $this->editDateNaissance = $med?->date_naissance ?? '';
+        $this->editSexe = $med?->sexe ?? '';
+        $this->editTaille = $med?->taille ?? '';
+        $this->editPoids = $med?->poids ?? '';
+        $this->editNomJeuneFille = $participant->nom_jeune_fille ?? '';
+        $this->editNationalite = $participant->nationalite ?? '';
+
+        // Contacts médicaux
+        $this->editMedecinNom = $med?->medecin_nom ?? '';
+        $this->editMedecinPrenom = $med?->medecin_prenom ?? '';
+        $this->editMedecinTelephone = $med?->medecin_telephone ?? '';
+        $this->editMedecinEmail = $med?->medecin_email ?? '';
+        $this->editMedecinAdresse = $med?->medecin_adresse ?? '';
+        $this->editMedecinCodePostal = $med?->medecin_code_postal ?? '';
+        $this->editMedecinVille = $med?->medecin_ville ?? '';
+
+        $this->editTherapeuteNom = $med?->therapeute_nom ?? '';
+        $this->editTherapeutePrenom = $med?->therapeute_prenom ?? '';
+        $this->editTherapeuteTelephone = $med?->therapeute_telephone ?? '';
+        $this->editTherapeuteEmail = $med?->therapeute_email ?? '';
+        $this->editTherapeuteAdresse = $med?->therapeute_adresse ?? '';
+        $this->editTherapeuteCodePostal = $med?->therapeute_code_postal ?? '';
+        $this->editTherapeuteVille = $med?->therapeute_ville ?? '';
+
+        // Adressé par
+        $this->editAdresseParEtablissement = $participant->adresse_par_etablissement ?? '';
+        $this->editAdresseParNom = $participant->adresse_par_nom ?? '';
+        $this->editAdresseParPrenom = $participant->adresse_par_prenom ?? '';
+        $this->editAdresseParTelephone = $participant->adresse_par_telephone ?? '';
+        $this->editAdresseParEmail = $participant->adresse_par_email ?? '';
+        $this->editAdresseParAdresse = $participant->adresse_par_adresse ?? '';
+        $this->editAdresseParCodePostal = $participant->adresse_par_code_postal ?? '';
+        $this->editAdresseParVille = $participant->adresse_par_ville ?? '';
+
+        // Notes
+        $this->medNotes = $med?->notes ?? '';
+
+        // Engagements (read-only)
+        $this->editDroitImageLabel = $participant->droit_image?->label();
+        $this->editModePaiement = $participant->mode_paiement_choisi;
+        $this->editMoyenPaiement = $participant->moyen_paiement_choisi;
+        $this->editAutorisationContactMedecin = $participant->autorisation_contact_medecin;
+        $this->editRgpdAccepteAt = $participant->rgpd_accepte_at?->format('d/m/Y à H:i');
+        $this->editFormulaireRempliAt = $participant->formulaireToken?->rempli_at?->format('d/m/Y à H:i');
+
+        // Documents
+        $this->editDocuments = Auth::user()?->peut_voir_donnees_sensibles
+            ? $this->getParticipantDocuments($participant->id)
+            : [];
+
+        // Reset mapping selectors
+        $this->mapAdresseParTiersId = null;
+        $this->mapMedecinTiersId = null;
+        $this->mapTherapeuteTiersId = null;
+    }
+
+    /**
+     * @return array<int, array{name: string, size: int, url: string}>
+     */
+    private function getParticipantDocuments(int $participantId): array
+    {
+        $dir = "participants/{$participantId}";
+        if (! Storage::disk('local')->exists($dir)) {
+            return [];
+        }
+
+        return collect(Storage::disk('local')->files($dir))
+            ->map(fn (string $path) => [
+                'name' => basename($path),
+                'size' => Storage::disk('local')->size($path),
+                'url' => route('gestion.participants.documents.download', [
+                    'participant' => $participantId,
+                    'filename' => basename($path),
+                ]),
+            ])
+            ->toArray();
+    }
+}
