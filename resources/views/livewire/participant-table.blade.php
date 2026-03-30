@@ -463,10 +463,15 @@
                 <h5 class="fw-bold mb-3">Lien formulaire participant</h5>
 
                 {{-- Token code --}}
-                <div class="text-center mb-3">
+                <div class="text-center mb-3" x-data="{ copiedCode: false }">
                     <span class="d-inline-block px-3 py-2 rounded bg-light border" style="font-size:1.6rem;font-family:monospace;letter-spacing:3px">
                         {{ $tokenCode }}
                     </span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" title="Copier le code"
+                            x-on:click="navigator.clipboard.writeText('{{ $tokenCode }}'); copiedCode = true; setTimeout(() => copiedCode = false, 1500)">
+                        <template x-if="!copiedCode"><i class="bi bi-clipboard"></i></template>
+                        <template x-if="copiedCode"><i class="bi bi-check-lg text-success"></i></template>
+                    </button>
                 </div>
 
                 {{-- Full URL --}}
