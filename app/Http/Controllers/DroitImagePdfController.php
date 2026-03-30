@@ -40,17 +40,17 @@ final class DroitImagePdfController extends Controller
             : ($year - 1).' / '.$year;
 
         $data = [
-            'participant'      => $participant,
-            'operation'        => $operation,
-            'typeOperation'    => $typeOp,
-            'qualificatif'     => $qualificatif,
+            'participant' => $participant,
+            'operation' => $operation,
+            'typeOperation' => $typeOp,
+            'qualificatif' => $qualificatif,
             'qualificatifPluriel' => $qualificatif.'s',
-            'exerciceLabel'    => $exerciceLabel,
-            'association'      => $association,
+            'exerciceLabel' => $exerciceLabel,
+            'association' => $association,
             'headerLogoBase64' => $headerLogoBase64,
-            'headerLogoMime'   => $headerLogoMime,
+            'headerLogoMime' => $headerLogoMime,
             'footerLogoBase64' => $footerLogoBase64,
-            'footerLogoMime'   => $footerLogoMime,
+            'footerLogoMime' => $footerLogoMime,
         ];
 
         $nom = $participant->tiers?->nom ?? 'participant';
