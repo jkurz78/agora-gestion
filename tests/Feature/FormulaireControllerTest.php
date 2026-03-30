@@ -11,6 +11,7 @@ use App\Models\ParticipantDonneesMedicales;
 use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
 use App\Models\User;
 use App\Services\FormulaireTokenService;
@@ -24,12 +25,14 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
     $this->service = app(FormulaireTokenService::class);
-    $this->operation = Operation::factory()->create([
-        'nom' => 'Yoga du mardi',
-        'date_debut' => now()->addMonths(2)->toDateString(),
-        'date_fin' => now()->addMonths(4)->toDateString(),
-        'nombre_seances' => 12,
-    ]);
+    $this->operation = Operation::factory()
+        ->for(TypeOperation::factory()->confidentiel())
+        ->create([
+            'nom' => 'Yoga du mardi',
+            'date_debut' => now()->addMonths(2)->toDateString(),
+            'date_fin' => now()->addMonths(4)->toDateString(),
+            'nombre_seances' => 12,
+        ]);
     $this->tiers = Tiers::factory()->create([
         'prenom' => 'Marie',
         'nom' => 'Dupont',
