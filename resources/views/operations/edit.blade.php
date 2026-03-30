@@ -23,11 +23,11 @@
                         <select name="type_operation_id" id="type_operation_id"
                                 class="form-select @error('type_operation_id') is-invalid @enderror"
                                 required {{ $typeLocked ? 'disabled' : '' }}>
-                            <option value="" data-code="">— Sélectionner —</option>
+                            <option value="">— Sélectionner —</option>
                             @foreach ($typeOperations as $type)
-                                <option value="{{ $type->id }}" data-nombre-seances="{{ $type->nombre_seances }}" data-code="{{ $type->code }}"
+                                <option value="{{ $type->id }}" data-nombre-seances="{{ $type->nombre_seances }}"
                                     {{ old('type_operation_id', $operation->type_operation_id) == $type->id ? 'selected' : '' }}>
-                                    {{ $type->code }} — {{ $type->nom }}
+                                    {{ $type->nom }}
                                 </option>
                             @endforeach
                         </select>
@@ -44,24 +44,6 @@
                     @error('type_operation_id')
                         <div class="invalid-feedback d-block">{{ $message }}</div>
                     @enderror
-                </div>
-
-                {{-- Code type (read-only) + Code opération --}}
-                <div class="row mb-3">
-                    <div class="col-md-3">
-                        <label class="form-label text-muted">Code type</label>
-                        <input type="text" id="type_code_display" class="form-control bg-light" readonly
-                               value="{{ $operation->typeOperation?->code ?? '' }}">
-                    </div>
-                    <div class="col-md-9">
-                        <label for="code" class="form-label">Code opération <span class="text-danger">*</span></label>
-                        <input type="text" name="code" id="code" class="form-control @error('code') is-invalid @enderror"
-                               value="{{ old('code', $operation->code) }}" required maxlength="50">
-                        <div class="form-text">Code court affiché dans les listes de sélection</div>
-                        @error('code')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
                 </div>
 
                 {{-- Nom (libellé long) --}}
@@ -146,11 +128,9 @@
             typeSelect.addEventListener('change', function () {
                 const selected = typeSelect.options[typeSelect.selectedIndex];
                 const seances = selected.getAttribute('data-nombre-seances');
-                const typeCode = selected.getAttribute('data-code');
                 if (seances) {
                     seancesInput.value = seances;
                 }
-                document.getElementById('type_code_display').value = typeCode || '';
             });
 
             // Listen for typeOperationCreated from Livewire
