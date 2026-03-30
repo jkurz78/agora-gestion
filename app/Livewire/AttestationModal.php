@@ -148,27 +148,6 @@ final class AttestationModal extends Component
         }
     }
 
-    public function telechargerPdf(): mixed
-    {
-        if ($this->mode === 'seance') {
-            $checkedIds = collect($this->presentParticipants)->where('checked', true)->pluck('id')->implode(',');
-            if (! $checkedIds) {
-                $this->resultMessage = 'Aucun participant sélectionné.';
-                $this->resultType = 'warning';
-
-                return null;
-            }
-
-            return redirect()->route('gestion.operations.seances.attestation-pdf', [
-                $this->operation, $this->seanceId, 'participants' => $checkedIds,
-            ]);
-        }
-
-        return redirect()->route('gestion.operations.participants.attestation-recap-pdf', [
-            $this->operation, $this->participantId,
-        ]);
-    }
-
     public function render(): View
     {
         return view('livewire.attestation-modal');
