@@ -38,6 +38,8 @@ final class Participant extends Model
         'moyen_paiement_choisi',
         'autorisation_contact_medecin',
         'rgpd_accepte_at',
+        'medecin_tiers_id',
+        'therapeute_tiers_id',
     ];
 
     protected function casts(): array
@@ -70,6 +72,16 @@ final class Participant extends Model
     public function referePar(): BelongsTo
     {
         return $this->belongsTo(Tiers::class, 'refere_par_id');
+    }
+
+    public function medecinTiers(): BelongsTo
+    {
+        return $this->belongsTo(Tiers::class, 'medecin_tiers_id');
+    }
+
+    public function therapeuteTiers(): BelongsTo
+    {
+        return $this->belongsTo(Tiers::class, 'therapeute_tiers_id');
     }
 
     public function donneesMedicales(): HasOne
