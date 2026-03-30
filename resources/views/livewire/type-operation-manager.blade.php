@@ -32,7 +32,7 @@
                     <th class="sortable" data-col="nom" style="cursor:pointer">Nom <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th>Sous-catégorie</th>
                     <th class="text-center">Séances</th>
-                    <th class="text-center">Confidentiel</th>
+                    <th class="text-center">Formulaire</th>
                     <th class="text-center">Adhérents</th>
                     <th class="text-center">Actif</th>
                     <th class="text-center">Tarifs</th>
@@ -59,9 +59,9 @@
                         <td class="small">{{ $type->sousCategorie?->nom ?? '—' }}</td>
                         {{-- Séances --}}
                         <td class="text-center small">{{ $type->nombre_seances ?? '—' }}</td>
-                        {{-- Confidentiel --}}
+                        {{-- Formulaire --}}
                         <td class="text-center">
-                            @if($type->confidentiel)
+                            @if($type->formulaire_actif)
                                 <i class="bi bi-circle-fill text-success" style="font-size:.6rem"></i>
                             @else
                                 <i class="bi bi-circle-fill" style="font-size:.6rem;color:#ccc"></i>
@@ -150,6 +150,10 @@
                         <button class="nav-link {{ $activeTab === 3 ? 'active' : '' }} {{ ($editingId !== null || $maxVisitedTab >= 3) ? '' : 'disabled' }}"
                                 wire:click="goToTab(3)" type="button">Emails</button>
                     </li>
+                    <li class="nav-item">
+                        <button class="nav-link {{ $activeTab === 4 ? 'active' : '' }} {{ ($editingId !== null || $maxVisitedTab >= 4) ? '' : 'disabled' }}"
+                                wire:click="goToTab(4)" type="button">Formulaire</button>
+                    </li>
                 </ul>
 
                 {{-- ── Onglet 1 : Général ─────────────────────────────────── --}}
@@ -196,16 +200,6 @@
 
                 {{-- Options --}}
                 <div class="mb-3">
-                    <div class="border rounded p-3 mb-2">
-                        <div class="form-check form-switch">
-                            <input type="checkbox" wire:model="confidentiel" class="form-check-input" id="optConfidentiel">
-                            <label class="form-check-label fw-semibold" for="optConfidentiel">Données confidentielles</label>
-                        </div>
-                        <small class="text-muted d-block mt-1">
-                            Active les champs médicaux (kiné, date de naissance, taille, poids) dans la fiche participant et les séances.
-                            Masque la fonction de création de token pour le formulaire d'auto-saisie.
-                        </small>
-                    </div>
                     <div class="border rounded p-3 mb-2">
                         <div class="form-check form-switch">
                             <input type="checkbox" wire:model="reserve_adherents" class="form-check-input" id="optAdherents">
@@ -420,6 +414,48 @@
 
                 @endif
 
+                {{-- ── Onglet 4 : Formulaire ──────────────────────────────── --}}
+                @if($activeTab === 4)
+
+                <div>
+                    <div class="form-check form-switch mb-3">
+                        <input type="checkbox" wire:model.live="formulaireActif" class="form-check-input" id="optFormulaireActif">
+                        <label class="form-check-label fw-semibold" for="optFormulaireActif">Utiliser l'envoi de formulaires</label>
+                    </div>
+
+                    <div class="ms-4" x-data x-bind:class="!$wire.formulaireActif && 'opacity-50'">
+                        <div class="form-check form-switch mb-2">
+                            <input type="checkbox" wire:model.live="formulairePrescripteur" class="form-check-input" id="optPrescripteur"
+                                   x-bind:disabled="!$wire.formulaireActif">
+                            <label class="form-check-label" for="optPrescripteur">Demander les coordonnées du prescripteur</label>
+                        </div>
+                        <div class="ms-4 mb-3" x-show="$wire.formulairePrescripteur && $wire.formulaireActif" x-cloak>
+                            <label class="form-label small">Titre du bloc</label>
+                            <input type="text" wire:model="formulairePrescripteurTitre" class="form-control form-control-sm"
+                                   placeholder="Je vous suis adressé(e) par">
+                        </div>
+
+                        <div class="form-check form-switch mb-2">
+                            <input type="checkbox" wire:model.live="formulaireParcoursTherapeutique" class="form-check-input" id="optParcours"
+                                   x-bind:disabled="!$wire.formulaireActif">
+                            <label class="form-check-label" for="optParcours">Récolter les informations nécessaires aux parcours thérapeutiques</label>
+                        </div>
+
+                        <div class="form-check form-switch mb-2">
+                            <input type="checkbox" wire:model.live="formulaireDroitImage" class="form-check-input" id="optDroitImage"
+                                   x-bind:disabled="!$wire.formulaireActif">
+                            <label class="form-check-label" for="optDroitImage">Demander les autorisations photo et vidéo</label>
+                        </div>
+                        <div class="ms-4 mb-3" x-show="$wire.formulaireDroitImage && $wire.formulaireActif" x-cloak>
+                            <label class="form-label small">Qualificatif des ateliers</label>
+                            <input type="text" wire:model="formulaireQualificatifAtelier" class="form-control form-control-sm"
+                                   placeholder="thérapeutique">
+                        </div>
+                    </div>
+                </div>
+
+                @endif
+
                 {{-- Mini-modale test email --}}
                 @if($showTestEmailModal)
                 <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
@@ -471,7 +507,7 @@
                             <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Annuler</button>
                         @endif
 
-                        @if($activeTab < 3)
+                        @if($activeTab < 4)
                             <button type="button" class="btn btn-sm btn-primary" wire:click="nextTab">
                                 Suivant <i class="bi bi-arrow-right"></i>
                             </button>
