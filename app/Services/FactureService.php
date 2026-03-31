@@ -315,6 +315,11 @@ final class FactureService
 
         $pdfContent = $pdf->output();
 
+        // Brouillon: return plain PDF (no Factur-X, not a fiscal document)
+        if ($facture->statut === StatutFacture::Brouillon) {
+            return $pdfContent;
+        }
+
         // Step 2: generate Factur-X XML (profile MINIMUM)
         $xml = $this->genererFacturXml($facture, $association);
 
