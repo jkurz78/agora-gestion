@@ -19,6 +19,12 @@ final class Association extends Model
         'telephone',
         'logo_path',
         'cachet_signature_path',
+        'siret',
+        'forme_juridique',
+        'facture_conditions_reglement',
+        'facture_mentions_legales',
+        'facture_mentions_penalites',
+        'facture_compte_bancaire_id',
     ];
 
     protected function casts(): array
@@ -33,6 +39,7 @@ final class Association extends Model
             'telephone' => 'string',
             'logo_path' => 'string',
             'cachet_signature_path' => 'string',
+            'facture_compte_bancaire_id' => 'integer',
         ];
     }
 }
