@@ -89,8 +89,9 @@
                                 {{ $facture->date->format('d/m/Y') }}
                             </td>
                             <td class="small">{{ $facture->tiers?->displayName() }}</td>
-                            <td class="text-end small text-nowrap fw-semibold" data-sort="{{ $facture->montant_total }}">
-                                {{ number_format((float) $facture->montant_total, 2, ',', "\u{202F}") }}&nbsp;&euro;
+                            @php $montantCalcule = $facture->montantCalcule(); @endphp
+                            <td class="text-end small text-nowrap fw-semibold" data-sort="{{ $montantCalcule }}">
+                                {{ number_format($montantCalcule, 2, ',', "\u{202F}") }}&nbsp;&euro;
                             </td>
                             <td class="text-end small text-nowrap" data-sort="{{ $montantRegle }}">
                                 {{ number_format($montantRegle, 2, ',', "\u{202F}") }}&nbsp;&euro;
