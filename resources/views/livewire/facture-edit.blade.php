@@ -178,7 +178,6 @@
                     </div>
                 </div>
             </div>
-        </div>
 
             {{-- Résumé paiement --}}
             @php
@@ -215,7 +214,37 @@
         </div>
 
         <div class="col-lg-4">
-            {{-- Panel 3 : Metadonnees --}}
+            {{-- Actions (en haut de la colonne droite) --}}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    <button wire:click="sauvegarder" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Enregistrer
+                    </button>
+
+                    <button wire:click="valider"
+                            wire:confirm="Valider cette facture ? Un numero sera attribue et la facture ne pourra plus etre modifiee."
+                            class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Valider la facture
+                    </button>
+
+                    <a href="{{ route('gestion.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
+                       target="_blank"
+                       class="btn btn-outline-secondary">
+                        <i class="bi bi-file-earmark-pdf"></i> Prévisualiser PDF
+                    </a>
+
+                    <button wire:click="supprimer"
+                            wire:confirm="Supprimer ce brouillon ? Cette action est irreversible."
+                            class="btn btn-outline-danger">
+                        <i class="bi bi-trash"></i> Supprimer le brouillon
+                    </button>
+                </div>
+            </div>
+
+            {{-- Informations --}}
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="bi bi-gear"></i> Informations</h5>
@@ -255,36 +284,6 @@
                         <textarea id="facture-notes" class="form-control" rows="2"
                                   wire:model="notes"></textarea>
                     </div>
-                </div>
-            </div>
-
-            {{-- Panel 4 : Actions --}}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
-                </div>
-                <div class="card-body d-grid gap-2">
-                    <button wire:click="sauvegarder" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Enregistrer
-                    </button>
-
-                    <button wire:click="valider"
-                            wire:confirm="Valider cette facture ? Un numero sera attribue et la facture ne pourra plus etre modifiee."
-                            class="btn btn-success">
-                        <i class="bi bi-check-circle"></i> Valider la facture
-                    </button>
-
-                    <a href="{{ route('gestion.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
-                       target="_blank"
-                       class="btn btn-outline-secondary">
-                        <i class="bi bi-file-earmark-pdf"></i> Prévisualiser PDF
-                    </a>
-
-                    <button wire:click="supprimer"
-                            wire:confirm="Supprimer ce brouillon ? Cette action est irreversible."
-                            class="btn btn-outline-danger">
-                        <i class="bi bi-trash"></i> Supprimer le brouillon
-                    </button>
                 </div>
             </div>
         </div>
