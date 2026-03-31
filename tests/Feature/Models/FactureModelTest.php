@@ -222,6 +222,50 @@ test('montantRegle returns sum for transactions on non-système accounts', funct
     expect($facture->montantRegle())->toBe(200.0);
 });
 
+test('montantRegle considers remise transactions on système account as paid', function (): void {
+    $tiers = Tiers::factory()->create();
+    $user = User::factory()->create();
+    $compteSysteme = CompteBancaire::factory()->create(['est_systeme' => true, 'nom' => 'Remises en banque']);
+    $compteReel = CompteBancaire::factory()->create(['est_systeme' => false]);
+
+    $remise = RemiseBancaire::create([
+        'numero' => 99,
+        'date' => now()->toDateString(),
+        'mode_paiement' => 'cheque',
+        'compte_cible_id' => $compteReel->id,
+        'libelle' => 'Test remise',
+        'saisi_par' => $user->id,
+    ]);
+
+    $facture = Facture::create([
+        'date' => now()->toDateString(),
+        'statut' => 'validee',
+        'numero' => 'F-2025-0099',
+        'tiers_id' => $tiers->id,
+        'montant_total' => 150,
+        'saisi_par' => $user->id,
+        'exercice' => 2025,
+    ]);
+
+    // Transaction sur compte système AVEC remise_id → réglée
+    $txRemise = Transaction::factory()->create([
+        'montant_total' => 100.00,
+        'compte_id' => $compteSysteme->id,
+        'remise_id' => $remise->id,
+    ]);
+    // Transaction sur compte système SANS remise_id → non réglée
+    $txAttente = Transaction::factory()->create([
+        'montant_total' => 50.00,
+        'compte_id' => $compteSysteme->id,
+        'mode_paiement' => 'cheque',
+        'remise_id' => null,
+    ]);
+
+    $facture->transactions()->attach([$txRemise->id, $txAttente->id]);
+
+    expect($facture->montantRegle())->toBe(100.0);
+});
+
 test('isAcquittee returns false when not fully paid', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
