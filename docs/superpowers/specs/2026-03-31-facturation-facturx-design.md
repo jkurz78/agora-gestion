@@ -22,7 +22,7 @@ L'association SVS a besoin de facturer ses prestations (séances, parcours) aux 
 
 - On facture des **transactions entières**, pas des lignes isolées au sein d'une transaction
 - Les lignes de facture sont stockées dans une **table dédiée** `facture_lignes` (pas de génération dynamique)
-- Le `montant_regle` est **calculé à la volée** (pas stocké) : une transaction est considérée réglée si son `remise_id` est non null (la remise bancaire est la source de vérité pour le paiement)
+- Le `montant_regle` est **calculé à la volée** (pas stocké) : une transaction est considérée réglée si elle est sur un **compte non-système** (`compte.est_systeme = false`). Cela couvre tous les cas : virements, CB, chèques saisis directement en banque, et recettes issues de remises bancaires. Les transactions sur le compte système "Remises en banque" sans remise sont considérées comme des créances en attente
 - Les préfixes de numérotation sont **fixés en dur** : `F` (factures), `AV` (avoirs)
 - La numérotation est **par exercice** : `F-2025-0001` (exercice sept 2025 → août 2026)
 
@@ -277,7 +277,7 @@ Format : `{Sous-catégorie} — {Opération} — Séance {n} du {date_séance}`
 public function montantRegle(): float
 {
     return (float) $this->transactions()
-        ->whereNotNull('remise_id')
+        ->whereHas('compte', fn ($q) => $q->where('est_systeme', false))
         ->sum('montant_total');
 }
 
