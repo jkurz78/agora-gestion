@@ -52,13 +52,23 @@ final class TransactionService
                 throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être modifiée.');
             }
 
+            if ($transaction->isLockedByFacture()) {
+                $this->assertLockedByFactureInvariants($transaction, $data, $lignes);
+            }
+
             if ($transaction->isLockedByRapprochement()) {
                 $this->assertLockedInvariants($transaction, $data, $lignes);
             }
 
             $transaction->update($data);
 
-            if ($transaction->isLockedByRapprochement()) {
+            if ($transaction->isLockedByFacture()) {
+                foreach ($lignes as $ligneData) {
+                    $transaction->lignes()->where('id', $ligneData['id'])->update([
+                        'notes' => $ligneData['notes'],
+                    ]);
+                }
+            } elseif ($transaction->isLockedByRapprochement()) {
                 foreach ($lignes as $ligneData) {
                     $transaction->lignes()->where('id', $ligneData['id'])->update([
                         'sous_categorie_id' => $ligneData['sous_categorie_id'],
@@ -120,6 +130,9 @@ final class TransactionService
         if ($transaction->isLockedByRemise()) {
             throw new \RuntimeException('Cette transaction est liée à une remise bancaire et ne peut pas être supprimée.');
         }
+        if ($transaction->isLockedByFacture()) {
+            throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être supprimée.');
+        }
         DB::transaction(function () use ($transaction) {
             $transaction->lignes()->each(function (TransactionLigne $ligne) {
                 $ligne->affectations()->delete();
@@ -135,6 +148,10 @@ final class TransactionService
         $this->exerciceService->assertOuvert(
             $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
         );
+
+        if ($transaction->isLockedByFacture()) {
+            throw new \RuntimeException('Cette transaction est liée à une facture validée. La ventilation ne peut pas être modifiée.');
+        }
 
         DB::transaction(function () use ($ligne, $affectations) {
             if (count($affectations) === 0) {
@@ -172,6 +189,10 @@ final class TransactionService
             $this->exerciceService->anneeForDate(CarbonImmutable::parse($transaction->date))
         );
 
+        if ($transaction->isLockedByFacture()) {
+            throw new \RuntimeException('Cette transaction est liée à une facture validée. La ventilation ne peut pas être modifiée.');
+        }
+
         DB::transaction(fn () => $ligne->affectations()->delete());
     }
 
@@ -187,6 +208,40 @@ final class TransactionService
                 throw new \InvalidArgumentException(
                     "La ligne {$index} utilise une sous-catégorie d'inscription : operation_id est obligatoire."
                 );
+            }
+        }
+    }
+
+    private function assertLockedByFactureInvariants(Transaction $transaction, array $data, array $lignes): void
+    {
+        if ((int) round((float) $transaction->montant_total * 100) !== (int) round((float) $data['montant_total'] * 100)) {
+            throw new \RuntimeException('Le montant total ne peut pas être modifié sur une transaction facturée.');
+        }
+        $existingLignes = $transaction->lignes()->get()->keyBy('id');
+        if (count($lignes) !== $existingLignes->count()) {
+            throw new \RuntimeException('Le nombre de lignes ne peut pas être modifié sur une transaction facturée.');
+        }
+        foreach ($lignes as $ligneData) {
+            $id = $ligneData['id'] ?? null;
+            if ($id === null || ! $existingLignes->has($id)) {
+                throw new \RuntimeException('Ligne inconnue sur une transaction facturée.');
+            }
+            $existing = $existingLignes->get($id);
+            if ((int) round((float) $existing->montant * 100) !== (int) round((float) $ligneData['montant'] * 100)) {
+                throw new \RuntimeException('Le montant d\'une ligne ne peut pas être modifié sur une transaction facturée.');
+            }
+            if ((int) $existing->sous_categorie_id !== (int) $ligneData['sous_categorie_id']) {
+                throw new \RuntimeException('La sous-catégorie ne peut pas être modifiée sur une transaction facturée.');
+            }
+            $existingOpId = $existing->operation_id;
+            $newOpId = $ligneData['operation_id'] !== '' && $ligneData['operation_id'] !== null ? (int) $ligneData['operation_id'] : null;
+            if ($existingOpId !== $newOpId) {
+                throw new \RuntimeException('L\'opération ne peut pas être modifiée sur une transaction facturée.');
+            }
+            $existingSeance = $existing->seance;
+            $newSeance = isset($ligneData['seance']) && $ligneData['seance'] !== '' && $ligneData['seance'] !== null ? (int) $ligneData['seance'] : null;
+            if ($existingSeance !== $newSeance) {
+                throw new \RuntimeException('La séance ne peut pas être modifiée sur une transaction facturée.');
             }
         }
     }
