@@ -57,6 +57,20 @@ final class Facture extends Model
         return $this->belongsToMany(Transaction::class, 'facture_transaction');
     }
 
+    /**
+     * Montant total pour affichage : figé en base si validée, calculé depuis les lignes sinon.
+     */
+    public function montantCalcule(): float
+    {
+        if ($this->statut !== StatutFacture::Brouillon) {
+            return (float) $this->montant_total;
+        }
+
+        return (float) $this->lignes()
+            ->where('type', \App\Enums\TypeLigneFacture::Montant)
+            ->sum('montant');
+    }
+
     public function montantRegle(): float
     {
         return (float) $this->transactions()
