@@ -161,7 +161,7 @@
                     <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
                 </div>
                 <div class="card-body d-grid gap-2">
-                    <a href="{{ route('gestion.factures.pdf', $facture) }}" class="btn btn-outline-primary" target="_blank">
+                    <a href="{{ route('gestion.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}" class="btn btn-outline-primary" target="_blank">
                         <i class="bi bi-file-earmark-pdf"></i> Télécharger PDF
                     </a>
                     <a href="{{ route('gestion.factures') }}" class="btn btn-outline-secondary">
