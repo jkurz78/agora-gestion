@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -114,6 +116,18 @@ final class Transaction extends Model
     public function isLockedByRemise(): bool
     {
         return $this->remise_id !== null;
+    }
+
+    public function factures(): BelongsToMany
+    {
+        return $this->belongsToMany(Facture::class, 'facture_transaction');
+    }
+
+    public function isLockedByFacture(): bool
+    {
+        return $this->factures()
+            ->where('statut', StatutFacture::Validee)
+            ->exists();
     }
 
     /**
