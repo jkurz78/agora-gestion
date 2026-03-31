@@ -17,6 +17,8 @@ final class CompteBancaire extends Model
     protected $fillable = [
         'nom',
         'iban',
+        'bic',
+        'domiciliation',
         'solde_initial',
         'date_solde_initial',
         'actif_recettes_depenses',
