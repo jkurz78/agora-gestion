@@ -173,12 +173,48 @@ test('montantRegle returns 0 when no transactions have remise_id', function (): 
 
     $transaction = Transaction::factory()->create([
         'montant_total' => 200.00,
+        'mode_paiement' => 'cheque',
         'remise_id' => null,
     ]);
 
     $facture->transactions()->attach($transaction->id);
 
     expect($facture->montantRegle())->toBe(0.0);
+});
+
+test('montantRegle considers virement/cb/prelevement as paid without remise', function (): void {
+    $tiers = Tiers::factory()->create();
+    $user = User::factory()->create();
+
+    $facture = Facture::create([
+        'date' => now()->toDateString(),
+        'statut' => 'validee',
+        'tiers_id' => $tiers->id,
+        'montant_total' => 300,
+        'saisi_par' => $user->id,
+        'exercice' => 2025,
+    ]);
+
+    $txVirement = Transaction::factory()->create([
+        'montant_total' => 100.00,
+        'mode_paiement' => 'virement',
+        'remise_id' => null,
+    ]);
+    $txCb = Transaction::factory()->create([
+        'montant_total' => 100.00,
+        'mode_paiement' => 'cb',
+        'remise_id' => null,
+    ]);
+    $txCheque = Transaction::factory()->create([
+        'montant_total' => 100.00,
+        'mode_paiement' => 'cheque',
+        'remise_id' => null,
+    ]);
+
+    $facture->transactions()->attach([$txVirement->id, $txCb->id, $txCheque->id]);
+
+    // Virement + CB = 200 réglé, chèque sans remise = non réglé
+    expect($facture->montantRegle())->toBe(200.0);
 });
 
 test('montantRegle returns sum when transactions have remise_id', function (): void {
@@ -216,11 +252,13 @@ test('montantRegle returns sum when transactions have remise_id', function (): v
 
     $transaction3 = Transaction::factory()->create([
         'montant_total' => 50.00,
+        'mode_paiement' => 'cheque',
         'remise_id' => null,
     ]);
 
     $facture->transactions()->attach([$transaction1->id, $transaction2->id, $transaction3->id]);
 
+    // 150 + 100 (avec remise) = 250, chèque sans remise = non réglé
     expect($facture->montantRegle())->toBe(250.0);
 });
 
