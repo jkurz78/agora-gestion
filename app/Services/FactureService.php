@@ -13,8 +13,11 @@ use App\Models\FactureLigne;
 use App\Models\Seance;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use Atgp\FacturX\Writer as FacturXWriter;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 final class FactureService
 {
@@ -278,6 +281,110 @@ final class FactureService
         }
 
         $ligne->delete();
+    }
+
+    /**
+     * Generate a Factur-X compliant PDF (PDF/A-3) for the given facture.
+     */
+    public function genererPdf(Facture $facture): string
+    {
+        $facture->load(['tiers', 'compteBancaire', 'lignes', 'transactions']);
+        $association = Association::first();
+
+        // Step 1: generate visual PDF via dompdf
+        $headerLogoBase64 = null;
+        $headerLogoMime = null;
+        if ($association?->logo_path) {
+            $logoContent = Storage::disk('public')->get($association->logo_path);
+            if ($logoContent) {
+                $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+                $headerLogoMime = in_array($ext, ['jpg', 'jpeg']) ? 'image/jpeg' : 'image/png';
+                $headerLogoBase64 = base64_encode($logoContent);
+            }
+        }
+
+        $pdf = Pdf::loadView('pdf.facture', [
+            'facture' => $facture,
+            'association' => $association,
+            'headerLogoBase64' => $headerLogoBase64,
+            'headerLogoMime' => $headerLogoMime,
+            'montantRegle' => $facture->montantRegle(),
+            'isAcquittee' => $facture->isAcquittee(),
+            'mentionsPenalites' => $association?->facture_mentions_penalites,
+        ])->setPaper('a4', 'portrait');
+
+        $pdfContent = $pdf->output();
+
+        // Step 2: generate Factur-X XML (profile MINIMUM)
+        $xml = $this->genererFacturXml($facture, $association);
+
+        // Step 3: embed XML into PDF via atgp/factur-x -> PDF/A-3
+        $writer = new FacturXWriter;
+
+        return $writer->generate($pdfContent, $xml, 'minimum', false);
+    }
+
+    /**
+     * Generate Factur-X MINIMUM profile XML for the given facture.
+     */
+    private function genererFacturXml(Facture $facture, ?Association $association): string
+    {
+        $numero = $facture->numero ?? 'BROUILLON';
+        $dateFormatted = $facture->date->format('Ymd');
+        $sellerName = htmlspecialchars($association?->nom ?? '', ENT_XML1, 'UTF-8');
+        $siret = htmlspecialchars($association?->siret ?? '', ENT_XML1, 'UTF-8');
+        $buyerName = htmlspecialchars($facture->tiers->displayName(), ENT_XML1, 'UTF-8');
+        $montantTotal = number_format((float) $facture->montant_total, 2, '.', '');
+        $duePayable = number_format((float) $facture->montant_total - $facture->montantRegle(), 2, '.', '');
+
+        $siretBlock = '';
+        if ($siret !== '') {
+            $siretBlock = <<<XML
+                <ram:SpecifiedLegalOrganization>
+                    <ram:ID schemeID="0002">{$siret}</ram:ID>
+                </ram:SpecifiedLegalOrganization>
+XML;
+        }
+
+        return <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+    xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
+    xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+    <rsm:ExchangedDocumentContext>
+        <ram:GuidelineSpecifiedDocumentContextParameter>
+            <ram:ID>urn:factur-x.eu:1p0:minimum</ram:ID>
+        </ram:GuidelineSpecifiedDocumentContextParameter>
+    </rsm:ExchangedDocumentContext>
+    <rsm:ExchangedDocument>
+        <ram:ID>{$numero}</ram:ID>
+        <ram:TypeCode>380</ram:TypeCode>
+        <ram:IssueDateTime>
+            <udt:DateTimeString format="102">{$dateFormatted}</udt:DateTimeString>
+        </ram:IssueDateTime>
+    </rsm:ExchangedDocument>
+    <rsm:SupplyChainTradeTransaction>
+        <ram:ApplicableHeaderTradeAgreement>
+            <ram:SellerTradeParty>
+                <ram:Name>{$sellerName}</ram:Name>
+                {$siretBlock}
+            </ram:SellerTradeParty>
+            <ram:BuyerTradeParty>
+                <ram:Name>{$buyerName}</ram:Name>
+            </ram:BuyerTradeParty>
+        </ram:ApplicableHeaderTradeAgreement>
+        <ram:ApplicableHeaderTradeDelivery/>
+        <ram:ApplicableHeaderTradeSettlement>
+            <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+            <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+                <ram:TaxBasisTotalAmount>{$montantTotal}</ram:TaxBasisTotalAmount>
+                <ram:GrandTotalAmount>{$montantTotal}</ram:GrandTotalAmount>
+                <ram:DuePayableAmount>{$duePayable}</ram:DuePayableAmount>
+            </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        </ram:ApplicableHeaderTradeSettlement>
+    </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>
+XML;
     }
 
     private function assertBrouillon(Facture $facture): void
