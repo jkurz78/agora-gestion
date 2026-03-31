@@ -60,10 +60,7 @@ final class Facture extends Model
     public function montantRegle(): float
     {
         return (float) $this->transactions()
-            ->where(fn ($q) => $q
-                ->whereNotNull('remise_id')
-                ->orWhereIn('mode_paiement', ['virement', 'cb', 'prelevement'])
-            )
+            ->whereHas('compte', fn ($q) => $q->where('est_systeme', false))
             ->sum('montant_total');
     }
 

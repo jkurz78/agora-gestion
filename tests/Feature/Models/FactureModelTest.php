@@ -158,9 +158,10 @@ test('facture transactions relation via pivot', function (): void {
     expect($facture->transactions)->toHaveCount(2);
 });
 
-test('montantRegle returns 0 when no transactions have remise_id', function (): void {
+test('montantRegle returns 0 when transactions are on système account', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
+    $compteSysteme = CompteBancaire::factory()->create(['est_systeme' => true]);
 
     $facture = Facture::create([
         'date' => now()->toDateString(),
@@ -173,8 +174,7 @@ test('montantRegle returns 0 when no transactions have remise_id', function (): 
 
     $transaction = Transaction::factory()->create([
         'montant_total' => 200.00,
-        'mode_paiement' => 'cheque',
-        'remise_id' => null,
+        'compte_id' => $compteSysteme->id,
     ]);
 
     $facture->transactions()->attach($transaction->id);
@@ -182,9 +182,11 @@ test('montantRegle returns 0 when no transactions have remise_id', function (): 
     expect($facture->montantRegle())->toBe(0.0);
 });
 
-test('montantRegle considers virement/cb/prelevement as paid without remise', function (): void {
+test('montantRegle returns sum for transactions on non-système accounts', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
+    $compteReel = CompteBancaire::factory()->create(['est_systeme' => false]);
+    $compteSysteme = CompteBancaire::factory()->create(['est_systeme' => true]);
 
     $facture = Facture::create([
         'date' => now()->toDateString(),
@@ -195,71 +197,29 @@ test('montantRegle considers virement/cb/prelevement as paid without remise', fu
         'exercice' => 2025,
     ]);
 
+    // Virement sur compte réel → réglé
     $txVirement = Transaction::factory()->create([
         'montant_total' => 100.00,
         'mode_paiement' => 'virement',
-        'remise_id' => null,
+        'compte_id' => $compteReel->id,
     ]);
-    $txCb = Transaction::factory()->create([
-        'montant_total' => 100.00,
-        'mode_paiement' => 'cb',
-        'remise_id' => null,
-    ]);
+    // Chèque sur compte réel → réglé (saisi directement en banque)
     $txCheque = Transaction::factory()->create([
         'montant_total' => 100.00,
         'mode_paiement' => 'cheque',
-        'remise_id' => null,
+        'compte_id' => $compteReel->id,
     ]);
-
-    $facture->transactions()->attach([$txVirement->id, $txCb->id, $txCheque->id]);
-
-    // Virement + CB = 200 réglé, chèque sans remise = non réglé
-    expect($facture->montantRegle())->toBe(200.0);
-});
-
-test('montantRegle returns sum when transactions have remise_id', function (): void {
-    $tiers = Tiers::factory()->create();
-    $user = User::factory()->create();
-    $compte = CompteBancaire::factory()->create();
-
-    $remise = RemiseBancaire::create([
-        'numero' => 1,
-        'date' => now()->toDateString(),
-        'mode_paiement' => 'cheque',
-        'compte_cible_id' => $compte->id,
-        'libelle' => 'Test remise',
-        'saisi_par' => $user->id,
-    ]);
-
-    $facture = Facture::create([
-        'date' => now()->toDateString(),
-        'statut' => 'validee',
-        'tiers_id' => $tiers->id,
-        'montant_total' => 300,
-        'saisi_par' => $user->id,
-        'exercice' => 2025,
-    ]);
-
-    $transaction1 = Transaction::factory()->create([
-        'montant_total' => 150.00,
-        'remise_id' => $remise->id,
-    ]);
-
-    $transaction2 = Transaction::factory()->create([
+    // Chèque sur compte système → non réglé (en attente de remise)
+    $txAttente = Transaction::factory()->create([
         'montant_total' => 100.00,
-        'remise_id' => $remise->id,
-    ]);
-
-    $transaction3 = Transaction::factory()->create([
-        'montant_total' => 50.00,
         'mode_paiement' => 'cheque',
-        'remise_id' => null,
+        'compte_id' => $compteSysteme->id,
     ]);
 
-    $facture->transactions()->attach([$transaction1->id, $transaction2->id, $transaction3->id]);
+    $facture->transactions()->attach([$txVirement->id, $txCheque->id, $txAttente->id]);
 
-    // 150 + 100 (avec remise) = 250, chèque sans remise = non réglé
-    expect($facture->montantRegle())->toBe(250.0);
+    // 100 + 100 (comptes réels) = 200, chèque sur système = non réglé
+    expect($facture->montantRegle())->toBe(200.0);
 });
 
 test('isAcquittee returns false when not fully paid', function (): void {
