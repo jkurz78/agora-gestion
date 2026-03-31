@@ -132,9 +132,28 @@
         }
         .footer-section p { margin-bottom: 4px; }
         .footer-section .mentions { white-space: pre-line; }
+
+        /* Watermark brouillon */
+        .watermark {
+            position: fixed;
+            top: 35%;
+            left: 10%;
+            font-size: 80px;
+            font-weight: bold;
+            color: rgba(220, 53, 69, 0.12);
+            transform: rotate(-35deg);
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            z-index: 0;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
+
+    @unless ($facture->numero)
+        <div class="watermark">BROUILLON</div>
+    @endunless
 
     {{-- HEADER --}}
     <div class="header">

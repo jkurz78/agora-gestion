@@ -240,6 +240,12 @@
                         <i class="bi bi-check-circle"></i> Valider la facture
                     </button>
 
+                    <a href="{{ route('gestion.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
+                       target="_blank"
+                       class="btn btn-outline-secondary">
+                        <i class="bi bi-file-earmark-pdf"></i> Prévisualiser PDF
+                    </a>
+
                     <button wire:click="supprimer"
                             wire:confirm="Supprimer ce brouillon ? Cette action est irreversible."
                             class="btn btn-outline-danger">
