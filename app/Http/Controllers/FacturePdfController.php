@@ -15,7 +15,8 @@ final class FacturePdfController extends Controller
         $facture->load('tiers');
 
         $pdfContent = $service->genererPdf($facture);
-        $filename = "Facture {$facture->numero} - {$facture->tiers->displayName()}.pdf";
+        $label = $facture->numero ?? 'Brouillon';
+        $filename = "Facture {$label} - {$facture->tiers->displayName()}.pdf";
 
         $inline = request()->query('mode') === 'inline';
 
