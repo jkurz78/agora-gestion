@@ -232,7 +232,7 @@
         <tfoot>
             <tr>
                 <td>Total</td>
-                <td class="text-end">{{ number_format((float) $facture->montant_total, 2, ',', "\u{00A0}") }} &euro;</td>
+                <td class="text-end">{{ number_format($facture->montantCalcule(), 2, ',', "\u{00A0}") }} &euro;</td>
             </tr>
         </tfoot>
     </table>

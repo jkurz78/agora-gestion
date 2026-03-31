@@ -59,7 +59,7 @@
                             <tfoot>
                                 <tr class="table-light fw-bold">
                                     <td class="text-end">Total</td>
-                                    <td class="text-end text-nowrap">{{ number_format((float) $facture->montant_total, 2, ',', "\u{202f}") }}&nbsp;&euro;</td>
+                                    <td class="text-end text-nowrap">{{ number_format($facture->montantCalcule(), 2, ',', "\u{202f}") }}&nbsp;&euro;</td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -76,7 +76,7 @@
                     <div class="row text-center">
                         <div class="col-md-4 mb-3 mb-md-0">
                             <div class="text-muted small">Montant total</div>
-                            <div class="fs-5 fw-bold">{{ number_format((float) $facture->montant_total, 2, ',', "\u{202f}") }}&nbsp;&euro;</div>
+                            <div class="fs-5 fw-bold">{{ number_format($facture->montantCalcule(), 2, ',', "\u{202f}") }}&nbsp;&euro;</div>
                         </div>
                         <div class="col-md-4 mb-3 mb-md-0">
                             <div class="text-muted small">Montant réglé</div>
@@ -84,8 +84,9 @@
                         </div>
                         <div class="col-md-4">
                             <div class="text-muted small">Reste dû</div>
-                            <div class="fs-5 fw-bold {{ ((float) $facture->montant_total - $montantRegle) > 0 ? 'text-danger' : 'text-success' }}">
-                                {{ number_format((float) $facture->montant_total - $montantRegle, 2, ',', "\u{202f}") }}&nbsp;&euro;
+                            @php $resteDu = $facture->montantCalcule() - $montantRegle; @endphp
+                            <div class="fs-5 fw-bold {{ $resteDu > 0 ? 'text-danger' : 'text-success' }}">
+                                {{ number_format($resteDu, 2, ',', "\u{202f}") }}&nbsp;&euro;
                             </div>
                         </div>
                     </div>
