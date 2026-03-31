@@ -49,6 +49,10 @@ class DatabaseSeeder extends Seeder
         \DB::table('association')->insert([
             'id' => 1,
             'nom' => 'Soigner Vivre Sourire (SVS)',
+            'forme_juridique' => 'Association loi 1901',
+            'facture_conditions_reglement' => 'Payable à réception',
+            'facture_mentions_legales' => "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé",
+            'facture_mentions_penalites' => "En cas de retard de paiement, pénalités au taux de 3× le taux d'intérêt légal. Indemnité forfaitaire de recouvrement : 40 € (art. D441-5 C.Com).",
             'created_at' => now(),
             'updated_at' => now(),
         ]);
