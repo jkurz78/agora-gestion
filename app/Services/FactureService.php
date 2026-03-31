@@ -1,0 +1,321 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Enums\StatutFacture;
+use App\Enums\TypeLigneFacture;
+use App\Enums\TypeTransaction;
+use App\Models\Association;
+use App\Models\Facture;
+use App\Models\FactureLigne;
+use App\Models\Seance;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+
+final class FactureService
+{
+    public function __construct(
+        private readonly ExerciceService $exerciceService,
+    ) {}
+
+    /**
+     * Create a new brouillon facture for the given tiers.
+     */
+    public function creer(int $tiersId): Facture
+    {
+        $exercice = $this->exerciceService->current();
+        $this->exerciceService->assertOuvert($exercice);
+
+        return DB::transaction(function () use ($tiersId, $exercice): Facture {
+            $association = Association::first();
+
+            $mentionsLegales = $association?->facture_mentions_legales
+                ?? "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé";
+
+            $conditionsReglement = $association?->facture_conditions_reglement
+                ?? 'Payable à réception';
+
+            $compteBancaireId = $association?->facture_compte_bancaire_id;
+
+            return Facture::create([
+                'numero' => null,
+                'date' => now()->toDateString(),
+                'statut' => StatutFacture::Brouillon,
+                'tiers_id' => $tiersId,
+                'compte_bancaire_id' => $compteBancaireId,
+                'conditions_reglement' => $conditionsReglement,
+                'mentions_legales' => $mentionsLegales,
+                'montant_total' => 0,
+                'saisi_par' => auth()->id(),
+                'exercice' => $exercice,
+            ]);
+        });
+    }
+
+    /**
+     * Attach transactions to a brouillon facture and generate facture lignes from their transaction lignes.
+     *
+     * @param  array<int>  $transactionIds
+     */
+    public function ajouterTransactions(Facture $facture, array $transactionIds): void
+    {
+        $this->assertBrouillon($facture);
+
+        DB::transaction(function () use ($facture, $transactionIds): void {
+            $transactions = Transaction::with(['lignes.sousCategorie', 'lignes.operation'])
+                ->whereIn('id', $transactionIds)
+                ->get();
+
+            // Validate all transactions
+            foreach ($transactions as $transaction) {
+                if ($transaction->type !== TypeTransaction::Recette) {
+                    throw new \RuntimeException("La transaction #{$transaction->id} n'est pas une recette.");
+                }
+
+                if ($transaction->tiers_id !== $facture->tiers_id) {
+                    throw new \RuntimeException("La transaction #{$transaction->id} n'appartient pas au même tiers que la facture.");
+                }
+
+                // Check if already linked to a non-annulée facture
+                $existingFacture = $transaction->factures()
+                    ->where('statut', '!=', StatutFacture::Annulee->value)
+                    ->first();
+
+                if ($existingFacture !== null) {
+                    throw new \RuntimeException("La transaction #{$transaction->id} est déjà liée à une facture non annulée.");
+                }
+            }
+
+            // Attach to pivot
+            $facture->transactions()->attach($transactionIds);
+
+            // Get current max ordre
+            $maxOrdre = (int) FactureLigne::where('facture_id', $facture->id)->max('ordre');
+
+            // Create facture lignes from transaction lignes
+            foreach ($transactions as $transaction) {
+                foreach ($transaction->lignes as $ligne) {
+                    $maxOrdre++;
+
+                    FactureLigne::create([
+                        'facture_id' => $facture->id,
+                        'transaction_ligne_id' => $ligne->id,
+                        'type' => TypeLigneFacture::Montant,
+                        'libelle' => $this->genererLibelleLigne($ligne),
+                        'montant' => $ligne->montant,
+                        'ordre' => $maxOrdre,
+                    ]);
+                }
+            }
+        });
+    }
+
+    /**
+     * Remove a transaction from a brouillon facture, deleting corresponding facture lignes.
+     */
+    public function retirerTransaction(Facture $facture, int $transactionId): void
+    {
+        $this->assertBrouillon($facture);
+
+        DB::transaction(function () use ($facture, $transactionId): void {
+            $transaction = Transaction::with('lignes')->findOrFail($transactionId);
+
+            $ligneIds = $transaction->lignes->pluck('id')->toArray();
+
+            // Delete facture lignes linked to this transaction's lignes
+            FactureLigne::where('facture_id', $facture->id)
+                ->whereIn('transaction_ligne_id', $ligneIds)
+                ->delete();
+
+            // Detach from pivot
+            $facture->transactions()->detach($transactionId);
+        });
+    }
+
+    /**
+     * Delete a brouillon facture with all its lignes and pivot entries.
+     */
+    public function supprimerBrouillon(Facture $facture): void
+    {
+        $this->assertBrouillon($facture);
+
+        DB::transaction(function () use ($facture): void {
+            // Delete all lignes
+            FactureLigne::where('facture_id', $facture->id)->delete();
+
+            // Detach all transactions from pivot
+            $facture->transactions()->detach();
+
+            // Delete the facture
+            $facture->delete();
+        });
+    }
+
+    /**
+     * Validate a brouillon facture: assign sequential numero, freeze montant_total, set statut to validee.
+     */
+    public function valider(Facture $facture): void
+    {
+        if ($facture->statut !== StatutFacture::Brouillon) {
+            throw new \RuntimeException('Seul un brouillon peut être validé.');
+        }
+
+        $montantLignes = $facture->lignes()
+            ->where('type', TypeLigneFacture::Montant)
+            ->count();
+        if ($montantLignes === 0) {
+            throw new \RuntimeException('La facture doit contenir au moins une ligne avec montant.');
+        }
+
+        DB::transaction(function () use ($facture) {
+            // Check exercice is open inside the transaction
+            $this->exerciceService->assertOuvert($facture->exercice);
+
+            // Lock ALL factures of this exercice upfront (single lock for both
+            // chronological constraint and sequential numbering)
+            $exerciceFactures = Facture::where('exercice', $facture->exercice)
+                ->where('statut', StatutFacture::Validee)
+                ->lockForUpdate()
+                ->get();
+
+            // Chronological constraint
+            $lastValidated = $exerciceFactures->sortByDesc('date')->first();
+            if ($lastValidated && $facture->date->lt($lastValidated->date)) {
+                throw new \RuntimeException(
+                    "La date doit être postérieure ou égale au {$lastValidated->date->format('d/m/Y')} (dernière facture validée {$lastValidated->numero})."
+                );
+            }
+
+            // Sequential numbering (from locked set)
+            $maxSeq = $exerciceFactures
+                ->filter(fn ($f) => $f->numero !== null)
+                ->map(fn ($f) => (int) last(explode('-', $f->numero)))
+                ->max() ?? 0;
+
+            $seq = $maxSeq + 1;
+            $numero = sprintf('F-%d-%04d', $facture->exercice, $seq);
+
+            $montantTotal = (float) $facture->lignes()
+                ->where('type', TypeLigneFacture::Montant)
+                ->sum('montant');
+
+            $facture->update([
+                'numero' => $numero,
+                'montant_total' => $montantTotal,
+                'statut' => StatutFacture::Validee,
+            ]);
+        });
+    }
+
+    /**
+     * Swap the ordre of a facture ligne with its neighbour (up or down).
+     */
+    public function majOrdre(Facture $facture, int $ligneId, string $direction): void
+    {
+        $this->assertBrouillon($facture);
+
+        $lignes = $facture->lignes()->orderBy('ordre')->get();
+        $index = $lignes->search(fn ($l) => $l->id === $ligneId);
+
+        if ($index === false) {
+            return;
+        }
+
+        $swapIndex = $direction === 'up' ? $index - 1 : $index + 1;
+
+        if ($swapIndex < 0 || $swapIndex >= $lignes->count()) {
+            return;
+        }
+
+        $ordreA = $lignes[$index]->ordre;
+        $ordreB = $lignes[$swapIndex]->ordre;
+        $lignes[$index]->update(['ordre' => $ordreB]);
+        $lignes[$swapIndex]->update(['ordre' => $ordreA]);
+    }
+
+    /**
+     * Update the libellé of a facture ligne.
+     */
+    public function majLibelle(Facture $facture, int $ligneId, string $libelle): void
+    {
+        $this->assertBrouillon($facture);
+        $facture->lignes()->where('id', $ligneId)->update(['libelle' => $libelle]);
+    }
+
+    /**
+     * Add a text-only line (no montant) to the facture.
+     */
+    public function ajouterLigneTexte(Facture $facture, string $texte): void
+    {
+        $this->assertBrouillon($facture);
+
+        $maxOrdre = (int) $facture->lignes()->max('ordre');
+
+        $facture->lignes()->create([
+            'type' => TypeLigneFacture::Texte,
+            'libelle' => $texte,
+            'montant' => null,
+            'transaction_ligne_id' => null,
+            'ordre' => $maxOrdre + 1,
+        ]);
+    }
+
+    /**
+     * Delete a text line from the facture. Only texte lines can be individually deleted.
+     */
+    public function supprimerLigne(Facture $facture, int $ligneId): void
+    {
+        $this->assertBrouillon($facture);
+
+        $ligne = $facture->lignes()->findOrFail($ligneId);
+
+        if ($ligne->type !== TypeLigneFacture::Texte) {
+            throw new \RuntimeException('Seules les lignes de texte peuvent être supprimées individuellement.');
+        }
+
+        $ligne->delete();
+    }
+
+    private function assertBrouillon(Facture $facture): void
+    {
+        if ($facture->statut !== StatutFacture::Brouillon) {
+            throw new \RuntimeException('Cette action n\'est possible que sur un brouillon.');
+        }
+    }
+
+    /**
+     * Generate auto-libellé for a facture ligne based on the transaction ligne.
+     */
+    private function genererLibelleLigne(TransactionLigne $ligne): string
+    {
+        $sousCategorie = $ligne->sousCategorie?->nom ?? '';
+        $operation = $ligne->operation?->nom;
+
+        if ($operation === null) {
+            return $sousCategorie;
+        }
+
+        $parts = [$sousCategorie, $operation];
+
+        if ($ligne->seance !== null) {
+            $seanceLabel = "Séance {$ligne->seance}";
+
+            // Try to find the séance date
+            $seanceDate = Seance::where('operation_id', $ligne->operation_id)
+                ->where('numero', $ligne->seance)
+                ->value('date');
+
+            if ($seanceDate !== null) {
+                $seanceLabel .= ' du '.Carbon::parse($seanceDate)->format('d/m/Y');
+            }
+
+            $parts[] = $seanceLabel;
+        }
+
+        return implode(' — ', $parts);
+    }
+}
