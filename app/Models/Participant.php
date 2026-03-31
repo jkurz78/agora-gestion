@@ -51,6 +51,7 @@ final class Participant extends Model
             'droit_image' => DroitImage::class,
             'autorisation_contact_medecin' => 'boolean',
             'rgpd_accepte_at' => 'datetime',
+            'refere_par_id' => 'integer',
         ];
     }
 
