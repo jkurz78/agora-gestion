@@ -34,6 +34,14 @@
                     <input type="text" name="iban" id="cb_iban" class="form-control" maxlength="34">
                 </div>
                 <div class="col-md-2">
+                    <label for="cb_bic" class="form-label">BIC</label>
+                    <input type="text" name="bic" id="cb_bic" class="form-control" maxlength="11">
+                </div>
+                <div class="col-md-3">
+                    <label for="cb_domiciliation" class="form-label">Domiciliation</label>
+                    <input type="text" name="domiciliation" id="cb_domiciliation" class="form-control" maxlength="255" placeholder="Nom de la banque">
+                </div>
+                <div class="col-md-2">
                     <label for="cb_solde" class="form-label">Solde initial</label>
                     <input type="number" name="solde_initial" id="cb_solde" class="form-control" required step="0.01">
                 </div>
@@ -65,6 +73,8 @@
             <tr>
                 <th>Nom</th>
                 <th>IBAN</th>
+                <th>BIC</th>
+                <th>Domiciliation</th>
                 <th>Solde initial</th>
                 <th>Date solde</th>
                 <th class="text-center">Rec./Dép.</th>
@@ -77,6 +87,8 @@
                 <tr>
                     <td>{{ $compte->nom }}</td>
                     <td>{{ $compte->iban ?? '—' }}</td>
+                    <td>{{ $compte->bic ?? '—' }}</td>
+                    <td>{{ $compte->domiciliation ?? '—' }}</td>
                     <td>{{ number_format((float) $compte->solde_initial, 2, ',', ' ') }} &euro;</td>
                     <td>{{ $compte->date_solde_initial->format('d/m/Y') }}</td>
                     <td class="text-center">
@@ -105,6 +117,8 @@
                                 data-update-url="{{ route($espace->value . '.parametres.comptes-bancaires.update', $compte) }}"
                                 data-nom="{{ $compte->nom }}"
                                 data-iban="{{ $compte->iban ?? '' }}"
+                                data-bic="{{ $compte->bic ?? '' }}"
+                                data-domiciliation="{{ $compte->domiciliation ?? '' }}"
                                 data-solde="{{ $compte->solde_initial }}"
                                 data-date="{{ $compte->date_solde_initial->format('Y-m-d') }}"
                                 data-actif-rd="{{ $compte->actif_recettes_depenses ? '1' : '0' }}"
@@ -124,7 +138,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="7" class="text-muted">Aucun compte bancaire enregistré.</td>
+                    <td colspan="9" class="text-muted">Aucun compte bancaire enregistré.</td>
                 </tr>
             @endforelse
         </tbody>
@@ -149,6 +163,14 @@
                     <div class="col-12">
                         <label for="edit_iban" class="form-label">IBAN</label>
                         <input type="text" name="iban" id="edit_iban" class="form-control" maxlength="34">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="edit_bic" class="form-label">BIC</label>
+                        <input type="text" name="bic" id="edit_bic" class="form-control" maxlength="11">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="edit_domiciliation" class="form-label">Domiciliation</label>
+                        <input type="text" name="domiciliation" id="edit_domiciliation" class="form-control" maxlength="255" placeholder="Nom de la banque">
                     </div>
                     <div class="col-md-6">
                         <label for="edit_solde" class="form-label">Solde initial <span class="text-danger">*</span></label>
@@ -190,6 +212,8 @@ function fillEditModal(btn) {
     form.action = btn.dataset.updateUrl;
     document.getElementById('edit_nom').value = btn.dataset.nom;
     document.getElementById('edit_iban').value = btn.dataset.iban;
+    document.getElementById('edit_bic').value = btn.dataset.bic;
+    document.getElementById('edit_domiciliation').value = btn.dataset.domiciliation;
     document.getElementById('edit_solde').value = btn.dataset.solde;
     const editDateWrapper = document.getElementById('edit_date');
     const editDateInput = editDateWrapper ? editDateWrapper.querySelector('input[type=text]') : null;
