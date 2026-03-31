@@ -180,6 +180,40 @@
             </div>
         </div>
 
+            {{-- Résumé paiement --}}
+            @php
+                $montantTotal = $facture->montantCalcule();
+                $montantRegle = $facture->montantRegle();
+                $resteDu = $montantTotal - $montantRegle;
+            @endphp
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-cash-stack"></i> Paiement</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="text-muted small">Total</div>
+                            <div class="fs-6 fw-bold">{{ number_format($montantTotal, 2, ',', "\u{202F}") }}&nbsp;&euro;</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted small">Réglé</div>
+                            <div class="fs-6 fw-bold text-success">{{ number_format($montantRegle, 2, ',', "\u{202F}") }}&nbsp;&euro;</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted small">Reste dû</div>
+                            <div class="fs-6 fw-bold {{ $resteDu > 0 ? 'text-danger' : 'text-success' }}">{{ number_format($resteDu, 2, ',', "\u{202F}") }}&nbsp;&euro;</div>
+                        </div>
+                    </div>
+                    @if ($montantRegle >= $montantTotal && $montantTotal > 0)
+                        <div class="text-center mt-2">
+                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Acquittée</span>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
         <div class="col-lg-4">
             {{-- Panel 3 : Metadonnees --}}
             <div class="card mb-4">

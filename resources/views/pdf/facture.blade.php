@@ -237,6 +237,19 @@
         </tfoot>
     </table>
 
+    {{-- PAIEMENT --}}
+    @php $resteDu = $facture->montantCalcule() - $montantRegle; @endphp
+    <table style="width: 50%; margin-left: auto; margin-bottom: 12px; font-size: 10px; border-collapse: collapse;">
+        <tr>
+            <td style="padding: 4px 8px; color: #6c757d;">Montant r&eacute;gl&eacute;</td>
+            <td style="padding: 4px 8px; text-align: right;">{{ number_format($montantRegle, 2, ',', "\u{00A0}") }} &euro;</td>
+        </tr>
+        <tr style="font-weight: bold; {{ $resteDu > 0 ? 'color: #dc3545;' : 'color: #198754;' }}">
+            <td style="padding: 4px 8px; border-top: 1px solid #dee2e6;">Reste d&ucirc;</td>
+            <td style="padding: 4px 8px; text-align: right; border-top: 1px solid #dee2e6;">{{ number_format($resteDu, 2, ',', "\u{00A0}") }} &euro;</td>
+        </tr>
+    </table>
+
     {{-- ACQUITTEE STAMP --}}
     @if ($isAcquittee)
         <div style="text-align: center; margin: 12px 0;">
