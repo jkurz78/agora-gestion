@@ -29,6 +29,8 @@ final class UpdateCompteBancaireRequest extends FormRequest
         return [
             'nom' => ['required', 'string', 'max:150'],
             'iban' => ['nullable', 'string', 'max:34'],
+            'bic' => ['nullable', 'string', 'max:11'],
+            'domiciliation' => ['nullable', 'string', 'max:255'],
             'solde_initial' => ['required', 'numeric'],
             'date_solde_initial' => ['required', 'date'],
             'actif_recettes_depenses' => ['boolean'],
