@@ -302,6 +302,14 @@
                         </a>
                     </li>
 
+                    {{-- Factures --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('gestion.factures*') ? 'active' : '' }}"
+                           href="{{ route('gestion.factures') }}">
+                            <i class="bi bi-receipt"></i> Factures
+                        </a>
+                    </li>
+
                     {{-- Sync HelloAsso --}}
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('gestion.helloasso-sync') ? 'active' : '' }}"

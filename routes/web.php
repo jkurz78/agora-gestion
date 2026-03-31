@@ -7,6 +7,7 @@ use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\DroitImagePdfController;
 use App\Http\Controllers\FormulaireController;
 use App\Http\Controllers\OperationController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\DetecteEspace;
 use App\Models\CompteBancaire;
+use App\Models\Facture;
 use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
@@ -137,6 +139,17 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
         })->name('remises-bancaires.validation');
         Route::get('/remises-bancaires/{remise}/pdf', RemiseBancairePdfController::class)
             ->name('remises-bancaires.pdf');
+
+        // Factures
+        Route::view('/factures', 'gestion.factures.index')->name('factures');
+        Route::get('/factures/{facture}/edit', function (Facture $facture) {
+            return view('gestion.factures.edit', compact('facture'));
+        })->name('factures.edit');
+        Route::get('/factures/{facture}', function (Facture $facture) {
+            return view('gestion.factures.show', compact('facture'));
+        })->name('factures.show');
+        Route::get('/factures/{facture}/pdf', FacturePdfController::class)
+            ->name('factures.pdf');
 
         // Shared registrations
         $registerParametres();
