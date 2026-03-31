@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Models\Association;
+use App\Models\CompteBancaire;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -34,6 +35,18 @@ final class AssociationForm extends Component
 
     public ?string $cachet_signature_path = null;
 
+    public ?string $siret = null;
+
+    public ?string $forme_juridique = null;
+
+    public ?string $facture_conditions_reglement = null;
+
+    public ?string $facture_mentions_legales = null;
+
+    public ?string $facture_mentions_penalites = null;
+
+    public ?int $facture_compte_bancaire_id = null;
+
     public function mount(): void
     {
         $association = Association::find(1);
@@ -46,6 +59,12 @@ final class AssociationForm extends Component
             $this->telephone = $association->telephone ?? '';
             $this->logo_path = $association->logo_path;
             $this->cachet_signature_path = $association->cachet_signature_path;
+            $this->siret = $association->siret;
+            $this->forme_juridique = $association->forme_juridique;
+            $this->facture_conditions_reglement = $association->facture_conditions_reglement;
+            $this->facture_mentions_legales = $association->facture_mentions_legales;
+            $this->facture_mentions_penalites = $association->facture_mentions_penalites;
+            $this->facture_compte_bancaire_id = $association->facture_compte_bancaire_id;
         }
     }
 
@@ -60,6 +79,12 @@ final class AssociationForm extends Component
             'telephone' => ['nullable', 'string', 'max:30'],
             'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
             'cachet' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:2048'],
+            'siret' => ['nullable', 'string', 'max:14'],
+            'forme_juridique' => ['nullable', 'string', 'max:255'],
+            'facture_conditions_reglement' => ['nullable', 'string', 'max:1000'],
+            'facture_mentions_legales' => ['nullable', 'string', 'max:2000'],
+            'facture_mentions_penalites' => ['nullable', 'string', 'max:2000'],
+            'facture_compte_bancaire_id' => ['nullable', 'integer', 'exists:comptes_bancaires,id'],
         ]);
 
         $data = [
@@ -69,6 +94,12 @@ final class AssociationForm extends Component
             'ville' => $this->ville,
             'email' => $this->email,
             'telephone' => $this->telephone,
+            'siret' => $this->siret,
+            'forme_juridique' => $this->forme_juridique,
+            'facture_conditions_reglement' => $this->facture_conditions_reglement,
+            'facture_mentions_legales' => $this->facture_mentions_legales,
+            'facture_mentions_penalites' => $this->facture_mentions_penalites,
+            'facture_compte_bancaire_id' => $this->facture_compte_bancaire_id,
         ];
 
         if ($this->logo !== null) {
@@ -130,6 +161,12 @@ final class AssociationForm extends Component
             $cachetUrl = Storage::disk('public')->url($this->cachet_signature_path);
         }
 
-        return view('livewire.parametres.association-form', ['logoUrl' => $logoUrl, 'cachetUrl' => $cachetUrl]);
+        $comptesBancaires = CompteBancaire::where('est_systeme', false)->orderBy('nom')->get();
+
+        return view('livewire.parametres.association-form', [
+            'logoUrl' => $logoUrl,
+            'cachetUrl' => $cachetUrl,
+            'comptesBancaires' => $comptesBancaires,
+        ]);
     }
 }
