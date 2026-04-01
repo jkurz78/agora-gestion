@@ -142,7 +142,7 @@ final class ReglementTable extends Component
         }
     }
 
-    public function emettreDocument(int $participantId, string $type): mixed
+    public function emettreDocument(int $participantId, string $type): void
     {
         $participant = $this->operation->participants()->findOrFail($participantId);
         $typeEnum = TypeDocumentPrevisionnel::from($type);
@@ -155,10 +155,7 @@ final class ReglementTable extends Component
             $service->genererPdf($document);
         }
 
-        return $this->redirect(
-            route('gestion.documents-previsionnels.pdf', $document),
-            navigate: false,
-        );
+        $this->dispatch('open-url', url: route('gestion.documents-previsionnels.pdf', $document));
     }
 
     public function render(): View
@@ -192,7 +189,7 @@ final class ReglementTable extends Component
             ->groupBy('participant_id', 'type')
             ->get()
             ->groupBy('participant_id')
-            ->map(fn ($items) => $items->keyBy('type'));
+            ->map(fn ($items) => $items->keyBy(fn ($item) => $item->type->value));
 
         return view('livewire.reglement-table', [
             'seances' => $seances,
