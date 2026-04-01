@@ -1,4 +1,17 @@
 <div>
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     {{-- En-tete --}}
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
@@ -14,8 +27,10 @@
                     <span class="badge bg-success fs-6">Acquittée</span>
                 @elseif ($facture->statut === \App\Enums\StatutFacture::Annulee)
                     <span class="badge bg-danger fs-6">Annulée</span>
+                @elseif ($montantRegle > 0)
+                    <span class="badge bg-warning text-dark fs-6">Partiellement réglée</span>
                 @else
-                    <span class="badge bg-primary fs-6">Validée</span>
+                    <span class="badge bg-secondary fs-6">Non réglée</span>
                 @endif
             </h1>
             <p class="text-muted mb-0">
@@ -95,6 +110,12 @@
                         <div class="text-center mt-3">
                             <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Acquittée</span>
                         </div>
+                    @elseif ($transactionsAEncaisser->isNotEmpty())
+                        <div class="text-center mt-3">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#encaissementModal">
+                                <i class="bi bi-cash-coin"></i> Enregistrer le règlement
+                            </button>
+                        </div>
                     @endif
                 </div>
             </div>
@@ -171,4 +192,52 @@
             </div>
         </div>
     </div>
+
+    {{-- Modale d'encaissement --}}
+    @if ($transactionsAEncaisser->isNotEmpty())
+    <div class="modal fade" id="encaissementModal" tabindex="-1" wire:ignore.self>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-cash-coin"></i> Enregistrer le règlement</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Sélectionnez les créances reçues et le compte bancaire de destination.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Créances en attente</label>
+                        @foreach ($transactionsAEncaisser as $tx)
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="tx-{{ $tx->id }}"
+                                       wire:click="toggleTransaction({{ $tx->id }})"
+                                       @checked(in_array($tx->id, $selectedTransactionIds))>
+                                <label class="form-check-label" for="tx-{{ $tx->id }}">
+                                    {{ $tx->libelle }}
+                                    <span class="fw-semibold text-nowrap">— {{ number_format((float) $tx->montant_total, 2, ',', "\u{202f}") }}&nbsp;&euro;</span>
+                                </label>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="encaissement-compte" class="form-label fw-semibold">Compte bancaire de destination</label>
+                        <select wire:model="encaissementCompteId" id="encaissement-compte" class="form-select">
+                            <option value="">-- Choisir --</option>
+                            @foreach ($comptesDestination as $compte)
+                                <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-primary" wire:click="encaisser" data-bs-dismiss="modal">
+                        <i class="bi bi-check-lg"></i> Confirmer l'encaissement
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 </div>
