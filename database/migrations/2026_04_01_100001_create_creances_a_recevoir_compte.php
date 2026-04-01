@@ -16,7 +16,6 @@ return new class extends Migration
             'solde_initial' => 0,
             'date_solde_initial' => now()->toDateString(),
             'actif_recettes_depenses' => true,
-            'actif_dons_cotisations' => false,
             'est_systeme' => true,
         ]);
     }
