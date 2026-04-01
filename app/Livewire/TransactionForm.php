@@ -252,7 +252,7 @@ final class TransactionForm extends Component
             'notes' => (string) ($ligne->notes ?? ''),
         ])->toArray();
 
-        $this->isLocked = $transaction->isLockedByRapprochement();
+        $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByRemise();
         $this->isLockedByFacture = $transaction->isLockedByFacture();
         $this->showForm = true;
     }
