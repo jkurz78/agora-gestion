@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\TypeDocumentPrevisionnel;
+use App\Exceptions\ExerciceCloturedException;
 use App\Models\Association;
 use App\Models\DocumentPrevisionnel;
 use App\Models\Exercice;
@@ -53,7 +54,7 @@ function createOperationWithReglements(int $nbSeances = 3, float $montant = 50.0
         $seance = Seance::create([
             'operation_id' => $operation->id,
             'numero' => $i,
-            'date' => '2025-10-' . str_pad((string) ($i * 7), 2, '0', STR_PAD_LEFT),
+            'date' => '2025-10-'.str_pad((string) ($i * 7), 2, '0', STR_PAD_LEFT),
             'titre' => "Séance $i",
         ]);
         $seances[] = $seance;
@@ -176,5 +177,5 @@ describe('emettre()', function () {
         [$operation, $participant] = createOperationWithReglements(2, 30.00);
 
         $this->service->emettre($operation, $participant, TypeDocumentPrevisionnel::Devis);
-    })->throws(\App\Exceptions\ExerciceCloturedException::class);
+    })->throws(ExerciceCloturedException::class);
 });

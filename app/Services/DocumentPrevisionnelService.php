@@ -11,8 +11,10 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
+use App\Models\Tiers;
 use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -104,13 +106,13 @@ final class DocumentPrevisionnelService
 
     /**
      * @param  \Illuminate\Database\Eloquent\Collection<int, Seance>  $seances
-     * @param  \Illuminate\Support\Collection<int, Reglement>  $reglements
+     * @param  Collection<int, Reglement>  $reglements
      * @return array<int, array{type: string, libelle: string, montant?: float, seance_id?: int}>
      */
     private function buildLignes(
         Operation $operation,
         \Illuminate\Database\Eloquent\Collection $seances,
-        \Illuminate\Support\Collection $reglements,
+        Collection $reglements,
         TypeDocumentPrevisionnel $type,
     ): array {
         $nbSeances = $seances->count();
@@ -191,7 +193,7 @@ final class DocumentPrevisionnelService
 
         // Convert to PDF/A-3 with metadata XML
         $xml = $this->genererMetadataXml($document, $association, $tiers);
-        $writer = new FacturXWriter();
+        $writer = new FacturXWriter;
         $pdfA3Content = $writer->generate($pdfContent, $xml, 'minimum', false);
 
         // Store on disk
@@ -205,7 +207,7 @@ final class DocumentPrevisionnelService
     private function genererMetadataXml(
         DocumentPrevisionnel $document,
         ?Association $association,
-        \App\Models\Tiers $tiers,
+        Tiers $tiers,
     ): string {
         $numero = htmlspecialchars($document->numero, ENT_XML1, 'UTF-8');
         $date = $document->date->format('Ymd');

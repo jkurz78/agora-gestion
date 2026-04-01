@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\TypeDocumentPrevisionnel;
 use App\Models\DocumentPrevisionnel;
 use App\Models\EmailLog;
 use App\Models\Operation;
@@ -403,7 +404,7 @@ final class ParticipantShow extends Component
                 'date' => $doc->created_at,
                 'type' => 'document_previsionnel',
                 'categorie' => $doc->type->value,
-                'icon' => $doc->type === \App\Enums\TypeDocumentPrevisionnel::Devis
+                'icon' => $doc->type === TypeDocumentPrevisionnel::Devis
                     ? 'bi-file-earmark-text'
                     : 'bi-file-earmark-ruled',
                 'color' => 'info',
@@ -413,7 +414,7 @@ final class ParticipantShow extends Component
                     $doc->numero,
                     $doc->version,
                     $doc->operation->nom,
-                    number_format((float) $doc->montant_total, 2, ',', "\u{00A0}") . ' €',
+                    number_format((float) $doc->montant_total, 2, ',', "\u{00A0}").' €',
                 ),
                 'detail' => null,
                 'copyable' => null,
