@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\TypeDocumentPrevisionnel;
+use App\Models\Association;
 use App\Models\DocumentPrevisionnel;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
+use Atgp\FacturX\Writer as FacturXWriter;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 final class DocumentPrevisionnelService
 {
@@ -155,5 +159,109 @@ final class DocumentPrevisionnelService
         }
 
         return $lignes;
+    }
+
+    public function genererPdf(DocumentPrevisionnel $document): string
+    {
+        $document->load('participant.tiers', 'operation');
+
+        $association = Association::first();
+        $tiers = $document->participant->tiers;
+
+        $headerLogoBase64 = null;
+        $headerLogoMime = null;
+        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
+            $logoContent = Storage::disk('public')->get($association->logo_path);
+            if ($logoContent) {
+                $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+                $headerLogoMime = in_array($ext, ['jpg', 'jpeg']) ? 'image/jpeg' : 'image/png';
+                $headerLogoBase64 = base64_encode($logoContent);
+            }
+        }
+
+        $pdf = Pdf::loadView('pdf.document-previsionnel', [
+            'document' => $document,
+            'association' => $association,
+            'tiers' => $tiers,
+            'headerLogoBase64' => $headerLogoBase64,
+            'headerLogoMime' => $headerLogoMime,
+        ])->setPaper('a4', 'portrait');
+
+        $pdfContent = $pdf->output();
+
+        // Convert to PDF/A-3 with metadata XML
+        $xml = $this->genererMetadataXml($document, $association, $tiers);
+        $writer = new FacturXWriter();
+        $pdfA3Content = $writer->generate($pdfContent, $xml, 'minimum', false);
+
+        // Store on disk
+        $path = "documents-previsionnels/{$document->numero}.pdf";
+        Storage::disk('local')->put($path, $pdfA3Content);
+        $document->update(['pdf_path' => $path]);
+
+        return $pdfA3Content;
+    }
+
+    private function genererMetadataXml(
+        DocumentPrevisionnel $document,
+        ?Association $association,
+        \App\Models\Tiers $tiers,
+    ): string {
+        $numero = htmlspecialchars($document->numero, ENT_XML1, 'UTF-8');
+        $date = $document->date->format('Ymd');
+        $montant = number_format((float) $document->montant_total, 2, '.', '');
+        $sellerName = htmlspecialchars($association?->nom ?? '', ENT_XML1, 'UTF-8');
+        $siret = htmlspecialchars($association?->siret ?? '', ENT_XML1, 'UTF-8');
+        $buyerName = htmlspecialchars($tiers->displayName(), ENT_XML1, 'UTF-8');
+
+        $siretBlock = '';
+        if ($siret !== '') {
+            $siretBlock = <<<XML
+                <ram:SpecifiedLegalOrganization>
+                    <ram:ID schemeID="0002">{$siret}</ram:ID>
+                </ram:SpecifiedLegalOrganization>
+XML;
+        }
+
+        // TypeCode 325 = Pro forma, not 380 (Invoice)
+        return <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+    xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
+    xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+    <rsm:ExchangedDocumentContext>
+        <ram:GuidelineSpecifiedDocumentContextParameter>
+            <ram:ID>urn:factur-x.eu:1p0:minimum</ram:ID>
+        </ram:GuidelineSpecifiedDocumentContextParameter>
+    </rsm:ExchangedDocumentContext>
+    <rsm:ExchangedDocument>
+        <ram:ID>{$numero}</ram:ID>
+        <ram:TypeCode>325</ram:TypeCode>
+        <ram:IssueDateTime>
+            <udt:DateTimeString format="102">{$date}</udt:DateTimeString>
+        </ram:IssueDateTime>
+    </rsm:ExchangedDocument>
+    <rsm:SupplyChainTradeTransaction>
+        <ram:ApplicableHeaderTradeAgreement>
+            <ram:SellerTradeParty>
+                <ram:Name>{$sellerName}</ram:Name>
+                {$siretBlock}
+            </ram:SellerTradeParty>
+            <ram:BuyerTradeParty>
+                <ram:Name>{$buyerName}</ram:Name>
+            </ram:BuyerTradeParty>
+        </ram:ApplicableHeaderTradeAgreement>
+        <ram:ApplicableHeaderTradeDelivery/>
+        <ram:ApplicableHeaderTradeSettlement>
+            <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+            <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+                <ram:TaxBasisTotalAmount>{$montant}</ram:TaxBasisTotalAmount>
+                <ram:GrandTotalAmount>{$montant}</ram:GrandTotalAmount>
+                <ram:DuePayableAmount>{$montant}</ram:DuePayableAmount>
+            </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+        </ram:ApplicableHeaderTradeSettlement>
+    </rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>
+XML;
     }
 }
