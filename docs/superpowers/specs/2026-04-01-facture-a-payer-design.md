@@ -51,7 +51,7 @@ Aucune modification des tables `factures`, `facture_lignes`, `facture_transactio
 
 1. L'utilisateur va dans **Nouvelle recette** (flux existant)
 2. Il sélectionne le tiers, la date, les lignes (opération, sous-catégorie, séance, montant)
-3. **Nouveauté** : le compte "Créances à recevoir" apparaît dans la liste des comptes disponibles
+3. **Nouveauté** : le compte "Créances à recevoir" apparaît dans la liste des comptes disponibles. Ce compte n'est proposé que pour les **recettes**, jamais pour les dépenses ni les virements.
 4. Il enregistre → la transaction est créée sur le compte système
 
 ### 3.2 Créer la facture
@@ -73,7 +73,7 @@ La fiche facture affiche :
 | Montant total | `montant_total` (figé à la validation) |
 | Montant réglé | `montantRegle()` — somme des transactions sur comptes non-système |
 | Reste à payer | `montant_total - montantRegle()` |
-| Statut | Acquittée si `montantRegle() >= montant_total`, sinon En attente |
+| Statut | Acquittée si `montantRegle() >= montant_total`, sinon Non réglée |
 
 Le bouton **"Enregistrer le règlement"** est visible si `montantRegle() < montant_total` (il reste des créances à encaisser).
 
@@ -100,40 +100,15 @@ Le bouton **"Enregistrer le règlement"** est visible si `montantRegle() < monta
 
 ---
 
-## 4. Service : `FactureService::encaisser()`
+## 4. Règles métier de l'encaissement
 
-### 4.1 Signature
+L'encaissement déplace les transactions sélectionnées du compte "Créances à recevoir" vers un compte bancaire réel.
 
-```php
-public function encaisser(Facture $facture, array $transactionIds, int $compteBancaireId): void
-```
-
-### 4.2 Logique
-
-```
-assertValidee(facture)
-assertNotAcquittee(facture)  // montantRegle < montant_total
-
-compteDestination = CompteBancaire::findOrFail(compteBancaireId)
-assert compteDestination.est_systeme === false
-
-DB::transaction {
-    pour chaque transactionId dans transactionIds :
-        transaction = facture.transactions().findOrFail(transactionId)
-        assert transaction.compte.est_systeme === true  // ne peut encaisser qu'une créance
-        transaction.update(compte_id: compteBancaireId)
-}
-```
-
-### 4.3 Validations
-
-| Règle | Message |
-|-------|---------|
-| Facture doit être validée | "Seule une facture validée peut être encaissée." |
-| Facture pas déjà acquittée | "Cette facture est déjà intégralement réglée." |
-| Compte destination non-système | "Le compte de destination doit être un compte bancaire réel." |
-| Transaction liée à la facture | "La transaction n'est pas liée à cette facture." |
-| Transaction sur compte système | "Cette transaction est déjà encaissée." |
+**Conditions :**
+- La facture doit être validée et non intégralement réglée
+- Le compte de destination doit être un compte bancaire réel (non-système)
+- Seules les transactions encore sur un compte système peuvent être encaissées
+- L'opération est atomique (tout ou rien)
 
 ---
 
@@ -175,13 +150,13 @@ Statut calculé (pas stocké) :
 | Statut affiché | Condition |
 |----------------|-----------|
 | Brouillon | `statut = brouillon` |
-| En attente | `statut = validee` ET `montantRegle() < montant_total` |
+| Non réglée | `statut = validee` ET `montantRegle() < montant_total` |
 | Acquittée | `statut = validee` ET `montantRegle() >= montant_total` |
 | Annulée | `statut = annulee` (V2) |
 
-### 6.3 Implémentation du filtre "En attente"
+### 6.3 Implémentation du filtre "Non réglée"
 
-Le statut "En attente" vs "Acquittée" est calculé dynamiquement. Pour le filtre SQL, deux approches :
+Le statut "Non réglée" vs "Acquittée" est calculé dynamiquement. Pour le filtre SQL, deux approches :
 
 **A) Sous-requête** : calculer `montant_regle` en SQL et comparer à `montant_total`. Plus performant mais requête complexe.
 
@@ -246,7 +221,7 @@ Créances à recevoir → encaisser() → Compte courant → rapprochement banca
 | 2 | Formulaire recette : exposer le compte "Créances à recevoir" | ~15 min |
 | 3 | `FactureService::encaisser()` | ~30 min |
 | 4 | UI : bouton "Enregistrer le règlement" + modale | ~1h |
-| 5 | UI : affichage Reste à payer / En attente sur la fiche facture | ~30 min |
+| 5 | UI : affichage Reste à payer / Non réglée sur la fiche facture | ~30 min |
 | 6 | Listing factures : filtre tiers + statut | ~1h |
 | 7 | Tests Pest | ~1h |
 | **Total** | | **~4-5h** |
