@@ -34,7 +34,8 @@
             <select wire:model.live="filterStatut" class="form-select">
                 <option value="">Tous</option>
                 <option value="brouillon">Brouillon</option>
-                <option value="validee">Validée</option>
+                <option value="validee">Validée (toutes)</option>
+                <option value="non_reglee">Non réglée</option>
                 <option value="acquittee">Acquittée</option>
                 <option value="annulee">Annulée</option>
             </select>
@@ -105,9 +106,13 @@
                                     <span class="badge bg-secondary" style="font-size:.7rem">
                                         <i class="bi bi-pencil"></i> Brouillon
                                     </span>
+                                @elseif ($facture->statut === \App\Enums\StatutFacture::Validee && $montantRegle > 0)
+                                    <span class="badge bg-warning text-dark" style="font-size:.7rem">
+                                        <i class="bi bi-hourglass-split"></i> Partiellement réglée
+                                    </span>
                                 @elseif ($facture->statut === \App\Enums\StatutFacture::Validee)
-                                    <span class="badge bg-primary" style="font-size:.7rem">
-                                        <i class="bi bi-check-lg"></i> Validée
+                                    <span class="badge bg-secondary" style="font-size:.7rem">
+                                        <i class="bi bi-clock"></i> Non réglée
                                     </span>
                                 @elseif ($facture->statut === \App\Enums\StatutFacture::Annulee)
                                     <span class="badge bg-danger" style="font-size:.7rem">
