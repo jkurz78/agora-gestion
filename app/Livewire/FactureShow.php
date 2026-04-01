@@ -81,6 +81,7 @@ final class FactureShow extends Component
             ->filter(fn ($t) => $t->compte->est_systeme);
 
         $comptesDestination = CompteBancaire::where('est_systeme', false)
+            ->where('actif_recettes_depenses', true)
             ->orderBy('nom')
             ->get();
 
