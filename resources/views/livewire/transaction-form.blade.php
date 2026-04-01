@@ -44,6 +44,11 @@
                 @endif
 
                 <form wire:submit="save">
+                    @if ($isLockedByFacture)
+                        <div class="alert alert-warning small py-2 mb-3">
+                            <i class="bi bi-lock"></i> Cette transaction est liée à une facture validée. Seuls le libellé, les notes et le compte peuvent être modifiés.
+                        </div>
+                    @endif
                     <div class="row g-3 mb-4">
                         <div class="col-md-2">
                             <label for="date" class="form-label">
@@ -142,12 +147,17 @@
                                 @forelse ($lignes as $index => $ligne)
                                     <tr wire:key="ligne-{{ $index }}">
                                         <td style="min-width:220px">
-                                            <livewire:sous-categorie-autocomplete
-                                                :key="'sc-tx-'.$index.'-'.($sousCategorieFilter ?? 'all')"
-                                                wire:model="lignes.{{ $index }}.sous_categorie_id"
-                                                filtre="{{ $type }}"
-                                                :sousCategorieFlag="$sousCategorieFilter"
-                                            />
+                                            @if ($isLockedByFacture)
+                                                @php $sc = \App\Models\SousCategorie::find($ligne['sous_categorie_id']); @endphp
+                                                <span class="form-control-plaintext">{{ $sc?->nom ?? '—' }}</span>
+                                            @else
+                                                <livewire:sous-categorie-autocomplete
+                                                    :key="'sc-tx-'.$index.'-'.($sousCategorieFilter ?? 'all')"
+                                                    wire:model="lignes.{{ $index }}.sous_categorie_id"
+                                                    filtre="{{ $type }}"
+                                                    :sousCategorieFlag="$sousCategorieFilter"
+                                                />
+                                            @endif
                                             @error('lignes.' . $index . '.sous_categorie_id')
                                                 <div class="text-danger small mt-1">{{ $message }}</div>
                                             @enderror
@@ -155,7 +165,7 @@
                                         <td>
                                             <select wire:model.live="lignes.{{ $index }}.operation_id"
                                                     class="form-select form-select-sm"
-                                                    {{ $exerciceCloture ? 'disabled' : '' }}>
+                                                    {{ $exerciceCloture || $isLockedByFacture ? 'disabled' : '' }}>
                                                 <option value="">-- Aucune --</option>
                                                 @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
                                                     <optgroup label="{{ $typeName }}">
@@ -174,7 +184,7 @@
                                             @if ($nbSeances)
                                                 <select wire:model="lignes.{{ $index }}.seance"
                                                         class="form-select form-select-sm"
-                                                        {{ $exerciceCloture ? 'disabled' : '' }}>
+                                                        {{ $exerciceCloture || $isLockedByFacture ? 'disabled' : '' }}>
                                                     <option value="">--</option>
                                                     @for ($s = 1; $s <= $nbSeances; $s++)
                                                         <option value="{{ $s }}">{{ $s }}</option>
@@ -183,7 +193,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            @if ($isLocked)
+                                            @if ($isLocked || $isLockedByFacture)
                                                 <span class="form-control-plaintext">{{ number_format((float) ($ligne['montant'] ?? 0), 2, ',', ' ') }} €</span>
                                             @else
                                                 <input type="number" wire:model.live="lignes.{{ $index }}.montant"
@@ -201,13 +211,13 @@
                                                    {{ $exerciceCloture ? 'disabled' : '' }}>
                                         </td>
                                         <td class="text-center">
-                                            @if (! $isLocked && ! $exerciceCloture)
+                                            @if (! $isLocked && ! $isLockedByFacture && ! $exerciceCloture)
                                                 <button type="button" wire:click="removeLigne({{ $index }})"
                                                         class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash"></i>
                                                 </button>
                                             @endif
-                                            @if ($isLocked && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
+                                            @if ($isLocked && ! $isLockedByFacture && ! $exerciceCloture && ($ligne['id'] ?? null) !== null)
                                                 <button type="button"
                                                         wire:click="ouvrirVentilation({{ $ligne['id'] }})"
                                                         class="btn btn-sm btn-outline-warning ms-1">
@@ -331,7 +341,7 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        @if (! $isLocked && ! $exerciceCloture)
+                        @if (! $isLocked && ! $isLockedByFacture && ! $exerciceCloture)
                             <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>
@@ -340,7 +350,7 @@
                             <button type="button" wire:click="resetForm" class="btn btn-secondary">{{ $exerciceCloture ? 'Fermer' : 'Annuler' }}</button>
                             @if (! $exerciceCloture)
                             <button type="submit" class="btn btn-success"
-                                    @if ($isLocked) title="Certains champs sont verrouillés et ne pourront pas être modifiés." @endif>
+                                    @if ($isLocked || $isLockedByFacture) title="Certains champs sont verrouillés (facture validée ou rapprochement)." @endif>
                                 {{ $transactionId ? 'Mettre à jour' : 'Enregistrer' }}
                             </button>
                             @endif
