@@ -1,4 +1,5 @@
 <?php
+
 // tests/Feature/CreancesARecevoirTest.php
 declare(strict_types=1);
 
