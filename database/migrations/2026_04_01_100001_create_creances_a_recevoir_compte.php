@@ -1,4 +1,5 @@
 <?php
+
 // database/migrations/2026_04_01_100001_create_creances_a_recevoir_compte.php
 declare(strict_types=1);
 

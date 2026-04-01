@@ -8,6 +8,7 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Seance;
@@ -211,6 +212,40 @@ final class FactureService
                 'montant_total' => $montantTotal,
                 'statut' => StatutFacture::Validee,
             ]);
+        });
+    }
+
+    /**
+     * Move selected transactions from a system account (Créances à recevoir)
+     * to a real bank account, marking them as paid on the invoice.
+     *
+     * @param  array<int>  $transactionIds
+     */
+    public function encaisser(Facture $facture, array $transactionIds, int $compteBancaireId): void
+    {
+        if ($facture->statut !== StatutFacture::Validee) {
+            throw new \RuntimeException('Seule une facture validée peut être encaissée.');
+        }
+
+        if ($facture->isAcquittee()) {
+            throw new \RuntimeException('Cette facture est déjà intégralement réglée.');
+        }
+
+        $compteDestination = CompteBancaire::findOrFail($compteBancaireId);
+        if ($compteDestination->est_systeme) {
+            throw new \RuntimeException('Le compte de destination doit être un compte bancaire réel.');
+        }
+
+        DB::transaction(function () use ($facture, $transactionIds, $compteBancaireId): void {
+            foreach ($transactionIds as $transactionId) {
+                $transaction = $facture->transactions()->findOrFail($transactionId);
+
+                if (! $transaction->compte->est_systeme) {
+                    throw new \RuntimeException('Cette transaction est déjà encaissée.');
+                }
+
+                $transaction->update(['compte_id' => $compteBancaireId]);
+            }
         });
     }
 
