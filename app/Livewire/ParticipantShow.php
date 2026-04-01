@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Models\DocumentPrevisionnel;
 use App\Models\EmailLog;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -388,6 +389,35 @@ final class ParticipantShow extends Component
                 'description' => 'Formulaire rempli depuis '.$formulaireToken->rempli_ip,
                 'detail' => null,
                 'copyable' => null,
+            ]);
+        }
+
+        // Documents prévisionnels (devis / pro forma)
+        $documents = DocumentPrevisionnel::where('participant_id', $this->participant->id)
+            ->with('operation')
+            ->orderByDesc('created_at')
+            ->get();
+
+        foreach ($documents as $doc) {
+            $timeline->push([
+                'date' => $doc->created_at,
+                'type' => 'document_previsionnel',
+                'categorie' => $doc->type->value,
+                'icon' => $doc->type === \App\Enums\TypeDocumentPrevisionnel::Devis
+                    ? 'bi-file-earmark-text'
+                    : 'bi-file-earmark-ruled',
+                'color' => 'info',
+                'description' => sprintf(
+                    '%s %s (v%d) — %s — %s',
+                    $doc->type->label(),
+                    $doc->numero,
+                    $doc->version,
+                    $doc->operation->nom,
+                    number_format((float) $doc->montant_total, 2, ',', "\u{00A0}") . ' €',
+                ),
+                'detail' => null,
+                'copyable' => null,
+                'pdf_url' => route('gestion.documents-previsionnels.pdf', $doc),
             ]);
         }
 

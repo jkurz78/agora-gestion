@@ -507,7 +507,14 @@
                                     <i class="bi {{ $event['icon'] }}"></i>
                                 </div>
                                 <div class="flex-grow-1">
-                                    <div class="fw-semibold small">{{ $event['description'] }}</div>
+                                    <div class="fw-semibold small">
+                                        {{ $event['description'] }}
+                                        @if(isset($event['pdf_url']))
+                                            <a href="{{ $event['pdf_url'] }}" target="_blank" class="ms-1 text-decoration-none" title="Ouvrir le PDF">
+                                                <i class="bi bi-box-arrow-up-right" style="font-size:0.75rem"></i>
+                                            </a>
+                                        @endif
+                                    </div>
                                     @if($event['detail'])
                                         <div class="text-muted small d-flex align-items-center gap-1">
                                             <span>{{ $event['detail'] }}</span>
