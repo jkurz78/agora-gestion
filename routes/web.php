@@ -7,6 +7,7 @@ use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentPrevisionnelPdfController;
 use App\Http\Controllers\DroitImagePdfController;
 use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\FormulaireController;
@@ -150,6 +151,10 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
         })->name('factures.show');
         Route::get('/factures/{facture}/pdf', FacturePdfController::class)
             ->name('factures.pdf');
+
+        // Documents prévisionnels (devis / pro forma)
+        Route::get('/documents-previsionnels/{document}/pdf', DocumentPrevisionnelPdfController::class)
+            ->name('documents-previsionnels.pdf');
 
         // Shared registrations
         $registerParametres();
