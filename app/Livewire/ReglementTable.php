@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\ModePaiement;
+use App\Enums\TypeDocumentPrevisionnel;
+use App\Models\DocumentPrevisionnel;
 use App\Models\Operation;
 use App\Models\Reglement;
 use App\Models\Seance;
+use App\Services\DocumentPrevisionnelService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -139,6 +142,25 @@ final class ReglementTable extends Component
         }
     }
 
+    public function emettreDocument(int $participantId, string $type): mixed
+    {
+        $participant = $this->operation->participants()->findOrFail($participantId);
+        $typeEnum = TypeDocumentPrevisionnel::from($type);
+
+        $service = app(DocumentPrevisionnelService::class);
+        $document = $service->emettre($this->operation, $participant, $typeEnum);
+
+        // Generate PDF if not already stored
+        if (! $document->pdf_path) {
+            $service->genererPdf($document);
+        }
+
+        return $this->redirect(
+            route('gestion.documents-previsionnels.pdf', $document),
+            navigate: false,
+        );
+    }
+
     public function render(): View
     {
         $seances = Seance::where('operation_id', $this->operation->id)
@@ -163,11 +185,21 @@ final class ReglementTable extends Component
         // Compute realized amounts from transaction_lignes
         $realiseMap = $this->computeRealise($seances, $participants);
 
+        // Load existing documents for badge display
+        $docVersions = DocumentPrevisionnel::where('operation_id', $this->operation->id)
+            ->whereIn('participant_id', $participants->pluck('id'))
+            ->select('participant_id', 'type', DB::raw('MAX(version) as last_version'))
+            ->groupBy('participant_id', 'type')
+            ->get()
+            ->groupBy('participant_id')
+            ->map(fn ($items) => $items->keyBy('type'));
+
         return view('livewire.reglement-table', [
             'seances' => $seances,
             'participants' => $participants,
             'reglementMap' => $reglementMap,
             'realiseMap' => $realiseMap,
+            'docVersions' => $docVersions,
         ]);
     }
 

@@ -79,8 +79,29 @@
                         @endphp
                         {{-- Row 1: Mode + Montant prévu --}}
                         <tr>
-                            <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;vertical-align:middle;font-size:11px;font-weight:500;padding:4px 6px;white-space:nowrap">
-                                {{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}
+                            <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;vertical-align:middle;padding:4px 6px;white-space:nowrap">
+                                <div style="font-size:11px;font-weight:500">{{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}</div>
+                                <div class="d-flex gap-1 mt-1">
+                                    @php
+                                        $pVersions = $docVersions[$participant->id] ?? collect();
+                                        $devisV = $pVersions->get('devis')?->last_version;
+                                        $proformaV = $pVersions->get('proforma')?->last_version;
+                                    @endphp
+                                    <button class="btn btn-outline-primary btn-sm py-0 px-1" style="font-size:9px;line-height:1.4"
+                                            wire:click="emettreDocument({{ $participant->id }}, 'devis')"
+                                            wire:loading.attr="disabled"
+                                            title="Émettre un devis">
+                                        <i class="bi bi-file-earmark-text"></i> Devis
+                                        @if($devisV) <span class="badge bg-primary" style="font-size:8px">v{{ $devisV }}</span> @endif
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size:9px;line-height:1.4"
+                                            wire:click="emettreDocument({{ $participant->id }}, 'proforma')"
+                                            wire:loading.attr="disabled"
+                                            title="Émettre une pro forma">
+                                        <i class="bi bi-file-earmark-ruled"></i> PF
+                                        @if($proformaV) <span class="badge bg-secondary" style="font-size:8px">v{{ $proformaV }}</span> @endif
+                                    </button>
+                                </div>
                             </td>
                             <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 3px;white-space:nowrap;vertical-align:middle;text-align:right;width:55px">
                                 <div class="d-flex align-items-center justify-content-between">
