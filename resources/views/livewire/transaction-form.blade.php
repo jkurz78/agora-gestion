@@ -97,7 +97,9 @@
                                         {{ $exerciceCloture ? 'disabled' : '' }}>
                                     <option value="">-- Aucun --</option>
                                     @foreach ($comptes as $compte)
-                                        <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+                                        @if (! $compte->est_systeme || $type === 'recette')
+                                            <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+                                        @endif
                                     @endforeach
                                 </select>
                             @endif
