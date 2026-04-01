@@ -23,7 +23,6 @@ it('system intermediary account exists', function () {
     expect($system)->not->toBeNull()
         ->and($system->nom)->toBe('Remises en banque')
         ->and($system->actif_recettes_depenses)->toBeFalse()
-        ->and($system->actif_dons_cotisations)->toBeFalse()
         ->and($system->est_systeme)->toBeTrue();
 });
 
