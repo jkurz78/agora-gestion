@@ -17,7 +17,6 @@ final class StoreCompteBancaireRequest extends FormRequest
     {
         $this->merge([
             'actif_recettes_depenses' => $this->boolean('actif_recettes_depenses'),
-            'actif_dons_cotisations' => $this->boolean('actif_dons_cotisations'),
         ]);
     }
 
@@ -34,7 +33,6 @@ final class StoreCompteBancaireRequest extends FormRequest
             'solde_initial' => ['required', 'numeric'],
             'date_solde_initial' => ['required', 'date'],
             'actif_recettes_depenses' => ['boolean'],
-            'actif_dons_cotisations' => ['boolean'],
         ];
     }
 }

@@ -22,7 +22,6 @@ final class CompteBancaire extends Model
         'solde_initial',
         'date_solde_initial',
         'actif_recettes_depenses',
-        'actif_dons_cotisations',
         'est_systeme',
     ];
 
@@ -32,7 +31,6 @@ final class CompteBancaire extends Model
             'solde_initial' => 'decimal:2',
             'date_solde_initial' => 'date',
             'actif_recettes_depenses' => 'boolean',
-            'actif_dons_cotisations' => 'boolean',
             'est_systeme' => 'boolean',
         ];
     }

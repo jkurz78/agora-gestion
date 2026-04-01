@@ -22,7 +22,6 @@ class CompteBancaireFactory extends Factory
             'solde_initial' => fake()->randomFloat(2, 0, 10000),
             'date_solde_initial' => fake()->date(),
             'actif_recettes_depenses' => true,
-            'actif_dons_cotisations' => true,
             'est_systeme' => false,
         ];
     }

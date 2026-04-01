@@ -55,11 +55,6 @@
                                id="cb_actif_rd" value="1" checked>
                         <label class="form-check-label" for="cb_actif_rd">Rec./Dép.</label>
                     </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="actif_dons_cotisations"
-                               id="cb_actif_dc" value="1" checked>
-                        <label class="form-check-label" for="cb_actif_dc">Dons/Cot.</label>
-                    </div>
                 </div>
                 <div class="col-md-1">
                     <button type="submit" class="btn btn-success w-100">Enregistrer</button>
@@ -78,7 +73,6 @@
                 <th>Solde initial</th>
                 <th>Date solde</th>
                 <th class="text-center">Rec./Dép.</th>
-                <th class="text-center">Dons/Cot.</th>
                 <th style="width: 130px;">Actions</th>
             </tr>
         </thead>
@@ -103,13 +97,6 @@
                             <i class="bi bi-x-circle text-secondary"></i>
                         @endif
                     </td>
-                    <td class="text-center">
-                        @if ($compte->actif_dons_cotisations)
-                            <i class="bi bi-check-circle-fill text-success"></i>
-                        @else
-                            <i class="bi bi-x-circle text-secondary"></i>
-                        @endif
-                    </td>
                     <td>
                         <a href="{{ route('compta.comptes-bancaires.transactions', $compte) }}"
                            class="btn btn-sm btn-outline-secondary"
@@ -128,8 +115,7 @@
                                     data-solde="{{ $compte->solde_initial }}"
                                     data-date="{{ $compte->date_solde_initial->format('Y-m-d') }}"
                                     data-actif-rd="{{ $compte->actif_recettes_depenses ? '1' : '0' }}"
-                                    data-actif-dc="{{ $compte->actif_dons_cotisations ? '1' : '0' }}"
-                                    onclick="fillEditModal(this)">
+                                        onclick="fillEditModal(this)">
                                 <i class="bi bi-pencil"></i>
                             </button>
                             <form action="{{ route($espace->value . '.parametres.comptes-bancaires.destroy', $compte) }}" method="POST" class="d-inline"
@@ -195,13 +181,6 @@
                                 Utilisable pour les recettes et dépenses
                             </label>
                         </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="actif_dons_cotisations"
-                                   id="edit_actif_dc" value="1">
-                            <label class="form-check-label" for="edit_actif_dc">
-                                Utilisable pour les dons et cotisations
-                            </label>
-                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -228,7 +207,6 @@ function fillEditModal(btn) {
         editDateInput._flatpickr.setDate(btn.dataset.date, true, 'Y-m-d');
     }
     document.getElementById('edit_actif_rd').checked = btn.dataset.actifRd === '1';
-    document.getElementById('edit_actif_dc').checked = btn.dataset.actifDc === '1';
 }
 </script>
 </x-app-layout>
