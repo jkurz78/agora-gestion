@@ -14,14 +14,22 @@
         <li>
             <a class="dropdown-item {{ $currentEspace === Espace::Compta ? 'active' : '' }}"
                href="{{ route('compta.dashboard') }}">
-                <span class="d-inline-block rounded-circle me-2" style="width:10px;height:10px;background-color:{{ Espace::Compta->color() }}"></span>
+                @if ($currentEspace === Espace::Compta)
+                    <i class="bi bi-check-lg me-1"></i>
+                @else
+                    <i class="bi bi-arrow-right me-1 opacity-50"></i>
+                @endif
                 {{ Espace::Compta->label() }}
             </a>
         </li>
         <li>
             <a class="dropdown-item {{ $currentEspace === Espace::Gestion ? 'active' : '' }}"
                href="{{ route('gestion.dashboard') }}">
-                <span class="d-inline-block rounded-circle me-2" style="width:10px;height:10px;background-color:{{ Espace::Gestion->color() }}"></span>
+                @if ($currentEspace === Espace::Gestion)
+                    <i class="bi bi-check-lg me-1"></i>
+                @else
+                    <i class="bi bi-arrow-right me-1 opacity-50"></i>
+                @endif
                 {{ Espace::Gestion->label() }}
             </a>
         </li>
