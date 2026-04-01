@@ -44,9 +44,13 @@
                 @endif
 
                 <form wire:submit="save">
-                    @if ($isLockedByFacture)
+                    @if ($isLocked && $isLockedByFacture)
                         <div class="alert alert-warning small py-2 mb-3">
-                            <i class="bi bi-lock"></i> Cette transaction est liée à une facture validée. Seuls le libellé, les notes et le compte peuvent être modifiés.
+                            <i class="bi bi-lock"></i> Cette transaction est verrouillée (rapprochement/remise + facture). Seuls le libellé et les notes peuvent être modifiés.
+                        </div>
+                    @elseif ($isLockedByFacture)
+                        <div class="alert alert-warning small py-2 mb-3">
+                            <i class="bi bi-lock"></i> Cette transaction est liée à une facture validée. Seuls le libellé et les notes peuvent être modifiés.
                         </div>
                     @endif
                     <div class="row g-3 mb-4">
@@ -92,10 +96,10 @@
                         <div class="col-md-3">
                             <label for="compte_id" class="form-label">
                                 Compte bancaire
-                                @if ($isLocked) <i class="bi bi-lock text-warning" title="Champ verrouillé par un rapprochement"></i> @endif
+                                @if ($isLocked || $isLockedByFacture) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLocked)
-                                <input type="text" value="{{ $comptes->firstWhere('id', $compte_id)?->nom ?? '—' }}"
+                            @if ($isLocked || $isLockedByFacture)
+                                <input type="text" value="{{ \App\Models\CompteBancaire::find($compte_id)?->nom ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
                                 <select wire:model="compte_id" id="compte_id" class="form-select"
