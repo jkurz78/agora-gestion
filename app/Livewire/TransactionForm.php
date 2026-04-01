@@ -250,7 +250,7 @@ final class TransactionForm extends Component
             'notes' => (string) ($ligne->notes ?? ''),
         ])->toArray();
 
-        $this->isLocked = $transaction->isLockedByRapprochement();
+        $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByFacture();
         $this->showForm = true;
     }
 
@@ -274,6 +274,7 @@ final class TransactionForm extends Component
 
         $isLocked = $this->transactionId
             ? Transaction::findOrFail($this->transactionId)->loadMissing('rapprochement')->isLockedByRapprochement()
+                || Transaction::findOrFail($this->transactionId)->isLockedByFacture()
             : false;
 
         $this->validate(
@@ -332,11 +333,17 @@ final class TransactionForm extends Component
 
         $service = app(TransactionService::class);
 
-        if ($this->transactionId) {
-            $transaction = Transaction::findOrFail($this->transactionId);
-            $service->update($transaction, $data, $lignes);
-        } else {
-            $service->create($data, $lignes);
+        try {
+            if ($this->transactionId) {
+                $transaction = Transaction::findOrFail($this->transactionId);
+                $service->update($transaction, $data, $lignes);
+            } else {
+                $service->create($data, $lignes);
+            }
+        } catch (\RuntimeException $e) {
+            $this->addError('lignes', $e->getMessage());
+
+            return;
         }
 
         $this->dispatch('transaction-saved');
