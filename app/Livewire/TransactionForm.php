@@ -48,6 +48,8 @@ final class TransactionForm extends Component
 
     public bool $isLocked = false;
 
+    public bool $isLockedByFacture = false;
+
     public ?string $sousCategorieFilter = null;
 
     // État du panneau de ventilation
@@ -250,7 +252,8 @@ final class TransactionForm extends Component
             'notes' => (string) ($ligne->notes ?? ''),
         ])->toArray();
 
-        $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByFacture();
+        $this->isLocked = $transaction->isLockedByRapprochement();
+        $this->isLockedByFacture = $transaction->isLockedByFacture();
         $this->showForm = true;
     }
 
@@ -258,7 +261,7 @@ final class TransactionForm extends Component
     {
         $this->reset([
             'transactionId', 'type', 'date', 'libelle', 'mode_paiement',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
         ]);
@@ -274,7 +277,6 @@ final class TransactionForm extends Component
 
         $isLocked = $this->transactionId
             ? Transaction::findOrFail($this->transactionId)->loadMissing('rapprochement')->isLockedByRapprochement()
-                || Transaction::findOrFail($this->transactionId)->isLockedByFacture()
             : false;
 
         $this->validate(
