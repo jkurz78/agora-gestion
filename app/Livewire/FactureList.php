@@ -10,6 +10,7 @@ use App\Models\Tiers;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -64,13 +65,12 @@ final class FactureList extends Component
         $query = Facture::with('tiers')
             ->where('exercice', $exercice);
 
-        if ($this->filterStatut !== '') {
-            if ($this->filterStatut === 'acquittee') {
-                // Acquittee = validee + fully paid — filter in collection after query
-                $query->where('statut', StatutFacture::Validee);
-            } else {
-                $query->where('statut', $this->filterStatut);
-            }
+        // Pre-filter by statut in SQL
+        if ($this->filterStatut !== '' && in_array($this->filterStatut, ['brouillon', 'annulee'])) {
+            $query->where('statut', $this->filterStatut);
+        } elseif (in_array($this->filterStatut, ['validee', 'acquittee', 'non_reglee'])) {
+            // All three require statut = validee in SQL; PHP post-filter distinguishes them
+            $query->where('statut', StatutFacture::Validee);
         }
 
         if ($this->filterTiers !== '') {
@@ -84,10 +84,31 @@ final class FactureList extends Component
 
         $query->orderByDesc('date')->orderByDesc('id');
 
-        $factures = $query->paginate(20);
+        // For acquittee/non_reglee filters we need PHP post-filtering
+        if (in_array($this->filterStatut, ['acquittee', 'non_reglee'])) {
+            $allFactures = $query->get();
 
-        // Post-filter for acquittee: only keep factures that are truly acquittee
-        // (This is handled in the view via isAcquittee() for display)
+            $filtered = $allFactures->filter(function (Facture $f) {
+                $acquittee = $f->isAcquittee();
+
+                return $this->filterStatut === 'acquittee' ? $acquittee : ! $acquittee;
+            });
+
+            $tiers = Tiers::where('pour_recettes', true)->orderBy('nom')->get();
+
+            return view('livewire.facture-list', [
+                'factures' => new LengthAwarePaginator(
+                    $filtered->forPage($this->getPage(), 20),
+                    $filtered->count(),
+                    20,
+                    $this->getPage(),
+                    ['path' => request()->url()],
+                ),
+                'tiers' => $tiers,
+            ]);
+        }
+
+        $factures = $query->paginate(20);
 
         $tiers = Tiers::where('pour_recettes', true)
             ->orderBy('nom')
