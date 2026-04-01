@@ -52,7 +52,7 @@ function createDocPrevSetup(int $nbSeances = 2, float $montant = 50.00): array
         $seance = Seance::create([
             'operation_id' => $operation->id,
             'numero' => $i,
-            'date' => "2025-10-" . str_pad((string) ($i * 7), 2, '0', STR_PAD_LEFT),
+            'date' => '2025-10-'.str_pad((string) ($i * 7), 2, '0', STR_PAD_LEFT),
             'titre' => "Séance $i",
         ]);
 

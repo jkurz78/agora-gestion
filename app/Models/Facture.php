@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\StatutFacture;
+use App\Enums\TypeLigneFacture;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -67,7 +68,7 @@ final class Facture extends Model
         }
 
         return (float) $this->lignes()
-            ->where('type', \App\Enums\TypeLigneFacture::Montant)
+            ->where('type', TypeLigneFacture::Montant)
             ->sum('montant');
     }
 
