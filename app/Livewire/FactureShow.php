@@ -85,6 +85,10 @@ final class FactureShow extends Component
             ->orderBy('nom')
             ->get();
 
+        if ($this->encaissementCompteId === null && $comptesDestination->count() === 1) {
+            $this->encaissementCompteId = $comptesDestination->first()->id;
+        }
+
         return view('livewire.facture-show', [
             'montantRegle' => $montantRegle,
             'isAcquittee' => $isAcquittee,
