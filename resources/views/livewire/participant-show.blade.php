@@ -13,11 +13,11 @@
             }
         }
      }"
-     x-init="$nextTick(() => setTimeout(() => ready = true, 200))"
+     x-on:focusin.once="$nextTick(() => ready = true)"
      x-on:input="if (ready) isDirty = true"
      x-on:beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }"
      x-on:click="
-        if (ready && isDirty) {
+        if (isDirty) {
             const link = $event.target.closest('a[href]');
             if (link && link.href.includes('/gestion/operations') && !link.classList.contains('btn-primary') && !link.getAttribute('target')) {
                 $event.preventDefault();
