@@ -53,36 +53,36 @@
         <div class="d-flex align-items-end">
         <ul class="nav nav-tabs nav-participant flex-grow-1 mb-0" style="border-bottom: none;">
         <li class="nav-item">
-            <a class="nav-link" :class="tab === 'coordonnees' && 'active'" @click.prevent="tab = 'coordonnees'" href="#">Coordonnées</a>
+            <a class="nav-link" :class="tab === 'coordonnees' && 'active'" @click.prevent="tab = 'coordonnees'" href="#"><i class="bi bi-person-lines-fill me-1"></i>Coordonnées</a>
         </li>
         @if($hasParcours)
             <li class="nav-item">
-                <a class="nav-link" :class="tab === 'parcours' && 'active'" @click.prevent="tab = 'parcours'" href="#">Données personnelles</a>
+                <a class="nav-link" :class="tab === 'parcours' && 'active'" @click.prevent="tab = 'parcours'" href="#"><i class="bi bi-person-badge me-1"></i>Données personnelles</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" :class="tab === 'contacts_medicaux' && 'active'" @click.prevent="tab = 'contacts_medicaux'" href="#">Contacts médicaux</a>
+                <a class="nav-link" :class="tab === 'contacts_medicaux' && 'active'" @click.prevent="tab = 'contacts_medicaux'" href="#"><i class="bi bi-heart-pulse me-1"></i>Contacts médicaux</a>
             </li>
         @endif
         @if($hasPrescripteur)
             <li class="nav-item">
-                <a class="nav-link" :class="tab === 'prescripteur' && 'active'" @click.prevent="tab = 'prescripteur'" href="#">Adressé par</a>
+                <a class="nav-link" :class="tab === 'prescripteur' && 'active'" @click.prevent="tab = 'prescripteur'" href="#"><i class="bi bi-building me-1"></i>Adressé par</a>
             </li>
         @endif
         @if($hasParcours)
             <li class="nav-item">
-                <a class="nav-link" :class="tab === 'notes' && 'active'" @click.prevent="tab = 'notes'" href="#">Notes</a>
+                <a class="nav-link" :class="tab === 'notes' && 'active'" @click.prevent="tab = 'notes'" href="#"><i class="bi bi-journal-text me-1"></i>Notes</a>
             </li>
         @endif
         <li class="nav-item">
-            <a class="nav-link" :class="tab === 'engagements' && 'active'" @click.prevent="tab = 'engagements'" href="#">Engagements</a>
+            <a class="nav-link" :class="tab === 'engagements' && 'active'" @click.prevent="tab = 'engagements'" href="#"><i class="bi bi-check2-square me-1"></i>Engagements</a>
         </li>
         @if($hasDocuments)
             <li class="nav-item">
-                <a class="nav-link" :class="tab === 'documents' && 'active'" @click.prevent="tab = 'documents'" href="#">Documents</a>
+                <a class="nav-link" :class="tab === 'documents' && 'active'" @click.prevent="tab = 'documents'" href="#"><i class="bi bi-paperclip me-1"></i>Documents</a>
             </li>
         @endif
         <li class="nav-item">
-            <a class="nav-link" :class="tab === 'historique' && 'active'" @click.prevent="tab = 'historique'" href="#">Historique</a>
+            <a class="nav-link" :class="tab === 'historique' && 'active'" @click.prevent="tab = 'historique'" href="#"><i class="bi bi-clock-history me-1"></i>Historique</a>
         </li>
     </ul>
         <div class="ms-3 d-flex align-items-center gap-2" style="margin-bottom: 6px;">
