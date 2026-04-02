@@ -41,7 +41,7 @@
 
     {{-- Zone haute : breadcrumb + PDF + onglets (fond gris) --}}
     <style>
-        .nav-participant .nav-link { color: #666; background: transparent; border: 1px solid transparent; }
+        .nav-participant .nav-link { color: #666; background: transparent; border: 1px solid transparent; font-size: 13px; padding: 6px 12px; }
         .nav-participant .nav-link:hover { color: #A9014F; }
         .nav-participant .nav-link.active { color: #A9014F; font-weight: 600; background: #fff; border-color: #dee2e6 #dee2e6 #fff; }
     </style>

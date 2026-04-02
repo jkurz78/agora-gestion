@@ -1,7 +1,7 @@
 <div>
     {{-- Zone haute : breadcrumb + onglets (fond gris) --}}
     <style>
-        .nav-gestion .nav-link { color: #666; background: transparent; border: 1px solid transparent; }
+        .nav-gestion .nav-link { color: #666; background: transparent; border: 1px solid transparent; font-size: 13px; padding: 6px 12px; }
         .nav-gestion .nav-link:hover:not(.disabled) { color: #A9014F; }
         .nav-gestion .nav-link.active { color: #A9014F; font-weight: 600; background: #fff; border-color: #dee2e6 #dee2e6 #fff; }
         .nav-gestion .nav-link.disabled { color: #bbb; font-style: italic; }
