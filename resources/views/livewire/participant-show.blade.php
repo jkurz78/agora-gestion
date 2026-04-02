@@ -49,18 +49,6 @@
         <x-operation-breadcrumb :operation="$operation" :participant="$participant" :participantMeta="$participantMeta">
         </x-operation-breadcrumb>
 
-        {{-- PDF actions --}}
-        <div class="d-flex gap-2 mb-3">
-            <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                <i class="bi bi-file-person"></i> Fiche PDF
-            </a>
-            @if($operation->typeOperation?->formulaire_droit_image && $participant->droit_image)
-            <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                <i class="bi bi-camera"></i> Autorisation photo
-            </a>
-            @endif
-        </div>
-
         {{-- Onglets + bouton enregistrer --}}
         <div class="d-flex align-items-end">
         <ul class="nav nav-tabs nav-participant flex-grow-1 mb-0" style="border-bottom: none;">
@@ -147,6 +135,11 @@
                     <input type="text" wire:model="editEmail" class="form-control form-control-sm">
                 </div>
             </div>
+
+            <hr class="my-3">
+            <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                <i class="bi bi-file-person"></i> Fiche PDF
+            </a>
 
         </div>
 
@@ -522,6 +515,13 @@
                             </tr>
                         </tbody>
                     </table>
+
+                    @if($operation->typeOperation?->formulaire_droit_image && $participant->droit_image)
+                        <hr class="my-3">
+                        <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-camera"></i> Autorisation photo
+                        </a>
+                    @endif
                 @endif
             </div>
 
