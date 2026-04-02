@@ -6,7 +6,7 @@
         .nav-gestion .nav-link.active { color: #A9014F; font-weight: 600; background: #fff; border-color: #dee2e6 #dee2e6 #fff; }
         .nav-gestion .nav-link.disabled { color: #bbb; font-style: italic; }
     </style>
-    <div style="background: #f8f9fa; margin: -1rem -1rem 0; padding: 1rem 1rem 0;">
+    <div style="background: #eef0f3; margin: -1rem -1rem 0; padding: 1rem 1rem 0;">
         <x-operation-breadcrumb :operation="$operation" :operationMeta="$operationMeta">
             <a class="btn btn-sm btn-outline-secondary" title="Modifier l'opération"
                href="{{ route('compta.operations.edit', $operation) }}?_redirect_back={{ urlencode(route('gestion.operations.show', $operation)) }}">
