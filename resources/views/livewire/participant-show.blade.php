@@ -599,5 +599,17 @@
 
     </div>
 
+    {{-- Bouton Enregistrer flottant (onglets éditables uniquement) --}}
+    <div x-show="isDirty && !['documents', 'historique'].includes(tab)"
+         x-transition
+         style="position: sticky; bottom: 20px; display: flex; justify-content: flex-end; pointer-events: none; z-index: 1040;">
+        <button type="button"
+                class="btn btn-primary shadow"
+                style="pointer-events: auto;"
+                wire:click="save" x-on:click="isDirty = false">
+            <i class="bi bi-check-lg me-1"></i> Enregistrer
+        </button>
+    </div>
+
     <x-unsaved-changes-modal />
 </div>
