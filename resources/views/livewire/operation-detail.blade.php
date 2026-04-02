@@ -8,10 +8,6 @@
     </style>
     <div style="background: #eef0f3; margin: -1rem -1rem 0; padding: 1rem 1rem 0;">
         <x-operation-breadcrumb :operation="$operation" :operationMeta="$operationMeta">
-            <a class="btn btn-sm btn-outline-secondary" title="Modifier l'opération"
-               href="{{ route('compta.operations.edit', $operation) }}?_redirect_back={{ urlencode(route('gestion.operations.show', $operation)) }}">
-                <i class="bi bi-gear"></i>
-            </a>
         </x-operation-breadcrumb>
 
         <ul class="nav nav-tabs nav-gestion mb-0" style="border-bottom: none;">
