@@ -39,8 +39,13 @@
         $participantMeta = implode(' · ', $metaParts);
     @endphp
 
-    {{-- Zone haute : breadcrumb + PDF (fond gris) --}}
-    <div style="background: #f8f9fa; margin: -1rem -1rem 0; padding: 1rem 1rem 0; border-bottom: 1px solid #dee2e6;">
+    {{-- Zone haute : breadcrumb + PDF + onglets (fond gris) --}}
+    <style>
+        .nav-participant .nav-link { color: #666; background: transparent; border: 1px solid transparent; }
+        .nav-participant .nav-link:hover { color: #A9014F; }
+        .nav-participant .nav-link.active { color: #A9014F; font-weight: 600; background: #fff; border-color: #dee2e6 #dee2e6 #fff; }
+    </style>
+    <div style="background: #f8f9fa; margin: -1rem -1rem 0; padding: 1rem 1rem 0;">
         <x-operation-breadcrumb :operation="$operation" :participant="$participant" :participantMeta="$participantMeta">
         </x-operation-breadcrumb>
 
@@ -55,11 +60,10 @@
             </a>
             @endif
         </div>
-    </div>
 
-    {{-- Ligne onglets + bouton enregistrer --}}
-    <div class="d-flex align-items-end mb-3">
-    <ul class="nav nav-tabs flex-grow-1 mb-0">
+        {{-- Onglets + bouton enregistrer --}}
+        <div class="d-flex align-items-end">
+        <ul class="nav nav-tabs nav-participant flex-grow-1 mb-0" style="border-bottom: none;">
         <li class="nav-item">
             <a class="nav-link" :class="tab === 'coordonnees' && 'active'" @click.prevent="tab = 'coordonnees'" href="#">Coordonnées</a>
         </li>
@@ -93,14 +97,15 @@
             <a class="nav-link" :class="tab === 'historique' && 'active'" @click.prevent="tab = 'historique'" href="#">Historique</a>
         </li>
     </ul>
-    <div class="ms-3 mb-1 d-flex align-items-center gap-2">
-        @if($successMessage)
-            <span class="text-success" style="font-size: 12px; white-space: nowrap;"><i class="bi bi-check-lg"></i> {{ $successMessage }}</span>
-        @endif
-        <button type="button" class="btn btn-sm btn-primary text-nowrap" wire:click="save" x-on:click="isDirty = false">
-            <i class="bi bi-check-lg"></i> Enregistrer
-        </button>
-    </div>
+        <div class="ms-3 mb-1 d-flex align-items-center gap-2">
+            @if($successMessage)
+                <span class="text-success" style="font-size: 12px; white-space: nowrap;"><i class="bi bi-check-lg"></i> {{ $successMessage }}</span>
+            @endif
+            <button type="button" class="btn btn-sm btn-primary text-nowrap" wire:click="save" x-on:click="isDirty = false">
+                <i class="bi bi-check-lg"></i> Enregistrer
+            </button>
+        </div>
+        </div>
     </div>
 
     {{-- Tab content --}}
