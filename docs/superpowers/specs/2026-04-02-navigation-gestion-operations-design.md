@@ -17,6 +17,7 @@
 - **Navigation hiérarchique à 3 niveaux** avec breadcrumb cliquable
 - **Zéro bascule vers l'espace Compta** — tout le CRUD opération reste dans Gestion
 - **Chaque niveau a son propre écran** — l'utilisateur sait toujours où il est
+- **Bouton "← Retour" explicite** sur les niveaux 2 et 3 en plus du breadcrumb cliquable — le breadcrumb n'est pas un pattern naturel pour les utilisateurs non-techniques
 
 ## Les 3 niveaux
 
@@ -59,9 +60,10 @@ URL : `GET /gestion/operations/{operation}` (nouvelle route dédiée)
 
 **Breadcrumb** (taille uniforme 13px) :
 ```
-Gestion des opérations / **Parcours Cheval Bleu**  [badge sous-catégorie]  15/09 — 30/06 · 8 participants · 10 séances    ⚙
+← Retour   Gestion des opérations / **Parcours Cheval Bleu**  [badge sous-catégorie]  15/09 — 30/06 · 8 participants · 10 séances    ⚙
 ```
-- "Gestion des opérations" cliquable → retour niveau 1
+- Bouton "← Retour" explicite à gauche du breadcrumb (retour niveau 1)
+- "Gestion des opérations" également cliquable → retour niveau 1
 - Segment courant en gras/noir
 - Infos contextuelles en petit gris à droite sur la même ligne
 - Engrenage à l'extrême droite
@@ -83,11 +85,13 @@ URL : `GET /gestion/operations/{operation}/participants/{participant}` (nouvelle
 
 **Breadcrumb** (taille uniforme 13px) :
 ```
-Gestion des opérations / Parcours Cheval Bleu / **Marie Dupont**  06 12 34 56 78 · marie.dupont@email.fr · Plein tarif
+← Retour   Gestion des opérations / Parcours Cheval Bleu / **Marie Dupont**  06 12 34 56 78 · marie.dupont@email.fr · Plein tarif    [Enregistrer]
 ```
-- Deux premiers segments cliquables (retour niveau 1 ou 2)
+- Bouton "← Retour" explicite à gauche du breadcrumb (retour niveau 2 — liste des participants)
+- Deux premiers segments également cliquables (retour niveau 1 ou 2)
 - Segment courant en gras/noir
 - Infos du participant en petit gris
+- Bouton "Enregistrer" à l'extrême droite
 
 **Bouton Enregistrer** : positionné en haut à droite, en face du breadcrumb. Position fixe indépendante de la hauteur de l'onglet.
 
