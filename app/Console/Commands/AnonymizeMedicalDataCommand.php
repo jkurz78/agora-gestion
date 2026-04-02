@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -111,27 +112,54 @@ final class AnonymizeMedicalDataCommand extends Command
             return self::SUCCESS;
         }
 
+        // Charger les colonnes brutes pour détecter les NULL (fonctionne même
+        // si l'APP_KEY est différente de celle qui a chiffré les données)
+        $rawRows = DB::table('participant_donnees_medicales')->get()->keyBy('id');
+
+        // Détecter si le déchiffrement fonctionne (même APP_KEY que la source)
+        $canDecrypt = false;
+        $sampleRaw = $rawRows->first(fn ($r) => $r->sexe !== null);
+        if ($sampleRaw) {
+            try {
+                ParticipantDonneesMedicales::find($sampleRaw->id)->sexe;
+                $canDecrypt = true;
+            } catch (DecryptException) {
+                $this->warn('APP_KEY différente de la source — sexe attribué aléatoirement.');
+            }
+        }
+
         $bar = $this->output->createProgressBar($records->count());
         $bar->start();
 
         $tiersUpdated = [];
 
         foreach ($records as $med) {
-            // Lire les valeurs déchiffrées AVANT toute modification
-            $sexe = $med->sexe;
-            $hadDateNaissance = $med->date_naissance !== null;
-            $hadPoids = $med->poids !== null;
-            $hadTaille = $med->taille !== null;
-            $hadMedecin = $med->medecin_nom !== null;
-            $hadMedecinEmail = $med->medecin_email !== null;
-            $hadMedecinAdresse = $med->medecin_adresse !== null;
-            $hadMedecinCp = $med->medecin_code_postal !== null;
-            $hadMedecinVille = $med->medecin_ville !== null;
-            $hadTherapeute = $med->therapeute_nom !== null;
-            $hadTherapeuteEmail = $med->therapeute_email !== null;
-            $hadTherapeuteAdresse = $med->therapeute_adresse !== null;
-            $hadTherapeuteCp = $med->therapeute_code_postal !== null;
-            $hadTherapeuteVille = $med->therapeute_ville !== null;
+            $raw = $rawRows[$med->id];
+
+            // Déterminer le sexe (déchiffré si possible, sinon aléatoire)
+            $sexe = null;
+            if ($raw->sexe !== null) {
+                if ($canDecrypt) {
+                    $sexe = $med->sexe;
+                } else {
+                    $sexe = ['M', 'F'][random_int(0, 1)];
+                }
+            }
+
+            // Détecter les champs non-null depuis les colonnes brutes
+            $hadDateNaissance = $raw->date_naissance !== null;
+            $hadPoids = $raw->poids !== null;
+            $hadTaille = $raw->taille !== null;
+            $hadMedecin = $raw->medecin_nom !== null;
+            $hadMedecinEmail = $raw->medecin_email !== null;
+            $hadMedecinAdresse = $raw->medecin_adresse !== null;
+            $hadMedecinCp = $raw->medecin_code_postal !== null;
+            $hadMedecinVille = $raw->medecin_ville !== null;
+            $hadTherapeute = $raw->therapeute_nom !== null;
+            $hadTherapeuteEmail = $raw->therapeute_email !== null;
+            $hadTherapeuteAdresse = $raw->therapeute_adresse !== null;
+            $hadTherapeuteCp = $raw->therapeute_code_postal !== null;
+            $hadTherapeuteVille = $raw->therapeute_ville !== null;
 
             $prenoms = ($sexe === 'F') ? self::PRENOMS_F : self::PRENOMS_M;
 
