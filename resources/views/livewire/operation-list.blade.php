@@ -25,6 +25,14 @@
                 @endforeach
             </select>
         </div>
+        <div>
+            <select class="form-select form-select-sm" wire:model.live="filterPeriode">
+                <option value="">Toutes les périodes</option>
+                <option value="futur">À venir</option>
+                <option value="en_cours">En cours</option>
+                <option value="termine">Terminées</option>
+            </select>
+        </div>
         <div class="text-muted small">
             {{ $operations->count() }} operation{{ $operations->count() > 1 ? 's' : '' }}
         </div>
