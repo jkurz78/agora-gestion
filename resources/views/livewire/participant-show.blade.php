@@ -19,7 +19,7 @@
      x-on:click="
         if (isDirty) {
             const link = $event.target.closest('a[href]');
-            if (link && link.href.includes('/gestion/operations') && !link.classList.contains('btn-primary') && !link.getAttribute('target')) {
+            if (link && link.getAttribute('href') !== '#' && link.href.includes('/gestion/operations') && !link.classList.contains('btn-primary') && !link.getAttribute('target')) {
                 $event.preventDefault();
                 pendingUrl = link.href;
                 showUnsavedModal = true;
@@ -602,10 +602,9 @@
     {{-- Bouton Enregistrer flottant (onglets éditables uniquement) --}}
     <div x-show="isDirty && !['documents', 'historique'].includes(tab)"
          x-transition
-         style="position: sticky; bottom: 20px; display: flex; justify-content: flex-end; pointer-events: none; z-index: 1040;">
+         style="position: sticky; bottom: 20px; max-width: 800px; text-align: right; z-index: 1040;">
         <button type="button"
                 class="btn btn-primary shadow"
-                style="pointer-events: auto;"
                 wire:click="save" x-on:click="isDirty = false">
             <i class="bi bi-check-lg me-1"></i> Enregistrer
         </button>
