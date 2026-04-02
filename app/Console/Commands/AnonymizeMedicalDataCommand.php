@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\ParticipantDonneesMedicales;
-use App\Models\Tiers;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\DB;
@@ -163,40 +162,50 @@ final class AnonymizeMedicalDataCommand extends Command
 
             $prenoms = ($sexe === 'F') ? self::PRENOMS_F : self::PRENOMS_M;
 
-            // ── Données médicales fictives (chiffrées automatiquement par le cast) ──
-            $med->date_naissance = $hadDateNaissance
-                ? sprintf('%02d/%02d/%04d', random_int(1, 28), random_int(1, 12), random_int(1950, 2010))
-                : null;
-            $med->sexe = $sexe; // préservé
-            $med->poids = $hadPoids ? (string) random_int(45, 100) : null;
-            $med->taille = $hadTaille ? (string) random_int(150, 195) : null;
-            $med->notes = null;
+            // ── Construire l'update avec encrypt() — évite Eloquent dirty check ──
+            $enc = fn (?string $v): ?string => $v !== null ? encrypt($v) : null;
+
+            $updates = [
+                'date_naissance' => $hadDateNaissance
+                    ? $enc(sprintf('%02d/%02d/%04d', random_int(1, 28), random_int(1, 12), random_int(1950, 2010)))
+                    : null,
+                'sexe' => $enc($sexe),
+                'poids' => $hadPoids ? $enc((string) random_int(45, 100)) : null,
+                'taille' => $hadTaille ? $enc((string) random_int(150, 195)) : null,
+                'notes' => null,
+            ];
 
             // Médecin
             if ($hadMedecin) {
-                $med->medecin_nom = self::pick(self::NOMS);
-                $med->medecin_prenom = self::pick(self::PRENOMS_M);
-                $med->medecin_telephone = self::phone();
-                $med->medecin_email = $hadMedecinEmail ? self::email($med->medecin_prenom, $med->medecin_nom) : null;
-                $med->medecin_adresse = $hadMedecinAdresse ? self::adresse() : null;
-                [$ville, $cp] = self::ville();
-                $med->medecin_code_postal = $hadMedecinCp ? $cp : null;
-                $med->medecin_ville = $hadMedecinVille ? $ville : null;
+                $medecinNom = self::pick(self::NOMS);
+                $medecinPrenom = self::pick(self::PRENOMS_M);
+                $updates += [
+                    'medecin_nom' => $enc($medecinNom),
+                    'medecin_prenom' => $enc($medecinPrenom),
+                    'medecin_telephone' => $enc(self::phone()),
+                    'medecin_email' => $hadMedecinEmail ? $enc(self::email($medecinPrenom, $medecinNom)) : null,
+                    'medecin_adresse' => $hadMedecinAdresse ? $enc(self::adresse()) : null,
+                    'medecin_code_postal' => $hadMedecinCp ? $enc(self::pickVilleCp()[1]) : null,
+                    'medecin_ville' => $hadMedecinVille ? $enc(self::pickVilleCp()[0]) : null,
+                ];
             }
 
             // Thérapeute
             if ($hadTherapeute) {
-                $med->therapeute_nom = self::pick(self::NOMS);
-                $med->therapeute_prenom = self::pick(self::PRENOMS_F);
-                $med->therapeute_telephone = self::phone();
-                $med->therapeute_email = $hadTherapeuteEmail ? self::email($med->therapeute_prenom, $med->therapeute_nom) : null;
-                $med->therapeute_adresse = $hadTherapeuteAdresse ? self::adresse() : null;
-                [$ville, $cp] = self::ville();
-                $med->therapeute_code_postal = $hadTherapeuteCp ? $cp : null;
-                $med->therapeute_ville = $hadTherapeuteVille ? $ville : null;
+                $therNom = self::pick(self::NOMS);
+                $therPrenom = self::pick(self::PRENOMS_F);
+                $updates += [
+                    'therapeute_nom' => $enc($therNom),
+                    'therapeute_prenom' => $enc($therPrenom),
+                    'therapeute_telephone' => $enc(self::phone()),
+                    'therapeute_email' => $hadTherapeuteEmail ? $enc(self::email($therPrenom, $therNom)) : null,
+                    'therapeute_adresse' => $hadTherapeuteAdresse ? $enc(self::adresse()) : null,
+                    'therapeute_code_postal' => $hadTherapeuteCp ? $enc(self::pickVilleCp()[1]) : null,
+                    'therapeute_ville' => $hadTherapeuteVille ? $enc(self::pickVilleCp()[0]) : null,
+                ];
             }
 
-            $med->save();
+            DB::table('participant_donnees_medicales')->where('id', $raw->id)->update($updates);
 
             // ── Corriger le prénom du tiers lié selon le sexe ──
             $tiers = $med->participant?->tiers;
@@ -265,7 +274,7 @@ final class AnonymizeMedicalDataCommand extends Command
     }
 
     /** @return array{string, string} [ville, code_postal] */
-    private static function ville(): array
+    private static function pickVilleCp(): array
     {
         $ville = array_rand(self::VILLES_78);
 
