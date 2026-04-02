@@ -1,6 +1,7 @@
 <div x-data="{
         tab: @entangle('activeTab'),
         isDirty: false,
+        ready: false,
         showUnsavedModal: false,
         pendingUrl: '',
         navigateTo(url) {
@@ -12,10 +13,11 @@
             }
         }
      }"
-     x-on:input="isDirty = true"
+     x-init="$nextTick(() => setTimeout(() => ready = true, 200))"
+     x-on:input="if (ready) isDirty = true"
      x-on:beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }"
      x-on:click="
-        if (isDirty) {
+        if (ready && isDirty) {
             const link = $event.target.closest('a[href]');
             if (link && link.href.includes('/gestion/operations') && !link.classList.contains('btn-primary') && !link.getAttribute('target')) {
                 $event.preventDefault();
