@@ -1,25 +1,62 @@
-<div x-data="{ tab: @entangle('activeTab'), isDirty: false, confirmLeave(cb) { if (this.isDirty) { if (confirm('Des modifications non enregistrées seront perdues. Continuer ?')) { cb(); } } else { cb(); } } }"
+<div x-data="{
+        tab: @entangle('activeTab'),
+        isDirty: false,
+        showUnsavedModal: false,
+        pendingUrl: '',
+        navigateTo(url) {
+            if (this.isDirty) {
+                this.pendingUrl = url;
+                this.showUnsavedModal = true;
+            } else {
+                window.location = url;
+            }
+        }
+     }"
      x-on:input="isDirty = true"
-     x-on:beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }">
+     x-on:beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }"
+     x-on:click="
+        if (isDirty) {
+            const link = $event.target.closest('a[href]');
+            if (link && link.href.includes('/gestion/operations') && !link.classList.contains('btn-primary') && !link.getAttribute('target')) {
+                $event.preventDefault();
+                pendingUrl = link.href;
+                showUnsavedModal = true;
+            }
+        }
+     ">
 
-    {{-- Header with back link + PDF buttons --}}
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <a href="#" @click.prevent="confirmLeave(() => $wire.dispatch('close-participant'))" class="text-decoration-none">
-            <i class="bi bi-arrow-left me-1"></i> Retour à la liste des participants
+    {{-- Breadcrumb with Save button --}}
+    @php
+        $tiers = $participant->tiers;
+        $tarif = $participant->typeOperationTarif;
+        $metaParts = array_filter([
+            $tiers?->telephone,
+            $tiers?->email,
+            $tarif?->libelle,
+        ]);
+        $participantMeta = implode(' · ', $metaParts);
+    @endphp
+
+    <x-operation-breadcrumb :operation="$operation" :participant="$participant" :participantMeta="$participantMeta">
+        @if($successMessage)
+            <span class="text-success me-2" style="font-size: 12px;"><i class="bi bi-check-lg"></i> {{ $successMessage }}</span>
+        @endif
+        <button type="button" class="btn btn-sm btn-primary" wire:click="save" x-on:click="isDirty = false">
+            <i class="bi bi-check-lg"></i> Enregistrer
+        </button>
+    </x-operation-breadcrumb>
+
+    {{-- PDF actions --}}
+    <div class="d-flex gap-2 mb-3">
+        <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-file-person"></i> Fiche PDF
         </a>
-        <div class="d-flex gap-2">
-            <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                <i class="bi bi-file-person"></i> Fiche PDF
-            </a>
-            @if($operation->typeOperation?->formulaire_droit_image && $participant->droit_image)
-            <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
-                <i class="bi bi-camera"></i> Autorisation photo
-            </a>
-            @endif
-        </div>
+        @if($operation->typeOperation?->formulaire_droit_image && $participant->droit_image)
+        <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-camera"></i> Autorisation photo
+        </a>
+        @endif
     </div>
-
-    <h5 class="fw-bold mb-3">{{ $editPrenom }} {{ $editNom }}</h5>
 
     {{-- Tab navigation --}}
     <ul class="nav nav-tabs mb-3">
@@ -548,20 +585,5 @@
 
     </div>
 
-    {{-- Save button --}}
-    <div class="mt-4 d-flex justify-content-between align-items-center">
-        @if($successMessage)
-            <span class="text-success"><i class="bi bi-check-lg"></i> {{ $successMessage }}</span>
-        @else
-            <span></span>
-        @endif
-        <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" @click="confirmLeave(() => $wire.dispatch('close-participant'))">
-                Annuler
-            </button>
-            <button type="button" class="btn btn-sm btn-primary" wire:click="save" x-on:click="isDirty = false">
-                <i class="bi bi-check-lg"></i> Enregistrer
-            </button>
-        </div>
-    </div>
+    <x-unsaved-changes-modal />
 </div>

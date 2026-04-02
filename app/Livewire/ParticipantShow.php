@@ -14,6 +14,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
+use App\Services\DocumentPrevisionnelService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -211,7 +212,7 @@ final class ParticipantShow extends Component
         // Touch participant to bust wire:key cache
         $participant->touch();
 
-        $this->dispatch('close-participant');
+        $this->successMessage = 'Modifications enregistrées.';
     }
 
     // ── Mapping Tiers methods ──────────────────────────────────
@@ -579,9 +580,9 @@ final class ParticipantShow extends Component
         // Récupérer ou générer le PDF
         $pdfContent = $doc->pdf_path && Storage::disk('local')->exists($doc->pdf_path)
             ? Storage::disk('local')->get($doc->pdf_path)
-            : app(\App\Services\DocumentPrevisionnelService::class)->genererPdf($doc);
+            : app(DocumentPrevisionnelService::class)->genererPdf($doc);
 
-        $pdfFilename = ucfirst($typeLabel) . " {$doc->numero} - {$tiers->displayName()}.pdf";
+        $pdfFilename = ucfirst($typeLabel)." {$doc->numero} - {$tiers->displayName()}.pdf";
 
         $template = EmailTemplate::where('categorie', CategorieEmail::Document->value)
             ->whereNull('type_operation_id')
@@ -596,7 +597,7 @@ final class ParticipantShow extends Component
                 typeDocumentArticleDe: $articleDe,
                 numeroDocument: $doc->numero,
                 dateDocument: $doc->date->format('d/m/Y'),
-                montantTotal: number_format((float) $doc->montant_total, 2, ',', "\u{00A0}") . ' €',
+                montantTotal: number_format((float) $doc->montant_total, 2, ',', "\u{00A0}").' €',
                 customObjet: $template?->objet,
                 customCorps: $template?->corps,
                 pdfContent: $pdfContent,
@@ -621,7 +622,7 @@ final class ParticipantShow extends Component
                 'envoye_par' => Auth::id(),
             ]);
 
-            session()->flash('success', ucfirst($typeLabel) . " envoyé à {$tiers->email}.");
+            session()->flash('success', ucfirst($typeLabel)." envoyé à {$tiers->email}.");
         } catch (\Throwable $e) {
             EmailLog::create([
                 'tiers_id' => $tiers->id,
@@ -631,13 +632,13 @@ final class ParticipantShow extends Component
                 'email_template_id' => $template?->id,
                 'destinataire_email' => $tiers->email,
                 'destinataire_nom' => $tiers->displayName(),
-                'objet' => ucfirst($typeLabel) . ' ' . $doc->numero,
+                'objet' => ucfirst($typeLabel).' '.$doc->numero,
                 'statut' => 'erreur',
                 'erreur_message' => $e->getMessage(),
                 'envoye_par' => Auth::id(),
             ]);
 
-            session()->flash('error', "Erreur lors de l'envoi : " . $e->getMessage());
+            session()->flash('error', "Erreur lors de l'envoi : ".$e->getMessage());
         }
     }
 }
