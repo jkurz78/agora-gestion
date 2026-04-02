@@ -20,6 +20,9 @@ final class OperationList extends Component
     #[Url(as: 'exercice')]
     public ?int $filterExercice = null;
 
+    #[Url(as: 'periode')]
+    public string $filterPeriode = '';
+
     // ── Modal properties ──
     public bool $showCreateModal = false;
 
@@ -132,6 +135,16 @@ final class OperationList extends Component
 
         if ($this->filterTypeId !== null) {
             $operationsQuery->where('type_operation_id', $this->filterTypeId);
+        }
+
+        $now = now()->toDateString();
+        if ($this->filterPeriode === 'futur') {
+            $operationsQuery->where('date_debut', '>', $now);
+        } elseif ($this->filterPeriode === 'en_cours') {
+            $operationsQuery->where('date_debut', '<=', $now)
+                ->where(fn ($q) => $q->whereNull('date_fin')->orWhere('date_fin', '>=', $now));
+        } elseif ($this->filterPeriode === 'termine') {
+            $operationsQuery->whereNotNull('date_fin')->where('date_fin', '<', $now);
         }
 
         $operations = $operationsQuery->orderBy('date_debut')->get();
