@@ -123,10 +123,10 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <button class="btn btn-sm btn-outline-secondary border-0"
+                                <button class="btn btn-sm btn-outline-secondary"
                                         wire:click.stop="openEditModal({{ $op->id }})"
-                                        title="Modifier">
-                                    <i class="bi bi-gear"></i>
+                                        title="Modifier l'opération">
+                                    <i class="bi bi-gear"></i> Modifier
                                 </button>
                             </td>
                         </tr>
