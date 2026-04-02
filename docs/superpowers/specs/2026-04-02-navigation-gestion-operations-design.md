@@ -68,6 +68,8 @@ URL : `GET /gestion/operations/{operation}` (nouvelle route dédiée)
 - Infos contextuelles en petit gris à droite sur la même ligne
 - Engrenage à l'extrême droite
 
+**Onglet par défaut** : Participants (c'est l'usage principal des animateurs)
+
 **Onglets** (inchangés) :
 - Participants
 - Séances
@@ -77,7 +79,7 @@ URL : `GET /gestion/operations/{operation}` (nouvelle route dédiée)
 
 **Contenu des onglets** : fonctionnel identique à l'existant.
 
-**Interaction participants** : clic sur un participant dans le tableau → ouvre le niveau 3.
+**Interaction participants** : clic sur un participant dans le tableau → ouvre le niveau 3. Les onglets de l'opération disparaissent — on entre dans le contexte de la fiche participant (onglets propres au participant). Le retour au niveau 2 (via bouton Retour ou breadcrumb) restaure les onglets de l'opération.
 
 ### Niveau 3 — Fiche participant
 
