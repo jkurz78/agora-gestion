@@ -127,14 +127,6 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
             ->name('operations.participants.droit-image-pdf');
         Route::get('/operations/{operation}/participants/{participant}/attestation-recap-pdf', [AttestationPresencePdfController::class, 'recap'])
             ->name('operations.participants.attestation-recap-pdf');
-        Route::get('/operations/{operation}/participants/{participant}', function (Operation $operation, Participant $participant) {
-            abort_unless($participant->operation_id === $operation->id, 404);
-
-            return view('gestion.operations.participant', compact('operation', 'participant'));
-        })->name('operations.participants.show');
-        Route::get('/operations/{operation}', function (Operation $operation) {
-            return view('gestion.operations.show', compact('operation'));
-        })->name('operations.show');
         Route::get('/operations/{operation}/seances/matrice-pdf', [SeancePdfController::class, 'matrice'])
             ->name('operations.seances.matrice-pdf');
         Route::get('/operations/{operation}/seances/{seance}/emargement-pdf', [SeancePdfController::class, 'emargement'])
@@ -143,6 +135,14 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
             ->name('operations.seances.export');
         Route::get('/operations/{operation}/seances/{seance}/attestation-pdf', [AttestationPresencePdfController::class, 'seance'])
             ->name('operations.seances.attestation-pdf');
+        Route::get('/operations/{operation}/participants/{participant}', function (Operation $operation, Participant $participant) {
+            abort_unless($participant->operation_id === $operation->id, 404);
+
+            return view('gestion.operations.participant', compact('operation', 'participant'));
+        })->name('operations.participants.show');
+        Route::get('/operations/{operation}', function (Operation $operation) {
+            return view('gestion.operations.show', compact('operation'));
+        })->name('operations.show');
 
         // Participant documents
         Route::get('/participants/{participant}/documents/{filename}', ParticipantDocumentController::class)
