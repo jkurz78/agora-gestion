@@ -116,15 +116,25 @@ final class AnonymizeMedicalDataCommand extends Command
         // si l'APP_KEY est différente de celle qui a chiffré les données)
         $rawRows = DB::table('participant_donnees_medicales')->get()->keyBy('id');
 
-        // Détecter si le déchiffrement fonctionne (même APP_KEY que la source)
-        $canDecrypt = false;
-        $sampleRaw = $rawRows->first(fn ($r) => $r->sexe !== null);
-        if ($sampleRaw) {
-            try {
-                ParticipantDonneesMedicales::find($sampleRaw->id)->sexe;
-                $canDecrypt = true;
-            } catch (DecryptException) {
-                $this->warn('APP_KEY différente de la source — sexe attribué aléatoirement.');
+        // Construire un déchiffreur pour la clé source (prod)
+        $prodEncrypter = null;
+        $prodKeyEnv = env('PROD_APP_KEY');
+        if ($prodKeyEnv) {
+            $key = base64_decode(str_replace('base64:', '', $prodKeyEnv));
+            $prodEncrypter = new \Illuminate\Encryption\Encrypter($key, config('app.cipher'));
+            $this->info('Clé prod fournie — sexe préservé depuis les données source.');
+        }
+
+        // Fallback : tester si l'APP_KEY locale peut déchiffrer (même clé)
+        if (! $prodEncrypter) {
+            $sampleRaw = $rawRows->first(fn ($r) => $r->sexe !== null);
+            if ($sampleRaw) {
+                try {
+                    ParticipantDonneesMedicales::find($sampleRaw->id)->sexe;
+                    $this->info('Même APP_KEY — sexe préservé.');
+                } catch (DecryptException) {
+                    $this->warn('Pas de PROD_APP_KEY et APP_KEY différente — sexe attribué aléatoirement.');
+                }
             }
         }
 
@@ -136,12 +146,16 @@ final class AnonymizeMedicalDataCommand extends Command
         foreach ($records as $med) {
             $raw = $rawRows[$med->id];
 
-            // Déterminer le sexe (déchiffré si possible, sinon aléatoire)
+            // Déterminer le sexe (déchiffré avec la clé prod si dispo)
             $sexe = null;
             if ($raw->sexe !== null) {
-                if ($canDecrypt) {
-                    $sexe = $med->sexe;
-                } else {
+                try {
+                    if ($prodEncrypter) {
+                        $sexe = $prodEncrypter->decryptString($raw->sexe);
+                    } else {
+                        $sexe = Crypt::decryptString($raw->sexe);
+                    }
+                } catch (\Throwable) {
                     $sexe = ['M', 'F'][random_int(0, 1)];
                 }
             }
