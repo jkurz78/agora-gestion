@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\ParticipantDonneesMedicales;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -162,8 +163,9 @@ final class AnonymizeMedicalDataCommand extends Command
 
             $prenoms = ($sexe === 'F') ? self::PRENOMS_F : self::PRENOMS_M;
 
-            // ── Construire l'update avec encrypt() — évite Eloquent dirty check ──
-            $enc = fn (?string $v): ?string => $v !== null ? encrypt($v) : null;
+            // ── Construire l'update — évite Eloquent dirty check ──
+            // Le cast 'encrypted' utilise encryptString (pas serialize), il faut matcher
+            $enc = fn (?string $v): ?string => $v !== null ? Crypt::encryptString($v) : null;
 
             $updates = [
                 'date_naissance' => $hadDateNaissance
