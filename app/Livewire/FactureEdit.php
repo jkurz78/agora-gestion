@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
@@ -33,7 +34,7 @@ final class FactureEdit extends Component
     public function mount(Facture $facture): void
     {
         if ($facture->statut !== StatutFacture::Brouillon) {
-            $this->redirect(route('gestion.factures.show', $facture));
+            $this->redirect(route($this->espacePrefix() . '.factures.show', $facture));
 
             return;
         }
@@ -138,7 +139,7 @@ final class FactureEdit extends Component
 
         try {
             app(FactureService::class)->valider($this->facture);
-            $this->redirect(route('gestion.factures.show', $this->facture));
+            $this->redirect(route($this->espacePrefix() . '.factures.show', $this->facture));
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -148,7 +149,7 @@ final class FactureEdit extends Component
     {
         try {
             app(FactureService::class)->supprimerBrouillon($this->facture);
-            $this->redirect(route('gestion.factures'));
+            $this->redirect(route($this->espacePrefix() . '.factures'));
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -186,5 +187,10 @@ final class FactureEdit extends Component
             'totalLignes' => $totalLignes,
             'comptesBancaires' => $comptesBancaires,
         ]);
+    }
+
+    private function espacePrefix(): string
+    {
+        return (request()->attributes->get('espace') ?? Espace::Compta)->value;
     }
 }

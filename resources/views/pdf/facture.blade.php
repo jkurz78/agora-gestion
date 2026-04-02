@@ -89,8 +89,8 @@
         /* Acquittee stamp */
         .stamp-acquittee {
             display: inline-block;
-            border: 3px solid #198754;
-            color: #198754;
+            border: 3px solid #2E7D32;
+            color: #2E7D32;
             font-size: 18px;
             font-weight: bold;
             padding: 6px 18px;
@@ -244,7 +244,7 @@
             <td style="padding: 4px 8px; color: #6c757d;">Montant r&eacute;gl&eacute;</td>
             <td style="padding: 4px 8px; text-align: right;">{{ number_format($montantRegle, 2, ',', "\u{00A0}") }} &euro;</td>
         </tr>
-        <tr style="font-weight: bold; {{ $resteDu > 0 ? 'color: #dc3545;' : 'color: #198754;' }}">
+        <tr style="font-weight: bold; {{ $resteDu > 0 ? 'color: #B5453A;' : 'color: #2E7D32;' }}">
             <td style="padding: 4px 8px; border-top: 1px solid #dee2e6;">Reste d&ucirc;</td>
             <td style="padding: 4px 8px; text-align: right; border-top: 1px solid #dee2e6;">{{ number_format($resteDu, 2, ',', "\u{00A0}") }} &euro;</td>
         </tr>

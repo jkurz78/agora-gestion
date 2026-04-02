@@ -350,6 +350,7 @@ final class ParticipantTable extends Component
                 customObjet: $template?->objet,
                 customCorps: $template?->corps,
                 libelleArticle: $typeOp->libelle_article,
+                typeOperationId: $typeOp->id,
             );
 
             Mail::mailer()

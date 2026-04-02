@@ -85,19 +85,19 @@
                                     @php
                                         $pVersions = $docVersions[$participant->id] ?? collect();
                                         $devisV = $pVersions->get('devis')?->last_version;
+                                        $devisId = $pVersions->get('devis')?->last_id;
                                         $proformaV = $pVersions->get('proforma')?->last_version;
+                                        $proformaId = $pVersions->get('proforma')?->last_id;
                                     @endphp
                                     <button class="btn btn-outline-primary btn-sm py-0 px-1" style="font-size:9px;line-height:1.4"
-                                            wire:click="emettreDocument({{ $participant->id }}, 'devis')"
-                                            wire:loading.attr="disabled"
-                                            title="Émettre un devis">
+                                            wire:click="openDocModal({{ $participant->id }}, 'devis')"
+                                            title="{{ $devisV ? 'Actions devis' : 'Émettre un devis' }}">
                                         <i class="bi bi-file-earmark-text"></i> Devis
                                         @if($devisV) <span class="badge bg-primary" style="font-size:8px">v{{ $devisV }}</span> @endif
                                     </button>
                                     <button class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size:9px;line-height:1.4"
-                                            wire:click="emettreDocument({{ $participant->id }}, 'proforma')"
-                                            wire:loading.attr="disabled"
-                                            title="Émettre une pro forma">
+                                            wire:click="openDocModal({{ $participant->id }}, 'proforma')"
+                                            title="{{ $proformaV ? 'Actions pro forma' : 'Émettre une pro forma' }}">
                                         <i class="bi bi-file-earmark-ruled"></i> PF
                                         @if($proformaV) <span class="badge bg-secondary" style="font-size:8px">v{{ $proformaV }}</span> @endif
                                     </button>
@@ -159,9 +159,9 @@
                             @endforeach
                             <td rowspan="2" style="text-align:center;vertical-align:middle;padding:4px 6px">
                                 <div style="font-weight:600;font-size:12px">{{ number_format($prevuLigne, 2, ',', ' ') }}</div>
-                                <div style="font-size:11px;color:{{ $realiseLigne > 0 ? '#198754' : '#6c757d' }}">{{ number_format($realiseLigne, 2, ',', ' ') }}</div>
+                                <div style="font-size:11px;color:{{ $realiseLigne > 0 ? '#2E7D32' : '#6c757d' }}">{{ number_format($realiseLigne, 2, ',', ' ') }}</div>
                                 @if(abs($ecartLigne) > 0.01)
-                                    <div style="font-size:10px;color:{{ $ecartLigne < 0 ? '#dc3545' : '#198754' }}">{{ ($ecartLigne >= 0 ? '+' : '') . number_format($ecartLigne, 2, ',', ' ') }}</div>
+                                    <div style="font-size:10px;color:{{ $ecartLigne < 0 ? '#B5453A' : '#2E7D32' }}">{{ ($ecartLigne >= 0 ? '+' : '') . number_format($ecartLigne, 2, ',', ' ') }}</div>
                                 @else
                                     <div style="font-size:10px;color:#6c757d">Écart 0</div>
                                 @endif
@@ -175,7 +175,7 @@
                                     $key = $participant->id . '-' . $seance->id;
                                     $realise = $realiseMap[$key] ?? 0;
                                     $prevu = (float) ($reglementMap[$key]?->montant_prevu ?? 0);
-                                    $color = $prevu == 0 && $realise == 0 ? '#6c757d' : ($realise >= $prevu && $prevu > 0 ? '#198754' : '#dc3545');
+                                    $color = $prevu == 0 && $realise == 0 ? '#6c757d' : ($realise >= $prevu && $prevu > 0 ? '#2E7D32' : '#B5453A');
                                 @endphp
                                 <td style="padding:2px 6px;background:#f8f9fa;text-align:center">
                                     <span style="font-size:11px;color:{{ $color }}">
@@ -196,7 +196,7 @@
                         <td style="text-align:center;font-weight:700">{{ number_format($grandTotalPrevu, 2, ',', ' ') }}</td>
                     </tr>
                     {{-- Total réalisé --}}
-                    <tr style="background:#eef1f5;font-size:12px;color:#198754">
+                    <tr style="background:#eef1f5;font-size:12px;color:#2E7D32">
                         <td colspan="2" style="position:sticky;left:0;z-index:1;background:#eef1f5;padding:4px 12px">Total réalisé</td>
                         @foreach($seances as $seance)
                             <td style="text-align:center">{{ number_format($totalRealiseParSeance[$seance->id], 2, ',', ' ') }}</td>
@@ -209,16 +209,66 @@
                         <td colspan="2" style="position:sticky;left:0;z-index:1;background:#eef1f5;padding:4px 12px">Écart</td>
                         @foreach($seances as $seance)
                             @php $ecart = ($totalRealiseParSeance[$seance->id]) - ($totalPrevuParSeance[$seance->id]); @endphp
-                            <td style="text-align:center;{{ $ecart < -0.01 ? 'color:#dc3545' : '' }}">
+                            <td style="text-align:center;{{ $ecart < -0.01 ? 'color:#B5453A' : '' }}">
                                 {{ abs($ecart) > 0.01 ? (($ecart >= 0 ? '+' : '') . number_format($ecart, 2, ',', ' ')) : '0' }}
                             </td>
                         @endforeach
-                        <td style="text-align:center;{{ $grandEcart < -0.01 ? 'color:#dc3545' : '' }}">
+                        <td style="text-align:center;{{ $grandEcart < -0.01 ? 'color:#B5453A' : '' }}">
                             {{ abs($grandEcart) > 0.01 ? (($grandEcart >= 0 ? '+' : '') . number_format($grandEcart, 2, ',', ' ')) : '0' }}
                         </td>
                     </tr>
                 </tfoot>
             </table>
+        </div>
+    @endif
+
+    {{-- Modale actions document --}}
+    @if($docModalParticipantId)
+        @php
+            $docModalParticipant = $participants->firstWhere('id', $docModalParticipantId);
+            $docModalVersions = $docVersions[$docModalParticipantId] ?? collect();
+            $docModalV = $docModalVersions->get($docModalType)?->last_version;
+            $docModalDocId = $docModalVersions->get($docModalType)?->last_id;
+            $docModalLabel = $docModalType === 'devis' ? 'Devis' : 'Pro forma';
+        @endphp
+        <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)">
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">{{ $docModalLabel }} — {{ $docModalParticipant?->tiers->displayName() }}</h6>
+                        <button type="button" class="btn-close" wire:click="$set('docModalParticipantId', null)"></button>
+                    </div>
+                    <div class="modal-body d-grid gap-2">
+                        @if($docModalV && $docModalDocId)
+                            <a href="{{ route('gestion.documents-previsionnels.pdf', $docModalDocId) }}" target="_blank"
+                               class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-file-earmark-pdf"></i> Ouvrir le PDF (v{{ $docModalV }})
+                            </a>
+                        @endif
+                        <button class="btn btn-outline-secondary btn-sm"
+                                wire:click="emettreDocument({{ $docModalParticipantId }}, '{{ $docModalType }}')"
+                                wire:loading.attr="disabled">
+                            <span wire:loading.remove wire:target="emettreDocument"><i class="bi bi-arrow-repeat"></i> {{ $docModalV ? 'Nouvelle version' : 'Émettre' }}</span>
+                            <span wire:loading wire:target="emettreDocument"><i class="bi bi-hourglass-split"></i> Génération...</span>
+                        </button>
+                        @if($docModalV && $docModalParticipant?->tiers->email)
+                            <button class="btn btn-outline-primary btn-sm"
+                                    wire:click="envoyerDocumentEmail({{ $docModalParticipantId }}, '{{ $docModalType }}')"
+                                    wire:loading.attr="disabled">
+                                <span wire:loading.remove wire:target="envoyerDocumentEmail"><i class="bi bi-envelope"></i> Envoyer par email</span>
+                                <span wire:loading wire:target="envoyerDocumentEmail"><i class="bi bi-hourglass-split"></i> Envoi...</span>
+                            </button>
+                        @elseif($docModalV && !$docModalParticipant?->tiers->email)
+                            <span class="text-muted small"><i class="bi bi-envelope-x"></i> Pas d'adresse email</span>
+                        @endif
+                        @if($docModalMessage)
+                            <div class="alert alert-{{ $docModalMessageType }} py-1 px-2 mb-0 small">
+                                {{ $docModalMessage }}
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
         </div>
     @endif
 </div>
