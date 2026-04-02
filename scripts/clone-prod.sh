@@ -24,6 +24,8 @@ DB_PASSWORD=$(echo "$PROD_ENV" | grep '^DB_PASSWORD=' | cut -d= -f2 | tr -d '"' 
 DB_HOST=$(echo "$PROD_ENV" | grep '^DB_HOST=' | cut -d= -f2 | tr -d '"' | tr -d "'")
 DB_HOST="${DB_HOST:-127.0.0.1}"
 
+PROD_APP_KEY=$(echo "$PROD_ENV" | grep '^APP_KEY=' | cut -d= -f2 | tr -d '"' | tr -d "'")
+
 if [[ -z "$DB_DATABASE" || -z "$DB_USERNAME" ]]; then
     echo "ERREUR : impossible de lire les credentials MySQL depuis la prod."
     exit 1
@@ -64,7 +66,7 @@ echo "==> Anonymisation SQL terminée."
 
 # ── Anonymisation des données médicales chiffrées (via Laravel) ──────────────
 echo "==> Anonymisation des données médicales (chiffrées) + correction prénoms/sexe..."
-ssh nas "/usr/local/bin/docker compose -f $NAS_COMPOSE exec -T app php artisan staging:anonymize-medical"
+ssh nas "/usr/local/bin/docker compose -f $NAS_COMPOSE exec -T -e PROD_APP_KEY='$PROD_APP_KEY' app php artisan staging:anonymize-medical"
 
 echo "==> Anonymisation complète."
 
