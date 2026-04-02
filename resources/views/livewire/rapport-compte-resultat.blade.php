@@ -9,8 +9,8 @@
         .cr-total td { background: #5a7fa8; color: #fff; font-weight: 700; font-size: 14px; border-bottom: none; padding: 9px 12px; }
         .cr-n1 { color: #9ab0c8; }
         .cr-cat .cr-n1 { color: #6b8aaa; }
-        .cr-neg { color: #dc3545; }
-        .cr-pos { color: #198754; }
+        .cr-neg { color: #B5453A; }
+        .cr-pos { color: #2E7D32; }
         .cr-zero { color: #6c757d; }
         .budget-bar-track { background: #e2e8f0; border-radius: 4px; height: 10px; width: 110px; overflow: hidden; }
         .cr-total .budget-bar-track { background: rgba(255,255,255,.25); }
@@ -32,7 +32,7 @@
             if ($budget === null || $budget <= 0 || $montantN === null) return '<span class="text-muted">&mdash;</span>';
             $pct     = $montantN / $budget * 100;
             $pctCap  = min($pct, 100);
-            $color   = $pct > 100 ? '#dc3545' : ($pct > 90 ? '#fd7e14' : '#198754');
+            $color   = $pct > 100 ? '#B5453A' : ($pct > 90 ? '#fd7e14' : '#2E7D32');
             return '<div class="budget-bar-track"><div class="budget-bar-fill" style="width:' . $pctCap . '%;background:' . $color . ';"></div></div>'
                  . '<div class="budget-label">' . number_format($pct, 0) . ' %</div>';
         };
@@ -120,13 +120,13 @@
     {{-- Resultat net --}}
     @if ($resultatNet >= 0)
     <div class="rounded p-4 d-flex justify-content-between align-items-center mt-2"
-         style="background:#198754;color:#fff;font-size:1.1rem;font-weight:700;">
+         style="background:#2E7D32;color:#fff;font-size:1.1rem;font-weight:700;">
         <span>EXC&Eacute;DENT</span>
         <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} &euro;</span>
     </div>
     @else
     <div class="rounded p-4 d-flex justify-content-between align-items-center mt-2"
-         style="background:#dc3545;color:#fff;font-size:1.1rem;font-weight:700;">
+         style="background:#B5453A;color:#fff;font-size:1.1rem;font-weight:700;">
         <span>DÉFICIT</span>
         <span>{{ number_format(abs($resultatNet), 2, ',', ' ') }} &euro;</span>
     </div>

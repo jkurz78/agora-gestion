@@ -514,6 +514,15 @@
                                                 <i class="bi bi-box-arrow-up-right" style="font-size:0.75rem"></i>
                                             </a>
                                         @endif
+                                        @if(isset($event['document_id']))
+                                            <button wire:click="envoyerDocumentEmail({{ $event['document_id'] }})"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="envoyerDocumentEmail({{ $event['document_id'] }})"
+                                                    class="btn btn-link btn-sm p-0 ms-1 text-decoration-none" title="Envoyer par email">
+                                                <span wire:loading.remove wire:target="envoyerDocumentEmail({{ $event['document_id'] }})"><i class="bi bi-envelope" style="font-size:0.75rem"></i></span>
+                                                <span wire:loading wire:target="envoyerDocumentEmail({{ $event['document_id'] }})"><i class="bi bi-hourglass-split" style="font-size:0.75rem"></i></span>
+                                            </button>
+                                        @endif
                                     </div>
                                     @if($event['detail'])
                                         <div class="text-muted small d-flex align-items-center gap-1">

@@ -19,6 +19,7 @@
     <title>{{ $title ?? $nomAsso.' '.($espaceLabel ?? 'Comptabilité') }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    @include('partials.colors')
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/fr.js"></script>
@@ -49,7 +50,8 @@
     @livewireStyles
     <style>
         .navbar-svs {
-            background-color: {{ $espaceColor ?? '#722281' }};
+            background: linear-gradient(160deg, color-mix(in srgb, {{ $espaceColor ?? '#722281' }}, white 15%) 0%, {{ $espaceColor ?? '#722281' }} 50%, color-mix(in srgb, {{ $espaceColor ?? '#722281' }}, black 20%) 100%);
+            box-shadow: 0 2px 8px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.12);
         }
         .navbar-svs .navbar-brand,
         .navbar-svs .nav-link,
@@ -97,6 +99,7 @@
             background-color: rgba(255, 255, 255, 0.15);
             border-color: rgba(255, 255, 255, 0.4);
             color: #fff;
+            border-radius: .75rem;
         }
         .navbar-svs .btn-user:hover {
             background-color: rgba(255, 255, 255, 0.25);
@@ -124,8 +127,8 @@
                     aria-expanded="false" aria-label="Ouvrir la navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
+            <div class="collapse navbar-collapse align-items-end" id="navbarNav">
+                <ul class="navbar-nav me-auto align-items-end">
 
                     @if(($espace ?? null) === \App\Enums\Espace::Compta)
                     {{-- Dropdown Transactions --}}
@@ -238,6 +241,14 @@
                         @endif
                     @endforeach
 
+                    {{-- Factures --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('compta.factures*') ? 'active' : '' }}"
+                           href="{{ route('compta.factures') }}">
+                            <i class="bi bi-receipt"></i> Factures
+                        </a>
+                    </li>
+
                     {{-- Dropdown Exercices --}}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ request()->routeIs('compta.exercices.*') ? 'active' : '' }}"
@@ -286,20 +297,26 @@
                         </a>
                     </li>
 
-                    {{-- Opérations --}}
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('gestion.operations*') ? 'active' : '' }}"
-                           href="{{ route('gestion.operations') }}">
+                    {{-- Dropdown Opérations --}}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('gestion.operations*') || request()->routeIs('gestion.remises-bancaires*') ? 'active' : '' }}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-calendar-event"></i> Opérations
                         </a>
-                    </li>
-
-                    {{-- Remises en banque --}}
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('gestion.remises-bancaires*') ? 'active' : '' }}"
-                           href="{{ route('gestion.remises-bancaires') }}">
-                            <i class="bi bi-bank"></i> Remises en banque
-                        </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('gestion.operations*') ? 'active' : '' }}"
+                                   href="{{ route('gestion.operations') }}">
+                                    <i class="bi bi-calendar-event"></i> Gestion des opérations
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('gestion.remises-bancaires*') ? 'active' : '' }}"
+                                   href="{{ route('gestion.remises-bancaires') }}">
+                                    <i class="bi bi-bank"></i> Remises en banque
+                                </a>
+                            </li>
+                        </ul>
                     </li>
 
                     {{-- Factures --}}
@@ -311,12 +328,14 @@
                     </li>
 
                     {{-- Sync HelloAsso --}}
+                    @if (Route::has('gestion.helloasso-sync'))
                     <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('gestion.helloasso-sync') ? 'active' : '' }}"
                            href="{{ route('gestion.helloasso-sync') }}">
                             <i class="bi bi-arrow-repeat"></i> Sync HelloAsso
                         </a>
                     </li>
+                    @endif
                     @endif
 
                     {{-- Dropdown Paramètres (shared) --}}
@@ -391,17 +410,10 @@
                     </li>
                 </ul>
 
-                <ul class="navbar-nav align-items-center gap-2">
-                    <li class="nav-item d-flex align-items-center">
-                        <span class="badge rounded-pill"
-                              style="background-color: rgba(255,255,255,0.18); color:#fff; font-size:.8rem; font-weight:500; padding:.4em .85em; border: 1px solid rgba(255,255,255,0.35) !important;">
-                            <i class="bi bi-{{ $exerciceCloture ? 'lock' : 'calendar3' }}"></i>
-                            Exercice {{ $exerciceLabel }}
-                        </span>
-                    </li>
+                <ul class="navbar-nav flex-column align-items-stretch" style="min-width:0">
                     <li class="nav-item">
                         <div class="dropdown">
-                            <button class="btn btn-user btn-sm dropdown-toggle" type="button"
+                            <button class="btn btn-user btn-sm dropdown-toggle w-100" type="button"
                                     data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-person-circle"></i> {{ auth()->user()->nom }}
                             </button>
@@ -422,6 +434,13 @@
                                 </li>
                             </ul>
                         </div>
+                    </li>
+                    <li class="nav-item">
+                        <span class="badge text-center w-100"
+                              style="background-color: rgba(255,255,255,0.18); color:#fff; font-size:.75rem; font-weight:500; padding:.4em .75em; border: 1px solid rgba(255,255,255,0.35) !important; border-radius:.75rem;">
+                            <i class="bi bi-{{ $exerciceCloture ? 'lock' : 'calendar3' }}"></i>
+                            Exercice {{ $exerciceLabel }}
+                        </span>
                     </li>
                 </ul>
             </div>

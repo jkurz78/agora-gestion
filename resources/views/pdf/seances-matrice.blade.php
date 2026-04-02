@@ -33,9 +33,9 @@
         .matrix .header-row td { background: #f8f9fa; font-size: 7px; }
         .matrix .footer-row td { background: #f0f0f0; font-weight: 600; }
 
-        .present { color: #198754; font-weight: bold; }
+        .present { color: #2E7D32; font-weight: bold; }
         .excuse { color: #fd7e14; }
-        .absence { color: #dc3545; font-weight: bold; }
+        .absence { color: #B5453A; font-weight: bold; }
         .arret { color: #6c757d; font-style: italic; }
         .kine-oui { background: #d4edda; }
         .kine-non { background: #f8d7da; }
@@ -154,7 +154,7 @@
                         <td class="{{ $statusClass }}" style="font-size:7px">{{ $statusLabel }}</td>
                         @if($isConfidentiel)
                             <td style="background:{{ $kineBg }};width:18px">
-                                @if($kine === 'oui') <span style="color:#198754">✓</span> @elseif($kine === 'non') <span style="color:#dc3545">✗</span> @endif
+                                @if($kine === 'oui') <span style="color:#2E7D32">✓</span> @elseif($kine === 'non') <span style="color:#B5453A">✗</span> @endif
                             </td>
                         @endif
                     @endforeach

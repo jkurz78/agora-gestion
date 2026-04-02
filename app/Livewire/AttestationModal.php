@@ -202,6 +202,7 @@ final class AttestationModal extends Component
                     pdfFilename: "Attestation présence - S{$seance->numero}.pdf",
                     libelleArticle: $typeOp->libelle_article,
                     blocSeances: $this->buildBlocSeances('seance', $seance),
+                    typeOperationId: $typeOp?->id,
                 );
 
                 Mail::mailer()
@@ -293,6 +294,7 @@ final class AttestationModal extends Component
                 pdfFilename: "Attestation présence - {$prenom} {$nom}.pdf",
                 libelleArticle: $typeOp->libelle_article ?? null,
                 blocSeances: $this->buildBlocSeances('recap', null, $this->seancesPresent, $this->totalSeances),
+                typeOperationId: $typeOp?->id,
             );
 
             Mail::mailer()

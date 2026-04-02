@@ -4,11 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\CategorieEmail;
+use App\Enums\Espace;
 use App\Enums\StatutFacture;
+use App\Mail\DocumentMail;
 use App\Models\CompteBancaire;
+use App\Models\EmailLog;
+use App\Models\EmailTemplate;
 use App\Models\Facture;
+use App\Models\Operation;
+use App\Models\TypeOperation;
 use App\Services\FactureService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 
 final class FactureShow extends Component
@@ -20,10 +29,24 @@ final class FactureShow extends Component
 
     public ?int $encaissementCompteId = null;
 
+    // ── Email state ──
+    public string $emailMessage = '';
+
+    public string $emailMessageType = 'info';
+
+    public bool $showEmailSenderModal = false;
+
+    /** @var array<int, array{email: string, label: string}> */
+    public array $emailSenderChoices = [];
+
+    public ?string $selectedEmailFrom = null;
+
+    public ?string $selectedEmailFromName = null;
+
     public function mount(Facture $facture): void
     {
         if ($facture->statut === StatutFacture::Brouillon) {
-            $this->redirect(route('gestion.factures.edit', $facture));
+            $this->redirect(route($this->espacePrefix() . '.factures.edit', $facture));
 
             return;
         }
@@ -72,6 +95,52 @@ final class FactureShow extends Component
         }
     }
 
+    public function envoyerEmail(): void
+    {
+        $this->emailMessage = '';
+
+        $tiers = $this->facture->tiers;
+        if (! $tiers?->email) {
+            $this->emailMessage = 'Aucune adresse email pour ce tiers.';
+            $this->emailMessageType = 'danger';
+
+            return;
+        }
+
+        // Résoudre les expéditeurs possibles via les opérations liées
+        $senders = $this->resolveEmailSenders();
+
+        if ($senders->isEmpty()) {
+            $this->emailMessage = "Aucune adresse d'expédition configurée. Configurez l'email dans le type d'opération.";
+            $this->emailMessageType = 'danger';
+
+            return;
+        }
+
+        if ($senders->count() === 1) {
+            $sender = $senders->first();
+            $this->doSendEmail($sender['email'], $sender['name']);
+
+            return;
+        }
+
+        // Plusieurs expéditeurs → modale de choix
+        $this->emailSenderChoices = $senders->values()->all();
+        $this->selectedEmailFrom = $senders->first()['email'];
+        $this->selectedEmailFromName = $senders->first()['name'];
+        $this->showEmailSenderModal = true;
+    }
+
+    public function confirmSendEmail(): void
+    {
+        if (! $this->selectedEmailFrom) {
+            return;
+        }
+
+        $this->showEmailSenderModal = false;
+        $this->doSendEmail($this->selectedEmailFrom, $this->selectedEmailFromName);
+    }
+
     public function render(): View
     {
         $montantRegle = $this->facture->montantRegle();
@@ -95,5 +164,137 @@ final class FactureShow extends Component
             'transactionsAEncaisser' => $transactionsAEncaisser,
             'comptesDestination' => $comptesDestination,
         ]);
+    }
+
+    private function doSendEmail(string $fromEmail, ?string $fromName): void
+    {
+        $tiers = $this->facture->tiers;
+        $template = EmailTemplate::where('categorie', CategorieEmail::Document->value)
+            ->whereNull('type_operation_id')
+            ->first();
+
+        $pdfContent = app(FactureService::class)->genererPdf($this->facture);
+        $label = $this->facture->numero ?? 'Brouillon';
+        $pdfFilename = "Facture {$label} - {$tiers->displayName()}.pdf";
+
+        // Résoudre opération et participant pour la timeline
+        $operationId = \App\Models\TransactionLigne::whereIn(
+            'transaction_id',
+            $this->facture->transactions()->pluck('transactions.id')
+        )->whereNotNull('operation_id')->value('operation_id');
+
+        $participantId = $operationId
+            ? \App\Models\Participant::where('tiers_id', $tiers->id)
+                ->where('operation_id', $operationId)
+                ->value('id')
+            : null;
+
+        try {
+            $mail = new DocumentMail(
+                prenomDestinataire: $tiers->prenom ?? '',
+                nomDestinataire: $tiers->nom,
+                typeDocument: 'facture',
+                typeDocumentArticle: 'la facture',
+                typeDocumentArticleDe: 'de la facture',
+                numeroDocument: $label,
+                dateDocument: $this->facture->date->format('d/m/Y'),
+                montantTotal: number_format((float) $this->facture->montant_total, 2, ',', "\u{00A0}") . ' €',
+                customObjet: $template?->objet,
+                customCorps: $template?->corps,
+                pdfContent: $pdfContent,
+                pdfFilename: $pdfFilename,
+                typeOperationId: $this->resolveFirstTypeOperationId(),
+            );
+
+            Mail::mailer()
+                ->to($tiers->email)
+                ->send($mail->from($fromEmail, $fromName));
+
+            EmailLog::create([
+                'tiers_id' => $tiers->id,
+                'participant_id' => $participantId,
+                'operation_id' => $operationId,
+                'categorie' => CategorieEmail::Document->value,
+                'email_template_id' => $template?->id,
+                'destinataire_email' => $tiers->email,
+                'destinataire_nom' => $tiers->displayName(),
+                'objet' => $mail->envelope()->subject,
+                'statut' => 'envoye',
+                'envoye_par' => Auth::id(),
+            ]);
+
+            $this->emailMessage = "Facture envoyée à {$tiers->email}.";
+            $this->emailMessageType = 'success';
+        } catch (\Throwable $e) {
+            EmailLog::create([
+                'tiers_id' => $tiers->id,
+                'participant_id' => $participantId,
+                'operation_id' => $operationId,
+                'categorie' => CategorieEmail::Document->value,
+                'email_template_id' => $template?->id,
+                'destinataire_email' => $tiers->email,
+                'destinataire_nom' => $tiers->displayName(),
+                'objet' => 'Facture ' . $label,
+                'statut' => 'erreur',
+                'erreur_message' => $e->getMessage(),
+                'envoye_par' => Auth::id(),
+            ]);
+
+            $this->emailMessage = 'Erreur lors de l\'envoi : ' . $e->getMessage();
+            $this->emailMessageType = 'danger';
+        }
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, array{email: string, name: ?string, label: string}>
+     */
+    private function resolveEmailSenders(): \Illuminate\Support\Collection
+    {
+        // Opérations liées via facture → transactions → transaction_lignes → operation_id
+        $operationIds = \App\Models\TransactionLigne::whereIn(
+            'transaction_id',
+            $this->facture->transactions()->pluck('transactions.id')
+        )
+            ->whereNotNull('operation_id')
+            ->distinct()
+            ->pluck('operation_id');
+
+        $typeOperationIds = Operation::whereIn('id', $operationIds)
+            ->whereNotNull('type_operation_id')
+            ->distinct()
+            ->pluck('type_operation_id');
+
+        $senders = TypeOperation::whereIn('id', $typeOperationIds)
+            ->whereNotNull('email_from')
+            ->where('email_from', '!=', '')
+            ->get()
+            ->map(fn (TypeOperation $to) => [
+                'email' => $to->email_from,
+                'name' => $to->email_from_name,
+                'label' => $to->nom . ' (' . $to->email_from . ')',
+            ])
+            ->unique('email');
+
+        return $senders;
+    }
+
+    private function resolveFirstTypeOperationId(): ?int
+    {
+        $operationIds = \App\Models\TransactionLigne::whereIn(
+            'transaction_id',
+            $this->facture->transactions()->pluck('transactions.id')
+        )
+            ->whereNotNull('operation_id')
+            ->distinct()
+            ->pluck('operation_id');
+
+        return Operation::whereIn('id', $operationIds)
+            ->whereNotNull('type_operation_id')
+            ->value('type_operation_id');
+    }
+
+    private function espacePrefix(): string
+    {
+        return (request()->attributes->get('espace') ?? Espace::Compta)->value;
     }
 }

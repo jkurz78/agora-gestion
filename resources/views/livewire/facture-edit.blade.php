@@ -10,7 +10,7 @@
                 — Exercice {{ $facture->exercice }}/{{ $facture->exercice + 1 }}
             </p>
         </div>
-        <a href="{{ route('gestion.factures') }}" class="btn btn-outline-secondary">
+        <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour
         </a>
     </div>
@@ -230,7 +230,7 @@
                         <i class="bi bi-check-circle"></i> Valider la facture
                     </button>
 
-                    <a href="{{ route('gestion.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
+                    <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
                        target="_blank"
                        class="btn btn-outline-secondary">
                         <i class="bi bi-file-earmark-pdf"></i> Prévisualiser PDF
