@@ -66,17 +66,6 @@
             <a href="{{ route('gestion.operations') }}" class="text-decoration-none" style="color: {{ $linkColor }};">Gestion des opérations</a>
             <span class="text-muted">/</span>
             <a href="{{ route('gestion.operations.show', $operation) }}" class="text-decoration-none" style="color: {{ $linkColor }};">{{ $operation->nom }}</a>
-
-            @if ($operation->typeOperation?->sousCategorie)
-                <span class="badge rounded-pill" style="background-color: {{ $badgeBg }}; color: {{ $badgeText }}; font-size: 11px;">
-                    {{ $operation->typeOperation->sousCategorie->nom }}
-                </span>
-            @endif
-
-            @if ($operationMeta)
-                <span class="text-muted">{{ $operationMeta }}</span>
-            @endif
-
             <span class="text-muted">/</span>
             <span class="fw-bold text-dark">{{ $participant->tiers?->displayName() ?? 'Participant' }}</span>
 
