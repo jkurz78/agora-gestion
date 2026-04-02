@@ -136,7 +136,7 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
         Route::get('/operations/{operation}/seances/{seance}/attestation-pdf', [AttestationPresencePdfController::class, 'seance'])
             ->name('operations.seances.attestation-pdf');
         Route::get('/operations/{operation}/participants/{participant}', function (Operation $operation, Participant $participant) {
-            abort_unless($participant->operation_id === $operation->id, 404);
+            abort_unless((int) $participant->operation_id === (int) $operation->id, 404);
 
             return view('gestion.operations.participant', compact('operation', 'participant'));
         })->name('operations.participants.show');
