@@ -50,7 +50,7 @@ it('renders participant show with participant name', function () {
         ->assertSee('Dupont');
 });
 
-it('can save coordonnées changes', function () {
+it('can save coordonnées changes and shows success message', function () {
     Livewire::test(ParticipantShow::class, [
         'operation' => $this->operation,
         'participant' => $this->participant,
@@ -58,7 +58,9 @@ it('can save coordonnées changes', function () {
         ->set('editNom', 'Martin')
         ->set('editPrenom', 'Jean')
         ->set('editEmail', 'jean@example.com')
-        ->call('save');
+        ->call('save')
+        ->assertSet('successMessage', 'Modifications enregistrées.')
+        ->assertSee('Modifications enregistrées.');
 
     $this->tiers->refresh();
     expect($this->tiers->nom)->toBe('Martin');
@@ -66,12 +68,13 @@ it('can save coordonnées changes', function () {
     expect($this->tiers->email)->toBe('jean@example.com');
 });
 
-it('shows back link to participant list', function () {
+it('shows breadcrumb with operation name', function () {
     Livewire::test(ParticipantShow::class, [
         'operation' => $this->operation,
         'participant' => $this->participant,
     ])
-        ->assertSee('Retour à la liste des participants');
+        ->assertSee($this->operation->nom)
+        ->assertSee('Enregistrer');
 });
 
 it('shows historique tab with email logs', function () {
