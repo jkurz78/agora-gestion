@@ -32,7 +32,7 @@
     $linkColor = '#A9014F';
 @endphp
 
-<div class="d-flex justify-content-between align-items-center mb-3" style="font-size: 13px;">
+<div class="d-flex justify-content-between align-items-center mb-2" style="font-size: 13px;">
     <div class="d-flex align-items-center gap-2 flex-wrap">
         {{-- "← Retour" button on levels 2 and 3 --}}
         @if ($level === 2)
