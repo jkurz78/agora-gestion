@@ -113,14 +113,14 @@
                     <tr wire:key="participant-row-{{ $p->id }}-{{ $p->updated_at?->timestamp }}-{{ $p->tiers?->updated_at?->timestamp }}-{{ $p->donneesMedicales?->updated_at?->timestamp }}">
                         {{-- Nom --}}
                         <td class="small" data-sort="{{ $p->tiers->nom ?? '' }}">
-                            <a href="#" wire:click.prevent="$dispatch('open-participant', { id: {{ $p->id }} })" class="text-decoration-none fw-semibold">
+                            <a href="{{ route('gestion.operations.participants.show', [$operation, $p]) }}" class="text-decoration-none fw-semibold">
                                 {{ $p->tiers->nom ?? '—' }}
                             </a>
                         </td>
 
                         {{-- Prénom --}}
                         <td class="small" data-sort="{{ $p->tiers->prenom ?? '' }}">
-                            <a href="#" wire:click.prevent="$dispatch('open-participant', { id: {{ $p->id }} })" class="text-decoration-none fw-semibold">
+                            <a href="{{ route('gestion.operations.participants.show', [$operation, $p]) }}" class="text-decoration-none fw-semibold">
                                 {{ $p->tiers->prenom ?? '—' }}
                             </a>
                         </td>
@@ -346,7 +346,7 @@
                         <td class="text-end">
                             <div class="d-flex gap-1 justify-content-end">
                                 <button class="btn btn-sm btn-outline-secondary"
-                                        wire:click="$dispatch('open-participant', { id: {{ $p->id }} })"
+                                        onclick="window.location='{{ route('gestion.operations.participants.show', [$operation, $p]) }}'"
                                         title="Modifier">
                                     <i class="bi bi-pencil"></i>
                                 </button>
