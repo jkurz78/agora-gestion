@@ -106,7 +106,7 @@
             margin-top: 4px;
         }
         .solde-card.ecart .solde-value {
-            color: #198754;
+            color: #2E7D32;
         }
         .soldes table.layout td {
             padding: 0 4px;
@@ -171,10 +171,10 @@
             text-align: right;
         }
         .text-danger {
-            color: #dc3545;
+            color: #B5453A;
         }
         .text-success {
-            color: #198754;
+            color: #2E7D32;
         }
 
         /* Footer */

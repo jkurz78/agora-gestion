@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Enums\StatutFacture;
 use App\Models\Facture;
 use App\Models\Tiers;
@@ -44,7 +45,7 @@ final class FactureList extends Component
 
         $facture = app(FactureService::class)->creer($this->newFactureTiersId);
 
-        $this->redirect(route('gestion.factures.edit', $facture));
+        $this->redirect(route($this->espacePrefix() . '.factures.edit', $facture));
     }
 
     public function supprimer(int $id): void
@@ -118,5 +119,10 @@ final class FactureList extends Component
             'factures' => $factures,
             'tiers' => $tiers,
         ]);
+    }
+
+    private function espacePrefix(): string
+    {
+        return (request()->attributes->get('espace') ?? Espace::Compta)->value;
     }
 }

@@ -167,9 +167,9 @@
                                                  "
                                                  title="{{ $kine === 'oui' ? 'Oui' : ($kine === 'non' ? 'Non' : 'Non renseigné') }} — clic pour changer">
                                                 @if($kine === 'oui')
-                                                    <i class="bi bi-check-lg" style="color:#198754;font-size:14px"></i>
+                                                    <i class="bi bi-check-lg" style="color:#2E7D32;font-size:14px"></i>
                                                 @elseif($kine === 'non')
-                                                    <i class="bi bi-x-lg" style="color:#dc3545;font-size:12px"></i>
+                                                    <i class="bi bi-x-lg" style="color:#B5453A;font-size:12px"></i>
                                                 @endif
                                             </div>
                                         @endif

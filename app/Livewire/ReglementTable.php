@@ -4,21 +4,43 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\CategorieEmail;
 use App\Enums\ModePaiement;
 use App\Enums\TypeDocumentPrevisionnel;
+use App\Mail\DocumentMail;
 use App\Models\DocumentPrevisionnel;
+use App\Models\EmailLog;
+use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Reglement;
 use App\Models\Seance;
 use App\Services\DocumentPrevisionnelService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
 final class ReglementTable extends Component
 {
     public Operation $operation;
+
+    public ?int $docModalParticipantId = null;
+
+    public string $docModalType = 'devis';
+
+    public string $docModalMessage = '';
+
+    public string $docModalMessageType = 'info';
+
+    public function openDocModal(int $participantId, string $type): void
+    {
+        $this->docModalParticipantId = $participantId;
+        $this->docModalType = $type;
+        $this->docModalMessage = '';
+    }
 
     public function mount(Operation $operation): void
     {
@@ -155,6 +177,10 @@ final class ReglementTable extends Component
             $service->genererPdf($document);
         }
 
+        $label = $typeEnum === TypeDocumentPrevisionnel::Devis ? 'Devis' : 'Pro forma';
+        $this->docModalMessage = "{$label} v{$document->version} généré.";
+        $this->docModalMessageType = 'success';
+
         $this->dispatch('open-url', url: route('gestion.documents-previsionnels.pdf', $document));
     }
 
@@ -185,7 +211,7 @@ final class ReglementTable extends Component
         // Load existing documents for badge display
         $docVersions = DocumentPrevisionnel::where('operation_id', $this->operation->id)
             ->whereIn('participant_id', $participants->pluck('id'))
-            ->select('participant_id', 'type', DB::raw('MAX(version) as last_version'))
+            ->select('participant_id', 'type', DB::raw('MAX(version) as last_version'), DB::raw('MAX(id) as last_id'))
             ->groupBy('participant_id', 'type')
             ->get()
             ->groupBy('participant_id')
@@ -244,5 +270,111 @@ final class ReglementTable extends Component
         }
 
         return $map;
+    }
+
+    public function envoyerDocumentEmail(int $participantId, string $type): void
+    {
+        $typeEnum = TypeDocumentPrevisionnel::from($type);
+
+        $doc = DocumentPrevisionnel::where('participant_id', $participantId)
+            ->where('operation_id', $this->operation->id)
+            ->where('type', $typeEnum)
+            ->orderByDesc('version')
+            ->with(['participant.tiers'])
+            ->first();
+
+        if (! $doc) {
+            $this->docModalMessage = 'Aucun document trouvé.';
+            $this->docModalMessageType = 'danger';
+
+            return;
+        }
+
+        $tiers = $doc->participant->tiers;
+
+        if (! $tiers?->email) {
+            $this->docModalMessage = 'Aucune adresse email pour ce tiers.';
+            $this->docModalMessageType = 'danger';
+
+            return;
+        }
+
+        $typeOp = $this->operation->typeOperation;
+        if (! $typeOp?->email_from) {
+            $this->docModalMessage = "L'adresse d'expédition n'est pas configurée pour le type d'opération.";
+            $this->docModalMessageType = 'danger';
+
+            return;
+        }
+
+        [$typeLabel, $article, $articleDe] = match ($typeEnum) {
+            TypeDocumentPrevisionnel::Devis => ['devis', 'le devis', 'du devis'],
+            TypeDocumentPrevisionnel::Proforma => ['pro forma', 'la pro forma', 'de la pro forma'],
+        };
+
+        $pdfContent = $doc->pdf_path && Storage::disk('local')->exists($doc->pdf_path)
+            ? Storage::disk('local')->get($doc->pdf_path)
+            : app(DocumentPrevisionnelService::class)->genererPdf($doc);
+
+        $pdfFilename = ucfirst($typeLabel) . " {$doc->numero} - {$tiers->displayName()}.pdf";
+
+        $template = EmailTemplate::where('categorie', CategorieEmail::Document->value)
+            ->whereNull('type_operation_id')
+            ->first();
+
+        try {
+            $mail = new DocumentMail(
+                prenomDestinataire: $tiers->prenom ?? '',
+                nomDestinataire: $tiers->nom,
+                typeDocument: $typeLabel,
+                typeDocumentArticle: $article,
+                typeDocumentArticleDe: $articleDe,
+                numeroDocument: $doc->numero,
+                dateDocument: $doc->date->format('d/m/Y'),
+                montantTotal: number_format((float) $doc->montant_total, 2, ',', "\u{00A0}") . ' €',
+                customObjet: $template?->objet,
+                customCorps: $template?->corps,
+                pdfContent: $pdfContent,
+                pdfFilename: $pdfFilename,
+                typeOperationId: $this->operation->type_operation_id,
+            );
+
+            Mail::mailer()
+                ->to($tiers->email)
+                ->send($mail->from($typeOp->email_from, $typeOp->email_from_name));
+
+            EmailLog::create([
+                'tiers_id' => $tiers->id,
+                'participant_id' => $doc->participant_id,
+                'operation_id' => $doc->operation_id,
+                'categorie' => CategorieEmail::Document->value,
+                'email_template_id' => $template?->id,
+                'destinataire_email' => $tiers->email,
+                'destinataire_nom' => $tiers->displayName(),
+                'objet' => $mail->envelope()->subject,
+                'statut' => 'envoye',
+                'envoye_par' => Auth::id(),
+            ]);
+
+            $this->docModalMessage = ucfirst($typeLabel) . " envoyé à {$tiers->email}.";
+            $this->docModalMessageType = 'success';
+        } catch (\Throwable $e) {
+            EmailLog::create([
+                'tiers_id' => $tiers->id,
+                'participant_id' => $doc->participant_id,
+                'operation_id' => $doc->operation_id,
+                'categorie' => CategorieEmail::Document->value,
+                'email_template_id' => $template?->id,
+                'destinataire_email' => $tiers->email,
+                'destinataire_nom' => $tiers->displayName(),
+                'objet' => ucfirst($typeLabel) . ' ' . $doc->numero,
+                'statut' => 'erreur',
+                'erreur_message' => $e->getMessage(),
+                'envoye_par' => Auth::id(),
+            ]);
+
+            $this->docModalMessage = "Erreur lors de l'envoi : " . $e->getMessage();
+            $this->docModalMessageType = 'danger';
+        }
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Helpers\ArticleFr;
+use App\Helpers\EmailLogo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
@@ -35,13 +36,14 @@ final class AttestationPresenceMail extends Mailable
         public readonly string $pdfFilename,
         public readonly ?string $libelleArticle = null,
         public readonly ?string $blocSeances = null,
+        public readonly ?int $typeOperationId = null,
     ) {
         $corps = $this->customCorps ?? '<p>Bonjour {prenom}, veuillez trouver ci-joint votre attestation de présence.</p>';
-        $allowedTags = '<p><br><strong><em><u><ul><ol><li><a><h1><h2><h3><h4><span><div><table><tr><td><th>';
+        $allVars = $this->variables() + EmailLogo::variables($this->typeOperationId);
         $corps = str_replace(
-            array_keys($this->variables()),
-            array_values($this->variables()),
-            strip_tags($corps, $allowedTags)
+            array_keys($allVars),
+            array_values($allVars),
+            strip_tags($corps, EmailLogo::ALLOWED_TAGS)
         );
         $this->corpsHtml = ArticleFr::contracter($corps);
     }

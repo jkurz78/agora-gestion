@@ -38,7 +38,7 @@
                 — Exercice {{ $facture->exercice }}/{{ $facture->exercice + 1 }}
             </p>
         </div>
-        <a href="{{ route('gestion.factures') }}" class="btn btn-outline-secondary">
+        <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour à la liste
         </a>
     </div>
@@ -182,10 +182,25 @@
                     <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
                 </div>
                 <div class="card-body d-grid gap-2">
-                    <a href="{{ route('gestion.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}" class="btn btn-outline-primary" target="_blank">
+                    <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}" class="btn btn-outline-primary" target="_blank">
                         <i class="bi bi-file-earmark-pdf"></i> Télécharger PDF
                     </a>
-                    <a href="{{ route('gestion.factures') }}" class="btn btn-outline-secondary">
+                    @if ($facture->tiers?->email)
+                        <button wire:click="envoyerEmail" class="btn btn-outline-primary" wire:loading.attr="disabled">
+                            <span wire:loading.remove wire:target="envoyerEmail"><i class="bi bi-envelope"></i> Envoyer par email</span>
+                            <span wire:loading wire:target="envoyerEmail"><i class="bi bi-hourglass-split"></i> Envoi...</span>
+                        </button>
+                    @else
+                        <button class="btn btn-outline-secondary" disabled title="Aucune adresse email pour ce tiers">
+                            <i class="bi bi-envelope-x"></i> Pas d'email
+                        </button>
+                    @endif
+                    @if ($emailMessage)
+                        <div class="alert alert-{{ $emailMessageType }} py-2 px-3 mb-0 small">
+                            {{ $emailMessage }}
+                        </div>
+                    @endif
+                    <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures') }}" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Retour à la liste
                     </a>
                 </div>
@@ -234,6 +249,41 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
                     <button type="button" class="btn btn-primary" wire:click="encaisser" data-bs-dismiss="modal">
                         <i class="bi bi-check-lg"></i> Confirmer l'encaissement
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- Modale choix expéditeur --}}
+    @if ($showEmailSenderModal)
+    <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Choisir l'adresse d'expédition</h5>
+                    <button type="button" class="btn-close" wire:click="$set('showEmailSenderModal', false)"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Plusieurs adresses d'expédition sont configurées pour les opérations liées à cette facture.</p>
+                    @foreach ($emailSenderChoices as $choice)
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="emailSender"
+                                   id="sender-{{ $loop->index }}"
+                                   value="{{ $choice['email'] }}"
+                                   wire:click="$set('selectedEmailFrom', '{{ $choice['email'] }}'); $set('selectedEmailFromName', '{{ $choice['name'] ?? '' }}')"
+                                   @checked($selectedEmailFrom === $choice['email'])>
+                            <label class="form-check-label" for="sender-{{ $loop->index }}">
+                                {{ $choice['label'] }}
+                            </label>
+                        </div>
+                    @endforeach
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" wire:click="$set('showEmailSenderModal', false)">Annuler</button>
+                    <button type="button" class="btn btn-primary" wire:click="confirmSendEmail">
+                        <i class="bi bi-envelope"></i> Envoyer
                     </button>
                 </div>
             </div>

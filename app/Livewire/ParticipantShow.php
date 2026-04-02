@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\CategorieEmail;
 use App\Enums\TypeDocumentPrevisionnel;
+use App\Mail\DocumentMail;
 use App\Models\DocumentPrevisionnel;
 use App\Models\EmailLog;
+use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -352,6 +356,19 @@ final class ParticipantShow extends Component
         // Build combined timeline
         $timeline = collect();
 
+        // Inscription du participant
+        $source = $this->participant->est_helloasso ? 'HelloAsso' : 'saisie manuelle';
+        $timeline->push([
+            'date' => $this->participant->created_at,
+            'type' => 'inscription',
+            'categorie' => 'inscription',
+            'icon' => $this->participant->est_helloasso ? 'bi-cloud-download' : 'bi-person-plus',
+            'color' => 'primary',
+            'description' => "Inscription ({$source})",
+            'detail' => null,
+            'copyable' => null,
+        ]);
+
         foreach ($emailLogs as $log) {
             $timeline->push([
                 'date' => $log->created_at,
@@ -419,6 +436,7 @@ final class ParticipantShow extends Component
                 'detail' => null,
                 'copyable' => null,
                 'pdf_url' => route('gestion.documents-previsionnels.pdf', $doc),
+                'document_id' => $doc->id,
             ]);
         }
 
@@ -530,5 +548,96 @@ final class ParticipantShow extends Component
                 ]),
             ])
             ->toArray();
+    }
+
+    public function envoyerDocumentEmail(int $documentId): void
+    {
+        $doc = DocumentPrevisionnel::with(['participant.tiers', 'operation.typeOperation'])
+            ->findOrFail($documentId);
+
+        $tiers = $doc->participant->tiers;
+
+        if (! $tiers?->email) {
+            session()->flash('error', 'Aucune adresse email pour ce tiers.');
+
+            return;
+        }
+
+        $typeOp = $doc->operation->typeOperation;
+        if (! $typeOp?->email_from) {
+            session()->flash('error', "L'adresse d'expédition n'est pas configurée pour le type d'opération.");
+
+            return;
+        }
+
+        // Grammaire française pour le type de document
+        [$typeLabel, $article, $articleDe] = match ($doc->type) {
+            TypeDocumentPrevisionnel::Devis => ['devis', 'le devis', 'du devis'],
+            TypeDocumentPrevisionnel::Proforma => ['pro forma', 'la pro forma', 'de la pro forma'],
+        };
+
+        // Récupérer ou générer le PDF
+        $pdfContent = $doc->pdf_path && Storage::disk('local')->exists($doc->pdf_path)
+            ? Storage::disk('local')->get($doc->pdf_path)
+            : app(\App\Services\DocumentPrevisionnelService::class)->genererPdf($doc);
+
+        $pdfFilename = ucfirst($typeLabel) . " {$doc->numero} - {$tiers->displayName()}.pdf";
+
+        $template = EmailTemplate::where('categorie', CategorieEmail::Document->value)
+            ->whereNull('type_operation_id')
+            ->first();
+
+        try {
+            $mail = new DocumentMail(
+                prenomDestinataire: $tiers->prenom ?? '',
+                nomDestinataire: $tiers->nom,
+                typeDocument: $typeLabel,
+                typeDocumentArticle: $article,
+                typeDocumentArticleDe: $articleDe,
+                numeroDocument: $doc->numero,
+                dateDocument: $doc->date->format('d/m/Y'),
+                montantTotal: number_format((float) $doc->montant_total, 2, ',', "\u{00A0}") . ' €',
+                customObjet: $template?->objet,
+                customCorps: $template?->corps,
+                pdfContent: $pdfContent,
+                pdfFilename: $pdfFilename,
+                typeOperationId: $doc->operation->type_operation_id,
+            );
+
+            Mail::mailer()
+                ->to($tiers->email)
+                ->send($mail->from($typeOp->email_from, $typeOp->email_from_name));
+
+            EmailLog::create([
+                'tiers_id' => $tiers->id,
+                'participant_id' => $doc->participant_id,
+                'operation_id' => $doc->operation_id,
+                'categorie' => CategorieEmail::Document->value,
+                'email_template_id' => $template?->id,
+                'destinataire_email' => $tiers->email,
+                'destinataire_nom' => $tiers->displayName(),
+                'objet' => $mail->envelope()->subject,
+                'statut' => 'envoye',
+                'envoye_par' => Auth::id(),
+            ]);
+
+            session()->flash('success', ucfirst($typeLabel) . " envoyé à {$tiers->email}.");
+        } catch (\Throwable $e) {
+            EmailLog::create([
+                'tiers_id' => $tiers->id,
+                'participant_id' => $doc->participant_id,
+                'operation_id' => $doc->operation_id,
+                'categorie' => CategorieEmail::Document->value,
+                'email_template_id' => $template?->id,
+                'destinataire_email' => $tiers->email,
+                'destinataire_nom' => $tiers->displayName(),
+                'objet' => ucfirst($typeLabel) . ' ' . $doc->numero,
+                'statut' => 'erreur',
+                'erreur_message' => $e->getMessage(),
+                'envoye_par' => Auth::id(),
+            ]);
+
+            session()->flash('error', "Erreur lors de l'envoi : " . $e->getMessage());
+        }
     }
 }

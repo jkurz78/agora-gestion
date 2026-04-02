@@ -49,6 +49,17 @@ $registerParametres = function (): void {
         Route::view('type-operations', 'parametres.type-operations.index')->name('type-operations.index');
     });
     Route::view('/helloasso-sync', 'banques.helloasso-sync')->name('helloasso-sync');
+
+    // Factures (accessibles depuis les deux espaces)
+    Route::view('/factures', 'gestion.factures.index')->name('factures');
+    Route::get('/factures/{facture}/edit', function (Facture $facture) {
+        return view('gestion.factures.edit', compact('facture'));
+    })->name('factures.edit');
+    Route::get('/factures/{facture}', function (Facture $facture) {
+        return view('gestion.factures.show', compact('facture'));
+    })->name('factures.show');
+    Route::get('/factures/{facture}/pdf', FacturePdfController::class)
+        ->name('factures.pdf');
 };
 
 // ── Espace Comptabilité ──
@@ -140,17 +151,6 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
         })->name('remises-bancaires.validation');
         Route::get('/remises-bancaires/{remise}/pdf', RemiseBancairePdfController::class)
             ->name('remises-bancaires.pdf');
-
-        // Factures
-        Route::view('/factures', 'gestion.factures.index')->name('factures');
-        Route::get('/factures/{facture}/edit', function (Facture $facture) {
-            return view('gestion.factures.edit', compact('facture'));
-        })->name('factures.edit');
-        Route::get('/factures/{facture}', function (Facture $facture) {
-            return view('gestion.factures.show', compact('facture'));
-        })->name('factures.show');
-        Route::get('/factures/{facture}/pdf', FacturePdfController::class)
-            ->name('factures.pdf');
 
         // Documents prévisionnels (devis / pro forma)
         Route::get('/documents-previsionnels/{document}/pdf', DocumentPrevisionnelPdfController::class)

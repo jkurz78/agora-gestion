@@ -13,26 +13,20 @@ return new class extends Migration
             [
                 'categorie' => 'formulaire',
                 'objet' => 'Action requise : Formulaire à compléter pour votre inscription {type_operation} « {operation} »',
-                'corps' => '<p>Bonjour {prenom},</p>'
+                'corps' => '<p>{logo_operation}</p>'
+                    .'<p>Bonjour {prenom},</p>'
                     .'<p>Afin de compléter votre dossier d\'inscription {type_operation} « {operation} », nous vous remercions de compléter le formulaire dont le lien est ci-dessous.</p>'
                     .'<p>Rappel : ce parcours se déroulera sur {nb_seances} séances du {date_debut} au {date_fin}.</p>'
-                    .'<p>Cordialement,<br>L\'équipe</p>',
+                    .'<p>Cordialement,<br>L\'équipe encadrante</p>',
             ],
             [
                 'categorie' => 'attestation',
                 'objet' => 'Attestation de présence — {operation}',
-                'corps' => '<p>Bonjour <strong>{prenom}</strong>,</p>'
+                'corps' => '<p>{logo_operation}</p>'
+                    .'<p>Bonjour <strong>{prenom}</strong>,</p>'
                     .'<p>Veuillez trouver ci-joint votre attestation de présence pour {type_operation} « <strong>{operation}</strong> ».</p>'
                     .'{bloc_seances}'
-                    .'<p>Cordialement,<br>L\'équipe</p>',
-            ],
-            [
-                'categorie' => 'facture',
-                'objet' => 'Facture n°{numero_facture} — {operation}',
-                'corps' => '<p>Bonjour <strong>{prenom} {nom}</strong>,</p>'
-                    .'<p>Veuillez trouver ci-joint la facture n°<strong>{numero_facture}</strong> du {date_facture} '
-                    .'relative à <strong>{operation}</strong>.</p>'
-                    .'<p>Cordialement,<br>L\'équipe</p>',
+                    .'<p>Cordialement,<br>L\'équipe encadrante</p>',
             ],
         ];
 

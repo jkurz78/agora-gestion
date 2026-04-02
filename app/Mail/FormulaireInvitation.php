@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Helpers\ArticleFr;
+use App\Helpers\EmailLogo;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -34,8 +35,9 @@ final class FormulaireInvitation extends Mailable
         public readonly ?string $customObjet = null,
         public readonly ?string $customCorps = null,
         public readonly ?string $libelleArticle = null,
+        public readonly ?int $typeOperationId = null,
     ) {
-        $vars = $this->variables();
+        $vars = $this->variables() + EmailLogo::variables($this->typeOperationId);
 
         $corps = $this->customCorps
             ?? '<p>Bonjour <strong>{prenom}</strong>,</p><p>Nous vous invitons à compléter votre formulaire pour <strong>{operation}</strong>.</p>';
@@ -46,8 +48,7 @@ final class FormulaireInvitation extends Mailable
         $corps = str_replace(array_keys($vars), array_values($vars), $corps);
         $corps = ArticleFr::contracter($corps);
 
-        // Allow the bloc_liens HTML through sanitization
-        $this->corpsHtml = strip_tags($corps, '<p><br><strong><em><u><ul><ol><li><a><h1><h2><h3><h4><span><div><table><tr><td><th>');
+        $this->corpsHtml = strip_tags($corps, EmailLogo::ALLOWED_TAGS);
     }
 
     public function envelope(): Envelope
