@@ -25,6 +25,8 @@ use App\Http\Controllers\UserController;
 use App\Http\Middleware\DetecteEspace;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
+use App\Models\Operation;
+use App\Models\Participant;
 use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
@@ -114,7 +116,7 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
     ->group(function () use ($registerParametres): void {
         Route::view('/dashboard', 'gestion.dashboard')->name('dashboard');
         Route::view('/adherents', 'gestion.adherents')->name('adherents');
-        Route::view('/operations', 'gestion.operations')->name('operations');
+        Route::view('/operations', 'gestion.operations.index')->name('operations');
         Route::get('/operations/{operation}/participants/export', ParticipantExportController::class)
             ->name('operations.participants.export');
         Route::get('/operations/{operation}/participants/pdf', ParticipantPdfController::class)
@@ -123,6 +125,16 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
             ->name('operations.participants.fiche-pdf');
         Route::get('/operations/{operation}/participants/{participant}/droit-image-pdf', DroitImagePdfController::class)
             ->name('operations.participants.droit-image-pdf');
+        Route::get('/operations/{operation}/participants/{participant}/attestation-recap-pdf', [AttestationPresencePdfController::class, 'recap'])
+            ->name('operations.participants.attestation-recap-pdf');
+        Route::get('/operations/{operation}/participants/{participant}', function (Operation $operation, Participant $participant) {
+            abort_unless($participant->operation_id === $operation->id, 404);
+
+            return view('gestion.operations.participant', compact('operation', 'participant'));
+        })->name('operations.participants.show');
+        Route::get('/operations/{operation}', function (Operation $operation) {
+            return view('gestion.operations.show', compact('operation'));
+        })->name('operations.show');
         Route::get('/operations/{operation}/seances/matrice-pdf', [SeancePdfController::class, 'matrice'])
             ->name('operations.seances.matrice-pdf');
         Route::get('/operations/{operation}/seances/{seance}/emargement-pdf', [SeancePdfController::class, 'emargement'])
@@ -131,8 +143,6 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
             ->name('operations.seances.export');
         Route::get('/operations/{operation}/seances/{seance}/attestation-pdf', [AttestationPresencePdfController::class, 'seance'])
             ->name('operations.seances.attestation-pdf');
-        Route::get('/operations/{operation}/participants/{participant}/attestation-recap-pdf', [AttestationPresencePdfController::class, 'recap'])
-            ->name('operations.participants.attestation-recap-pdf');
 
         // Participant documents
         Route::get('/participants/{participant}/documents/{filename}', ParticipantDocumentController::class)
