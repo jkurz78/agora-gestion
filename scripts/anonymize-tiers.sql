@@ -154,13 +154,13 @@ CREATE TEMPORARY TABLE tmp_entreprises (
     nom VARCHAR(100)
 );
 INSERT INTO tmp_entreprises (nom) VALUES
-('Solutions Informatiques'),('Cabinet Médical du Parc'),('Boulangerie Artisanale'),
-('Auto-École de la Gare'),('Pharmacie Centrale'),('Agence Immobilière du Centre'),
-('Restaurant Le Provençal'),('Garage Automobile Martin'),('Cabinet d''Avocats Associés'),
-('Fleuriste Les Quatre Saisons'),('Librairie du Centre'),('Menuiserie Générale'),
-('Plomberie Services'),('Électricité Durand'),('Pressing du Parc'),
-('Optique Vision Plus'),('Imprimerie Moderne'),('Boucherie Charcuterie'),
-('Salon de Coiffure L''Éclat'),('Pâtisserie Delacroix');
+('Association Soins et Solidarité'),('Maison des Femmes'),('Centre d''Hébergement d''Urgence'),
+('CIDFF des Yvelines'),('Association d''Aide aux Victimes'),('Clinique du Parc'),
+('Cabinet Médical du Centre'),('Centre Médico-Psychologique'),('Maison de Justice et du Droit'),
+('Association Femmes Solidaires'),('Centre de Soins Psychologiques'),('Cabinet d''Avocats Associés'),
+('Fondation pour l''Enfance'),('Pôle Santé des Yvelines'),('Centre d''Accueil et d''Écoute'),
+('Réseau Santé Précarité'),('Maison des Adolescents'),('Centre Hospitalier Spécialisé'),
+('Association Vivre Ensemble'),('Service Social Départemental');
 
 DROP TEMPORARY TABLE IF EXISTS tmp_etablissements;
 CREATE TEMPORARY TABLE tmp_etablissements (
@@ -168,10 +168,11 @@ CREATE TEMPORARY TABLE tmp_etablissements (
     nom VARCHAR(100)
 );
 INSERT INTO tmp_etablissements (nom) VALUES
-('Centre Hospitalier'),('Clinique Saint-Louis'),('Maison de Retraite Les Tilleuls'),
-('Foyer d''Accueil'),('EHPAD Les Jardins'),('Centre Médical'),
-('Maison de Santé'),('Institut Médico-Éducatif'),('Centre de Rééducation'),
-('Résidence Les Chênes');
+('Centre Hospitalier'),('Clinique Saint-Louis'),('Maison des Femmes de Saint-Germain'),
+('Foyer d''Hébergement'),('Centre Médico-Psychologique'),('Centre Médical'),
+('Maison de Santé Pluridisciplinaire'),('Centre d''Accueil d''Urgence'),('Maison de Justice'),
+('CIDFF'),('Association d''Aide aux Victimes'),('Pôle Santé'),
+('Cabinet de Psychologie'),('Centre de Soins de Suite'),('Service d''Aide Sociale');
 
 
 -- ═══════════════════════════════════════════════════════════════════════
