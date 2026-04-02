@@ -1,20 +1,20 @@
 <div>
-    {{-- Breadcrumb --}}
-    <x-operation-breadcrumb :operation="$operation" :operationMeta="$operationMeta">
-        <a class="btn btn-sm btn-outline-secondary" title="Modifier l'opération"
-           href="{{ route('compta.operations.edit', $operation) }}?_redirect_back={{ urlencode(route('gestion.operations.show', $operation)) }}">
-            <i class="bi bi-gear"></i>
-        </a>
-    </x-operation-breadcrumb>
-
-    {{-- Tabs --}}
+    {{-- Zone haute : breadcrumb + onglets (fond gris) --}}
     <style>
-        .nav-gestion .nav-link { color: #666; }
+        .nav-gestion .nav-link { color: #666; background: transparent; border: 1px solid transparent; }
         .nav-gestion .nav-link:hover:not(.disabled) { color: #A9014F; }
-        .nav-gestion .nav-link.active { color: #A9014F; font-weight: 600; border-color: #dee2e6 #dee2e6 #fff; }
+        .nav-gestion .nav-link.active { color: #A9014F; font-weight: 600; background: #fff; border-color: #dee2e6 #dee2e6 #fff; }
         .nav-gestion .nav-link.disabled { color: #bbb; font-style: italic; }
     </style>
-    <ul class="nav nav-tabs nav-gestion mb-3">
+    <div style="background: #f8f9fa; margin: -1rem -1rem 0; padding: 1rem 1rem 0;">
+        <x-operation-breadcrumb :operation="$operation" :operationMeta="$operationMeta">
+            <a class="btn btn-sm btn-outline-secondary" title="Modifier l'opération"
+               href="{{ route('compta.operations.edit', $operation) }}?_redirect_back={{ urlencode(route('gestion.operations.show', $operation)) }}">
+                <i class="bi bi-gear"></i>
+            </a>
+        </x-operation-breadcrumb>
+
+        <ul class="nav nav-tabs nav-gestion mb-0" style="border-bottom: none;">
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'participants' ? 'active' : '' }}" wire:click="setTab('participants')">
                 <i class="bi bi-people me-1"></i>Participants ({{ $participantsCount }})
@@ -51,6 +51,7 @@
             </button>
         </li>
     </ul>
+    </div>
 
     {{-- Tab content --}}
     @if($activeTab === 'participants')
