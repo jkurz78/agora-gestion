@@ -60,7 +60,13 @@ cat "$SCRIPT_DIR/anonymize-tiers.sql" \
 | ssh nas "/usr/local/bin/docker compose -f $NAS_COMPOSE exec -T db \
     mariadb --user=root --password='$STAGING_ROOT_PASS' $STAGING_DB"
 
-echo "==> Anonymisation terminée."
+echo "==> Anonymisation SQL terminée."
+
+# ── Anonymisation des données médicales chiffrées (via Laravel) ──────────────
+echo "==> Anonymisation des données médicales (chiffrées) + correction prénoms/sexe..."
+ssh nas "/usr/local/bin/docker compose -f $NAS_COMPOSE exec -T app php artisan staging:anonymize-medical"
+
+echo "==> Anonymisation complète."
 
 # ── Vider les caches Laravel ─────────────────────────────────────────────────
 echo "==> Vidage des caches Laravel..."
