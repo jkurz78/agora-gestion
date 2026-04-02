@@ -85,11 +85,11 @@
             <a class="nav-link" :class="tab === 'historique' && 'active'" @click.prevent="tab = 'historique'" href="#">Historique</a>
         </li>
     </ul>
-        <div class="ms-3 mb-1 d-flex align-items-center gap-2">
+        <div class="ms-3 d-flex align-items-center gap-2" style="margin-bottom: 6px;">
             @if($successMessage)
                 <span class="text-success" style="font-size: 12px; white-space: nowrap;"><i class="bi bi-check-lg"></i> {{ $successMessage }}</span>
             @endif
-            <button type="button" class="btn btn-sm btn-primary text-nowrap" wire:click="save" x-on:click="isDirty = false">
+            <button x-show="isDirty" x-transition type="button" class="btn btn-sm btn-primary text-nowrap" wire:click="save" x-on:click="isDirty = false">
                 <i class="bi bi-check-lg"></i> Enregistrer
             </button>
         </div>
