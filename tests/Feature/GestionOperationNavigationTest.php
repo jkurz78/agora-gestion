@@ -2,10 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutOperation;
+use App\Livewire\OperationList;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use App\Models\User;
+use Livewire\Livewire;
 
 test('operations list page loads', function (): void {
     $user = User::factory()->create();
@@ -73,4 +77,54 @@ test('unauthenticated user is redirected from operation detail', function (): vo
     $operation = Operation::factory()->create();
     $this->get("/gestion/operations/{$operation->id}")
         ->assertRedirect('/login');
+});
+
+test('niveau 1: opérations listées dans le tableau', function (): void {
+    $user = User::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Equithérapie', 'actif' => true]);
+    $op = Operation::factory()->create([
+        'nom' => 'Parcours Cheval Bleu',
+        'type_operation_id' => $type->id,
+        'date_debut' => now()->addDays(14),
+        'date_fin' => now()->addMonths(9),
+    ]);
+    $tiers1 = Tiers::factory()->create();
+    $tiers2 = Tiers::factory()->create();
+    $tiers3 = Tiers::factory()->create();
+    Participant::create(['tiers_id' => $tiers1->id, 'operation_id' => $op->id, 'date_inscription' => now()->toDateString()]);
+    Participant::create(['tiers_id' => $tiers2->id, 'operation_id' => $op->id, 'date_inscription' => now()->toDateString()]);
+    Participant::create(['tiers_id' => $tiers3->id, 'operation_id' => $op->id, 'date_inscription' => now()->toDateString()]);
+
+    $this->actingAs($user)
+        ->get('/gestion/operations')
+        ->assertSee('Parcours Cheval Bleu')
+        ->assertSee('Equithérapie')
+        ->assertSee('3');
+});
+
+test('niveau 1: filtre par type fonctionne', function (): void {
+    $user = User::factory()->create();
+    $type1 = TypeOperation::factory()->create(['nom' => 'Type A', 'actif' => true]);
+    $type2 = TypeOperation::factory()->create(['nom' => 'Type B', 'actif' => true]);
+    Operation::factory()->create(['nom' => 'Op A', 'type_operation_id' => $type1->id]);
+    Operation::factory()->create(['nom' => 'Op B', 'type_operation_id' => $type2->id]);
+
+    Livewire::actingAs($user)
+        ->test(OperationList::class)
+        ->set('filterTypeId', $type1->id)
+        ->assertSee('Op A')
+        ->assertDontSee('Op B');
+});
+
+test('niveau 1: opérations clôturées affichées en opacité réduite', function (): void {
+    $user = User::factory()->create();
+    $op = Operation::factory()->create([
+        'nom' => 'Op Clôturée',
+        'statut' => StatutOperation::Cloturee,
+    ]);
+
+    $this->actingAs($user)
+        ->get('/gestion/operations')
+        ->assertSee('Op Clôturée')
+        ->assertSee('opacity');
 });
