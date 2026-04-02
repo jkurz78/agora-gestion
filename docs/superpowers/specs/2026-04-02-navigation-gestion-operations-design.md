@@ -18,6 +18,7 @@
 - **Zéro bascule vers l'espace Compta** — tout le CRUD opération reste dans Gestion
 - **Chaque niveau a son propre écran** — l'utilisateur sait toujours où il est
 - **Bouton "← Retour" explicite** sur les niveaux 2 et 3 en plus du breadcrumb cliquable — le breadcrumb n'est pas un pattern naturel pour les utilisateurs non-techniques
+- **Bouton retour du navigateur fonctionnel** — chaque niveau a sa propre URL, l'historique du navigateur suit la hiérarchie (retour = remonter d'un niveau). Aujourd'hui tout est sur une seule URL avec état Livewire en mémoire, ce qui casse le retour navigateur.
 
 ## Les 3 niveaux
 
