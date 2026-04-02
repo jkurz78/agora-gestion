@@ -17,7 +17,7 @@
         <ul class="nav nav-tabs nav-gestion mb-0" style="border-bottom: none;">
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'details' ? 'active' : '' }}" wire:click="setTab('details')">
-                <i class="bi bi-card-text me-1"></i>Détails
+                <i class="bi bi-info-circle me-1"></i>Infos
             </button>
         </li>
         <li class="nav-item d-flex align-items-end" style="padding:0 4px">
