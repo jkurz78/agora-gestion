@@ -34,7 +34,7 @@
     </style>
 
     {{-- Toolbar --}}
-    <div class="d-flex justify-content-end align-items-center mb-3">
+    <div class="d-flex justify-content-end align-items-center mt-2 mb-3">
         <div class="d-flex gap-2">
             <div class="dropdown" x-data="{ sensible: false }">
                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
