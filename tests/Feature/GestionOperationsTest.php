@@ -21,11 +21,11 @@ test('operations are listed in selector', function (): void {
         ->assertSee('Art-thérapie test');
 });
 
-test('operation can be pre-selected via URL parameter', function (): void {
+test('operation detail page shows tabs', function (): void {
     $user = User::factory()->create();
     $op = Operation::factory()->create(['nom' => 'Sophrologie test']);
     $this->actingAs($user)
-        ->get('/gestion/operations?id='.$op->id)
+        ->get('/gestion/operations/'.$op->id)
         ->assertOk()
         ->assertSee('Sophrologie test')
         ->assertSee('Détails');
