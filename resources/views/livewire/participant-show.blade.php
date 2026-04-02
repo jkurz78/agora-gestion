@@ -39,29 +39,27 @@
         $participantMeta = implode(' · ', $metaParts);
     @endphp
 
-    <x-operation-breadcrumb :operation="$operation" :participant="$participant" :participantMeta="$participantMeta">
-        @if($successMessage)
-            <span class="text-success me-2" style="font-size: 12px;"><i class="bi bi-check-lg"></i> {{ $successMessage }}</span>
-        @endif
-        <button type="button" class="btn btn-sm btn-primary" wire:click="save" x-on:click="isDirty = false">
-            <i class="bi bi-check-lg"></i> Enregistrer
-        </button>
-    </x-operation-breadcrumb>
+    {{-- Zone haute : breadcrumb + PDF (fond gris) --}}
+    <div style="background: #f8f9fa; margin: -1rem -1rem 0; padding: 1rem 1rem 0; border-bottom: 1px solid #dee2e6;">
+        <x-operation-breadcrumb :operation="$operation" :participant="$participant" :participantMeta="$participantMeta">
+        </x-operation-breadcrumb>
 
-    {{-- PDF actions --}}
-    <div class="d-flex gap-2 mb-3">
-        <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
-            <i class="bi bi-file-person"></i> Fiche PDF
-        </a>
-        @if($operation->typeOperation?->formulaire_droit_image && $participant->droit_image)
-        <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
-            <i class="bi bi-camera"></i> Autorisation photo
-        </a>
-        @endif
+        {{-- PDF actions --}}
+        <div class="d-flex gap-2 mb-3">
+            <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                <i class="bi bi-file-person"></i> Fiche PDF
+            </a>
+            @if($operation->typeOperation?->formulaire_droit_image && $participant->droit_image)
+            <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                <i class="bi bi-camera"></i> Autorisation photo
+            </a>
+            @endif
+        </div>
     </div>
 
-    {{-- Tab navigation --}}
-    <ul class="nav nav-tabs mb-3">
+    {{-- Ligne onglets + bouton enregistrer --}}
+    <div class="d-flex align-items-end mb-3">
+    <ul class="nav nav-tabs flex-grow-1 mb-0">
         <li class="nav-item">
             <a class="nav-link" :class="tab === 'coordonnees' && 'active'" @click.prevent="tab = 'coordonnees'" href="#">Coordonnées</a>
         </li>
@@ -95,6 +93,15 @@
             <a class="nav-link" :class="tab === 'historique' && 'active'" @click.prevent="tab = 'historique'" href="#">Historique</a>
         </li>
     </ul>
+    <div class="ms-3 mb-1 d-flex align-items-center gap-2">
+        @if($successMessage)
+            <span class="text-success" style="font-size: 12px; white-space: nowrap;"><i class="bi bi-check-lg"></i> {{ $successMessage }}</span>
+        @endif
+        <button type="button" class="btn btn-sm btn-primary text-nowrap" wire:click="save" x-on:click="isDirty = false">
+            <i class="bi bi-check-lg"></i> Enregistrer
+        </button>
+    </div>
+    </div>
 
     {{-- Tab content --}}
     <div style="max-width:800px;">
