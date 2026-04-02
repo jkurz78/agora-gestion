@@ -1,4 +1,4 @@
-<div style="max-width:100%;overflow:hidden" x-data @open-url.window="window.open($event.detail.url, '_blank')">
+<div class="mt-2" style="max-width:100%;overflow:hidden" x-data @open-url.window="window.open($event.detail.url, '_blank')">
     @if($participants->isEmpty())
         <div class="text-center text-muted py-4">
             <i class="bi bi-people" style="font-size:2rem;opacity:0.3"></i>

@@ -16,6 +16,14 @@
 
         <ul class="nav nav-tabs nav-gestion mb-0" style="border-bottom: none;">
         <li class="nav-item">
+            <button class="nav-link {{ $activeTab === 'details' ? 'active' : '' }}" wire:click="setTab('details')">
+                <i class="bi bi-card-text me-1"></i>Détails
+            </button>
+        </li>
+        <li class="nav-item d-flex align-items-end" style="padding:0 4px">
+            <span style="border-left:1px solid #ccc;height:20px;display:inline-block;margin-bottom:8px"></span>
+        </li>
+        <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'participants' ? 'active' : '' }}" wire:click="setTab('participants')">
                 <i class="bi bi-people me-1"></i>Participants ({{ $participantsCount }})
             </button>
@@ -34,11 +42,6 @@
         </li>
         <li class="nav-item d-flex align-items-end" style="padding:0 4px">
             <span style="border-left:1px solid #ccc;height:20px;display:inline-block;margin-bottom:8px"></span>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link {{ $activeTab === 'details' ? 'active' : '' }}" wire:click="setTab('details')">
-                <i class="bi bi-card-text me-1"></i>Détails
-            </button>
         </li>
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'compte_resultat' ? 'active' : '' }}" wire:click="setTab('compte_resultat')">
