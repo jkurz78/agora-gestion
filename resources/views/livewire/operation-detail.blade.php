@@ -44,11 +44,6 @@
                 <i class="bi bi-bar-chart-line me-1"></i>Compte résultat
             </button>
         </li>
-        <li class="nav-item">
-            <button class="nav-link {{ $activeTab === 'compte_resultat_seances' ? 'active' : '' }}" wire:click="setTab('compte_resultat_seances')">
-                <i class="bi bi-grid-3x3-gap me-1"></i>Résultat par séances
-            </button>
-        </li>
     </ul>
     </div>
 
@@ -122,7 +117,4 @@
         <livewire:rapport-compte-resultat-operations :selectedOperationIds="[$operation->id]" :key="'cr-'.$operation->id" />
     @endif
 
-    @if($activeTab === 'compte_resultat_seances')
-        <livewire:rapport-seances :selectedOperationIds="[$operation->id]" :key="'rs-'.$operation->id" />
-    @endif
 </div>
