@@ -22,18 +22,34 @@
 
     @script
     <script>
-        function renderPivot() {
+        var pivotInitialized = false;
+
+        function renderPivot(preserveState) {
             var wrapper = document.getElementById('pivot-wrapper');
             var el = document.getElementById('pivot-output');
             var toggle = document.getElementById('subtotalToggle');
             if (!wrapper || !el || typeof jQuery === 'undefined' || typeof jQuery.fn.pivotUI === 'undefined') {
-                setTimeout(renderPivot, 100);
+                setTimeout(function() { renderPivot(false); }, 100);
                 return;
             }
 
             var data = JSON.parse(wrapper.dataset.pivot || '[]');
             var view = wrapper.dataset.view || 'participants';
             var useSubtotals = toggle && toggle.checked && typeof jQuery.pivotUtilities.subtotal_renderers !== 'undefined';
+
+            // Sauvegarder la config courante (lignes, colonnes, agrégateur) si le pivot existe déjà
+            var saved = {};
+            if (preserveState && pivotInitialized) {
+                try {
+                    var current = jQuery(el).data('pivotUIOptions');
+                    if (current) {
+                        saved.rows = current.rows;
+                        saved.cols = current.cols;
+                        saved.aggregatorName = current.aggregatorName;
+                        saved.vals = current.vals;
+                    }
+                } catch(e) {}
+            }
 
             var defaults = view === 'participants'
                 ? { rows: ["Opération"], vals: ["Montant prévu"], aggregatorName: "Somme" }
@@ -43,19 +59,20 @@
                 locale: "fr",
                 cols: [],
                 rendererName: useSubtotals ? "Table With Subtotal" : "Table",
-            }, defaults);
+            }, defaults, saved);
 
             if (useSubtotals) {
                 config.dataClass = jQuery.pivotUtilities.SubtotalPivotData;
                 config.renderers = jQuery.pivotUtilities.subtotal_renderers;
             }
 
-            jQuery(el).empty().pivotUI(data, config);
+            jQuery(el).empty().pivotUI(data, config, true);
+            pivotInitialized = true;
         }
 
-        renderPivot();
+        renderPivot(false);
         document.getElementById('subtotalToggle')?.addEventListener('change', function() {
-            renderPivot();
+            renderPivot(true);
         });
         $wire.$watch('filterExercice', () => setTimeout(renderPivot, 100));
     </script>
