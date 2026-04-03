@@ -38,21 +38,53 @@ final class RapportService
 
     /**
      * Compte de résultat filtré par opérations. Pas de N-1 ni budget. Cotisations exclues.
+     * Optionnellement ventilé par séances et/ou par tiers.
      *
      * @param  array<int>  $operationIds
-     * @return array{charges: list<array>, produits: list<array>}
+     * @return array{charges: list<array>, produits: list<array>, seances?: list<int>}
      */
-    public function compteDeResultatOperations(int $exercice, array $operationIds): array
-    {
+    public function compteDeResultatOperations(
+        int $exercice,
+        array $operationIds,
+        bool $parSeances = false,
+        bool $parTiers = false,
+    ): array {
         [$start, $end] = $this->exerciceDates($exercice);
 
-        $charges = $this->fetchDepenseRows($start, $end, $operationIds);
-        $produits = $this->fetchProduitsRows($start, $end, $exercice, $operationIds);
+        if (! $parSeances && ! $parTiers) {
+            $charges = $this->fetchDepenseRows($start, $end, $operationIds);
+            $produits = $this->fetchProduitsRows($start, $end, $exercice, $operationIds);
 
-        return [
-            'charges' => $this->buildHierarchySimple($charges),
-            'produits' => $this->buildHierarchySimple($produits),
+            return [
+                'charges' => $this->buildHierarchySimple($charges),
+                'produits' => $this->buildHierarchySimple($produits),
+            ];
+        }
+
+        $chargesMap = $this->fetchOperationRows('depense', $start, $end, $operationIds, $parSeances, $parTiers);
+        $produitsMap = $this->fetchOperationRows('recette', $start, $end, $operationIds, $parSeances, $parTiers);
+
+        $allSeances = [];
+        if ($parSeances) {
+            $allSeances = collect(array_merge(array_values($chargesMap), array_values($produitsMap)))
+                ->pluck('seance')
+                ->unique()
+                ->map(fn ($s) => (int) $s)
+                ->sort()
+                ->values()
+                ->all();
+        }
+
+        $result = [
+            'charges' => $this->buildHierarchyOperations($chargesMap, $parSeances, $parTiers, $allSeances),
+            'produits' => $this->buildHierarchyOperations($produitsMap, $parSeances, $parTiers, $allSeances),
         ];
+
+        if ($parSeances) {
+            $result['seances'] = $allSeances;
+        }
+
+        return $result;
     }
 
     /**
@@ -415,6 +447,270 @@ final class RapportService
         }
 
         return collect($flat)->map(fn ($row) => (object) $row);
+    }
+
+    /**
+     * Construit 2 query builders (sans/avec affectations) avec SELECT/GROUP BY dynamiques.
+     *
+     * @param  array<int>  $operationIds
+     * @return array{\Illuminate\Database\Query\Builder, \Illuminate\Database\Query\Builder}
+     */
+    private function buildOperationQueries(
+        string $type,
+        string $start,
+        string $end,
+        array $operationIds,
+        bool $withSeance,
+        bool $withTiers,
+    ): array {
+        $baseCols = [
+            'c.id as categorie_id', 'c.nom as categorie_nom',
+            'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
+        ];
+        $baseGroup = ['c.id', 'c.nom', 'sc.id', 'sc.nom'];
+
+        if ($withTiers) {
+            $baseCols = array_merge($baseCols, [
+                DB::raw('COALESCE(tx.tiers_id, 0) as tiers_id'),
+                DB::raw("COALESCE(t.type, '') as tiers_type"),
+                DB::raw("COALESCE(t.nom, '') as tiers_nom"),
+                DB::raw("COALESCE(t.prenom, '') as tiers_prenom"),
+                DB::raw("COALESCE(t.entreprise, '') as tiers_entreprise"),
+            ]);
+            $baseGroup = array_merge($baseGroup, ['tx.tiers_id', 't.type', 't.nom', 't.prenom', 't.entreprise']);
+        }
+
+        // Q1 : lignes sans affectations
+        $q1Cols = $baseCols;
+        $q1Group = $baseGroup;
+        if ($withSeance) {
+            $q1Cols[] = DB::raw('COALESCE(transaction_lignes.seance, 0) as seance');
+            $q1Group[] = DB::raw('COALESCE(transaction_lignes.seance, 0)');
+        }
+        $q1Cols[] = DB::raw('SUM(transaction_lignes.montant) as montant');
+
+        $q1 = DB::table('transaction_lignes')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('transactions as tx', 'tx.id', '=', 'transaction_lignes.transaction_id')
+            ->where('tx.type', $type)
+            ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'transaction_lignes.id')
+            ->whereNull('transaction_lignes.deleted_at')
+            ->whereNull('tx.deleted_at')
+            ->whereNull('tla.id')
+            ->whereIn('transaction_lignes.operation_id', $operationIds)
+            ->whereBetween('tx.date', [$start, $end])
+            ->select($q1Cols)
+            ->groupBy($q1Group);
+
+        if ($withTiers) {
+            $q1->leftJoin('tiers as t', 't.id', '=', 'tx.tiers_id');
+        }
+
+        // Q2 : lignes avec affectations
+        $q2Cols = $baseCols;
+        $q2Group = $baseGroup;
+        if ($withSeance) {
+            $q2Cols[] = DB::raw('COALESCE(tla2.seance, 0) as seance');
+            $q2Group[] = DB::raw('COALESCE(tla2.seance, 0)');
+        }
+        $q2Cols[] = DB::raw('SUM(tla2.montant) as montant');
+
+        $q2 = DB::table('transaction_ligne_affectations as tla2')
+            ->join('transaction_lignes', 'transaction_lignes.id', '=', 'tla2.transaction_ligne_id')
+            ->join('sous_categories as sc', 'transaction_lignes.sous_categorie_id', '=', 'sc.id')
+            ->join('categories as c', 'c.id', '=', 'sc.categorie_id')
+            ->join('transactions as tx', 'tx.id', '=', 'transaction_lignes.transaction_id')
+            ->where('tx.type', $type)
+            ->whereNull('transaction_lignes.deleted_at')
+            ->whereNull('tx.deleted_at')
+            ->whereIn('tla2.operation_id', $operationIds)
+            ->whereBetween('tx.date', [$start, $end])
+            ->select($q2Cols)
+            ->groupBy($q2Group);
+
+        if ($withTiers) {
+            $q2->leftJoin('tiers as t', 't.id', '=', 'tx.tiers_id');
+        }
+
+        return [$q1, $q2];
+    }
+
+    /**
+     * Exécute les requêtes et accumule dans une map plate à clé composite.
+     *
+     * @param  array<int>  $operationIds
+     * @return array<string, array>
+     */
+    private function fetchOperationRows(
+        string $type,
+        string $start,
+        string $end,
+        array $operationIds,
+        bool $withSeance,
+        bool $withTiers,
+    ): array {
+        [$q1, $q2] = $this->buildOperationQueries($type, $start, $end, $operationIds, $withSeance, $withTiers);
+
+        $map = [];
+        foreach ([$q1->get(), $q2->get()] as $rows) {
+            foreach ($rows as $row) {
+                $key = (string) $row->sous_categorie_id;
+                if ($withTiers) {
+                    $key .= '_'.$row->tiers_id;
+                }
+                if ($withSeance) {
+                    $key .= '_'.$row->seance;
+                }
+
+                if (isset($map[$key])) {
+                    $map[$key]['montant'] += (float) $row->montant;
+                } else {
+                    $entry = [
+                        'categorie_id' => (int) $row->categorie_id,
+                        'categorie_nom' => $row->categorie_nom,
+                        'sous_categorie_id' => (int) $row->sous_categorie_id,
+                        'sous_categorie_nom' => $row->sous_categorie_nom,
+                        'montant' => (float) $row->montant,
+                    ];
+                    if ($withSeance) {
+                        $entry['seance'] = (int) $row->seance;
+                    }
+                    if ($withTiers) {
+                        $entry['tiers_id'] = (int) $row->tiers_id;
+                        $entry['tiers_type'] = $row->tiers_type !== '' ? $row->tiers_type : null;
+                        $entry['tiers_nom'] = $row->tiers_nom !== '' ? $row->tiers_nom : null;
+                        $entry['tiers_prenom'] = $row->tiers_prenom !== '' ? $row->tiers_prenom : null;
+                        $entry['tiers_entreprise'] = $row->tiers_entreprise !== '' ? $row->tiers_entreprise : null;
+                    }
+                    $map[$key] = $entry;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Construit la hiérarchie imbriquée (cat -> sous-cat -> tiers optionnel) avec montants simples ou ventilés par séance.
+     *
+     * @param  array<string, array>  $map
+     * @param  list<int>  $allSeances
+     * @return list<array>
+     */
+    private function buildHierarchyOperations(array $map, bool $withSeance, bool $withTiers, array $allSeances = []): array
+    {
+        $categories = [];
+
+        foreach ($map as $entry) {
+            $catId = $entry['categorie_id'];
+            $scId = $entry['sous_categorie_id'];
+
+            if (! isset($categories[$catId])) {
+                $categories[$catId] = [
+                    'categorie_id' => $catId,
+                    'label' => $entry['categorie_nom'],
+                    'sous_categories_map' => [],
+                ];
+                if ($withSeance) {
+                    $categories[$catId]['seances'] = array_fill_keys($allSeances, 0.0);
+                    $categories[$catId]['total'] = 0.0;
+                } else {
+                    $categories[$catId]['montant'] = 0.0;
+                }
+            }
+
+            if (! isset($categories[$catId]['sous_categories_map'][$scId])) {
+                $scEntry = ['sous_categorie_id' => $scId, 'label' => $entry['sous_categorie_nom']];
+                if ($withSeance) {
+                    $scEntry['seances'] = array_fill_keys($allSeances, 0.0);
+                    $scEntry['total'] = 0.0;
+                } else {
+                    $scEntry['montant'] = 0.0;
+                }
+                if ($withTiers) {
+                    $scEntry['tiers_map'] = [];
+                }
+                $categories[$catId]['sous_categories_map'][$scId] = $scEntry;
+            }
+
+            $montant = $entry['montant'];
+
+            if ($withTiers) {
+                $tiersId = $entry['tiers_id'];
+                if (! isset($categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId])) {
+                    $tEntry = [
+                        'tiers_id' => $tiersId,
+                        'label' => $this->formatTiersLabel($entry),
+                        'type' => $tiersId === 0 ? null : $entry['tiers_type'],
+                    ];
+                    if ($withSeance) {
+                        $tEntry['seances'] = array_fill_keys($allSeances, 0.0);
+                        $tEntry['total'] = 0.0;
+                    } else {
+                        $tEntry['montant'] = 0.0;
+                    }
+                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId] = $tEntry;
+                }
+                if ($withSeance) {
+                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['seances'][$entry['seance']] += $montant;
+                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['total'] += $montant;
+                } else {
+                    $categories[$catId]['sous_categories_map'][$scId]['tiers_map'][$tiersId]['montant'] += $montant;
+                }
+            }
+
+            if ($withSeance) {
+                $seance = $entry['seance'];
+                $categories[$catId]['sous_categories_map'][$scId]['seances'][$seance] += $montant;
+                $categories[$catId]['sous_categories_map'][$scId]['total'] += $montant;
+                $categories[$catId]['seances'][$seance] += $montant;
+                $categories[$catId]['total'] += $montant;
+            } else {
+                $categories[$catId]['sous_categories_map'][$scId]['montant'] += $montant;
+                $categories[$catId]['montant'] += $montant;
+            }
+        }
+
+        $result = [];
+        foreach ($categories as $cat) {
+            $scs = [];
+            foreach ($cat['sous_categories_map'] as $sc) {
+                if ($withTiers) {
+                    $tiers = array_values($sc['tiers_map']);
+                    usort($tiers, fn ($a, $b) => strcmp($a['label'], $b['label']));
+                    $sc['tiers'] = $tiers;
+                    unset($sc['tiers_map']);
+                }
+                $scs[] = $sc;
+            }
+            usort($scs, fn ($a, $b) => strcmp($a['label'], $b['label']));
+            $cat['sous_categories'] = $scs;
+            unset($cat['sous_categories_map']);
+            $result[] = $cat;
+        }
+        usort($result, fn ($a, $b) => strcmp($a['label'], $b['label']));
+
+        return $result;
+    }
+
+    /**
+     * Formate le label d'un tiers pour l'affichage.
+     */
+    private function formatTiersLabel(array $entry): string
+    {
+        if ($entry['tiers_id'] === 0) {
+            return '(sans tiers)';
+        }
+        if ($entry['tiers_type'] === 'entreprise') {
+            return ($entry['tiers_entreprise'] !== null && $entry['tiers_entreprise'] !== '')
+                ? $entry['tiers_entreprise']
+                : mb_strtoupper($entry['tiers_nom'] ?? '');
+        }
+        $nom = mb_strtoupper($entry['tiers_nom'] ?? '');
+        $prenom = $entry['tiers_prenom'] ?? '';
+
+        return trim(($prenom !== '' ? $prenom.' ' : '').$nom);
     }
 
     /**
