@@ -182,7 +182,7 @@ final class FactureService
             // Lock ALL factures of this exercice upfront (single lock for both
             // chronological constraint and sequential numbering)
             $exerciceFactures = Facture::where('exercice', $facture->exercice)
-                ->where('statut', StatutFacture::Validee)
+                ->whereIn('statut', [StatutFacture::Validee, StatutFacture::Annulee])
                 ->lockForUpdate()
                 ->get();
 
@@ -319,6 +319,49 @@ final class FactureService
     }
 
     /**
+     * Cancel a validated invoice by issuing a credit note (avoir).
+     */
+    public function annuler(Facture $facture): void
+    {
+        if ($facture->statut !== StatutFacture::Validee) {
+            throw new \RuntimeException('Seule une facture validée peut être annulée.');
+        }
+
+        // Check no linked transaction is locked by rapprochement
+        foreach ($facture->transactions as $tx) {
+            if ($tx->isLockedByRapprochement()) {
+                throw new \RuntimeException(
+                    "La transaction « {$tx->libelle} » est rapprochée en banque. Veuillez d'abord annuler le rapprochement."
+                );
+            }
+        }
+
+        $exerciceCourant = $this->exerciceService->current();
+
+        DB::transaction(function () use ($facture, $exerciceCourant): void {
+            // Lock avoirs of current exercise for sequential numbering
+            $existingAvoirs = Facture::where('exercice', $exerciceCourant)
+                ->where('statut', StatutFacture::Annulee)
+                ->whereNotNull('numero_avoir')
+                ->lockForUpdate()
+                ->get();
+
+            $maxSeq = $existingAvoirs
+                ->map(fn ($f) => (int) last(explode('-', $f->numero_avoir)))
+                ->max() ?? 0;
+
+            $seq = $maxSeq + 1;
+            $numeroAvoir = sprintf('AV-%d-%04d', $exerciceCourant, $seq);
+
+            $facture->update([
+                'statut' => StatutFacture::Annulee,
+                'numero_avoir' => $numeroAvoir,
+                'date_annulation' => now()->toDateString(),
+            ]);
+        });
+    }
+
+    /**
      * Generate a Factur-X compliant PDF (PDF/A-3) for the given facture.
      */
     public function genererPdf(Facture $facture): string
@@ -350,8 +393,8 @@ final class FactureService
 
         $pdfContent = $pdf->output();
 
-        // Brouillon: return plain PDF (no Factur-X, not a fiscal document)
-        if ($facture->statut === StatutFacture::Brouillon) {
+        // Brouillon or annulée: return plain PDF (no Factur-X, not a fiscal document)
+        if ($facture->statut !== StatutFacture::Validee) {
             return $pdfContent;
         }
 
