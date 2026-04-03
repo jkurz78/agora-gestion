@@ -8,81 +8,95 @@ use App\Models\Operation;
 use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use App\Services\RapportService;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 final class RapportCompteResultatOperations extends Component
 {
     /** @var array<int, int> */
+    #[Url(as: 'ops')]
     public array $selectedOperationIds = [];
 
-    public ?int $filterTypeId = null;
+    #[Url(as: 'seances')]
+    public bool $parSeances = false;
 
-    public function exportCsv(): mixed
-    {
-        if (empty($this->selectedOperationIds)) {
-            return null;
-        }
-
-        $exercice = app(ExerciceService::class)->current();
-        $data = app(RapportService::class)->compteDeResultatOperations($exercice, $this->selectedOperationIds);
-
-        $rows = [];
-        foreach ($data['charges'] as $cat) {
-            foreach ($cat['sous_categories'] as $sc) {
-                $rows[] = ['Charge', $cat['label'], $sc['label'], number_format((float) $sc['montant'], 2, ',', '')];
-            }
-        }
-        foreach ($data['produits'] as $cat) {
-            foreach ($cat['sous_categories'] as $sc) {
-                $rows[] = ['Produit', $cat['label'], $sc['label'], number_format((float) $sc['montant'], 2, ',', '')];
-            }
-        }
-
-        $csv = app(RapportService::class)->toCsv($rows, ['Type', 'Catégorie', 'Sous-catégorie', 'Montant']);
-
-        return response()->streamDownload(function () use ($csv) {
-            echo $csv;
-        }, 'cr_operations_'.$exercice.'.csv', ['Content-Type' => 'text/csv']);
-    }
-
-    public function updatedFilterTypeId(): void
-    {
-        $this->selectedOperationIds = [];
-    }
+    #[Url(as: 'tiers')]
+    public bool $parTiers = false;
 
     public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();
-        $typeOperations = TypeOperation::actif()->orderBy('nom')->get();
 
-        $query = Operation::forExercice($exercice)->orderBy('nom');
-        if ($this->filterTypeId !== null) {
-            $query->where('type_operation_id', $this->filterTypeId);
-        }
-        $operations = $query->get();
+        $operationTree = $this->buildOperationTree($exercice);
 
         $charges = [];
         $produits = [];
-        $totalChargesN = 0.0;
-        $totalProduitsN = 0.0;
+        $seances = [];
+        $totalCharges = 0.0;
+        $totalProduits = 0.0;
+        $hasSelection = ! empty($this->selectedOperationIds);
 
-        if (! empty($this->selectedOperationIds)) {
-            $data = app(RapportService::class)->compteDeResultatOperations($exercice, $this->selectedOperationIds);
+        if ($hasSelection) {
+            $data = app(RapportService::class)->compteDeResultatOperations(
+                $exercice,
+                $this->selectedOperationIds,
+                $this->parSeances,
+                $this->parTiers,
+            );
             $charges = $data['charges'];
             $produits = $data['produits'];
-            $totalChargesN = collect($charges)->sum('montant');
-            $totalProduitsN = collect($produits)->sum('montant');
+            $seances = $data['seances'] ?? [];
+            $totalCharges = $this->parSeances
+                ? collect($charges)->sum('total')
+                : collect($charges)->sum('montant');
+            $totalProduits = $this->parSeances
+                ? collect($produits)->sum('total')
+                : collect($produits)->sum('montant');
         }
 
         return view('livewire.rapport-compte-resultat-operations', [
-            'operations' => $operations,
-            'typeOperations' => $typeOperations,
+            'operationTree' => $operationTree,
             'charges' => $charges,
             'produits' => $produits,
-            'totalChargesN' => $totalChargesN,
-            'totalProduitsN' => $totalProduitsN,
-            'resultatNet' => $totalProduitsN - $totalChargesN,
-            'hasSelection' => ! empty($this->selectedOperationIds),
+            'seances' => $seances,
+            'totalCharges' => $totalCharges,
+            'totalProduits' => $totalProduits,
+            'resultatNet' => $totalProduits - $totalCharges,
+            'hasSelection' => $hasSelection,
         ]);
+    }
+
+    /** @return list<array{id: int, nom: string, types: list<array>}> */
+    private function buildOperationTree(int $exercice): array
+    {
+        $typeOperations = TypeOperation::actif()
+            ->with(['sousCategorie', 'operations' => fn ($q) => $q->forExercice($exercice)->orderBy('nom')])
+            ->orderBy('nom')
+            ->get();
+
+        $tree = [];
+        foreach ($typeOperations as $type) {
+            if ($type->operations->isEmpty()) {
+                continue;
+            }
+            $scId = $type->sous_categorie_id;
+            if (! isset($tree[$scId])) {
+                $tree[$scId] = [
+                    'id' => $scId,
+                    'nom' => $type->sousCategorie->nom,
+                    'types' => [],
+                ];
+            }
+            $tree[$scId]['types'][] = [
+                'id' => $type->id,
+                'nom' => $type->nom,
+                'operations' => $type->operations
+                    ->map(fn ($op) => ['id' => $op->id, 'nom' => $op->nom])
+                    ->values()
+                    ->all(),
+            ];
+        }
+
+        return collect($tree)->sortBy('nom')->values()->all();
     }
 }
