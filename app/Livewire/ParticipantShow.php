@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 final class ParticipantShow extends Component
@@ -222,10 +223,26 @@ final class ParticipantShow extends Component
         if ($this->mapAdresseParTiersId === null) {
             return;
         }
-        $this->participant->update(['refere_par_id' => $this->mapAdresseParTiersId]);
-        $this->dispatch('notify', message: 'Tiers associé au prescripteur.');
-        $this->participant->refresh();
-        $this->loadParticipantData();
+
+        $sourceData = [
+            'nom' => $this->participant->adresse_par_nom,
+            'prenom' => $this->participant->adresse_par_prenom,
+            'entreprise' => $this->participant->adresse_par_etablissement,
+            'telephone' => $this->participant->adresse_par_telephone,
+            'email' => $this->participant->adresse_par_email,
+            'adresse_ligne1' => $this->participant->adresse_par_adresse,
+            'code_postal' => $this->participant->adresse_par_code_postal,
+            'ville' => $this->participant->adresse_par_ville,
+        ];
+
+        $this->dispatch('open-tiers-merge',
+            sourceData: $sourceData,
+            tiersId: $this->mapAdresseParTiersId,
+            sourceLabel: 'Données prescripteur du formulaire',
+            targetLabel: 'Tiers existant',
+            confirmLabel: 'Associer comme prescripteur',
+            context: 'adresse_par',
+        );
     }
 
     public function createAdresseParTiers(): void
@@ -260,10 +277,26 @@ final class ParticipantShow extends Component
         if ($this->mapMedecinTiersId === null) {
             return;
         }
-        $this->participant->update(['medecin_tiers_id' => $this->mapMedecinTiersId]);
-        $this->dispatch('notify', message: 'Tiers associé au médecin traitant.');
-        $this->participant->refresh();
-        $this->loadParticipantData();
+
+        $med = $this->participant->donneesMedicales;
+        $sourceData = $med ? [
+            'nom' => $med->medecin_nom,
+            'prenom' => $med->medecin_prenom,
+            'telephone' => $med->medecin_telephone,
+            'email' => $med->medecin_email,
+            'adresse_ligne1' => $med->medecin_adresse,
+            'code_postal' => $med->medecin_code_postal,
+            'ville' => $med->medecin_ville,
+        ] : [];
+
+        $this->dispatch('open-tiers-merge',
+            sourceData: $sourceData,
+            tiersId: $this->mapMedecinTiersId,
+            sourceLabel: 'Données médecin du formulaire',
+            targetLabel: 'Tiers existant',
+            confirmLabel: 'Associer comme médecin traitant',
+            context: 'medecin',
+        );
     }
 
     public function createMedecinTiers(): void
@@ -301,10 +334,26 @@ final class ParticipantShow extends Component
         if ($this->mapTherapeuteTiersId === null) {
             return;
         }
-        $this->participant->update(['therapeute_tiers_id' => $this->mapTherapeuteTiersId]);
-        $this->dispatch('notify', message: 'Tiers associé au thérapeute.');
-        $this->participant->refresh();
-        $this->loadParticipantData();
+
+        $med = $this->participant->donneesMedicales;
+        $sourceData = $med ? [
+            'nom' => $med->therapeute_nom,
+            'prenom' => $med->therapeute_prenom,
+            'telephone' => $med->therapeute_telephone,
+            'email' => $med->therapeute_email,
+            'adresse_ligne1' => $med->therapeute_adresse,
+            'code_postal' => $med->therapeute_code_postal,
+            'ville' => $med->therapeute_ville,
+        ] : [];
+
+        $this->dispatch('open-tiers-merge',
+            sourceData: $sourceData,
+            tiersId: $this->mapTherapeuteTiersId,
+            sourceLabel: 'Données thérapeute du formulaire',
+            targetLabel: 'Tiers existant',
+            confirmLabel: 'Associer comme thérapeute référent',
+            context: 'therapeute',
+        );
     }
 
     public function createTherapeuteTiers(): void
@@ -333,6 +382,28 @@ final class ParticipantShow extends Component
     {
         $this->participant->update(['therapeute_tiers_id' => null]);
         $this->dispatch('notify', message: 'Association supprimée.');
+        $this->participant->refresh();
+        $this->loadParticipantData();
+    }
+
+    #[On('tiers-merge-confirmed')]
+    public function onTiersMergeConfirmed(int $tiersId, string $context, array $contextData = []): void
+    {
+        match ($context) {
+            'medecin' => $this->participant->update(['medecin_tiers_id' => $tiersId]),
+            'therapeute' => $this->participant->update(['therapeute_tiers_id' => $tiersId]),
+            'adresse_par' => $this->participant->update(['refere_par_id' => $tiersId]),
+            default => null,
+        };
+
+        $message = match ($context) {
+            'medecin' => 'Tiers associé au médecin traitant.',
+            'therapeute' => 'Tiers associé au thérapeute.',
+            'adresse_par' => 'Tiers associé au prescripteur.',
+            default => 'Tiers associé.',
+        };
+
+        $this->dispatch('notify', message: $message);
         $this->participant->refresh();
         $this->loadParticipantData();
     }
