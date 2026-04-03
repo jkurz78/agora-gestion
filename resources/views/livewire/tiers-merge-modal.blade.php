@@ -39,10 +39,10 @@
                     <table class="table table-sm table-borderless mb-0">
                         <thead>
                             <tr style="border-bottom:2px solid #3d5473">
-                                <th class="text-end pe-3 text-muted" style="width:15%">Champ</th>
-                                <th style="width:25%;background-color:#f8f9fa">{{ $sourceLabel }}</th>
-                                <th style="width:25%;background-color:#f8f9fa">{{ $targetLabel }}</th>
-                                <th style="width:35%">Résultat</th>
+                                <th class="text-end pe-3 text-muted" style="width:12%">Champ</th>
+                                <th class="text-center" style="width:28%;background-color:#f8f9fa">{{ $sourceLabel }}</th>
+                                <th class="text-center" style="width:28%;background-color:#f8f9fa">{{ $targetLabel }}</th>
+                                <th style="width:32%">Résultat</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -82,7 +82,7 @@
                                             x-on:click="copyToResult('{{ $key }}', {{ \Js::from($src) }})"
                                             title="Cliquer pour copier vers Résultat"
                                         @endif
-                                        class="small align-middle">
+                                        class="small align-middle text-center">
                                         {{ $src ?? '—' }}
                                     </td>
                                     <td style="{{ $tgtHasValue ? 'cursor:pointer;' : '' }}{{ $tgtBg }}"
@@ -90,7 +90,7 @@
                                             x-on:click="copyToResult('{{ $key }}', {{ \Js::from($tgt) }})"
                                             title="Cliquer pour copier vers Résultat"
                                         @endif
-                                        class="small align-middle">
+                                        class="small align-middle text-center">
                                         {{ $tgt ?? '—' }}
                                     </td>
                                     <td class="py-1 px-0">
