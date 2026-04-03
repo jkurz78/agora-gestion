@@ -67,7 +67,7 @@ it('refuse annulation sur un brouillon', function () {
     ]);
 
     expect(fn () => $this->service->annuler($facture))
-        ->toThrow(\RuntimeException::class, 'Seule une facture validée');
+        ->toThrow(RuntimeException::class, 'Seule une facture validée');
 });
 
 it('refuse annulation si une transaction est rapprochée', function () {
@@ -107,7 +107,7 @@ it('refuse annulation si une transaction est rapprochée', function () {
     $facture->transactions()->attach($tx->id);
 
     expect(fn () => $this->service->annuler($facture))
-        ->toThrow(\RuntimeException::class, 'rapprochée en banque');
+        ->toThrow(RuntimeException::class, 'rapprochée en banque');
 });
 
 it('libère les transactions après annulation', function () {
