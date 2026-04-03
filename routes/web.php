@@ -116,6 +116,7 @@ Route::middleware(['auth', DetecteEspace::class.':gestion'])
     ->group(function () use ($registerParametres): void {
         Route::view('/dashboard', 'gestion.dashboard')->name('dashboard');
         Route::view('/adherents', 'gestion.adherents')->name('adherents');
+        Route::view('/analyse', 'gestion.analyse.index')->name('analyse');
         Route::view('/operations', 'gestion.operations.index')->name('operations');
         Route::get('/operations/{operation}/participants/export', ParticipantExportController::class)
             ->name('operations.participants.export');

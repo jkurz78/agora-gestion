@@ -299,7 +299,7 @@
 
                     {{-- Dropdown Opérations --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('gestion.operations*') || request()->routeIs('gestion.remises-bancaires*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('gestion.operations*') || request()->routeIs('gestion.remises-bancaires*') || request()->routeIs('gestion.analyse*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-calendar-event"></i> Opérations
                         </a>
@@ -314,6 +314,13 @@
                                 <a class="dropdown-item {{ request()->routeIs('gestion.remises-bancaires*') ? 'active' : '' }}"
                                    href="{{ route('gestion.remises-bancaires') }}">
                                     <i class="bi bi-bank"></i> Remises en banque
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('gestion.analyse*') ? 'active' : '' }}"
+                                   href="{{ route('gestion.analyse') }}">
+                                    <i class="bi bi-graph-up"></i> Analyse
                                 </a>
                             </li>
                         </ul>
