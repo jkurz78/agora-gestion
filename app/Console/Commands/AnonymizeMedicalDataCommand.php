@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\ParticipantDonneesMedicales;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Encryption\Encrypter;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
@@ -121,7 +122,7 @@ final class AnonymizeMedicalDataCommand extends Command
         $prodKeyEnv = env('PROD_APP_KEY');
         if ($prodKeyEnv) {
             $key = base64_decode(str_replace('base64:', '', $prodKeyEnv));
-            $prodEncrypter = new \Illuminate\Encryption\Encrypter($key, config('app.cipher'));
+            $prodEncrypter = new Encrypter($key, config('app.cipher'));
             $this->info('Clé prod fournie — sexe préservé depuis les données source.');
         }
 
@@ -270,7 +271,7 @@ final class AnonymizeMedicalDataCommand extends Command
 
     private static function phone(): string
     {
-        return '06' . str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT);
+        return '06'.str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT);
     }
 
     private static function email(string $prenom, string $nom): string
@@ -281,12 +282,12 @@ final class AnonymizeMedicalDataCommand extends Command
             $s,
         ));
 
-        return $slug($prenom) . '.' . $slug($nom) . '@' . self::pick(self::PROVIDERS);
+        return $slug($prenom).'.'.$slug($nom).'@'.self::pick(self::PROVIDERS);
     }
 
     private static function adresse(): string
     {
-        return random_int(1, 120) . ' ' . self::pick(self::RUES);
+        return random_int(1, 120).' '.self::pick(self::RUES);
     }
 
     /** @return array{string, string} [ville, code_postal] */

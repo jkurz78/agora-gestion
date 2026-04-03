@@ -37,4 +37,3 @@ it('RapportCompteResultatOperations affiche les opérations clôturées dans l\'
     Livewire::test(RapportCompteResultatOperations::class)
         ->assertSee('Op clôturée visible');
 });
-
