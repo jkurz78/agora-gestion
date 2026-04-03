@@ -94,7 +94,11 @@ Route::middleware(['auth', DetecteEspace::class.':compta'])
         Route::get('comptes-bancaires/{compte}/transactions', function (CompteBancaire $compte) {
             return view('comptes-bancaires.transactions', compact('compte'));
         })->name('comptes-bancaires.transactions');
-        Route::view('/rapports', 'rapports.index')->name('rapports.index');
+        // Rapports — écrans dédiés
+        Route::view('/rapports/compte-resultat', 'rapports.compte-resultat')->name('rapports.compte-resultat');
+        Route::view('/rapports/operations', 'rapports.operations')->name('rapports.operations');
+        Route::view('/rapports/analyse', 'rapports.analyse')->name('rapports.analyse');
+        Route::redirect('/rapports', '/compta/rapports/compte-resultat', 301)->name('rapports.index');
 
         // Exercices
         Route::view('/exercices/cloture', 'exercices.cloture')->name('exercices.cloture');
@@ -187,7 +191,7 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/budget', '/compta/budget');
     Route::permanentRedirect('/rapprochement', '/compta/rapprochement');
     Route::permanentRedirect('/virements', '/compta/virements');
-    Route::permanentRedirect('/rapports', '/compta/rapports');
+    Route::permanentRedirect('/rapports', '/compta/rapports/compte-resultat');
     Route::permanentRedirect('/membres', '/gestion/adherents');
     Route::permanentRedirect('/banques/helloasso-sync', '/compta/helloasso-sync');
     Route::permanentRedirect('/exercices/cloture', '/compta/exercices/cloture');
