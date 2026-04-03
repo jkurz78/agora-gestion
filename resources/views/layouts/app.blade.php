@@ -227,7 +227,6 @@
                     @php
                         $navItems = [
                             ['route' => 'compta.budget.index',   'icon' => 'piggy-bank',             'label' => 'Budget'],
-                            ['route' => 'compta.rapports.index', 'icon' => 'file-earmark-bar-graph', 'label' => 'Rapports'],
                         ];
                     @endphp
                     @foreach ($navItems as $item)
@@ -240,6 +239,35 @@
                             </li>
                         @endif
                     @endforeach
+
+                    {{-- Dropdown Rapports --}}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('compta.rapports.*') ? 'active' : '' }}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-file-earmark-bar-graph"></i> Rapports
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('compta.rapports.compte-resultat') ? 'active' : '' }}"
+                                   href="{{ route('compta.rapports.compte-resultat') }}">
+                                    Compte de résultat
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('compta.rapports.operations') ? 'active' : '' }}"
+                                   href="{{ route('compta.rapports.operations') }}">
+                                    Compte de résultat par opérations
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('compta.rapports.analyse') ? 'active' : '' }}"
+                                   href="{{ route('compta.rapports.analyse') }}">
+                                    <i class="bi bi-graph-up me-1"></i>Analyse financière
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
 
                     {{-- Factures --}}
                     <li class="nav-item">
