@@ -97,6 +97,7 @@ Route::middleware(['auth', DetecteEspace::class.':compta'])
         // Rapports — écrans dédiés
         Route::view('/rapports/compte-resultat', 'rapports.compte-resultat')->name('rapports.compte-resultat');
         Route::view('/rapports/operations', 'rapports.operations')->name('rapports.operations');
+        Route::view('/rapports/flux-tresorerie', 'rapports.flux-tresorerie')->name('rapports.flux-tresorerie');
         Route::view('/rapports/analyse', 'rapports.analyse')->name('rapports.analyse');
         Route::redirect('/rapports', '/compta/rapports/compte-resultat', 301)->name('rapports.index');
 
