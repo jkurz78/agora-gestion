@@ -18,19 +18,15 @@ final class AnalysePivot extends Component
     #[Url(as: 'exercice')]
     public ?int $filterExercice = null;
 
-    #[Url(as: 'vue')]
-    public string $activeView = 'participants';
+    public string $mode = 'participants';
 
-    public function mount(): void
+    public function mount(string $mode = 'participants'): void
     {
+        $this->mode = $mode;
+
         if ($this->filterExercice === null) {
             $this->filterExercice = app(ExerciceService::class)->current();
         }
-    }
-
-    public function switchView(string $view): void
-    {
-        $this->activeView = $view;
     }
 
     /** @return list<array<string, mixed>> */
@@ -83,7 +79,8 @@ final class AnalysePivot extends Component
     public function getFinancierDataProperty(): array
     {
         $exerciceService = app(ExerciceService::class);
-        $range = $exerciceService->dateRange($this->filterExercice ?? $exerciceService->current());
+        $exercice = $this->filterExercice ?? $exerciceService->current();
+        $range = $exerciceService->dateRange($exercice);
 
         return TransactionLigne::query()
             ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
@@ -109,12 +106,24 @@ final class AnalysePivot extends Component
                 'comptes_bancaires.nom as Compte',
             ])
             ->get()
-            ->map(function ($row) {
+            ->map(function ($row) use ($exercice) {
                 $data = (array) $row->getAttributes();
-                $data['Date'] = $row->getAttribute('Date')
-                    ? Carbon::parse($row->getAttribute('Date'))->format('d/m/Y')
+                $date = $row->getAttribute('Date')
+                    ? Carbon::parse($row->getAttribute('Date'))
                     : null;
+                $data['Date'] = $date?->format('d/m/Y');
                 $data['Montant'] = (float) ($data['Montant'] ?? 0);
+
+                // Temporal dimensions
+                if ($date) {
+                    $data['Mois'] = ucfirst($date->translatedFormat('F Y'));
+                    $data['Trimestre'] = $this->trimestre($date, $exercice);
+                    $data['Semestre'] = $this->semestre($date, $exercice);
+                } else {
+                    $data['Mois'] = null;
+                    $data['Trimestre'] = null;
+                    $data['Semestre'] = null;
+                }
 
                 return $data;
             })
@@ -127,9 +136,38 @@ final class AnalysePivot extends Component
 
         return view('livewire.analyse-pivot', [
             'exerciceYears' => $exerciceService->availableYears(),
-            'pivotData' => $this->activeView === 'participants'
+            'pivotData' => $this->mode === 'participants'
                 ? $this->participantsData
                 : $this->financierData,
         ]);
+    }
+
+    /**
+     * Map a date to its trimestre within the exercice (Sept-Aug).
+     * T1: Sept-Nov, T2: Dec-Feb, T3: Mar-May, T4: Jun-Aug
+     */
+    private function trimestre(Carbon $date, int $exercice): string
+    {
+        $month = $date->month;
+        $t = match (true) {
+            in_array($month, [9, 10, 11]) => 'T1',
+            in_array($month, [12, 1, 2]) => 'T2',
+            in_array($month, [3, 4, 5]) => 'T3',
+            default => 'T4',
+        };
+
+        return $t.' '.$exercice.'-'.($exercice + 1);
+    }
+
+    /**
+     * Map a date to its semestre within the exercice (Sept-Aug).
+     * S1: Sept-Feb, S2: Mar-Aug
+     */
+    private function semestre(Carbon $date, int $exercice): string
+    {
+        $month = $date->month;
+        $s = ($month >= 9 || $month <= 2) ? 'S1' : 'S2';
+
+        return $s.' '.$exercice.'-'.($exercice + 1);
     }
 }

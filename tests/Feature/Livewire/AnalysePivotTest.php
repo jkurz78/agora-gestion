@@ -23,10 +23,23 @@ beforeEach(function () {
     view()->share('espace', Espace::Gestion);
 });
 
-it('renders the analyse pivot component', function () {
-    Livewire::test(AnalysePivot::class)
+it('renders in participants mode without toggle buttons', function () {
+    Livewire::test(AnalysePivot::class, ['mode' => 'participants'])
         ->assertOk()
-        ->assertSee('Analyse');
+        ->assertSee('Analyse')
+        ->assertDontSee('Financière');
+});
+
+it('renders in financier mode without toggle buttons', function () {
+    Livewire::test(AnalysePivot::class, ['mode' => 'financier'])
+        ->assertOk()
+        ->assertSee('Analyse')
+        ->assertDontSee('Participants / Règlements');
+});
+
+it('defaults to participants mode', function () {
+    $component = Livewire::test(AnalysePivot::class, ['mode' => 'participants']);
+    expect($component->get('mode'))->toBe('participants');
 });
 
 it('returns participants data with correct fields', function () {
@@ -57,7 +70,7 @@ it('returns participants data with correct fields', function () {
         'montant_prevu' => 25.00,
     ]);
 
-    $component = Livewire::test(AnalysePivot::class);
+    $component = Livewire::test(AnalysePivot::class, ['mode' => 'participants']);
     $data = $component->get('participantsData');
 
     expect($data)->toBeArray()->not->toBeEmpty();
@@ -69,7 +82,7 @@ it('returns participants data with correct fields', function () {
     expect($data[0]['Montant prévu'])->toBe(25.0);
 });
 
-it('returns financier data with correct fields', function () {
+it('returns financier data with correct fields including temporal dimensions', function () {
     $compte = CompteBancaire::factory()->create();
     $tiers = Tiers::factory()->create(['nom' => 'Fournisseur', 'pour_depenses' => true]);
     $sousCategorie = SousCategorie::factory()->create();
@@ -89,13 +102,17 @@ it('returns financier data with correct fields', function () {
         'montant' => 100.00,
     ]);
 
-    $component = Livewire::test(AnalysePivot::class)
-        ->set('activeView', 'financier');
+    $component = Livewire::test(AnalysePivot::class, ['mode' => 'financier']);
     $data = $component->get('financierData');
 
     expect($data)->toBeArray()->not->toBeEmpty();
     expect($data[0])->toHaveKeys([
         'Tiers', 'Date', 'Montant', 'Sous-catégorie', 'Catégorie', 'Type', 'Compte',
+        'Mois', 'Trimestre', 'Semestre',
     ]);
     expect($data[0]['Montant'])->toBe(100.0);
+    // January 2026 → exercice 2025 → T2 (Dec-Feb), S1 (Sept-Feb)
+    expect($data[0]['Mois'])->toBe('Janvier 2026');
+    expect($data[0]['Trimestre'])->toBe('T2 2025-2026');
+    expect($data[0]['Semestre'])->toBe('S1 2025-2026');
 });

@@ -11,7 +11,7 @@
         .pvtAxisLabel { background-color: #3d5473 !important; color: white !important; }
     </style>
 
-    <livewire:analyse-pivot />
+    <livewire:analyse-pivot mode="participants" />
 
     @push('scripts')
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>

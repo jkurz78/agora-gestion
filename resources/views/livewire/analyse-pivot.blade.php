@@ -1,20 +1,8 @@
 <div>
-    {{-- Header with exercice selector and view toggle --}}
+    {{-- Header with exercice selector --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0"><i class="bi bi-graph-up me-2"></i>Analyse</h4>
         <div class="d-flex gap-3 align-items-center">
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button"
-                        class="btn {{ $activeView === 'participants' ? 'btn-primary' : 'btn-outline-primary' }}"
-                        wire:click="switchView('participants')">
-                    <i class="bi bi-people me-1"></i>Participants / Règlements
-                </button>
-                <button type="button"
-                        class="btn {{ $activeView === 'financier' ? 'btn-primary' : 'btn-outline-primary' }}"
-                        wire:click="switchView('financier')">
-                    <i class="bi bi-cash-stack me-1"></i>Financière
-                </button>
-            </div>
             <select class="form-select form-select-sm" style="width:auto" wire:model.live="filterExercice">
                 @foreach($exerciceYears as $year)
                     <option value="{{ $year }}">{{ $year }}/{{ $year + 1 }}</option>
@@ -23,8 +11,8 @@
         </div>
     </div>
 
-    {{-- Data carrier (Livewire updates attributes) + pivot container (wire:ignore protects PivotTable DOM) --}}
-    <div id="pivot-wrapper" data-pivot='@json($pivotData)' data-view="{{ $activeView }}">
+    {{-- Data carrier + pivot container --}}
+    <div id="pivot-wrapper" data-pivot='@json($pivotData)' data-view="{{ $mode }}">
         <div id="pivot-output" wire:ignore class="border rounded bg-white p-2"></div>
     </div>
 
@@ -43,7 +31,7 @@
 
             var defaults = view === 'participants'
                 ? { rows: ["Opération"], vals: ["Montant prévu"], aggregatorName: "Somme" }
-                : { rows: ["Opération"], vals: ["Montant"], aggregatorName: "Somme" };
+                : { rows: ["Catégorie"], vals: ["Montant"], aggregatorName: "Somme" };
 
             jQuery(el).empty().pivotUI(data, Object.assign({
                 locale: "fr",
@@ -53,7 +41,6 @@
         }
 
         renderPivot();
-        $wire.$watch('activeView', () => setTimeout(renderPivot, 100));
         $wire.$watch('filterExercice', () => setTimeout(renderPivot, 100));
     </script>
     @endscript
