@@ -58,7 +58,7 @@ Le tableau passe en mode croisé avec les colonnes :
 - **S1, S2, ...** : une colonne par numéro de séance distinct trouvé dans les données des opérations sélectionnées, triées par numéro
 - **Total** : dernière colonne, somme de la ligne
 - **Cellules à zéro** : affichées en tiret "—"
-- **Lignes catégorie** : affichent uniquement le total (pas de ventilation par séance) — sujet à révision après test utilisateur
+- **Lignes catégorie** : ventilation complète par séance (comme l'ancien rapport séances)
 - **Lignes sous-catégorie** : ventilation complète par séance
 - **Lignes Total charges/recettes** : ventilation complète par séance
 
