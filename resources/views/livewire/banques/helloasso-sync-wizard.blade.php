@@ -237,7 +237,7 @@
                                                 <td>
                                                     <livewire:tiers-autocomplete
                                                         wire:model.live="selectedTiers.{{ $index }}"
-                                                        filtre="recettes"
+                                                        filtre="tous"
                                                         :key="'rapprochement-'.$index"
                                                     />
                                                 </td>
