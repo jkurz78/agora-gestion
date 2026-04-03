@@ -211,3 +211,23 @@ it('blocks confirmMerge when HelloAsso identities conflict', function () {
     $tiers->refresh();
     expect($tiers->nom)->toBe('Dupont'); // unchanged
 });
+
+it('renders modal with field labels and column headers', function () {
+    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: ['nom' => 'Durand', 'prenom' => 'Jean'],
+            tiersId: $tiers->id,
+            sourceLabel: 'Données HelloAsso',
+            targetLabel: 'Tiers existant',
+            confirmLabel: 'Associer ce tiers',
+            context: 'test',
+        )
+        ->assertSee('Données HelloAsso')
+        ->assertSee('Tiers existant')
+        ->assertSee('Résultat')
+        ->assertSee('Associer ce tiers')
+        ->assertSee('Dupont')
+        ->assertSee('Durand');
+});
