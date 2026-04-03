@@ -39,6 +39,11 @@ final class Tiers extends Model
         ];
     }
 
+    public function getNomAttribute(?string $value): ?string
+    {
+        return $value !== null ? mb_strtoupper($value) : null;
+    }
+
     public function displayName(): string
     {
         if ($this->type === 'entreprise') {
