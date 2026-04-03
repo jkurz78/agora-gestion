@@ -958,7 +958,7 @@ final class RapportService
         $exerciceModel = Exercice::where('annee', $exercice)->first();
         $exerciceInfo = [
             'annee' => $exercice,
-            'label' => $exercice . '-' . ($exercice + 1),
+            'label' => $exercice.'-'.($exercice + 1),
             'date_debut' => $start,
             'date_fin' => $end,
             'is_cloture' => $exerciceModel?->isCloture() ?? false,
