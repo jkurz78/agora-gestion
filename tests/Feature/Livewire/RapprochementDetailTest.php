@@ -48,7 +48,7 @@ it('affiche la colonne Tiers pour une recette', function () {
     ]);
 
     Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
-        ->assertSee('Jean Dupont');
+        ->assertSee('Jean DUPONT');
 });
 
 it('affiche la colonne Tiers pour une autre recette (don/cotisation)', function () {
@@ -62,7 +62,7 @@ it('affiche la colonne Tiers pour une autre recette (don/cotisation)', function 
     ]);
 
     Livewire::test(RapprochementDetail::class, ['rapprochement' => $this->rapprochement])
-        ->assertSee('Marie Martin');
+        ->assertSee('Marie MARTIN');
 });
 
 it('affiche les totaux débits et crédits pointés', function () {

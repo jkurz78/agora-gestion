@@ -143,7 +143,7 @@ it('opens seance attestation modal with present participants', function () {
 
     Livewire::test(AttestationModal::class, ['operation' => $operation])
         ->call('openSeanceModal', $seance->id)
-        ->assertSee('Dupont')
+        ->assertSee('DUPONT')
         ->assertSee('Marie');
 });
 

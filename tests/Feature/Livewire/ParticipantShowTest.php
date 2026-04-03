@@ -47,7 +47,7 @@ it('renders participant show with participant name', function () {
     ])
         ->assertOk()
         ->assertSee('Marie')
-        ->assertSee('Dupont');
+        ->assertSee('DUPONT');
 });
 
 it('can save coordonnées changes and shows success message', function () {
@@ -63,7 +63,7 @@ it('can save coordonnées changes and shows success message', function () {
         ->assertSee('Modifications enregistrées.');
 
     $this->tiers->refresh();
-    expect($this->tiers->nom)->toBe('Martin');
+    expect($this->tiers->nom)->toBe('MARTIN');
     expect($this->tiers->prenom)->toBe('Jean');
     expect($this->tiers->email)->toBe('jean@example.com');
 });

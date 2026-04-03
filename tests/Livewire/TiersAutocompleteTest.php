@@ -23,8 +23,8 @@ it('can search tiers by name', function () {
         ->set('search', 'Dup')
         ->assertSet('open', true)
         ->call('doSearch')
-        ->assertSee('Dupont')
-        ->assertDontSee('Martin');
+        ->assertSee('DUPONT')
+        ->assertDontSee('MARTIN');
 });
 
 it('can search tiers by entreprise name', function () {

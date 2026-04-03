@@ -69,6 +69,6 @@ it('shows tiers without cotisation for current exercice', function () {
     ]);
 
     Livewire::test(Dashboard::class)
-        ->assertDontSee('Avec Cot')
-        ->assertSee('Sans');
+        ->assertDontSee('Cot AVEC')
+        ->assertSee('SANS');
 });

@@ -8,17 +8,17 @@ use Illuminate\Support\Facades\Schema;
 
 it('displayName returns nom as fallback when entreprise field is null', function () {
     $tiers = new Tiers(['type' => 'entreprise', 'entreprise' => null, 'nom' => 'Mairie de Lyon', 'prenom' => null]);
-    expect($tiers->displayName())->toBe('Mairie de Lyon');
+    expect($tiers->displayName())->toBe('MAIRIE DE LYON');
 });
 
 it('displayName returns prenom nom for particulier', function () {
     $tiers = new Tiers(['type' => 'particulier', 'nom' => 'Martin', 'prenom' => 'Jean']);
-    expect($tiers->displayName())->toBe('Jean Martin');
+    expect($tiers->displayName())->toBe('Jean MARTIN');
 });
 
 it('displayName works with no prenom for particulier', function () {
     $tiers = new Tiers(['type' => 'particulier', 'nom' => 'Martin', 'prenom' => null]);
-    expect($tiers->displayName())->toBe('Martin');
+    expect($tiers->displayName())->toBe('MARTIN');
 });
 
 it('factory creates a valid tiers', function () {
@@ -66,7 +66,7 @@ it('displayName returns entreprise field for entreprise type', function () {
 
 it('displayName falls back to nom when entreprise field is null', function () {
     $tiers = new Tiers(['type' => 'entreprise', 'entreprise' => null, 'nom' => 'Mairie de Lyon']);
-    expect($tiers->displayName())->toBe('Mairie de Lyon');
+    expect($tiers->displayName())->toBe('MAIRIE DE LYON');
 });
 
 it('can create tiers with all new fields', function () {

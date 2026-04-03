@@ -62,6 +62,6 @@ it('displays remise details', function () {
     Livewire::test(RemiseBancaireShow::class, ['remise' => $this->remise])
         ->assertSee('Remise chèques n°1')
         ->assertSee('Banque Pop')
-        ->assertSee('Jean Dupont')
+        ->assertSee('Jean DUPONT')
         ->assertSee('RBC-00001-001');
 });

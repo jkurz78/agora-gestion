@@ -15,7 +15,7 @@ it('affiche la page transactions d\'un tiers existant', function (): void {
     $this->actingAs($this->user)
         ->get(route('compta.tiers.transactions', $tiers))
         ->assertOk()
-        ->assertSee('Martin');
+        ->assertSee('MARTIN');
 });
 
 it('retourne 404 pour un tiers inexistant', function (): void {

@@ -17,7 +17,7 @@ it('renders the component', function (): void {
     Livewire::actingAs($this->user)
         ->test(TiersTransactions::class, ['tiersId' => $this->tiers->id])
         ->assertOk()
-        ->assertSee('Dupont');
+        ->assertSee('DUPONT');
 });
 
 it('affiche un message quand aucune transaction', function (): void {
