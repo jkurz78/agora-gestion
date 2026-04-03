@@ -150,6 +150,7 @@ final class TiersAutocomplete extends Component
                 'pour_recettes' => in_array($this->filtre, ['recettes', 'dons']),
                 'pour_depenses' => $this->filtre === 'depenses',
                 'context' => $this->context,
+                'sourceId' => $this->getId(),
             ])->to(TiersForm::class);
             $this->open = false;
         }
@@ -179,8 +180,11 @@ final class TiersAutocomplete extends Component
     }
 
     #[On('tiers-saved')]
-    public function onTiersSaved(int $id): void
+    public function onTiersSaved(int $id, ?string $sourceId = null): void
     {
+        if ($sourceId !== null && $sourceId !== $this->getId()) {
+            return;
+        }
         $this->selectTiers($id);
     }
 

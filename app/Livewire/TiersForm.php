@@ -47,6 +47,8 @@ final class TiersForm extends Component
 
     public string $context = ''; // 'participant' adapts the form
 
+    public ?string $sourceId = null; // ID of the autocomplete that opened this form
+
     public function showNewForm(): void
     {
         $this->reset([
@@ -112,6 +114,7 @@ final class TiersForm extends Component
         $this->pour_recettes = (bool) ($prefill['pour_recettes'] ?? false);
         $this->pour_depenses = (bool) ($prefill['pour_depenses'] ?? false);
         $this->context = $prefill['context'] ?? '';
+        $this->sourceId = $prefill['sourceId'] ?? null;
 
         if ($this->context === 'participant') {
             $this->pour_recettes = true;
@@ -128,6 +131,7 @@ final class TiersForm extends Component
             'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
             'adresse_ligne1', 'code_postal', 'ville', 'pays',
             'pour_depenses', 'pour_recettes', 'est_helloasso', 'showForm', 'showDetails',
+            'sourceId',
         ]);
         $this->pays = 'France';
         $this->resetValidation();
@@ -179,7 +183,7 @@ final class TiersForm extends Component
         }
 
         $id = $tiers->id;
-        $this->dispatch('tiers-saved', id: $id);
+        $this->dispatch('tiers-saved', id: $id, sourceId: $this->sourceId);
         $this->resetForm();
     }
 
