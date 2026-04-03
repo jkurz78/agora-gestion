@@ -4,6 +4,7 @@ use App\Models\BudgetLine;
 use App\Models\Categorie;
 use App\Models\Operation;
 use App\Models\SousCategorie;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -177,4 +178,100 @@ it('compteDeResultatOperations retourne structure sans montant_n1 ni budget', fu
     expect($cat)->not->toHaveKey('budget');
     expect($cat['sous_categories'][0])->not->toHaveKey('montant_n1');
     expect($cat['sous_categories'][0])->not->toHaveKey('budget');
+});
+
+it('compteDeResultatOperations avec parSeances regroupe par séance', function () {
+    $op = Operation::factory()->create();
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Transport']);
+
+    $d1 = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'saisi_par' => $this->user->id]);
+    $d1->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d1->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
+
+    $d2 = Transaction::factory()->asDepense()->create(['date' => '2025-10-02', 'saisi_par' => $this->user->id]);
+    $d2->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d2->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => null, 'montant' => 50.00]);
+
+    $result = $this->service->compteDeResultatOperations(2025, [$op->id], parSeances: true);
+
+    expect($result)->toHaveKey('seances');
+    expect($result['seances'])->toContain(0, 1);
+
+    $cat = $result['charges'][0];
+    expect($cat)->toHaveKey('total');
+    expect($cat)->toHaveKey('seances');
+    expect($cat['total'])->toBe(150.0);
+    expect($cat['seances'][1])->toBe(100.0);
+    expect($cat['seances'][0])->toBe(50.0);
+
+    $sc0 = $cat['sous_categories'][0];
+    expect($sc0['total'])->toBe(150.0);
+    expect($sc0['seances'][1])->toBe(100.0);
+});
+
+it('compteDeResultatOperations avec parTiers regroupe par tiers', function () {
+    $op = Operation::factory()->create();
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Transport']);
+
+    $tiers1 = Tiers::factory()->create(['type' => 'particulier', 'nom' => 'dupont', 'prenom' => 'Jean']);
+    $tiers2 = Tiers::factory()->entreprise()->create(['entreprise' => 'Martin SAS']);
+
+    $d1 = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'tiers_id' => $tiers1->id, 'saisi_par' => $this->user->id]);
+    $d1->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d1->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 100.00]);
+
+    $d2 = Transaction::factory()->asDepense()->create(['date' => '2025-10-02', 'tiers_id' => $tiers2->id, 'saisi_par' => $this->user->id]);
+    $d2->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d2->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 200.00]);
+
+    $d3 = Transaction::factory()->asDepense()->create(['date' => '2025-10-03', 'tiers_id' => null, 'saisi_par' => $this->user->id]);
+    $d3->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d3->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'montant' => 50.00]);
+
+    $result = $this->service->compteDeResultatOperations(2025, [$op->id], parTiers: true);
+
+    expect($result)->not->toHaveKey('seances');
+
+    $cat = $result['charges'][0];
+    expect($cat['montant'])->toBe(350.0);
+
+    $sc0 = $cat['sous_categories'][0];
+    expect($sc0['montant'])->toBe(350.0);
+    expect($sc0)->toHaveKey('tiers');
+    expect($sc0['tiers'])->toHaveCount(3);
+
+    $labels = collect($sc0['tiers'])->pluck('label')->all();
+    expect($labels)->toContain('(sans tiers)');
+    expect($labels)->toContain('Jean DUPONT');
+    expect($labels)->toContain('Martin SAS');
+
+    $tiersMap = collect($sc0['tiers'])->keyBy('label');
+    expect($tiersMap['Jean DUPONT']['type'])->toBe('particulier');
+    expect($tiersMap['Martin SAS']['type'])->toBe('entreprise');
+    expect($tiersMap['(sans tiers)']['type'])->toBeNull();
+});
+
+it('compteDeResultatOperations avec parSeances et parTiers combinés', function () {
+    $op = Operation::factory()->create();
+    $sc = SousCategorie::factory()->create(['categorie_id' => $this->depenseCat->id, 'nom' => 'Transport']);
+    $tiers = Tiers::factory()->create(['type' => 'particulier', 'nom' => 'dupont', 'prenom' => 'Jean']);
+
+    $d = Transaction::factory()->asDepense()->create(['date' => '2025-10-01', 'tiers_id' => $tiers->id, 'saisi_par' => $this->user->id]);
+    $d->lignes()->forceDelete();
+    TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'operation_id' => $op->id, 'seance' => 2, 'montant' => 75.00]);
+
+    $result = $this->service->compteDeResultatOperations(2025, [$op->id], parSeances: true, parTiers: true);
+
+    expect($result)->toHaveKey('seances');
+
+    $sc0 = $result['charges'][0]['sous_categories'][0];
+    expect($sc0)->toHaveKey('tiers');
+    expect($sc0)->toHaveKey('seances');
+    expect($sc0['total'])->toBe(75.0);
+
+    $t = $sc0['tiers'][0];
+    expect($t)->toHaveKey('seances');
+    expect($t)->toHaveKey('total');
+    expect($t['seances'][2])->toBe(75.0);
+    expect($t['total'])->toBe(75.0);
 });
