@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Espace;
 use App\Livewire\Banques\HelloassoSyncWizard;
 use App\Livewire\ParticipantShow;
 use App\Livewire\TiersMergeModal;
@@ -148,8 +149,7 @@ it('updates tiers with result data on confirmMerge', function () {
         ->set('resultData.nom', 'Durand')
         ->set('resultData.email', 'new@example.com')
         ->call('confirmMerge')
-        ->assertDispatched('tiers-merge-confirmed', fn ($name, $params) =>
-            $params['tiersId'] === $tiers->id
+        ->assertDispatched('tiers-merge-confirmed', fn ($name, $params) => $params['tiersId'] === $tiers->id
             && $params['context'] === 'helloasso'
             && $params['contextData'] === ['index' => 0]
         )
@@ -176,8 +176,7 @@ it('dispatches tiers-merge-cancelled on cancel without DB changes', function () 
             context: 'medecin',
         )
         ->call('cancelMerge')
-        ->assertDispatched('tiers-merge-cancelled', fn ($name, $params) =>
-            $params['context'] === 'medecin'
+        ->assertDispatched('tiers-merge-cancelled', fn ($name, $params) => $params['context'] === 'medecin'
         )
         ->assertSet('showModal', false);
 
@@ -239,7 +238,7 @@ it('renders modal with field labels and column headers', function () {
 });
 
 it('HelloassoSyncWizard associerTiers dispatches open-tiers-merge', function () {
-    view()->share('espace', \App\Enums\Espace::Gestion);
+    view()->share('espace', Espace::Gestion);
 
     $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'pour_recettes' => true]);
 
@@ -248,8 +247,8 @@ it('HelloassoSyncWizard associerTiers dispatches open-tiers-merge', function () 
     // Simulate state that would exist after loadTiers()
     $component->set('persons', [
         ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com',
-         'address' => '5 rue X', 'city' => 'Lyon', 'zipCode' => '69001', 'country' => 'France',
-         'tiers_id' => null, 'tiers_name' => null],
+            'address' => '5 rue X', 'city' => 'Lyon', 'zipCode' => '69001', 'country' => 'France',
+            'tiers_id' => null, 'tiers_name' => null],
     ]);
     $component->set('selectedTiers', [0 => $tiers->id]);
 
