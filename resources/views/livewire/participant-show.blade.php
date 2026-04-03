@@ -611,4 +611,6 @@
     </div>
 
     <x-unsaved-changes-modal />
+
+    <livewire:tiers-merge-modal />
 </div>
