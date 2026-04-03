@@ -45,7 +45,7 @@ final class FactureList extends Component
 
         $facture = app(FactureService::class)->creer($this->newFactureTiersId);
 
-        $this->redirect(route($this->espacePrefix() . '.factures.edit', $facture));
+        $this->redirect(route($this->espacePrefix().'.factures.edit', $facture));
     }
 
     public function supprimer(int $id): void

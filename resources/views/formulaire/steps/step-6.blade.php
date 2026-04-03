@@ -7,12 +7,12 @@ $qualificatifPluriel = $qualificatif . 's';
 
     <div class="card mb-4">
         <div class="card-body" style="font-size: 0.95rem;">
-            <p>Nous avons l'habitude dans les ateliers {{ $qualificatifPluriel }} de proposer la prise de photos à différents temps de l'atelier. Ces photos peuvent être individuelles ou de groupe.</p>
+            <p>Nous avons l'habitude dans les parcours {{ $qualificatifPluriel }} de proposer la prise de photos à différents temps du parcours. Ces photos peuvent être individuelles ou de groupe.</p>
             <p>Ces photos sont réalisées à titre de souvenir mais aussi pour vous permettre d'évaluer avec le temps tout votre cheminement {{ $qualificatif }}.</p>
             <p>Nous vous proposerons, au fil des séances, de vous photographier individuellement ou en groupe avec votre cheval ou poney.</p>
             <p>Les photos vous seront remises individuellement en téléchargement informatique sécurisé à la fin de chaque séance et vous devrez <strong>vous engager au préalable à ne les utiliser que pour votre usage personnel</strong>, éventuellement à l'usage du groupe ou avec l'accord écrit des personnes photographiées en cas de diffusion.</p>
-            <p>Le groupe peut également être amené à donner son accord à la diffusion de certaines photos dans le cadre de la formation des équipes encadrantes des ateliers {{ $qualificatifPluriel }} et ce, à visée didactique.</p>
-            <p class="mb-0">Vous pouvez à tout moment modifier votre décision en en faisant part au responsable de l'équipe encadrante de votre atelier.</p>
+            <p>Le groupe peut également être amené à donner son accord à la diffusion de certaines photos dans le cadre de la formation des équipes encadrantes des parcours {{ $qualificatifPluriel }} et ce, à visée didactique.</p>
+            <p class="mb-0">Vous pouvez à tout moment modifier votre décision en en faisant part au responsable de l'équipe encadrante de votre parcours.</p>
         </div>
     </div>
 

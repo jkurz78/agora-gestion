@@ -445,7 +445,7 @@
                             <label class="form-check-label" for="optDroitImage">Demander les autorisations photo et vidéo</label>
                         </div>
                         <div class="ms-4 mb-3" x-show="$wire.formulaireDroitImage && $wire.formulaireActif" x-cloak>
-                            <label class="form-label small">Qualificatif des ateliers</label>
+                            <label class="form-label small">Qualificatif des parcours</label>
                             <input type="text" wire:model="formulaireQualificatifAtelier" class="form-control form-control-sm"
                                    placeholder="thérapeutique">
                         </div>

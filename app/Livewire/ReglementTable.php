@@ -316,7 +316,7 @@ final class ReglementTable extends Component
             ? Storage::disk('local')->get($doc->pdf_path)
             : app(DocumentPrevisionnelService::class)->genererPdf($doc);
 
-        $pdfFilename = ucfirst($typeLabel) . " {$doc->numero} - {$tiers->displayName()}.pdf";
+        $pdfFilename = ucfirst($typeLabel)." {$doc->numero} - {$tiers->displayName()}.pdf";
 
         $template = EmailTemplate::where('categorie', CategorieEmail::Document->value)
             ->whereNull('type_operation_id')
@@ -331,7 +331,7 @@ final class ReglementTable extends Component
                 typeDocumentArticleDe: $articleDe,
                 numeroDocument: $doc->numero,
                 dateDocument: $doc->date->format('d/m/Y'),
-                montantTotal: number_format((float) $doc->montant_total, 2, ',', "\u{00A0}") . ' €',
+                montantTotal: number_format((float) $doc->montant_total, 2, ',', "\u{00A0}").' €',
                 customObjet: $template?->objet,
                 customCorps: $template?->corps,
                 pdfContent: $pdfContent,
@@ -356,7 +356,7 @@ final class ReglementTable extends Component
                 'envoye_par' => Auth::id(),
             ]);
 
-            $this->docModalMessage = ucfirst($typeLabel) . " envoyé à {$tiers->email}.";
+            $this->docModalMessage = ucfirst($typeLabel)." envoyé à {$tiers->email}.";
             $this->docModalMessageType = 'success';
         } catch (\Throwable $e) {
             EmailLog::create([
@@ -367,13 +367,13 @@ final class ReglementTable extends Component
                 'email_template_id' => $template?->id,
                 'destinataire_email' => $tiers->email,
                 'destinataire_nom' => $tiers->displayName(),
-                'objet' => ucfirst($typeLabel) . ' ' . $doc->numero,
+                'objet' => ucfirst($typeLabel).' '.$doc->numero,
                 'statut' => 'erreur',
                 'erreur_message' => $e->getMessage(),
                 'envoye_par' => Auth::id(),
             ]);
 
-            $this->docModalMessage = "Erreur lors de l'envoi : " . $e->getMessage();
+            $this->docModalMessage = "Erreur lors de l'envoi : ".$e->getMessage();
             $this->docModalMessageType = 'danger';
         }
     }
