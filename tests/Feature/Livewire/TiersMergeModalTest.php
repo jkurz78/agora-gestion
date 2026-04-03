@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Livewire\Banques\HelloassoSyncWizard;
 use App\Livewire\TiersMergeModal;
 use App\Models\Tiers;
 use App\Models\User;
@@ -230,4 +231,27 @@ it('renders modal with field labels and column headers', function () {
         ->assertSee('Associer ce tiers')
         ->assertSee('Dupont')
         ->assertSee('Durand');
+});
+
+it('HelloassoSyncWizard associerTiers dispatches open-tiers-merge', function () {
+    view()->share('espace', \App\Enums\Espace::Gestion);
+
+    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'pour_recettes' => true]);
+
+    $component = Livewire::test(HelloassoSyncWizard::class);
+
+    // Simulate state that would exist after loadTiers()
+    $component->set('persons', [
+        ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com',
+         'address' => '5 rue X', 'city' => 'Lyon', 'zipCode' => '69001', 'country' => 'France',
+         'tiers_id' => null, 'tiers_name' => null],
+    ]);
+    $component->set('selectedTiers', [0 => $tiers->id]);
+
+    $component->call('associerTiers', 0)
+        ->assertDispatched('open-tiers-merge');
+
+    // Tiers should NOT be updated yet (no direct update)
+    $tiers->refresh();
+    expect($tiers->est_helloasso)->toBeFalse();
 });
