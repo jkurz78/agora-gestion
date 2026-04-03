@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -453,7 +454,7 @@ final class RapportService
      * Construit 2 query builders (sans/avec affectations) avec SELECT/GROUP BY dynamiques.
      *
      * @param  array<int>  $operationIds
-     * @return array{\Illuminate\Database\Query\Builder, \Illuminate\Database\Query\Builder}
+     * @return array{Builder, Builder}
      */
     private function buildOperationQueries(
         string $type,
