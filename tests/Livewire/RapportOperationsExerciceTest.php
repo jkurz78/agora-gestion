@@ -22,8 +22,10 @@ it('RapportCompteResultatOperations n\'affiche pas les opérations hors exercice
         'statut' => StatutOperation::EnCours,
     ]);
 
-    Livewire::test(RapportCompteResultatOperations::class)
-        ->assertDontSee('Op hors exercice');
+    $component = Livewire::test(RapportCompteResultatOperations::class);
+    $tree = $component->viewData('operationTree');
+    $allNames = collect($tree)->flatMap(fn ($sc) => collect($sc['types'])->flatMap(fn ($t) => collect($t['operations'])->pluck('nom')));
+    expect($allNames)->not->toContain('Op hors exercice');
 });
 
 it('RapportCompteResultatOperations affiche les opérations clôturées dans l\'exercice', function () {
@@ -34,6 +36,8 @@ it('RapportCompteResultatOperations affiche les opérations clôturées dans l\'
         'statut' => StatutOperation::Cloturee,
     ]);
 
-    Livewire::test(RapportCompteResultatOperations::class)
-        ->assertSee('Op clôturée visible');
+    $component = Livewire::test(RapportCompteResultatOperations::class);
+    $tree = $component->viewData('operationTree');
+    $allNames = collect($tree)->flatMap(fn ($sc) => collect($sc['types'])->flatMap(fn ($t) => collect($t['operations'])->pluck('nom')));
+    expect($allNames)->toContain('Op clôturée visible');
 });
