@@ -83,11 +83,13 @@ final class TiersMergeModal extends Component
             $this->sourceBooleans[$field] = (bool) ($sourceData[$field] ?? false);
         }
 
-        // Check helloasso_id conflict
-        $sourceHelloassoId = $sourceData['helloasso_id'] ?? null;
-        $this->helloassoIdConflict = $sourceHelloassoId !== null
-            && $tiers->helloasso_id !== null
-            && $sourceHelloassoId !== $tiers->helloasso_id;
+        // Check HelloAsso identity conflict (both are HelloAsso with different nom/prenom)
+        $sourceIsHelloasso = (bool) ($sourceData['est_helloasso'] ?? false);
+        $sourceHaNom = $sourceData['helloasso_nom'] ?? null;
+        $sourceHaPrenom = $sourceData['helloasso_prenom'] ?? null;
+        $this->helloassoIdConflict = $sourceIsHelloasso
+            && $tiers->est_helloasso
+            && ($sourceHaNom !== $tiers->helloasso_nom || $sourceHaPrenom !== $tiers->helloasso_prenom);
 
         // Pre-fill result: target values, completed by source where target is empty
         $this->resultData = [];
