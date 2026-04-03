@@ -259,6 +259,12 @@
                                     Compte de résultat par opérations
                                 </a>
                             </li>
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('compta.rapports.flux-tresorerie') ? 'active' : '' }}"
+                                   href="{{ route('compta.rapports.flux-tresorerie') }}">
+                                    <i class="bi bi-cash-stack me-1"></i>Flux de trésorerie
+                                </a>
+                            </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item {{ request()->routeIs('compta.rapports.analyse') ? 'active' : '' }}"
