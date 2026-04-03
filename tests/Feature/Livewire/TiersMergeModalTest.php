@@ -109,3 +109,105 @@ it('always keeps target type over source type', function () {
         )
         ->assertSet('resultData.type', 'entreprise');
 });
+
+it('updates tiers with result data on confirmMerge', function () {
+    $tiers = Tiers::factory()->create([
+        'type' => 'particulier',
+        'nom' => 'Dupont',
+        'prenom' => 'Marie',
+        'email' => 'old@example.com',
+        'pour_depenses' => false,
+        'pour_recettes' => true,
+        'est_helloasso' => false,
+    ]);
+
+    $sourceData = [
+        'nom' => 'Durand',
+        'prenom' => 'Jean',
+        'email' => 'new@example.com',
+        'pour_recettes' => false,
+        'est_helloasso' => true,
+    ];
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: $sourceData,
+            tiersId: $tiers->id,
+            sourceLabel: 'Source',
+            targetLabel: 'Cible',
+            confirmLabel: 'Valider',
+            context: 'helloasso',
+            contextData: ['index' => 0],
+        )
+        ->set('resultData.nom', 'Durand')
+        ->set('resultData.email', 'new@example.com')
+        ->call('confirmMerge')
+        ->assertDispatched('tiers-merge-confirmed', fn ($name, $params) =>
+            $params['tiersId'] === $tiers->id
+            && $params['context'] === 'helloasso'
+            && $params['contextData'] === ['index' => 0]
+        )
+        ->assertSet('showModal', false);
+
+    $tiers->refresh();
+    expect($tiers->nom)->toBe('Durand');
+    expect($tiers->email)->toBe('new@example.com');
+    // OR logic on booleans
+    expect($tiers->pour_recettes)->toBeTrue();   // was true, stays true
+    expect($tiers->est_helloasso)->toBeTrue();    // OR: false || true = true
+});
+
+it('dispatches tiers-merge-cancelled on cancel without DB changes', function () {
+    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'email' => 'old@test.com']);
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: ['nom' => 'Autre', 'email' => 'new@test.com'],
+            tiersId: $tiers->id,
+            sourceLabel: 'Source',
+            targetLabel: 'Cible',
+            confirmLabel: 'Valider',
+            context: 'medecin',
+        )
+        ->call('cancelMerge')
+        ->assertDispatched('tiers-merge-cancelled', fn ($name, $params) =>
+            $params['context'] === 'medecin'
+        )
+        ->assertSet('showModal', false);
+
+    $tiers->refresh();
+    expect($tiers->nom)->toBe('Dupont');
+    expect($tiers->email)->toBe('old@test.com');
+});
+
+it('blocks confirmMerge when HelloAsso identities conflict', function () {
+    $tiers = Tiers::factory()->create([
+        'nom' => 'Dupont',
+        'est_helloasso' => true,
+        'helloasso_nom' => 'Dupont',
+        'helloasso_prenom' => 'Marie',
+    ]);
+
+    $sourceData = [
+        'nom' => 'Dupont',
+        'est_helloasso' => true,
+        'helloasso_nom' => 'Dupont',
+        'helloasso_prenom' => 'Jean',
+    ];
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: $sourceData,
+            tiersId: $tiers->id,
+            sourceLabel: 'Source',
+            targetLabel: 'Cible',
+            confirmLabel: 'Fusionner',
+            context: 'fusion',
+        )
+        ->assertSet('helloassoIdConflict', true)
+        ->call('confirmMerge')
+        ->assertNotDispatched('tiers-merge-confirmed');
+
+    $tiers->refresh();
+    expect($tiers->nom)->toBe('Dupont'); // unchanged
+});
