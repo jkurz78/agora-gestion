@@ -22,7 +22,7 @@
                     <h5 class="modal-title"><i class="bi bi-arrow-left-right me-2"></i>Enrichissement du tiers</h5>
                     <button type="button" class="btn-close" wire:click="cancelMerge"></button>
                 </div>
-                <div class="modal-body p-0"
+                <div class="modal-body px-4 py-3"
                      x-data="{
                          copyToResult(field, value) {
                              $wire.set('resultData.' + field, value);
@@ -30,18 +30,18 @@
                      }">
 
                     @if($helloassoIdConflict)
-                        <div class="alert alert-danger m-3">
+                        <div class="alert alert-danger">
                             <i class="bi bi-exclamation-triangle me-1"></i>
                             Ces deux tiers ont des identités HelloAsso différentes. La fusion n'est pas possible.
                         </div>
                     @endif
 
-                    <table class="table table-sm table-bordered mb-0">
-                        <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                            <tr>
-                                <th style="width:15%">Champ</th>
-                                <th style="width:25%">{{ $sourceLabel }}</th>
-                                <th style="width:25%">{{ $targetLabel }}</th>
+                    <table class="table table-sm table-borderless mb-0">
+                        <thead>
+                            <tr style="border-bottom:2px solid #3d5473">
+                                <th class="text-end pe-3 text-muted" style="width:15%">Champ</th>
+                                <th style="width:25%;background-color:#f8f9fa">{{ $sourceLabel }}</th>
+                                <th style="width:25%;background-color:#f8f9fa">{{ $targetLabel }}</th>
                                 <th style="width:35%">Résultat</th>
                             </tr>
                         </thead>
@@ -56,53 +56,54 @@
                                     $needsColoring = ($srcHasValue && $tgtHasValue && $src !== $tgt)
                                         || ($srcHasValue && $res !== $src)
                                         || ($tgtHasValue && $res !== $tgt);
-                                    $srcColor = '';
-                                    $tgtColor = '';
+                                    $srcBg = 'background-color:#f8f9fa';
+                                    $tgtBg = 'background-color:#f8f9fa';
                                     if ($needsColoring) {
                                         $srcMatchesResult = $srcHasValue && $src === $res;
                                         $tgtMatchesResult = $tgtHasValue && $tgt === $res;
                                         $vert = 'background-color: rgba(46,125,50,0.15)';
                                         $rouge = 'background-color: rgba(181,69,58,0.15)';
                                         if ($srcMatchesResult && !$tgtMatchesResult) {
-                                            $srcColor = $vert;
-                                            $tgtColor = $tgtHasValue ? $rouge : '';
+                                            $srcBg = $vert;
+                                            $tgtBg = $tgtHasValue ? $rouge : 'background-color:#f8f9fa';
                                         } elseif ($tgtMatchesResult && !$srcMatchesResult) {
-                                            $srcColor = $srcHasValue ? $rouge : '';
-                                            $tgtColor = $vert;
+                                            $srcBg = $srcHasValue ? $rouge : 'background-color:#f8f9fa';
+                                            $tgtBg = $vert;
                                         } elseif (!$srcMatchesResult && !$tgtMatchesResult) {
-                                            $srcColor = $srcHasValue ? $rouge : '';
-                                            $tgtColor = $tgtHasValue ? $rouge : '';
+                                            $srcBg = $srcHasValue ? $rouge : 'background-color:#f8f9fa';
+                                            $tgtBg = $tgtHasValue ? $rouge : 'background-color:#f8f9fa';
                                         }
                                     }
                                 @endphp
-                                <tr wire:key="merge-row-{{ $key }}">
-                                    <td class="fw-bold small align-middle">{{ $label }}</td>
-                                    <td style="{{ $src !== null && $src !== '' ? 'cursor:pointer;' : '' }}{{ $srcColor }}"
-                                        @if($src !== null && $src !== '')
+                                <tr wire:key="merge-row-{{ $key }}" style="border-bottom:1px solid #e9ecef">
+                                    <td class="fw-bold small align-middle text-end pe-3 text-muted">{{ $label }}</td>
+                                    <td style="{{ $srcHasValue ? 'cursor:pointer;' : '' }}{{ $srcBg }}"
+                                        @if($srcHasValue)
                                             x-on:click="copyToResult('{{ $key }}', {{ \Js::from($src) }})"
                                             title="Cliquer pour copier vers Résultat"
                                         @endif
                                         class="small align-middle">
                                         {{ $src ?? '—' }}
                                     </td>
-                                    <td style="{{ $tgt !== null && $tgt !== '' ? 'cursor:pointer;' : '' }}{{ $tgtColor }}"
-                                        @if($tgt !== null && $tgt !== '')
+                                    <td style="{{ $tgtHasValue ? 'cursor:pointer;' : '' }}{{ $tgtBg }}"
+                                        @if($tgtHasValue)
                                             x-on:click="copyToResult('{{ $key }}', {{ \Js::from($tgt) }})"
                                             title="Cliquer pour copier vers Résultat"
                                         @endif
                                         class="small align-middle">
                                         {{ $tgt ?? '—' }}
                                     </td>
-                                    <td class="p-1">
+                                    <td class="py-1 px-0">
                                         @if($key === 'type')
-                                            <select wire:model.live="resultData.{{ $key }}" class="form-select form-select-sm">
+                                            <select wire:model.live="resultData.{{ $key }}"
+                                                    class="form-select form-select-sm border-0 bg-transparent shadow-none">
                                                 <option value="particulier">Particulier</option>
                                                 <option value="entreprise">Entreprise</option>
                                             </select>
                                         @else
                                             <input type="text"
                                                    wire:model.live.debounce.300ms="resultData.{{ $key }}"
-                                                   class="form-control form-control-sm">
+                                                   class="form-control form-control-sm border-0 bg-transparent shadow-none">
                                         @endif
                                     </td>
                                 </tr>
