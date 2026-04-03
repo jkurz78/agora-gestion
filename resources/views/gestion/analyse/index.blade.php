@@ -7,7 +7,8 @@
         .pvtAxisContainer, .pvtVals { background: #f8f9fa; border-color: #dee2e6 !important; }
         .pvtFilterBox { font-size: 0.85rem; }
         .pvtTable tbody tr td { padding: 4px 8px; }
-        .pvtTable thead tr th { background-color: #3d5473; color: white; padding: 4px 8px; }
+        .pvtTable thead tr th, .pvtTable tbody tr th { background-color: #3d5473; color: white; padding: 4px 8px; }
+        .pvtTotalLabel, .pvtTotal, .pvtGrandTotal { font-weight: bold; background-color: #e9ecef; }
     </style>
 
     <livewire:analyse-pivot />
