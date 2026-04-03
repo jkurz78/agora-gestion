@@ -349,4 +349,6 @@
         </div>
     @endif
     @endif
+
+    <livewire:tiers-merge-modal />
 </div>
