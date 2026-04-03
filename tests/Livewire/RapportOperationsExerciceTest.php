@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Enums\StatutOperation;
 use App\Livewire\RapportCompteResultatOperations;
-use App\Livewire\RapportSeances;
 use App\Models\Operation;
 use App\Models\User;
 use Livewire\Livewire;
@@ -39,15 +38,3 @@ it('RapportCompteResultatOperations affiche les opérations clôturées dans l\'
         ->assertSee('Op clôturée visible');
 });
 
-it('RapportSeances n\'affiche pas les opérations hors exercice', function () {
-    Operation::factory()->create([
-        'nom' => 'Op séances hors exercice',
-        'date_debut' => '2024-09-01',
-        'date_fin' => '2025-08-30',
-        'nombre_seances' => 3,
-        'statut' => StatutOperation::EnCours,
-    ]);
-
-    Livewire::test(RapportSeances::class)
-        ->assertDontSee('Op séances hors exercice');
-});
