@@ -7,7 +7,6 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Models\TypeOperation;
 use App\Models\User;
 use Livewire\Livewire;
 
