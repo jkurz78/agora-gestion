@@ -18,6 +18,7 @@ use App\Services\HelloAssoSyncService;
 use App\Services\HelloAssoTiersResolver;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 final class HelloassoSyncWizard extends Component
@@ -279,6 +280,39 @@ final class HelloassoSyncWizard extends Component
         $tiersId = $this->selectedTiers[$index] ?? null;
         $person = $this->persons[$index] ?? null;
         if ($tiersId === null || $person === null) {
+            return;
+        }
+
+        $this->dispatch('open-tiers-merge',
+            sourceData: [
+                'type' => 'particulier',
+                'nom' => $person['lastName'],
+                'prenom' => $person['firstName'],
+                'email' => $person['email'],
+                'adresse_ligne1' => $person['address'],
+                'code_postal' => $person['zipCode'],
+                'ville' => $person['city'],
+                'pays' => $person['country'],
+            ],
+            tiersId: $tiersId,
+            sourceLabel: 'Données HelloAsso',
+            targetLabel: 'Tiers existant',
+            confirmLabel: 'Associer ce tiers HelloAsso',
+            context: 'helloasso',
+            contextData: ['index' => $index, 'person' => $person],
+        );
+    }
+
+    #[On('tiers-merge-confirmed')]
+    public function onTiersMergeConfirmed(int $tiersId, string $context, array $contextData = []): void
+    {
+        if ($context !== 'helloasso') {
+            return;
+        }
+
+        $index = $contextData['index'] ?? null;
+        $person = $contextData['person'] ?? null;
+        if ($index === null || $person === null) {
             return;
         }
 
