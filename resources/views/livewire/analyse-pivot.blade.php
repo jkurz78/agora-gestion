@@ -23,33 +23,38 @@
         </div>
     </div>
 
-    {{-- Pivot table container --}}
-    <div id="pivot-output" class="border rounded bg-white p-2" wire:ignore></div>
+    {{-- Data carrier (Livewire updates attributes) + pivot container (wire:ignore protects PivotTable DOM) --}}
+    <div id="pivot-wrapper" data-pivot='@json($pivotData)' data-view="{{ $activeView }}">
+        <div id="pivot-output" wire:ignore class="border rounded bg-white p-2"></div>
+    </div>
 
-    {{-- Init script: runs after CDN scripts are loaded via @push in wrapper --}}
+    @script
     <script>
-        (function() {
-            function initPivot() {
-                if (typeof jQuery === 'undefined' || typeof jQuery.fn.pivotUI === 'undefined') {
-                    setTimeout(initPivot, 100);
-                    return;
-                }
-
-                var data = @json($pivotData);
-                var view = @json($activeView);
-
-                var defaults = view === 'participants'
-                    ? { rows: ["Opération"], vals: ["Montant prévu"], aggregatorName: "Somme" }
-                    : { rows: ["Opération"], vals: ["Montant"], aggregatorName: "Somme" };
-
-                jQuery("#pivot-output").empty().pivotUI(data, Object.assign({
-                    locale: "fr",
-                    cols: [],
-                    rendererName: "Table",
-                }, defaults));
+        function renderPivot() {
+            var wrapper = document.getElementById('pivot-wrapper');
+            var el = document.getElementById('pivot-output');
+            if (!wrapper || !el || typeof jQuery === 'undefined' || typeof jQuery.fn.pivotUI === 'undefined') {
+                setTimeout(renderPivot, 100);
+                return;
             }
 
-            initPivot();
-        })();
+            var data = JSON.parse(wrapper.dataset.pivot || '[]');
+            var view = wrapper.dataset.view || 'participants';
+
+            var defaults = view === 'participants'
+                ? { rows: ["Opération"], vals: ["Montant prévu"], aggregatorName: "Somme" }
+                : { rows: ["Opération"], vals: ["Montant"], aggregatorName: "Somme" };
+
+            jQuery(el).empty().pivotUI(data, Object.assign({
+                locale: "fr",
+                cols: [],
+                rendererName: "Table",
+            }, defaults));
+        }
+
+        renderPivot();
+        $wire.$watch('activeView', () => setTimeout(renderPivot, 100));
+        $wire.$watch('filterExercice', () => setTimeout(renderPivot, 100));
     </script>
+    @endscript
 </div>
