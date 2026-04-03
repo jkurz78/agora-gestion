@@ -182,7 +182,7 @@ final class FactureService
             // Lock ALL factures of this exercice upfront (single lock for both
             // chronological constraint and sequential numbering)
             $exerciceFactures = Facture::where('exercice', $facture->exercice)
-                ->where('statut', StatutFacture::Validee)
+                ->whereIn('statut', [StatutFacture::Validee, StatutFacture::Annulee])
                 ->lockForUpdate()
                 ->get();
 
