@@ -393,8 +393,8 @@ final class FactureService
 
         $pdfContent = $pdf->output();
 
-        // Brouillon: return plain PDF (no Factur-X, not a fiscal document)
-        if ($facture->statut === StatutFacture::Brouillon) {
+        // Brouillon or annulée: return plain PDF (no Factur-X, not a fiscal document)
+        if ($facture->statut !== StatutFacture::Validee) {
             return $pdfContent;
         }
 
