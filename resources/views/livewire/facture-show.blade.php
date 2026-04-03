@@ -37,6 +37,13 @@
                 Date d'émission : <strong>{{ $facture->date->format('d/m/Y') }}</strong>
                 — Exercice {{ $facture->exercice }}/{{ $facture->exercice + 1 }}
             </p>
+            @if ($facture->statut === \App\Enums\StatutFacture::Annulee && $facture->numero_avoir)
+                <p class="text-muted mb-0">
+                    Avoir <strong>{{ $facture->numero_avoir }}</strong>
+                    émis le <strong>{{ $facture->date_annulation->format('d/m/Y') }}</strong>
+                    — Annule la facture {{ $facture->numero }}
+                </p>
+            @endif
         </div>
         <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour à la liste
@@ -82,6 +89,7 @@
                 </div>
             </div>
 
+            @if ($facture->statut !== \App\Enums\StatutFacture::Annulee)
             {{-- Statut de paiement --}}
             <div class="card mb-4">
                 <div class="card-header">
@@ -119,6 +127,7 @@
                     @endif
                 </div>
             </div>
+            @endif
         </div>
 
         <div class="col-lg-4">
@@ -183,8 +192,14 @@
                 </div>
                 <div class="card-body d-grid gap-2">
                     <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}" class="btn btn-outline-primary" target="_blank">
-                        <i class="bi bi-file-earmark-pdf"></i> Télécharger PDF
+                        <i class="bi bi-file-earmark-pdf"></i>
+                        {{ $facture->statut === \App\Enums\StatutFacture::Annulee ? 'Télécharger l\'avoir (PDF)' : 'Télécharger PDF' }}
                     </a>
+                    @if ($facture->statut === \App\Enums\StatutFacture::Validee)
+                        <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#annulationModal">
+                            <i class="bi bi-x-circle"></i> Annuler avec avoir
+                        </button>
+                    @endif
                     @if ($facture->tiers?->email)
                         <button wire:click="envoyerEmail" class="btn btn-outline-primary" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="envoyerEmail"><i class="bi bi-envelope"></i> Envoyer par email</span>
@@ -207,6 +222,34 @@
             </div>
         </div>
     </div>
+
+    {{-- Modale de confirmation d'annulation --}}
+    @if ($facture->statut === \App\Enums\StatutFacture::Validee)
+    <div class="modal fade" id="annulationModal" tabindex="-1" wire:ignore.self>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Annuler cette facture</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Êtes-vous sûr de vouloir annuler la facture <strong>{{ $facture->numero }}</strong> ?</p>
+                    <ul class="text-muted small">
+                        <li>Un avoir sera émis avec un numéro séquentiel</li>
+                        <li>Les transactions associées seront libérées</li>
+                        <li>Cette action est irréversible</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Non, conserver</button>
+                    <button type="button" class="btn btn-danger" wire:click="annuler" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>Oui, émettre l'avoir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- Modale d'encaissement --}}
     @if ($transactionsAEncaisser->isNotEmpty())
