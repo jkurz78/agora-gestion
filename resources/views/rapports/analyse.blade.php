@@ -19,5 +19,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.14.1/jquery-ui.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.fr.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/subtotal@1.11.0/dist/subtotal.min.js"></script>
     @endpush
 </x-app-layout>
