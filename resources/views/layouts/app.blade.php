@@ -297,6 +297,14 @@
                         </a>
                     </li>
 
+                    {{-- Analyse --}}
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('gestion.analyse*') ? 'active' : '' }}"
+                                       href="{{ route('gestion.analyse') }}">
+                                        <i class="bi bi-graph-up me-1"></i> Analyse
+                                    </a>
+                                </li>
+
                     {{-- Dropdown Opérations --}}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ request()->routeIs('gestion.operations*') || request()->routeIs('gestion.remises-bancaires*') ? 'active' : '' }}"
