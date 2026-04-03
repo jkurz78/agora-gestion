@@ -9,6 +9,11 @@
         .pvtTable td, .pvtTable th { padding: 4px 8px; color: #212529; }
         .pvtTotalLabel, .pvtTotal, .pvtGrandTotal { font-weight: bold; background-color: #e9ecef; }
         .pvtAxisLabel { background-color: #3d5473 !important; color: white !important; }
+        /* Subtotal.js styling */
+        .pvtTable .pvtRowSubtotal td, .pvtTable .pvtRowSubtotal th { font-weight: 700; background-color: #dce6f0; }
+        .pvtTable .pvtColSubtotal td, .pvtTable .pvtColSubtotal th { font-weight: 700; background-color: #dce6f0; }
+        .pvtTable .pvtGrandTotal { font-weight: 700; background-color: #3d5473 !important; color: #fff !important; }
+        .pvtTable .toggle { cursor: pointer; color: #3d5473; font-size: 0.9rem; }
     </style>
 
     <livewire:analyse-pivot mode="participants" />
