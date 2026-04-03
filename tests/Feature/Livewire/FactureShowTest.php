@@ -82,7 +82,7 @@ it('renders with all facture data', function () {
         ->assertStatus(200)
         ->assertSee('Facture F-'.$this->exercice.'-0001')
         ->assertSee($this->facture->date->format('d/m/Y'))
-        ->assertSee('Marie Dupont')
+        ->assertSee('Marie DUPONT')
         ->assertSee('Prestations associatives')
         ->assertSee('Cotisation annuelle')
         ->assertSee('Frais de dossier')

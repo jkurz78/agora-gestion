@@ -19,7 +19,7 @@ it('crée un tiers', function () {
     ]);
 
     expect($tiers)->toBeInstanceOf(Tiers::class);
-    expect($tiers->nom)->toBe('Mairie de Lyon');
+    expect($tiers->nom)->toBe('MAIRIE DE LYON');
     $this->assertDatabaseHas('tiers', ['nom' => 'Mairie de Lyon', 'pour_depenses' => true]);
 });
 
@@ -28,7 +28,7 @@ it('met à jour un tiers', function () {
 
     app(TiersService::class)->update($tiers, ['nom' => 'Nouveau nom']);
 
-    expect($tiers->fresh()->nom)->toBe('Nouveau nom');
+    expect($tiers->fresh()->nom)->toBe('NOUVEAU NOM');
 });
 
 it('supprime un tiers sans contrainte', function () {

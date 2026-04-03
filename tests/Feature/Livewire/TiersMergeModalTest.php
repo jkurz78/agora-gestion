@@ -94,7 +94,7 @@ it('pre-fills result with source values when target fields are empty', function 
             confirmLabel: 'Valider',
             context: 'test',
         )
-        ->assertSet('resultData.nom', 'Dupont')        // target had value
+        ->assertSet('resultData.nom', 'DUPONT')        // target had value (accessor uppercases)
         ->assertSet('resultData.email', 'marie@new.com') // target was empty, took source
         ->assertSet('resultData.telephone', '0612345678') // target was empty, took source
         ->assertSet('resultData.ville', 'Toulouse');      // target was empty, took source
@@ -156,7 +156,7 @@ it('updates tiers with result data on confirmMerge', function () {
         ->assertSet('showModal', false);
 
     $tiers->refresh();
-    expect($tiers->nom)->toBe('Durand');
+    expect($tiers->nom)->toBe('DURAND');
     expect($tiers->email)->toBe('new@example.com');
     // OR logic on booleans
     expect($tiers->pour_recettes)->toBeTrue();   // was true, stays true
@@ -181,7 +181,7 @@ it('dispatches tiers-merge-cancelled on cancel without DB changes', function () 
         ->assertSet('showModal', false);
 
     $tiers->refresh();
-    expect($tiers->nom)->toBe('Dupont');
+    expect($tiers->nom)->toBe('DUPONT');
     expect($tiers->email)->toBe('old@test.com');
 });
 
@@ -214,7 +214,7 @@ it('blocks confirmMerge when HelloAsso identities conflict', function () {
         ->assertNotDispatched('tiers-merge-confirmed');
 
     $tiers->refresh();
-    expect($tiers->nom)->toBe('Dupont'); // unchanged
+    expect($tiers->nom)->toBe('DUPONT'); // unchanged (accessor uppercases)
 });
 
 it('renders modal with field labels and column headers', function () {
@@ -233,7 +233,7 @@ it('renders modal with field labels and column headers', function () {
         ->assertSee('Tiers existant')
         ->assertSee('Résultat')
         ->assertSee('Associer ce tiers')
-        ->assertSee('Dupont')
+        ->assertSee('DUPONT')
         ->assertSee('Durand');
 });
 

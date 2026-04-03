@@ -32,7 +32,7 @@ it('shows participants in table', function () {
     ]);
 
     Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
-        ->assertSee('Dupont')
+        ->assertSee('DUPONT')
         ->assertSee('Marie');
 });
 

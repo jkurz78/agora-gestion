@@ -18,7 +18,7 @@ it('renders the tiers list', function () {
 
     Livewire::test(TiersList::class)
         ->assertOk()
-        ->assertSee('Mairie de Lyon');
+        ->assertSee('MAIRIE DE LYON');
 });
 
 it('filters by search', function () {
@@ -27,8 +27,8 @@ it('filters by search', function () {
 
     Livewire::test(TiersList::class)
         ->set('search', 'Mairie')
-        ->assertSee('Mairie de Lyon')
-        ->assertDontSee('Leclerc SA');
+        ->assertSee('MAIRIE DE LYON')
+        ->assertDontSee('LECLERC SA');
 });
 
 it('filters pour_depenses', function () {
@@ -37,8 +37,8 @@ it('filters pour_depenses', function () {
 
     Livewire::test(TiersList::class)
         ->set('filtre', 'depenses')
-        ->assertSee('Fournisseur A')
-        ->assertDontSee('Recette Only');
+        ->assertSee('FOURNISSEUR A')
+        ->assertDontSee('RECETTE ONLY');
 });
 
 it('can delete a tiers', function () {
@@ -57,7 +57,7 @@ it('recherche dans le champ entreprise', function () {
     Livewire::test(TiersList::class)
         ->set('search', 'ACME')
         ->assertSee('ACME Corp')
-        ->assertDontSee('Dupont');
+        ->assertDontSee('DUPONT');
 });
 
 it('recherche dans le champ ville', function () {
@@ -66,8 +66,8 @@ it('recherche dans le champ ville', function () {
 
     Livewire::test(TiersList::class)
         ->set('search', 'Lyon')
-        ->assertSee('Martin')
-        ->assertDontSee('Dupont');
+        ->assertSee('MARTIN')
+        ->assertDontSee('DUPONT');
 });
 
 it('recherche dans le champ code_postal', function () {
@@ -76,8 +76,8 @@ it('recherche dans le champ code_postal', function () {
 
     Livewire::test(TiersList::class)
         ->set('search', '75')
-        ->assertSee('Martin')
-        ->assertDontSee('Dupont');
+        ->assertSee('MARTIN')
+        ->assertDontSee('DUPONT');
 });
 
 it('recherche dans le champ email', function () {
@@ -86,8 +86,8 @@ it('recherche dans le champ email', function () {
 
     Livewire::test(TiersList::class)
         ->set('search', 'acme')
-        ->assertSee('Martin')
-        ->assertDontSee('Dupont');
+        ->assertSee('MARTIN')
+        ->assertDontSee('DUPONT');
 });
 
 it('filtre helloasso actif — affiche seulement les tiers avec est_helloasso', function () {
@@ -96,8 +96,8 @@ it('filtre helloasso actif — affiche seulement les tiers avec est_helloasso', 
 
     Livewire::test(TiersList::class)
         ->set('filtreHelloasso', true)
-        ->assertSee('Martin')
-        ->assertDontSee('Dupont');
+        ->assertSee('MARTIN')
+        ->assertDontSee('DUPONT');
 });
 
 it('filtre helloasso inactif — affiche tous les tiers', function () {
@@ -106,8 +106,8 @@ it('filtre helloasso inactif — affiche tous les tiers', function () {
 
     Livewire::test(TiersList::class)
         ->set('filtreHelloasso', false)
-        ->assertSee('Martin')
-        ->assertSee('Dupont');
+        ->assertSee('MARTIN')
+        ->assertSee('DUPONT');
 });
 
 it('tri par nom ASC — ordre COALESCE(entreprise, nom)', function () {
@@ -119,7 +119,7 @@ it('tri par nom ASC — ordre COALESCE(entreprise, nom)', function () {
     // Default is already sortBy='nom', sortDir='asc', so don't call sort
 
     $html = $component->html();
-    $posArnaud = strpos($html, 'Arnaud');
+    $posArnaud = strpos($html, 'ARNAUD');
     $posMartin = strpos($html, 'Martin SARL');
     $posZephyr = strpos($html, 'Zéphyr SA');
 
@@ -135,7 +135,7 @@ it('tri par nom DESC', function () {
         ->call('sort', 'nom');  // toggle from default asc to desc
 
     $html = $component->html();
-    expect(strpos($html, 'Zéphyr SA'))->toBeLessThan(strpos($html, 'Arnaud'));
+    expect(strpos($html, 'Zéphyr SA'))->toBeLessThan(strpos($html, 'ARNAUD'));
 });
 
 it('tri par ville', function () {
@@ -158,7 +158,7 @@ it('entreprise sans raison sociale — displayName affiche nom, tri COALESCE rab
     // Default is already sortBy='nom', sortDir='asc'
 
     $html = $component->html();
-    expect(strpos($html, 'Ancien'))->toBeLessThan(strpos($html, 'Zéphyr SA'));
+    expect(strpos($html, 'ANCIEN'))->toBeLessThan(strpos($html, 'Zéphyr SA'));
 });
 
 it('affiche icône 👤 pour un particulier', function () {
@@ -184,7 +184,7 @@ it('affiche la sous-ligne contact pour une entreprise avec nom renseigné', func
 
     Livewire::test(TiersList::class)
         ->assertSeeHtml('class="text-muted small"')
-        ->assertSee('Jean Dupont');
+        ->assertSee('Jean DUPONT');
 });
 
 it('n\'affiche pas de sous-ligne contact pour une entreprise sans nom ni prénom', function () {

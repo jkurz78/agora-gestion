@@ -56,7 +56,7 @@ it('renders the validation page with session data', function () {
     session(['remise_selected_ids' => [$this->reglement->id]]);
 
     Livewire::test(RemiseBancaireValidation::class, ['remise' => $this->remise])
-        ->assertSee('Jean Dupont')
+        ->assertSee('Jean DUPONT')
         ->assertSee('30,00');
 });
 

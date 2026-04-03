@@ -181,7 +181,7 @@ it('logs email when formulaire invitation is sent successfully', function () {
         ->and($log->categorie)->toBe('formulaire')
         ->and($log->email_template_id)->toBe($template->id)
         ->and($log->destinataire_email)->toBe('participant@example.com')
-        ->and($log->destinataire_nom)->toBe('Dupont Marie')
+        ->and($log->destinataire_nom)->toBe('DUPONT Marie')
         ->and($log->statut)->toBe('envoye')
         ->and($log->envoye_par)->toBe($this->user->id)
         ->and($log->erreur_message)->toBeNull();
