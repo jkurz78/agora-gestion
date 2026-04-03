@@ -51,22 +51,27 @@
                                     $src = $sourceData[$key] ?? null;
                                     $tgt = $targetData[$key] ?? null;
                                     $res = $resultData[$key] ?? null;
-                                    $hasConflict = $src !== null && $src !== '' && $tgt !== null && $tgt !== '' && $src !== $tgt;
+                                    $srcHasValue = $src !== null && $src !== '';
+                                    $tgtHasValue = $tgt !== null && $tgt !== '';
+                                    $needsColoring = ($srcHasValue && $tgtHasValue && $src !== $tgt)
+                                        || ($srcHasValue && $res !== $src)
+                                        || ($tgtHasValue && $res !== $tgt);
                                     $srcColor = '';
                                     $tgtColor = '';
-                                    if ($hasConflict) {
-                                        $srcMatchesResult = $src === $res;
-                                        $tgtMatchesResult = $tgt === $res;
+                                    if ($needsColoring) {
+                                        $srcMatchesResult = $srcHasValue && $src === $res;
+                                        $tgtMatchesResult = $tgtHasValue && $tgt === $res;
+                                        $vert = 'background-color: rgba(46,125,50,0.15)';
+                                        $rouge = 'background-color: rgba(181,69,58,0.15)';
                                         if ($srcMatchesResult && !$tgtMatchesResult) {
-                                            $srcColor = 'background-color: rgba(46,125,50,0.15)'; // vert anglais
-                                            $tgtColor = 'background-color: rgba(181,69,58,0.15)'; // rouge brique
+                                            $srcColor = $vert;
+                                            $tgtColor = $tgtHasValue ? $rouge : '';
                                         } elseif ($tgtMatchesResult && !$srcMatchesResult) {
-                                            $srcColor = 'background-color: rgba(181,69,58,0.15)';
-                                            $tgtColor = 'background-color: rgba(46,125,50,0.15)';
-                                        } else {
-                                            // manual edit or both match
-                                            $srcColor = $srcMatchesResult && $tgtMatchesResult ? '' : 'background-color: rgba(181,69,58,0.15)';
-                                            $tgtColor = $srcMatchesResult && $tgtMatchesResult ? '' : 'background-color: rgba(181,69,58,0.15)';
+                                            $srcColor = $srcHasValue ? $rouge : '';
+                                            $tgtColor = $vert;
+                                        } elseif (!$srcMatchesResult && !$tgtMatchesResult) {
+                                            $srcColor = $srcHasValue ? $rouge : '';
+                                            $tgtColor = $tgtHasValue ? $rouge : '';
                                         }
                                     }
                                 @endphp
