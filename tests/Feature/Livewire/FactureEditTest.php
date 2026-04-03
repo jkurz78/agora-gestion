@@ -47,7 +47,7 @@ it('renders with facture data', function () {
     Livewire::test(FactureEdit::class, ['facture' => $this->facture])
         ->assertStatus(200)
         ->assertSee('Brouillon de facture')
-        ->assertSee('Sophie Martin');
+        ->assertSee('Sophie MARTIN');
 });
 
 it('shows available transactions for the tiers', function () {

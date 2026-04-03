@@ -17,7 +17,7 @@ it('met à jour selectedLabel et selectedType quand tiersId change programmatiqu
     Livewire::actingAs($this->user)
         ->test(TiersAutocomplete::class)
         ->set('tiersId', $tiers->id)
-        ->assertSet('selectedLabel', 'Jean Dupont')
+        ->assertSet('selectedLabel', 'Jean DUPONT')
         ->assertSet('selectedType', 'particulier');
 });
 

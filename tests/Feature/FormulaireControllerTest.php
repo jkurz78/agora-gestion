@@ -79,7 +79,7 @@ describe('show', function () {
         $response = $this->get(route('formulaire.show', ['token' => $token->token]));
 
         $response->assertStatus(200);
-        $response->assertSee('Bonjour Marie Dupont');
+        $response->assertSee('Bonjour Marie DUPONT');
         $response->assertSee('Yoga du mardi');
         $response->assertSee('06 12 34 56 78');
         $response->assertSee('marie@example.com');

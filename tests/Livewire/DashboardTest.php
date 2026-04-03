@@ -93,9 +93,9 @@ it('shows membres without cotisation', function () {
     ]);
 
     Livewire::test(Dashboard::class)
-        ->assertSee('Martin')
+        ->assertSee('MARTIN')
         ->assertSee('Pierre')
-        ->assertDontSee('Durand');
+        ->assertDontSee('DURAND');
 });
 
 it('displays comptes bancaires with soldes', function () {

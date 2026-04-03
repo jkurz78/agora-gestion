@@ -143,7 +143,7 @@ it('loads existing tiers for editing', function () {
 
     Livewire::test(TiersForm::class)
         ->dispatch('edit-tiers', id: $tiers->id)
-        ->assertSet('nom', 'Leclerc')
+        ->assertSet('nom', 'LECLERC')
         ->assertSet('entreprise', 'Leclerc SA')
         ->assertSet('ville', 'Bordeaux')
         ->assertSet('showDetails', true);
@@ -165,7 +165,7 @@ it('can update a tiers', function () {
         ->assertHasNoErrors()
         ->assertDispatched('tiers-saved');
 
-    expect($tiers->fresh()->nom)->toBe('Nouveau');
+    expect($tiers->fresh()->nom)->toBe('NOUVEAU');
 });
 
 // --- Listener open-tiers-form ---

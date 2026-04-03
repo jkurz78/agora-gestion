@@ -62,7 +62,7 @@ it('renders the selection page', function () {
 
 it('shows available reglements with matching mode_paiement', function () {
     Livewire::test(RemiseBancaireSelection::class, ['remise' => $this->remise])
-        ->assertSee('Jean Dupont')
+        ->assertSee('Jean DUPONT')
         ->assertSee('Gym Seniors')
         ->assertSee('30,00');
 });
@@ -71,7 +71,7 @@ it('does not show reglements with different mode_paiement', function () {
     $this->reglement->update(['mode_paiement' => ModePaiement::Especes->value]);
 
     Livewire::test(RemiseBancaireSelection::class, ['remise' => $this->remise])
-        ->assertDontSee('Jean Dupont');
+        ->assertDontSee('Jean DUPONT');
 });
 
 it('toggles reglement selection', function () {

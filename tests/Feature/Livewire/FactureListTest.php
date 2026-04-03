@@ -47,7 +47,7 @@ it('displays existing factures with correct data', function () {
 
     Livewire::test(FactureList::class)
         ->assertSee('F-'.$this->exercice.'-0001')
-        ->assertSee('Jean Dupont')
+        ->assertSee('Jean DUPONT')
         ->assertSee('150,00');
 });
 

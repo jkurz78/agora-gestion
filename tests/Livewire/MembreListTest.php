@@ -49,8 +49,8 @@ it('filtre a_jour retourne les tiers avec cotisation exercice courant', function
     Livewire::actingAs($this->user)
         ->test(AdherentList::class)
         ->set('filtre', 'a_jour')
-        ->assertSee('AJour')
-        ->assertDontSee('EnRetard');
+        ->assertSee('AJOUR')
+        ->assertDontSee('ENRETARD');
 });
 
 it('filtre en_retard retourne les tiers avec cotisation N-1 sans cotisation N', function (): void {
@@ -64,8 +64,8 @@ it('filtre en_retard retourne les tiers avec cotisation N-1 sans cotisation N', 
     Livewire::actingAs($this->user)
         ->test(AdherentList::class)
         ->set('filtre', 'en_retard')
-        ->assertSee('EnRetard')
-        ->assertDontSee('AJour');
+        ->assertSee('ENRETARD')
+        ->assertDontSee('AJOUR');
 });
 
 it('filtre tous retourne tous les tiers avec au moins une cotisation', function (): void {
@@ -77,8 +77,8 @@ it('filtre tous retourne tous les tiers avec au moins une cotisation', function 
     Livewire::actingAs($this->user)
         ->test(AdherentList::class)
         ->set('filtre', 'tous')
-        ->assertSee('AvecCot')
-        ->assertDontSee('SansCot');
+        ->assertSee('AVECCOT')
+        ->assertDontSee('SANSCOT');
 });
 
 it('filtre par recherche texte sur le nom', function (): void {
@@ -92,8 +92,8 @@ it('filtre par recherche texte sur le nom', function (): void {
         ->test(AdherentList::class)
         ->set('filtre', 'a_jour')
         ->set('search', 'Martin')
-        ->assertSee('Martin')
-        ->assertDontSee('Dupont');
+        ->assertSee('MARTIN')
+        ->assertDontSee('DUPONT');
 });
 
 it('has default perPage of 20', function (): void {
