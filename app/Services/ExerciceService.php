@@ -166,6 +166,19 @@ final class ExerciceService
     }
 
     /**
+     * Return available exercice years for dropdowns.
+     * From current year + 1 down to current year - 3.
+     *
+     * @return list<int>
+     */
+    public function availableYears(): array
+    {
+        $currentYear = (int) now()->format('Y');
+
+        return range($currentYear + 1, $currentYear - 3);
+    }
+
+    /**
      * Switch the displayed exercice in session.
      */
     public function changerExerciceAffiche(Exercice $exercice): void
