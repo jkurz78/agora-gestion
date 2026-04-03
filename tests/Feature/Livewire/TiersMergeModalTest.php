@@ -3,8 +3,13 @@
 declare(strict_types=1);
 
 use App\Livewire\Banques\HelloassoSyncWizard;
+use App\Livewire\ParticipantShow;
 use App\Livewire\TiersMergeModal;
+use App\Models\Operation;
+use App\Models\Participant;
+use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -254,4 +259,38 @@ it('HelloassoSyncWizard associerTiers dispatches open-tiers-merge', function () 
     // Tiers should NOT be updated yet (no direct update)
     $tiers->refresh();
     expect($tiers->est_helloasso)->toBeFalse();
+});
+
+it('ParticipantShow mapMedecinTiers dispatches open-tiers-merge', function () {
+    $typeOp = TypeOperation::factory()->create([
+        'formulaire_parcours_therapeutique' => true,
+        'formulaire_prescripteur' => true,
+    ]);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $tiers = Tiers::factory()->create(['nom' => 'Participant']);
+    $medecinTiers = Tiers::factory()->create(['nom' => 'DrMedecin', 'prenom' => 'Paul']);
+    $participant = Participant::create([
+        'tiers_id' => $tiers->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => '2026-01-15',
+    ]);
+    ParticipantDonneesMedicales::create([
+        'participant_id' => $participant->id,
+        'medecin_nom' => 'Martin',
+        'medecin_prenom' => 'Sophie',
+        'medecin_telephone' => '0601020304',
+        'medecin_email' => 'sophie@doc.fr',
+    ]);
+
+    Livewire::test(ParticipantShow::class, [
+        'operation' => $operation,
+        'participant' => $participant,
+    ])
+        ->set('mapMedecinTiersId', $medecinTiers->id)
+        ->call('mapMedecinTiers')
+        ->assertDispatched('open-tiers-merge');
+
+    // Participant should NOT have medecin_tiers_id yet
+    $participant->refresh();
+    expect($participant->medecin_tiers_id)->toBeNull();
 });
