@@ -47,7 +47,8 @@ Rapprochement bancaire
 
 ### Règles de calcul
 
-- **Solde d'ouverture consolidé** : somme sur tous les comptes bancaires actifs du solde d'ouverture de l'exercice. Pour chaque compte : `solde_reel_actuel - recettes_exercice + depenses_exercice - virements_in + virements_out` (logique existante dans `ClotureWizard`).
+- **Périmètre des comptes** : uniquement les comptes bancaires réels (`est_systeme = false`). Les comptes techniques (effet à recevoir, remise bancaire) sont exclus — comme sur le dashboard et le rapprochement bancaire. Le traitement des effets à recevoir vis-à-vis des écritures non pointées est un sujet à revisiter ultérieurement.
+- **Solde d'ouverture consolidé** : somme sur tous les comptes bancaires réels du solde d'ouverture de l'exercice. Pour chaque compte : `solde_reel_actuel - recettes_exercice + depenses_exercice - virements_in + virements_out` (logique existante dans `ClotureWizard`).
 - **Encaissements** : `SUM(montant_total)` des transactions de type `recette` avec scope `forExercice()`.
 - **Décaissements** : `SUM(montant_total)` des transactions de type `depense` avec scope `forExercice()`.
 - **Virements internes** : s'annulent en consolidé (entrée sur un compte = sortie sur un autre). Ne figurent pas dans le rapport.
