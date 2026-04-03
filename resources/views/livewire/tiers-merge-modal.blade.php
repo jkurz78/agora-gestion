@@ -72,17 +72,17 @@
                                 @endphp
                                 <tr wire:key="merge-row-{{ $key }}">
                                     <td class="fw-bold small align-middle">{{ $label }}</td>
-                                    <td style="cursor:pointer;{{ $srcColor }}"
+                                    <td style="{{ $src !== null && $src !== '' ? 'cursor:pointer;' : '' }}{{ $srcColor }}"
                                         @if($src !== null && $src !== '')
-                                            x-on:click="copyToResult('{{ $key }}', '{{ addslashes($src) }}')"
+                                            x-on:click="copyToResult('{{ $key }}', {{ \Js::from($src) }})"
                                             title="Cliquer pour copier vers Résultat"
                                         @endif
                                         class="small align-middle">
                                         {{ $src ?? '—' }}
                                     </td>
-                                    <td style="cursor:pointer;{{ $tgtColor }}"
+                                    <td style="{{ $tgt !== null && $tgt !== '' ? 'cursor:pointer;' : '' }}{{ $tgtColor }}"
                                         @if($tgt !== null && $tgt !== '')
-                                            x-on:click="copyToResult('{{ $key }}', '{{ addslashes($tgt) }}')"
+                                            x-on:click="copyToResult('{{ $key }}', {{ \Js::from($tgt) }})"
                                             title="Cliquer pour copier vers Résultat"
                                         @endif
                                         class="small align-middle">
