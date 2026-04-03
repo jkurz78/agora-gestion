@@ -181,11 +181,23 @@
                     @endif
                 </td>
                 <td style="width: 40%; text-align: right;">
-                    <div class="doc-title">FACTURE</div>
-                    <div class="doc-info">
-                        <span><strong>N&deg; :</strong> {{ $facture->numero ?? 'Brouillon' }}</span>
-                        <span><strong>Date :</strong> {{ $facture->date->format('d/m/Y') }}</span>
-                    </div>
+                    @if ($facture->statut === \App\Enums\StatutFacture::Annulee && $facture->numero_avoir)
+                        <div class="doc-title">AVOIR</div>
+                        <div class="doc-info">
+                            <span><strong>N&deg; :</strong> {{ $facture->numero_avoir }}</span>
+                            <span><strong>Date :</strong> {{ $facture->date_annulation->format('d/m/Y') }}</span>
+                        </div>
+                        <div style="font-size: 9px; color: #6c757d; margin-top: 4px;">
+                            Annule la facture {{ $facture->numero }}
+                            du {{ $facture->date->format('d/m/Y') }}
+                        </div>
+                    @else
+                        <div class="doc-title">FACTURE</div>
+                        <div class="doc-info">
+                            <span><strong>N&deg; :</strong> {{ $facture->numero ?? 'Brouillon' }}</span>
+                            <span><strong>Date :</strong> {{ $facture->date->format('d/m/Y') }}</span>
+                        </div>
+                    @endif
                 </td>
             </tr>
         </table>
@@ -223,7 +235,7 @@
                 @else
                     <tr class="{{ $montantIndex % 2 === 1 ? 'row-even' : '' }}">
                         <td>{{ $ligne->libelle }}</td>
-                        <td class="text-end">{{ number_format((float) $ligne->montant, 2, ',', "\u{00A0}") }} &euro;</td>
+                        <td class="text-end">{{ $facture->statut === \App\Enums\StatutFacture::Annulee ? '-' : '' }}{{ number_format((float) $ligne->montant, 2, ',', "\u{00A0}") }} &euro;</td>
                     </tr>
                     @php $montantIndex++; @endphp
                 @endif
@@ -232,11 +244,12 @@
         <tfoot>
             <tr>
                 <td>Total</td>
-                <td class="text-end">{{ number_format($facture->montantCalcule(), 2, ',', "\u{00A0}") }} &euro;</td>
+                <td class="text-end">{{ $facture->statut === \App\Enums\StatutFacture::Annulee ? '-' : '' }}{{ number_format($facture->montantCalcule(), 2, ',', "\u{00A0}") }} &euro;</td>
             </tr>
         </tfoot>
     </table>
 
+    @if ($facture->statut !== \App\Enums\StatutFacture::Annulee)
     {{-- PAIEMENT --}}
     @php $resteDu = $facture->montantCalcule() - $montantRegle; @endphp
     <table style="width: 50%; margin-left: auto; margin-bottom: 12px; font-size: 10px; border-collapse: collapse;">
@@ -255,6 +268,7 @@
         <div style="text-align: center; margin: 12px 0;">
             <div class="stamp-acquittee">Acquitt&eacute;e</div>
         </div>
+    @endif
     @endif
 
     {{-- BANK DETAILS --}}
