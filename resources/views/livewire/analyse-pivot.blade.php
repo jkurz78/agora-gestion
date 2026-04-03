@@ -24,56 +24,32 @@
     </div>
 
     {{-- Pivot table container --}}
-    <div id="pivot-output" class="border rounded bg-white p-2"
-         wire:ignore
-         wire:key="pivot-{{ $activeView }}-{{ $filterExercice }}">
-    </div>
+    <div id="pivot-output" class="border rounded bg-white p-2" wire:ignore></div>
 
-    {{-- CDN dependencies (loaded only on this page) --}}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.css">
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.14.1/jquery-ui.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.fr.min.js"></script>
-
+    {{-- Init script: runs after CDN scripts are loaded via @push in wrapper --}}
     <script>
-        document.addEventListener('livewire:navigated', initPivot);
-        document.addEventListener('DOMContentLoaded', initPivot);
+        (function() {
+            function initPivot() {
+                if (typeof jQuery === 'undefined' || typeof jQuery.fn.pivotUI === 'undefined') {
+                    setTimeout(initPivot, 100);
+                    return;
+                }
 
-        Livewire.hook('morph.updated', ({ el }) => {
-            if (el.id === 'pivot-output' || el.closest?.('#pivot-output')) {
-                setTimeout(initPivot, 50);
+                var data = @json($pivotData);
+                var view = @json($activeView);
+
+                var defaults = view === 'participants'
+                    ? { rows: ["Opération"], vals: ["Montant prévu"], aggregatorName: "Somme" }
+                    : { rows: ["Opération"], vals: ["Montant"], aggregatorName: "Somme" };
+
+                jQuery("#pivot-output").empty().pivotUI(data, Object.assign({
+                    locale: "fr",
+                    cols: [],
+                    rendererName: "Table",
+                }, defaults));
             }
-        });
 
-        function initPivot() {
-            if (typeof jQuery === 'undefined' || typeof jQuery.pivotUI === 'undefined') {
-                setTimeout(initPivot, 100);
-                return;
-            }
-
-            var data = @json($pivotData);
-            var view = @json($activeView);
-
-            var defaults = view === 'participants'
-                ? { rows: ["Opération"], vals: ["Montant prévu"], aggregatorName: "Somme" }
-                : { rows: ["Opération"], vals: ["Montant"], aggregatorName: "Somme" };
-
-            jQuery("#pivot-output").empty().pivotUI(data, Object.assign({
-                locale: "fr",
-                cols: [],
-                rendererName: "Table",
-            }, defaults));
-        }
+            initPivot();
+        })();
     </script>
-
-    <style>
-        .pvtUi { width: 100%; }
-        .pvtTable { font-size: 0.85rem; }
-        .pvtAxisContainer, .pvtVals { background: #f8f9fa; border-color: #dee2e6 !important; }
-        .pvtFilterBox { font-size: 0.85rem; }
-        .pvtTable tbody tr td { padding: 4px 8px; }
-        .pvtTable thead tr th { background-color: #3d5473; color: white; padding: 4px 8px; }
-    </style>
 </div>
