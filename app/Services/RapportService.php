@@ -951,17 +951,14 @@ final class RapportService
      */
     public function fluxTresorerie(int $exercice): array
     {
-        $exerciceService = app(ExerciceService::class);
         $soldeService = app(SoldeService::class);
-        $range = $exerciceService->dateRange($exercice);
-        $start = $range['start']->toDateString();
-        $end = $range['end']->toDateString();
+        [$start, $end] = $this->exerciceDates($exercice);
 
         // --- Exercice info ---
         $exerciceModel = Exercice::where('annee', $exercice)->first();
         $exerciceInfo = [
             'annee' => $exercice,
-            'label' => $exerciceService->label($exercice),
+            'label' => $exercice . '-' . ($exercice + 1),
             'date_debut' => $start,
             'date_fin' => $end,
             'is_cloture' => $exerciceModel?->isCloture() ?? false,
@@ -973,7 +970,7 @@ final class RapportService
         $soldeOuverture = 0.0;
 
         foreach ($comptes as $compte) {
-            $soldeReel = $soldeService->solde($compte);
+            $soldeActuelCompte = $soldeService->solde($compte);
             $recettesCompte = (float) $compte->recettes()->forExercice($exercice)->sum('montant_total');
             $depensesCompte = (float) $compte->depenses()->forExercice($exercice)->sum('montant_total');
             $virementsIn = (float) VirementInterne::where('compte_destination_id', $compte->id)
@@ -981,7 +978,7 @@ final class RapportService
             $virementsOut = (float) VirementInterne::where('compte_source_id', $compte->id)
                 ->forExercice($exercice)->sum('montant');
 
-            $soldeOuverture += $soldeReel - $recettesCompte + $depensesCompte - $virementsIn + $virementsOut;
+            $soldeOuverture += $soldeActuelCompte - $recettesCompte + $depensesCompte - $virementsIn + $virementsOut;
         }
         $soldeOuverture = round($soldeOuverture, 2);
 
