@@ -23,6 +23,7 @@ use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeancePdfController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
+use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\DetecteEspace;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -42,7 +43,7 @@ Route::middleware('auth')->get('/', function () {
 
 // ── Shared route registrar (parametres, helloasso-sync) ──
 $registerParametres = function (): void {
-    Route::prefix('parametres')->name('parametres.')->group(function (): void {
+    Route::prefix('parametres')->name('parametres.')->middleware(CheckEspaceAccess::class.':parametres')->group(function (): void {
         Route::view('/association', 'parametres.association')->name('association');
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::resource('categories', CategorieController::class)->except(['show']);
