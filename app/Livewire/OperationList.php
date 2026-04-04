@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Enums\StatutOperation;
 use App\Models\Operation;
 use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -49,8 +51,17 @@ final class OperationList extends Component
         }
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Gestion);
+    }
+
     public function openCreateModal(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $this->resetForm();
         $this->showCreateModal = true;
         $this->showEditModal = false;
@@ -58,6 +69,10 @@ final class OperationList extends Component
 
     public function openEditModal(int $operationId): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $operation = Operation::findOrFail($operationId);
 
         $this->editOperationId = $operation->id;
@@ -81,6 +96,10 @@ final class OperationList extends Component
 
     public function saveOperation(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $validated = $this->validate([
             'formNom' => 'required|max:150',
             'formDateDebut' => 'required|date',
