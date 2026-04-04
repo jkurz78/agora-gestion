@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\StatutOperation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
@@ -16,6 +17,7 @@ use App\Models\TransactionLigneAffectation;
 use App\Services\ExerciceService;
 use App\Services\TransactionService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -63,6 +65,11 @@ final class TransactionForm extends Component
     public array $affectations = [];
 
     public bool $ventilationHasAffectations = false;
+
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Compta);
+    }
 
     public function getMontantTotalProperty(): float
     {
@@ -173,6 +180,10 @@ final class TransactionForm extends Component
 
     public function saveVentilation(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $allowedIds = collect($this->lignes)->pluck('id')->filter()->map(fn ($id) => (int) $id)->toArray();
         if ($this->ventilationLigneId === null || ! in_array($this->ventilationLigneId, $allowedIds, true)) {
             abort(403);
@@ -211,6 +222,10 @@ final class TransactionForm extends Component
 
     public function supprimerVentilation(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $allowedIds = collect($this->lignes)->pluck('id')->filter()->map(fn ($id) => (int) $id)->toArray();
         if ($this->ventilationLigneId === null || ! in_array($this->ventilationLigneId, $allowedIds, true)) {
             abort(403);
@@ -270,6 +285,10 @@ final class TransactionForm extends Component
 
     public function save(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $exerciceService = app(ExerciceService::class);
         $range = $exerciceService->dateRange($exerciceService->current());
         $dateDebut = $range['start']->toDateString();

@@ -345,14 +345,14 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        @if (! $isLocked && ! $isLockedByFacture && ! $exerciceCloture)
+                        @if (! $isLocked && ! $isLockedByFacture && ! $exerciceCloture && $this->canEdit)
                             <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>
                         @endif
                         <div class="ms-auto">
-                            <button type="button" wire:click="resetForm" class="btn btn-secondary">{{ $exerciceCloture ? 'Fermer' : 'Annuler' }}</button>
-                            @if (! $exerciceCloture)
+                            <button type="button" wire:click="resetForm" class="btn btn-secondary">{{ $exerciceCloture || ! $this->canEdit ? 'Fermer' : 'Annuler' }}</button>
+                            @if (! $exerciceCloture && $this->canEdit)
                             <button type="submit" class="btn btn-success"
                                     @if ($isLocked || $isLockedByFacture) title="Certains champs sont verrouillés (facture validée ou rapprochement)." @endif>
                                 {{ $transactionId ? 'Mettre à jour' : 'Enregistrer' }}

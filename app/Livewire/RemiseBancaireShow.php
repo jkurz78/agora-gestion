@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 final class RemiseBancaireShow extends Component
@@ -19,8 +21,17 @@ final class RemiseBancaireShow extends Component
         $this->remise = $remise;
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Gestion);
+    }
+
     public function supprimer(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         try {
             app(RemiseBancaireService::class)->supprimer($this->remise);
             session()->flash('success', 'Remise supprimée.');

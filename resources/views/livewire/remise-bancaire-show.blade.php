@@ -121,7 +121,7 @@
                 <i class="bi bi-file-pdf"></i> PDF
             </a>
         @endif
-        @if (! $verrouille)
+        @if (! $verrouille && $this->canEdit)
             <a href="{{ route('gestion.remises-bancaires.selection', $remise) }}"
                class="btn btn-outline-secondary">
                 <i class="bi bi-pencil"></i> Modifier
