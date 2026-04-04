@@ -106,6 +106,20 @@
                     <input type="checkbox" wire:model.live="parTiers" class="form-check-input" id="toggleTiers">
                     <label class="form-check-label small" for="toggleTiers">Tiers en lignes</label>
                 </div>
+                {{-- Export dropdown --}}
+                @if (! empty($selectedOperationIds))
+                <div class="ms-auto">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-download me-1"></i>Exporter
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{{ $this->exportUrl('xlsx') }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</a></li>
+                            <li><a class="dropdown-item" href="{{ $this->exportUrl('pdf') }}" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a></li>
+                        </ul>
+                    </div>
+                </div>
+                @endif
             </div>
         </div>
     </div>
