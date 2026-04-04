@@ -2,10 +2,12 @@
     {{-- Header --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="mb-0">Gestion des operations</h1>
-        <button class="btn btn-sm text-white" style="background-color:#A9014F"
-                wire:click="openCreateModal">
-            <i class="bi bi-plus-lg me-1"></i> Nouvelle operation
-        </button>
+        @if($this->canEdit)
+            <button class="btn btn-sm text-white" style="background-color:#A9014F"
+                    wire:click="openCreateModal">
+                <i class="bi bi-plus-lg me-1"></i> Nouvelle operation
+            </button>
+        @endif
     </div>
 
     {{-- Filters --}}
@@ -131,11 +133,13 @@
                                 @endif
                             </td>
                             <td class="text-end">
-                                <button class="btn btn-sm btn-outline-secondary"
-                                        wire:click.stop="openEditModal({{ $op->id }})"
-                                        title="Modifier l'opération">
-                                    <i class="bi bi-gear"></i> Modifier
-                                </button>
+                                @if($this->canEdit)
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            wire:click.stop="openEditModal({{ $op->id }})"
+                                            title="Modifier l'opération">
+                                        <i class="bi bi-gear"></i> Modifier
+                                    </button>
+                                @endif
                             </td>
                         </tr>
                     @endforeach

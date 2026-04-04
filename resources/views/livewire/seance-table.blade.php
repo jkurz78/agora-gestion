@@ -28,9 +28,11 @@
                     </li>
                 </ul>
             </div>
-            <button class="btn btn-sm btn-primary" wire:click="addSeance">
-                <i class="bi bi-plus-lg"></i> Ajouter une séance
-            </button>
+            @if($this->canEdit)
+                <button class="btn btn-sm btn-primary" wire:click="addSeance">
+                    <i class="bi bi-plus-lg"></i> Ajouter une séance
+                </button>
+            @endif
         </div>
     </div>
 
@@ -50,12 +52,14 @@
                             <th style="min-width:170px;text-align:center;font-size:12px">
                                 <div class="d-flex align-items-center justify-content-center gap-2">
                                     <span>S{{ $seance->numero }}</span>
-                                    <button class="btn btn-sm p-0 text-white opacity-50"
-                                            wire:click="removeSeance({{ $seance->id }})"
-                                            wire:confirm="Supprimer la séance {{ $seance->numero }} et toutes ses présences ?"
-                                            title="Supprimer">
-                                        <i class="bi bi-x-lg" style="font-size:12px"></i>
-                                    </button>
+                                    @if($this->canEdit)
+                                        <button class="btn btn-sm p-0 text-white opacity-50"
+                                                wire:click="removeSeance({{ $seance->id }})"
+                                                wire:confirm="Supprimer la séance {{ $seance->numero }} et toutes ses présences ?"
+                                                title="Supprimer">
+                                            <i class="bi bi-x-lg" style="font-size:12px"></i>
+                                        </button>
+                                    @endif
                                 </div>
                             </th>
                         @endforeach
