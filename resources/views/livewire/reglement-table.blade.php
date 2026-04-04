@@ -144,8 +144,7 @@
                                             <span wire:key="montant-{{ $participant->id }}-{{ $seance->id }}-{{ $montant }}"
                                                   style="font-size:12px;font-variant-numeric:tabular-nums;border:1px solid transparent;border-radius:3px;padding:1px 4px;min-width:40px;display:inline-block;text-align:right"
                                                   x-data="{ editing: false, value: @js($montant) }"
-                                                  @click="if(!editing){editing=true;$nextTick(()=>{$refs.input.focus();$refs.input.select()})}"
-                                                  :style="!editing ? 'cursor:text' : ''">
+                                                  @if($this->canEdit) @click="if(!editing){editing=true;$nextTick(()=>{$refs.input.focus();$refs.input.select()})}" :style="!editing ? 'cursor:text' : ''" @endif>
                                                 <template x-if="!editing">
                                                     <span x-text="value" style="display:inline-block;min-width:40px;text-align:right"></span>
                                                 </template>

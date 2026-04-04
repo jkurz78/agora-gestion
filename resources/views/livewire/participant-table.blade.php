@@ -128,8 +128,8 @@
 
                         {{-- Téléphone --}}
                         <td x-data="{ editing: false, value: @js($p->tiers->telephone ?? '') }"
-                            @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
-                            class="small" style="cursor:pointer">
+                            @if($this->canEdit) @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }" style="cursor:pointer" @endif
+                            class="small">
                             <template x-if="!editing">
                                 <span x-text="value || '—'"></span>
                             </template>
@@ -144,8 +144,8 @@
 
                         {{-- Email --}}
                         <td x-data="{ editing: false, value: @js($p->tiers->email ?? '') }"
-                            @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
-                            class="small" style="cursor:pointer">
+                            @if($this->canEdit) @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }" style="cursor:pointer" @endif
+                            class="small">
                             <template x-if="!editing">
                                 <span x-text="value || '—'"></span>
                             </template>
@@ -161,8 +161,8 @@
                         {{-- Date inscription --}}
                         @php $dateInscr = $p->date_inscription?->format('d/m/Y') ?? ''; @endphp
                         <td x-data="{ editing: false, value: @js($dateInscr) }"
-                            @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
-                            class="small text-nowrap" style="cursor:pointer"
+                            @if($this->canEdit) @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }" style="cursor:pointer" @endif
+                            class="small text-nowrap"
                             data-sort="{{ $p->date_inscription?->format('Y-m-d') ?? '' }}">
                             <template x-if="!editing">
                                 <span x-text="value || '—'"></span>
@@ -209,9 +209,9 @@
                                 }
                             @endphp
                             <td x-data="{ editing: false, value: @js($dateNaisDisplay) }"
-                                @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
+                                @if($this->canEdit) @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }" style="cursor:pointer" @endif
                                 data-sort="{{ $dateNais }}"
-                                class="small text-nowrap" style="cursor:pointer">
+                                class="small text-nowrap">
                                 <template x-if="!editing">
                                     <span x-text="value || '—'"></span>
                                 </template>
@@ -242,9 +242,9 @@
                             {{-- Sexe --}}
                             @php $sexe = $med?->sexe ?? ''; @endphp
                             <td x-data="{ editing: false, value: @js($sexe) }"
-                                @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
+                                @if($this->canEdit) @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }" style="cursor:pointer" @endif
                                 data-sort="{{ $sexe }}"
-                                class="small" style="cursor:pointer">
+                                class="small">
                                 <template x-if="!editing">
                                     <span x-text="value || '—'"></span>
                                 </template>
@@ -263,9 +263,9 @@
                             {{-- Taille --}}
                             @php $taille = $med?->taille ?? ''; @endphp
                             <td x-data="{ editing: false, value: @js($taille) }"
-                                @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
+                                @if($this->canEdit) @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }" style="cursor:pointer" @endif
                                 data-sort="{{ $taille }}"
-                                class="small" style="cursor:pointer">
+                                class="small">
                                 <template x-if="!editing">
                                     <span x-text="value ? value + ' cm' : '—'"></span>
                                 </template>
@@ -282,9 +282,9 @@
                             {{-- Poids --}}
                             @php $poids = $med?->poids ?? ''; @endphp
                             <td x-data="{ editing: false, value: @js($poids) }"
-                                @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }"
+                                @if($this->canEdit) @click="if(!editing) { editing=true; $nextTick(()=>$refs.input.focus()) }" style="cursor:pointer" @endif
                                 data-sort="{{ $poids }}"
-                                class="small" style="cursor:pointer">
+                                class="small">
                                 <template x-if="!editing">
                                     <span x-text="value ? value + ' kg' : '—'"></span>
                                 </template>
