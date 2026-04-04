@@ -40,3 +40,39 @@ it('exports compte-resultat as pdf', function () {
         ->assertOk()
         ->assertHeader('Content-Type', 'application/pdf');
 });
+
+it('exports operations as xlsx with filters', function () {
+    $this->get('/compta/rapports/export/operations/xlsx?ops[]=1&seances=1&tiers=1')
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+it('exports operations as pdf', function () {
+    $this->get('/compta/rapports/export/operations/pdf')
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+});
+
+it('exports flux-tresorerie as xlsx', function () {
+    $this->get('/compta/rapports/export/flux-tresorerie/xlsx')
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+it('exports flux-tresorerie as pdf', function () {
+    $this->get('/compta/rapports/export/flux-tresorerie/pdf')
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+});
+
+it('exports analyse-financier as xlsx', function () {
+    $this->get('/compta/rapports/export/analyse-financier/xlsx')
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+it('exports analyse-participants as xlsx', function () {
+    $this->get('/compta/rapports/export/analyse-participants/xlsx')
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
