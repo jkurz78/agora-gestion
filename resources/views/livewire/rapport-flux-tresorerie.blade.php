@@ -1,5 +1,6 @@
 <div x-data="{ showMensuel: false, showRecettesNP: false, showDepensesNP: false }">
     <style>
+        [x-cloak] { display: none !important; }
         .ft-header td { background: #3d5473; color: #fff; font-weight: 400; font-size: 12px; padding: 8px 16px; border: none; }
         .ft-row td { padding: 10px 16px; font-size: 14px; border-bottom: 1px solid #e2e8f0; }
         .ft-row-label { font-weight: 600; color: #1e3a5f; }
@@ -77,21 +78,17 @@
                     </tr>
 
                     {{-- Détail mensuel (dépliant) --}}
-                    <template x-if="showMensuel">
-                        <tbody>
-                            @foreach ($mensuel as $ligne)
-                                <tr class="ft-mensuel">
-                                    <td style="padding-left:36px;">{{ $ligne['mois'] }}</td>
-                                    <td class="text-end">{{ $fmt($ligne['recettes']) }}</td>
-                                    <td class="text-end">{{ $fmt($ligne['depenses']) }}</td>
-                                    <td class="text-end {{ $ligne['solde'] >= 0 ? 'text-success' : 'text-danger' }}">
-                                        {{ $ligne['solde'] >= 0 ? '+' : '' }}{{ $fmt($ligne['solde']) }}
-                                    </td>
-                                    <td class="text-end fw-bold">{{ $fmt($ligne['cumul']) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </template>
+                    @foreach ($mensuel as $ligne)
+                        <tr class="ft-mensuel" x-show="showMensuel" x-cloak>
+                            <td style="padding-left:36px;">{{ $ligne['mois'] }}</td>
+                            <td class="text-end">{{ $fmt($ligne['recettes']) }}</td>
+                            <td class="text-end">{{ $fmt($ligne['depenses']) }}</td>
+                            <td class="text-end {{ $ligne['solde'] >= 0 ? 'text-success' : 'text-danger' }}">
+                                {{ $ligne['solde'] >= 0 ? '+' : '' }}{{ $fmt($ligne['solde']) }}
+                            </td>
+                            <td class="text-end fw-bold">{{ $fmt($ligne['cumul']) }}</td>
+                        </tr>
+                    @endforeach
 
                     {{-- Séparateur --}}
                     <tr class="ft-separator"><td colspan="5"></td></tr>
@@ -130,23 +127,19 @@
                         </td>
                         <td class="text-end">{{ $fmt($rapprochement['recettes_non_pointees']) }}</td>
                     </tr>
-                    <template x-if="showRecettesNP">
-                        <tbody>
-                            @foreach (collect($ecritures_non_pointees)->where('type', 'recette') as $e)
-                                <tr class="ft-rapprochement-detail">
-                                    <td>
-                                        <span class="text-muted me-2">{{ $e['numero_piece'] ?? '—' }}</span>
-                                        {{ $e['date'] }}
-                                        <span class="mx-1">·</span>
-                                        {{ $e['tiers'] }}
-                                        <span class="mx-1">·</span>
-                                        <span class="text-muted">{{ $e['libelle'] }}</span>
-                                    </td>
-                                    <td class="text-end">{{ $fmt($e['montant']) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </template>
+                    @foreach (collect($ecritures_non_pointees)->where('type', 'recette') as $e)
+                        <tr class="ft-rapprochement-detail" x-show="showRecettesNP" x-cloak>
+                            <td>
+                                <span class="text-muted me-2">{{ $e['numero_piece'] ?? '—' }}</span>
+                                {{ $e['date'] }}
+                                <span class="mx-1">·</span>
+                                {{ $e['tiers'] }}
+                                <span class="mx-1">·</span>
+                                <span class="text-muted">{{ $e['libelle'] }}</span>
+                            </td>
+                            <td class="text-end">{{ $fmt($e['montant']) }}</td>
+                        </tr>
+                    @endforeach
 
                     {{-- Dépenses non pointées (dépliable) --}}
                     <tr class="ft-rapprochement ft-rapprochement-toggle" @click="showDepensesNP = !showDepensesNP">
@@ -157,23 +150,19 @@
                         </td>
                         <td class="text-end">{{ $fmt($rapprochement['depenses_non_pointees']) }}</td>
                     </tr>
-                    <template x-if="showDepensesNP">
-                        <tbody>
-                            @foreach (collect($ecritures_non_pointees)->where('type', 'depense') as $e)
-                                <tr class="ft-rapprochement-detail">
-                                    <td>
-                                        <span class="text-muted me-2">{{ $e['numero_piece'] ?? '—' }}</span>
-                                        {{ $e['date'] }}
-                                        <span class="mx-1">·</span>
-                                        {{ $e['tiers'] }}
-                                        <span class="mx-1">·</span>
-                                        <span class="text-muted">{{ $e['libelle'] }}</span>
-                                    </td>
-                                    <td class="text-end">{{ $fmt($e['montant']) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </template>
+                    @foreach (collect($ecritures_non_pointees)->where('type', 'depense') as $e)
+                        <tr class="ft-rapprochement-detail" x-show="showDepensesNP" x-cloak>
+                            <td>
+                                <span class="text-muted me-2">{{ $e['numero_piece'] ?? '—' }}</span>
+                                {{ $e['date'] }}
+                                <span class="mx-1">·</span>
+                                {{ $e['tiers'] }}
+                                <span class="mx-1">·</span>
+                                <span class="text-muted">{{ $e['libelle'] }}</span>
+                            </td>
+                            <td class="text-end">{{ $fmt($e['montant']) }}</td>
+                        </tr>
+                    @endforeach
 
                     {{-- Solde réel --}}
                     <tr class="ft-rapprochement-result">
