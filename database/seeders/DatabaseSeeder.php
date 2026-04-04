@@ -18,11 +18,13 @@ class DatabaseSeeder extends Seeder
             'nom' => 'Marie Dupont',
             'email' => 'admin@svs.fr',
             'peut_voir_donnees_sensibles' => true,
+            'role' => 'admin',
         ]);
 
         User::factory()->create([
             'nom' => 'Jean Martin',
             'email' => 'jean@svs.fr',
+            'role' => 'gestionnaire',
         ]);
 
         CompteBancaire::factory()->create([
