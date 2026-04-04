@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\Role;
+use App\Mail\PasswordChangedByAdmin;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
@@ -55,7 +57,9 @@ final class UserController extends Controller
         $utilisateur->nom = $validated['nom'];
         $utilisateur->email = $validated['email'];
 
-        if (! empty($validated['password'])) {
+        $passwordChanged = ! empty($validated['password']);
+
+        if ($passwordChanged) {
             $utilisateur->password = $validated['password'];
         }
 
@@ -63,6 +67,13 @@ final class UserController extends Controller
         $utilisateur->role = Role::tryFrom($validated['role'] ?? '') ?? $utilisateur->role;
 
         $utilisateur->save();
+
+        if ($passwordChanged) {
+            Mail::to($utilisateur)->send(new PasswordChangedByAdmin(
+                user: $utilisateur,
+                changedByName: auth()->user()->nom,
+            ));
+        }
 
         return redirect()->route(request()->attributes->get('espace')->value.'.parametres.utilisateurs.index')
             ->with('success', 'Utilisateur mis à jour.');
