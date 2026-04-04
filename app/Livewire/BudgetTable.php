@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Enums\TypeCategorie;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
@@ -11,6 +12,7 @@ use App\Models\Categorie;
 use App\Services\BudgetImportService;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -47,10 +49,21 @@ final class BudgetTable extends Component
 
     public ?string $importSuccess = null;
 
+    // ── Computed ──────────────────────────────────────────────────────────────
+
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Compta);
+    }
+
     // ── Actions édition ───────────────────────────────────────────────────────
 
     public function addLine(int $sousCategorieId): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
         BudgetLine::create([
@@ -69,6 +82,10 @@ final class BudgetTable extends Component
 
     public function saveEdit(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
         $this->validate(['editingMontant' => ['required', 'numeric', 'min:0']]);
@@ -85,6 +102,10 @@ final class BudgetTable extends Component
 
     public function deleteLine(int $lineId): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         app(ExerciceService::class)->assertOuvert(app(ExerciceService::class)->current());
 
         BudgetLine::findOrFail($lineId)->delete();
@@ -140,6 +161,10 @@ final class BudgetTable extends Component
 
     public function importBudget(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $this->validate();
 
         $exercice = app(ExerciceService::class)->current();

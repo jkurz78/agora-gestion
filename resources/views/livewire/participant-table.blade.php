@@ -70,9 +70,11 @@
                     @endif
                 </ul>
             </div>
+            @if($this->canEdit)
             <button class="btn btn-sm btn-primary" wire:click="openAddModal">
                 <i class="bi bi-plus-lg"></i> Ajouter un participant
             </button>
+            @endif
         </div>
     </div>
 
@@ -357,12 +359,14 @@
                                     <i class="bi bi-camera"></i>
                                 </a>
                                 @endif
+                                @if($this->canEdit)
                                 <button class="btn btn-sm btn-outline-danger"
                                         wire:click="removeParticipant({{ $p->id }})"
                                         wire:confirm="Supprimer ce participant ?"
                                         title="Supprimer">
                                     <i class="bi bi-trash"></i>
                                 </button>
+                                @endif
                             </div>
                         </td>
                     </tr>

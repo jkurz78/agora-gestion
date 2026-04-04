@@ -7,7 +7,7 @@
     @endif
 
     {{-- Boutons de création + import --}}
-    @if (! $exerciceCloture)
+    @if (! $exerciceCloture && $this->canEdit)
     <div class="d-flex align-items-center gap-2 mb-3">
         <button wire:click="$dispatch('open-transaction-form', {type: 'depense'})"
                 class="btn btn-danger">
@@ -142,7 +142,7 @@
                                         style="padding:.15rem .35rem;font-size:.75rem">
                                     <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
                                 </button>
-                                @if (! $exerciceCloture)
+                                @if (! $exerciceCloture && $this->canEdit)
                                 @if ($transaction->pointe)
                                     <button class="btn btn-sm btn-outline-danger" disabled
                                             title="Dépointez cette transaction avant de la supprimer."
