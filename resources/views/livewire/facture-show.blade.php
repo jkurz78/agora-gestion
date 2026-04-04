@@ -118,7 +118,7 @@
                         <div class="text-center mt-3">
                             <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Acquittée</span>
                         </div>
-                    @elseif ($transactionsAEncaisser->isNotEmpty())
+                    @elseif ($transactionsAEncaisser->isNotEmpty() && $this->canEdit)
                         <div class="text-center mt-3">
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#encaissementModal">
                                 <i class="bi bi-cash-coin"></i> Enregistrer le règlement
@@ -195,11 +195,12 @@
                         <i class="bi bi-file-earmark-pdf"></i>
                         {{ $facture->statut === \App\Enums\StatutFacture::Annulee ? 'Télécharger l\'avoir (PDF)' : 'Télécharger PDF' }}
                     </a>
-                    @if ($facture->statut === \App\Enums\StatutFacture::Validee)
+                    @if ($facture->statut === \App\Enums\StatutFacture::Validee && $this->canEdit)
                         <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#annulationModal">
                             <i class="bi bi-x-circle"></i> Annuler avec avoir
                         </button>
                     @endif
+                    @if($this->canEdit)
                     @if ($facture->tiers?->email)
                         <button wire:click="envoyerEmail" class="btn btn-outline-primary" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="envoyerEmail"><i class="bi bi-envelope"></i> Envoyer par email</span>
@@ -209,6 +210,7 @@
                         <button class="btn btn-outline-secondary" disabled title="Aucune adresse email pour ce tiers">
                             <i class="bi bi-envelope-x"></i> Pas d'email
                         </button>
+                    @endif
                     @endif
                     @if ($emailMessage)
                         <div class="alert alert-{{ $emailMessageType }} py-2 px-3 mb-0 small">
