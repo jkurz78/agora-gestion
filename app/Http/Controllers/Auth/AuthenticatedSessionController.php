@@ -28,6 +28,13 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $user = $request->user();
+
+        if ($user->hasTwoFactorEnabled() && $user->two_factor_method === \App\Enums\TwoFactorMethod::Email) {
+            app(\App\Services\TwoFactorService::class)->generateEmailCode($user);
+            $request->session()->put('two_factor_code_sent', true);
+        }
+
         return redirect()->intended(route('home', absolute: false));
     }
 
