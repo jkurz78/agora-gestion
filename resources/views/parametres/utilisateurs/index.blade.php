@@ -46,6 +46,16 @@
                     <label class="form-label">Confirmer</label>
                     <input type="password" name="password_confirmation" class="form-control" required>
                 </div>
+                <div class="col-md-2">
+                    <label class="form-label">Rôle</label>
+                    <select name="role" class="form-select">
+                        @foreach(\App\Enums\Role::cases() as $r)
+                            <option value="{{ $r->value }}" {{ old('role', 'admin') === $r->value ? 'selected' : '' }}>
+                                {{ $r->label() }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
                 <div class="col-md-2 d-flex align-items-end">
                     <div class="form-check mb-2">
                         <input type="checkbox" class="form-check-input" name="peut_voir_donnees_sensibles" value="1" id="addSensible">
@@ -61,13 +71,14 @@
 
     <table class="table table-sm table-striped table-hover">
         <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-            <tr><th>Nom</th><th>Email</th><th style="width:100px;"></th></tr>
+            <tr><th>Nom</th><th>Email</th><th>Rôle</th><th style="width:100px;"></th></tr>
         </thead>
         <tbody>
             @forelse ($utilisateurs as $utilisateur)
                 <tr>
                     <td>{{ $utilisateur->nom }}</td>
                     <td>{{ $utilisateur->email }}</td>
+                    <td><span class="badge bg-secondary">{{ $utilisateur->role->label() }}</span></td>
                     <td>
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-outline-primary"
@@ -90,7 +101,7 @@
                     </td>
                 </tr>
                 <tr class="collapse" id="editUser{{ $utilisateur->id }}">
-                    <td colspan="3" class="bg-light">
+                    <td colspan="4" class="bg-light">
                         <form action="{{ route($espace->value . '.parametres.utilisateurs.update', $utilisateur) }}"
                               method="POST" class="row g-2 align-items-end p-2">
                             @csrf @method('PUT')
@@ -112,6 +123,16 @@
                                 <label class="form-label">Confirmer</label>
                                 <input type="password" name="password_confirmation" class="form-control">
                             </div>
+                            <div class="col-md-2">
+                                <label class="form-label">Rôle</label>
+                                <select name="role" class="form-select">
+                                    @foreach(\App\Enums\Role::cases() as $r)
+                                        <option value="{{ $r->value }}" {{ $utilisateur->role === $r ? 'selected' : '' }}>
+                                            {{ $r->label() }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
                             <div class="col-md-2 d-flex align-items-end">
                                 <div class="form-check mb-2">
                                     <input type="checkbox" class="form-check-input" name="peut_voir_donnees_sensibles" value="1"
@@ -127,7 +148,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="3" class="text-muted">Aucun utilisateur.</td></tr>
+                <tr><td colspan="4" class="text-muted">Aucun utilisateur.</td></tr>
             @endforelse
         </tbody>
     </table>
