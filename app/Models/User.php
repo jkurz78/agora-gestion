@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\Espace;
 use App\Enums\Role;
+use App\Enums\TwoFactorMethod;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,6 +29,11 @@ final class User extends Authenticatable implements MustVerifyEmail
         'dernier_espace',
         'peut_voir_donnees_sensibles',
         'role',
+        'two_factor_method',
+        'two_factor_secret',
+        'two_factor_confirmed_at',
+        'two_factor_recovery_codes',
+        'two_factor_trusted_token',
     ];
 
     /**
@@ -36,6 +42,9 @@ final class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
+        'two_factor_trusted_token',
     ];
 
     protected function casts(): array
@@ -46,11 +55,28 @@ final class User extends Authenticatable implements MustVerifyEmail
             'dernier_espace' => Espace::class,
             'peut_voir_donnees_sensibles' => 'boolean',
             'role' => Role::class,
+            'two_factor_method' => TwoFactorMethod::class,
+            'two_factor_secret' => 'encrypted',
+            'two_factor_confirmed_at' => 'datetime',
+            'two_factor_recovery_codes' => 'encrypted:array',
         ];
     }
 
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class, 'saisi_par');
+    }
+
+    public function hasTwoFactorEnabled(): bool
+    {
+        if ($this->two_factor_method === null) {
+            return false;
+        }
+
+        if ($this->two_factor_method === TwoFactorMethod::Totp) {
+            return $this->two_factor_confirmed_at !== null;
+        }
+
+        return true;
     }
 }
