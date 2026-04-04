@@ -16,6 +16,7 @@ use App\Http\Controllers\ParticipantDocumentController;
 use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantFichePdfController;
 use App\Http\Controllers\ParticipantPdfController;
+use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
@@ -100,6 +101,7 @@ Route::middleware(['auth', DetecteEspace::class.':compta'])
         Route::view('/rapports/flux-tresorerie', 'rapports.flux-tresorerie')->name('rapports.flux-tresorerie');
         Route::view('/rapports/analyse', 'rapports.analyse')->name('rapports.analyse');
         Route::redirect('/rapports', '/compta/rapports/compte-resultat', 301)->name('rapports.index');
+        Route::get('/rapports/export/{rapport}/{format}', RapportExportController::class)->name('rapports.export');
 
         // Exercices
         Route::view('/exercices/cloture', 'exercices.cloture')->name('exercices.cloture');
