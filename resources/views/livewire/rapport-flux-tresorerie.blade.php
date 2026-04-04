@@ -1,4 +1,4 @@
-<div x-data="{ showMensuel: false, showRecettesNP: false, showDepensesNP: false }">
+<div x-data="{ showMensuel: false, showRecettesNP: false, showDepensesNP: false, showCS: {} }">
     <style>
         [x-cloak] { display: none !important; }
         .ft-header td { background: #3d5473; color: #fff; font-weight: 400; font-size: 12px; padding: 8px 16px; border: none; }
@@ -162,6 +162,31 @@
                             </td>
                             <td class="text-end">{{ $fmt($e['montant']) }}</td>
                         </tr>
+                    @endforeach
+
+                    {{-- Comptes système (créances à recevoir, etc.) --}}
+                    @foreach ($rapprochement['comptes_systeme'] as $idx => $cs)
+                        <tr class="ft-rapprochement ft-rapprochement-toggle" @click="showCS[{{ $idx }}] = !showCS[{{ $idx }}]">
+                            <td style="padding-left:32px;">
+                                <span class="ft-chevron" :class="showCS[{{ $idx }}] && 'open'">&#9654;</span>
+                                <span class="text-danger">−</span> {{ $cs['nom'] }}
+                                <span class="text-muted">({{ $cs['nb_ecritures'] }} {{ Str::plural('écriture', $cs['nb_ecritures']) }})</span>
+                            </td>
+                            <td class="text-end">{{ $fmt($cs['solde']) }}</td>
+                        </tr>
+                        @foreach ($cs['ecritures'] as $e)
+                            <tr class="ft-rapprochement-detail" x-show="showCS[{{ $idx }}]" x-cloak>
+                                <td>
+                                    <span class="text-muted me-2">{{ $e['numero_piece'] ?? '—' }}</span>
+                                    {{ $e['date'] }}
+                                    <span class="mx-1">·</span>
+                                    {{ $e['tiers'] }}
+                                    <span class="mx-1">·</span>
+                                    <span class="text-muted">{{ $e['libelle'] }}</span>
+                                </td>
+                                <td class="text-end">{{ $fmt($e['montant']) }}</td>
+                            </tr>
+                        @endforeach
                     @endforeach
 
                     {{-- Solde réel --}}
