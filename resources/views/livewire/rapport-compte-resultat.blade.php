@@ -21,9 +21,15 @@
 
     {{-- Export --}}
     <div class="d-flex justify-content-end mb-3">
-        <button wire:click="exportCsv" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-download"></i> Exporter CSV
-        </button>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-download me-1"></i>Exporter
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="{{ $this->exportUrl('xlsx') }}"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</a></li>
+                <li><a class="dropdown-item" href="{{ $this->exportUrl('pdf') }}" target="_blank"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a></li>
+            </ul>
+        </div>
     </div>
 
     @php

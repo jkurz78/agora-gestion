@@ -10,44 +10,15 @@ use Livewire\Component;
 
 final class RapportCompteResultat extends Component
 {
-    public function exportCsv(): mixed
+    public function exportUrl(string $format): string
     {
         $exercice = app(ExerciceService::class)->current();
-        $data = app(RapportService::class)->compteDeResultat($exercice);
 
-        $rows = [];
-        foreach ($data['charges'] as $cat) {
-            foreach ($cat['sous_categories'] as $sc) {
-                $rows[] = [
-                    'Charge',
-                    $cat['label'],
-                    $sc['label'],
-                    $sc['montant_n1'] !== null ? number_format((float) $sc['montant_n1'], 2, ',', '') : '',
-                    number_format((float) $sc['montant_n'], 2, ',', ''),
-                    $sc['budget'] !== null ? number_format((float) $sc['budget'], 2, ',', '') : '',
-                    $sc['budget'] !== null ? number_format((float) $sc['montant_n'] - (float) $sc['budget'], 2, ',', '') : '',
-                ];
-            }
-        }
-        foreach ($data['produits'] as $cat) {
-            foreach ($cat['sous_categories'] as $sc) {
-                $rows[] = [
-                    'Produit',
-                    $cat['label'],
-                    $sc['label'],
-                    $sc['montant_n1'] !== null ? number_format((float) $sc['montant_n1'], 2, ',', '') : '',
-                    number_format((float) $sc['montant_n'], 2, ',', ''),
-                    $sc['budget'] !== null ? number_format((float) $sc['budget'], 2, ',', '') : '',
-                    $sc['budget'] !== null ? number_format((float) $sc['montant_n'] - (float) $sc['budget'], 2, ',', '') : '',
-                ];
-            }
-        }
-
-        $csv = app(RapportService::class)->toCsv($rows, ['Type', 'Catégorie', 'Sous-catégorie', 'N-1', 'N', 'Budget', 'Écart']);
-
-        return response()->streamDownload(function () use ($csv) {
-            echo $csv;
-        }, 'compte_resultat_'.$exercice.'.csv', ['Content-Type' => 'text/csv']);
+        return route('compta.rapports.export', [
+            'rapport' => 'compte-resultat',
+            'format' => $format,
+            'exercice' => $exercice,
+        ]);
     }
 
     public function render(): mixed
