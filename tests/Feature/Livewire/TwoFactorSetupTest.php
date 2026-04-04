@@ -7,6 +7,7 @@ use App\Livewire\TwoFactorSetup;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use PragmaRX\Google2FA\Google2FA;
 
 uses(RefreshDatabase::class);
 
@@ -48,7 +49,7 @@ it('can start TOTP setup and shows QR code', function () {
 
 it('can confirm TOTP with valid code', function () {
     $user = User::factory()->create();
-    $google2fa = new \PragmaRX\Google2FA\Google2FA();
+    $google2fa = new Google2FA;
 
     $component = Livewire::actingAs($user)
         ->test(TwoFactorSetup::class)
@@ -66,7 +67,7 @@ it('can confirm TOTP with valid code', function () {
 
 it('shows recovery codes after TOTP confirmation', function () {
     $user = User::factory()->create();
-    $google2fa = new \PragmaRX\Google2FA\Google2FA();
+    $google2fa = new Google2FA;
 
     $component = Livewire::actingAs($user)
         ->test(TwoFactorSetup::class)

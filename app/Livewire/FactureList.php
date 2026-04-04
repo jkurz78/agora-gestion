@@ -45,7 +45,9 @@ final class FactureList extends Component
 
     public function creer(): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         $this->validate([
             'newFactureTiersId' => ['required', 'exists:tiers,id'],
@@ -58,7 +60,9 @@ final class FactureList extends Component
 
     public function supprimer(int $id): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         try {
             $facture = Facture::findOrFail($id);
