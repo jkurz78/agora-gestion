@@ -246,7 +246,8 @@ final class ParticipantTable extends Component
             'participant_id' => $participant->id,
         ]);
 
-        $med->update(['notes' => $this->medNotes !== '' ? $this->medNotes : null]);
+        $notes = $this->medNotes !== '' ? ParticipantDonneesMedicales::sanitizeNotes($this->medNotes) : null;
+        $med->update(['notes' => $notes]);
 
         $participant->touch();
         $this->showNotesModal = false;

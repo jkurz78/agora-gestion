@@ -312,7 +312,7 @@
                                         <i class="bi bi-journal-text"></i>
                                     </button>
                                     @if($hasNotes)
-                                        <span class="notes-preview-bubble">{!! Str::limit($hasNotes, 300) !!}</span>
+                                        <span class="notes-preview-bubble">{!! nl2br(e(Str::limit(strip_tags($hasNotes), 300))) !!}</span>
                                     @endif
                                 </span>
                             </td>
