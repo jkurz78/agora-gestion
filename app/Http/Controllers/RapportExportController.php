@@ -322,6 +322,9 @@ final class RapportExportController extends Controller
         $sheet2->getStyle('A'.$row.':B'.$row)->getFont()->setBold(true);
         $sheet2->getStyle('B2:B'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
 
+        // Ouvrir sur le premier onglet
+        $spreadsheet->setActiveSheetIndex(0);
+
         return $spreadsheet;
     }
 
