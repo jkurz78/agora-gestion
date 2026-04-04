@@ -13,52 +13,54 @@
     @endif
 
     {{-- Bouton Nouvelle remise --}}
-    <div class="mb-3">
-        <button wire:click="$set('showCreateForm', true)" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> Nouvelle remise
-        </button>
-    </div>
+    @if ($this->canEdit)
+        <div class="mb-3">
+            <button wire:click="$set('showCreateForm', true)" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Nouvelle remise
+            </button>
+        </div>
 
-    {{-- Formulaire de création --}}
-    @if ($showCreateForm)
-        <div class="card mb-4">
-            <div class="card-body">
-                <h6 class="mb-3">Nouvelle remise en banque</h6>
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-3">
-                        <label class="form-label">Date <span class="text-danger">*</span></label>
-                        <x-date-input name="date" wire:model="date" :value="$date" />
-                        @error('date') <div class="text-danger small">{{ $message }}</div> @enderror
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Compte bancaire <span class="text-danger">*</span></label>
-                        <select wire:model="compte_cible_id" class="form-select @error('compte_cible_id') is-invalid @enderror">
-                            <option value="">-- Sélectionner --</option>
-                            @foreach ($comptes as $compte)
-                                <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
-                            @endforeach
-                        </select>
-                        @error('compte_cible_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label">Type <span class="text-danger">*</span></label>
-                        <select wire:model="mode_paiement" class="form-select @error('mode_paiement') is-invalid @enderror">
-                            <option value="cheque">Chèques</option>
-                            <option value="especes">Espèces</option>
-                        </select>
-                        @error('mode_paiement') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-                    <div class="col-md-auto">
-                        <button wire:click="create" class="btn btn-success">
-                            <i class="bi bi-check-lg"></i> Créer
-                        </button>
-                        <button wire:click="$set('showCreateForm', false)" class="btn btn-secondary">
-                            Annuler
-                        </button>
+        {{-- Formulaire de création --}}
+        @if ($showCreateForm)
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h6 class="mb-3">Nouvelle remise en banque</h6>
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Date <span class="text-danger">*</span></label>
+                            <x-date-input name="date" wire:model="date" :value="$date" />
+                            @error('date') <div class="text-danger small">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Compte bancaire <span class="text-danger">*</span></label>
+                            <select wire:model="compte_cible_id" class="form-select @error('compte_cible_id') is-invalid @enderror">
+                                <option value="">-- Sélectionner --</option>
+                                @foreach ($comptes as $compte)
+                                    <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+                                @endforeach
+                            </select>
+                            @error('compte_cible_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Type <span class="text-danger">*</span></label>
+                            <select wire:model="mode_paiement" class="form-select @error('mode_paiement') is-invalid @enderror">
+                                <option value="cheque">Chèques</option>
+                                <option value="especes">Espèces</option>
+                            </select>
+                            @error('mode_paiement') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
+                        <div class="col-md-auto">
+                            <button wire:click="create" class="btn btn-success">
+                                <i class="bi bi-check-lg"></i> Créer
+                            </button>
+                            <button wire:click="$set('showCreateForm', false)" class="btn btn-secondary">
+                                Annuler
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        @endif
     @endif
 
     {{-- Liste des remises --}}
@@ -117,7 +119,7 @@
                                        class="btn btn-sm btn-outline-primary" title="Voir">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    @if (! $remise->isVerrouillee())
+                                    @if ($this->canEdit && ! $remise->isVerrouillee())
                                         <a href="{{ route('gestion.remises-bancaires.selection', $remise) }}"
                                            class="btn btn-sm btn-outline-secondary" title="Modifier">
                                             <i class="bi bi-pencil"></i>

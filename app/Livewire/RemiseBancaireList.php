@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Models\CompteBancaire;
 use App\Models\RemiseBancaire;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -25,8 +27,17 @@ final class RemiseBancaireList extends Component
 
     public string $mode_paiement = 'cheque';
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Gestion);
+    }
+
     public function create(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $this->validate([
             'date' => ['required', 'date'],
             'compte_cible_id' => ['required', 'exists:comptes_bancaires,id'],
@@ -44,6 +55,10 @@ final class RemiseBancaireList extends Component
 
     public function supprimer(int $id): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         try {
             $remise = RemiseBancaire::findOrFail($id);
             app(RemiseBancaireService::class)->supprimer($remise);

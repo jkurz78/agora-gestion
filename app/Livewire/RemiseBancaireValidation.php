@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 final class RemiseBancaireValidation extends Component
@@ -23,8 +25,17 @@ final class RemiseBancaireValidation extends Component
         $this->selectedIds = session('remise_selected_ids', []);
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Gestion);
+    }
+
     public function comptabiliser(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         try {
             $service = app(RemiseBancaireService::class);
 

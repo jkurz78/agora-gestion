@@ -61,13 +61,19 @@
                     @foreach ($reglements as $reglement)
                         <tr wire:key="reg-{{ $reglement->id }}"
                             class="{{ in_array($reglement->id, $selectedIds) ? 'table-success' : '' }}"
-                            style="cursor: pointer;"
-                            wire:click="toggleReglement({{ $reglement->id }})">
+                            @if ($this->canEdit) style="cursor: pointer;" wire:click="toggleReglement({{ $reglement->id }})" @endif>
                             <td>
-                                <input type="checkbox"
-                                       class="form-check-input"
-                                       @checked(in_array($reglement->id, $selectedIds))
-                                       wire:click.stop="toggleReglement({{ $reglement->id }})">
+                                @if ($this->canEdit)
+                                    <input type="checkbox"
+                                           class="form-check-input"
+                                           @checked(in_array($reglement->id, $selectedIds))
+                                           wire:click.stop="toggleReglement({{ $reglement->id }})">
+                                @else
+                                    <input type="checkbox"
+                                           class="form-check-input"
+                                           @checked(in_array($reglement->id, $selectedIds))
+                                           disabled>
+                                @endif
                             </td>
                             <td class="small">{{ $reglement->participant->tiers->displayName() }}</td>
                             <td class="small">{{ $reglement->seance->operation->nom }}</td>
@@ -92,11 +98,13 @@
                 <strong>{{ $countSelected }}</strong> règlement{{ $countSelected > 1 ? 's' : '' }} sélectionné{{ $countSelected > 1 ? 's' : '' }}
                 — Total : <strong>{{ number_format((float) $totalSelected, 2, ',', ' ') }} €</strong>
             </div>
-            <button wire:click="valider"
-                    class="btn btn-success"
-                    @disabled($countSelected === 0)>
-                <i class="bi bi-check-lg"></i> Valider la sélection
-            </button>
+            @if ($this->canEdit)
+                <button wire:click="valider"
+                        class="btn btn-success"
+                        @disabled($countSelected === 0)>
+                    <i class="bi bi-check-lg"></i> Valider la sélection
+                </button>
+            @endif
         </div>
     </div>
 </div>
