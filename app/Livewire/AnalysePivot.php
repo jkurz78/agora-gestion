@@ -130,6 +130,17 @@ final class AnalysePivot extends Component
             ->toArray();
     }
 
+    public function exportUrl(): string
+    {
+        $rapport = $this->mode === 'participants' ? 'analyse-participants' : 'analyse-financier';
+
+        return route('compta.rapports.export', [
+            'rapport' => $rapport,
+            'format' => 'xlsx',
+            'exercice' => $this->filterExercice,
+        ]);
+    }
+
     public function render(): View
     {
         $exerciceService = app(ExerciceService::class);

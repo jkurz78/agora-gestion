@@ -3,6 +3,9 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h4 class="mb-0"><i class="bi bi-graph-up me-2"></i>Analyse</h4>
         <div class="d-flex gap-3 align-items-center">
+            <a href="{{ $this->exportUrl() }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Exporter en Excel
+            </a>
             <div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" id="subtotalToggle">
                 <label class="form-check-label small" for="subtotalToggle">Sous-totaux</label>
