@@ -22,6 +22,20 @@ final class RapportCompteResultatOperations extends Component
     #[Url(as: 'tiers')]
     public bool $parTiers = false;
 
+    public function exportUrl(string $format): string
+    {
+        $exercice = app(ExerciceService::class)->current();
+
+        return route('compta.rapports.export', [
+            'rapport' => 'operations',
+            'format' => $format,
+            'exercice' => $exercice,
+            'ops' => $this->selectedOperationIds,
+            'seances' => $this->parSeances ? '1' : '0',
+            'tiers' => $this->parTiers ? '1' : '0',
+        ]);
+    }
+
     public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();
