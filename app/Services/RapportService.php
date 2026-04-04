@@ -1005,7 +1005,43 @@ final class RapportService
         $depensesNonPointees = round((float) ($nonPointees->total_depenses ?? 0), 2);
         $nbRecettesNonPointees = (int) ($nonPointees->nb_recettes ?? 0);
         $nbDepensesNonPointees = (int) ($nonPointees->nb_depenses ?? 0);
-        $soldeReel = round($soldeTheorique - $recettesNonPointees + $depensesNonPointees, 2);
+
+        // --- Comptes système (créances à recevoir, remise bancaire, etc.) ---
+        $comptesSysteme = [];
+        $totalComptesSysteme = 0.0;
+        foreach (CompteBancaire::where('est_systeme', true)->orderBy('nom')->get() as $cs) {
+            $soldeCs = $soldeService->solde($cs);
+            if (abs($soldeCs) < 0.01) {
+                continue; // ne pas afficher les comptes système à zéro
+            }
+
+            $ecrituresCs = Transaction::where('compte_id', $cs->id)
+                ->whereBetween('date', [$start, $end])
+                ->with('tiers')
+                ->orderBy('date')
+                ->get()
+                ->map(fn (Transaction $t) => [
+                    'numero_piece' => $t->numero_piece,
+                    'date' => $t->date->format('d/m/Y'),
+                    'tiers' => $t->tiers?->displayName() ?? '—',
+                    'libelle' => $t->libelle,
+                    'type' => $t->type->value,
+                    'montant' => (float) $t->montant_total,
+                ])
+                ->values()
+                ->all();
+
+            $comptesSysteme[] = [
+                'nom' => $cs->nom,
+                'solde' => $soldeCs,
+                'nb_ecritures' => count($ecrituresCs),
+                'ecritures' => $ecrituresCs,
+            ];
+            $totalComptesSysteme += $soldeCs;
+        }
+        $totalComptesSysteme = round($totalComptesSysteme, 2);
+
+        $soldeReel = round($soldeTheorique - $recettesNonPointees + $depensesNonPointees - $totalComptesSysteme, 2);
 
         // --- Ventilation mensuelle ---
         $isSqlite = DB::connection()->getDriverName() === 'sqlite';
@@ -1078,6 +1114,8 @@ final class RapportService
                 'nb_recettes_non_pointees' => $nbRecettesNonPointees,
                 'depenses_non_pointees' => $depensesNonPointees,
                 'nb_depenses_non_pointees' => $nbDepensesNonPointees,
+                'comptes_systeme' => $comptesSysteme,
+                'total_comptes_systeme' => $totalComptesSysteme,
                 'solde_reel' => $soldeReel,
             ],
             'mensuel' => $mensuel,
