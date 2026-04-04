@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Enums\StatutPresence;
 use App\Models\Operation;
 use App\Models\Presence;
@@ -47,8 +48,17 @@ final class SeanceTable extends Component
         }
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Gestion);
+    }
+
     public function addSeance(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $maxNumero = Seance::where('operation_id', $this->operation->id)->max('numero') ?? 0;
         Seance::create([
             'operation_id' => $this->operation->id,
@@ -60,6 +70,10 @@ final class SeanceTable extends Component
 
     public function removeSeance(int $seanceId): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         Seance::where('id', $seanceId)
             ->where('operation_id', $this->operation->id)
             ->delete();
@@ -67,6 +81,10 @@ final class SeanceTable extends Component
 
     public function updateSeanceField(int $seanceId, string $field, ?string $value): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $allowed = ['titre', 'date'];
         if (! in_array($field, $allowed, true)) {
             return;
@@ -78,6 +96,10 @@ final class SeanceTable extends Component
 
     public function updatePresence(int $seanceId, int $participantId, string $field, ?string $value): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if (! Auth::user()?->peut_voir_donnees_sensibles) {
             return;
         }
