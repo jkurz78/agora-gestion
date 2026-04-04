@@ -46,6 +46,11 @@ final class FactureShow extends Component
 
     public ?string $selectedEmailFromName = null;
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Compta);
+    }
+
     public function mount(Facture $facture): void
     {
         if ($facture->statut === StatutFacture::Brouillon) {
@@ -69,6 +74,8 @@ final class FactureShow extends Component
 
     public function encaisser(): void
     {
+        if (! $this->canEdit) { return; }
+
         if ($this->encaissementCompteId === null) {
             session()->flash('error', 'Veuillez sélectionner un compte bancaire de destination.');
 
@@ -100,6 +107,8 @@ final class FactureShow extends Component
 
     public function annuler(): void
     {
+        if (! $this->canEdit) { return; }
+
         try {
             app(FactureService::class)->annuler($this->facture);
             $this->facture->refresh();
@@ -112,6 +121,8 @@ final class FactureShow extends Component
 
     public function envoyerEmail(): void
     {
+        if (! $this->canEdit) { return; }
+
         $this->emailMessage = '';
 
         $tiers = $this->facture->tiers;
@@ -148,6 +159,8 @@ final class FactureShow extends Component
 
     public function confirmSendEmail(): void
     {
+        if (! $this->canEdit) { return; }
+
         if (! $this->selectedEmailFrom) {
             return;
         }

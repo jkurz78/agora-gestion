@@ -220,6 +220,7 @@
                     <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
                 </div>
                 <div class="card-body d-grid gap-2">
+                    @if($this->canEdit)
                     <button wire:click="sauvegarder" class="btn btn-primary">
                         <i class="bi bi-save"></i> Enregistrer
                     </button>
@@ -229,6 +230,7 @@
                             class="btn btn-success">
                         <i class="bi bi-check-circle"></i> Valider la facture
                     </button>
+                    @endif
 
                     <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
                        target="_blank"
@@ -236,11 +238,13 @@
                         <i class="bi bi-file-earmark-pdf"></i> Prévisualiser PDF
                     </a>
 
+                    @if($this->canEdit)
                     <button wire:click="supprimer"
                             wire:confirm="Supprimer ce brouillon ? Cette action est irreversible."
                             class="btn btn-outline-danger">
                         <i class="bi bi-trash"></i> Supprimer le brouillon
                     </button>
+                    @endif
                 </div>
             </div>
 

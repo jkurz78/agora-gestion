@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
+use App\Enums\Espace;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Mail\DocumentMail;
 use App\Models\DocumentPrevisionnel;
@@ -152,6 +153,10 @@ final class ParticipantShow extends Component
 
     public function save(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $participant = $this->participant->loadMissing('tiers');
 
         // Update tiers
@@ -220,6 +225,10 @@ final class ParticipantShow extends Component
 
     public function mapAdresseParTiers(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if ($this->mapAdresseParTiersId === null) {
             return;
         }
@@ -247,6 +256,10 @@ final class ParticipantShow extends Component
 
     public function createAdresseParTiers(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $tiers = Tiers::create([
             'nom' => $this->participant->adresse_par_nom,
             'prenom' => $this->participant->adresse_par_prenom,
@@ -266,6 +279,10 @@ final class ParticipantShow extends Component
 
     public function unlinkAdresseParTiers(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $this->participant->update(['refere_par_id' => null]);
         $this->dispatch('notify', message: 'Association supprimée.');
         $this->participant->refresh();
@@ -274,6 +291,10 @@ final class ParticipantShow extends Component
 
     public function mapMedecinTiers(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if ($this->mapMedecinTiersId === null) {
             return;
         }
@@ -301,6 +322,10 @@ final class ParticipantShow extends Component
 
     public function createMedecinTiers(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $med = $this->participant->donneesMedicales;
         if ($med === null) {
             return;
@@ -323,6 +348,10 @@ final class ParticipantShow extends Component
 
     public function unlinkMedecinTiers(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $this->participant->update(['medecin_tiers_id' => null]);
         $this->dispatch('notify', message: 'Association supprimée.');
         $this->participant->refresh();
@@ -331,6 +360,10 @@ final class ParticipantShow extends Component
 
     public function mapTherapeuteTiers(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if ($this->mapTherapeuteTiersId === null) {
             return;
         }
@@ -358,6 +391,10 @@ final class ParticipantShow extends Component
 
     public function createTherapeuteTiers(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $med = $this->participant->donneesMedicales;
         if ($med === null) {
             return;
@@ -380,6 +417,10 @@ final class ParticipantShow extends Component
 
     public function unlinkTherapeuteTiers(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $this->participant->update(['therapeute_tiers_id' => null]);
         $this->dispatch('notify', message: 'Association supprimée.');
         $this->participant->refresh();
@@ -389,6 +430,10 @@ final class ParticipantShow extends Component
     #[On('tiers-merge-confirmed')]
     public function onTiersMergeConfirmed(int $tiersId, string $context, array $contextData = []): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         match ($context) {
             'medecin' => $this->participant->update(['medecin_tiers_id' => $tiersId]),
             'therapeute' => $this->participant->update(['therapeute_tiers_id' => $tiersId]),
@@ -406,6 +451,11 @@ final class ParticipantShow extends Component
         $this->dispatch('notify', message: $message);
         $this->participant->refresh();
         $this->loadParticipantData();
+    }
+
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Gestion);
     }
 
     public function render(): View
@@ -624,6 +674,10 @@ final class ParticipantShow extends Component
 
     public function envoyerDocumentEmail(int $documentId): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $doc = DocumentPrevisionnel::with(['participant.tiers', 'operation.typeOperation'])
             ->findOrFail($documentId);
 

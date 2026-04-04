@@ -89,9 +89,11 @@
             @if($successMessage)
                 <span class="text-success" style="font-size: 12px; white-space: nowrap;"><i class="bi bi-check-lg"></i> {{ $successMessage }}</span>
             @endif
+            @if($this->canEdit)
             <button x-show="isDirty" x-transition type="button" class="btn btn-sm btn-primary text-nowrap" wire:click="save" x-on:click="isDirty = false">
                 <i class="bi bi-check-lg"></i> Enregistrer
             </button>
+            @endif
         </div>
         </div>
     </div>
@@ -229,12 +231,14 @@
                     <div class="alert alert-success py-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $medecinTiers->nom }} {{ $medecinTiers->prenom }}</span>
+                            @if($this->canEdit)
                             <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkMedecinTiers">
                                 <i class="bi bi-x-lg"></i> Dissocier
                             </button>
+                            @endif
                         </div>
                     </div>
-                @else
+                @elseif($this->canEdit)
                     <div class="p-2 bg-light rounded">
                         <label class="form-label small fw-bold">Associer à un tiers</label>
                         <div class="d-flex gap-2 align-items-end">
@@ -300,12 +304,14 @@
                     <div class="alert alert-success py-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $therapeuteTiers->nom }} {{ $therapeuteTiers->prenom }}</span>
+                            @if($this->canEdit)
                             <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkTherapeuteTiers">
                                 <i class="bi bi-x-lg"></i> Dissocier
                             </button>
+                            @endif
                         </div>
                     </div>
-                @else
+                @elseif($this->canEdit)
                     <div class="p-2 bg-light rounded">
                         <label class="form-label small fw-bold">Associer à un tiers</label>
                         <div class="d-flex gap-2 align-items-end">
@@ -378,12 +384,14 @@
                     <div class="alert alert-success py-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $refTiers->nom }} {{ $refTiers->prenom }}</span>
+                            @if($this->canEdit)
                             <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkAdresseParTiers">
                                 <i class="bi bi-x-lg"></i> Dissocier
                             </button>
+                            @endif
                         </div>
                     </div>
-                @else
+                @elseif($this->canEdit)
                     <div class="mt-3 p-2 bg-light rounded">
                         <label class="form-label small fw-bold">Associer à un tiers</label>
                         <div class="d-flex gap-2 align-items-end">
@@ -565,7 +573,7 @@
                                                 <i class="bi bi-box-arrow-up-right" style="font-size:0.75rem"></i>
                                             </a>
                                         @endif
-                                        @if(isset($event['document_id']))
+                                        @if(isset($event['document_id']) && $this->canEdit)
                                             <button wire:click="envoyerDocumentEmail({{ $event['document_id'] }})"
                                                     wire:loading.attr="disabled"
                                                     wire:target="envoyerDocumentEmail({{ $event['document_id'] }})"
@@ -600,6 +608,7 @@
     </div>
 
     {{-- Bouton Enregistrer flottant (onglets éditables uniquement) --}}
+    @if($this->canEdit)
     <div x-show="isDirty && !['documents', 'historique'].includes(tab)"
          x-transition
          style="position: sticky; bottom: 20px; max-width: 800px; text-align: right; z-index: 1040;">
@@ -609,6 +618,7 @@
             <i class="bi bi-check-lg me-1"></i> Enregistrer
         </button>
     </div>
+    @endif
 
     <x-unsaved-changes-modal />
 
