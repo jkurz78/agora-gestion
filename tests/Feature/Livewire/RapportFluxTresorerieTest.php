@@ -36,15 +36,23 @@ it('affiche le composant avec la synthèse', function () {
         ->assertSee('10 000,00');
 });
 
-it('masque le tableau mensuel par défaut', function () {
+it('affiche la ligne flux dépliable avec les totaux annuels', function () {
+    Transaction::factory()->create([
+        'type' => 'recette',
+        'date' => '2025-10-01',
+        'montant_total' => 8000.00,
+        'compte_id' => CompteBancaire::first()->id,
+    ]);
+
     Livewire::test(RapportFluxTresorerie::class)
-        ->assertDontSee('Septembre 2025');
+        ->assertSeeHtml('Flux de l\'exercice')
+        ->assertSee('8 000,00');
 });
 
-it('affiche le tableau mensuel quand le toggle est activé', function () {
+it('contient le détail mensuel dans le HTML (masqué par Alpine)', function () {
+    // Alpine.js gère l'affichage côté client, le HTML est rendu côté serveur
     Livewire::test(RapportFluxTresorerie::class)
-        ->set('fluxMensuels', true)
-        ->assertSee('Septembre 2025');
+        ->assertSeeHtml('Septembre 2025');
 });
 
 it('affiche rapport définitif quand exercice clôturé', function () {
@@ -58,8 +66,16 @@ it('affiche rapport définitif quand exercice clôturé', function () {
         ->assertSee('15/09/2026');
 });
 
-it('persiste fluxMensuels dans URL', function () {
+it('affiche le bloc rapprochement avec le nombre d\'écritures non pointées', function () {
+    Transaction::factory()->create([
+        'type' => 'recette',
+        'date' => '2025-10-15',
+        'montant_total' => 1500.00,
+        'compte_id' => CompteBancaire::first()->id,
+        'rapprochement_id' => null,
+    ]);
+
     Livewire::test(RapportFluxTresorerie::class)
-        ->set('fluxMensuels', true)
-        ->assertSet('fluxMensuels', true);
+        ->assertSee('Rapprochement bancaire')
+        ->assertSee('1 500,00');
 });
