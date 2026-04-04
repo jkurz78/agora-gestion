@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\Espace;
+use App\Enums\Role;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,6 +27,7 @@ final class User extends Authenticatable implements MustVerifyEmail
         'password',
         'dernier_espace',
         'peut_voir_donnees_sensibles',
+        'role',
     ];
 
     /**
@@ -43,6 +45,7 @@ final class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'dernier_espace' => Espace::class,
             'peut_voir_donnees_sensibles' => 'boolean',
+            'role' => Role::class,
         ];
     }
 
