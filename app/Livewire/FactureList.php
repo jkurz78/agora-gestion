@@ -12,6 +12,7 @@ use App\Services\ExerciceService;
 use App\Services\FactureService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -27,6 +28,11 @@ final class FactureList extends Component
 
     public ?int $newFactureTiersId = null;
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Compta);
+    }
+
     public function updatedFilterStatut(): void
     {
         $this->resetPage();
@@ -39,6 +45,8 @@ final class FactureList extends Component
 
     public function creer(): void
     {
+        if (! $this->canEdit) { return; }
+
         $this->validate([
             'newFactureTiersId' => ['required', 'exists:tiers,id'],
         ]);
@@ -50,6 +58,8 @@ final class FactureList extends Component
 
     public function supprimer(int $id): void
     {
+        if (! $this->canEdit) { return; }
+
         try {
             $facture = Facture::findOrFail($id);
             app(FactureService::class)->supprimerBrouillon($facture);

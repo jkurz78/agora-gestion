@@ -14,6 +14,7 @@
 
     {{-- Barre de création + filtres --}}
     <div class="row g-3 mb-4 align-items-end">
+        @if($this->canEdit)
         <div class="col-md-4">
             <label class="form-label">Nouvelle facture</label>
             <div class="input-group">
@@ -29,6 +30,7 @@
             </div>
             @error('newFactureTiersId') <div class="text-danger small">{{ $message }}</div> @enderror
         </div>
+        @endif
         <div class="col-md-3">
             <label class="form-label">Statut</label>
             <select wire:model.live="filterStatut" class="form-select">
@@ -121,7 +123,7 @@
                                 @endif
                             </td>
                             <td onclick="event.stopPropagation()">
-                                @if ($isBrouillon)
+                                @if ($isBrouillon && $this->canEdit)
                                     <button wire:click="supprimer({{ $facture->id }})"
                                             wire:confirm="Supprimer ce brouillon de facture ?"
                                             class="btn btn-sm btn-outline-danger" title="Supprimer">
