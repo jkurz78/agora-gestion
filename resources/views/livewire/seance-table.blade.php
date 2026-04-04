@@ -72,7 +72,8 @@
                                        placeholder="Titre..."
                                        class="form-control form-control-sm border-0 bg-transparent text-center"
                                        style="font-size:12px;padding:2px 4px"
-                                       onblur="@this.call('updateSeanceField', {{ $seance->id }}, 'titre', this.value)">
+                                       {{ $this->canEdit ? '' : 'readonly' }}
+                                       @if($this->canEdit) onblur="@this.call('updateSeanceField', {{ $seance->id }}, 'titre', this.value)" @endif>
                             </td>
                         @endforeach
                     </tr>
@@ -154,7 +155,8 @@
                                         <div style="flex:1;padding:2px 4px">
                                             <select class="form-select form-select-sm border-0"
                                                     style="font-size:12px;padding:1px 2px;background-color:transparent"
-                                                    onchange="@this.call('updatePresence', {{ $seance->id }}, {{ $participant->id }}, 'statut', this.value)">
+                                                    {{ $this->canEdit ? '' : 'disabled' }}
+                                                    @if($this->canEdit) onchange="@this.call('updatePresence', {{ $seance->id }}, {{ $participant->id }}, 'statut', this.value)" @endif>
                                                 <option value="" {{ $statut === '' ? 'selected' : '' }}>—</option>
                                                 @foreach($statuts as $s)
                                                     <option value="{{ $s->value }}" {{ $statut === $s->value ? 'selected' : '' }}>{{ $s->label() }}</option>
@@ -191,8 +193,8 @@
                                 @endphp
                                 <td style="padding:1px 4px;border-top:none"
                                     x-data="{ editing: false, value: @js($commentaire) }"
-                                    @click="if(!editing){editing=true;$nextTick(()=>$refs.input.focus())}"
-                                    class="small" style="cursor:pointer">
+                                    @if($this->canEdit) @click="if(!editing){editing=true;$nextTick(()=>$refs.input.focus())}" style="cursor:pointer" @endif
+                                    class="small">
                                     <template x-if="!editing">
                                         <span style="font-size:12px;color:#888" x-text="value ? value.substring(0,30) + (value.length > 30 ? '...' : '') : '—'"></span>
                                     </template>
