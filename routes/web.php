@@ -67,7 +67,7 @@ $registerParametres = function (): void {
 };
 
 // ── Espace Comptabilité ──
-Route::middleware(['auth', 'verified', DetecteEspace::class.':compta'])
+Route::middleware(['auth', 'verified', \App\Http\Middleware\EnsureTwoFactor::class, DetecteEspace::class.':compta'])
     ->prefix('compta')
     ->name('compta.')
     ->group(function () use ($registerParametres): void {
@@ -118,7 +118,7 @@ Route::middleware(['auth', 'verified', DetecteEspace::class.':compta'])
     });
 
 // ── Espace Gestion ──
-Route::middleware(['auth', 'verified', DetecteEspace::class.':gestion'])
+Route::middleware(['auth', 'verified', \App\Http\Middleware\EnsureTwoFactor::class, DetecteEspace::class.':gestion'])
     ->prefix('gestion')
     ->name('gestion.')
     ->group(function () use ($registerParametres): void {
