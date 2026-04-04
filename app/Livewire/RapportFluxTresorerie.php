@@ -10,6 +10,17 @@ use Livewire\Component;
 
 final class RapportFluxTresorerie extends Component
 {
+    public function exportUrl(string $format): string
+    {
+        $exercice = app(ExerciceService::class)->current();
+
+        return route('compta.rapports.export', [
+            'rapport' => 'flux-tresorerie',
+            'format' => $format,
+            'exercice' => $exercice,
+        ]);
+    }
+
     public function render(): mixed
     {
         $exercice = app(ExerciceService::class)->current();
