@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\TwoFactorMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\TwoFactorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,8 +32,8 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
-        if ($user->hasTwoFactorEnabled() && $user->two_factor_method === \App\Enums\TwoFactorMethod::Email) {
-            app(\App\Services\TwoFactorService::class)->generateEmailCode($user);
+        if ($user->hasTwoFactorEnabled() && $user->two_factor_method === TwoFactorMethod::Email) {
+            app(TwoFactorService::class)->generateEmailCode($user);
             $request->session()->put('two_factor_code_sent', true);
         }
 

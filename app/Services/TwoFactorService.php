@@ -7,6 +7,10 @@ namespace App\Services;
 use App\Enums\TwoFactorMethod;
 use App\Mail\TwoFactorCodeMail;
 use App\Models\User;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +26,7 @@ final class TwoFactorService
 
     public function __construct()
     {
-        $this->google2fa = new Google2FA();
+        $this->google2fa = new Google2FA;
     }
 
     // ── Enable / Disable ──────────────────────────────────────
@@ -224,12 +228,12 @@ final class TwoFactorService
             $user->two_factor_secret,
         );
 
-        $renderer = new \BaconQrCode\Renderer\Image\SvgImageBackEnd();
-        $imageRenderer = new \BaconQrCode\Renderer\ImageRenderer(
-            new \BaconQrCode\Renderer\RendererStyle\RendererStyle(200),
+        $renderer = new SvgImageBackEnd;
+        $imageRenderer = new ImageRenderer(
+            new RendererStyle(200),
             $renderer,
         );
-        $writer = new \BaconQrCode\Writer($imageRenderer);
+        $writer = new Writer($imageRenderer);
 
         return $writer->writeString($qrCodeUrl);
     }

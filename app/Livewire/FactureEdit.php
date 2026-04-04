@@ -55,7 +55,9 @@ final class FactureEdit extends Component
 
     public function toggleTransaction(int $transactionId): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         $service = app(FactureService::class);
         $selectedIds = $this->facture->transactions()->pluck('transactions.id')->toArray();
@@ -75,7 +77,9 @@ final class FactureEdit extends Component
 
     public function updateLibelle(int $ligneId, string $libelle): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         try {
             app(FactureService::class)->majLibelle($this->facture, $ligneId, $libelle);
@@ -87,7 +91,9 @@ final class FactureEdit extends Component
 
     public function moveUp(int $ligneId): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         try {
             app(FactureService::class)->majOrdre($this->facture, $ligneId, 'up');
@@ -99,7 +105,9 @@ final class FactureEdit extends Component
 
     public function moveDown(int $ligneId): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         try {
             app(FactureService::class)->majOrdre($this->facture, $ligneId, 'down');
@@ -111,7 +119,9 @@ final class FactureEdit extends Component
 
     public function addTexte(): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         if (trim($this->newTexteLibelle) === '') {
             return;
@@ -128,7 +138,9 @@ final class FactureEdit extends Component
 
     public function deleteTexte(int $ligneId): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         try {
             app(FactureService::class)->supprimerLigne($this->facture, $ligneId);
@@ -140,7 +152,9 @@ final class FactureEdit extends Component
 
     public function sauvegarder(): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         $this->facture->update([
             'date' => $this->date,
@@ -155,7 +169,9 @@ final class FactureEdit extends Component
 
     public function valider(): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         $this->sauvegarder();
 
@@ -169,7 +185,9 @@ final class FactureEdit extends Component
 
     public function supprimer(): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         try {
             app(FactureService::class)->supprimerBrouillon($this->facture);

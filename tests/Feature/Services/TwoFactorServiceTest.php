@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\TwoFactorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use PragmaRX\Google2FA\Google2FA;
 
 uses(RefreshDatabase::class);
 
@@ -38,7 +39,7 @@ it('confirms TOTP with valid code', function () {
     $user = User::factory()->create();
     $secret = $this->service->enableTotp($user);
 
-    $google2fa = new \PragmaRX\Google2FA\Google2FA();
+    $google2fa = new Google2FA;
     $validCode = $google2fa->getCurrentOtp($secret);
 
     expect($this->service->confirmTotp($user, $validCode))->toBeTrue();
@@ -81,9 +82,9 @@ it('rejects expired email code', function () {
     $this->service->enableEmail($user);
 
     // Insert expired code
-    \DB::table('two_factor_codes')->insert([
+    DB::table('two_factor_codes')->insert([
         'user_id' => $user->id,
-        'code' => \Hash::make('123456'),
+        'code' => Hash::make('123456'),
         'expires_at' => now()->subMinute(),
     ]);
 

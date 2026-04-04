@@ -25,6 +25,7 @@ use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\DetecteEspace;
+use App\Http\Middleware\EnsureTwoFactor;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
@@ -67,7 +68,7 @@ $registerParametres = function (): void {
 };
 
 // ── Espace Comptabilité ──
-Route::middleware(['auth', 'verified', \App\Http\Middleware\EnsureTwoFactor::class, DetecteEspace::class.':compta'])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::class.':compta'])
     ->prefix('compta')
     ->name('compta.')
     ->group(function () use ($registerParametres): void {
@@ -118,7 +119,7 @@ Route::middleware(['auth', 'verified', \App\Http\Middleware\EnsureTwoFactor::cla
     });
 
 // ── Espace Gestion ──
-Route::middleware(['auth', 'verified', \App\Http\Middleware\EnsureTwoFactor::class, DetecteEspace::class.':gestion'])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::class.':gestion'])
     ->prefix('gestion')
     ->name('gestion.')
     ->group(function () use ($registerParametres): void {
