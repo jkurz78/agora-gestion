@@ -35,7 +35,7 @@ final class FormulaireToken extends Model
 
     public function isExpire(): bool
     {
-        return $this->expire_at->lt(today());
+        return $this->expire_at !== null && $this->expire_at->lt(today());
     }
 
     public function isUtilise(): bool
@@ -45,6 +45,6 @@ final class FormulaireToken extends Model
 
     public function isValide(): bool
     {
-        return ! $this->isExpire() && ! $this->isUtilise();
+        return $this->expire_at !== null && ! $this->isExpire() && ! $this->isUtilise();
     }
 }
