@@ -74,7 +74,9 @@ final class FactureShow extends Component
 
     public function encaisser(): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         if ($this->encaissementCompteId === null) {
             session()->flash('error', 'Veuillez sélectionner un compte bancaire de destination.');
@@ -107,7 +109,9 @@ final class FactureShow extends Component
 
     public function annuler(): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         try {
             app(FactureService::class)->annuler($this->facture);
@@ -121,7 +125,9 @@ final class FactureShow extends Component
 
     public function envoyerEmail(): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         $this->emailMessage = '';
 
@@ -159,7 +165,9 @@ final class FactureShow extends Component
 
     public function confirmSendEmail(): void
     {
-        if (! $this->canEdit) { return; }
+        if (! $this->canEdit) {
+            return;
+        }
 
         if (! $this->selectedEmailFrom) {
             return;

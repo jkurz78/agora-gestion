@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\TwoFactorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use PragmaRX\Google2FA\Google2FA;
 
 uses(RefreshDatabase::class);
 
@@ -61,7 +62,7 @@ it('shows challenge page for TOTP method', function () {
 });
 
 it('verifies valid TOTP code', function () {
-    $google2fa = new \PragmaRX\Google2FA\Google2FA();
+    $google2fa = new Google2FA;
     $secret = $google2fa->generateSecretKey();
 
     $user = User::factory()->create([
