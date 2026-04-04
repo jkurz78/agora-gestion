@@ -83,13 +83,15 @@
 
     {{-- Actions --}}
     <div class="d-flex gap-2 mt-3">
-        <button wire:click="comptabiliser"
-                wire:confirm="Comptabiliser cette remise ? Les transactions comptables et le virement interne seront créés."
-                class="btn btn-success"
-                @disabled($reglements->isEmpty())>
-            <i class="bi bi-check-circle"></i>
-            {{ $remise->virement_id !== null ? 'Modifier la remise' : 'Comptabiliser' }}
-        </button>
+        @if ($this->canEdit)
+            <button wire:click="comptabiliser"
+                    wire:confirm="Comptabiliser cette remise ? Les transactions comptables et le virement interne seront créés."
+                    class="btn btn-success"
+                    @disabled($reglements->isEmpty())>
+                <i class="bi bi-check-circle"></i>
+                {{ $remise->virement_id !== null ? 'Modifier la remise' : 'Comptabiliser' }}
+            </button>
+        @endif
         <a href="{{ route('gestion.remises-bancaires.selection', $remise) }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Retour
         </a>

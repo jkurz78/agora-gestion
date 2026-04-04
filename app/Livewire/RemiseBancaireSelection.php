@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 final class RemiseBancaireSelection extends Component
@@ -30,8 +32,17 @@ final class RemiseBancaireSelection extends Component
             ->toArray();
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Gestion);
+    }
+
     public function toggleReglement(int $id): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if (in_array($id, $this->selectedIds, true)) {
             $this->selectedIds = array_values(array_diff($this->selectedIds, [$id]));
         } else {
@@ -41,6 +52,10 @@ final class RemiseBancaireSelection extends Component
 
     public function valider(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if (count($this->selectedIds) === 0) {
             $this->addError('selection', 'Sélectionnez au moins un règlement.');
 
