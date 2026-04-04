@@ -300,20 +300,25 @@ final class RapportExportController extends Controller
         $sheet2->getStyle('A1:B1')->getFont()->setBold(true);
         $row++;
 
-        $sheet2->fromArray([['Solde théorique', $data['rapprochement']['solde_theorique']]], null, 'A'.$row);
+        $sheet2->setCellValue('A'.$row, 'Solde théorique');
+        $sheet2->setCellValue('B'.$row, $data['rapprochement']['solde_theorique']);
         $row++;
 
-        $sheet2->fromArray([['- Recettes non pointées ('.$data['rapprochement']['nb_recettes_non_pointees'].')', $data['rapprochement']['recettes_non_pointees']]], null, 'A'.$row);
+        $sheet2->setCellValue('A'.$row, 'Recettes non pointées ('.$data['rapprochement']['nb_recettes_non_pointees'].')');
+        $sheet2->setCellValue('B'.$row, -$data['rapprochement']['recettes_non_pointees']);
         $row++;
-        $sheet2->fromArray([['+ Dépenses non pointées ('.$data['rapprochement']['nb_depenses_non_pointees'].')', $data['rapprochement']['depenses_non_pointees']]], null, 'A'.$row);
+        $sheet2->setCellValue('A'.$row, 'Dépenses non pointées ('.$data['rapprochement']['nb_depenses_non_pointees'].')');
+        $sheet2->setCellValue('B'.$row, $data['rapprochement']['depenses_non_pointees']);
         $row++;
 
         foreach ($data['rapprochement']['comptes_systeme'] as $cs) {
-            $sheet2->fromArray([['- '.$cs['nom'].' ('.$cs['nb_ecritures'].' écr.)', $cs['solde']]], null, 'A'.$row);
+            $sheet2->setCellValue('A'.$row, $cs['nom'].' ('.$cs['nb_ecritures'].' écr.)');
+            $sheet2->setCellValue('B'.$row, -$cs['solde']);
             $row++;
         }
 
-        $sheet2->fromArray([['= Solde bancaire réel', $data['rapprochement']['solde_reel']]], null, 'A'.$row);
+        $sheet2->setCellValue('A'.$row, 'Solde bancaire réel');
+        $sheet2->setCellValue('B'.$row, $data['rapprochement']['solde_reel']);
         $sheet2->getStyle('A'.$row.':B'.$row)->getFont()->setBold(true);
         $sheet2->getStyle('B2:B'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
 
