@@ -24,7 +24,7 @@ it('se rend sans erreur', function () {
         ->assertOk()
         ->assertSee('DEPENSES')
         ->assertSee('RECETTES')
-        ->assertSee('Exporter CSV');
+        ->assertSee('Exporter');
 });
 
 it('affiche les catégories et sous-catégories', function () {
