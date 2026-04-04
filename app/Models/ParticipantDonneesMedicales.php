@@ -59,6 +59,16 @@ final class ParticipantDonneesMedicales extends Model
         ];
     }
 
+    /**
+     * Sanitise le HTML des notes médicales : ne garde que les balises de mise en forme.
+     */
+    public static function sanitizeNotes(string $html): string
+    {
+        $clean = strip_tags($html, '<p><br><strong><em><b><i><u><ul><ol><li>');
+
+        return (string) preg_replace('/\s+on\w+\s*=\s*["\'][^"\']*["\']/i', '', $clean);
+    }
+
     public function participant(): BelongsTo
     {
         return $this->belongsTo(Participant::class);
