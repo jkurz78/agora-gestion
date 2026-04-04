@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Mail\FormulaireInvitation;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
@@ -74,6 +75,11 @@ final class ParticipantTable extends Component
         $this->operation = $operation;
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Gestion);
+    }
+
     public function render(): View
     {
         $canSeeSensible = (bool) Auth::user()?->peut_voir_donnees_sensibles;
@@ -115,6 +121,10 @@ final class ParticipantTable extends Component
 
     public function addParticipant(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if ($this->addTiersId === null) {
             $this->addError('addTiersId', 'Veuillez sélectionner un tiers.');
 
@@ -151,6 +161,10 @@ final class ParticipantTable extends Component
 
     public function updateTiersField(int $participantId, string $field, string $value): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $allowed = ['nom', 'prenom', 'telephone', 'email'];
         if (! in_array($field, $allowed, true)) {
             return;
@@ -165,6 +179,10 @@ final class ParticipantTable extends Component
 
     public function updateParticipantField(int $participantId, string $field, string $value): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $allowed = ['date_inscription'];
         if (! in_array($field, $allowed, true)) {
             return;
@@ -186,6 +204,10 @@ final class ParticipantTable extends Component
 
     public function updateMedicalField(int $participantId, string $field, string $value): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if (! Auth::user()?->peut_voir_donnees_sensibles) {
             return;
         }
@@ -218,6 +240,10 @@ final class ParticipantTable extends Component
 
     public function removeParticipant(int $id): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $participant = Participant::where('operation_id', $this->operation->id)
             ->findOrFail($id);
 
@@ -236,6 +262,10 @@ final class ParticipantTable extends Component
 
     public function saveNotes(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if (! Auth::user()?->peut_voir_donnees_sensibles) {
             return;
         }
@@ -258,6 +288,10 @@ final class ParticipantTable extends Component
 
     public function genererToken(int $participantId): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $participant = Participant::where('operation_id', $this->operation->id)
             ->findOrFail($participantId);
 
@@ -274,6 +308,10 @@ final class ParticipantTable extends Component
 
     public function genererTokenAvecDate(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if ($this->tokenParticipantId === null) {
             return;
         }
@@ -302,6 +340,10 @@ final class ParticipantTable extends Component
 
     public function envoyerTokenParEmail(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if ($this->tokenParticipantId === null || $this->tokenUrl === null) {
             return;
         }

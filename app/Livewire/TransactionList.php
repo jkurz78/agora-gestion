@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Enums\TypeTransaction;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
@@ -14,6 +15,7 @@ use App\Models\Transaction;
 use App\Services\ExerciceService;
 use App\Services\TransactionService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -77,8 +79,17 @@ final class TransactionList extends Component
         $this->resetPage();
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Compta);
+    }
+
     public function delete(int $id): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $transaction = Transaction::findOrFail($id);
         try {
             app(TransactionService::class)->delete($transaction);

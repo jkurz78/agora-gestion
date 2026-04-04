@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
+use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Mail\DocumentMail;
@@ -40,6 +41,11 @@ final class ReglementTable extends Component
         $this->docModalParticipantId = $participantId;
         $this->docModalType = $type;
         $this->docModalMessage = '';
+    }
+
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Gestion);
     }
 
     public function mount(Operation $operation): void
@@ -88,6 +94,10 @@ final class ReglementTable extends Component
 
     public function cycleModePaiement(int $participantId, int $seanceId): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $seance = Seance::where('operation_id', $this->operation->id)->findOrFail($seanceId);
 
         $reglement = Reglement::where('participant_id', $participantId)
@@ -109,6 +119,10 @@ final class ReglementTable extends Component
 
     public function updateMontant(int $participantId, int $seanceId, string $montant): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $seance = Seance::where('operation_id', $this->operation->id)->findOrFail($seanceId);
 
         $existing = Reglement::where('participant_id', $participantId)
@@ -129,6 +143,10 @@ final class ReglementTable extends Component
 
     public function copierLigne(int $participantId): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $seances = Seance::where('operation_id', $this->operation->id)
             ->orderBy('numero')
             ->get();
@@ -166,6 +184,10 @@ final class ReglementTable extends Component
 
     public function emettreDocument(int $participantId, string $type): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $participant = $this->operation->participants()->findOrFail($participantId);
         $typeEnum = TypeDocumentPrevisionnel::from($type);
 
@@ -274,6 +296,10 @@ final class ReglementTable extends Component
 
     public function envoyerDocumentEmail(int $participantId, string $type): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         $typeEnum = TypeDocumentPrevisionnel::from($type);
 
         $doc = DocumentPrevisionnel::where('participant_id', $participantId)

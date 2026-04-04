@@ -11,7 +11,7 @@
         <button wire:click="openExportModal" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-download"></i> Exporter
         </button>
-        @if (! $exerciceCloture)
+        @if (! $exerciceCloture && $this->canEdit)
         <button wire:click="toggleImportPanel" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-upload"></i> Importer
         </button>
@@ -138,7 +138,7 @@
                                 <tr>
                                     <td class="ps-4">{{ $sc->nom }}</td>
                                     <td class="text-end">
-                                        @if (! $exerciceCloture && $line && $editingLineId === $line->id)
+                                        @if (! $exerciceCloture && $this->canEdit && $line && $editingLineId === $line->id)
                                             <div class="d-flex justify-content-end gap-1">
                                                 <input type="number" wire:model="editingMontant" step="0.01" min="0"
                                                        class="form-control form-control-sm" style="width: 120px;"
@@ -151,7 +151,7 @@
                                                     <i class="bi bi-x"></i>
                                                 </button>
                                             </div>
-                                        @elseif ($line && ! $exerciceCloture)
+                                        @elseif ($line && ! $exerciceCloture && $this->canEdit)
                                             <span wire:click="startEdit({{ $line->id }})" style="cursor: pointer;"
                                                   class="text-primary" title="Cliquer pour modifier">
                                                 {{ number_format($prevu, 2, ',', ' ') }} &euro;
@@ -171,7 +171,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if (! $exerciceCloture)
+                                        @if (! $exerciceCloture && $this->canEdit)
                                         @if (! $line)
                                             <button wire:click="addLine({{ $sc->id }})"
                                                     class="btn btn-sm btn-outline-primary">
@@ -238,7 +238,7 @@
                                 <tr>
                                     <td class="ps-4">{{ $sc->nom }}</td>
                                     <td class="text-end">
-                                        @if (! $exerciceCloture && $line && $editingLineId === $line->id)
+                                        @if (! $exerciceCloture && $this->canEdit && $line && $editingLineId === $line->id)
                                             <div class="d-flex justify-content-end gap-1">
                                                 <input type="number" wire:model="editingMontant" step="0.01" min="0"
                                                        class="form-control form-control-sm" style="width: 120px;"
@@ -251,7 +251,7 @@
                                                     <i class="bi bi-x"></i>
                                                 </button>
                                             </div>
-                                        @elseif ($line && ! $exerciceCloture)
+                                        @elseif ($line && ! $exerciceCloture && $this->canEdit)
                                             <span wire:click="startEdit({{ $line->id }})" style="cursor: pointer;"
                                                   class="text-primary" title="Cliquer pour modifier">
                                                 {{ number_format($prevu, 2, ',', ' ') }} &euro;
@@ -271,7 +271,7 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if (! $exerciceCloture)
+                                        @if (! $exerciceCloture && $this->canEdit)
                                         @if (! $line)
                                             <button wire:click="addLine({{ $sc->id }})"
                                                     class="btn btn-sm btn-outline-primary">

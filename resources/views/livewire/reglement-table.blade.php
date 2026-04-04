@@ -81,6 +81,7 @@
                         <tr>
                             <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;vertical-align:middle;padding:4px 6px;white-space:nowrap">
                                 <div style="font-size:11px;font-weight:500">{{ $participant->tiers->nom }} {{ $participant->tiers->prenom }}</div>
+                                @if($this->canEdit)
                                 <div class="d-flex gap-1 mt-1">
                                     @php
                                         $pVersions = $docVersions[$participant->id] ?? collect();
@@ -102,12 +103,15 @@
                                         @if($proformaV) <span class="badge bg-secondary" style="font-size:8px">v{{ $proformaV }}</span> @endif
                                     </button>
                                 </div>
+                                @endif
                             </td>
                             <td style="background:#f8f9fa;font-size:10px;color:#888;padding:2px 3px;white-space:nowrap;vertical-align:middle;text-align:right;width:55px">
                                 <div class="d-flex align-items-center justify-content-between">
+                                    @if($this->canEdit)
                                     <button class="btn btn-sm p-0" style="color:#0d6efd;font-size:10px;border:1px solid #0d6efd;border-radius:3px;padding:0 3px !important;line-height:1.3;flex-shrink:0"
                                             wire:click="copierLigne({{ $participant->id }})"
                                             title="Recopier la 1re séance sur toute la ligne">→</button>
+                                    @endif
                                     <span>Prévu</span>
                                 </div>
                             </td>

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\Espace;
 use App\Enums\StatutRapprochement;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -27,8 +29,17 @@ final class RapprochementDetail extends Component
         $this->rapprochement = $rapprochement;
     }
 
+    public function getCanEditProperty(): bool
+    {
+        return Auth::user()->role->canWrite(Espace::Compta);
+    }
+
     public function toggle(string $type, int $id): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         try {
             app(RapprochementBancaireService::class)
                 ->toggleTransaction($this->rapprochement, $type, $id);
@@ -40,6 +51,10 @@ final class RapprochementDetail extends Component
 
     public function supprimer(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         try {
             app(RapprochementBancaireService::class)->supprimer($this->rapprochement);
             $this->redirect(route('compta.rapprochement.index'));
@@ -50,6 +65,10 @@ final class RapprochementDetail extends Component
 
     public function verrouiller(): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         try {
             app(RapprochementBancaireService::class)
                 ->verrouiller($this->rapprochement);
@@ -62,6 +81,10 @@ final class RapprochementDetail extends Component
 
     public function updateSoldeFin(string $value): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if ($this->rapprochement->isVerrouille()) {
             $this->addError('solde_fin', 'Impossible de modifier un rapprochement verrouillé.');
 
@@ -86,6 +109,10 @@ final class RapprochementDetail extends Component
 
     public function updateDateFin(string $value): void
     {
+        if (! $this->canEdit) {
+            return;
+        }
+
         if ($this->rapprochement->isVerrouille()) {
             $this->addError('date_fin', 'Impossible de modifier un rapprochement verrouillé.');
 
