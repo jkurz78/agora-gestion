@@ -250,13 +250,13 @@
                             <li>
                                 <a class="dropdown-item {{ request()->routeIs('compta.rapports.compte-resultat') ? 'active' : '' }}"
                                    href="{{ route('compta.rapports.compte-resultat') }}">
-                                    Compte de résultat
+                                    <i class="bi bi-journal-text me-1"></i>Compte de résultat
                                 </a>
                             </li>
                             <li>
                                 <a class="dropdown-item {{ request()->routeIs('compta.rapports.operations') ? 'active' : '' }}"
                                    href="{{ route('compta.rapports.operations') }}">
-                                    Compte de résultat par opérations
+                                    <i class="bi bi-diagram-3 me-1"></i>Compte de résultat par opérations
                                 </a>
                             </li>
                             <li>
