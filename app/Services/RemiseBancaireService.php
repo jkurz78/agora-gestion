@@ -10,6 +10,8 @@ use App\Models\CompteBancaire;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Models\TransactionLigneAffectation;
 use Illuminate\Support\Facades\DB;
 
 final class RemiseBancaireService
@@ -145,21 +147,21 @@ final class RemiseBancaireService
             $toRemove = array_diff($currentReglementIds, $reglementIds);
             $toAdd = array_diff($reglementIds, $currentReglementIds);
 
-            // Remove reglements — use direct reglement_id link on transaction
-            foreach ($toRemove as $reglementId) {
-                $reglement = Reglement::findOrFail($reglementId);
-                $reglement->update(['remise_id' => null]);
+            // Remove reglements — bulk delete transactions, lignes, and affectations
+            if (count($toRemove) > 0) {
+                Reglement::whereIn('id', $toRemove)->update(['remise_id' => null]);
 
-                $transaction = Transaction::where('remise_id', $remise->id)
-                    ->where('reglement_id', $reglementId)
-                    ->first();
+                $txToRemove = Transaction::where('remise_id', $remise->id)
+                    ->whereIn('reglement_id', $toRemove)
+                    ->pluck('id');
 
-                if ($transaction) {
-                    $transaction->lignes()->each(function ($ligne) {
-                        $ligne->affectations()->delete();
-                        $ligne->delete();
-                    });
-                    $transaction->forceDelete();
+                if ($txToRemove->isNotEmpty()) {
+                    $ligneIds = TransactionLigne::whereIn('transaction_id', $txToRemove)->pluck('id');
+                    if ($ligneIds->isNotEmpty()) {
+                        TransactionLigneAffectation::whereIn('transaction_ligne_id', $ligneIds)->delete();
+                        TransactionLigne::whereIn('id', $ligneIds)->delete();
+                    }
+                    Transaction::whereIn('id', $txToRemove)->forceDelete();
                 }
             }
 
@@ -252,14 +254,16 @@ final class RemiseBancaireService
             // Free all reglements
             Reglement::where('remise_id', $remise->id)->update(['remise_id' => null]);
 
-            // Soft-delete all transactions
-            Transaction::where('remise_id', $remise->id)->each(function (Transaction $tx) {
-                $tx->lignes()->each(function ($ligne) {
-                    $ligne->affectations()->delete();
-                    $ligne->delete();
-                });
-                $tx->delete();
-            });
+            // Bulk-delete all transactions, lignes, and affectations
+            $txIds = Transaction::where('remise_id', $remise->id)->pluck('id');
+            if ($txIds->isNotEmpty()) {
+                $ligneIds = TransactionLigne::whereIn('transaction_id', $txIds)->pluck('id');
+                if ($ligneIds->isNotEmpty()) {
+                    TransactionLigneAffectation::whereIn('transaction_ligne_id', $ligneIds)->delete();
+                    TransactionLigne::whereIn('id', $ligneIds)->delete();
+                }
+                Transaction::whereIn('id', $txIds)->delete();
+            }
 
             // Soft-delete virement
             if ($remise->virement_id !== null) {
