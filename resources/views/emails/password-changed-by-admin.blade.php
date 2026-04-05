@@ -1,12 +1,15 @@
-<x-mail::message>
-# Mot de passe modifié
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px">
+    <h2 style="color:#3d5473">Mot de passe modifié</h2>
 
-Bonjour {{ $user->nom }},
+    <p>Bonjour {{ $user->nom }},</p>
 
-Votre mot de passe sur **{{ config('app.name') }}** a été modifié par {{ $changedByName }}.
+    <p>Votre mot de passe sur <strong>{{ config('app.name') }}</strong> a été modifié par {{ $changedByName }}.</p>
 
-Si vous n'êtes pas à l'origine de cette demande, contactez immédiatement votre administrateur.
+    <p style="color:#c0392b"><strong>Si vous n'êtes pas à l'origine de cette demande, contactez immédiatement votre administrateur.</strong></p>
 
-Cordialement,<br>
-{{ config('app.name') }}
-</x-mail::message>
+    <p>Cordialement,<br>{{ config('app.name') }}</p>
+</body>
+</html>
