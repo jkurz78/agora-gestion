@@ -1,16 +1,19 @@
-<x-mail::message>
-# Code de vérification
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"></head>
+<body style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px">
+    <h2 style="color:#3d5473">Code de vérification</h2>
 
-Votre code de connexion est :
+    <p>Votre code de connexion est :</p>
 
-<x-mail::panel>
-<strong style="font-size: 24px; letter-spacing: 4px;">{{ $code }}</strong>
-</x-mail::panel>
+    <div style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:6px;padding:20px;text-align:center;margin:20px 0">
+        <strong style="font-size:28px;letter-spacing:6px;color:#3d5473">{{ $code }}</strong>
+    </div>
 
-Ce code expire dans **10 minutes**.
+    <p>Ce code expire dans <strong>10 minutes</strong>.</p>
 
-Si vous n'avez pas demandé ce code, ignorez cet email.
+    <p style="color:#888;font-size:12px">Si vous n'avez pas demandé ce code, ignorez cet email.</p>
 
-Cordialement,<br>
-{{ config('app.name') }}
-</x-mail::message>
+    <p>Cordialement,<br>{{ config('app.name') }}</p>
+</body>
+</html>
