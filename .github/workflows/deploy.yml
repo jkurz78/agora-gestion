@@ -37,7 +37,21 @@ jobs:
     steps:
       - name: Get runner public IP
         id: ip
-        uses: haythem/public-ip@v1.3
+        run: |
+          for attempt in 1 2 3; do
+            for svc in "https://api.ipify.org" "https://ifconfig.me/ip" "https://icanhazip.com"; do
+              IP=$(curl -sf --max-time 10 "$svc" 2>/dev/null | tr -d '[:space:]')
+              if [[ "$IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "ipv4=$IP" >> "$GITHUB_OUTPUT"
+                echo "Got IP $IP from $svc (attempt $attempt)"
+                exit 0
+              fi
+            done
+            echo "Attempt $attempt failed, waiting 30s..."
+            sleep 30
+          done
+          echo "Failed to get public IP after 3 attempts"
+          exit 1
 
       - name: Remove all whitelisted IPs
         run: |
