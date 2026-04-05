@@ -31,11 +31,11 @@ run_cmd() {
     fi
 }
 
-run_cmd "$PHP artisan optimize:clear"
 run_cmd "git checkout -- ."
 run_cmd "git pull origin main"
 run_cmd "git fetch --tags"
 run_cmd "$COMPOSER install --no-dev --optimize-autoloader --no-interaction"
+run_cmd "$PHP artisan optimize:clear"
 run_cmd "$PHP artisan migrate --force"
 run_cmd "$PHP artisan storage:link --force"
 run_cmd "$PHP artisan app:version-stamp"
