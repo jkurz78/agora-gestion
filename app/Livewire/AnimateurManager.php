@@ -74,14 +74,20 @@ final class AnimateurManager extends Component
             return;
         }
 
+        // Récupérer la dernière transaction de ce tiers pour pré-remplir
+        $lastTx = Transaction::where('tiers_id', $tiersId)
+            ->where('type', TypeTransaction::Depense)
+            ->latest('id')
+            ->first();
+
         $this->isEditing = false;
         $this->editingTransactionId = null;
         $this->modalTiersId = $tiersId;
         $this->modalTiersLabel = $tiers->displayName();
         $this->modalDate = now()->format('Y-m-d');
         $this->modalReference = '';
-        $this->modalModePaiement = null;
-        $this->modalCompteId = null;
+        $this->modalModePaiement = $lastTx?->mode_paiement?->value;
+        $this->modalCompteId = $lastTx?->compte_id;
         $this->errorMessage = '';
 
         $this->modalLignes = [
@@ -163,10 +169,12 @@ final class AnimateurManager extends Component
 
     public function addModalLigne(): void
     {
+        $lastLigne = end($this->modalLignes) ?: [];
+
         $this->modalLignes[] = [
             'sous_categorie_id' => null,
-            'operation_id' => $this->operation->id,
-            'seance' => null,
+            'operation_id' => $lastLigne['operation_id'] ?? $this->operation->id,
+            'seance' => $lastLigne['seance'] ?? null,
             'montant' => '',
             'id' => null,
         ];
