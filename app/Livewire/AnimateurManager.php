@@ -484,6 +484,8 @@ final class AnimateurManager extends Component
 
     private function applyOcrResult(InvoiceOcrResult $result): void
     {
+        $validScIds = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', 'depense'))->pluck('id')->toArray();
+
         if ($result->date !== null) {
             $this->modalDate = $result->date;
         }
@@ -499,7 +501,7 @@ final class AnimateurManager extends Component
             $this->modalLignes = [];
             foreach ($result->lignes as $ligne) {
                 $this->modalLignes[] = [
-                    'sous_categorie_id' => $ligne->sous_categorie_id,
+                    'sous_categorie_id' => $ligne->sous_categorie_id !== null && in_array($ligne->sous_categorie_id, $validScIds, true) ? $ligne->sous_categorie_id : null,
                     'operation_id' => $existingOpId,
                     'seance' => $existingSeance,
                     'montant' => number_format($ligne->montant, 2, '.', ''),

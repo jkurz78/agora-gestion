@@ -33,6 +33,24 @@
                 </div>
             @endif
             <div class="card-body">
+                @if ($ocrMode && $ocrWaitingForFile)
+                    <div class="text-center py-5">
+                        <div class="mb-4">
+                            <i class="bi bi-cloud-arrow-up" style="font-size:3rem;color:#6c757d"></i>
+                            <p class="mt-2 text-muted">Sélectionnez la facture fournisseur à analyser</p>
+                        </div>
+                        <label class="btn btn-primary btn-lg mb-3">
+                            <i class="bi bi-upload me-2"></i> Choisir un fichier
+                            <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                   @change="const f = $event.target.files[0]; if (f) { sessionStorage.setItem('pj-ocr-preview-url', URL.createObjectURL(f)); sessionStorage.setItem('pj-ocr-preview-name', f.name); }">
+                        </label>
+                        <div wire:loading wire:target="pieceJointe" class="mt-2">
+                            <div class="spinner-border spinner-border-sm text-primary"></div>
+                            <span class="text-muted small">Upload en cours...</span>
+                        </div>
+                        @error('pieceJointe') <div class="text-danger small mt-2">{{ $message }}</div> @enderror
+                    </div>
+                @else
                 @if ($ocrAnalyzing)
                     <div class="alert alert-info py-2 d-flex align-items-center gap-2">
                         <div class="spinner-border spinner-border-sm"></div>
@@ -107,7 +125,7 @@
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Tiers</label>
-                            <livewire:tiers-autocomplete wire:model="tiers_id" filtre="{{ $type === 'depense' ? 'depenses' : 'recettes' }}" :key="'transaction-tiers-'.($transactionId ?? 'new')" />
+                            <livewire:tiers-autocomplete wire:model="tiers_id" filtre="{{ $type === 'depense' ? 'depenses' : 'recettes' }}" :key="'transaction-tiers-'.($transactionId ?? 'new').'-'.($tiers_id ?? '0')" />
                             @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
@@ -159,7 +177,7 @@
 
                         {{-- Pièce jointe (dépenses uniquement) --}}
                         @if ($type === 'depense' && ! $exerciceCloture)
-                        <div class="col-12">
+                        <div class="{{ $ocrMode ? 'col-md-4' : 'col-12' }}">
                             <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
 
                             @if ($existingPieceJointeNom && ! $pieceJointe)
@@ -443,6 +461,7 @@
                             </div>
                         </template>
                     </div>
+                @endif
                 @endif
             </div>
         </div>
