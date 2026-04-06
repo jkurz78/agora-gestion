@@ -24,6 +24,11 @@
                 <i class="bi bi-people me-1"></i>Participants ({{ $participantsCount }})
             </button>
         </li>
+        <li class="nav-item">
+            <button class="nav-link {{ $activeTab === 'animateurs' ? 'active' : '' }}" wire:click="setTab('animateurs')">
+                <i class="bi bi-person-workspace me-1"></i>Animateurs
+            </button>
+        </li>
         @if(auth()->user()?->peut_voir_donnees_sensibles)
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'seances' ? 'active' : '' }}" wire:click="setTab('seances')">
@@ -50,6 +55,10 @@
     {{-- Tab content --}}
     @if($activeTab === 'participants')
         <livewire:participant-table :operation="$operation" :key="'pt-'.$operation->id" />
+    @endif
+
+    @if($activeTab === 'animateurs')
+        <livewire:animateur-manager :operation="$operation" :key="'am-'.$operation->id" />
     @endif
 
     @if($activeTab === 'seances')
