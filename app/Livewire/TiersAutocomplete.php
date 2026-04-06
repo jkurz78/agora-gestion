@@ -23,6 +23,8 @@ final class TiersAutocomplete extends Component
 
     public string $search = '';
 
+    public string $defaultSearch = '';
+
     public bool $open = false;
 
     public ?string $selectedLabel = null;
@@ -43,6 +45,8 @@ final class TiersAutocomplete extends Component
             $tiers = Tiers::find($this->tiersId);
             $this->selectedLabel = $tiers?->displayName();
             $this->selectedType = $tiers?->type;
+        } elseif ($this->defaultSearch !== '') {
+            $this->search = $this->defaultSearch;
         }
     }
 

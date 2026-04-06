@@ -76,6 +76,8 @@ final class TransactionForm extends Component
 
     public ?string $ocrError = null;
 
+    public ?string $ocrTiersNom = null;
+
     /** @var array<string> */
     public array $ocrWarnings = [];
 
@@ -108,7 +110,7 @@ final class TransactionForm extends Component
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
-            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings']);
+            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom']);
         $this->type = $type;
         $this->isLocked = false;
         $this->resetValidation();
@@ -321,7 +323,7 @@ final class TransactionForm extends Component
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
-            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings',
+            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
         ]);
         $this->resetValidation();
     }
@@ -498,6 +500,21 @@ final class TransactionForm extends Component
         if ($result->tiers_id !== null) {
             $this->tiers_id = $result->tiers_id;
         }
+
+        // Construire le libellé depuis le nom du tiers et la référence
+        $parts = [];
+        if ($result->tiers_nom !== null) {
+            $parts[] = $result->tiers_nom;
+        }
+        if ($result->reference !== null) {
+            $parts[] = 'Facture '.$result->reference;
+        }
+        if (! empty($parts)) {
+            $this->libelle = implode(' — ', $parts);
+        }
+
+        // Stocker le nom du tiers OCR pour pré-remplir l'autocomplete
+        $this->ocrTiersNom = $result->tiers_nom;
 
         if (! empty($result->lignes)) {
             $this->lignes = [];
