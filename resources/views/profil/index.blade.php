@@ -1,7 +1,8 @@
 @php
     $espace = auth()->user()->dernier_espace ?? \App\Enums\Espace::Compta;
-    $espaceColor = $espace->color();
-    $espaceLabel = $espace->label();
+    view()->share('espace', $espace);
+    view()->share('espaceColor', $espace->color());
+    view()->share('espaceLabel', $espace->label());
     $retourRoute = route($espace->value . '.dashboard');
 @endphp
 
