@@ -47,6 +47,8 @@ final class AssociationForm extends Component
 
     public ?int $facture_compte_bancaire_id = null;
 
+    public ?string $anthropic_api_key = null;
+
     public function mount(): void
     {
         $association = Association::find(1);
@@ -65,6 +67,7 @@ final class AssociationForm extends Component
             $this->facture_mentions_legales = $association->facture_mentions_legales;
             $this->facture_mentions_penalites = $association->facture_mentions_penalites;
             $this->facture_compte_bancaire_id = $association->facture_compte_bancaire_id;
+            $this->anthropic_api_key = $association->anthropic_api_key;
         }
     }
 
@@ -85,6 +88,7 @@ final class AssociationForm extends Component
             'facture_mentions_legales' => ['nullable', 'string', 'max:2000'],
             'facture_mentions_penalites' => ['nullable', 'string', 'max:2000'],
             'facture_compte_bancaire_id' => ['nullable', 'integer', 'exists:comptes_bancaires,id'],
+            'anthropic_api_key' => ['nullable', 'string', 'max:255'],
         ]);
 
         $data = [
@@ -100,6 +104,7 @@ final class AssociationForm extends Component
             'facture_mentions_legales' => $this->facture_mentions_legales,
             'facture_mentions_penalites' => $this->facture_mentions_penalites,
             'facture_compte_bancaire_id' => $this->facture_compte_bancaire_id,
+            'anthropic_api_key' => $this->anthropic_api_key ?: null,
         ];
 
         if ($this->logo !== null) {
