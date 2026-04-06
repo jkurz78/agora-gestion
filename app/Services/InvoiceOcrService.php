@@ -103,14 +103,20 @@ final class InvoiceOcrService
             ->map(fn (Operation $o) => $o->id.': '.$o->nom.' (type: '.($o->typeOperation?->nom ?? '-').', séances: '.$o->nombre_seances.')')
             ->implode("\n");
 
+        $today = now()->format('d/m/Y');
+        $nextYear = $exercice + 1;
+        $exerciceLabel = $exercice.'/'.$nextYear;
+
         $prompt = <<<PROMPT
 Tu es un assistant d'extraction de factures fournisseur pour une association.
+Date du jour : {$today}. Exercice comptable en cours : {$exerciceLabel} (du 01/09/{$exercice} au 31/08/{$nextYear}).
 
 Extrais les informations de cette facture au format JSON suivant :
 
 {"date": "YYYY-MM-DD", "reference": "numéro de facture", "tiers_id": null, "tiers_nom": "nom fournisseur", "montant_total": 0.00, "lignes": [{"description": "...", "sous_categorie_id": null, "operation_id": null, "seance": null, "montant": 0.00}], "warnings": []}
 
 Règles :
+- Pour la date, lis EXACTEMENT ce qui est écrit sur la facture. Ne corrige pas l'année.
 - Respecte les lignes telles qu'elles apparaissent sur la facture. Si la facture indique quantité 2 à 70€ pour un montant de 140€, c'est UNE SEULE ligne à 140€. Ne ventile jamais.
 - Pour tiers_id, cherche le tiers le plus proche dans la liste ci-dessous. Si aucun ne correspond, mets null.
 - Pour sous_categorie_id, choisis la sous-catégorie la plus pertinente. Si aucune ne correspond, mets null.
