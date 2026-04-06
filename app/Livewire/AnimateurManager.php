@@ -18,9 +18,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 final class AnimateurManager extends Component
 {
+    use WithFileUploads;
+
     public Operation $operation;
 
     // --- Tiers autocomplete for adding new animateur ---
@@ -52,6 +56,15 @@ final class AnimateurManager extends Component
     public array $modalLignes = [];
 
     public string $errorMessage = '';
+
+    public string $modalStep = 'form'; // 'upload' | 'form'
+
+    /** @var TemporaryUploadedFile|null */
+    public $modalPieceJointe = null;
+
+    public ?string $existingPieceJointeNom = null;
+
+    public ?string $existingPieceJointeUrl = null;
 
     public function mount(Operation $operation): void
     {
@@ -100,7 +113,31 @@ final class AnimateurManager extends Component
             ],
         ];
 
+        $this->modalStep = 'upload';
+        $this->modalPieceJointe = null;
+        $this->existingPieceJointeNom = null;
+        $this->existingPieceJointeUrl = null;
+
         $this->showModal = true;
+    }
+
+    public function skipUpload(): void
+    {
+        $this->modalStep = 'form';
+        $this->modalPieceJointe = null;
+    }
+
+    public function proceedWithFile(): void
+    {
+        if ($this->modalPieceJointe !== null) {
+            $this->validate([
+                'modalPieceJointe' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            ], [
+                'modalPieceJointe.mimes' => 'Le justificatif doit être un fichier PDF, JPG ou PNG.',
+                'modalPieceJointe.max' => 'Le justificatif ne doit pas dépasser 10 Mo.',
+            ]);
+        }
+        $this->modalStep = 'form';
     }
 
     public function openEditModal(array $transactionIds): void
@@ -149,6 +186,11 @@ final class AnimateurManager extends Component
             ];
         }
 
+        $this->modalStep = 'form';
+        $this->modalPieceJointe = null;
+        $this->existingPieceJointeNom = $transaction->piece_jointe_nom;
+        $this->existingPieceJointeUrl = $transaction->pieceJointeUrl();
+
         $this->showModal = true;
     }
 
@@ -165,6 +207,10 @@ final class AnimateurManager extends Component
         $this->modalCompteId = null;
         $this->modalLignes = [];
         $this->errorMessage = '';
+        $this->modalStep = 'form';
+        $this->modalPieceJointe = null;
+        $this->existingPieceJointeNom = null;
+        $this->existingPieceJointeUrl = null;
     }
 
     public function addModalLigne(): void
@@ -264,12 +310,19 @@ final class AnimateurManager extends Component
 
         try {
             $service = app(TransactionService::class);
+            $savedTransaction = null;
 
             if ($this->isEditing && $this->editingTransactionId !== null) {
                 $transaction = Transaction::findOrFail($this->editingTransactionId);
                 $service->update($transaction, $data, $lignes);
+                $savedTransaction = $transaction;
             } else {
-                $service->create($data, $lignes);
+                $savedTransaction = $service->create($data, $lignes);
+            }
+
+            // Sauvegarder la pièce jointe si uploadée
+            if ($this->modalPieceJointe !== null && $savedTransaction !== null) {
+                $service->storePieceJointe($savedTransaction, $this->modalPieceJointe);
             }
 
             $this->closeModal();
