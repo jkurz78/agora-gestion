@@ -102,7 +102,7 @@
                             @endisset
                             @isset($summary['factures'])
                                 <a href="{{ route('compta.factures') }}" class="text-decoration-none text-nowrap text-dark">
-                                    <span class="badge bg-danger" style="font-size:.65rem">{{ $summary['factures']['count'] }} DEP</span>
+                                    <span class="badge bg-danger" style="font-size:.65rem">{{ $summary['factures']['count'] }} FAC</span>
                                     {{ number_format((float)$summary['factures']['total'], 2, ',', ' ') }} €
                                     @if($summary['factures']['impayees'] > 0)
                                         <span class="badge bg-danger rounded-pill" style="font-size:.55rem">{{ $summary['factures']['impayees'] }} imp.</span>
