@@ -33,8 +33,11 @@ class AuthenticatedSessionController extends Controller
         $user = $request->user();
 
         if ($user->hasTwoFactorEnabled() && $user->two_factor_method === TwoFactorMethod::Email) {
-            app(TwoFactorService::class)->generateEmailCode($user);
-            $request->session()->put('two_factor_code_sent', true);
+            $twoFactorService = app(TwoFactorService::class);
+            if (! $twoFactorService->isTrustedBrowser($request, $user)) {
+                $twoFactorService->generateEmailCode($user);
+                $request->session()->put('two_factor_code_sent', true);
+            }
         }
 
         return redirect()->intended(route('home', absolute: false));
