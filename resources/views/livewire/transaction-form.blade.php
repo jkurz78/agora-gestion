@@ -125,7 +125,7 @@
                         </div>
                         <div class="col-md-2">
                             <label class="form-label">Tiers</label>
-                            <livewire:tiers-autocomplete wire:model="tiers_id" filtre="{{ $type === 'depense' ? 'depenses' : 'recettes' }}" :key="'transaction-tiers-'.($transactionId ?? 'new').'-'.($tiers_id ?? '0')" />
+                            <livewire:tiers-autocomplete wire:model="tiers_id" filtre="{{ $type === 'depense' ? 'depenses' : 'recettes' }}" :defaultSearch="$ocrTiersNom ?? ''" :key="'transaction-tiers-'.($transactionId ?? 'new').'-'.($tiers_id ?? '0').'-'.($ocrTiersNom ?? '')" />
                             @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
