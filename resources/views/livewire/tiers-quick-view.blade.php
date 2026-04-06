@@ -185,21 +185,27 @@
                             </div>
                             <ul class="list-unstyled ms-3 mb-0">
                                 @isset($summary['referent']['refere_par'])
-                                    <li class="small text-muted">
-                                        <i class="bi bi-person-fill me-1"></i><em>Référé par :</em>
-                                        {{ $summary['referent']['refere_par']->displayName() }}
+                                    <li class="small text-muted mb-1">
+                                        <i class="bi bi-person-fill me-1"></i><em>A référé :</em>
+                                        @foreach($summary['referent']['refere_par'] as $r)
+                                            <div class="ps-3">{{ $r['nom'] }}@if($r['operation']) <span class="text-muted">— {{ $r['operation'] }}</span>@endif</div>
+                                        @endforeach
                                     </li>
                                 @endisset
                                 @isset($summary['referent']['medecin'])
-                                    <li class="small text-muted">
-                                        <i class="bi bi-hospital me-1"></i><em>Médecin :</em>
-                                        {{ $summary['referent']['medecin']->displayName() }}
+                                    <li class="small text-muted mb-1">
+                                        <i class="bi bi-hospital me-1"></i><em>Médecin de :</em>
+                                        @foreach($summary['referent']['medecin'] as $r)
+                                            <div class="ps-3">{{ $r['nom'] }}@if($r['operation']) <span class="text-muted">— {{ $r['operation'] }}</span>@endif</div>
+                                        @endforeach
                                     </li>
                                 @endisset
                                 @isset($summary['referent']['therapeute'])
-                                    <li class="small text-muted">
-                                        <i class="bi bi-heart-pulse me-1"></i><em>Thérapeute :</em>
-                                        {{ $summary['referent']['therapeute']->displayName() }}
+                                    <li class="small text-muted mb-1">
+                                        <i class="bi bi-heart-pulse me-1"></i><em>Thérapeute de :</em>
+                                        @foreach($summary['referent']['therapeute'] as $r)
+                                            <div class="ps-3">{{ $r['nom'] }}@if($r['operation']) <span class="text-muted">— {{ $r['operation'] }}</span>@endif</div>
+                                        @endforeach
                                     </li>
                                 @endisset
                             </ul>
