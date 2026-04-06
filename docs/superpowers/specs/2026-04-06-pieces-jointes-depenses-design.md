@@ -131,6 +131,15 @@ GET /transactions/{transaction}/piece-jointe
 - Réponse : `Storage::response($path, $nom_original, ['Content-Type' => $mime])`
 - 404 si pas de pièce jointe
 
+## Sécurité
+
+- **Validation Laravel** : règles `mimes:pdf,jpg,jpeg,png` + `max:10240` (10 Mo). La règle `mimes` vérifie le contenu réel du fichier (magic bytes), pas seulement l'extension
+- **Vérification MIME côté service** : `$file->getMimeType()` (basé sur libmagic) comparé à une whitelist (`application/pdf`, `image/jpeg`, `image/png`) avant stockage
+- **Nom de fichier sanitisé** : le fichier est stocké sous un nom généré (`justificatif.{ext}`), jamais le nom original — le nom original est conservé uniquement en base (`piece_jointe_nom`) pour le Content-Disposition au téléchargement
+- **Stockage privé** : `storage/app/private/` n'est pas servi par le serveur web — un fichier malveillant ne peut pas être exécuté par URL directe
+- **Consultation via contrôleur uniquement** : le fichier est servi par `Storage::response()` avec le MIME stocké en base, pas celui deviné à la volée
+- **Path traversal** : non applicable — le chemin est construit par le code (`pieces-jointes/{id}/justificatif.{ext}`), le nom original du fichier n'est jamais utilisé dans le chemin de stockage
+
 ## Tests
 
 - **TransactionService** : test upload, remplacement (l'ancien fichier est supprimé), suppression, vérification des colonnes
