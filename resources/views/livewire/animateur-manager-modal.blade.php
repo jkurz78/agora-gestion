@@ -40,8 +40,9 @@
                         <input type="date" class="form-control form-control-sm" wire:model="modalDate">
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label" style="font-size:12px">R&eacute;f&eacute;rence <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control form-control-sm" wire:model="modalReference" placeholder="FA-001">
+                        <label class="form-label" style="font-size:12px">N° facture <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control form-control-sm" wire:model="modalReference" placeholder="FA-001"
+                               x-init="$nextTick(() => $el.focus())" autofocus>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label" style="font-size:12px">Mode paiement</label>
