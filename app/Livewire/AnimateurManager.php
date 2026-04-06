@@ -131,6 +131,23 @@ final class AnimateurManager extends Component
         $this->modalPieceJointe = null;
     }
 
+    public function removePieceJointe(): void
+    {
+        $this->modalPieceJointe = null;
+        $this->previewUrl = null;
+        $this->previewMime = null;
+        $this->existingPieceJointeNom = null;
+        $this->existingPieceJointeUrl = null;
+
+        // Supprimer la PJ existante en base si on est en édition
+        if ($this->isEditing && $this->editingTransactionId !== null) {
+            $transaction = Transaction::find($this->editingTransactionId);
+            if ($transaction?->hasPieceJointe()) {
+                app(TransactionService::class)->deletePieceJointe($transaction);
+            }
+        }
+    }
+
     public function updatedModalPieceJointe(): void
     {
         $this->proceedWithFile();
