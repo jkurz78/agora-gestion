@@ -75,7 +75,9 @@
                                     </div>
                                 </template>
                                 <template x-if="!previewMime || !previewMime.startsWith('image/')">
-                                    <iframe :src="previewUrl + '#navpanes=0'" class="flex-grow-1 border rounded" style="width:100%;min-height:0"></iframe>
+                                    <div class="flex-grow-1 border rounded overflow-hidden" style="min-height:0">
+                                        <iframe :src="previewUrl + '#navpanes=0'" style="border:none;width:100%;height:100%"></iframe>
+                                    </div>
                                 </template>
 
                                 <div class="text-center py-1 small text-muted" x-text="previewName"></div>
