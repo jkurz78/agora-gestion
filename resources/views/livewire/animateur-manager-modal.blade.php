@@ -71,7 +71,7 @@
 
             @else
                 {{-- Step 2: Formulaire (avec ou sans split view) --}}
-                <div class="modal-body"
+                <div class="modal-body" style="overflow-x:hidden"
                      x-data="{
                          previewUrl: sessionStorage.getItem('pj-preview-url') || @js($previewUrl),
                          previewMime: sessionStorage.getItem('pj-preview-mime') || @js($previewMime),
@@ -79,7 +79,7 @@
                          scale: 1
                      }">
 
-                    <div class="row">
+                    <div class="row g-0">
                         {{-- Colonne gauche : prévisualisation --}}
                         <template x-if="previewUrl">
                         <div class="col-md-5" style="overflow:hidden">
