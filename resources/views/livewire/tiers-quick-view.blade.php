@@ -70,6 +70,7 @@
                         || isset($summary['participations'])
                         || isset($summary['referent'])
                         || isset($summary['factures']);
+                    // cotisations shown in header, factures in flux line — but still count for "has activity"
                 @endphp
 
                 @if(!$hasSections)
@@ -78,25 +79,34 @@
                     </p>
                 @else
 
-                    {{-- Flux financiers (ligne compacte) --}}
-                    @if(isset($summary['recettes']) || isset($summary['dons']) || isset($summary['depenses']))
+                    {{-- Flux financiers (ligne compacte avec badges) --}}
+                    @if(isset($summary['recettes']) || isset($summary['dons']) || isset($summary['depenses']) || isset($summary['factures']))
                         <div class="d-flex flex-wrap gap-3 mb-3 small">
                             @isset($summary['recettes'])
-                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap" style="color:#198754">
-                                    <i class="bi bi-arrow-down-circle-fill me-1"></i><strong>Recettes</strong>
+                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
+                                    <span class="badge bg-success" style="font-size:.65rem">REC</span>
                                     ({{ $summary['recettes']['count'] }}) {{ number_format((float)$summary['recettes']['total'], 2, ',', ' ') }} €
                                 </a>
                             @endisset
                             @isset($summary['dons'])
-                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap" style="color:#e67e00">
-                                    <i class="bi bi-heart-fill me-1"></i><strong>Dons</strong>
+                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
+                                    <span class="badge bg-warning text-dark" style="font-size:.65rem">DON</span>
                                     ({{ $summary['dons']['count'] }}) {{ number_format((float)$summary['dons']['total'], 2, ',', ' ') }} €
                                 </a>
                             @endisset
                             @isset($summary['depenses'])
-                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap" style="color:#dc3545">
-                                    <i class="bi bi-arrow-up-circle-fill me-1"></i><strong>Dépenses</strong>
+                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
+                                    <span class="badge bg-danger" style="font-size:.65rem">DEP</span>
                                     ({{ $summary['depenses']['count'] }}) {{ number_format((float)$summary['depenses']['total'], 2, ',', ' ') }} €
+                                </a>
+                            @endisset
+                            @isset($summary['factures'])
+                                <a href="{{ route('compta.factures') }}" class="text-decoration-none text-nowrap text-dark">
+                                    <span class="badge bg-secondary" style="font-size:.65rem">FAC</span>
+                                    ({{ $summary['factures']['count'] }}) {{ number_format((float)$summary['factures']['total'], 2, ',', ' ') }} €
+                                    @if($summary['factures']['impayees'] > 0)
+                                        <span class="badge bg-danger rounded-pill" style="font-size:.55rem">{{ $summary['factures']['impayees'] }} imp.</span>
+                                    @endif
                                 </a>
                             @endisset
                         </div>
@@ -180,26 +190,7 @@
                         </div>
                     @endisset
 
-                    {{-- Factures --}}
-                    @isset($summary['factures'])
-                        <div class="mb-3">
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="bi bi-receipt small text-dark"></i>
-                                <span class="fw-semibold small">Factures</span>
-                                <a href="{{ route('compta.factures') }}"
-                                   class="text-muted small text-decoration-none" target="_blank">
-                                    {{ $summary['factures']['count'] }}
-                                    &bull; {{ number_format((float)$summary['factures']['total'], 2, ',', ' ') }}&nbsp;€
-                                    <i class="bi bi-box-arrow-up-right small"></i>
-                                </a>
-                                @if($summary['factures']['impayees'] > 0)
-                                    <span class="badge bg-danger rounded-pill small">
-                                        {{ $summary['factures']['impayees'] }} impayée{{ $summary['factures']['impayees'] > 1 ? 's' : '' }}
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                    @endisset
+                    {{-- Factures moved to flux financiers line --}}
 
                 @endif
             </div>
