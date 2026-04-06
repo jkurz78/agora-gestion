@@ -302,6 +302,9 @@
                         {{-- Référé par --}}
                         <td class="small" data-sort="{{ $p->referePar?->displayName() ?? '' }}">
                             {{ $p->referePar?->displayName() ?? '—' }}
+                            @if($p->refere_par_id)
+                                <x-tiers-info-icon :tiersId="$p->refere_par_id" />
+                            @endif
                         </td>
 
                         {{-- Notes icon --}}

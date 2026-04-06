@@ -4,6 +4,7 @@
         <div class="d-flex align-items-center gap-2 px-3 py-2 border rounded" style="background:#f0e8f5;border-color:#c9a8d8!important">
             <span class="text-muted" style="font-size:.75rem">{{ $selectedType === 'entreprise' ? '🏢' : '👤' }}</span>
             <span class="fw-medium">{{ $selectedLabel }}</span>
+            <x-tiers-info-icon :tiersId="$tiersId" />
             <button type="button" class="btn-close btn-close-sm ms-auto" wire:click="clearTiers" aria-label="Effacer"></button>
         </div>
     @else

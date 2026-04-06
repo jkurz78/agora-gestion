@@ -91,7 +91,12 @@
                             <td class="small text-nowrap" data-sort="{{ $facture->date->format('Y-m-d') }}">
                                 {{ $facture->date->format('d/m/Y') }}
                             </td>
-                            <td class="small">{{ $facture->tiers?->displayName() }}</td>
+                            <td class="small">
+                                {{ $facture->tiers?->displayName() }}
+                                @if($facture->tiers_id)
+                                    <x-tiers-info-icon :tiersId="$facture->tiers_id" />
+                                @endif
+                            </td>
                             @php $montantCalcule = $facture->montantCalcule(); @endphp
                             <td class="text-end small text-nowrap fw-semibold" data-sort="{{ $montantCalcule }}">
                                 {{ number_format($montantCalcule, 2, ',', "\u{202F}") }}&nbsp;&euro;
