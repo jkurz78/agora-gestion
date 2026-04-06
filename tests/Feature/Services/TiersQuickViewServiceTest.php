@@ -129,6 +129,7 @@ describe('depenses', function (): void {
         $groupe = $result['depenses']['par_operation'][0];
         expect($groupe['operation_id'])->toBe($op->id)
             ->and($groupe['operation_nom'])->toBe('Yoga Adultes')
+            ->and($groupe['sous_categorie'])->toBe('Inscription')
             ->and($groupe['count'])->toBe(2)
             ->and((float) $groupe['total'])->toBe(120.00);
     });
@@ -146,6 +147,16 @@ describe('depenses', function (): void {
     test('exclut les dépenses soft-deletées', function (): void {
         $tx = makeDepense($this->tiers->id, 100.00, '2025-10-01');
         $tx->delete();
+
+        $result = $this->service->getSummary($this->tiers, $this->exercice);
+
+        expect($result)->not->toHaveKey('depenses');
+    });
+
+    test('exclut les transaction_lignes soft-deletées', function (): void {
+        $tx = makeDepense($this->tiers->id, 100.00, '2025-10-01');
+        // Soft-delete the ligne, not the transaction
+        TransactionLigne::where('transaction_id', $tx->id)->first()->delete();
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
