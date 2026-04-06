@@ -1,0 +1,146 @@
+<div class="mt-2" style="max-width:100%;overflow:hidden">
+    @php
+        $fmt = fn(float $v): string => number_format($v, 2, ',', "\u{202F}");
+        $seanceNums = $seances->pluck('numero')->toArray();
+        $animateurList = $matrixData['animateurs'];
+        $seanceTotals = $matrixData['seanceTotals'];
+        $grandTotal = $matrixData['grandTotal'];
+        $colCount = count($seanceNums);
+    @endphp
+
+    @if(empty($animateurList))
+        <div class="text-center text-muted py-4">
+            <i class="bi bi-person-workspace" style="font-size:2rem;opacity:0.3"></i>
+            <p class="mt-2">Aucune facture d'animateur enregistr&eacute;e pour cette op&eacute;ration.</p>
+        </div>
+    @else
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 180 + ($colCount * 110) + 100 }}px">
+                <colgroup>
+                    <col style="width:180px">
+                    @for($i = 0; $i < $colCount; $i++)<col style="width:110px">@endfor
+                    <col style="width:100px">
+                </colgroup>
+                <thead>
+                    <tr style="background:#3d5473;color:#fff">
+                        <th style="position:sticky;left:0;z-index:2;background:#3d5473;font-size:12px;min-width:180px">Animateur</th>
+                        @foreach($seances as $seance)
+                            <th style="text-align:center;font-size:12px">S{{ $seance->numero }}</th>
+                        @endforeach
+                        <th style="text-align:center;font-size:12px">Total</th>
+                    </tr>
+                    @if($seances->contains(fn($s) => $s->date || $s->titre))
+                    <tr>
+                        @php $hasInfo = false; @endphp
+                        <td style="position:sticky;left:0;z-index:2;background:#f8f9fa"></td>
+                        @foreach($seances as $seance)
+                            <td style="background:#f8f9fa;text-align:center;font-size:10px;color:#6c757d">
+                                @if($seance->titre){{ $seance->titre }}@endif
+                                @if($seance->date)<br>{{ $seance->date->format('d/m') }}@endif
+                            </td>
+                        @endforeach
+                        <td style="background:#f8f9fa"></td>
+                    </tr>
+                    @endif
+                </thead>
+                <tbody>
+                    @foreach($animateurList as $tiersId => $anim)
+                        {{-- Parent row: animateur name + totals --}}
+                        <tr style="background:#eef1f5">
+                            <td style="position:sticky;left:0;z-index:1;background:#eef1f5;font-weight:600;padding:4px 8px;white-space:nowrap;font-size:12px">
+                                {{ $anim['tiersName'] }}
+                            </td>
+                            @foreach($seanceNums as $num)
+                                @php
+                                    $key = (string) $num;
+                                    $val = $anim['seanceTotals'][$key] ?? 0;
+                                @endphp
+                                <td style="text-align:center;font-weight:600;padding:4px 6px;vertical-align:middle">
+                                    <div class="d-flex align-items-center justify-content-center gap-1">
+                                        @if($val > 0)
+                                            <span>{{ $fmt($val) }}</span>
+                                        @endif
+                                        <button class="btn btn-sm p-0 ms-1" style="color:#198754;font-size:14px;line-height:1;border:none;background:none"
+                                                wire:click="openCreateModal({{ $tiersId }}, {{ $num }})"
+                                                title="Nouvelle facture pour S{{ $num }}">&#8853;</button>
+                                    </div>
+                                </td>
+                            @endforeach
+                            <td style="text-align:center;font-weight:700;padding:4px 6px">
+                                {{ $fmt($anim['total']) }}
+                            </td>
+                        </tr>
+                        {{-- Sub-rows per sous-catégorie --}}
+                        @foreach($anim['sousCategories'] as $scId => $sc)
+                            <tr>
+                                <td style="position:sticky;left:0;z-index:1;background:#fff;padding:2px 8px 2px 20px;font-size:11px;color:#6c757d;white-space:nowrap">
+                                    {{ $sc['scName'] }}
+                                </td>
+                                @foreach($seanceNums as $num)
+                                    @php
+                                        $key = (string) $num;
+                                        $cell = $sc['seanceAmounts'][$key] ?? null;
+                                    @endphp
+                                    <td style="text-align:center;padding:2px 6px;font-size:11px">
+                                        @if($cell && $cell['montant'] > 0)
+                                            <span style="cursor:pointer;text-decoration:underline dotted;color:#0d6efd"
+                                                  wire:click="openEditModal(@js($cell['transactionIds']))"
+                                                  title="Modifier la transaction">
+                                                {{ $fmt($cell['montant']) }}
+                                            </span>
+                                        @else
+                                            <span style="color:#ccc">&mdash;</span>
+                                        @endif
+                                    </td>
+                                @endforeach
+                                <td style="text-align:center;padding:2px 6px;font-size:11px;font-weight:500">
+                                    {{ $fmt($sc['total']) }}
+                                </td>
+                            </tr>
+                        @endforeach
+
+                        {{-- Transversal (null seance) amounts if any --}}
+                        @php $hasNull = false; @endphp
+                        @foreach($anim['sousCategories'] as $scId => $sc)
+                            @if(isset($sc['seanceAmounts']['null']))
+                                @php $hasNull = true; @endphp
+                            @endif
+                        @endforeach
+                        @if($hasNull && $colCount > 0)
+                            <tr>
+                                <td colspan="{{ 1 + $colCount + 1 }}" style="padding:2px 8px 2px 20px;font-size:10px;color:#888;background:#fffdf0">
+                                    <i class="bi bi-info-circle me-1"></i>Ce tiers a aussi des d&eacute;penses sans s&eacute;ance affect&eacute;e (incluses dans le total)
+                                </td>
+                            </tr>
+                        @endif
+                    @endforeach
+                </tbody>
+                <tfoot>
+                    <tr style="background:#eef1f5;font-weight:600;font-size:12px">
+                        <td style="position:sticky;left:0;z-index:1;background:#eef1f5;padding:6px 8px">Total</td>
+                        @foreach($seanceNums as $num)
+                            @php $key = (string) $num; @endphp
+                            <td style="text-align:center">
+                                {{ $fmt($seanceTotals[$key] ?? 0) }}
+                            </td>
+                        @endforeach
+                        <td style="text-align:center;font-weight:700">
+                            {{ $fmt($grandTotal) }}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    @endif
+
+    {{-- Ajouter un animateur --}}
+    <div class="mt-3 p-3 border rounded" style="max-width:400px;background:#fafafa">
+        <label class="form-label fw-medium" style="font-size:13px">
+            <i class="bi bi-plus-circle me-1"></i>Ajouter un animateur
+        </label>
+        <livewire:tiers-autocomplete wire:model="newTiersId" filtre="depenses" :key="'anim-tiers-'.$operation->id" />
+    </div>
+
+    {{-- Modal --}}
+    @include('livewire.animateur-manager-modal')
+</div>
