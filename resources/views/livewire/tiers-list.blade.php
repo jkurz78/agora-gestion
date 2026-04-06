@@ -71,6 +71,7 @@
                         <td class="fw-semibold">
                             {{ $tiers->type === 'entreprise' ? '🏢' : '👤' }}
                             {{ $tiers->displayName() }}
+                            <x-tiers-info-icon :tiersId="$tiers->id" />
                             @if ($tiers->est_helloasso)
                                 <span class="badge text-bg-info ms-1" style="font-size:.6rem" title="Synchronisé depuis HelloAsso">HA</span>
                             @endif

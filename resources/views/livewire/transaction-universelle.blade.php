@@ -489,6 +489,9 @@
                                     <i class="bi bi-bank text-muted me-1" style="font-size:.7rem"></i>
                                 @endif
                                 {{ $tx->tiers }}
+                                @if($tx->tiers_id)
+                                    <x-tiers-info-icon :tiersId="$tx->tiers_id" />
+                                @endif
                             @else
                                 <span class="text-muted">—</span>
                             @endif
