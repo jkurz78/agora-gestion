@@ -25,6 +25,9 @@ final class AnimateurManager extends Component
     // --- Tiers autocomplete for adding new animateur ---
     public ?int $newTiersId = null;
 
+    /** @var array<int> Tiers IDs ajoutés manuellement (pas encore de transaction) */
+    public array $addedTiersIds = [];
+
     // --- Modal state ---
     public bool $showModal = false;
 
@@ -57,7 +60,9 @@ final class AnimateurManager extends Component
     public function updatedNewTiersId(?int $value): void
     {
         if ($value !== null) {
-            $this->openCreateModal($value, null);
+            if (! in_array($value, $this->addedTiersIds, true)) {
+                $this->addedTiersIds[] = $value;
+            }
             $this->newTiersId = null;
         }
     }
@@ -414,6 +419,28 @@ final class AnimateurManager extends Component
             $seanceTotals[$seanceKey] += $montant;
             $grandTotal += $montant;
         }
+
+        // Merge manually added tiers (no transactions yet)
+        foreach ($this->addedTiersIds as $addedId) {
+            if (! isset($animateurs[$addedId])) {
+                $tiers = Tiers::find($addedId);
+                if ($tiers !== null) {
+                    $animateurs[$addedId] = [
+                        'tiersId' => $addedId,
+                        'tiersName' => $tiers->displayName(),
+                        'sousCategories' => [],
+                        'seanceTotals' => [],
+                        'total' => 0.0,
+                    ];
+                }
+            }
+        }
+
+        // Remove from addedTiersIds those that now have transactions
+        $this->addedTiersIds = array_values(array_filter(
+            $this->addedTiersIds,
+            fn (int $id): bool => ! isset($animateurs[$id]) || $animateurs[$id]['total'] === 0.0
+        ));
 
         // Sort animateurs by name
         uasort($animateurs, fn (array $a, array $b): int => strcasecmp($a['tiersName'], $b['tiersName']));
