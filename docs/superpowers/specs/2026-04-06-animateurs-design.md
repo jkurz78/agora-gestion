@@ -20,22 +20,21 @@ WHERE tl.operation_id = :operation_id
   AND tx.type = 'depense'
 ```
 
-## Migration : `seance` → `seance_id`
+## Modèle de données : pas de migration
 
-### Sur `transaction_lignes`
+Le champ `seance` (entier) sur `transaction_lignes` est **conservé tel quel**. Pas de FK vers `seances`.
 
-- **Ajouter** `seance_id` (bigint unsigned, nullable, FK vers `seances`, nullOnDelete)
-- **Migrer les données** : pour chaque ligne ayant `seance` (entier) ET `operation_id`, rechercher `seances.id` via `seances.operation_id = tl.operation_id AND seances.numero = tl.seance`. Si aucune séance ne matche (données orphelines), `seance_id` reste null
-- **Supprimer** l'ancien champ `seance` (entier)
-- **Modèle** `TransactionLigne` : ajouter relation `belongsTo(Seance)`
+La matrice joint sur les deux colonnes existantes :
 
-### Impact code existant
+```sql
+LEFT JOIN seances s
+  ON s.operation_id = tl.operation_id
+  AND s.numero = tl.seance
+```
 
-Tous les écrans qui lisent/écrivent le champ `seance` (entier) sur `TransactionLigne` doivent basculer vers `seance_id` (FK). À auditer :
-- Saisie de dépenses
-- Saisie de recettes
-- Affichage des lignes de transaction
-- Exports / rapports
+**Justification** : une FK introduirait des risques sur l'existant — orphelins si les séances sont créées après les transactions, blocage de la saisie libre côté Compta, impact sur les restitutions. Le join sur `(operation_id, numero)` est fiable (couple unique dans `seances`) et ne touche à rien.
+
+**Aucun impact** sur le code existant ni les rapports.
 
 ## Composant Livewire : `AnimateurManager`
 
@@ -47,7 +46,7 @@ Nouvel onglet "Animateurs" dans `OperationDetail`, positionné juste à droite d
 
 - Séances de l'opération (colonnes)
 - Tiers distincts ayant des dépenses liées à cette opération (lignes)
-- `TransactionLigne` groupées par (`tiers_id`, `seance_id`, `sous_categorie_id`) avec `SUM(montant)`
+- `TransactionLigne` groupées par (`tiers_id`, `seance` (numéro), `sous_categorie_id`) avec `SUM(montant)`, jointes aux `seances` via `operation_id + numero`
 
 ### Structure de la matrice
 
@@ -132,7 +131,7 @@ Crée :
   - `montant_total` = somme des montants des lignes
 - N `TransactionLigne` avec :
   - `operation_id` = opération choisie par ligne
-  - `seance_id` = séance choisie par ligne (nullable)
+  - `seance` = numéro de la séance choisie (nullable, entier)
   - `sous_categorie_id` = sous-catégorie choisie
   - `montant` = montant saisi
   - `notes` = `{opération.nom} — Séance {seance.numero} — {sous_catégorie.nom}`
