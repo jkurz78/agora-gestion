@@ -25,6 +25,7 @@ final class Association extends Model
         'facture_mentions_legales',
         'facture_mentions_penalites',
         'facture_compte_bancaire_id',
+        'anthropic_api_key',
     ];
 
     protected function casts(): array
@@ -40,6 +41,7 @@ final class Association extends Model
             'logo_path' => 'string',
             'cachet_signature_path' => 'string',
             'facture_compte_bancaire_id' => 'integer',
+            'anthropic_api_key' => 'encrypted',
         ];
     }
 }
