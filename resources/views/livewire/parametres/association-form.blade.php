@@ -20,6 +20,12 @@
                 <i class="bi bi-receipt"></i> Facturation
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-ocr" data-bs-toggle="tab" data-bs-target="#pane-ocr"
+                    type="button" role="tab" aria-controls="pane-ocr" aria-selected="false">
+                <i class="bi bi-robot"></i> OCR / IA
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content">
@@ -157,6 +163,36 @@
                         <span wire:loading>Enregistrement…</span>
                     </button>
 
+                </div>
+            </div>
+        </div>
+
+        {{-- Onglet OCR / IA --}}
+        <div class="tab-pane fade" id="pane-ocr" role="tabpanel" aria-labelledby="tab-ocr">
+            <div class="card" style="max-width: 640px;">
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Renseignez une clé API Anthropic pour activer l'analyse automatique des factures fournisseur.
+                        L'analyse utilise Claude Vision pour extraire la date, le tiers, les lignes et montants.
+                    </p>
+
+                    <div class="mb-4">
+                        <label class="form-label">Clé API Anthropic</label>
+                        <input type="password" class="form-control @error('anthropic_api_key') is-invalid @enderror"
+                               wire:model="anthropic_api_key"
+                               placeholder="sk-ant-api03-...">
+                        @error('anthropic_api_key') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        @if($anthropic_api_key)
+                            <div class="form-text text-success"><i class="bi bi-check-circle"></i> Clé configurée — OCR actif</div>
+                        @else
+                            <div class="form-text text-muted">OCR désactivé — aucune clé configurée</div>
+                        @endif
+                    </div>
+
+                    <button type="button" class="btn btn-primary" wire:click="save" wire:loading.attr="disabled">
+                        <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
+                        <span wire:loading>Enregistrement…</span>
+                    </button>
                 </div>
             </div>
         </div>
