@@ -1,6 +1,6 @@
 @if($showModal)
-<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)" wire:click.self="closeModal">
-    <div class="modal-dialog {{ ($modalStep === 'form' && $previewUrl) ? 'modal-xl' : 'modal-lg' }}">
+<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)" wire:click.self="closeModal" @click.self="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')">
+    <div class="modal-dialog {{ ($modalStep === 'form' && ($previewUrl || $modalPieceJointe)) ? 'modal-xl' : 'modal-lg' }}">
         <div class="modal-content">
             <div class="modal-header py-2">
                 <h6 class="modal-title">
@@ -10,39 +10,60 @@
                         {{ $isEditing ? 'Modifier la facture' : 'Nouvelle facture d\'encadrement' }}
                     @endif
                 </h6>
-                <button type="button" class="btn-close" wire:click="closeModal"></button>
+                <button type="button" class="btn-close" wire:click="closeModal" @click="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')"></button>
             </div>
 
             @if($modalStep === 'upload')
                 {{-- Step 1: Upload --}}
-                <div class="modal-body text-center py-5">
+                <div class="modal-body text-center py-5"
+                     x-data="{ fileName: null, fileUrl: null, fileMime: null }"
+                     x-on:piece-jointe-ready.window="fileName = $event.detail.name; fileUrl = $event.detail.url; fileMime = $event.detail.mime">
                     <div class="mb-4">
                         <i class="bi bi-cloud-arrow-up" style="font-size:3rem;color:#6c757d"></i>
                         <p class="mt-2 text-muted">Uploadez la facture du fournisseur pour l'afficher pendant la saisie</p>
                     </div>
 
-                    @if($modalPieceJointe)
-                        <div class="mb-3">
-                            <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i>{{ $modalPieceJointe->getClientOriginalName() }}</span>
+                    <template x-if="fileName">
+                        <div>
+                            <div class="mb-3">
+                                <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i><span x-text="fileName"></span></span>
+                            </div>
+                            <button type="button" class="btn btn-primary" wire:click="proceedWithFile">
+                                <i class="bi bi-arrow-right me-1"></i> Continuer avec ce fichier
+                            </button>
                         </div>
-                        <button type="button" class="btn btn-primary" wire:click="proceedWithFile">
-                            <i class="bi bi-arrow-right me-1"></i> Continuer avec ce fichier
-                        </button>
-                    @else
-                        <label class="btn btn-primary btn-lg mb-3">
-                            <i class="bi bi-upload me-2"></i> Choisir un fichier
-                            <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
-                        </label>
-                        <div wire:loading wire:target="modalPieceJointe" class="mt-2">
-                            <div class="spinner-border spinner-border-sm text-primary"></div>
-                            <span class="text-muted small">Upload en cours...</span>
+                    </template>
+
+                    <template x-if="!fileName">
+                        <div>
+                            <label class="btn btn-primary btn-lg mb-3">
+                                <i class="bi bi-upload me-2"></i> Choisir un fichier
+                                <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                       x-ref="fileInput"
+                                       @change="
+                                           const file = $event.target.files[0];
+                                           if (file) {
+                                               fileName = file.name;
+                                               fileMime = file.type;
+                                               fileUrl = URL.createObjectURL(file);
+                                               sessionStorage.setItem('pj-preview-url', fileUrl);
+                                               sessionStorage.setItem('pj-preview-mime', fileMime);
+                                               sessionStorage.setItem('pj-preview-name', fileName);
+                                           }
+                                       ">
+                            </label>
+                            <div wire:loading wire:target="modalPieceJointe" class="mt-2">
+                                <div class="spinner-border spinner-border-sm text-primary"></div>
+                                <span class="text-muted small">Upload en cours...</span>
+                            </div>
                         </div>
-                    @endif
+                    </template>
 
                     @error('modalPieceJointe') <div class="text-danger small mt-2">{{ $message }}</div> @enderror
 
                     <div class="mt-4">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="skipUpload">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="skipUpload"
+                                @click="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')">
                             Ignorer <i class="bi bi-arrow-right ms-1"></i>
                         </button>
                     </div>
@@ -50,39 +71,41 @@
 
             @else
                 {{-- Step 2: Formulaire (avec ou sans split view) --}}
-                <div class="modal-body">
-                    @php
-                        $hasPieceJointe = $previewUrl !== null;
-                    @endphp
+                <div class="modal-body"
+                     x-data="{
+                         previewUrl: sessionStorage.getItem('pj-preview-url') || {{ $previewUrl ? \"'\" . $previewUrl . \"'\" : 'null' }},
+                         previewMime: sessionStorage.getItem('pj-preview-mime') || {{ $previewMime ? \"'\" . $previewMime . \"'\" : 'null' }},
+                         previewName: sessionStorage.getItem('pj-preview-name') || {{ $existingPieceJointeNom ? \"'\" . addslashes($existingPieceJointeNom) . \"'\" : 'null' }},
+                         scale: 1
+                     }">
 
                     <div class="row">
                         {{-- Colonne gauche : prévisualisation --}}
-                        @if($hasPieceJointe)
+                        <template x-if="previewUrl">
                         <div class="col-md-5">
                             <div class="border rounded p-1 h-100 d-flex flex-column" style="min-height:500px">
-                                @if($previewMime && str_starts_with($previewMime, 'image/'))
-                                    <div class="flex-grow-1 overflow-auto text-center p-2" x-data="{ scale: 1 }">
+                                <template x-if="previewMime && previewMime.startsWith('image/')">
+                                    <div class="flex-grow-1 overflow-auto text-center p-2">
                                         <div class="mb-2">
                                             <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.max(0.25, scale - 0.25)"><i class="bi bi-dash-lg"></i></button>
                                             <span class="mx-2 small" x-text="Math.round(scale * 100) + '%'"></span>
                                             <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.min(3, scale + 0.25)"><i class="bi bi-plus-lg"></i></button>
                                             <button type="button" class="btn btn-sm btn-outline-secondary ms-1" @click="scale = 1">1:1</button>
                                         </div>
-                                        <img src="{{ $previewUrl }}" :style="'transform: scale(' + scale + '); transform-origin: top center'" class="img-fluid">
+                                        <img :src="previewUrl" :style="'transform: scale(' + scale + '); transform-origin: top center'" class="img-fluid">
                                     </div>
-                                @else
-                                    <iframe src="{{ $previewUrl }}" class="flex-grow-1 w-100" style="border:none;min-height:500px"></iframe>
-                                @endif
+                                </template>
+                                <template x-if="!previewMime || !previewMime.startsWith('image/')">
+                                    <iframe :src="previewUrl" class="flex-grow-1 w-100" style="border:none;min-height:500px"></iframe>
+                                </template>
 
-                                <div class="text-center py-1 small text-muted border-top">
-                                    {{ $modalPieceJointe ? $modalPieceJointe->getClientOriginalName() : $existingPieceJointeNom }}
-                                </div>
+                                <div class="text-center py-1 small text-muted border-top" x-text="previewName"></div>
                             </div>
                         </div>
-                        @endif
+                        </template>
 
                         {{-- Colonne droite (ou pleine largeur) : formulaire --}}
-                        <div class="{{ $hasPieceJointe ? 'col-md-7' : 'col-12' }}">
+                        <div :class="previewUrl ? 'col-md-7' : 'col-12'">
                             {{-- Error message --}}
                             @if($errorMessage)
                                 <div class="alert alert-danger py-2 small">{{ $errorMessage }}</div>
@@ -231,9 +254,10 @@
                         <strong>Total : {{ number_format($modalTotal, 2, ',', "\u{202F}") }} &euro;</strong>
                     </div>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="closeModal">Annuler</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="closeModal" @click="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')">Annuler</button>
                         <button type="button" class="btn btn-sm btn-primary" wire:click="saveTransaction"
-                                wire:loading.attr="disabled" wire:target="saveTransaction">
+                                wire:loading.attr="disabled" wire:target="saveTransaction"
+                                @click="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')">
                             <span wire:loading.remove wire:target="saveTransaction">
                                 <i class="bi bi-check-lg me-1"></i>{{ $isEditing ? 'Mettre &agrave; jour' : 'Enregistrer' }}
                             </span>
