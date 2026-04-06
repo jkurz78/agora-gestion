@@ -73,9 +73,9 @@
                 {{-- Step 2: Formulaire (avec ou sans split view) --}}
                 <div class="modal-body"
                      x-data="{
-                         previewUrl: sessionStorage.getItem('pj-preview-url') || {{ $previewUrl ? \"'\" . $previewUrl . \"'\" : 'null' }},
-                         previewMime: sessionStorage.getItem('pj-preview-mime') || {{ $previewMime ? \"'\" . $previewMime . \"'\" : 'null' }},
-                         previewName: sessionStorage.getItem('pj-preview-name') || {{ $existingPieceJointeNom ? \"'\" . addslashes($existingPieceJointeNom) . \"'\" : 'null' }},
+                         previewUrl: sessionStorage.getItem('pj-preview-url') || @js($previewUrl),
+                         previewMime: sessionStorage.getItem('pj-preview-mime') || @js($previewMime),
+                         previewName: sessionStorage.getItem('pj-preview-name') || @js($existingPieceJointeNom),
                          scale: 1
                      }">
 
