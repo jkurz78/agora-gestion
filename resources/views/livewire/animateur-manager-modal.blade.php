@@ -82,10 +82,10 @@
                     <div class="row">
                         {{-- Colonne gauche : prévisualisation --}}
                         <template x-if="previewUrl">
-                        <div class="col-md-5">
-                            <div class="border rounded p-1 h-100 d-flex flex-column" style="min-height:500px">
+                        <div class="col-md-5" style="overflow:hidden">
+                            <div class="border rounded p-1 d-flex flex-column" style="height:70vh;overflow:hidden">
                                 <template x-if="previewMime && previewMime.startsWith('image/')">
-                                    <div class="flex-grow-1 overflow-auto text-center p-2">
+                                    <div class="flex-grow-1 overflow-auto text-center p-2" style="min-height:0">
                                         <div class="mb-2">
                                             <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.max(0.25, scale - 0.25)"><i class="bi bi-dash-lg"></i></button>
                                             <span class="mx-2 small" x-text="Math.round(scale * 100) + '%'"></span>
@@ -96,10 +96,10 @@
                                     </div>
                                 </template>
                                 <template x-if="!previewMime || !previewMime.startsWith('image/')">
-                                    <iframe :src="previewUrl + '#navpanes=0'" class="flex-grow-1 w-100" style="border:none;min-height:500px"></iframe>
+                                    <iframe :src="previewUrl + '#navpanes=0'" class="flex-grow-1" style="border:none;width:100%;min-height:0"></iframe>
                                 </template>
 
-                                <div class="text-center py-1 small text-muted border-top" x-text="previewName"></div>
+                                <div class="text-center py-1 small text-muted border-top flex-shrink-0" x-text="previewName"></div>
                             </div>
                         </div>
                         </template>
