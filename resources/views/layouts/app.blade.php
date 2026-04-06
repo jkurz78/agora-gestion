@@ -223,22 +223,23 @@
                         </a>
                     </li>
 
-                    {{-- Liens directs --}}
-                    @php
-                        $navItems = [
-                            ['route' => 'compta.budget.index',   'icon' => 'piggy-bank',             'label' => 'Budget'],
-                        ];
-                    @endphp
-                    @foreach ($navItems as $item)
-                        @if (Route::has($item['route']))
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs(str_replace('.index', '.*', $item['route'])) ? 'active' : '' }}"
-                                   href="{{ route($item['route']) }}">
-                                    <i class="bi bi-{{ $item['icon'] }}"></i> {{ $item['label'] }}
-                                </a>
-                            </li>
-                        @endif
-                    @endforeach
+                    {{-- Factures --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('compta.factures*') ? 'active' : '' }}"
+                           href="{{ route('compta.factures') }}">
+                            <i class="bi bi-receipt"></i> Factures
+                        </a>
+                    </li>
+
+                    {{-- Budget --}}
+                    @if (Route::has('compta.budget.index'))
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('compta.budget.*') ? 'active' : '' }}"
+                               href="{{ route('compta.budget.index') }}">
+                                <i class="bi bi-piggy-bank"></i> Budget
+                            </a>
+                        </li>
+                    @endif
 
                     {{-- Dropdown Rapports --}}
                     <li class="nav-item dropdown">
@@ -273,14 +274,6 @@
                                 </a>
                             </li>
                         </ul>
-                    </li>
-
-                    {{-- Factures --}}
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('compta.factures*') ? 'active' : '' }}"
-                           href="{{ route('compta.factures') }}">
-                            <i class="bi bi-receipt"></i> Factures
-                        </a>
                     </li>
 
                     {{-- Dropdown Exercices --}}
