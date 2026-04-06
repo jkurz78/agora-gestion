@@ -47,6 +47,11 @@ final class TiersQuickViewService
             $summary['participations'] = $participations;
         }
 
+        $animations = $this->getAnimations($tiers, $exercice);
+        if ($animations !== null) {
+            $summary['animations'] = $animations;
+        }
+
         $referent = $this->getReferent($tiers, $exercice);
         if ($referent !== null) {
             $summary['referent'] = $referent;
@@ -238,6 +243,37 @@ final class TiersQuickViewService
             ->all();
 
         return count($participations) > 0 ? $participations : null;
+    }
+
+    /**
+     * @return array<int, array{operation_id: int, operation_nom: string, date_debut: string|null}>|null
+     */
+    private function getAnimations(Tiers $tiers, int $exercice): ?array
+    {
+        $dateDebut = "{$exercice}-09-01";
+        $dateFin = ($exercice + 1).'-08-31';
+
+        $animations = DB::table('transactions as tx')
+            ->join('transaction_lignes as tl', 'tl.transaction_id', '=', 'tx.id')
+            ->join('operations as op', 'op.id', '=', 'tl.operation_id')
+            ->where('tx.tiers_id', $tiers->id)
+            ->where('tx.type', TypeTransaction::Depense->value)
+            ->whereBetween('tx.date', [$dateDebut, $dateFin])
+            ->whereNull('tx.deleted_at')
+            ->whereNull('tl.deleted_at')
+            ->whereNotNull('tl.operation_id')
+            ->select('op.id as operation_id', 'op.nom as operation_nom', 'op.date_debut')
+            ->distinct()
+            ->orderBy('op.nom')
+            ->get()
+            ->map(fn (object $r): array => [
+                'operation_id' => (int) $r->operation_id,
+                'operation_nom' => $r->operation_nom,
+                'date_debut' => $r->date_debut,
+            ])
+            ->all();
+
+        return count($animations) > 0 ? $animations : null;
     }
 
     /**
