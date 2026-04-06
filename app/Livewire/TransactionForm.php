@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\DTOs\InvoiceOcrResult;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\StatutOperation;
+use App\Exceptions\OcrAnalysisException;
+use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
@@ -15,6 +18,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
 use App\Services\ExerciceService;
+use App\Services\InvoiceOcrService;
 use App\Services\TransactionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -64,6 +68,15 @@ final class TransactionForm extends Component
 
     public ?string $existingPieceJointeUrl = null;
 
+    public bool $ocrMode = false;
+
+    public bool $ocrAnalyzing = false;
+
+    public ?string $ocrError = null;
+
+    /** @var array<string> */
+    public array $ocrWarnings = [];
+
     // État du panneau de ventilation
     public ?int $ventilationLigneId = null;
 
@@ -92,7 +105,8 @@ final class TransactionForm extends Component
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
-            'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl']);
+            'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
+            'ocrMode', 'ocrAnalyzing', 'ocrError', 'ocrWarnings']);
         $this->type = $type;
         $this->isLocked = false;
         $this->resetValidation();
@@ -114,6 +128,15 @@ final class TransactionForm extends Component
         } else {
             $this->showNewForm($type);
         }
+    }
+
+    #[On('open-transaction-form-ocr')]
+    public function openFormOcr(): void
+    {
+        $this->showNewForm('depense');
+        $this->ocrMode = true;
+        $this->ocrWarnings = [];
+        $this->ocrError = null;
     }
 
     public function addLigne(): void
@@ -295,6 +318,7 @@ final class TransactionForm extends Component
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
+            'ocrMode', 'ocrAnalyzing', 'ocrError', 'ocrWarnings',
         ]);
         $this->resetValidation();
     }
@@ -415,6 +439,71 @@ final class TransactionForm extends Component
         app(TransactionService::class)->deletePieceJointe($transaction);
         $this->existingPieceJointeNom = null;
         $this->existingPieceJointeUrl = null;
+    }
+
+    public function updatedPieceJointe(): void
+    {
+        if ($this->pieceJointe === null || ! $this->ocrMode) {
+            return;
+        }
+
+        if (! InvoiceOcrService::isConfigured()) {
+            return;
+        }
+
+        $this->ocrAnalyzing = true;
+        $this->ocrError = null;
+
+        try {
+            $this->validate([
+                'pieceJointe' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            ]);
+
+            $result = app(InvoiceOcrService::class)->analyze($this->pieceJointe);
+            $this->applyOcrResult($result);
+        } catch (OcrAnalysisException|OcrNotConfiguredException $e) {
+            $this->ocrError = $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->ocrError = 'Erreur inattendue : '.$e->getMessage();
+        } finally {
+            $this->ocrAnalyzing = false;
+        }
+    }
+
+    public function retryOcr(): void
+    {
+        if ($this->pieceJointe !== null) {
+            $this->updatedPieceJointe();
+        }
+    }
+
+    private function applyOcrResult(InvoiceOcrResult $result): void
+    {
+        if ($result->date !== null) {
+            $this->date = $result->date;
+        }
+        if ($result->reference !== null) {
+            $this->reference = $result->reference;
+        }
+        if ($result->tiers_id !== null) {
+            $this->tiers_id = $result->tiers_id;
+        }
+
+        if (! empty($result->lignes)) {
+            $this->lignes = [];
+            foreach ($result->lignes as $ligne) {
+                $this->lignes[] = [
+                    'id' => null,
+                    'sous_categorie_id' => $ligne->sous_categorie_id !== null ? (string) $ligne->sous_categorie_id : '',
+                    'operation_id' => $ligne->operation_id !== null ? (string) $ligne->operation_id : '',
+                    'seance' => $ligne->seance !== null ? (string) $ligne->seance : '',
+                    'montant' => (string) $ligne->montant,
+                    'notes' => $ligne->description ?? '',
+                ];
+            }
+        }
+
+        $this->ocrWarnings = $result->warnings;
     }
 
     public function render(): View
