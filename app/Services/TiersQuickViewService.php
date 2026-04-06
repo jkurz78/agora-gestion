@@ -47,7 +47,7 @@ final class TiersQuickViewService
             $summary['participations'] = $participations;
         }
 
-        $referent = $this->getReferent($tiers);
+        $referent = $this->getReferent($tiers, $exercice);
         if ($referent !== null) {
             $summary['referent'] = $referent;
         }
@@ -243,14 +243,17 @@ final class TiersQuickViewService
     /**
      * @return array<string, mixed>|null
      */
-    private function getReferent(Tiers $tiers): ?array
+    private function getReferent(Tiers $tiers, int $exercice): ?array
     {
         if (! auth()->check() || ! auth()->user()->peut_voir_donnees_sensibles) {
             return null;
         }
 
+        $operationScope = fn ($q) => $q->forExercice($exercice);
+
         $referePar = Participant::query()
             ->where('refere_par_id', $tiers->id)
+            ->whereHas('operation', $operationScope)
             ->with(['tiers:id,nom,prenom', 'operation:id,nom'])
             ->get()
             ->map(fn (Participant $p): array => [
@@ -262,6 +265,7 @@ final class TiersQuickViewService
 
         $medecin = Participant::query()
             ->where('medecin_tiers_id', $tiers->id)
+            ->whereHas('operation', $operationScope)
             ->with(['tiers:id,nom,prenom', 'operation:id,nom'])
             ->get()
             ->map(fn (Participant $p): array => [
@@ -273,6 +277,7 @@ final class TiersQuickViewService
 
         $therapeute = Participant::query()
             ->where('therapeute_tiers_id', $tiers->id)
+            ->whereHas('operation', $operationScope)
             ->with(['tiers:id,nom,prenom', 'operation:id,nom'])
             ->get()
             ->map(fn (Participant $p): array => [

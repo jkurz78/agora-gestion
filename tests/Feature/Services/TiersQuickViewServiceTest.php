@@ -361,12 +361,12 @@ describe('participations', function (): void {
 
 describe('referent', function (): void {
     test('absente quand l\'utilisateur ne peut pas voir les données sensibles', function (): void {
-        $op = Operation::factory()->create();
+        $op = Operation::factory()->create(['date_debut' => '2025-10-01', 'date_fin' => '2026-06-30']);
         $participant = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
         Participant::create([
             'tiers_id' => $participant->id,
             'operation_id' => $op->id,
-            'refere_par_id' => $this->tiers->id, // this->tiers IS the referent
+            'refere_par_id' => $this->tiers->id,
         ]);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
@@ -376,12 +376,12 @@ describe('referent', function (): void {
 
     test('présente quand l\'utilisateur peut voir les données sensibles', function (): void {
         $this->user->update(['peut_voir_donnees_sensibles' => true]);
-        $op = Operation::factory()->create();
+        $op = Operation::factory()->create(['date_debut' => '2025-10-01', 'date_fin' => '2026-06-30']);
         $participant = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
         Participant::create([
             'tiers_id' => $participant->id,
             'operation_id' => $op->id,
-            'refere_par_id' => $this->tiers->id, // this->tiers IS the referent
+            'refere_par_id' => $this->tiers->id,
         ]);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
@@ -391,7 +391,7 @@ describe('referent', function (): void {
 
     test('referent contient refere_par avec les participants référés', function (): void {
         $this->user->update(['peut_voir_donnees_sensibles' => true]);
-        $op = Operation::factory()->create(['nom' => 'Yoga']);
+        $op = Operation::factory()->create(['nom' => 'Yoga', 'date_debut' => '2025-10-01', 'date_fin' => '2026-06-30']);
         $participant = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
         Participant::create([
             'tiers_id' => $participant->id,
@@ -408,12 +408,12 @@ describe('referent', function (): void {
 
     test('referent contient medecin si ce tiers est médecin de participants', function (): void {
         $this->user->update(['peut_voir_donnees_sensibles' => true]);
-        $op = Operation::factory()->create();
+        $op = Operation::factory()->create(['date_debut' => '2025-10-01', 'date_fin' => '2026-06-30']);
         $participant = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
         Participant::create([
             'tiers_id' => $participant->id,
             'operation_id' => $op->id,
-            'medecin_tiers_id' => $this->tiers->id, // this->tiers IS the doctor
+            'medecin_tiers_id' => $this->tiers->id,
         ]);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
@@ -424,18 +424,33 @@ describe('referent', function (): void {
 
     test('referent contient therapeute si ce tiers est thérapeute de participants', function (): void {
         $this->user->update(['peut_voir_donnees_sensibles' => true]);
-        $op = Operation::factory()->create();
+        $op = Operation::factory()->create(['date_debut' => '2025-10-01', 'date_fin' => '2026-06-30']);
         $participant = Tiers::factory()->create(['nom' => 'Martin', 'prenom' => 'Lucie']);
         Participant::create([
             'tiers_id' => $participant->id,
             'operation_id' => $op->id,
-            'therapeute_tiers_id' => $this->tiers->id, // this->tiers IS the therapist
+            'therapeute_tiers_id' => $this->tiers->id,
         ]);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
         expect($result['referent'])->toHaveKey('therapeute')
             ->and($result['referent']['therapeute'])->toHaveCount(1);
+    });
+
+    test('exclut les referents d\'opérations hors exercice', function (): void {
+        $this->user->update(['peut_voir_donnees_sensibles' => true]);
+        $op = Operation::factory()->create(['date_debut' => '2024-01-01', 'date_fin' => '2024-06-30']);
+        $participant = Tiers::factory()->create();
+        Participant::create([
+            'tiers_id' => $participant->id,
+            'operation_id' => $op->id,
+            'refere_par_id' => $this->tiers->id,
+        ]);
+
+        $result = $this->service->getSummary($this->tiers, $this->exercice);
+
+        expect($result)->not->toHaveKey('referent');
     });
 
     test('absente si l\'utilisateur a peut_voir_donnees_sensibles mais aucune donnée sensible', function (): void {
