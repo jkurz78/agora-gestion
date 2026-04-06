@@ -217,9 +217,29 @@
                                 </table>
                             </div>
 
-                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" wire:click="addModalLigne">
-                                <i class="bi bi-plus"></i> Ajouter une ligne
-                            </button>
+                            <div class="d-flex gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="addModalLigne">
+                                    <i class="bi bi-plus"></i> Ajouter une ligne
+                                </button>
+                                <template x-if="!previewUrl">
+                                    <label class="btn btn-sm btn-outline-secondary mb-0">
+                                        <i class="bi bi-paperclip"></i> Joindre un justificatif
+                                        <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                               @change="
+                                                   const file = $event.target.files[0];
+                                                   if (file) {
+                                                       const url = URL.createObjectURL(file);
+                                                       sessionStorage.setItem('pj-preview-url', url);
+                                                       sessionStorage.setItem('pj-preview-mime', file.type);
+                                                       sessionStorage.setItem('pj-preview-name', file.name);
+                                                       previewUrl = url;
+                                                       previewMime = file.type;
+                                                       previewName = file.name;
+                                                   }
+                                               ">
+                                    </label>
+                                </template>
+                            </div>
                         </div>
                     </div>
                 </div>
