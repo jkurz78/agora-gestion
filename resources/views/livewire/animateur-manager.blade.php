@@ -17,24 +17,22 @@
                 </colgroup>
                 <thead>
                     <tr style="background:#3d5473;color:#fff">
-                        <th style="position:sticky;left:0;z-index:2;background:#3d5473;font-size:12px;min-width:180px">Animateur</th>
+                        <th style="position:sticky;left:0;z-index:2;background:#3d5473;font-size:11px;min-width:180px;text-align:right;font-weight:normal;font-style:italic;color:#b0c4de">Séance →</th>
                         @foreach($seances as $seance)
                             <th style="text-align:center;font-size:12px">S{{ $seance->numero }}</th>
                         @endforeach
                         <th style="text-align:center;font-size:12px">Total</th>
                     </tr>
-                    @if($seances->contains(fn($s) => $s->date || $s->titre))
                     <tr>
-                        <td style="position:sticky;left:0;z-index:2;background:#f8f9fa"></td>
+                        <td style="position:sticky;left:0;z-index:2;background:#f8f9fa;font-size:11px;font-weight:600;color:#495057">Animateur ↓</td>
                         @foreach($seances as $seance)
                             <td style="background:#f8f9fa;text-align:center;font-size:10px;color:#6c757d">
                                 @if($seance->titre){{ $seance->titre }}@endif
-                                @if($seance->date)<br>{{ $seance->date->format('d/m') }}@endif
+                                @if($seance->date){{ $seance->date->format('d/m') }}@endif
                             </td>
                         @endforeach
                         <td style="background:#f8f9fa"></td>
                     </tr>
-                    @endif
                 </thead>
                 <tbody>
                     @forelse($animateurList as $tiersId => $anim)
