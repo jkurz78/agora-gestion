@@ -1,8 +1,8 @@
 @if($showModal)
 @php $clearSS = "sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')"; @endphp
-<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)" wire:click.self="closeModal" @click.self="{{ $clearSS }}">
+<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);overflow-x:hidden" wire:click.self="closeModal" @click.self="{{ $clearSS }}">
     <div class="modal-dialog {{ ($modalStep === 'form' && ($previewUrl || $modalPieceJointe)) ? 'modal-xl' : 'modal-lg' }}">
-        <div class="modal-content">
+        <div class="modal-content" style="overflow-x:hidden">
             <div class="modal-header py-2">
                 <h6 class="modal-title">
                     @if($modalStep === 'upload')
