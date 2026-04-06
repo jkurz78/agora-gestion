@@ -1,5 +1,6 @@
 @if($showModal)
-<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)" wire:click.self="closeModal" @click.self="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')">
+@php $clearSS = "sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')"; @endphp
+<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)" wire:click.self="closeModal" @click.self="{{ $clearSS }}">
     <div class="modal-dialog {{ ($modalStep === 'form' && ($previewUrl || $modalPieceJointe)) ? 'modal-xl' : 'modal-lg' }}">
         <div class="modal-content">
             <div class="modal-header py-2">
@@ -10,60 +11,38 @@
                         {{ $isEditing ? 'Modifier la facture' : 'Nouvelle facture d\'encadrement' }}
                     @endif
                 </h6>
-                <button type="button" class="btn-close" wire:click="closeModal" @click="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')"></button>
+                <button type="button" class="btn-close" wire:click="closeModal" @click="{{ $clearSS }}"></button>
             </div>
 
             @if($modalStep === 'upload')
-                {{-- Step 1: Upload --}}
-                <div class="modal-body text-center py-5"
-                     x-data="{ fileName: null, fileUrl: null, fileMime: null }"
-                     x-on:piece-jointe-ready.window="fileName = $event.detail.name; fileUrl = $event.detail.url; fileMime = $event.detail.mime">
+                {{-- Step 1: Upload — passe automatiquement au formulaire dès upload terminé --}}
+                <div class="modal-body text-center py-5">
                     <div class="mb-4">
                         <i class="bi bi-cloud-arrow-up" style="font-size:3rem;color:#6c757d"></i>
                         <p class="mt-2 text-muted">Uploadez la facture du fournisseur pour l'afficher pendant la saisie</p>
                     </div>
 
-                    <template x-if="fileName">
-                        <div>
-                            <div class="mb-3">
-                                <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i><span x-text="fileName"></span></span>
-                            </div>
-                            <button type="button" class="btn btn-primary" wire:click="proceedWithFile">
-                                <i class="bi bi-arrow-right me-1"></i> Continuer avec ce fichier
-                            </button>
-                        </div>
-                    </template>
-
-                    <template x-if="!fileName">
-                        <div>
-                            <label class="btn btn-primary btn-lg mb-3">
-                                <i class="bi bi-upload me-2"></i> Choisir un fichier
-                                <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
-                                       x-ref="fileInput"
-                                       @change="
-                                           const file = $event.target.files[0];
-                                           if (file) {
-                                               fileName = file.name;
-                                               fileMime = file.type;
-                                               fileUrl = URL.createObjectURL(file);
-                                               sessionStorage.setItem('pj-preview-url', fileUrl);
-                                               sessionStorage.setItem('pj-preview-mime', fileMime);
-                                               sessionStorage.setItem('pj-preview-name', fileName);
-                                           }
-                                       ">
-                            </label>
-                            <div wire:loading wire:target="modalPieceJointe" class="mt-2">
-                                <div class="spinner-border spinner-border-sm text-primary"></div>
-                                <span class="text-muted small">Upload en cours...</span>
-                            </div>
-                        </div>
-                    </template>
+                    <label class="btn btn-primary btn-lg mb-3">
+                        <i class="bi bi-upload me-2"></i> Choisir un fichier
+                        <input type="file" wire:model="modalPieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                               @change="
+                                   const file = $event.target.files[0];
+                                   if (file) {
+                                       sessionStorage.setItem('pj-preview-url', URL.createObjectURL(file));
+                                       sessionStorage.setItem('pj-preview-mime', file.type);
+                                       sessionStorage.setItem('pj-preview-name', file.name);
+                                   }
+                               ">
+                    </label>
+                    <div wire:loading wire:target="modalPieceJointe" class="mt-2">
+                        <div class="spinner-border spinner-border-sm text-primary"></div>
+                        <span class="text-muted small">Upload en cours...</span>
+                    </div>
 
                     @error('modalPieceJointe') <div class="text-danger small mt-2">{{ $message }}</div> @enderror
 
                     <div class="mt-4">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="skipUpload"
-                                @click="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="skipUpload" @click="{{ $clearSS }}">
                             Ignorer <i class="bi bi-arrow-right ms-1"></i>
                         </button>
                     </div>
@@ -82,10 +61,10 @@
                     <div class="row g-0">
                         {{-- Colonne gauche : prévisualisation --}}
                         <template x-if="previewUrl">
-                        <div class="col-md-5" style="overflow:hidden">
-                            <div class="border rounded p-1 d-flex flex-column" style="height:70vh;overflow:hidden">
+                        <div class="col-md-5 pe-2">
+                            <div class="d-flex flex-column" style="height:70vh">
                                 <template x-if="previewMime && previewMime.startsWith('image/')">
-                                    <div class="flex-grow-1 overflow-auto text-center p-2" style="min-height:0">
+                                    <div class="flex-grow-1 overflow-auto text-center border rounded p-2" style="min-height:0">
                                         <div class="mb-2">
                                             <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.max(0.25, scale - 0.25)"><i class="bi bi-dash-lg"></i></button>
                                             <span class="mx-2 small" x-text="Math.round(scale * 100) + '%'"></span>
@@ -96,10 +75,10 @@
                                     </div>
                                 </template>
                                 <template x-if="!previewMime || !previewMime.startsWith('image/')">
-                                    <iframe :src="previewUrl + '#navpanes=0'" class="flex-grow-1" style="border:none;width:100%;min-height:0"></iframe>
+                                    <iframe :src="previewUrl + '#navpanes=0'" class="flex-grow-1 border rounded" style="width:100%;min-height:0"></iframe>
                                 </template>
 
-                                <div class="text-center py-1 small text-muted border-top flex-shrink-0" x-text="previewName"></div>
+                                <div class="text-center py-1 small text-muted" x-text="previewName"></div>
                             </div>
                         </div>
                         </template>
@@ -254,10 +233,10 @@
                         <strong>Total : {{ number_format($modalTotal, 2, ',', "\u{202F}") }} &euro;</strong>
                     </div>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="closeModal" @click="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')">Annuler</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="closeModal" @click="{{ $clearSS }}">Annuler</button>
                         <button type="button" class="btn btn-sm btn-primary" wire:click="saveTransaction"
                                 wire:loading.attr="disabled" wire:target="saveTransaction"
-                                @click="sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')">
+                                @click="{{ $clearSS }}">
                             <span wire:loading.remove wire:target="saveTransaction">
                                 <i class="bi bi-check-lg me-1"></i>{{ $isEditing ? 'Mettre &agrave; jour' : 'Enregistrer' }}
                             </span>
