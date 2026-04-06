@@ -151,13 +151,17 @@
                                     </label>
                                 </div>
                             @else
-                                <div class="d-flex align-items-center gap-2">
+                                <div class="d-flex align-items-center gap-2" x-data="{ tempUrl: null }">
                                     <label class="btn btn-sm btn-outline-secondary mb-0">
                                         <i class="bi bi-paperclip"></i> Joindre un justificatif
-                                        <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                        <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
+                                               @change="const f = $event.target.files[0]; if (f) tempUrl = URL.createObjectURL(f)">
                                     </label>
                                     @if ($pieceJointe)
                                         <span class="small text-success"><i class="bi bi-check-circle"></i> {{ $pieceJointe->getClientOriginalName() }}</span>
+                                        <a :href="tempUrl" target="_blank" class="btn btn-sm btn-outline-primary" title="Visualiser" x-show="tempUrl">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
                                     @endif
                                     <div wire:loading wire:target="pieceJointe" class="spinner-border spinner-border-sm text-primary"></div>
                                 </div>
