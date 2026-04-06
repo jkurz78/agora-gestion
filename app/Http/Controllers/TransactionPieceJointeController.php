@@ -21,9 +21,14 @@ final class TransactionPieceJointeController extends Controller
             abort(404);
         }
 
+        $downloadName = $transaction->piece_jointe_nom;
+        if ($transaction->numero_piece) {
+            $downloadName = $transaction->numero_piece.' - '.$downloadName;
+        }
+
         return Storage::disk('local')->response(
             $transaction->piece_jointe_path,
-            $transaction->piece_jointe_nom,
+            $downloadName,
             ['Content-Type' => $transaction->piece_jointe_mime],
             'inline'
         );
