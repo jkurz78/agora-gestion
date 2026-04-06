@@ -16,8 +16,10 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\ExerciceService;
 use App\Services\InvoiceOcrService;
 use App\Services\TransactionService;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\On;
@@ -487,7 +489,7 @@ final class AnimateurManager extends Component
         $validScIds = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', 'depense'))->pluck('id')->toArray();
 
         if ($result->date !== null) {
-            $this->modalDate = $result->date;
+            $this->modalDate = $this->adjustDateToExercice($result->date);
         }
         if ($result->reference !== null) {
             $this->modalReference = $result->reference;
@@ -511,6 +513,32 @@ final class AnimateurManager extends Component
         }
 
         $this->ocrWarnings = $result->warnings;
+    }
+
+    private function adjustDateToExercice(string $date): string
+    {
+        $exerciceService = app(ExerciceService::class);
+        $range = $exerciceService->dateRange($exerciceService->current());
+        $start = $range['start'];
+        $end = $range['end'];
+
+        $parsed = CarbonImmutable::parse($date);
+
+        if ($parsed->between($start, $end)) {
+            return $date;
+        }
+
+        $plusOne = $parsed->addYear();
+        if ($plusOne->between($start, $end)) {
+            return $plusOne->format('Y-m-d');
+        }
+
+        $minusOne = $parsed->subYear();
+        if ($minusOne->between($start, $end)) {
+            return $minusOne->format('Y-m-d');
+        }
+
+        return $date;
     }
 
     private function buildLigneNotes(array $ligne, \Illuminate\Support\Collection $operations, \Illuminate\Support\Collection $sousCategories): string
