@@ -219,6 +219,11 @@ final class AnimateurManager extends Component
             'compte_id' => $this->modalCompteId,
         ];
 
+        $operationIds = collect($this->modalLignes)->pluck('operation_id')->filter()->unique()->map(fn ($v) => (int) $v);
+        $operations = Operation::whereIn('id', $operationIds)->pluck('nom', 'id');
+        $scIds = collect($this->modalLignes)->pluck('sous_categorie_id')->filter()->unique()->map(fn ($v) => (int) $v);
+        $sousCategories = SousCategorie::whereIn('id', $scIds)->pluck('nom', 'id');
+
         $lignes = [];
         foreach ($this->modalLignes as $modalLigne) {
             $seance = ($modalLigne['seance'] !== null && $modalLigne['seance'] !== '')
@@ -234,7 +239,7 @@ final class AnimateurManager extends Component
                 'operation_id' => $operationId,
                 'seance' => $seance,
                 'montant' => round((float) $modalLigne['montant'], 2),
-                'notes' => $this->buildLigneNotes($modalLigne),
+                'notes' => $this->buildLigneNotes($modalLigne, $operations, $sousCategories),
             ];
 
             if ($this->isEditing && isset($modalLigne['id']) && $modalLigne['id'] !== null) {
@@ -283,9 +288,11 @@ final class AnimateurManager extends Component
 
         $matrixData = $this->buildMatrixData($seances);
 
-        $comptes = CompteBancaire::where('actif_recettes_depenses', true)
-            ->orderBy('nom')
-            ->get(['id', 'nom']);
+        $comptes = $this->showModal
+            ? CompteBancaire::where('actif_recettes_depenses', true)
+                ->orderBy('nom')
+                ->get(['id', 'nom'])
+            : collect();
 
         return view('livewire.animateur-manager', [
             'seances' => $seances,
@@ -295,7 +302,7 @@ final class AnimateurManager extends Component
         ]);
     }
 
-    private function buildLigneNotes(array $ligne): string
+    private function buildLigneNotes(array $ligne, \Illuminate\Support\Collection $operations, \Illuminate\Support\Collection $sousCategories): string
     {
         $parts = [];
 
@@ -303,11 +310,8 @@ final class AnimateurManager extends Component
             ? (int) $ligne['operation_id']
             : null;
 
-        if ($operationId !== null) {
-            $op = Operation::find($operationId);
-            if ($op !== null) {
-                $parts[] = $op->nom;
-            }
+        if ($operationId !== null && $operations->has($operationId)) {
+            $parts[] = $operations->get($operationId);
         }
 
         $seance = ($ligne['seance'] !== null && $ligne['seance'] !== '')
@@ -322,11 +326,8 @@ final class AnimateurManager extends Component
             ? (int) $ligne['sous_categorie_id']
             : null;
 
-        if ($scId !== null) {
-            $sc = SousCategorie::find($scId);
-            if ($sc !== null) {
-                $parts[] = $sc->nom;
-            }
+        if ($scId !== null && $sousCategories->has($scId)) {
+            $parts[] = $sousCategories->get($scId);
         }
 
         return implode(' — ', $parts);
@@ -341,9 +342,8 @@ final class AnimateurManager extends Component
     {
         // Fetch all depense transaction lines for this operation
         $lignes = TransactionLigne::query()
-            ->whereHas('transaction', fn ($q) => $q->where('type', 'depense')->whereNull('deleted_at'))
+            ->whereHas('transaction', fn ($q) => $q->where('type', TypeTransaction::Depense))
             ->where('operation_id', $this->operation->id)
-            ->whereNull('deleted_at')
             ->with(['transaction.tiers', 'sousCategorie'])
             ->get();
 
