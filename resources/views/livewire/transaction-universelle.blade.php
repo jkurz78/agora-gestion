@@ -98,7 +98,7 @@
                         @endif
                         @if(in_array('depense', $availableTypes) && \App\Services\InvoiceOcrService::isConfigured())
                             <li><a class="dropdown-item" href="#"
-                                @click.prevent="$dispatch('open-transaction-form-ocr')">
+                                wire:click.prevent="$dispatch('open-transaction-form-ocr')">
                                 <i class="bi bi-file-earmark-text text-primary me-1"></i> Dépense depuis facture</a></li>
                         @endif
                         @if(in_array('recette', $availableTypes))
@@ -153,7 +153,7 @@
                         @endif
                         @if(in_array('depense', $availableTypes) && \App\Services\InvoiceOcrService::isConfigured())
                             <li><a class="dropdown-item" href="#"
-                                @click.prevent="$dispatch('open-transaction-form-ocr')">
+                                wire:click.prevent="$dispatch('open-transaction-form-ocr')">
                                 <i class="bi bi-file-earmark-text text-primary me-1"></i> Dépense depuis facture</a></li>
                         @endif
                         @if(in_array('recette', $availableTypes))
