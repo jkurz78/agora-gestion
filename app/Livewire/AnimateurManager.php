@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\DTOs\InvoiceOcrResult;
 use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
+use App\Exceptions\OcrAnalysisException;
+use App\Exceptions\OcrNotConfiguredException;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Seance;
@@ -13,6 +16,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\InvoiceOcrService;
 use App\Services\TransactionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -65,6 +69,13 @@ final class AnimateurManager extends Component
     public ?string $existingPieceJointeNom = null;
 
     public ?string $existingPieceJointeUrl = null;
+
+    public bool $ocrAnalyzing = false;
+
+    public ?string $ocrError = null;
+
+    /** @var array<string> */
+    public array $ocrWarnings = [];
 
     public ?string $previewUrl = null;
 
@@ -150,7 +161,44 @@ final class AnimateurManager extends Component
 
     public function updatedModalPieceJointe(): void
     {
+        $this->ocrError = null;
+        $this->ocrWarnings = [];
+
+        // Validate and set preview URL (existing behavior)
         $this->proceedWithFile();
+
+        // If validation failed or no file, stop
+        if ($this->modalPieceJointe === null || $this->modalStep !== 'form') {
+            return;
+        }
+
+        // Launch OCR if configured
+        if (! InvoiceOcrService::isConfigured()) {
+            return;
+        }
+
+        $this->ocrAnalyzing = true;
+
+        try {
+            $tiers = Tiers::find($this->modalTiersId);
+            $context = [
+                'tiers_attendu' => $tiers?->displayName() ?? '',
+                'operation_attendue' => $this->operation->nom,
+            ];
+            $seance = $this->modalLignes[0]['seance'] ?? null;
+            if ($seance !== null && $seance !== '') {
+                $context['seance_attendue'] = (int) $seance;
+            }
+
+            $result = app(InvoiceOcrService::class)->analyze($this->modalPieceJointe, $context);
+            $this->applyOcrResult($result);
+        } catch (OcrAnalysisException|OcrNotConfiguredException $e) {
+            $this->ocrError = $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->ocrError = 'Erreur inattendue : '.$e->getMessage();
+        } finally {
+            $this->ocrAnalyzing = false;
+        }
     }
 
     public function proceedWithFile(): void
@@ -225,6 +273,36 @@ final class AnimateurManager extends Component
         $this->showModal = true;
     }
 
+    public function retryOcr(): void
+    {
+        if ($this->modalPieceJointe !== null) {
+            $this->ocrError = null;
+            $this->ocrWarnings = [];
+            $this->ocrAnalyzing = true;
+
+            try {
+                $tiers = Tiers::find($this->modalTiersId);
+                $context = [
+                    'tiers_attendu' => $tiers?->displayName() ?? '',
+                    'operation_attendue' => $this->operation->nom,
+                ];
+                $seance = $this->modalLignes[0]['seance'] ?? null;
+                if ($seance !== null && $seance !== '') {
+                    $context['seance_attendue'] = (int) $seance;
+                }
+
+                $result = app(InvoiceOcrService::class)->analyze($this->modalPieceJointe, $context);
+                $this->applyOcrResult($result);
+            } catch (OcrAnalysisException|OcrNotConfiguredException $e) {
+                $this->ocrError = $e->getMessage();
+            } catch (\Throwable $e) {
+                $this->ocrError = 'Erreur inattendue : '.$e->getMessage();
+            } finally {
+                $this->ocrAnalyzing = false;
+            }
+        }
+    }
+
     public function closeModal(): void
     {
         $this->showModal = false;
@@ -244,6 +322,9 @@ final class AnimateurManager extends Component
         $this->existingPieceJointeUrl = null;
         $this->previewUrl = null;
         $this->previewMime = null;
+        $this->ocrAnalyzing = false;
+        $this->ocrError = null;
+        $this->ocrWarnings = [];
     }
 
     public function addModalLigne(): void
@@ -399,6 +480,35 @@ final class AnimateurManager extends Component
             'comptes' => $comptes,
             'modesPaiement' => ModePaiement::cases(),
         ]);
+    }
+
+    private function applyOcrResult(InvoiceOcrResult $result): void
+    {
+        if ($result->date !== null) {
+            $this->modalDate = $result->date;
+        }
+        if ($result->reference !== null) {
+            $this->modalReference = $result->reference;
+        }
+
+        // Apply extracted lines but keep operation and seance from matrix context
+        if (! empty($result->lignes)) {
+            $existingOpId = $this->modalLignes[0]['operation_id'] ?? null;
+            $existingSeance = $this->modalLignes[0]['seance'] ?? null;
+
+            $this->modalLignes = [];
+            foreach ($result->lignes as $ligne) {
+                $this->modalLignes[] = [
+                    'sous_categorie_id' => $ligne->sous_categorie_id,
+                    'operation_id' => $existingOpId,
+                    'seance' => $existingSeance,
+                    'montant' => number_format($ligne->montant, 2, '.', ''),
+                    'id' => null,
+                ];
+            }
+        }
+
+        $this->ocrWarnings = $result->warnings;
     }
 
     private function buildLigneNotes(array $ligne, \Illuminate\Support\Collection $operations, \Illuminate\Support\Collection $sousCategories): string
