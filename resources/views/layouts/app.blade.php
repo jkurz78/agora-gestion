@@ -372,14 +372,17 @@
                     @endif
                     @endif
 
-                    {{-- Dropdown Paramètres (shared) --}}
-                    @php $espacePrefix = ($espace ?? \App\Enums\Espace::Compta)->value; @endphp
+                </ul>
+
+                {{-- Dropdown Paramètres (poussé à droite) --}}
+                @php $espacePrefix = ($espace ?? \App\Enums\Espace::Compta)->value; @endphp
+                <ul class="navbar-nav ms-auto me-3 align-items-end">
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ (request()->routeIs($espacePrefix . '.parametres.*') && !request()->routeIs($espacePrefix . '.parametres.comptes-bancaires.*')) || request()->routeIs($espacePrefix . '.operations.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-gear"></i> Paramètres
                         </a>
-                        <ul class="dropdown-menu">
+                        <ul class="dropdown-menu dropdown-menu-end">
                             @if (Route::has($espacePrefix . '.parametres.association'))
                             <li>
                                 <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.association') ? 'active' : '' }}"
