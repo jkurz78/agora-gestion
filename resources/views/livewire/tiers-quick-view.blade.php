@@ -25,15 +25,22 @@
                             {{ $tiers->displayName() }}
                         </span>
                     </div>
-                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                        <select wire:model.live="exercice"
-                                class="form-select py-0 px-1 border-0"
-                                style="width:auto;font-size:.6rem;background:#f0e8f5;color:#4a1060">
-                            @foreach($availableYears as $year)
-                                <option value="{{ $year }}">{{ $year }}-{{ $year + 1 }}</option>
-                            @endforeach
-                        </select>
-                        <button type="button" class="btn-close" wire:click="close" aria-label="Fermer" style="font-size:.55rem"></button>
+                    <div class="d-flex flex-column align-items-end flex-shrink-0">
+                        <div class="d-flex align-items-center gap-2">
+                            <select wire:model.live="exercice"
+                                    class="form-select py-0 px-1 border-0"
+                                    style="width:auto;font-size:.6rem;background:#f0e8f5;color:#4a1060">
+                                @foreach($availableYears as $year)
+                                    <option value="{{ $year }}">{{ $year }}-{{ $year + 1 }}</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="btn-close" wire:click="close" aria-label="Fermer" style="font-size:.55rem"></button>
+                        </div>
+                        @isset($summary['cotisations'])
+                            <span style="font-size:.6rem;color:#4a1060" class="mt-1">
+                                <i class="bi bi-person-check-fill me-1"></i>Adhérent — {{ number_format((float)$summary['cotisations']['total'], 2, ',', ' ') }} €
+                            </span>
+                        @endisset
                     </div>
                 </div>
                 {{-- Contact in header --}}
@@ -131,18 +138,7 @@
                         </div>
                     @endisset
 
-                    {{-- Cotisations --}}
-                    @isset($summary['cotisations'])
-                        <div class="mb-3">
-                            <div class="d-flex align-items-center gap-1">
-                                <i class="bi bi-person-check-fill small" style="color:#722281"></i>
-                                <span class="fw-semibold small">Adhésion / Cotisation</span>
-                                <span class="ms-1 text-muted small">
-                                    {{ number_format((float)$summary['cotisations']['total'], 2, ',', ' ') }}&nbsp;€
-                                </span>
-                            </div>
-                        </div>
-                    @endisset
+                    {{-- Cotisations in header --}}
 
                     {{-- Participations --}}
                     @isset($summary['participations'])
