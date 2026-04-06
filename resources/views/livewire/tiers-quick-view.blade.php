@@ -17,51 +17,43 @@
             @click.stop
         >
             {{-- Header --}}
-            <div class="d-flex align-items-center justify-content-between px-3 py-2 rounded-top-3"
-                 style="background:#f0e8f5;border-bottom:1px solid #d9c7ea">
-                <div class="d-flex align-items-center gap-2 overflow-hidden">
-                    <span style="font-size:1.1rem">
-                        @if($tiers->type === 'entreprise')🏢@else👤@endif
-                    </span>
-                    <span class="fw-semibold text-truncate" style="color:#4a1060;max-width:260px">
-                        {{ $tiers->displayName() }}
-                    </span>
-                    <span class="badge rounded-pill small"
-                          style="background:#722281;font-size:0.65rem">
-                        {{ $tiers->type === 'entreprise' ? 'Entreprise' : 'Particulier' }}
-                    </span>
+            <div class="px-3 py-2 rounded-top-3" style="background:#f0e8f5;border-bottom:1px solid #d9c7ea">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-1 overflow-hidden">
+                        <span style="font-size:.8rem">@if($tiers->type === 'entreprise')🏢@else👤@endif</span>
+                        <span class="fw-semibold text-truncate" style="color:#4a1060;max-width:280px;font-size:.85rem">
+                            {{ $tiers->displayName() }}
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                        <select wire:model.live="exercice"
+                                class="form-select py-0 px-1 border-0"
+                                style="width:auto;font-size:.6rem;background:#f0e8f5;color:#4a1060">
+                            @foreach($availableYears as $year)
+                                <option value="{{ $year }}">{{ $year }}-{{ $year + 1 }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="btn-close" wire:click="close" aria-label="Fermer" style="font-size:.55rem"></button>
+                    </div>
                 </div>
-                <div class="d-flex align-items-center gap-2 ms-2 flex-shrink-0">
-                    <select wire:model.live="exercice"
-                            class="form-select py-0 px-1 border-0"
-                            style="width:auto;font-size:.65rem;background:#f0e8f5;color:#4a1060">
-                        @foreach($availableYears as $year)
-                            <option value="{{ $year }}">{{ $year }}-{{ $year + 1 }}</option>
-                        @endforeach
-                    </select>
-                    <button type="button" class="btn-close btn-sm" wire:click="close" aria-label="Fermer"></button>
-                </div>
-            </div>
-
-            <div class="p-3">
-
-                {{-- Contact --}}
-                @if(!empty($summary['contact']))
-                    <div class="d-flex gap-3 mb-3 small text-muted">
+                {{-- Contact in header --}}
+                @if(!empty($summary['contact']['email']) || !empty($summary['contact']['telephone']))
+                    <div class="d-flex gap-3 mt-1" style="font-size:.65rem">
                         @if(!empty($summary['contact']['email']))
-                            <a href="mailto:{{ $summary['contact']['email'] }}" class="text-decoration-none text-muted">
+                            <a href="mailto:{{ $summary['contact']['email'] }}" class="text-decoration-none" style="color:#6b5077">
                                 <i class="bi bi-envelope me-1"></i>{{ $summary['contact']['email'] }}
                             </a>
                         @endif
                         @if(!empty($summary['contact']['telephone']))
-                            <a href="tel:{{ $summary['contact']['telephone'] }}" class="text-decoration-none text-muted">
+                            <a href="tel:{{ $summary['contact']['telephone'] }}" class="text-decoration-none" style="color:#6b5077">
                                 <i class="bi bi-telephone me-1"></i>{{ $summary['contact']['telephone'] }}
                             </a>
                         @endif
                     </div>
                 @endif
+            </div>
 
-                {{-- Exercice selector is in header --}}
+            <div class="p-3">
 
                 @php
                     $hasSections = isset($summary['depenses'])
