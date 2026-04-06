@@ -70,6 +70,8 @@ final class TransactionForm extends Component
 
     public bool $ocrMode = false;
 
+    public bool $ocrWaitingForFile = false;
+
     public bool $ocrAnalyzing = false;
 
     public ?string $ocrError = null;
@@ -106,7 +108,7 @@ final class TransactionForm extends Component
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
-            'ocrMode', 'ocrAnalyzing', 'ocrError', 'ocrWarnings']);
+            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings']);
         $this->type = $type;
         $this->isLocked = false;
         $this->resetValidation();
@@ -135,6 +137,7 @@ final class TransactionForm extends Component
     {
         $this->showNewForm('depense');
         $this->ocrMode = true;
+        $this->ocrWaitingForFile = true;
         $this->ocrWarnings = [];
         $this->ocrError = null;
     }
@@ -318,7 +321,7 @@ final class TransactionForm extends Component
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
-            'ocrMode', 'ocrAnalyzing', 'ocrError', 'ocrWarnings',
+            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings',
         ]);
         $this->resetValidation();
     }
@@ -443,6 +446,10 @@ final class TransactionForm extends Component
 
     public function updatedPieceJointe(): void
     {
+        if ($this->ocrWaitingForFile) {
+            $this->ocrWaitingForFile = false;
+        }
+
         if ($this->pieceJointe === null || ! $this->ocrMode) {
             return;
         }
@@ -479,6 +486,9 @@ final class TransactionForm extends Component
 
     private function applyOcrResult(InvoiceOcrResult $result): void
     {
+        $validScIds = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', 'depense'))->pluck('id')->toArray();
+        $validOpIds = Operation::pluck('id')->toArray();
+
         if ($result->date !== null) {
             $this->date = $result->date;
         }
@@ -494,8 +504,8 @@ final class TransactionForm extends Component
             foreach ($result->lignes as $ligne) {
                 $this->lignes[] = [
                     'id' => null,
-                    'sous_categorie_id' => $ligne->sous_categorie_id !== null ? (string) $ligne->sous_categorie_id : '',
-                    'operation_id' => $ligne->operation_id !== null ? (string) $ligne->operation_id : '',
+                    'sous_categorie_id' => $ligne->sous_categorie_id !== null && in_array($ligne->sous_categorie_id, $validScIds, true) ? (string) $ligne->sous_categorie_id : '',
+                    'operation_id' => $ligne->operation_id !== null && in_array($ligne->operation_id, $validOpIds, true) ? (string) $ligne->operation_id : '',
                     'seance' => $ligne->seance !== null ? (string) $ligne->seance : '',
                     'montant' => (string) $ligne->montant,
                     'notes' => $ligne->description ?? '',
