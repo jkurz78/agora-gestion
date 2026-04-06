@@ -142,6 +142,11 @@ final class TransactionService
             throw new \RuntimeException('Cette transaction est liée à une facture validée et ne peut pas être supprimée.');
         }
         DB::transaction(function () use ($transaction) {
+            // Supprimer la pièce jointe si présente
+            if ($transaction->hasPieceJointe()) {
+                $this->deletePieceJointe($transaction);
+            }
+
             $transaction->lignes()->each(function (TransactionLigne $ligne) {
                 $ligne->affectations()->delete();
                 $ligne->delete();

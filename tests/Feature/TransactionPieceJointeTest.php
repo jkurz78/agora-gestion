@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Enums\TypeTransaction;
+use App\Models\CompteBancaire;
+use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
@@ -136,4 +139,31 @@ it('deletePieceJointe supprime le fichier et remet les colonnes à null', functi
         ->and($transaction->piece_jointe_nom)->toBeNull()
         ->and($transaction->piece_jointe_mime)->toBeNull()
         ->and(Storage::disk('local')->exists("pieces-jointes/{$transaction->id}/justificatif.pdf"))->toBeFalse();
+});
+
+it('la suppression d\'une transaction supprime aussi la pièce jointe du disque', function () {
+    Storage::fake('local');
+    $sc = SousCategorie::factory()->create();
+    $compte = CompteBancaire::factory()->create();
+    $service = app(TransactionService::class);
+
+    $transaction = $service->create([
+        'type' => TypeTransaction::Depense->value,
+        'date' => '2025-10-01',
+        'libelle' => 'Test',
+        'montant_total' => '50.00',
+        'mode_paiement' => 'virement',
+        'reference' => 'REF-PJ',
+        'compte_id' => $compte->id,
+    ], [['sous_categorie_id' => $sc->id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null]]);
+
+    $file = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
+    $service->storePieceJointe($transaction, $file);
+    $path = $transaction->fresh()->piece_jointe_path;
+
+    expect(Storage::disk('local')->exists($path))->toBeTrue();
+
+    $service->delete($transaction);
+
+    expect(Storage::disk('local')->exists($path))->toBeFalse();
 });
