@@ -35,6 +35,9 @@ final class Transaction extends Model
         'remise_id',
         'reglement_id',
         'numero_piece',
+        'piece_jointe_path',
+        'piece_jointe_nom',
+        'piece_jointe_mime',
         'helloasso_order_id',
         'helloasso_cashout_id',
         'helloasso_payment_id',
@@ -128,6 +131,20 @@ final class Transaction extends Model
         return $this->factures()
             ->where('statut', StatutFacture::Validee)
             ->exists();
+    }
+
+    public function hasPieceJointe(): bool
+    {
+        return $this->piece_jointe_path !== null;
+    }
+
+    public function pieceJointeUrl(): ?string
+    {
+        if (! $this->hasPieceJointe()) {
+            return null;
+        }
+
+        return route('transactions.piece-jointe', $this);
     }
 
     /**
