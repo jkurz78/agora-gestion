@@ -55,6 +55,9 @@
                 if (highlighted >= 0 && items[highlighted]) {
                     items[highlighted].click();
                     highlighted = -1;
+                } else if (items.length > 0) {
+                    items[0].click();
+                    highlighted = -1;
                 }
             "
         >
