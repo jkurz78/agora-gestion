@@ -1,7 +1,6 @@
 @if($showModal)
 @php $clearSS = "sessionStorage.removeItem('pj-preview-url'); sessionStorage.removeItem('pj-preview-mime'); sessionStorage.removeItem('pj-preview-name')"; @endphp
-<style>.pj-modal, .pj-modal * { overflow-x: hidden !important; }</style>
-<div class="modal fade show d-block pj-modal" tabindex="-1" style="background:rgba(0,0,0,.5)" wire:click.self="closeModal" @click.self="{{ $clearSS }}">
+<div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)" wire:click.self="closeModal" @click.self="{{ $clearSS }}">
     <div class="modal-dialog {{ ($modalStep === 'form' && ($previewUrl || $modalPieceJointe)) ? 'modal-xl' : 'modal-lg' }}">
         <div class="modal-content">
             <div class="modal-header py-2">
@@ -76,8 +75,8 @@
                                     </div>
                                 </template>
                                 <template x-if="!previewMime || !previewMime.startsWith('image/')">
-                                    <div class="flex-grow-1 border rounded overflow-hidden" style="min-height:0">
-                                        <iframe :src="previewUrl + '#navpanes=0'" style="border:none;width:100%;height:100%"></iframe>
+                                    <div class="flex-grow-1 rounded position-relative" style="min-height:0">
+                                        <iframe :src="previewUrl + '#navpanes=0'" style="position:absolute;top:0;left:0;right:0;bottom:0;border:none;width:100%;height:100%"></iframe>
                                     </div>
                                 </template>
 
