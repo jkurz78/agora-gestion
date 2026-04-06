@@ -84,25 +84,25 @@
                         <div class="d-flex flex-wrap gap-3 mb-3 small">
                             @isset($summary['recettes'])
                                 <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
-                                    <span class="badge bg-success" style="font-size:.65rem">REC {{ $summary['recettes']['count'] }}</span>
+                                    <span class="badge bg-success" style="font-size:.65rem">{{ $summary['recettes']['count'] }} REC</span>
                                     {{ number_format((float)$summary['recettes']['total'], 2, ',', ' ') }} €
                                 </a>
                             @endisset
                             @isset($summary['dons'])
                                 <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
-                                    <span class="badge bg-warning text-dark" style="font-size:.65rem">DON {{ $summary['dons']['count'] }}</span>
+                                    <span class="badge bg-warning text-dark" style="font-size:.65rem">{{ $summary['dons']['count'] }} DON</span>
                                     {{ number_format((float)$summary['dons']['total'], 2, ',', ' ') }} €
                                 </a>
                             @endisset
                             @isset($summary['depenses'])
                                 <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
-                                    <span class="badge bg-danger" style="font-size:.65rem">DEP {{ $summary['depenses']['count'] }}</span>
+                                    <span class="badge bg-danger" style="font-size:.65rem">{{ $summary['depenses']['count'] }} DEP</span>
                                     {{ number_format((float)$summary['depenses']['total'], 2, ',', ' ') }} €
                                 </a>
                             @endisset
                             @isset($summary['factures'])
                                 <a href="{{ route('compta.factures') }}" class="text-decoration-none text-nowrap text-dark">
-                                    <span class="badge bg-secondary" style="font-size:.65rem">FAC {{ $summary['factures']['count'] }}</span>
+                                    <span class="badge bg-danger" style="font-size:.65rem">{{ $summary['factures']['count'] }} DEP</span>
                                     {{ number_format((float)$summary['factures']['total'], 2, ',', ' ') }} €
                                     @if($summary['factures']['impayees'] > 0)
                                         <span class="badge bg-danger rounded-pill" style="font-size:.55rem">{{ $summary['factures']['impayees'] }} imp.</span>
