@@ -252,7 +252,7 @@
                                                 <td>
                                                     <input type="number" step="0.01" min="0.01"
                                                            class="form-control form-control-sm text-end"
-                                                           wire:model="modalLignes.{{ $idx }}.montant"
+                                                           wire:model.live="modalLignes.{{ $idx }}.montant"
                                                            style="font-size:12px"
                                                            placeholder="0,00">
                                                 </td>
