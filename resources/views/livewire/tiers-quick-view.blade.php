@@ -36,16 +36,11 @@
                             </select>
                             <button type="button" class="btn-close" wire:click="close" aria-label="Fermer" style="font-size:.55rem"></button>
                         </div>
-                        @isset($summary['cotisations'])
-                            <span style="font-size:.6rem;color:#4a1060" class="mt-1">
-                                <i class="bi bi-person-check-fill me-1"></i>Adhérent — {{ number_format((float)$summary['cotisations']['total'], 2, ',', ' ') }} €
-                            </span>
-                        @endisset
                     </div>
                 </div>
-                {{-- Contact in header --}}
-                @if(!empty($summary['contact']['email']) || !empty($summary['contact']['telephone']))
-                    <div class="d-flex gap-3 mt-1" style="font-size:.65rem">
+                {{-- Contact + Adhésion --}}
+                <div class="d-flex justify-content-between align-items-center mt-1" style="font-size:.6rem">
+                    <div class="d-flex gap-3">
                         @if(!empty($summary['contact']['email']))
                             <a href="mailto:{{ $summary['contact']['email'] }}" class="text-decoration-none" style="color:#6b5077">
                                 <i class="bi bi-envelope me-1"></i>{{ $summary['contact']['email'] }}
@@ -57,7 +52,12 @@
                             </a>
                         @endif
                     </div>
-                @endif
+                    @isset($summary['cotisations'])
+                        <span style="color:#4a1060">
+                            <i class="bi bi-person-check-fill me-1"></i>Adhérent — {{ number_format((float)$summary['cotisations']['total'], 2, ',', ' ') }} €
+                        </span>
+                    @endisset
+                </div>
             </div>
 
             <div class="p-3">
