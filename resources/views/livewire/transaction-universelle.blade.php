@@ -509,6 +509,12 @@
                         @else
                             {{ $tx->libelle ?? '—' }}
                         @endif
+                        @if($tx->piece_jointe_path)
+                            <a href="{{ route('transactions.piece-jointe', $tx->id) }}" target="_blank"
+                               title="Justificatif : {{ $tx->piece_jointe_nom }}" class="text-muted ms-1" @click.stop>
+                                <i class="bi bi-paperclip"></i>
+                            </a>
+                        @endif
                     </td>
                     <td class="small text-muted">
                         @if((int)$tx->nb_lignes > 1)

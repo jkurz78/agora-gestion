@@ -166,6 +166,8 @@ final class TransactionUniverselleService
                 -(tx.montant_total) as montant,
                 tx.pointe,
                 tx.notes,
+                tx.piece_jointe_path,
+                tx.piece_jointe_nom,
                 (tx.helloasso_order_id IS NOT NULL) as is_helloasso
             ")
             ->where('tx.type', 'depense')
@@ -213,6 +215,8 @@ final class TransactionUniverselleService
                 tx.montant_total as montant,
                 tx.pointe,
                 tx.notes,
+                tx.piece_jointe_path,
+                tx.piece_jointe_nom,
                 (tx.helloasso_order_id IS NOT NULL) as is_helloasso
             ")
             ->where('tx.type', 'recette')
@@ -257,6 +261,8 @@ final class TransactionUniverselleService
                 -(vi.montant) as montant,
                 (vi.rapprochement_source_id IS NOT NULL OR EXISTS (SELECT 1 FROM remises_bancaires rb WHERE rb.virement_id = vi.id AND rb.deleted_at IS NULL)) as pointe,
                 vi.notes,
+                NULL as piece_jointe_path,
+                NULL as piece_jointe_nom,
                 0 as is_helloasso
             ")
             ->whereNull('vi.deleted_at')
@@ -293,6 +299,8 @@ final class TransactionUniverselleService
                 vi.montant,
                 (vi.rapprochement_destination_id IS NOT NULL) as pointe,
                 vi.notes,
+                NULL as piece_jointe_path,
+                NULL as piece_jointe_nom,
                 0 as is_helloasso
             ")
             ->whereNull('vi.deleted_at')
