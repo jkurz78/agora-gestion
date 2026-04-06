@@ -86,7 +86,7 @@ final class TiersQuickViewService
             ->whereBetween('tx.date', [$dateDebut, $dateFin])
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
-            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tx.montant_total) as total')
+            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
             ->first();
 
         if ($row === null || (int) $row->count === 0) {
@@ -102,7 +102,7 @@ final class TiersQuickViewService
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
             ->whereNotNull('tl.operation_id')
-            ->selectRaw('tl.operation_id, op.nom as operation_nom, COUNT(DISTINCT tx.id) as count, SUM(tx.montant_total) as total')
+            ->selectRaw('tl.operation_id, op.nom as operation_nom, COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
             ->groupBy('tl.operation_id', 'op.nom')
             ->get()
             ->map(fn (object $r): array => [
@@ -144,7 +144,7 @@ final class TiersQuickViewService
             ->whereNull('tl.deleted_at')
             ->where('sc.pour_dons', false)
             ->where('sc.pour_cotisations', false)
-            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tx.montant_total) as total')
+            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
             ->first();
 
         if ($row === null || (int) $row->count === 0) {
@@ -174,7 +174,7 @@ final class TiersQuickViewService
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
             ->where('sc.pour_dons', true)
-            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tx.montant_total) as total')
+            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
             ->first();
 
         if ($row === null || (int) $row->count === 0) {
@@ -204,7 +204,7 @@ final class TiersQuickViewService
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
             ->where('sc.pour_cotisations', true)
-            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tx.montant_total) as total')
+            ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
             ->first();
 
         if ($row === null || (int) $row->count === 0) {
@@ -247,39 +247,58 @@ final class TiersQuickViewService
             return null;
         }
 
-        $participant = Participant::query()
-            ->where('tiers_id', $tiers->id)
-            ->where(function ($q): void {
-                $q->whereNotNull('refere_par_id')
-                    ->orWhereNotNull('medecin_tiers_id')
-                    ->orWhereNotNull('therapeute_tiers_id');
-            })
-            ->with([
-                'referePar:id,nom,prenom',
-                'medecinTiers:id,nom,prenom',
-                'therapeuteTiers:id,nom,prenom',
+        $referePar = Participant::query()
+            ->where('refere_par_id', $tiers->id)
+            ->with(['tiers:id,nom,prenom', 'operation:id,nom'])
+            ->get()
+            ->map(fn (Participant $p): array => [
+                'participant_id' => $p->id,
+                'nom' => $p->tiers?->displayName() ?? '—',
+                'operation' => $p->operation?->nom,
             ])
-            ->first();
+            ->all();
 
-        if ($participant === null) {
+        $medecin = Participant::query()
+            ->where('medecin_tiers_id', $tiers->id)
+            ->with(['tiers:id,nom,prenom', 'operation:id,nom'])
+            ->get()
+            ->map(fn (Participant $p): array => [
+                'participant_id' => $p->id,
+                'nom' => $p->tiers?->displayName() ?? '—',
+                'operation' => $p->operation?->nom,
+            ])
+            ->all();
+
+        $therapeute = Participant::query()
+            ->where('therapeute_tiers_id', $tiers->id)
+            ->with(['tiers:id,nom,prenom', 'operation:id,nom'])
+            ->get()
+            ->map(fn (Participant $p): array => [
+                'participant_id' => $p->id,
+                'nom' => $p->tiers?->displayName() ?? '—',
+                'operation' => $p->operation?->nom,
+            ])
+            ->all();
+
+        if (empty($referePar) && empty($medecin) && empty($therapeute)) {
             return null;
         }
 
         $referent = [];
 
-        if ($participant->referePar !== null) {
-            $referent['refere_par'] = $participant->referePar;
+        if (! empty($referePar)) {
+            $referent['refere_par'] = $referePar;
         }
 
-        if ($participant->medecinTiers !== null) {
-            $referent['medecin'] = $participant->medecinTiers;
+        if (! empty($medecin)) {
+            $referent['medecin'] = $medecin;
         }
 
-        if ($participant->therapeuteTiers !== null) {
-            $referent['therapeute'] = $participant->therapeuteTiers;
+        if (! empty($therapeute)) {
+            $referent['therapeute'] = $therapeute;
         }
 
-        return count($referent) > 0 ? $referent : null;
+        return $referent;
     }
 
     /**
