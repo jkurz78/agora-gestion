@@ -171,6 +171,22 @@
                         </ul>
                     </li>
 
+                    {{-- Tiers --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('compta.tiers.*') ? 'active fw-semibold' : '' }}"
+                           href="{{ route('compta.tiers.index') }}">
+                            <i class="bi bi-building-add"></i> Tiers
+                        </a>
+                    </li>
+
+                    {{-- Factures --}}
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('compta.factures*') ? 'active' : '' }}"
+                           href="{{ route('compta.factures') }}">
+                            <i class="bi bi-receipt"></i> Factures
+                        </a>
+                    </li>
+
                     {{-- Dropdown Banques --}}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ request()->routeIs('compta.comptes-bancaires.*') || request()->routeIs('compta.rapprochement.*') || request()->routeIs('compta.virements.*') || request()->routeIs('compta.parametres.comptes-bancaires.*') || request()->routeIs('compta.helloasso-sync') ? 'active' : '' }}"
@@ -213,22 +229,6 @@
                             </li>
                             @endif
                         </ul>
-                    </li>
-
-                    {{-- Tiers --}}
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('compta.tiers.*') ? 'active fw-semibold' : '' }}"
-                           href="{{ route('compta.tiers.index') }}">
-                            <i class="bi bi-building-add"></i> Tiers
-                        </a>
-                    </li>
-
-                    {{-- Factures --}}
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('compta.factures*') ? 'active' : '' }}"
-                           href="{{ route('compta.factures') }}">
-                            <i class="bi bi-receipt"></i> Factures
-                        </a>
                     </li>
 
                     {{-- Budget --}}
