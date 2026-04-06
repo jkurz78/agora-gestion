@@ -145,6 +145,29 @@
                         </div>
                     @endisset
 
+                    {{-- Animations / encadrements --}}
+                    @isset($summary['animations'])
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center gap-1 mb-1">
+                                <i class="bi bi-person-workspace small text-info"></i>
+                                <span class="fw-semibold small">Animations / encadrements</span>
+                            </div>
+                            <ul class="list-unstyled ms-3 mb-0">
+                                @foreach($summary['animations'] as $anim)
+                                    <li class="small text-muted">
+                                        <a href="{{ route('gestion.operations.show', $anim['operation_id']) }}"
+                                           class="text-decoration-none text-muted" target="_blank">
+                                            <i class="bi bi-link-45deg"></i>{{ $anim['operation_nom'] }}
+                                        </a>
+                                        @if(!empty($anim['date_debut']))
+                                            <span class="ms-1">— {{ \Carbon\Carbon::parse($anim['date_debut'])->format('d/m/Y') }}</span>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endisset
+
                     {{-- Référent --}}
                     @isset($summary['referent'])
                         <div class="mb-3">
