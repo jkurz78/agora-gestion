@@ -24,7 +24,7 @@
                         <th style="text-align:center;font-size:12px">Total</th>
                     </tr>
                     <tr>
-                        <td style="position:sticky;left:0;z-index:2;background:#f8f9fa;font-size:11px;font-weight:600;color:#495057">Animateur ↓</td>
+                        <td style="position:sticky;left:0;z-index:2;background:#f8f9fa;font-size:11px;font-weight:600;color:#495057">Encadrant ↓</td>
                         @foreach($seances as $seance)
                             <td style="background:#f8f9fa;text-align:center;font-size:10px;color:#6c757d">
                                 @if($seance->titre){{ $seance->titre }}@endif
@@ -36,7 +36,7 @@
                 </thead>
                 <tbody>
                     @forelse($animateurList as $tiersId => $anim)
-                        {{-- Parent row: animateur name + totals --}}
+                        {{-- Parent row: encadrant name + totals --}}
                         <tr style="background:#eef1f5">
                             <td style="position:sticky;left:0;z-index:1;background:#eef1f5;font-weight:600;padding:4px 8px;white-space:nowrap;font-size:12px">
                                 {{ $anim['tiersName'] }}
@@ -72,13 +72,20 @@
                                         $key = (string) $num;
                                         $cell = $sc['seanceAmounts'][$key] ?? null;
                                     @endphp
-                                    <td style="text-align:center;padding:2px 6px;font-size:11px">
+                                    <td style="text-align:center;padding:2px 4px;font-size:11px">
                                         @if($cell && $cell['montant'] > 0)
                                             <span style="cursor:pointer;text-decoration:underline dotted;color:#0d6efd"
                                                   wire:click="openEditModal(@js($cell['transactionIds']))"
                                                   title="Modifier la transaction">
                                                 {{ $fmt($cell['montant']) }}
                                             </span>
+                                            @if(!empty($cell['numeroPieces']))
+                                                <div style="font-size:9px;color:#999;line-height:1.1">
+                                                    @foreach($cell['numeroPieces'] as $np)
+                                                        {{ $np }}@if(!$loop->last)<br>@endif
+                                                    @endforeach
+                                                </div>
+                                            @endif
                                         @else
                                             <span style="color:#ccc">&mdash;</span>
                                         @endif
@@ -107,7 +114,7 @@
                     @empty
                         <tr>
                             <td colspan="{{ $colCount + 2 }}" class="text-center text-muted py-3" style="font-size:12px">
-                                Ajoutez un animateur ci-dessous pour commencer le suivi des factures.
+                                Ajoutez un encadrant ci-dessous pour commencer le suivi des factures.
                             </td>
                         </tr>
                     @endforelse
@@ -129,10 +136,10 @@
             </table>
         </div>
 
-    {{-- Ajouter un animateur --}}
+    {{-- Ajouter un encadrant --}}
     <div class="mt-3 p-3 border rounded" style="max-width:400px;background:#fafafa">
         <label class="form-label fw-medium" style="font-size:13px">
-            <i class="bi bi-plus-circle me-1"></i>Ajouter un animateur
+            <i class="bi bi-plus-circle me-1"></i>Ajouter un encadrant
         </label>
         <livewire:tiers-autocomplete wire:model="newTiersId" filtre="depenses" :key="'anim-tiers-'.$operation->id" />
     </div>

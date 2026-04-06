@@ -26,7 +26,7 @@
         </li>
         <li class="nav-item">
             <button class="nav-link {{ $activeTab === 'animateurs' ? 'active' : '' }}" wire:click="setTab('animateurs')">
-                <i class="bi bi-person-workspace me-1"></i>Animateurs
+                <i class="bi bi-person-workspace me-1"></i>Encadrants
             </button>
         </li>
         @if(auth()->user()?->peut_voir_donnees_sensibles)

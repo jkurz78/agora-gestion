@@ -145,12 +145,12 @@
                         </div>
                     @endisset
 
-                    {{-- Animations / encadrements --}}
+                    {{-- Encadrements --}}
                     @isset($summary['animations'])
                         <div class="mb-3">
                             <div class="d-flex align-items-center gap-1 mb-1">
                                 <i class="bi bi-person-workspace small text-info"></i>
-                                <span class="fw-semibold small">Animations / encadrements</span>
+                                <span class="fw-semibold small">Encadrements</span>
                             </div>
                             <ul class="list-unstyled ms-3 mb-0">
                                 @foreach($summary['animations'] as $anim)

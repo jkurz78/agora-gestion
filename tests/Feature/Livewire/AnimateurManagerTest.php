@@ -42,7 +42,7 @@ beforeEach(function () {
 it('renders with empty matrix when no depenses exist', function () {
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
         ->assertOk()
-        ->assertSeeHtml('Ajoutez un animateur');
+        ->assertSeeHtml('Ajoutez un encadrant');
 });
 
 it('displays animateur from existing depense transaction', function () {
@@ -65,7 +65,7 @@ it('displays animateur from existing depense transaction', function () {
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
         ->assertSee('DURAND')
         ->assertSee('Sophie')
-        ->assertDontSee('Ajoutez un animateur');
+        ->assertDontSee('Ajoutez un encadrant');
 });
 
 it('opens create modal with pre-filled tiers and seance', function () {
