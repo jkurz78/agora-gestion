@@ -1,6 +1,6 @@
 @if($showModal)
 <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5)" wire:click.self="closeModal">
-    <div class="modal-dialog {{ ($modalStep === 'form' && ($modalPieceJointe || $existingPieceJointeUrl)) ? 'modal-xl' : 'modal-lg' }}">
+    <div class="modal-dialog {{ ($modalStep === 'form' && $previewUrl) ? 'modal-xl' : 'modal-lg' }}">
         <div class="modal-content">
             <div class="modal-header py-2">
                 <h6 class="modal-title">
@@ -52,7 +52,7 @@
                 {{-- Step 2: Formulaire (avec ou sans split view) --}}
                 <div class="modal-body">
                     @php
-                        $hasPieceJointe = $modalPieceJointe || $existingPieceJointeUrl;
+                        $hasPieceJointe = $previewUrl !== null;
                     @endphp
 
                     <div class="row">
@@ -60,13 +60,7 @@
                         @if($hasPieceJointe)
                         <div class="col-md-5">
                             <div class="border rounded p-1 h-100 d-flex flex-column" style="min-height:500px">
-                                @if($modalPieceJointe)
-                                    @php $tempUrl = $modalPieceJointe->temporaryUrl(); $mime = $modalPieceJointe->getMimeType(); @endphp
-                                @else
-                                    @php $tempUrl = $existingPieceJointeUrl; $mime = null; @endphp
-                                @endif
-
-                                @if($mime && str_starts_with($mime, 'image/'))
+                                @if($previewMime && str_starts_with($previewMime, 'image/'))
                                     <div class="flex-grow-1 overflow-auto text-center p-2" x-data="{ scale: 1 }">
                                         <div class="mb-2">
                                             <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.max(0.25, scale - 0.25)"><i class="bi bi-dash-lg"></i></button>
@@ -74,10 +68,10 @@
                                             <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.min(3, scale + 0.25)"><i class="bi bi-plus-lg"></i></button>
                                             <button type="button" class="btn btn-sm btn-outline-secondary ms-1" @click="scale = 1">1:1</button>
                                         </div>
-                                        <img src="{{ $tempUrl }}" :style="'transform: scale(' + scale + '); transform-origin: top center'" class="img-fluid">
+                                        <img src="{{ $previewUrl }}" :style="'transform: scale(' + scale + '); transform-origin: top center'" class="img-fluid">
                                     </div>
                                 @else
-                                    <iframe src="{{ $tempUrl }}" class="flex-grow-1 w-100" style="border:none;min-height:500px"></iframe>
+                                    <iframe src="{{ $previewUrl }}" class="flex-grow-1 w-100" style="border:none;min-height:500px"></iframe>
                                 @endif
 
                                 <div class="text-center py-1 small text-muted border-top">

@@ -66,6 +66,10 @@ final class AnimateurManager extends Component
 
     public ?string $existingPieceJointeUrl = null;
 
+    public ?string $previewUrl = null;
+
+    public ?string $previewMime = null;
+
     public function mount(Operation $operation): void
     {
         $this->operation = $operation;
@@ -136,6 +140,9 @@ final class AnimateurManager extends Component
                 'modalPieceJointe.mimes' => 'Le justificatif doit être un fichier PDF, JPG ou PNG.',
                 'modalPieceJointe.max' => 'Le justificatif ne doit pas dépasser 10 Mo.',
             ]);
+
+            $this->previewUrl = $this->modalPieceJointe->temporaryUrl();
+            $this->previewMime = $this->modalPieceJointe->getMimeType();
         }
         $this->modalStep = 'form';
     }
@@ -190,6 +197,8 @@ final class AnimateurManager extends Component
         $this->modalPieceJointe = null;
         $this->existingPieceJointeNom = $transaction->piece_jointe_nom;
         $this->existingPieceJointeUrl = $transaction->pieceJointeUrl();
+        $this->previewUrl = $transaction->pieceJointeUrl();
+        $this->previewMime = $transaction->piece_jointe_mime;
 
         $this->showModal = true;
     }
@@ -211,6 +220,8 @@ final class AnimateurManager extends Component
         $this->modalPieceJointe = null;
         $this->existingPieceJointeNom = null;
         $this->existingPieceJointeUrl = null;
+        $this->previewUrl = null;
+        $this->previewMime = null;
     }
 
     public function addModalLigne(): void
