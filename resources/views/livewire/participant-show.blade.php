@@ -230,7 +230,7 @@
                 @if($medecinTiers)
                     <div class="alert alert-success py-2">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $medecinTiers->nom }} {{ $medecinTiers->prenom }}</span>
+                            <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $medecinTiers->nom }} {{ $medecinTiers->prenom }} <x-tiers-info-icon :tiersId="$medecinTiers->id" /></span>
                             @if($this->canEdit)
                             <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkMedecinTiers">
                                 <i class="bi bi-x-lg"></i> Dissocier
@@ -303,7 +303,7 @@
                 @if($therapeuteTiers)
                     <div class="alert alert-success py-2">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $therapeuteTiers->nom }} {{ $therapeuteTiers->prenom }}</span>
+                            <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $therapeuteTiers->nom }} {{ $therapeuteTiers->prenom }} <x-tiers-info-icon :tiersId="$therapeuteTiers->id" /></span>
                             @if($this->canEdit)
                             <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkTherapeuteTiers">
                                 <i class="bi bi-x-lg"></i> Dissocier
@@ -383,7 +383,7 @@
                 @if($refTiers)
                     <div class="alert alert-success py-2">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $refTiers->nom }} {{ $refTiers->prenom }}</span>
+                            <span><i class="bi bi-link-45deg"></i> <strong>Tiers associé :</strong> {{ $refTiers->nom }} {{ $refTiers->prenom }} <x-tiers-info-icon :tiersId="$refTiers->id" /></span>
                             @if($this->canEdit)
                             <button type="button" class="btn btn-sm btn-outline-danger" wire:click="unlinkAdresseParTiers">
                                 <i class="bi bi-x-lg"></i> Dissocier

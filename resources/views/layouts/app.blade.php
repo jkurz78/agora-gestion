@@ -500,6 +500,7 @@
     <livewire:tiers-form />
     <livewire:transaction-form />
     <livewire:virement-interne-form />
+    <livewire:tiers-quick-view />
     @livewireScripts
     <script>
         function initTooltips() {
