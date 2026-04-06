@@ -78,67 +78,48 @@
                     </p>
                 @else
 
-                    {{-- Dépenses --}}
-                    @isset($summary['depenses'])
-                        <div class="mb-3">
-                            <div class="d-flex align-items-center gap-1 mb-1">
-                                <i class="bi bi-arrow-up-circle-fill text-danger small"></i>
-                                <span class="fw-semibold small">Dépenses</span>
-                                <span class="ms-1 text-muted small">
-                                    {{ $summary['depenses']['count'] }} &bull;
-                                    {{ number_format((float)$summary['depenses']['total'], 2, ',', ' ') }}&nbsp;€
-                                </span>
-                            </div>
-                            @isset($summary['depenses']['par_operation'])
-                                <ul class="list-unstyled ms-3 mb-0">
-                                    @foreach($summary['depenses']['par_operation'] as $op)
-                                        <li class="small text-muted">
-                                            <a href="{{ route('gestion.operations.show', $op['operation_id']) }}"
-                                               class="text-decoration-none text-muted" target="_blank">
-                                                <i class="bi bi-link-45deg"></i>{{ $op['operation_nom'] }}
-                                            </a>
-                                            —
-                                            {{ $op['count'] }} &bull; {{ number_format((float)$op['total'], 2, ',', ' ') }}&nbsp;€
-                                        </li>
-                                    @endforeach
-                                </ul>
+                    {{-- Flux financiers (ligne compacte) --}}
+                    @if(isset($summary['recettes']) || isset($summary['dons']) || isset($summary['depenses']))
+                        <div class="d-flex flex-wrap gap-3 mb-3 small">
+                            @isset($summary['recettes'])
+                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap" style="color:#198754">
+                                    <i class="bi bi-arrow-down-circle-fill me-1"></i><strong>Recettes</strong>
+                                    ({{ $summary['recettes']['count'] }}) {{ number_format((float)$summary['recettes']['total'], 2, ',', ' ') }} €
+                                </a>
+                            @endisset
+                            @isset($summary['dons'])
+                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap" style="color:#e67e00">
+                                    <i class="bi bi-heart-fill me-1"></i><strong>Dons</strong>
+                                    ({{ $summary['dons']['count'] }}) {{ number_format((float)$summary['dons']['total'], 2, ',', ' ') }} €
+                                </a>
+                            @endisset
+                            @isset($summary['depenses'])
+                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap" style="color:#dc3545">
+                                    <i class="bi bi-arrow-up-circle-fill me-1"></i><strong>Dépenses</strong>
+                                    ({{ $summary['depenses']['count'] }}) {{ number_format((float)$summary['depenses']['total'], 2, ',', ' ') }} €
+                                </a>
                             @endisset
                         </div>
-                    @endisset
+                    @endif
 
-                    {{-- Recettes --}}
-                    @isset($summary['recettes'])
+                    {{-- Détail dépenses par opération --}}
+                    @if(isset($summary['depenses']['par_operation']) && count($summary['depenses']['par_operation']) > 0)
                         <div class="mb-3">
-                            <div class="d-flex align-items-center gap-1">
-                                <i class="bi bi-arrow-down-circle-fill text-success small"></i>
-                                <span class="fw-semibold small">Recettes</span>
-                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}"
-                                   class="ms-1 text-muted small text-decoration-none" target="_blank">
-                                    {{ $summary['recettes']['count'] }} &bull;
-                                    {{ number_format((float)$summary['recettes']['total'], 2, ',', ' ') }}&nbsp;€
-                                    <i class="bi bi-box-arrow-up-right small"></i>
-                                </a>
-                            </div>
+                            <div class="fw-semibold small mb-1">Dépenses par opération</div>
+                            <ul class="list-unstyled ms-2 mb-0">
+                                @foreach($summary['depenses']['par_operation'] as $op)
+                                    <li class="small text-muted">
+                                        <a href="{{ route('gestion.operations.show', $op['operation_id']) }}"
+                                           class="text-decoration-none text-muted">
+                                            <i class="bi bi-link-45deg"></i>{{ $op['operation_nom'] }}
+                                        </a>
+                                        @if($op['sous_categorie']) — {{ $op['sous_categorie'] }}@endif
+                                        : {{ number_format((float)$op['total'], 2, ',', ' ') }} € ({{ $op['count'] }})
+                                    </li>
+                                @endforeach
+                            </ul>
                         </div>
-                    @endisset
-
-                    {{-- Dons --}}
-                    @isset($summary['dons'])
-                        <div class="mb-3">
-                            <div class="d-flex align-items-center gap-1">
-                                <i class="bi bi-heart-fill text-warning small"></i>
-                                <span class="fw-semibold small">Dons</span>
-                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}"
-                                   class="ms-1 text-muted small text-decoration-none" target="_blank">
-                                    {{ $summary['dons']['count'] }} &bull;
-                                    {{ number_format((float)$summary['dons']['total'], 2, ',', ' ') }}&nbsp;€
-                                    <i class="bi bi-box-arrow-up-right small"></i>
-                                </a>
-                            </div>
-                        </div>
-                    @endisset
-
-                    {{-- Cotisations in header --}}
+                    @endif
 
                     {{-- Participations --}}
                     @isset($summary['participations'])
