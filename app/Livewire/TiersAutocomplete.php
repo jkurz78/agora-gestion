@@ -47,6 +47,7 @@ final class TiersAutocomplete extends Component
             $this->selectedType = $tiers?->type;
         } elseif ($this->defaultSearch !== '') {
             $this->search = $this->defaultSearch;
+            $this->doSearch();
         }
     }
 
