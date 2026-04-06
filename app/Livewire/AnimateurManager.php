@@ -16,6 +16,7 @@ use App\Models\TransactionLigne;
 use App\Services\TransactionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 final class AnimateurManager extends Component
@@ -57,14 +58,13 @@ final class AnimateurManager extends Component
         $this->operation = $operation;
     }
 
-    public function updatedNewTiersId(?int $value): void
+    #[On('tiers-selected')]
+    public function onTiersSelected(int $id): void
     {
-        if ($value !== null) {
-            if (! in_array($value, $this->addedTiersIds, true)) {
-                $this->addedTiersIds[] = $value;
-            }
-            $this->newTiersId = null;
+        if (! in_array($id, $this->addedTiersIds, true)) {
+            $this->addedTiersIds[] = $id;
         }
+        $this->newTiersId = null;
     }
 
     public function openCreateModal(int $tiersId, ?int $seanceNum): void
