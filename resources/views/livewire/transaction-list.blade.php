@@ -125,6 +125,11 @@
                             @else
                                 {{ $transaction->libelle }}
                             @endif
+                            @if($transaction->hasPieceJointe())
+                                <a href="{{ $transaction->pieceJointeUrl() }}" target="_blank" title="Justificatif : {{ $transaction->piece_jointe_nom }}" class="text-muted ms-1">
+                                    <i class="bi bi-paperclip"></i>
+                                </a>
+                            @endif
                         </td>
                         <td class="small">@if($transaction->tiers)<span style="font-size:.7rem">{{ $transaction->tiers->type === 'entreprise' ? '🏢' : '👤' }}</span> {{ $transaction->tiers->displayName() }}@else—@endif</td>
                         <td><span class="badge bg-secondary" style="font-size:.7rem">{{ $transaction->mode_paiement->label() }}</span></td>

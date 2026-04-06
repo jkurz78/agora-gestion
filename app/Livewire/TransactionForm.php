@@ -20,10 +20,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 final class TransactionForm extends Component
 {
     use RespectsExerciceCloture;
+    use WithFileUploads;
 
     public ?int $transactionId = null;
 
@@ -54,6 +57,13 @@ final class TransactionForm extends Component
 
     public ?string $sousCategorieFilter = null;
 
+    /** @var TemporaryUploadedFile|null */
+    public $pieceJointe = null;
+
+    public ?string $existingPieceJointeNom = null;
+
+    public ?string $existingPieceJointeUrl = null;
+
     // État du panneau de ventilation
     public ?int $ventilationLigneId = null;
 
@@ -81,7 +91,8 @@ final class TransactionForm extends Component
         $this->reset(['transactionId', 'type', 'date', 'libelle', 'mode_paiement',
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
-            'ventilationHasAffectations']);
+            'ventilationHasAffectations',
+            'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl']);
         $this->type = $type;
         $this->isLocked = false;
         $this->resetValidation();
@@ -267,6 +278,10 @@ final class TransactionForm extends Component
             'notes' => (string) ($ligne->notes ?? ''),
         ])->toArray();
 
+        $this->existingPieceJointeNom = $transaction->piece_jointe_nom;
+        $this->existingPieceJointeUrl = $transaction->pieceJointeUrl();
+        $this->pieceJointe = null;
+
         $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByRemise();
         $this->isLockedByFacture = $transaction->isLockedByFacture();
         $this->showForm = true;
@@ -279,6 +294,7 @@ final class TransactionForm extends Component
             'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
+            'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
         ]);
         $this->resetValidation();
     }
@@ -321,6 +337,15 @@ final class TransactionForm extends Component
             ]
         );
 
+        if ($this->pieceJointe !== null && $this->type === 'depense') {
+            $this->validate([
+                'pieceJointe' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+            ], [
+                'pieceJointe.mimes' => 'Le justificatif doit être un fichier PDF, JPG ou PNG.',
+                'pieceJointe.max' => 'Le justificatif ne doit pas dépasser 10 Mo.',
+            ]);
+        }
+
         $data = [
             'type' => $this->type,
             'date' => $this->date,
@@ -354,12 +379,13 @@ final class TransactionForm extends Component
 
         $service = app(TransactionService::class);
 
+        $createdTransaction = null;
         try {
             if ($this->transactionId) {
                 $transaction = Transaction::findOrFail($this->transactionId);
                 $service->update($transaction, $data, $lignes);
             } else {
-                $service->create($data, $lignes);
+                $createdTransaction = $service->create($data, $lignes);
             }
         } catch (\RuntimeException $e) {
             $this->addError('lignes', $e->getMessage());
@@ -367,8 +393,28 @@ final class TransactionForm extends Component
             return;
         }
 
+        // Sauvegarder la pièce jointe si uploadée
+        if ($this->pieceJointe !== null && $this->type === 'depense') {
+            $tx = $createdTransaction ?? Transaction::find($this->transactionId);
+            if ($tx) {
+                $service->storePieceJointe($tx, $this->pieceJointe);
+            }
+        }
+
         $this->dispatch('transaction-saved');
         $this->resetForm();
+    }
+
+    public function deletePieceJointe(): void
+    {
+        if (! $this->canEdit || $this->transactionId === null) {
+            return;
+        }
+
+        $transaction = Transaction::findOrFail($this->transactionId);
+        app(TransactionService::class)->deletePieceJointe($transaction);
+        $this->existingPieceJointeNom = null;
+        $this->existingPieceJointeUrl = null;
     }
 
     public function render(): View

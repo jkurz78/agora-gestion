@@ -127,6 +127,45 @@
                             <input type="text" wire:model="notes" id="notes" class="form-control"
                                    {{ $exerciceCloture ? 'disabled' : '' }}>
                         </div>
+
+                        {{-- Pièce jointe (dépenses uniquement) --}}
+                        @if ($type === 'depense' && ! $exerciceCloture)
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
+
+                            @if ($existingPieceJointeNom && ! $pieceJointe)
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="small text-muted">{{ $existingPieceJointeNom }}</span>
+                                    <a href="{{ $existingPieceJointeUrl }}" target="_blank" class="btn btn-sm btn-outline-primary" title="Consulter">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    @if ($this->canEdit)
+                                    <button type="button" wire:click="deletePieceJointe" wire:confirm="Supprimer le justificatif ?"
+                                            class="btn btn-sm btn-outline-danger" title="Supprimer">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                    @endif
+                                    <label class="btn btn-sm btn-outline-secondary mb-0" title="Remplacer">
+                                        <i class="bi bi-arrow-repeat"></i> Remplacer
+                                        <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                    </label>
+                                </div>
+                            @else
+                                <div class="d-flex align-items-center gap-2">
+                                    <label class="btn btn-sm btn-outline-secondary mb-0">
+                                        <i class="bi bi-paperclip"></i> Joindre un justificatif
+                                        <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                    </label>
+                                    @if ($pieceJointe)
+                                        <span class="small text-success"><i class="bi bi-check-circle"></i> {{ $pieceJointe->getClientOriginalName() }}</span>
+                                    @endif
+                                    <div wire:loading wire:target="pieceJointe" class="spinner-border spinner-border-sm text-primary"></div>
+                                </div>
+                            @endif
+
+                            @error('pieceJointe') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                        </div>
+                        @endif
                     </div>
 
                     {{-- Lignes section --}}
