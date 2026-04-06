@@ -131,6 +131,11 @@ final class AnimateurManager extends Component
         $this->modalPieceJointe = null;
     }
 
+    public function updatedModalPieceJointe(): void
+    {
+        $this->proceedWithFile();
+    }
+
     public function proceedWithFile(): void
     {
         if ($this->modalPieceJointe !== null) {
