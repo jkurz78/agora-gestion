@@ -1,4 +1,4 @@
-<div class="mt-2" style="max-width:100%;overflow:hidden">
+<div class="mt-2" style="max-width:100%">
     @php
         $fmt = fn(float $v): string => number_format($v, 2, ',', "\u{202F}");
         $seanceNums = $seances->pluck('numero')->toArray();
