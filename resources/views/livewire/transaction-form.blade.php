@@ -33,6 +33,35 @@
                 </div>
             @endif
             <div class="card-body">
+                @if ($ocrAnalyzing)
+                    <div class="alert alert-info py-2 d-flex align-items-center gap-2">
+                        <div class="spinner-border spinner-border-sm"></div>
+                        Analyse de la facture en cours...
+                    </div>
+                @endif
+
+                @if ($ocrError)
+                    <div class="alert alert-danger py-2">
+                        <i class="bi bi-exclamation-triangle"></i> {{ $ocrError }}
+                        <div class="mt-2">
+                            <button type="button" wire:click="retryOcr" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-arrow-clockwise"></i> Réessayer
+                            </button>
+                            <button type="button" wire:click="$set('ocrError', null)" class="btn btn-sm btn-outline-secondary">
+                                Ignorer
+                            </button>
+                        </div>
+                    </div>
+                @endif
+
+                @if (! empty($ocrWarnings))
+                    <div class="alert alert-warning py-2 small">
+                        @foreach ($ocrWarnings as $warning)
+                            <div><i class="bi bi-exclamation-triangle"></i> {{ $warning }}</div>
+                        @endforeach
+                    </div>
+                @endif
+
                 @if(!$sousCategorieFilter)
                 <div class="mb-3">
                     @if ($type === 'depense')
@@ -155,7 +184,7 @@
                                     <label class="btn btn-sm btn-outline-secondary mb-0">
                                         <i class="bi bi-paperclip"></i> Joindre un justificatif
                                         <input type="file" wire:model="pieceJointe" accept=".pdf,.jpg,.jpeg,.png" class="d-none"
-                                               @change="const f = $event.target.files[0]; if (f) tempUrl = URL.createObjectURL(f)">
+                                               @change="const f = $event.target.files[0]; if (f) { tempUrl = URL.createObjectURL(f); sessionStorage.setItem('pj-ocr-preview-url', tempUrl); }">
                                     </label>
                                     @if ($pieceJointe)
                                         <span class="small text-success"><i class="bi bi-check-circle"></i> {{ $pieceJointe->getClientOriginalName() }}</span>
@@ -404,6 +433,17 @@
                         </div>
                     </div>
                 </form>
+
+                @if ($ocrMode && ($pieceJointe || $existingPieceJointeNom))
+                    <hr class="my-3">
+                    <div style="height:40vh" x-data="{ pUrl: sessionStorage.getItem('pj-ocr-preview-url') }">
+                        <template x-if="pUrl">
+                            <div class="position-relative rounded" style="height:100%;overflow:hidden">
+                                <iframe :src="pUrl + '#navpanes=0'" style="position:absolute;top:0;left:0;right:0;bottom:0;border:none;width:100%;height:100%"></iframe>
+                            </div>
+                        </template>
+                    </div>
+                @endif
             </div>
         </div>
         </div>

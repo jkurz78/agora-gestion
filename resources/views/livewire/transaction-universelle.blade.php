@@ -96,6 +96,11 @@
                                 wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'depense' })">
                                 <i class="bi bi-arrow-down-circle text-danger me-1"></i> Dépense</a></li>
                         @endif
+                        @if(in_array('depense', $availableTypes) && \App\Services\InvoiceOcrService::isConfigured())
+                            <li><a class="dropdown-item" href="#"
+                                @click.prevent="$dispatch('open-transaction-form-ocr')">
+                                <i class="bi bi-file-earmark-text text-primary me-1"></i> Dépense depuis facture</a></li>
+                        @endif
                         @if(in_array('recette', $availableTypes))
                             <li><a class="dropdown-item" href="#"
                                 wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'recette' })">
@@ -145,6 +150,11 @@
                             <li><a class="dropdown-item" href="#"
                                 wire:click.prevent="$dispatch('open-transaction-form', { id: null, type: 'depense' })">
                                 <i class="bi bi-arrow-down-circle text-danger me-1"></i> Dépense</a></li>
+                        @endif
+                        @if(in_array('depense', $availableTypes) && \App\Services\InvoiceOcrService::isConfigured())
+                            <li><a class="dropdown-item" href="#"
+                                @click.prevent="$dispatch('open-transaction-form-ocr')">
+                                <i class="bi bi-file-earmark-text text-primary me-1"></i> Dépense depuis facture</a></li>
                         @endif
                         @if(in_array('recette', $availableTypes))
                             <li><a class="dropdown-item" href="#"
