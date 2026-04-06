@@ -224,7 +224,7 @@ final class AnimateurManager extends Component
         $data = [
             'type' => TypeTransaction::Depense->value,
             'date' => $this->modalDate,
-            'libelle' => "Facture d'animation {$this->modalReference} de {$tiers->displayName()}",
+            'libelle' => "Facture d'encadrement {$this->modalReference} de {$tiers->displayName()}",
             'montant_total' => round($montantTotal, 2),
             'mode_paiement' => $this->modalModePaiement,
             'tiers_id' => $this->modalTiersId,
@@ -405,11 +405,15 @@ final class AnimateurManager extends Component
                 $scData['seanceAmounts'][$seanceKey] = [
                     'montant' => 0.0,
                     'transactionIds' => [],
+                    'numeroPieces' => [],
                 ];
             }
             $scData['seanceAmounts'][$seanceKey]['montant'] += $montant;
             if (! in_array($transaction->id, $scData['seanceAmounts'][$seanceKey]['transactionIds'], true)) {
                 $scData['seanceAmounts'][$seanceKey]['transactionIds'][] = $transaction->id;
+                if ($transaction->numero_piece) {
+                    $scData['seanceAmounts'][$seanceKey]['numeroPieces'][] = $transaction->numero_piece;
+                }
             }
             $scData['total'] += $montant;
 
