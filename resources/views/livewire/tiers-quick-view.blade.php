@@ -81,7 +81,7 @@
 
                     {{-- Flux financiers (ligne compacte avec badges) --}}
                     @if(isset($summary['recettes']) || isset($summary['dons']) || isset($summary['depenses']) || isset($summary['factures']))
-                        <div class="d-flex flex-wrap gap-3 mb-3 small">
+                        <div class="d-flex flex-wrap gap-3 mb-3 small justify-content-center">
                             @isset($summary['recettes'])
                                 <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
                                     <span class="badge bg-success" style="font-size:.65rem">{{ $summary['recettes']['count'] }} REC</span>
