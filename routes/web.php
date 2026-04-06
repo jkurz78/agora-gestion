@@ -22,6 +22,7 @@ use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeancePdfController;
 use App\Http\Controllers\SousCategorieController;
+use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\DetecteEspace;
@@ -183,6 +184,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
 // ── Profile (espace-agnostic) ──
 Route::middleware('auth')->group(function (): void {
     Route::view('/profil', 'profil.index')->name('profil.index');
+    Route::get('/transactions/{transaction}/piece-jointe', TransactionPieceJointeController::class)
+        ->name('transactions.piece-jointe');
 });
 
 // ── Legacy redirects (301) ──

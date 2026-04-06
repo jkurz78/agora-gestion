@@ -9,10 +9,18 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 final class TransactionService
 {
+    private const ALLOWED_MIMES = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+    ];
+
     public function __construct(
         private readonly ExerciceService $exerciceService,
     ) {}
@@ -194,6 +202,44 @@ final class TransactionService
         }
 
         DB::transaction(fn () => $ligne->affectations()->delete());
+    }
+
+    public function storePieceJointe(Transaction $transaction, UploadedFile $file): void
+    {
+        $mime = $file->getMimeType();
+        if (! in_array($mime, self::ALLOWED_MIMES, true)) {
+            throw new \InvalidArgumentException('Type de fichier non autorisé : '.$mime);
+        }
+
+        $dir = "pieces-jointes/{$transaction->id}";
+
+        if ($transaction->piece_jointe_path !== null) {
+            Storage::disk('local')->deleteDirectory($dir);
+        }
+
+        $extension = $file->guessExtension() ?? 'bin';
+        $storedPath = $file->storeAs($dir, "justificatif.{$extension}", 'local');
+
+        $transaction->update([
+            'piece_jointe_path' => $storedPath,
+            'piece_jointe_nom' => $file->getClientOriginalName(),
+            'piece_jointe_mime' => $mime,
+        ]);
+    }
+
+    public function deletePieceJointe(Transaction $transaction): void
+    {
+        if ($transaction->piece_jointe_path === null) {
+            return;
+        }
+
+        Storage::disk('local')->deleteDirectory("pieces-jointes/{$transaction->id}");
+
+        $transaction->update([
+            'piece_jointe_path' => null,
+            'piece_jointe_nom' => null,
+            'piece_jointe_mime' => null,
+        ]);
     }
 
     private function validateInscriptionRequiresOperation(array $lignes): void
