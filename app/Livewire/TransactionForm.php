@@ -20,6 +20,7 @@ use App\Models\TransactionLigneAffectation;
 use App\Services\ExerciceService;
 use App\Services\InvoiceOcrService;
 use App\Services\TransactionService;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -492,7 +493,7 @@ final class TransactionForm extends Component
         $validOpIds = Operation::pluck('id')->toArray();
 
         if ($result->date !== null) {
-            $this->date = $result->date;
+            $this->date = $this->adjustDateToExercice($result->date);
         }
         if ($result->reference !== null) {
             $this->reference = $result->reference;
@@ -531,6 +532,34 @@ final class TransactionForm extends Component
         }
 
         $this->ocrWarnings = $result->warnings;
+    }
+
+    private function adjustDateToExercice(string $date): string
+    {
+        $exerciceService = app(ExerciceService::class);
+        $range = $exerciceService->dateRange($exerciceService->current());
+        $start = $range['start'];
+        $end = $range['end'];
+
+        $parsed = CarbonImmutable::parse($date);
+
+        if ($parsed->between($start, $end)) {
+            return $date;
+        }
+
+        // Essayer avec l'année +1 ou -1 (erreur IA fréquente)
+        $plusOne = $parsed->addYear();
+        if ($plusOne->between($start, $end)) {
+            return $plusOne->format('Y-m-d');
+        }
+
+        $minusOne = $parsed->subYear();
+        if ($minusOne->between($start, $end)) {
+            return $minusOne->format('Y-m-d');
+        }
+
+        // Aucune correction possible, garder la date originale
+        return $date;
     }
 
     public function render(): View
