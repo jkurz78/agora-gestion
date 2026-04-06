@@ -117,6 +117,7 @@ Extrais les informations de cette facture au format JSON suivant :
 
 Règles :
 - Pour la date, lis EXACTEMENT ce qui est écrit sur la facture. Ne corrige pas l'année.
+- L'association n'est PAS assujettie à la TVA et ne la récupère pas. Utilise TOUJOURS les montants TTC. Si la facture affiche des montants HT avec TVA, calcule le TTC pour chaque ligne (montant HT × (1 + taux TVA)). Pour montant_total, utilise le "Net à payer" ou "Total TTC".
 - Respecte les lignes telles qu'elles apparaissent sur la facture. Si la facture indique quantité 2 à 70€ pour un montant de 140€, c'est UNE SEULE ligne à 140€. Ne ventile jamais.
 - Pour tiers_id, cherche le tiers le plus proche dans la liste ci-dessous. Si aucun ne correspond, mets null.
 - Pour sous_categorie_id, choisis la sous-catégorie la plus pertinente. Si aucune ne correspond, mets null.
