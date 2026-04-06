@@ -160,7 +160,7 @@
                                 </select>
                             @endif
                         </div>
-                        <div class="col-md-2">
+                        <div class="{{ $ocrMode ? 'col-md-2' : 'col-md-2' }}">
                             <label class="form-label">
                                 Montant total
                                 @if ($isLocked) <i class="bi bi-lock text-warning" title="Champ verrouillé par un rapprochement"></i> @endif
@@ -169,15 +169,26 @@
                                 {{ number_format($this->montantTotal, 2, ',', ' ') }} €
                             </div>
                         </div>
-                        <div class="col-12">
+                        {{-- En mode OCR : PJ sur la même ligne que Montant total --}}
+                        @if ($ocrMode && $type === 'depense' && ! $exerciceCloture)
+                        <div class="col-md-3">
+                            <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
+                            @if ($pieceJointe)
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="small text-success text-truncate" style="max-width:150px"><i class="bi bi-check-circle"></i> {{ $pieceJointe->getClientOriginalName() }}</span>
+                                </div>
+                            @endif
+                        </div>
+                        @endif
+                        <div class="{{ $ocrMode ? 'col-md-8' : 'col-12' }}">
                             <label for="notes" class="form-label">Notes</label>
                             <input type="text" wire:model="notes" id="notes" class="form-control"
                                    {{ $exerciceCloture ? 'disabled' : '' }}>
                         </div>
 
-                        {{-- Pièce jointe (dépenses uniquement) --}}
-                        @if ($type === 'depense' && ! $exerciceCloture)
-                        <div class="{{ $ocrMode ? 'col-md-4' : 'col-12' }}">
+                        {{-- Pièce jointe (dépenses uniquement, hors OCR mode qui l'affiche au-dessus) --}}
+                        @if ($type === 'depense' && ! $exerciceCloture && ! $ocrMode)
+                        <div class="col-12">
                             <label class="form-label"><i class="bi bi-paperclip"></i> Justificatif</label>
 
                             @if ($existingPieceJointeNom && ! $pieceJointe)
