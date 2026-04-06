@@ -84,20 +84,27 @@
                         <template x-if="previewUrl">
                         <div class="col-md-5">
                             <div class="border rounded p-1 h-100 d-flex flex-column" style="min-height:500px">
-                                <template x-if="previewMime && previewMime.startsWith('image/')">
-                                    <div class="flex-grow-1 overflow-auto text-center p-2">
-                                        <div class="mb-2">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.max(0.25, scale - 0.25)"><i class="bi bi-dash-lg"></i></button>
-                                            <span class="mx-2 small" x-text="Math.round(scale * 100) + '%'"></span>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.min(3, scale + 0.25)"><i class="bi bi-plus-lg"></i></button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary ms-1" @click="scale = 1">1:1</button>
+                                {{-- Barre de zoom commune --}}
+                                <div class="text-center py-1 border-bottom">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.max(0.5, scale - 0.25)"><i class="bi bi-dash-lg"></i></button>
+                                    <span class="mx-2 small" x-text="Math.round(scale * 100) + '%'"></span>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @click="scale = Math.min(3, scale + 0.25)"><i class="bi bi-plus-lg"></i></button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary ms-1" @click="scale = 1">1:1</button>
+                                </div>
+
+                                {{-- Conteneur scrollable avec zoom --}}
+                                <div class="flex-grow-1 overflow-auto" style="min-height:0">
+                                    <template x-if="previewMime && previewMime.startsWith('image/')">
+                                        <div class="text-center p-2">
+                                            <img :src="previewUrl" :style="'transform: scale(' + scale + '); transform-origin: top center'" class="img-fluid">
                                         </div>
-                                        <img :src="previewUrl" :style="'transform: scale(' + scale + '); transform-origin: top center'" class="img-fluid">
-                                    </div>
-                                </template>
-                                <template x-if="!previewMime || !previewMime.startsWith('image/')">
-                                    <iframe :src="previewUrl + '#toolbar=0&navpanes=0'" class="flex-grow-1 w-100" style="border:none;min-height:500px"></iframe>
-                                </template>
+                                    </template>
+                                    <template x-if="!previewMime || !previewMime.startsWith('image/')">
+                                        <div :style="'transform: scale(' + scale + '); transform-origin: top left; width: ' + (100/scale) + '%; height: ' + (100/scale) + '%'">
+                                            <iframe :src="previewUrl + '#toolbar=0&navpanes=0'" class="w-100 h-100" style="border:none;min-height:800px"></iframe>
+                                        </div>
+                                    </template>
+                                </div>
 
                                 <div class="text-center py-1 small text-muted border-top" x-text="previewName"></div>
                             </div>
