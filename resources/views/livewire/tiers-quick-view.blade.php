@@ -13,7 +13,7 @@
         {{-- Floating card --}}
         <div
             class="position-fixed top-50 start-50 translate-middle shadow-lg rounded-3"
-            style="z-index:2050;width:520px;max-height:85vh;overflow-y:auto;background:#fff"
+            style="z-index:2050;width:560px;max-height:85vh;overflow-y:auto;background:#fff"
             @click.stop
         >
             {{-- Header --}}
@@ -23,15 +23,24 @@
                     <span style="font-size:1.1rem">
                         @if($tiers->type === 'entreprise')🏢@else👤@endif
                     </span>
-                    <span class="fw-semibold text-truncate" style="color:#4a1060;max-width:300px">
+                    <span class="fw-semibold text-truncate" style="color:#4a1060;max-width:260px">
                         {{ $tiers->displayName() }}
                     </span>
                     <span class="badge rounded-pill small"
-                          style="background:#722281;font-size:0.7rem">
+                          style="background:#722281;font-size:0.65rem">
                         {{ $tiers->type === 'entreprise' ? 'Entreprise' : 'Particulier' }}
                     </span>
                 </div>
-                <button type="button" class="btn-close btn-sm" wire:click="close" aria-label="Fermer"></button>
+                <div class="d-flex align-items-center gap-2 ms-2 flex-shrink-0">
+                    <select wire:model.live="exercice"
+                            class="form-select py-0 px-1 border-0"
+                            style="width:auto;font-size:.65rem;background:#f0e8f5;color:#4a1060">
+                        @foreach($exerciceOptions as $year)
+                            <option value="{{ $year }}">{{ $year }}-{{ $year + 1 }}</option>
+                        @endforeach
+                    </select>
+                    <button type="button" class="btn-close btn-sm" wire:click="close" aria-label="Fermer"></button>
+                </div>
             </div>
 
             <div class="p-3">
@@ -52,17 +61,7 @@
                     </div>
                 @endif
 
-                {{-- Exercice selector --}}
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <label class="small text-muted mb-0 text-nowrap">Exercice :</label>
-                    <select wire:model.live="exercice"
-                            class="form-select form-select-sm"
-                            style="width:auto">
-                        @foreach($availableYears as $year)
-                            <option value="{{ $year }}">{{ $year }}-{{ $year + 1 }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                {{-- Exercice selector is in header --}}
 
                 @php
                     $hasSections = isset($summary['depenses'])
