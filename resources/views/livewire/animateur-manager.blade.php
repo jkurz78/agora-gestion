@@ -8,13 +8,7 @@
         $colCount = count($seanceNums);
     @endphp
 
-    @if(empty($animateurList))
-        <div class="text-center text-muted py-4">
-            <i class="bi bi-person-workspace" style="font-size:2rem;opacity:0.3"></i>
-            <p class="mt-2">Aucune facture d'animateur enregistr&eacute;e pour cette op&eacute;ration.</p>
-        </div>
-    @else
-        <div class="table-responsive">
+    <div class="table-responsive">
             <table class="table table-sm table-bordered mb-0" style="font-size:12px;table-layout:fixed;width:{{ 180 + ($colCount * 110) + 100 }}px">
                 <colgroup>
                     <col style="width:180px">
@@ -43,7 +37,7 @@
                     @endif
                 </thead>
                 <tbody>
-                    @foreach($animateurList as $tiersId => $anim)
+                    @forelse($animateurList as $tiersId => $anim)
                         {{-- Parent row: animateur name + totals --}}
                         <tr style="background:#eef1f5">
                             <td style="position:sticky;left:0;z-index:1;background:#eef1f5;font-weight:600;padding:4px 8px;white-space:nowrap;font-size:12px">
@@ -112,7 +106,13 @@
                                 </td>
                             </tr>
                         @endif
-                    @endforeach
+                    @empty
+                        <tr>
+                            <td colspan="{{ $colCount + 2 }}" class="text-center text-muted py-3" style="font-size:12px">
+                                Ajoutez un animateur ci-dessous pour commencer le suivi des factures.
+                            </td>
+                        </tr>
+                    @endforelse
                 </tbody>
                 <tfoot>
                     <tr style="background:#eef1f5;font-weight:600;font-size:12px">
@@ -130,7 +130,6 @@
                 </tfoot>
             </table>
         </div>
-    @endif
 
     {{-- Ajouter un animateur --}}
     <div class="mt-3 p-3 border rounded" style="max-width:400px;background:#fafafa">
