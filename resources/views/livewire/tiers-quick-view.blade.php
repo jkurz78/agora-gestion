@@ -35,7 +35,7 @@
                     <select wire:model.live="exercice"
                             class="form-select py-0 px-1 border-0"
                             style="width:auto;font-size:.65rem;background:#f0e8f5;color:#4a1060">
-                        @foreach($exerciceOptions as $year)
+                        @foreach($availableYears as $year)
                             <option value="{{ $year }}">{{ $year }}-{{ $year + 1 }}</option>
                         @endforeach
                     </select>
