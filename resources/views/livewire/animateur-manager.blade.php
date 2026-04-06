@@ -31,7 +31,6 @@
                     </tr>
                     @if($seances->contains(fn($s) => $s->date || $s->titre))
                     <tr>
-                        @php $hasInfo = false; @endphp
                         <td style="position:sticky;left:0;z-index:2;background:#f8f9fa"></td>
                         @foreach($seances as $seance)
                             <td style="background:#f8f9fa;text-align:center;font-size:10px;color:#6c757d">
