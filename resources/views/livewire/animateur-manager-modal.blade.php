@@ -4,7 +4,7 @@
         <div class="modal-content">
             <div class="modal-header py-2">
                 <h6 class="modal-title">
-                    {{ $isEditing ? 'Modifier la facture' : 'Nouvelle facture d\'animation' }}
+                    {{ $isEditing ? 'Modifier la facture' : 'Nouvelle facture d\'encadrement' }}
                 </h6>
                 <button type="button" class="btn-close" wire:click="closeModal"></button>
             </div>
