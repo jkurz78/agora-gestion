@@ -64,7 +64,8 @@ it('displays animateur from existing depense transaction', function () {
 
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
         ->assertSee('DURAND')
-        ->assertSee('Sophie');
+        ->assertSee('Sophie')
+        ->assertDontSee('Aucune facture');
 });
 
 it('opens create modal with pre-filled tiers and seance', function () {
@@ -73,6 +74,7 @@ it('opens create modal with pre-filled tiers and seance', function () {
         ->assertSet('showModal', true)
         ->assertSet('isEditing', false)
         ->assertSet('modalTiersId', $this->tiers->id)
+        ->assertSet('modalTiersLabel', $this->tiers->displayName())
         ->assertSet('modalLignes.0.seance', 2)
         ->assertSet('modalLignes.0.operation_id', $this->operation->id);
 });
