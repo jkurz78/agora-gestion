@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
+use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -39,7 +40,7 @@ function makeDepense(int $tiersId, float $montant, string $date, ?SousCategorie 
         'libelle' => 'Test dépense',
         'montant_total' => $montant,
         'tiers_id' => $tiersId,
-        'compte_id' => \App\Models\CompteBancaire::factory()->create()->id,
+        'compte_id' => CompteBancaire::factory()->create()->id,
         'saisi_par' => User::factory()->create()->id,
     ]);
     TransactionLigne::forceCreate([
@@ -61,7 +62,7 @@ function makeRecette(int $tiersId, float $montant, string $date, ?SousCategorie 
         'libelle' => 'Test recette',
         'montant_total' => $montant,
         'tiers_id' => $tiersId,
-        'compte_id' => \App\Models\CompteBancaire::factory()->create()->id,
+        'compte_id' => CompteBancaire::factory()->create()->id,
         'saisi_par' => User::factory()->create()->id,
     ]);
     TransactionLigne::forceCreate([
@@ -350,11 +351,11 @@ describe('participations', function (): void {
 describe('referent', function (): void {
     test('absente quand l\'utilisateur ne peut pas voir les données sensibles', function (): void {
         $op = Operation::factory()->create();
-        $referent = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
+        $participant = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
         Participant::create([
-            'tiers_id' => $this->tiers->id,
+            'tiers_id' => $participant->id,
             'operation_id' => $op->id,
-            'refere_par_id' => $referent->id,
+            'refere_par_id' => $this->tiers->id, // this->tiers IS the referent
         ]);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
@@ -365,11 +366,11 @@ describe('referent', function (): void {
     test('présente quand l\'utilisateur peut voir les données sensibles', function (): void {
         $this->user->update(['peut_voir_donnees_sensibles' => true]);
         $op = Operation::factory()->create();
-        $referent = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
+        $participant = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
         Participant::create([
-            'tiers_id' => $this->tiers->id,
+            'tiers_id' => $participant->id,
             'operation_id' => $op->id,
-            'refere_par_id' => $referent->id,
+            'refere_par_id' => $this->tiers->id, // this->tiers IS the referent
         ]);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
@@ -377,52 +378,53 @@ describe('referent', function (): void {
         expect($result)->toHaveKey('referent');
     });
 
-    test('referent contient refere_par avec les données du tiers référent', function (): void {
+    test('referent contient refere_par avec les participants référés', function (): void {
         $this->user->update(['peut_voir_donnees_sensibles' => true]);
-        $op = Operation::factory()->create();
-        $referent = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
+        $op = Operation::factory()->create(['nom' => 'Yoga']);
+        $participant = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
         Participant::create([
-            'tiers_id' => $this->tiers->id,
+            'tiers_id' => $participant->id,
             'operation_id' => $op->id,
-            'refere_par_id' => $referent->id,
+            'refere_par_id' => $this->tiers->id,
         ]);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
         expect($result['referent'])->toHaveKey('refere_par')
-            ->and($result['referent']['refere_par'])->not->toBeEmpty();
+            ->and($result['referent']['refere_par'])->toHaveCount(1)
+            ->and($result['referent']['refere_par'][0]['operation'])->toBe('Yoga');
     });
 
-    test('referent contient medecin si renseigné', function (): void {
+    test('referent contient medecin si ce tiers est médecin de participants', function (): void {
         $this->user->update(['peut_voir_donnees_sensibles' => true]);
         $op = Operation::factory()->create();
-        $medecin = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
+        $participant = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
         Participant::create([
-            'tiers_id' => $this->tiers->id,
+            'tiers_id' => $participant->id,
             'operation_id' => $op->id,
-            'medecin_tiers_id' => $medecin->id,
+            'medecin_tiers_id' => $this->tiers->id, // this->tiers IS the doctor
         ]);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
         expect($result['referent'])->toHaveKey('medecin')
-            ->and($result['referent']['medecin'])->not->toBeEmpty();
+            ->and($result['referent']['medecin'])->toHaveCount(1);
     });
 
-    test('referent contient therapeute si renseigné', function (): void {
+    test('referent contient therapeute si ce tiers est thérapeute de participants', function (): void {
         $this->user->update(['peut_voir_donnees_sensibles' => true]);
         $op = Operation::factory()->create();
-        $therapeute = Tiers::factory()->create(['nom' => 'Martin', 'prenom' => 'Lucie']);
+        $participant = Tiers::factory()->create(['nom' => 'Martin', 'prenom' => 'Lucie']);
         Participant::create([
-            'tiers_id' => $this->tiers->id,
+            'tiers_id' => $participant->id,
             'operation_id' => $op->id,
-            'therapeute_tiers_id' => $therapeute->id,
+            'therapeute_tiers_id' => $this->tiers->id, // this->tiers IS the therapist
         ]);
 
         $result = $this->service->getSummary($this->tiers, $this->exercice);
 
         expect($result['referent'])->toHaveKey('therapeute')
-            ->and($result['referent']['therapeute'])->not->toBeEmpty();
+            ->and($result['referent']['therapeute'])->toHaveCount(1);
     });
 
     test('absente si l\'utilisateur a peut_voir_donnees_sensibles mais aucune donnée sensible', function (): void {
@@ -493,7 +495,7 @@ describe('factures', function (): void {
     });
 
     test('impayees = 0 si toutes les factures validées sont acquittées', function (): void {
-        $compte = \App\Models\CompteBancaire::factory()->create(['est_systeme' => false]);
+        $compte = CompteBancaire::factory()->create(['est_systeme' => false]);
         $facture = Facture::forceCreate([
             'tiers_id' => $this->tiers->id,
             'exercice' => $this->exercice,
