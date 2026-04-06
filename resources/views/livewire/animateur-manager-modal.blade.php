@@ -110,6 +110,35 @@
 
                         {{-- Colonne droite (ou pleine largeur) : formulaire --}}
                         <div :class="previewUrl ? 'col-md-7' : 'col-12'">
+                            @if ($ocrAnalyzing)
+                                <div class="alert alert-info py-2 d-flex align-items-center gap-2 small">
+                                    <div class="spinner-border spinner-border-sm"></div>
+                                    Analyse de la facture en cours...
+                                </div>
+                            @endif
+
+                            @if ($ocrError)
+                                <div class="alert alert-danger py-2 small">
+                                    <i class="bi bi-exclamation-triangle"></i> {{ $ocrError }}
+                                    <div class="mt-1">
+                                        <button type="button" wire:click="retryOcr" class="btn btn-sm btn-outline-danger py-0" style="font-size:11px">
+                                            <i class="bi bi-arrow-clockwise"></i> Réessayer
+                                        </button>
+                                        <button type="button" wire:click="$set('ocrError', null)" class="btn btn-sm btn-outline-secondary py-0" style="font-size:11px">
+                                            Ignorer
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
+
+                            @if (! empty($ocrWarnings))
+                                <div class="alert alert-warning py-2 small">
+                                    @foreach ($ocrWarnings as $warning)
+                                        <div><i class="bi bi-exclamation-triangle"></i> {{ $warning }}</div>
+                                    @endforeach
+                                </div>
+                            @endif
+
                             {{-- Error message --}}
                             @if($errorMessage)
                                 <div class="alert alert-danger py-2 small">{{ $errorMessage }}</div>
