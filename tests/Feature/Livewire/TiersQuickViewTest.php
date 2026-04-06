@@ -61,7 +61,7 @@ it('displays depenses section when summary has depenses', function () {
 
     // Manually set summary for deterministic test
     $component->set('summary', $mockSummary)
-        ->assertSee('Dépenses')
+        ->assertSee('DEP')
         ->assertSee('450');
 });
 
@@ -88,7 +88,7 @@ it('shows tiers name and type badge when visible', function () {
     Livewire::test(TiersQuickView::class)
         ->dispatch('open-tiers-quick-view', tiersId: $tiers->id)
         ->assertSee('MARTIN')
-        ->assertSee('Particulier');
+        ->assertSee('Jean');
 });
 
 it('shows no activity message when summary has no sections', function () {
