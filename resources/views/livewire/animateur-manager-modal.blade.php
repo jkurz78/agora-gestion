@@ -312,7 +312,7 @@
                                 wire:loading.attr="disabled" wire:target="saveTransaction"
                                 @click="{{ $clearSS }}">
                             <span wire:loading.remove wire:target="saveTransaction">
-                                <i class="bi bi-check-lg me-1"></i>{{ $isEditing ? 'Mettre &agrave; jour' : 'Enregistrer' }}
+                                <i class="bi bi-check-lg me-1"></i>{{ $isEditing ? 'Mettre à jour' : 'Enregistrer' }}
                             </span>
                             <span wire:loading wire:target="saveTransaction">
                                 <i class="bi bi-hourglass-split me-1"></i>En cours...
