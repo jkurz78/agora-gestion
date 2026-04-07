@@ -19,10 +19,10 @@ beforeEach(function () {
 it('creates association row with id=1 when none exists', function () {
     $association = Association::find(1) ?? new Association;
     $association->id = 1;
-    $association->fill(['nom' => 'SVS Test', 'ville' => 'Paris'])->save();
+    $association->fill(['nom' => 'Asso Test', 'ville' => 'Paris'])->save();
 
     expect(Association::count())->toBe(1)
-        ->and(Association::find(1)?->nom)->toBe('SVS Test');
+        ->and(Association::find(1)?->nom)->toBe('Asso Test');
 });
 
 it('updates existing association without creating duplicate', function () {
@@ -52,19 +52,19 @@ it('association page redirects guest to login', function () {
 it('can save association info via livewire', function () {
     Livewire::actingAs($this->user)
         ->test(AssociationForm::class)
-        ->set('nom', 'SVS')
+        ->set('nom', 'Mon Asso')
         ->set('adresse', '12 rue des Lilas')
         ->set('code_postal', '75001')
         ->set('ville', 'Paris')
-        ->set('email', 'contact@svs.fr')
+        ->set('email', 'contact@monasso.fr')
         ->set('telephone', '0123456789')
         ->call('save')
         ->assertHasNoErrors();
 
     $this->assertDatabaseHas('association', [
         'id' => 1,
-        'nom' => 'SVS',
-        'email' => 'contact@svs.fr',
+        'nom' => 'Mon Asso',
+        'email' => 'contact@monasso.fr',
     ]);
 });
 
@@ -79,7 +79,7 @@ it('validates nom is required', function () {
 it('validates email format', function () {
     Livewire::actingAs($this->user)
         ->test(AssociationForm::class)
-        ->set('nom', 'SVS')
+        ->set('nom', 'Mon Asso')
         ->set('email', 'pas-un-email')
         ->call('save')
         ->assertHasErrors(['email']);
@@ -91,7 +91,7 @@ it('rejects logo exceeding 2MB', function () {
 
     Livewire::actingAs($this->user)
         ->test(AssociationForm::class)
-        ->set('nom', 'SVS')
+        ->set('nom', 'Mon Asso')
         ->set('logo', $file)
         ->call('save')
         ->assertHasErrors(['logo']);
@@ -103,7 +103,7 @@ it('rejects logo with invalid mime type', function () {
 
     Livewire::actingAs($this->user)
         ->test(AssociationForm::class)
-        ->set('nom', 'SVS')
+        ->set('nom', 'Mon Asso')
         ->set('logo', $file)
         ->call('save')
         ->assertHasErrors(['logo']);
@@ -115,7 +115,7 @@ it('saves valid logo and persists logo_path', function () {
 
     Livewire::actingAs($this->user)
         ->test(AssociationForm::class)
-        ->set('nom', 'SVS')
+        ->set('nom', 'Mon Asso')
         ->set('logo', $file)
         ->call('save')
         ->assertHasNoErrors();
@@ -132,13 +132,13 @@ it('deletes old logo file before saving new one', function () {
     Storage::disk('public')->put('association/logo.png', 'old');
     $assoc = Association::find(1) ?? new Association;
     $assoc->id = 1;
-    $assoc->fill(['nom' => 'SVS', 'logo_path' => 'association/logo.png'])->save();
+    $assoc->fill(['nom' => 'Mon Asso', 'logo_path' => 'association/logo.png'])->save();
 
     $newFile = UploadedFile::fake()->image('logo.jpg', 200, 200);
 
     Livewire::actingAs($this->user)
         ->test(AssociationForm::class)
-        ->set('nom', 'SVS')
+        ->set('nom', 'Mon Asso')
         ->set('logo', $newFile)
         ->call('save')
         ->assertHasNoErrors();

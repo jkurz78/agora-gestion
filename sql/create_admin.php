@@ -2,7 +2,7 @@
 
 /**
  * One-time script to create the initial admin user.
- * Run from CLI: php accounting/sql/create_admin.php admin@svs.fr "YourPassword123"
+ * Run from CLI: php accounting/sql/create_admin.php admin@monasso.fr "YourPassword123"
  * Delete this file after use.
  */
 if (PHP_SAPI !== 'cli') {

@@ -1,9 +1,9 @@
 @php
     $association   = \App\Models\Association::find(1);
-    $nomAsso       = $association?->nom ?? 'Soigner•Vivre•Sourire';
+    $nomAsso       = $association?->nom ?? 'Mon Association';
     $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
         ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
-        : asset('images/logo.png');
+        : asset('images/agora-gestion.svg');
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -32,6 +32,11 @@
             </div>
         </div>
     </div>
+    <div class="text-center mt-4 mb-3">
+        <img src="{{ asset('images/agora-gestion.svg') }}" alt="AgoraGestion" height="120" class="opacity-75 d-block mx-auto">
+        <small class="text-muted">{{ config('version.tag', '') }}</small>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

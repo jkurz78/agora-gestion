@@ -29,7 +29,7 @@ final class TestEmail extends Mailable
     public function content(): Content
     {
         return new Content(
-            htmlString: "<p>Ceci est un mail de test envoyé depuis <strong>SVS Accounting</strong> pour le type d'opération <strong>{$this->typeNom}</strong>.</p><p>Si vous recevez ce message, la configuration email est fonctionnelle.</p>",
+            htmlString: "<p>Ceci est un mail de test envoyé depuis <strong>AgoraGestion</strong> pour le type d'opération <strong>{$this->typeNom}</strong>.</p><p>Si vous recevez ce message, la configuration email est fonctionnelle.</p>",
         );
     }
 }

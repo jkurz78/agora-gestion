@@ -11,7 +11,7 @@
 set -euo pipefail
 
 PROD_APP_DIR="/home/***CPANEL_USER***/public_html/***DEPLOY_SUBDOMAIN***"
-NAS_COMPOSE="/volume1/docker/svs-staging/docker-compose.staging.yml"
+NAS_COMPOSE="/volume1/docker/agora-staging/docker-compose.staging.yml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Lecture des credentials ──────────────────────────────────────────────────
@@ -33,7 +33,7 @@ fi
 echo "    DB : $DB_DATABASE@$DB_HOST (utilisateur : $DB_USERNAME)"
 
 echo "==> Lecture des credentials MySQL staging..."
-STAGING_ENV=$(ssh nas "cat /volume1/docker/svs-staging/.env")
+STAGING_ENV=$(ssh nas "cat /volume1/docker/agora-staging/.env")
 
 STAGING_DB=$(echo "$STAGING_ENV" | grep '^DB_DATABASE=' | cut -d= -f2 | tr -d '"' | tr -d "'")
 STAGING_ROOT_PASS=$(echo "$STAGING_ENV" | grep '^DB_ROOT_PASSWORD=' | cut -d= -f2 | tr -d '"' | tr -d "'")

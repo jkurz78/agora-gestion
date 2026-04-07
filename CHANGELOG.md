@@ -1,9 +1,15 @@
 # Changelog
 
-Toutes les modifications notables de SVS Accounting sont documentées ici.
+Toutes les modifications notables de AgoraGestion sont documentées ici.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
+
+## [v2.7.3] — 2026-04-07
+### Rebranding
+- **AgoraGestion** — renommage complet du projet (SVS Accounting → AgoraGestion) : layouts, scripts de déploiement, docker-compose, seeders, tests, README
+- **Logo SVG** — remplacement du logo PNG par le logo vectoriel `agora-gestion.svg`
+- **CSS** — renommage des classes `.navbar-svs` → `.navbar-app`, fonction `svsParseFlatpickrDate` → `parseFlatpickrDate`
 
 ## [v1.2.9] — 2026-03-21
 ### Correctif
@@ -37,7 +43,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [v1.2.2] — 2026-03-21
 ### Correctif
-- **Date vide à l'ouverture d'un formulaire de modification** — `svsParseFlatpickrDate` ne gérait pas le format ISO `aaaa-mm-jj` stocké dans le champ caché. Corrigé pour tous les formulaires utilisant `x-date-input` (virements, dépenses, recettes, dons, cotisations)
+- **Date vide à l'ouverture d'un formulaire de modification** — `parseFlatpickrDate` ne gérait pas le format ISO `aaaa-mm-jj` stocké dans le champ caché. Corrigé pour tous les formulaires utilisant `x-date-input` (virements, dépenses, recettes, dons, cotisations)
 
 ## [v1.2.1] — 2026-03-21
 ### Correctif

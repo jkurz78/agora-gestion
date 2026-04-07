@@ -72,7 +72,7 @@
             <div class="mb-4">
                 <label class="form-label">Slug organisation</label>
                 <input type="text" class="form-control @error('organisationSlug') is-invalid @enderror"
-                       wire:model="organisationSlug" placeholder="ex : association-svs">
+                       wire:model="organisationSlug" placeholder="ex : mon-association">
                 <div class="form-text text-muted">
                     Visible dans l'URL : helloasso.com/associations/<em>slug</em>
                 </div>

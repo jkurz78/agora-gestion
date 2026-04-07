@@ -1,4 +1,4 @@
-{{-- Couleurs SVS — surcharge Bootstrap (source unique pour toute l'app) --}}
+{{-- Couleurs app — surcharge Bootstrap (source unique pour toute l'app) --}}
 <style>
     :root,
     [data-bs-theme="light"] {

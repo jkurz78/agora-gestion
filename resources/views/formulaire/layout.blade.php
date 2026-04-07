@@ -1,9 +1,9 @@
 @php
     $association = \App\Models\Association::find(1);
-    $nomAsso     = $association?->nom ?? 'Soigner Vivre Sourire';
+    $nomAsso     = $association?->nom ?? 'Mon Association';
     $logoAsset   = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
         ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
-        : asset('images/logo.png');
+        : asset('images/agora-gestion.svg');
 @endphp
 <!DOCTYPE html>
 <html lang="fr">

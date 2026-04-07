@@ -41,12 +41,12 @@ function createValidatedFacture(): Facture
     ]);
 
     Association::create([
-        'nom' => 'SVS Test',
+        'nom' => 'Asso Test',
         'forme_juridique' => 'Association loi 1901',
         'adresse' => '1 rue du Test',
         'code_postal' => '69001',
         'ville' => 'Lyon',
-        'email' => 'test@svs.fr',
+        'email' => 'test@monasso.fr',
         'telephone' => '04 00 00 00 00',
         'siret' => '12345678901234',
         'facture_conditions_reglement' => 'Payable à réception',

@@ -1,9 +1,9 @@
 #!/bin/bash
 # Hook git post-receive — à installer sur le NAS
-# Chemin : ~/repos/svs-accounting.git/hooks/post-receive
+# Chemin : ~/repos/agora-gestion.git/hooks/post-receive
 set -e
 
-DEPLOY_DIR="/volume1/docker/svs-staging"
+DEPLOY_DIR="/volume1/docker/agora-staging"
 COMPOSE_FILE="$DEPLOY_DIR/docker-compose.staging.yml"
 
 while read oldrev newrev ref; do
@@ -18,18 +18,18 @@ while read oldrev newrev ref; do
 
         # Extraire les fichiers dans le répertoire de déploiement
         # Chemin absolu car $HOME peut être vide dans le contexte git hook
-        git --work-tree="$DEPLOY_DIR" --git-dir="***NAS_HOME***/repos/svs-accounting.git" checkout -f staging
+        git --work-tree="$DEPLOY_DIR" --git-dir="***NAS_HOME***/repos/agora-gestion.git" checkout -f staging
 
         # Auto-mise à jour du hook lui-même (en premier, avant tout le reste)
-        cp "$DEPLOY_DIR/scripts/deploy-hook.sh" "***NAS_HOME***/repos/svs-accounting.git/hooks/post-receive"
-        chmod +x "***NAS_HOME***/repos/svs-accounting.git/hooks/post-receive"
+        cp "$DEPLOY_DIR/scripts/deploy-hook.sh" "***NAS_HOME***/repos/agora-gestion.git/hooks/post-receive"
+        chmod +x "***NAS_HOME***/repos/agora-gestion.git/hooks/post-receive"
 
         cd "$DEPLOY_DIR"
 
         # Stamper la version avant le build (git n'est pas dispo dans le container)
-        _RAW_TAG=$(/usr/local/bin/git --git-dir="***NAS_HOME***/repos/svs-accounting.git" describe --tags 2>/dev/null || echo '')
+        _RAW_TAG=$(/usr/local/bin/git --git-dir="***NAS_HOME***/repos/agora-gestion.git" describe --tags 2>/dev/null || echo '')
         GIT_TAG=$([[ "$_RAW_TAG" =~ ^v[0-9] ]] && echo "$_RAW_TAG" || echo 'staging')
-        GIT_DATE=$(/usr/local/bin/git --git-dir="***NAS_HOME***/repos/svs-accounting.git" log -1 --format=%as 2>/dev/null || date +%Y-%m-%d)
+        GIT_DATE=$(/usr/local/bin/git --git-dir="***NAS_HOME***/repos/agora-gestion.git" log -1 --format=%as 2>/dev/null || date +%Y-%m-%d)
         GIT_YEAR=$(echo "$GIT_DATE" | cut -c1-4)
         printf "<?php\nreturn array (\n  'tag' => '%s',\n  'date' => '%s',\n  'year' => '%s',\n);\n" \
             "$GIT_TAG" "$GIT_DATE" "$GIT_YEAR" > "$DEPLOY_DIR/config/version.php"

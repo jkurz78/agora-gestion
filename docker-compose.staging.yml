@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    image: svs-accounting:staging
+    image: agora-gestion:staging
     restart: unless-stopped
     env_file: .env
     ports:

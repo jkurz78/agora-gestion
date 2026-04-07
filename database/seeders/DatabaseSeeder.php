@@ -16,14 +16,14 @@ class DatabaseSeeder extends Seeder
     {
         User::factory()->create([
             'nom' => 'Marie Dupont',
-            'email' => 'admin@svs.fr',
+            'email' => 'admin@monasso.fr',
             'peut_voir_donnees_sensibles' => true,
             'role' => 'admin',
         ]);
 
         User::factory()->create([
             'nom' => 'Jean Martin',
-            'email' => 'jean@svs.fr',
+            'email' => 'jean@monasso.fr',
             'role' => 'gestionnaire',
         ]);
 
@@ -50,7 +50,7 @@ class DatabaseSeeder extends Seeder
 
         \DB::table('association')->insert([
             'id' => 1,
-            'nom' => 'Soigner Vivre Sourire (SVS)',
+            'nom' => 'Mon Association',
             'forme_juridique' => 'Association loi 1901',
             'facture_conditions_reglement' => 'Payable à réception',
             'facture_mentions_legales' => "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé",
