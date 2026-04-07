@@ -115,6 +115,21 @@ final class TiersMergeModal extends Component
             return;
         }
 
+        // CSV import context: do NOT write to DB, just dispatch the merge decisions
+        if ($this->context === 'csv_import') {
+            $this->dispatch('tiers-merge-confirmed',
+                tiersId: $this->tiersId,
+                context: $this->context,
+                contextData: array_merge($this->contextData, [
+                    'merge_data' => $this->resultData,
+                    'boolean_data' => $this->sourceBooleans,
+                ]),
+            );
+            $this->closeModal();
+
+            return;
+        }
+
         $tiers = Tiers::findOrFail($this->tiersId);
 
         // Build update data from result fields
@@ -132,6 +147,17 @@ final class TiersMergeModal extends Component
 
         $this->dispatch('tiers-merge-confirmed',
             tiersId: $this->tiersId,
+            context: $this->context,
+            contextData: $this->contextData,
+        );
+
+        $this->closeModal();
+    }
+
+    public function createNewTiers(): void
+    {
+        $this->dispatch('tiers-merge-create-new',
+            sourceData: $this->sourceData,
             context: $this->context,
             contextData: $this->contextData,
         );

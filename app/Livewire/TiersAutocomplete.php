@@ -93,11 +93,19 @@ final class TiersAutocomplete extends Component
             });
         }
 
-        $this->results = $query->limit(8)->get()->map(fn (Tiers $t): array => [
-            'id' => $t->id,
-            'label' => $t->displayName(),
-            'type' => $t->type,
-        ])->toArray();
+        $results = $query->limit(8)->get();
+        $suffixes = Tiers::disambiguationSuffixes($results);
+
+        $this->results = $results->map(function (Tiers $t) use ($suffixes): array {
+            return [
+                'id' => $t->id,
+                'label' => $t->displayName(),
+                'suffix' => $suffixes[$t->id] ?? '',
+                'email' => $t->email ?? '',
+                'location' => trim(($t->code_postal ?? '').' '.($t->ville ?? '')),
+                'type' => $t->type,
+            ];
+        })->toArray();
 
         $this->open = true;
     }

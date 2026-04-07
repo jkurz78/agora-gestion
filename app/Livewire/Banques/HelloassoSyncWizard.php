@@ -303,6 +303,21 @@ final class HelloassoSyncWizard extends Component
         );
     }
 
+    #[On('tiers-merge-create-new')]
+    public function onTiersMergeCreateNew(array $sourceData, string $context, array $contextData = []): void
+    {
+        if ($context !== 'helloasso') {
+            return;
+        }
+
+        $index = $contextData['index'] ?? null;
+        if ($index === null) {
+            return;
+        }
+
+        $this->creerTiers((int) $index);
+    }
+
     #[On('tiers-merge-confirmed')]
     public function onTiersMergeConfirmed(int $tiersId, string $context, array $contextData = []): void
     {

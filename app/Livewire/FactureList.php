@@ -7,7 +7,6 @@ namespace App\Livewire;
 use App\Enums\Espace;
 use App\Enums\StatutFacture;
 use App\Models\Facture;
-use App\Models\Tiers;
 use App\Services\ExerciceService;
 use App\Services\FactureService;
 use Illuminate\Contracts\View\View;
@@ -109,8 +108,6 @@ final class FactureList extends Component
                 return $this->filterStatut === 'acquittee' ? $acquittee : ! $acquittee;
             });
 
-            $tiers = Tiers::where('pour_recettes', true)->orderBy('nom')->get();
-
             return view('livewire.facture-list', [
                 'factures' => new LengthAwarePaginator(
                     $filtered->forPage($this->getPage(), 20),
@@ -119,19 +116,13 @@ final class FactureList extends Component
                     $this->getPage(),
                     ['path' => request()->url()],
                 ),
-                'tiers' => $tiers,
             ]);
         }
 
         $factures = $query->paginate(20);
 
-        $tiers = Tiers::where('pour_recettes', true)
-            ->orderBy('nom')
-            ->get();
-
         return view('livewire.facture-list', [
             'factures' => $factures,
-            'tiers' => $tiers,
         ]);
     }
 

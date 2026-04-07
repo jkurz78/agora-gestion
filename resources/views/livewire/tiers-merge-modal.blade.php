@@ -113,6 +113,9 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" wire:click="cancelMerge">Annuler</button>
+                    <button type="button" class="btn btn-outline-success" wire:click="createNewTiers">
+                        <i class="bi bi-person-plus me-1"></i>Créer un nouveau tiers
+                    </button>
                     <button type="button" class="btn btn-success"
                             wire:click="confirmMerge"
                             @disabled($helloassoIdConflict)>
