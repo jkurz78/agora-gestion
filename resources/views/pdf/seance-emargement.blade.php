@@ -60,25 +60,40 @@
             border-radius: 2px;
         }
 
-        .page-number:after { content: counter(page) " / " counter(pages); }
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            font-size: 8px;
-            color: #999;
+        .footer-logo {
+            height: 12mm;
+            vertical-align: middle;
+            margin-left: 6px;
+            opacity: 0.6;
         }
     </style>
 </head>
 <body>
-    <div class="footer"><span class="page-number"></span></div>
     @if($footerLogoBase64)
-        <div style="position: fixed; bottom: 10mm; left: 10mm;">
-            <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height: 15mm;" alt="">
+        <div style="position:fixed; bottom:10mm; left:15mm;">
+            <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height:12mm; opacity:0.6;" alt="">
         </div>
     @endif
+    @if($appLogoBase64)
+        <div style="position:fixed; bottom:10mm; right:15mm;">
+            <img src="data:image/svg+xml;base64,{{ $appLogoBase64 }}" class="footer-logo" alt="">
+        </div>
+    @endif
+    <script type="text/php">
+        $font = $fontMetrics->getFont('DejaVu Sans');
+        $size = 8;
+        $y = $pdf->get_height() - 36;
+
+        // Centre : pagination (A4 = 595.28pt de large)
+        $pageText = "Page {PAGE_NUM} / {PAGE_COUNT}";
+        $pageWidth = $fontMetrics->getTextWidth($pageText, $font, $size);
+        $pdf->page_text((595.28 - $pageWidth) / 2, $y, $pageText, $font, $size, [0.6, 0.6, 0.6]);
+
+        // Droite (à gauche du logo) : AgoraGestion · date
+        $rightText = "AgoraGestion \xC2\xB7 {{ now()->format('d/m/Y H:i') }}";
+        $rightWidth = $fontMetrics->getTextWidth($rightText, $font, $size);
+        $pdf->page_text($pdf->get_width() - 42 - 40 - $rightWidth, $y, $rightText, $font, $size, [0.6, 0.6, 0.6]);
+    </script>
 
     <table class="header">
         <tr>
@@ -134,8 +149,5 @@
         </tbody>
     </table>
 
-    <div style="margin-top: 12px; font-size: 8px; color: #999; text-align: right;">
-        Généré le {{ now()->format('d/m/Y à H:i') }}
-    </div>
 </body>
 </html>

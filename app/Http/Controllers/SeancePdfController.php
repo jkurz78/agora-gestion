@@ -31,6 +31,9 @@ final class SeancePdfController extends Controller
 
         [$association, $headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime] = $this->getAssociationData($operation);
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $filename = Str::ascii($operation->nom).' - Emargement S'.$seance->numero.'.pdf';
 
         $pdf = Pdf::loadView('pdf.seance-emargement', [
@@ -43,7 +46,9 @@ final class SeancePdfController extends Controller
             'headerLogoMime' => $headerLogoMime,
             'footerLogoBase64' => $footerLogoBase64,
             'footerLogoMime' => $footerLogoMime,
-        ])->setPaper('a4', 'portrait');
+            'appLogoBase64' => $appLogoBase64,
+        ])->setPaper('a4', 'portrait')
+          ->setOption('isPhpEnabled', true);
 
         return $pdf->stream($filename);
     }
