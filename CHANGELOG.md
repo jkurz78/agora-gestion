@@ -5,6 +5,11 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [v2.7.4] — 2026-04-07
+### Améliorations
+- **PDF émargement** — pied de page structuré : logo association à gauche, pagination centrée, « AgoraGestion · date » + logo à droite
+- **Seeder** — correction enum `facture` → `document` dans EmailTemplateSeeder
+
 ## [v2.7.3] — 2026-04-07
 ### Rebranding
 - **AgoraGestion** — renommage complet du projet (SVS Accounting → AgoraGestion) : layouts, scripts de déploiement, docker-compose, seeders, tests, README

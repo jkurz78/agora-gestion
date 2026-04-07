@@ -34,12 +34,11 @@ class EmailTemplateSeeder extends Seeder
         );
 
         EmailTemplate::updateOrCreate(
-            ['categorie' => 'facture', 'type_operation_id' => null],
+            ['categorie' => 'document', 'type_operation_id' => null],
             [
-                'objet' => 'Facture n°{numero_facture} — {operation}',
+                'objet' => '{type_document_uc} n°{numero_document} — {operation}',
                 'corps' => '<p>Bonjour <strong>{prenom} {nom}</strong>,</p>'
-                    .'<p>Veuillez trouver ci-joint la facture n°<strong>{numero_facture}</strong> du {date_facture} '
-                    .'relative à <strong>{operation}</strong>.</p>'
+                    .'<p>Veuillez trouver ci-joint {type_document_article} n°<strong>{numero_document}</strong> du {date_document}.</p>'
                     .'<p>Cordialement,<br>L\'équipe</p>',
             ],
         );
