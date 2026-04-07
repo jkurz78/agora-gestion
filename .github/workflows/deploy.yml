@@ -99,7 +99,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
             ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
-            "bash /home/${{ secrets.CPANEL_USERNAME }}/public_html/***DEPLOY_SUBDOMAIN***/deploy.sh"
+            "bash /home/${{ secrets.CPANEL_USERNAME }}/public_html/${{ secrets.DEPLOY_SUBDOMAIN }}/deploy.sh"
 
       - name: Clean up SSH key
         if: always()
@@ -113,4 +113,4 @@ jobs:
             "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove_all"
           curl -sm 45 \
             -H "Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
-            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=***HOME_HOST***&port=22"
+            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ secrets.HOME_SSH_HOST }}&port=22"

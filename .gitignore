@@ -39,4 +39,19 @@ public/proto-*.html
 # Version générée localement
 /config/version.php
 .claude/worktrees/
+.claude/launch.json
+.claude/settings.local.json
 .env.swp
+
+# Scripts d'ops (spécifiques à l'infrastructure)
+/deploy.sh
+/scripts/clone-prod.sh
+/scripts/deploy-hook.sh
+
+# Docs internes (specs, plans, design)
+/docs/
+
+# Fichiers locaux
+/tmp/
+/sql/create_admin.php
+/memory/
