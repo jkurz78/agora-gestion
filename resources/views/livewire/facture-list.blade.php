@@ -17,18 +17,15 @@
         @if($this->canEdit)
         <div class="col-md-4">
             <label class="form-label">Nouvelle facture</label>
-            <div class="input-group">
-                <select wire:model="newFactureTiersId" class="form-select @error('newFactureTiersId') is-invalid @enderror">
-                    <option value="">-- Tiers --</option>
-                    @foreach ($tiers as $t)
-                        <option value="{{ $t->id }}">{{ $t->displayName() }}</option>
-                    @endforeach
-                </select>
-                <button wire:click="creer" class="btn btn-primary">
+            <div class="d-flex gap-2">
+                <div class="flex-grow-1">
+                    <livewire:tiers-autocomplete wire:model="newFactureTiersId" filtre="recettes" />
+                    @error('newFactureTiersId') <div class="text-danger small">{{ $message }}</div> @enderror
+                </div>
+                <button wire:click="creer" class="btn btn-primary align-self-start">
                     <i class="bi bi-plus-lg"></i> Créer
                 </button>
             </div>
-            @error('newFactureTiersId') <div class="text-danger small">{{ $message }}</div> @enderror
         </div>
         @endif
         <div class="col-md-3">

@@ -58,7 +58,18 @@
                         :style="highlighted === {{ $loop->index }} ? 'background:#f0e8f5' : ''"
                     >
                         <span style="font-size:.75rem">{{ ($item['type'] ?? '') === 'entreprise' ? '🏢' : '👤' }}</span>
-                        <span>{{ $item['label'] }}</span>
+                        <span style="line-height:1.1">
+                            {{ $item['label'] }}
+                            @if(! empty($item['email']) || ! empty($item['location']))
+                                <br>
+                                @if(! empty($item['email']))
+                                    <span class="text-muted" style="font-size:.7rem">{{ $item['email'] }}</span>
+                                @endif
+                                @if(! empty($item['location']))
+                                    <br><span class="text-muted" style="font-size:.7rem">{{ $item['location'] }}</span>
+                                @endif
+                            @endif
+                        </span>
                     </div>
                 @endforeach
 

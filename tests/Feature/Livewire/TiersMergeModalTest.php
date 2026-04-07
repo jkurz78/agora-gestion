@@ -293,3 +293,84 @@ it('ParticipantShow mapMedecinTiers dispatches open-tiers-merge', function () {
     $participant->refresh();
     expect($participant->medecin_tiers_id)->toBeNull();
 });
+
+it('dispatches tiers-merge-create-new with correct data on createNewTiers', function () {
+    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: ['nom' => 'Durand', 'prenom' => 'Jean', 'email' => 'jean@test.com'],
+            tiersId: $tiers->id,
+            sourceLabel: 'Source',
+            targetLabel: 'Cible',
+            confirmLabel: 'Valider',
+            context: 'helloasso',
+            contextData: ['index' => 3, 'person' => ['firstName' => 'Jean', 'lastName' => 'Durand']],
+        )
+        ->call('createNewTiers')
+        ->assertDispatched('tiers-merge-create-new', fn ($name, $params) => $params['context'] === 'helloasso'
+            && $params['contextData'] === ['index' => 3, 'person' => ['firstName' => 'Jean', 'lastName' => 'Durand']]
+            && isset($params['sourceData']['nom'])
+        );
+});
+
+it('closes modal after createNewTiers is called', function () {
+    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: ['nom' => 'Durand', 'prenom' => 'Jean'],
+            tiersId: $tiers->id,
+            sourceLabel: 'Source',
+            targetLabel: 'Cible',
+            confirmLabel: 'Valider',
+            context: 'test',
+        )
+        ->assertSet('showModal', true)
+        ->call('createNewTiers')
+        ->assertSet('showModal', false)
+        ->assertSet('tiersId', null)
+        ->assertSet('sourceData', [])
+        ->assertSet('targetData', [])
+        ->assertSet('resultData', []);
+});
+
+it('confirmMerge still works correctly after adding createNewTiers', function () {
+    $tiers = Tiers::factory()->create([
+        'type' => 'particulier',
+        'nom' => 'Dupont',
+        'prenom' => 'Marie',
+        'email' => 'old@example.com',
+    ]);
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: ['nom' => 'Durand', 'prenom' => 'Jean', 'email' => 'new@example.com'],
+            tiersId: $tiers->id,
+            sourceLabel: 'Source',
+            targetLabel: 'Cible',
+            confirmLabel: 'Valider',
+            context: 'helloasso',
+            contextData: ['index' => 0],
+        )
+        ->call('confirmMerge')
+        ->assertDispatched('tiers-merge-confirmed')
+        ->assertSet('showModal', false);
+});
+
+it('cancelMerge still works correctly after adding createNewTiers', function () {
+    $tiers = Tiers::factory()->create(['nom' => 'Dupont']);
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: ['nom' => 'Autre'],
+            tiersId: $tiers->id,
+            sourceLabel: 'Source',
+            targetLabel: 'Cible',
+            confirmLabel: 'Valider',
+            context: 'test',
+        )
+        ->call('cancelMerge')
+        ->assertDispatched('tiers-merge-cancelled')
+        ->assertSet('showModal', false);
+});

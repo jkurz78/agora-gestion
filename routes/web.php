@@ -22,6 +22,8 @@ use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeancePdfController;
 use App\Http\Controllers\SousCategorieController;
+use App\Http\Controllers\TiersExportController;
+use App\Http\Controllers\TiersTemplateController;
 use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\CheckEspaceAccess;
@@ -83,6 +85,9 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
         Route::view('/dons', 'dons.index')->name('dons.index');
         Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
         Route::view('/tiers', 'tiers.index')->name('tiers.index');
+        Route::get('/tiers/template/csv', [TiersTemplateController::class, 'csv'])->name('tiers.template.csv');
+        Route::get('/tiers/template/xlsx', [TiersTemplateController::class, 'xlsx'])->name('tiers.template.xlsx');
+        Route::get('/tiers/export', TiersExportController::class)->name('tiers.export');
         Route::get('/tiers/{tiers}/transactions', function (Tiers $tiers) {
             return view('tiers.transactions', compact('tiers'));
         })->name('tiers.transactions');
