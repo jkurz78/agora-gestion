@@ -36,7 +36,7 @@ final class HelloAssoSyncService
     }
 
     /**
-     * Import HelloAsso orders into SVS transactions.
+     * Import HelloAsso orders into local transactions.
      *
      * @param  list<array<string, mixed>>  $orders
      */

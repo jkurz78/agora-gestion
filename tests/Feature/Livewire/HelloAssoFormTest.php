@@ -13,7 +13,7 @@ use Livewire\Livewire;
 beforeEach(function () {
     $this->actingAs(User::factory()->create());
     // Créer l'association id=1 via DB car 'id' n'est pas dans $fillable du modèle Association
-    DB::table('association')->insert(['id' => 1, 'nom' => 'SVS', 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('association')->insert(['id' => 1, 'nom' => 'Mon Asso', 'created_at' => now(), 'updated_at' => now()]);
 });
 
 it('monte sans configuration existante', function () {
@@ -29,14 +29,14 @@ it('monte avec configuration existante et ne pré-remplit pas le secret', functi
         'association_id' => 1,
         'client_id' => 'cid-123',
         'client_secret' => 'secret-xyz',
-        'organisation_slug' => 'association-svs',
+        'organisation_slug' => 'mon-association',
         'environnement' => 'production',
     ]);
 
     Livewire::test(HelloassoForm::class)
         ->assertSet('clientId', 'cid-123')
         ->assertSet('clientSecret', '')
-        ->assertSet('organisationSlug', 'association-svs')
+        ->assertSet('organisationSlug', 'mon-association')
         ->assertSet('secretDejaEnregistre', true);
 });
 
@@ -88,16 +88,16 @@ it('appelle le service et stocke le succès en tableau', function () {
     $mock = Mockery::mock(HelloAssoService::class);
     $mock->shouldReceive('testerConnexion')
         ->once()
-        ->andReturn(new HelloAssoTestResult(success: true, organisationNom: 'SVS'));
+        ->andReturn(new HelloAssoTestResult(success: true, organisationNom: 'Mon Asso'));
     app()->instance(HelloAssoService::class, $mock);
 
     Livewire::test(HelloassoForm::class)
         ->set('clientId', 'cid')
         ->set('clientSecret', 'secret')
-        ->set('organisationSlug', 'asso-svs')
+        ->set('organisationSlug', 'mon-association')
         ->call('testerConnexion')
         ->assertSet('testResult.success', true)
-        ->assertSet('testResult.organisationNom', 'SVS');
+        ->assertSet('testResult.organisationNom', 'Mon Asso');
 });
 
 it('stocke l\'erreur en tableau si le test échoue', function () {
@@ -110,7 +110,7 @@ it('stocke l\'erreur en tableau si le test échoue', function () {
     Livewire::test(HelloassoForm::class)
         ->set('clientId', 'cid')
         ->set('clientSecret', 'mauvais-secret')
-        ->set('organisationSlug', 'asso-svs')
+        ->set('organisationSlug', 'mon-association')
         ->call('testerConnexion')
         ->assertSet('testResult.success', false)
         ->assertSet('testResult.erreur', "Erreur d'authentification (HTTP 401)");
@@ -121,7 +121,7 @@ it('utilise le secret en base si clientSecret est vide pour le test', function (
         'association_id' => 1,
         'client_id' => 'cid',
         'client_secret' => 'secret-en-base',
-        'organisation_slug' => 'asso-svs',
+        'organisation_slug' => 'mon-association',
         'environnement' => 'production',
     ]);
 
@@ -131,13 +131,13 @@ it('utilise le secret en base si clientSecret est vide pour le test', function (
         ->withArgs(function (HelloAssoParametres $p) {
             return $p->client_secret === 'secret-en-base';
         })
-        ->andReturn(new HelloAssoTestResult(success: true, organisationNom: 'SVS'));
+        ->andReturn(new HelloAssoTestResult(success: true, organisationNom: 'Mon Asso'));
     app()->instance(HelloAssoService::class, $mock);
 
     Livewire::test(HelloassoForm::class)
         ->set('clientId', 'cid')
         ->set('clientSecret', '')
-        ->set('organisationSlug', 'asso-svs')
+        ->set('organisationSlug', 'mon-association')
         ->call('testerConnexion')
         ->assertSet('testResult.success', true);
 });

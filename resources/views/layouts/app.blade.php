@@ -1,9 +1,9 @@
 @php
     $association   = \App\Models\Association::find(1);
-    $nomAsso       = $association?->nom ?? 'Soigner•Vivre•Sourire';
+    $nomAsso       = $association?->nom ?? 'Mon Association';
     $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
         ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
-        : asset('images/logo.png');
+        : asset('images/agora-gestion.svg');
     $exerciceService = app(\App\Services\ExerciceService::class);
     $exerciceActif   = $exerciceService->current();
     $exerciceLabel   = $exerciceService->label($exerciceActif);
@@ -24,7 +24,7 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/fr.js"></script>
     <script>
-    window.svsParseFlatpickrDate = function(str) {
+    window.parseFlatpickrDate = function(str) {
         str = (str || '').trim();
         const y = new Date().getFullYear();
         function expandYear(yy) {
@@ -49,59 +49,59 @@
     </script>
     @livewireStyles
     <style>
-        .navbar-svs {
+        .navbar-app {
             background: linear-gradient(160deg, color-mix(in srgb, {{ $espaceColor ?? '#722281' }}, white 15%) 0%, {{ $espaceColor ?? '#722281' }} 50%, color-mix(in srgb, {{ $espaceColor ?? '#722281' }}, black 20%) 100%);
             box-shadow: 0 2px 8px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.12);
         }
-        .navbar-svs .navbar-brand,
-        .navbar-svs .nav-link,
-        .navbar-svs .navbar-toggler {
+        .navbar-app .navbar-brand,
+        .navbar-app .nav-link,
+        .navbar-app .navbar-toggler {
             color: rgba(255, 255, 255, 0.9);
         }
-        .navbar-svs .nav-link:hover,
-        .navbar-svs .nav-link:focus {
+        .navbar-app .nav-link:hover,
+        .navbar-app .nav-link:focus {
             color: #fff;
             background-color: rgba(255, 255, 255, 0.12);
             border-radius: 6px;
         }
-        .navbar-svs .nav-link.active {
+        .navbar-app .nav-link.active {
             color: #fff;
             background-color: rgba(255, 255, 255, 0.2);
             border-radius: 6px;
             font-weight: 600;
         }
-        .navbar-svs .navbar-toggler {
+        .navbar-app .navbar-toggler {
             border-color: rgba(255, 255, 255, 0.4);
         }
-        .navbar-svs .dropdown-menu {
+        .navbar-app .dropdown-menu {
             background-color: #fff;
             border: none;
             box-shadow: 0 4px 16px {{ ($espaceColor ?? '#722281') }}2e;
             border-radius: 8px;
         }
-        .navbar-svs .dropdown-item {
+        .navbar-app .dropdown-item {
             color: #333;
         }
-        .navbar-svs .dropdown-item:hover,
-        .navbar-svs .dropdown-item:focus {
+        .navbar-app .dropdown-item:hover,
+        .navbar-app .dropdown-item:focus {
             background-color: {{ ($espaceColor ?? '#722281') }}18;
             color: {{ $espaceColor ?? '#722281' }};
         }
-        .navbar-svs .dropdown-item.active,
-        .navbar-svs .dropdown-item:active {
+        .navbar-app .dropdown-item.active,
+        .navbar-app .dropdown-item:active {
             background-color: {{ $espaceColor ?? '#722281' }};
             color: #fff;
         }
-        .navbar-svs .dropdown-divider {
+        .navbar-app .dropdown-divider {
             border-color: {{ ($espaceColor ?? '#722281') }}30;
         }
-        .navbar-svs .btn-user {
+        .navbar-app .btn-user {
             background-color: rgba(255, 255, 255, 0.15);
             border-color: rgba(255, 255, 255, 0.4);
             color: #fff;
             border-radius: .75rem;
         }
-        .navbar-svs .btn-user:hover {
+        .navbar-app .btn-user:hover {
             background-color: rgba(255, 255, 255, 0.25);
             border-color: rgba(255, 255, 255, 0.7);
             color: #fff;
@@ -110,7 +110,7 @@
 </head>
 <body>
     @auth
-    <nav class="navbar navbar-expand-lg navbar-svs mb-4">
+    <nav class="navbar navbar-expand-lg navbar-app mb-4">
         <div class="container-fluid">
             <div class="navbar-brand d-flex align-items-center gap-2 mb-0">
                 <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.dashboard') }}">
@@ -514,7 +514,7 @@
     @stack('scripts')
     @php $footerBg = app()->environment('production') ? ($espaceColor ?? '#722281') : '#b45309'; @endphp
     <footer class="text-center small py-2" style="position:fixed;bottom:0;left:0;right:0;background-color:{{ $footerBg }};color:rgba(255,255,255,0.85);z-index:1030;">
-        &copy; {{ config('version.year', date('Y')) }} Jürgen Kurz &middot; SVS Accounting &middot; {{ config('version.tag', app()->environment()) }} &middot; {{ config('version.date', '') }}
+        &copy; {{ config('version.year', date('Y')) }} Jürgen Kurz &middot; AgoraGestion &middot; {{ config('version.tag', app()->environment()) }} &middot; {{ config('version.date', '') }}
     </footer>
 </body>
 </html>

@@ -7,8 +7,8 @@ it('navbar brand shows new app name and logo', function () {
 
     $response = $this->actingAs($user)->get(route('compta.dashboard'));
 
-    $response->assertSee('Soigner•Vivre•Sourire');
-    $response->assertSee('images/logo.png', false);
+    $response->assertSee('Mon Association');
+    $response->assertSee('images/agora-gestion.svg', false);
 });
 
 it('navbar does not contain tableau de bord nav item link', function () {
@@ -28,18 +28,19 @@ it('page title is updated', function () {
 
     $response = $this->actingAs($user)->get(route('compta.dashboard'));
 
-    $response->assertSee('Soigner•Vivre•Sourire Comptabilité', false);
+    $response->assertSee('Mon Association Comptabilité', false);
 });
 
 it('login page shows logo and new app name', function () {
     $response = $this->get('/login');
 
-    $response->assertSee('Soigner•Vivre•Sourire');
-    $response->assertSee('images/logo.png', false);
+    $response->assertSee('Mon Association');
+    $response->assertSee('images/agora-gestion.svg', false);
+    $response->assertSee('AgoraGestion', false);
 });
 
 it('login page title is updated', function () {
     $response = $this->get('/login');
 
-    $response->assertSee('Soigner•Vivre•Sourire Gestion et comptabilité - Connexion', false);
+    $response->assertSee('Mon Association Gestion et comptabilité - Connexion', false);
 });

@@ -22,7 +22,7 @@
                      allowInput: true,
                      disableMobile: true,
                      defaultDate: hidden.value || null,
-                     parseDate(str) { return window.svsParseFlatpickrDate(str); },
+                     parseDate(str) { return window.parseFlatpickrDate(str); },
                      onChange(dates) {
                          if (!dates.length) return;
                          const d = dates[0];

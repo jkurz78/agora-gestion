@@ -85,7 +85,7 @@ final class HelloAssoTiersResolver
     }
 
     /**
-     * Resolve persons against SVS Tiers database.
+     * Resolve persons against local Tiers database.
      * Primary match: nom+prénom (case-insensitive) + est_helloasso.
      * Suggestions: nom+prénom match, then email match if available.
      *

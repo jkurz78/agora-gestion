@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    DB::table('association')->insert(['id' => 1, 'nom' => 'SVS', 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('association')->insert(['id' => 1, 'nom' => 'Mon Asso', 'created_at' => now(), 'updated_at' => now()]);
 
     $this->parametres = HelloAssoParametres::create([
         'association_id' => 1,

@@ -25,7 +25,7 @@ run_cmd() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] ÉCHEC — déploiement interrompu" >> "$LOGFILE"
         # Envoyer mail d'échec
         tail -n +"$SECTION_START" "$LOGFILE" | mail \
-            -s "[SVS Accounting] ❌ Déploiement ÉCHOUÉ — $(date '+%d/%m/%Y %H:%M')" \
+            -s "[AgoraGestion] ❌ Déploiement ÉCHOUÉ — $(date '+%d/%m/%Y %H:%M')" \
             "$MAILTO"
         exit 1
     fi
@@ -47,5 +47,5 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Déploiement terminé avec succès" >> "$LO
 
 # Envoyer mail de succès
 tail -n +"$SECTION_START" "$LOGFILE" | mail \
-    -s "[SVS Accounting] ✅ Déploiement réussi — $(date '+%d/%m/%Y %H:%M')" \
+    -s "[AgoraGestion] ✅ Déploiement réussi — $(date '+%d/%m/%Y %H:%M')" \
     "$MAILTO"

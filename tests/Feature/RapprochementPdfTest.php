@@ -105,7 +105,7 @@ it('passes only pointed transactions to PDF view', function () {
 it('télécharge le PDF avec un nom de fichier structuré', function () {
     $assoc = Association::find(1) ?? new Association;
     $assoc->id = 1;
-    $assoc->fill(['nom' => 'SVS Association'])->save();
+    $assoc->fill(['nom' => 'Mon Association'])->save();
 
     $response = $this->actingAs($this->user)
         ->get(route('compta.rapprochement.pdf', $this->rapprochement));
@@ -113,7 +113,7 @@ it('télécharge le PDF avec un nom de fichier structuré', function () {
     $response->assertOk();
     $contentDisposition = $response->headers->get('Content-Disposition');
     expect($contentDisposition)->toContain('attachment');
-    expect($contentDisposition)->toContain('SVS Association');
+    expect($contentDisposition)->toContain('Mon Association');
     expect($contentDisposition)->toContain('Compte Test');
     expect($contentDisposition)->toContain($this->rapprochement->date_fin->format('Y-m-d'));
 });

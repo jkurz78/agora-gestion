@@ -1,4 +1,4 @@
-# SVS Comptabilite
+# AgoraGestion
 
 Application de comptabilite pour association loi 1901 (non-profit). Construite avec Laravel 11, Livewire 4, et Bootstrap 5.
 
@@ -12,7 +12,7 @@ Application de comptabilite pour association loi 1901 (non-profit). Construite a
 ### Installation
 
 ```bash
-git clone <repo-url> && cd svs-accounting
+git clone <repo-url> && cd agora-gestion
 composer install
 cp .env.example .env
 php artisan key:generate
@@ -43,8 +43,8 @@ L'app tourne sur **http://localhost:8000**.
 
 | Email | Mot de passe | Role |
 |-------|-------------|------|
-| `admin@svs.fr` | `password` | Admin (Marie Dupont) |
-| `jean@svs.fr` | `password` | Utilisateur (Jean Martin) |
+| `admin@monasso.fr` | `password` | Admin (Marie Dupont) |
+| `jean@monasso.fr` | `password` | Utilisateur (Jean Martin) |
 
 Le seeder cree aussi : 3 comptes bancaires, des categories/sous-categories, 2 operations avec seances, des depenses, recettes, membres, cotisations et dons.
 

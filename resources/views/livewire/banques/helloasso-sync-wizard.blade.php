@@ -76,7 +76,7 @@
                                         <th>Type</th>
                                         <th>Période</th>
                                         <th>Statut</th>
-                                        <th>Opération SVS</th>
+                                        <th>Opération locale</th>
                                     </tr>
                                 </thead>
                                 <tbody>

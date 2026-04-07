@@ -345,7 +345,7 @@
     <div class="footer">
         <table class="layout">
             <tr>
-                <td class="footer-left">SVS Accounting — Document généré automatiquement</td>
+                <td class="footer-left">AgoraGestion — Document généré automatiquement</td>
                 <td class="footer-right">Page 1</td>
             </tr>
         </table>

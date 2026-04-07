@@ -90,7 +90,7 @@
                                             allowInput: true,
                                             disableMobile: true,
                                             defaultDate: @js($seance->date?->format('d/m/Y')),
-                                            parseDate(str) { return window.svsParseFlatpickrDate(str); },
+                                            parseDate(str) { return window.parseFlatpickrDate(str); },
                                             onChange: (dates) => {
                                                 if (!dates.length) return;
                                                 const d = dates[0];

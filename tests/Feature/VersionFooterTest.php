@@ -43,15 +43,15 @@ it('le footer version est présent dans les pages authentifiées', function (): 
     $response = $this->actingAs($user)->get(route('compta.dashboard'));
 
     $response->assertStatus(200);
-    // Vérifier le marqueur unique du footer : "SVS Accounting &middot;" (entité HTML)
-    $response->assertSee('SVS Accounting &middot;', false);
+    // Vérifier le marqueur unique du footer : "AgoraGestion &middot;" (entité HTML)
+    $response->assertSee('AgoraGestion &middot;', false);
 });
 
 it('le footer version est absent des pages guest (login)', function (): void {
     $response = $this->get('/login');
 
     // La page login utilise guest.blade.php, pas app.blade.php
-    // Elle ne doit PAS contenir "SVS Accounting &middot;" (spécifique au footer)
+    // Elle ne doit PAS contenir "AgoraGestion &middot;" (spécifique au footer)
     $response->assertStatus(200);
-    $response->assertDontSee('SVS Accounting &middot;', false);
+    $response->assertDontSee('AgoraGestion &middot;', false);
 });
