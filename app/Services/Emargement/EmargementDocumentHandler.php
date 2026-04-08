@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Emargement;
 
 use App\Models\Seance;
+use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Services\IncomingDocuments\Contracts\DocumentHandler;
 use App\Services\IncomingDocuments\HandlerAttempt;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
