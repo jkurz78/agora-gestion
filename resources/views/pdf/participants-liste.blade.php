@@ -103,10 +103,8 @@
             @foreach($participants as $p)
                 @php
                     $med = $confidentiel ? $p->donneesMedicales : null;
-                    $age = null;
-                    if ($med?->date_naissance) {
-                        try { $age = \Carbon\Carbon::parse($med->date_naissance)->age; } catch (\Throwable) {}
-                    }
+                    $dateNaiss = $med?->dateNaissanceCarbon();
+                    $age = $dateNaiss?->age;
                 @endphp
                 <tr>
                     <td class="fw-bold">{{ $p->tiers->nom ?? '' }}</td>
@@ -114,7 +112,7 @@
                     <td>{{ $p->tiers->telephone ?? '' }}</td>
                     <td>{{ $p->tiers->email ?? '' }}</td>
                     @if($confidentiel)
-                        <td>{{ $med?->date_naissance ? \Carbon\Carbon::parse($med->date_naissance)->format('d/m/Y') : '' }}</td>
+                        <td>{{ $dateNaiss?->format('d/m/Y') ?? $med?->date_naissance ?? '' }}</td>
                         <td>{{ $age !== null ? $age.' ans' : '' }}</td>
                         <td>{{ $med?->sexe ?? '' }}</td>
                         <td>{{ $med?->taille ? $med->taille.' cm' : '' }}</td>

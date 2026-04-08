@@ -98,10 +98,8 @@
     @foreach($participants->sortBy(fn ($p) => mb_strtolower(($p->tiers->nom ?? '').' '.($p->tiers->prenom ?? ''))) as $p)
         @php
             $med = $confidentiel ? $p->donneesMedicales : null;
-            $age = null;
-            if ($med?->date_naissance) {
-                try { $age = \Carbon\Carbon::parse($med->date_naissance)->age; } catch (\Throwable) {}
-            }
+            $dateNaiss = $med?->dateNaissanceCarbon();
+            $age = $dateNaiss?->age;
         @endphp
         <div class="card">
                             <div class="card-name">
@@ -152,7 +150,7 @@
                                             @if($med?->date_naissance)
                                                 <span class="card-row">
                                                     <span class="card-label">Naissance</span>
-                                                    <span class="card-value">{{ \Carbon\Carbon::parse($med->date_naissance)->format('d/m/Y') }}{{ $age !== null ? ' ('.$age.' ans)' : '' }}</span>
+                                                    <span class="card-value">{{ $dateNaiss?->format('d/m/Y') ?? $med->date_naissance }}{{ $age !== null ? ' ('.$age.' ans)' : '' }}</span>
                                                 </span>
                                             @endif
                                             @if($med?->sexe)
