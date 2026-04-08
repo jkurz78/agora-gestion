@@ -117,6 +117,18 @@ final class ParticipantTable extends Component
         }
 
         $this->addTiersId = $id;
+        $this->resetErrorBag('addTiersId');
+    }
+
+    #[On('tiers-cleared')]
+    public function onTiersCleared(): void
+    {
+        if (! $this->showAddModal) {
+            return;
+        }
+
+        $this->addTiersId = null;
+        $this->resetErrorBag('addTiersId');
     }
 
     public function addParticipant(): void
@@ -470,5 +482,6 @@ final class ParticipantTable extends Component
         $this->addTelephone = '';
         $this->addEmail = '';
         $this->addTypeOperationTarifId = null;
+        $this->resetErrorBag();
     }
 }
