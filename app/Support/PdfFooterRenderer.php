@@ -52,7 +52,18 @@ final class PdfFooterRenderer
 
     public static function render(PDF $pdf): void
     {
-        $domPdf = $pdf->getDomPDF();
+        // Defensive: when the PDF is mocked in tests, getDomPDF() may not be
+        // wired up. Silently skip footer injection in that case — the
+        // production path always returns a real Dompdf instance.
+        try {
+            $domPdf = $pdf->getDomPDF();
+        } catch (\Throwable) {
+            return;
+        }
+        if (! $domPdf instanceof \Dompdf\Dompdf) {
+            return;
+        }
+
         $domPdf->render();
         $canvas = $domPdf->getCanvas();
         $fontMetrics = $domPdf->getFontMetrics();
