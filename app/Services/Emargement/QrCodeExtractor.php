@@ -12,7 +12,7 @@ use Spatie\PdfToImage\Pdf as PdfToImage;
 use Throwable;
 use Zxing\QrReader;
 
-final class QrCodeExtractor
+class QrCodeExtractor
 {
     public function extractSeanceIdFromPdf(string $pdfPath): QrExtractionResult
     {
