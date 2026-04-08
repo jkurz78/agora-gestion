@@ -96,7 +96,7 @@ final class TiersCsvParserService
             // Validate email format
             $email = trim($row['email'] ?? '');
             if ($email !== '' && ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : email invalide."];
+                $errors[] = ['line' => $lineNum, 'message' => "Ligne {$lineNum} : email invalide ({$email})."];
 
                 continue;
             }

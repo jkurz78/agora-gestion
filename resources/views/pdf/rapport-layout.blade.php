@@ -10,7 +10,7 @@
             font-size: 14px;
             color: #212529;
             line-height: 1.4;
-            margin: 15mm;
+            margin: 15mm 15mm 25mm 15mm;
         }
         table { width: 100%; border-collapse: collapse; }
 
@@ -21,19 +21,6 @@
         .association-address { font-size: 12px; color: #6c757d; }
         .doc-title { font-size: 18px; font-weight: bold; color: #A9014F; text-align: right; }
         .doc-subtitle { font-size: 13px; color: #6c757d; text-align: right; margin-top: 2px; }
-
-        /* Footer */
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            font-size: 9px;
-            color: #999;
-        }
-        .footer-table { width: 100%; }
-        .footer-table td { padding: 0; border: none; }
-        .page-number:after { content: counter(page) " / " counter(pages); }
 
         /* Data table */
         .data-table { margin-top: 10px; }
@@ -69,16 +56,7 @@
     </style>
 </head>
 <body>
-    {{-- Footer (position fixed = every page) --}}
-    <div class="footer">
-        <table class="footer-table">
-            <tr>
-                <td style="text-align:left;width:33%;">{{ config('app.name') }}</td>
-                <td style="text-align:center;width:34%;"><span class="page-number"></span></td>
-                <td style="text-align:right;width:33%;">Généré le {{ now()->format('d/m/Y à H:i') }}</td>
-            </tr>
-        </table>
-    </div>
+    @include('pdf.partials.footer-logos')
 
     {{-- Header --}}
     <table class="header">

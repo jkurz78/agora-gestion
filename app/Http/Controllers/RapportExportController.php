@@ -9,6 +9,7 @@ use App\Livewire\AnalysePivot;
 use App\Models\Association;
 use App\Services\ExerciceService;
 use App\Services\RapportService;
+use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -401,17 +402,26 @@ final class RapportExportController extends Controller
             $subtitle = $viewData['subtitle'];
         }
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $data = array_merge($viewData, [
             'title' => self::TITLES[$rapport],
             'subtitle' => $subtitle,
             'association' => $association,
             'headerLogoBase64' => $headerLogoBase64,
             'headerLogoMime' => $headerLogoMime,
+            'appLogoBase64' => $appLogoBase64,
+            // Reports never use a footer association logo (the header has it).
+            'footerLogoBase64' => null,
+            'footerLogoMime' => null,
         ]);
 
         $view = 'pdf.rapport-'.str_replace('-', '-', $rapport);
 
         $pdf = Pdf::loadView($view, $data)->setPaper('a4', $orientation);
+
+        PdfFooterRenderer::render($pdf);
 
         return $pdf->stream($filename);
     }

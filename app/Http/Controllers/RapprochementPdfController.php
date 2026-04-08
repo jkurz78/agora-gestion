@@ -8,6 +8,7 @@ use App\Models\Association;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
+use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -43,6 +44,9 @@ final class RapprochementPdfController extends Controller
             }
         }
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $data = [
             'rapprochement' => $rapprochement,
             'compte' => $compte,
@@ -52,6 +56,10 @@ final class RapprochementPdfController extends Controller
             'association' => $association,
             'logoBase64' => $logoBase64,
             'logoMime' => $logoMime,
+            'appLogoBase64' => $appLogoBase64,
+            // No footer association logo: the header already shows it.
+            'footerLogoBase64' => null,
+            'footerLogoMime' => null,
         ];
 
         $dateFin = $rapprochement->date_fin->format('Y-m-d');
@@ -62,6 +70,8 @@ final class RapprochementPdfController extends Controller
         $filename = $prefix.'Rapprochement '.$comptePart.' au '.$dateFin.'.pdf';
 
         $pdf = Pdf::loadView('pdf.rapprochement', $data);
+        PdfFooterRenderer::render($pdf);
+
         $inline = request()->query('mode') === 'inline';
 
         return $inline ? $pdf->stream($filename) : $pdf->download($filename);

@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -45,6 +46,9 @@ final class ParticipantFichePdfController extends Controller
             }
         }
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $pdf = Pdf::loadView('pdf.participant-fiche', [
             'participant' => $participant,
             'operation' => $operation,
@@ -58,7 +62,10 @@ final class ParticipantFichePdfController extends Controller
             'headerLogoMime' => $headerLogoMime,
             'footerLogoBase64' => $footerLogoBase64,
             'footerLogoMime' => $footerLogoMime,
+            'appLogoBase64' => $appLogoBase64,
         ])->setPaper('a4', 'portrait');
+
+        PdfFooterRenderer::render($pdf);
 
         $nom = $participant->tiers->nom ?? 'participant';
         $prenom = $participant->tiers->prenom ?? '';

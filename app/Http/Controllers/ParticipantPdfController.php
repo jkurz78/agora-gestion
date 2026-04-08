@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -40,6 +41,9 @@ final class ParticipantPdfController extends Controller
 
         [$headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime] = $this->resolveLogos($association, $operation);
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $data = [
             'operation' => $operation,
             'participants' => $participants,
@@ -51,6 +55,7 @@ final class ParticipantPdfController extends Controller
             'headerLogoMime' => $headerLogoMime,
             'footerLogoBase64' => $footerLogoBase64,
             'footerLogoMime' => $footerLogoMime,
+            'appLogoBase64' => $appLogoBase64,
         ];
 
         $view = $format === 'annuaire' ? 'pdf.participants-annuaire' : 'pdf.participants-liste';
@@ -61,6 +66,8 @@ final class ParticipantPdfController extends Controller
         $filename = $assoPrefix.'Participants '.Str::ascii($operation->nom).' - '.($format === 'annuaire' ? 'Annuaire' : 'Liste').'.pdf';
 
         $pdf = Pdf::loadView($view, $data)->setPaper('a4', $format === 'annuaire' ? 'portrait' : 'landscape');
+
+        PdfFooterRenderer::render($pdf);
 
         return $pdf->stream($filename);
     }

@@ -10,6 +10,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
+use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -53,6 +54,9 @@ final class AttestationPresencePdfController extends Controller
 
         [$association, $headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime, $cachetBase64, $cachetMime] = $this->getAssociationData($operation);
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $pdf = Pdf::loadView('pdf.attestation-presence', [
             'mode' => 'seance',
             'operation' => $operation,
@@ -65,7 +69,10 @@ final class AttestationPresencePdfController extends Controller
             'footerLogoMime' => $footerLogoMime,
             'cachetBase64' => $cachetBase64,
             'cachetMime' => $cachetMime,
+            'appLogoBase64' => $appLogoBase64,
         ])->setPaper('a4', 'portrait');
+
+        PdfFooterRenderer::render($pdf);
 
         $filename = "Attestation présence - {$operation->nom} - S{$seance->numero}.pdf";
 
@@ -103,6 +110,9 @@ final class AttestationPresencePdfController extends Controller
 
         [$association, $headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime, $cachetBase64, $cachetMime] = $this->getAssociationData($operation);
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $pdf = Pdf::loadView('pdf.attestation-presence', [
             'mode' => 'recap',
             'operation' => $operation,
@@ -116,7 +126,10 @@ final class AttestationPresencePdfController extends Controller
             'footerLogoMime' => $footerLogoMime,
             'cachetBase64' => $cachetBase64,
             'cachetMime' => $cachetMime,
+            'appLogoBase64' => $appLogoBase64,
         ])->setPaper('a4', 'portrait');
+
+        PdfFooterRenderer::render($pdf);
 
         $prenom = $participant->tiers->prenom ?? '';
         $nom = $participant->tiers->nom ?? '';
