@@ -5,6 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [v2.7.5] — 2026-04-08
+### Améliorations
+- **PDFs — footer unifié** — tous les PDFs (rapprochement bancaire, remise bancaire, émargement, matrice présences, participants liste/annuaire, fiche participant, droit image, attestation présence, rapports compte-résultat/opérations/flux trésorerie) partagent le même pied de page : logo association à gauche (selon contexte), pagination centrée « Page X / Y » correcte sur toutes les pages, « AgoraGestion · date » + logo à droite
+- **PDF émargement** — remplissage dynamique de la dernière page avec des lignes vides en mode formation (pour accueillir des participants de dernière minute). Pas de lignes vides en parcours thérapeutique (liste fermée).
+- **Modale d'ajout de participant** — message d'erreur « déjà inscrit » s'efface correctement au changement ou à la suppression de la sélection de tiers
+- **Import tiers** — le message d'erreur pour email invalide inclut maintenant l'adresse fautive
+
+### Correctifs
+- **Anonymizer** — dates générées au format ISO Y-m-d (cohérent avec la prod) pour éviter les erreurs de parsing Carbon en préprod
+
 ## [v2.7.4] — 2026-04-07
 ### Améliorations
 - **PDF émargement** — pied de page structuré : logo association à gauche, pagination centrée, « AgoraGestion · date » + logo à droite

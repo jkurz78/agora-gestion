@@ -132,6 +132,7 @@ final class TiersAutocomplete extends Component
         $this->results = [];
         $this->existingTiers = null;
         $this->showActivateModal = false;
+        $this->dispatch('tiers-cleared');
     }
 
     public function openCreateModal(): void
