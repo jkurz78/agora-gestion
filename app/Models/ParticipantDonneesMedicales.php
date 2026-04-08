@@ -64,7 +64,8 @@ final class ParticipantDonneesMedicales extends Model
      * Date de naissance parsée en Carbon, null si vide ou format invalide.
      *
      * Le champ chiffré peut contenir plusieurs formats selon l'origine de la
-     * saisie : ISO (Y-m-d), français (d/m/Y) ou tiret français (d-m-Y).
+     * saisie : ISO (Y-m-d), ISO datetime (Y-m-d H:i:s), français (d/m/Y),
+     * tiret français (d-m-Y).
      */
     public function dateNaissanceCarbon(): ?Carbon
     {
@@ -73,10 +74,17 @@ final class ParticipantDonneesMedicales extends Model
             return null;
         }
 
+        // On extrait juste la partie date si jamais il y a une heure derrière.
+        $dateOnly = trim(explode(' ', $raw)[0]);
+
         foreach (['Y-m-d', 'd/m/Y', 'd-m-Y'] as $fmt) {
-            $parsed = Carbon::createFromFormat($fmt, $raw);
-            if ($parsed !== false) {
-                return $parsed->startOfDay();
+            try {
+                $parsed = Carbon::createFromFormat($fmt, $dateOnly);
+                if ($parsed !== false) {
+                    return $parsed->startOfDay();
+                }
+            } catch (\Throwable) {
+                // Format ne correspond pas, on passe au suivant.
             }
         }
 
