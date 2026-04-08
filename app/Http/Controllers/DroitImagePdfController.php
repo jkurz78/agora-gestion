@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -39,6 +40,9 @@ final class DroitImagePdfController extends Controller
             ? $year.' / '.($year + 1)
             : ($year - 1).' / '.$year;
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $data = [
             'participant' => $participant,
             'operation' => $operation,
@@ -51,12 +55,15 @@ final class DroitImagePdfController extends Controller
             'headerLogoMime' => $headerLogoMime,
             'footerLogoBase64' => $footerLogoBase64,
             'footerLogoMime' => $footerLogoMime,
+            'appLogoBase64' => $appLogoBase64,
         ];
 
         $nom = $participant->tiers?->nom ?? 'participant';
         $filename = 'autorisation-image-'.$nom.'.pdf';
 
         $pdf = Pdf::loadView('pdf.participant-droit-image', $data)->setPaper('a4', 'portrait');
+
+        PdfFooterRenderer::render($pdf);
 
         return $pdf->stream($filename);
     }

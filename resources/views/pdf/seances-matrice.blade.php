@@ -10,7 +10,7 @@
             font-size: 8px;
             color: #212529;
             line-height: 1.3;
-            margin: 10mm;
+            margin: 10mm 10mm 22mm 10mm;
         }
         table { width: 100%; border-collapse: collapse; }
 
@@ -40,25 +40,10 @@
         .kine-oui { background: #d4edda; }
         .kine-non { background: #f8d7da; }
 
-        .page-number:after { content: counter(page) " / " counter(pages); }
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            font-size: 7px;
-            color: #999;
-        }
     </style>
 </head>
 <body>
-    <div class="footer"><span class="page-number"></span></div>
-    @if($footerLogoBase64)
-        <div style="position: fixed; bottom: 10mm; left: 10mm;">
-            <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height: 15mm;" alt="">
-        </div>
-    @endif
+    @include('pdf.partials.footer-logos')
 
     <table class="header">
         <tr>
@@ -190,7 +175,6 @@
 
     <div style="margin-top: 8px; font-size: 7px; color: #999;">
         Abs. = Absence non justifiée
-        <span style="float:right">Généré le {{ now()->format('d/m/Y à H:i') }}</span>
     </div>
 </body>
 </html>

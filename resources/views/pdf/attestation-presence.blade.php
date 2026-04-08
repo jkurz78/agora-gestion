@@ -10,7 +10,7 @@
             font-size: 11px;
             color: #212529;
             line-height: 1.4;
-            margin: 15mm;
+            margin: 15mm 15mm 25mm 15mm;
         }
         table { width: 100%; border-collapse: collapse; }
 
@@ -81,25 +81,10 @@
 
         .page-break { page-break-after: always; }
 
-        .page-number:after { content: counter(page) " / " counter(pages); }
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            font-size: 8px;
-            color: #999;
-        }
     </style>
 </head>
 <body>
-    <div class="footer">Généré le {{ now()->translatedFormat('j F Y à H:i') }} — <span class="page-number"></span></div>
-    @if($footerLogoBase64)
-        <div style="position: fixed; bottom: 10mm; left: 10mm;">
-            <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height: 15mm;" alt="">
-        </div>
-    @endif
+    @include('pdf.partials.footer-logos')
 
     @if($mode === 'seance')
         {{-- Mode séance: one page per participant --}}
@@ -223,9 +208,6 @@
             @endif
         </div>
 
-        <div style="margin-top: 12px; font-size: 8px; color: #999; text-align: right;">
-            Généré le {{ now()->translatedFormat('j F Y à H:i') }}
-        </div>
     @endif
 </body>
 </html>

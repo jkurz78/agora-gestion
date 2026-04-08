@@ -10,7 +10,7 @@
             font-size: 14px;
             color: #212529;
             line-height: 1.4;
-            margin: 15mm;
+            margin: 15mm 15mm 25mm 15mm;
         }
         table { width: 100%; border-collapse: collapse; }
 
@@ -62,26 +62,10 @@
             letter-spacing: 0.5px;
         }
 
-        /* Footer pagination */
-        .page-number:after { content: counter(page) " / " counter(pages); }
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            font-size: 10px;
-            color: #999;
-        }
     </style>
 </head>
 <body>
-    <div class="footer"><span class="page-number"></span></div>
-    @if($footerLogoBase64)
-        <div style="position: fixed; bottom: 10mm; left: 10mm;">
-            <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height: 15mm;" alt="">
-        </div>
-    @endif
+    @include('pdf.partials.footer-logos')
 
     {{-- Header --}}
     <table class="header">
@@ -256,9 +240,10 @@
         </div>
     @endforeach
 
-    <div style="position: fixed; bottom: 5mm; right: 10mm; font-size: 8px; color: #999;">
-        Généré le {{ now()->format('d/m/Y à H:i') }}
-        @if($confidentiel) — <span class="confidentiel-badge">CONFIDENTIEL</span>@endif
-    </div>
+    @if($confidentiel)
+        <div style="position: fixed; top: 5mm; right: 10mm; font-size: 9px; color: #A9014F; font-weight: bold; letter-spacing: 1px;">
+            CONFIDENTIEL
+        </div>
+    @endif
 </body>
 </html>

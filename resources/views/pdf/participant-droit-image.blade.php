@@ -10,7 +10,7 @@
             font-size: 13px;
             color: #212529;
             line-height: 1.5;
-            margin: 18mm 15mm 20mm 15mm;
+            margin: 18mm 15mm 28mm 15mm;
         }
 
         /* Header */
@@ -77,26 +77,10 @@
             padding-top: 8px;
         }
 
-        /* Footer pagination */
-        .page-number:after { content: counter(page) " / " counter(pages); }
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            text-align: center;
-            font-size: 10px;
-            color: #999;
-        }
     </style>
 </head>
 <body>
-    <div class="footer"><span class="page-number"></span></div>
-    @if($footerLogoBase64)
-        <div style="position: fixed; bottom: 10mm; left: 10mm;">
-            <img src="data:{{ $footerLogoMime }};base64,{{ $footerLogoBase64 }}" style="height: 12mm;" alt="">
-        </div>
-    @endif
+    @include('pdf.partials.footer-logos')
 
     {{-- Header --}}
     <table class="header">
@@ -184,8 +168,6 @@
         </div>
     @endif
 
-    <div style="position: fixed; bottom: 5mm; right: 10mm; font-size: 8px; color: #bbb;">
-        Généré le {{ now()->format('d/m/Y à H:i') }}
-    </div>
+
 </body>
 </html>

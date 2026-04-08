@@ -12,7 +12,7 @@
         body {
             font-family: DejaVu Sans, sans-serif;
             font-size: 11px;
-            margin: 15mm;
+            margin: 15mm 15mm 25mm 15mm;
             color: #212529;
             line-height: 1.4;
         }
@@ -168,24 +168,10 @@
             width: 250px;
         }
 
-        /* Footer */
-        .footer {
-            margin-top: 20px;
-            padding-top: 8px;
-            border-top: 1px solid #dee2e6;
-        }
-        .footer-left {
-            font-size: 9px;
-            color: #6c757d;
-        }
-        .footer-right {
-            font-size: 9px;
-            color: #6c757d;
-            text-align: right;
-        }
     </style>
 </head>
 <body>
+    @include('pdf.partials.footer-logos')
 
     {{-- HEADER --}}
     <div class="header">
@@ -278,15 +264,6 @@
         <div class="signature-box"></div>
     </div>
 
-    {{-- FOOTER --}}
-    <div class="footer">
-        <table class="layout">
-            <tr>
-                <td class="footer-left">AgoraGestion — Document généré automatiquement</td>
-                <td class="footer-right">Page 1</td>
-            </tr>
-        </table>
-    </div>
 
 </body>
 </html>

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Association;
 use App\Models\RemiseBancaire;
+use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -35,6 +36,9 @@ final class RemiseBancairePdfController extends Controller
         $typeLabel = $remise->mode_paiement->value === 'cheque' ? 'chèques' : 'espèces';
         $montantTotal = $remise->montantTotal();
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $data = [
             'remise' => $remise,
             'compteCible' => $remise->compteCible,
@@ -44,6 +48,9 @@ final class RemiseBancairePdfController extends Controller
             'association' => $association,
             'logoBase64' => $logoBase64,
             'logoMime' => $logoMime,
+            'appLogoBase64' => $appLogoBase64,
+            'footerLogoBase64' => null,
+            'footerLogoMime' => null,
         ];
 
         $dateFormatted = $remise->date->format('Y-m-d');
@@ -53,6 +60,8 @@ final class RemiseBancairePdfController extends Controller
         $filename = $prefix.'Bordereau remise '.$typeLabel.' n°'.$remise->numero.' du '.$dateFormatted.'.pdf';
 
         $pdf = Pdf::loadView('pdf.remise-bancaire', $data);
+        PdfFooterRenderer::render($pdf);
+
         $inline = request()->query('mode') === 'inline';
 
         return $inline ? $pdf->stream($filename) : $pdf->download($filename);
