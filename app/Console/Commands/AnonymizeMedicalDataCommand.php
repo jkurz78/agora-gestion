@@ -184,7 +184,7 @@ final class AnonymizeMedicalDataCommand extends Command
 
             $updates = [
                 'date_naissance' => $hadDateNaissance
-                    ? $enc(sprintf('%02d/%02d/%04d', random_int(1, 28), random_int(1, 12), random_int(1950, 2010)))
+                    ? $enc(sprintf('%04d-%02d-%02d', random_int(1950, 2010), random_int(1, 12), random_int(1, 28)))
                     : null,
                 'sexe' => $enc($sexe),
                 'poids' => $hadPoids ? $enc((string) random_int(45, 100)) : null,
