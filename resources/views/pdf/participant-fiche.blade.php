@@ -262,13 +262,12 @@
                     <td style="width:50%;vertical-align:top">
                         @if($med?->date_naissance)
                             @php
-                                $dateNaiss = $med->dateNaissanceCarbon();
-                                $age = $dateNaiss?->age;
+                                try { $age = \Carbon\Carbon::parse($med->date_naissance)->age; } catch (\Throwable) { $age = null; }
                             @endphp
                             <span class="field-row">
                                 <span class="field-label">Date naissance</span>
                                 <span class="field-value">
-                                    {{ $dateNaiss?->format('d/m/Y') ?? $med->date_naissance }}
+                                    {{ \Carbon\Carbon::parse($med->date_naissance)->format('d/m/Y') }}
                                     @if($age !== null) ({{ $age }} ans)@endif
                                 </span>
                             </span>

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -58,29 +57,6 @@ final class ParticipantDonneesMedicales extends Model
             'therapeute_code_postal' => 'encrypted',
             'therapeute_ville' => 'encrypted',
         ];
-    }
-
-    /**
-     * Date de naissance parsée en Carbon, null si vide ou format invalide.
-     *
-     * Le champ chiffré peut contenir plusieurs formats selon l'origine de la
-     * saisie : ISO (Y-m-d), français (d/m/Y) ou tiret français (d-m-Y).
-     */
-    public function dateNaissanceCarbon(): ?Carbon
-    {
-        $raw = $this->date_naissance;
-        if ($raw === null || $raw === '') {
-            return null;
-        }
-
-        foreach (['Y-m-d', 'd/m/Y', 'd-m-Y'] as $fmt) {
-            $parsed = Carbon::createFromFormat($fmt, $raw);
-            if ($parsed !== false) {
-                return $parsed->startOfDay();
-            }
-        }
-
-        return null;
     }
 
     /**
