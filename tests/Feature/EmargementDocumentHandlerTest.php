@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Models\Operation;
 use App\Models\Seance;
+use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Services\Emargement\EmargementDocumentHandler;
-use App\Services\Emargement\QrCodeExtractor;
 use App\Services\Emargement\QrExtractionResult;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use Illuminate\Support\Facades\Storage;

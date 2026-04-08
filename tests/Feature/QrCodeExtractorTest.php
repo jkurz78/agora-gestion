@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Services\Emargement\QrCodeExtractor;
+use App\Services\Emargement\ImagickQrCodeExtractor;
 use Tests\Support\GenerateTestPdf;
 
 beforeEach(function () {
-    $this->extractor = new QrCodeExtractor;
+    $this->extractor = new ImagickQrCodeExtractor;
     $this->tempDir = storage_path('app/private/temp/test-fixtures');
     if (! is_dir($this->tempDir)) {
         mkdir($this->tempDir, 0755, true);

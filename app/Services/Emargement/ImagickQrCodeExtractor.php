@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Emargement;
 
+use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Support\EmargementQrCode;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -12,7 +13,7 @@ use Spatie\PdfToImage\Pdf as PdfToImage;
 use Throwable;
 use Zxing\QrReader;
 
-class QrCodeExtractor
+final class ImagickQrCodeExtractor implements QrCodeExtractor
 {
     public function extractSeanceIdFromPdf(string $pdfPath): QrExtractionResult
     {
