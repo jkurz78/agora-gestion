@@ -15,6 +15,10 @@ final class Seance extends Model
         'numero',
         'date',
         'titre',
+        'feuille_signee_path',
+        'feuille_signee_at',
+        'feuille_signee_source',
+        'feuille_signee_sender_email',
     ];
 
     protected function casts(): array
@@ -23,7 +27,18 @@ final class Seance extends Model
             'operation_id' => 'integer',
             'date' => 'date',
             'numero' => 'integer',
+            'feuille_signee_at' => 'datetime',
         ];
+    }
+
+    public function hasSignedSheet(): bool
+    {
+        return $this->feuille_signee_path !== null;
+    }
+
+    public function presencesLocked(): bool
+    {
+        return $this->hasSignedSheet();
     }
 
     public function operation(): BelongsTo
