@@ -21,4 +21,16 @@ final class SeanceFeuilleController extends Controller
             'feuille-signee-seance-'.$seance->numero.'.pdf',
         );
     }
+
+    public function view(Operation $operation, Seance $seance): StreamedResponse
+    {
+        abort_unless((int) $seance->operation_id === $operation->id, 404);
+        abort_if($seance->feuille_signee_path === null, 404);
+
+        return Storage::disk('local')->response(
+            $seance->feuille_signee_path,
+            'feuille-signee-seance-'.$seance->numero.'.pdf',
+            ['Content-Type' => 'application/pdf'],
+        );
+    }
 }
