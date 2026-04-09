@@ -88,7 +88,7 @@
                     </div>
                 @endif
             </td>
-            <td style="width:40%">
+            <td style="width:40%;padding-right:25mm">
                 <div class="doc-title">{{ $operation->nom }}</div>
                 <div class="doc-subtitle">
                     Séance {{ $seance->numero }}{{ $seance->titre ? ' — '.$seance->titre : '' }}<br>
