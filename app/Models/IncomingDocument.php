@@ -35,4 +35,13 @@ final class IncomingDocument extends Model
     {
         return $this->belongsTo(Association::class);
     }
+
+    /**
+     * Chemin (relatif au disk 'local') de la vignette JPEG associée à un storage_path PDF.
+     * Convention : le PDF `incoming-documents/{uuid}.pdf` a sa vignette à `incoming-documents/thumbs/{uuid}.jpg`.
+     */
+    public static function thumbnailPath(string $storagePath): string
+    {
+        return 'incoming-documents/thumbs/'.pathinfo($storagePath, PATHINFO_FILENAME).'.jpg';
+    }
 }
