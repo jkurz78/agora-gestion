@@ -9,6 +9,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
+use App\Support\EmargementQrCode;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -69,6 +70,7 @@ final class SeancePdfController extends Controller
             'footerLogoMime' => $footerLogoMime,
             'appLogoBase64' => $appLogoBase64,
             'emptyRows' => $emptyRows,
+            'qrBase64' => EmargementQrCode::generateBase64Png($seance->id),
         ])->setPaper('a4', 'portrait');
 
         PdfFooterRenderer::render($pdf);

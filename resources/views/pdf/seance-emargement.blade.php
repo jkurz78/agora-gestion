@@ -88,6 +88,9 @@
                     {{ $seance->date?->format('d/m/Y') ?? 'Date non définie' }}
                     · {{ $participants->count() }} participants
                 </div>
+                <img src="data:image/png;base64,{{ $qrBase64 }}"
+                     alt="Code de suivi"
+                     style="width:96px;height:96px;margin-top:8px;">
             </td>
         </tr>
     </table>
