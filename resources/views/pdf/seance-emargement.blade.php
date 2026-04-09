@@ -20,6 +20,13 @@
         .association-address { font-size: 9px; color: #6c757d; }
         .doc-title { font-size: 15px; font-weight: bold; color: #A9014F; text-align: right; }
         .doc-subtitle { font-size: 10px; color: #6c757d; text-align: right; margin-top: 2px; }
+        .qr-top-right {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 96px;
+            height: 96px;
+        }
 
         .emargement-title {
             text-align: center;
@@ -88,12 +95,14 @@
                     {{ $seance->date?->format('d/m/Y') ?? 'Date non définie' }}
                     · {{ $participants->count() }} participants
                 </div>
-                <img src="data:image/png;base64,{{ $qrBase64 }}"
-                     alt="Code de suivi"
-                     style="width:96px;height:96px;margin-top:8px;">
             </td>
         </tr>
     </table>
+
+    <img class="qr-top-right"
+         src="data:image/png;base64,{{ $qrBase64 }}"
+         alt="Code de suivi">
+
 
     <div class="emargement-title">Feuille d'émargement</div>
 
