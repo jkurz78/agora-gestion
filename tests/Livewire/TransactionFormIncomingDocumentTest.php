@@ -212,3 +212,37 @@ it('save conserve l\'IncomingDocument si la validation échoue', function () {
     expect(IncomingDocument::find($doc->id))->not->toBeNull()
         ->and(Storage::disk('local')->exists($doc->storage_path))->toBeTrue();
 });
+
+it('retryOcr en mode inbox relance analyzeFromPath sur le fichier disque', function () {
+    // Première réponse : erreur API. Seconde réponse : succès.
+    Http::fakeSequence()
+        ->push(['error' => 'boom'], 500)
+        ->push([
+            'content' => [[
+                'type' => 'text',
+                'text' => json_encode([
+                    'date' => '2025-11-22',
+                    'reference' => 'FAC-RETRY',
+                    'tiers_id' => null,
+                    'tiers_nom' => 'EDF',
+                    'montant_total' => 50.00,
+                    'lignes' => [
+                        ['description' => 'Retry', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 50.00],
+                    ],
+                    'warnings' => [],
+                ]),
+            ]],
+        ]);
+
+    $doc = createInboxDocument();
+
+    $component = Livewire::test(TransactionForm::class)
+        ->dispatch('open-transaction-form-from-incoming', docId: $doc->id);
+
+    // Le premier appel a échoué
+    expect($component->get('ocrError'))->not->toBeNull();
+
+    $component->call('retryOcr')
+        ->assertSet('ocrError', null)
+        ->assertSet('reference', 'FAC-RETRY');
+});

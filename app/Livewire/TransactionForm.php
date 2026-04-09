@@ -542,6 +542,22 @@ final class TransactionForm extends Component
 
     public function retryOcr(): void
     {
+        // Mode inbox : relancer depuis le fichier disque
+        if ($this->incomingDocumentId !== null) {
+            $doc = IncomingDocument::find($this->incomingDocumentId);
+            if ($doc === null) {
+                return;
+            }
+            $diskPath = Storage::disk('local')->path($doc->storage_path);
+            if (! file_exists($diskPath) || ! InvoiceOcrService::isConfigured()) {
+                return;
+            }
+            $this->runOcrAnalysis(fn ($svc) => $svc->analyzeFromPath($diskPath, 'application/pdf'));
+
+            return;
+        }
+
+        // Mode upload (existant) : re-déclenche updatedPieceJointe() qui utilise déjà le helper
         if ($this->pieceJointe !== null) {
             $this->updatedPieceJointe();
         }
