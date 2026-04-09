@@ -30,10 +30,10 @@
 
         .emargement-title {
             text-align: center;
-            font-size: 16px;
+            font-size: 20px;
             font-weight: 600;
             color: #333;
-            margin: 16px 0 10px 0;
+            margin: -5mm 0 10px 0;
         }
         .data-table { margin-top: 0; border: 1px solid #999; }
         .data-table th {
