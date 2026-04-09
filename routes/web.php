@@ -81,6 +81,9 @@ $registerDocumentsEntrants = function (): void {
 
     Route::get('/documents-en-attente/{document}/download', [IncomingDocumentsController::class, 'download'])
         ->name('documents-en-attente.download');
+
+    Route::get('/documents-en-attente/{document}/thumbnail', [IncomingDocumentsController::class, 'thumbnail'])
+        ->name('documents-en-attente.thumbnail');
 };
 
 // ── Espace Comptabilité ──

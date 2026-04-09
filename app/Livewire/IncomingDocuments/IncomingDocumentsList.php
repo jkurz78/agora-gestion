@@ -117,6 +117,7 @@ final class IncomingDocumentsList extends Component
                 'feuille_signee_sender_email' => $doc->sender_email === 'upload-manuel' ? null : $doc->sender_email,
             ]);
 
+            $this->deleteThumbnail($doc);
             $doc->delete();
         });
 
@@ -129,6 +130,7 @@ final class IncomingDocumentsList extends Component
     {
         $doc = IncomingDocument::findOrFail($docId);
         Storage::disk('local')->delete($doc->storage_path);
+        $this->deleteThumbnail($doc);
         $doc->delete();
         session()->flash('success', 'Document supprimé.');
         $this->redirect($this->pageUrl, navigate: false);
@@ -161,5 +163,10 @@ final class IncomingDocumentsList extends Component
                     ->get()
                 : collect(),
         ]);
+    }
+
+    private function deleteThumbnail(IncomingDocument $doc): void
+    {
+        Storage::disk('local')->delete(IncomingDocument::thumbnailPath($doc->storage_path));
     }
 }
