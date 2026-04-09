@@ -50,7 +50,7 @@
         .data-table th:first-child { border-left: none; }
         .data-table td {
             padding: 22px 12px;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid #666;
             font-size: 13px;
             vertical-align: middle;
         }
