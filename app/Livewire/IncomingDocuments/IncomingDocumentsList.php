@@ -131,6 +131,12 @@ final class IncomingDocumentsList extends Component
         $this->redirect($this->pageUrl, navigate: false);
     }
 
+    public function creerDepense(int $docId): void
+    {
+        $doc = IncomingDocument::findOrFail($docId);
+        $this->dispatch('open-transaction-form-from-incoming', docId: $doc->id);
+    }
+
     public function render(): View
     {
         return view('livewire.incoming-documents.list', [

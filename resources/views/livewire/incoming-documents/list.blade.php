@@ -73,6 +73,13 @@
                                             wire:click="ouvrirAssignation({{ $doc->id }})">
                                         Attacher à une séance
                                     </button>
+                                    @if(\App\Services\InvoiceOcrService::isConfigured() && Auth::user()->role->canWrite(\App\Enums\Espace::Compta))
+                                        <button class="btn btn-sm btn-outline-success"
+                                                wire:click="creerDepense({{ $doc->id }})"
+                                                title="Créer une dépense depuis ce PDF">
+                                            <i class="bi bi-receipt"></i> Créer dépense
+                                        </button>
+                                    @endif
                                     <button class="btn btn-sm btn-outline-danger"
                                             wire:click="supprimer({{ $doc->id }})"
                                             wire:confirm="Supprimer ce document ?"
