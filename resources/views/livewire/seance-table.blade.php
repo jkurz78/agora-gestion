@@ -153,10 +153,12 @@
                                 <td style="padding:0;vertical-align:middle;border-bottom:none">
                                     <div class="d-flex" style="min-height:28px">
                                         <div style="flex:1;padding:2px 4px">
+                                            @php $statutLocked = ! $this->canEdit || $seance->feuille_signee_path !== null; @endphp
                                             <select class="form-select form-select-sm border-0"
                                                     style="font-size:12px;padding:1px 2px;background-color:transparent"
-                                                    {{ $this->canEdit ? '' : 'disabled' }}
-                                                    @if($this->canEdit) onchange="@this.call('updatePresence', {{ $seance->id }}, {{ $participant->id }}, 'statut', this.value)" @endif>
+                                                    @if($statutLocked) disabled @endif
+                                                    @if($statutLocked) title="@if($seance->feuille_signee_path) Verrouillé par la feuille signée @else Lecture seule @endif" @endif
+                                                    @if(! $statutLocked) onchange="@this.call('updatePresence', {{ $seance->id }}, {{ $participant->id }}, 'statut', this.value)" @endif>
                                                 <option value="" {{ $statut === '' ? 'selected' : '' }}>—</option>
                                                 @foreach($statuts as $s)
                                                     <option value="{{ $s->value }}" {{ $statut === $s->value ? 'selected' : '' }}>{{ $s->label() }}</option>
@@ -243,6 +245,32 @@
                         @endforeach
                     </tr>
                     <tr style="background:#f8f8f8;font-size:12px">
+                        <td style="position:sticky;left:0;z-index:1;background:#f8f8f8;color:#888">Feuille signée</td>
+                        @foreach($seances as $seance)
+                            <td style="text-align:center">
+                                @if($seance->feuille_signee_path)
+                                    <span class="badge bg-success"
+                                          title="Attachée le {{ $seance->feuille_signee_at?->format('d/m/Y H:i') }} ({{ $seance->feuille_signee_source === 'email' ? 'par email' : 'manuel' }})">
+                                        ✓ Signée
+                                    </span>
+                                    <button type="button" class="btn btn-link btn-sm p-0"
+                                            wire:click="$dispatchTo('seance-feuille-attachment', 'open-feuille-modal', { seanceId: {{ $seance->id }} })"
+                                            title="Gérer la feuille signée"
+                                            style="color:#A9014F;text-decoration:none">
+                                        <i class="bi bi-gear"></i>
+                                    </button>
+                                @else
+                                    <button type="button" class="btn btn-link btn-sm p-0"
+                                            wire:click="$dispatchTo('seance-feuille-attachment', 'open-feuille-modal', { seanceId: {{ $seance->id }} })"
+                                            title="Attacher feuille signée"
+                                            style="color:#A9014F;text-decoration:none">
+                                        <i class="bi bi-paperclip"></i> Attacher
+                                    </button>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
+                    <tr style="background:#f8f8f8;font-size:12px">
                         <td style="position:sticky;left:0;z-index:1;background:#f8f8f8;color:#888">Attestations</td>
                         @foreach($seances as $seance)
                             <td style="text-align:center">
@@ -259,4 +287,6 @@
             </table>
         </div>
     @endif
+
+    <livewire:seance-feuille-attachment />
 </div>
