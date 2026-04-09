@@ -495,7 +495,7 @@ final class TransactionForm extends Component
                 // Cleanup inbox (row + fichier) uniquement après succès
                 Storage::disk('local')->delete($doc->storage_path);
                 // Cleanup vignette si elle existe (générée en Task 9-10)
-                $thumbPath = 'incoming-documents/thumbs/'.pathinfo($doc->storage_path, PATHINFO_FILENAME).'.jpg';
+                $thumbPath = IncomingDocument::thumbnailPath($doc->storage_path);
                 Storage::disk('local')->delete($thumbPath);
                 $doc->delete();
             }
