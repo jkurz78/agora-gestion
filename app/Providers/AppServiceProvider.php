@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Console\Commands\VersionStampCommand;
+use App\Models\IncomingDocument;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 final class AppServiceProvider extends ServiceProvider
@@ -17,5 +19,9 @@ final class AppServiceProvider extends ServiceProvider
             $data = VersionStampCommand::readGitVersion();
             VersionStampCommand::writeVersionFile($data);
         }
+
+        View::composer('layouts.app', function (\Illuminate\View\View $view): void {
+            $view->with('incomingDocumentsCount', IncomingDocument::count());
+        });
     }
 }
