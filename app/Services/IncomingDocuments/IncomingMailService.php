@@ -36,16 +36,25 @@ final class IncomingMailService
 
             $client->connect();
 
-            $folders = $client->getFolders(false);
+            // getFolders(true) pour inclure les sous-dossiers (INBOX.Processed, etc.)
+            $folders = $client->getFolders(true);
             $folderCount = $folders->count();
 
             $processedCreated = $this->ensureFolder($client, $processedFolder);
             $errorsCreated = $this->ensureFolder($client, $errorsFolder);
 
-            $inbox = $client->getFolder('INBOX');
-            $unseenCount = $inbox !== null
-                ? $inbox->query()->unseen()->count()
-                : null;
+            // Compter les messages non lus via STATUS (pas besoin de SELECT)
+            $unseenCount = null;
+
+            try {
+                $inbox = $client->getFolder('INBOX');
+                if ($inbox !== null) {
+                    $status = $inbox->status();
+                    $unseenCount = $status['unseen'] ?? null;
+                }
+            } catch (Throwable) {
+                // Certains serveurs restreignent STATUS ; on ignore
+            }
 
             $client->disconnect();
 
@@ -66,12 +75,26 @@ final class IncomingMailService
 
     private function ensureFolder(Client $client, string $name): bool
     {
-        if ($client->getFolder($name) !== null) {
-            return false;
+        // Vérifier d'abord si le dossier existe déjà (getFolders inclut les sous-dossiers)
+        try {
+            $existing = $client->getFolder($name);
+            if ($existing !== null) {
+                return false;
+            }
+        } catch (Throwable) {
+            // getFolder peut échouer sur certains serveurs ; on tente la création
         }
 
-        $client->createFolder($name, true);
+        // Créer le dossier, en ignorant ALREADYEXISTS (race condition ou lookup raté)
+        try {
+            $client->createFolder($name, true);
 
-        return true;
+            return true;
+        } catch (Throwable $e) {
+            if (str_contains($e->getMessage(), 'ALREADYEXISTS')) {
+                return false;
+            }
+            throw $e;
+        }
     }
 }

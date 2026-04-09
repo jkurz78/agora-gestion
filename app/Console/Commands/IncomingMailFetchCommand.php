@@ -97,10 +97,16 @@ final class IncomingMailFetchCommand extends Command
 
         $client->connect();
 
-        // Ensure processed/errors folders exist
+        // Ensure processed/errors folders exist (tolère ALREADYEXISTS)
         foreach ([$params->processed_folder, $params->errors_folder] as $folderName) {
-            if ($client->getFolder($folderName) === null) {
-                $client->createFolder($folderName, true);
+            try {
+                if ($client->getFolder($folderName) === null) {
+                    $client->createFolder($folderName, true);
+                }
+            } catch (Throwable $e) {
+                if (! str_contains($e->getMessage(), 'ALREADYEXISTS')) {
+                    throw $e;
+                }
             }
         }
 
