@@ -586,7 +586,6 @@ final class TransactionForm extends Component
         );
 
         $storagePath = $doc->storage_path;
-        $thumbPath = IncomingDocument::thumbnailPath($storagePath);
 
         // Ordre : on supprime la row d'abord (source de vérité). Si la row-delete
         // échoue (exception DB), la méthode propage et les fichiers disque restent
@@ -595,7 +594,7 @@ final class TransactionForm extends Component
         // sans row — le backfill artisan les détectera.
         $doc->delete();
 
-        Storage::disk('local')->delete([$storagePath, $thumbPath]);
+        Storage::disk('local')->delete($storagePath);
     }
 
     /**

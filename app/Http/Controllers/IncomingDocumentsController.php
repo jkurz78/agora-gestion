@@ -20,17 +20,4 @@ final class IncomingDocumentsController extends Controller
             ['Content-Type' => 'application/pdf'],
         );
     }
-
-    public function thumbnail(IncomingDocument $document): StreamedResponse
-    {
-        $thumbPath = IncomingDocument::thumbnailPath($document->storage_path);
-
-        abort_if(! Storage::disk('local')->exists($thumbPath), 404);
-
-        return Storage::disk('local')->response(
-            $thumbPath,
-            'thumb-'.pathinfo($document->storage_path, PATHINFO_FILENAME).'.jpg',
-            ['Content-Type' => 'image/jpeg'],
-        );
-    }
 }

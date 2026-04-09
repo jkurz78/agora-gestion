@@ -15,7 +15,6 @@ final class IncomingDocumentIngester
     /** @param  iterable<DocumentHandler>  $handlers */
     public function __construct(
         private readonly iterable $handlers,
-        private readonly ?IncomingDocumentThumbnailGenerator $thumbnailGenerator = null,
     ) {}
 
     public function ingest(IncomingDocumentFile $file): IngestionResult
@@ -86,15 +85,6 @@ final class IncomingDocumentIngester
         $storagePath = "incoming-documents/{$uuid}.pdf";
 
         Storage::disk('local')->put($storagePath, file_get_contents($file->tempPath));
-
-        // Génération de la vignette (échec non bloquant)
-        if ($this->thumbnailGenerator !== null) {
-            $thumbPath = IncomingDocument::thumbnailPath($storagePath);
-            $this->thumbnailGenerator->generate(
-                Storage::disk('local')->path($storagePath),
-                Storage::disk('local')->path($thumbPath),
-            );
-        }
 
         return IncomingDocument::create([
             'association_id' => 1,
