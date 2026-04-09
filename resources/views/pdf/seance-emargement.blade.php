@@ -89,7 +89,7 @@
                 @endif
             </td>
             <td style="width:40%;padding-right:25mm;vertical-align:top">
-                <div class="doc-title" style="margin-top:-10mm">{{ $operation->nom }}</div>
+                <div class="doc-title" style="margin-top:-5mm">{{ $operation->nom }}</div>
                 <div class="doc-subtitle">
                     Séance {{ $seance->numero }}{{ $seance->titre ? ' — '.$seance->titre : '' }}<br>
                     {{ $seance->date?->format('d/m/Y') ?? 'Date non définie' }}
