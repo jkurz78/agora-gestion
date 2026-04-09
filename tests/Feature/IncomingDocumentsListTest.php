@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Livewire\IncomingDocuments\IncomingDocumentsList;
 use App\Models\Association;
 use App\Models\IncomingDocument;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 
 beforeEach(function () {
     Storage::fake('local');
@@ -96,4 +98,61 @@ it('returns 404 when downloading a missing file', function () {
     $this->actingAs($this->user)
         ->get(route('gestion.documents-en-attente.download', $doc))
         ->assertNotFound();
+});
+
+it('sert la vignette JPEG via la route thumbnail', function () {
+    Storage::disk('local')->put('incoming-documents/abc.pdf', 'PDF');
+    Storage::disk('local')->put('incoming-documents/thumbs/abc.jpg', 'FAKE-JPEG-BYTES');
+
+    $doc = IncomingDocument::create([
+        'association_id' => 1,
+        'storage_path' => 'incoming-documents/abc.pdf',
+        'original_filename' => 'facture.pdf',
+        'sender_email' => 'f@test.fr',
+        'received_at' => now(),
+        'reason' => 'unclassified',
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('gestion.documents-en-attente.thumbnail', $doc))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/jpeg');
+});
+
+it('renvoie 404 si la vignette n\'existe pas', function () {
+    Storage::disk('local')->put('incoming-documents/abc.pdf', 'PDF');
+
+    $doc = IncomingDocument::create([
+        'association_id' => 1,
+        'storage_path' => 'incoming-documents/abc.pdf',
+        'original_filename' => 'facture.pdf',
+        'sender_email' => 'f@test.fr',
+        'received_at' => now(),
+        'reason' => 'unclassified',
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('gestion.documents-en-attente.thumbnail', $doc))
+        ->assertNotFound();
+});
+
+it('supprime la vignette quand on supprime un document inbox', function () {
+    Storage::disk('local')->put('incoming-documents/abc.pdf', 'PDF');
+    Storage::disk('local')->put('incoming-documents/thumbs/abc.jpg', 'JPEG');
+
+    $doc = IncomingDocument::create([
+        'association_id' => 1,
+        'storage_path' => 'incoming-documents/abc.pdf',
+        'original_filename' => 'facture.pdf',
+        'sender_email' => 'f@test.fr',
+        'received_at' => now(),
+        'reason' => 'unclassified',
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(IncomingDocumentsList::class)
+        ->call('supprimer', $doc->id);
+
+    expect(Storage::disk('local')->exists('incoming-documents/thumbs/abc.jpg'))->toBeFalse()
+        ->and(Storage::disk('local')->exists('incoming-documents/abc.pdf'))->toBeFalse();
 });

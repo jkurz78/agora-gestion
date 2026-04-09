@@ -30,12 +30,13 @@
                 <table class="table">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
+                            <th style="width:80px">Aperçu</th>
                             <th>Reçu le</th>
                             <th>Expéditeur</th>
                             <th>Fichier</th>
                             <th>Sujet</th>
                             <th>Raison</th>
-                            <th style="width:280px">Actions</th>
+                            <th style="width:380px">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -44,6 +45,12 @@
                         @endphp
                         @foreach($documents as $doc)
                             <tr>
+                                <td>
+                                    <img src="{{ route($espacePrefix.'.documents-en-attente.thumbnail', $doc) }}"
+                                         alt="Aperçu"
+                                         style="width:60px;height:auto;max-height:84px;object-fit:cover;border:1px solid #dee2e6;border-radius:4px"
+                                         onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<i class=\'bi bi-file-earmark-pdf text-muted\' style=\'font-size:2rem\'></i>')">
+                                </td>
                                 <td>{{ $doc->received_at->format('d/m H:i') }}</td>
                                 <td>{{ $doc->sender_email }}</td>
                                 <td>{{ $doc->original_filename }}</td>
