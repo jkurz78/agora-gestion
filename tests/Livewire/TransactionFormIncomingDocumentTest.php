@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Espace;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\IncomingDocument;
@@ -58,6 +59,7 @@ it('open-transaction-form-from-incoming charge le document et lance l\'OCR', fun
         ]),
     ]);
 
+    $this->user->update(['dernier_espace' => Espace::Compta]);
     $doc = createInboxDocument();
 
     Livewire::test(TransactionForm::class)
@@ -69,7 +71,36 @@ it('open-transaction-form-from-incoming charge le document et lance l\'OCR', fun
         ->assertSet('incomingDocumentId', $doc->id)
         ->assertSet('reference', 'FAC-42')
         ->assertSet('ocrTiersNom', 'EDF')
-        ->assertSet('existingPieceJointeNom', 'facture-fournisseur.pdf');
+        ->assertSet('existingPieceJointeNom', 'facture-fournisseur.pdf')
+        ->assertSet('incomingDocumentPreviewUrl', route('compta.documents-en-attente.download', $doc));
+});
+
+it('construit l\'URL de prévisu selon l\'espace actuel de l\'utilisateur (gestion)', function () {
+    Http::fake([
+        'api.anthropic.com/*' => Http::response([
+            'content' => [[
+                'type' => 'text',
+                'text' => json_encode([
+                    'date' => '2025-11-22',
+                    'reference' => 'FAC-G',
+                    'tiers_id' => null,
+                    'tiers_nom' => 'EDF',
+                    'montant_total' => 50.0,
+                    'lignes' => [
+                        ['description' => 'X', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 50.0],
+                    ],
+                    'warnings' => [],
+                ]),
+            ]],
+        ]),
+    ]);
+
+    $this->user->update(['dernier_espace' => Espace::Gestion]);
+    $doc = createInboxDocument();
+
+    Livewire::test(TransactionForm::class)
+        ->dispatch('open-transaction-form-from-incoming', docId: $doc->id)
+        ->assertSet('incomingDocumentPreviewUrl', route('gestion.documents-en-attente.download', $doc));
 });
 
 it('open-transaction-form-from-incoming ignore un docId inexistant sans planter', function () {
