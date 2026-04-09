@@ -43,6 +43,7 @@
             font-size: 13px;
             text-align: left;
             font-weight: 600;
+            border-top: 1px solid #999;
             border-bottom: 2px solid #333;
             border-left: 1px solid #ddd;
         }
