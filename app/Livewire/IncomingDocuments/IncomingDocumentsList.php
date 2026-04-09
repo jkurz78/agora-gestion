@@ -33,6 +33,13 @@ final class IncomingDocumentsList extends Component
 
     public ?int $selectedSeanceId = null;
 
+    public string $pageUrl = '';
+
+    public function mount(): void
+    {
+        $this->pageUrl = url()->current();
+    }
+
     public function ajouter(IncomingDocumentIngester $ingester): void
     {
         $this->validate([
@@ -61,7 +68,7 @@ final class IncomingDocumentsList extends Component
         }
 
         $this->reset('fichierAjoute');
-        $this->redirect(request()->fullUrl(), navigate: false);
+        $this->redirect($this->pageUrl, navigate: false);
     }
 
     public function ouvrirAssignation(int $docId): void
@@ -112,7 +119,7 @@ final class IncomingDocumentsList extends Component
 
         session()->flash('success', 'Document attaché à la séance '.$seance->numero.'.');
         $this->fermerAssignation();
-        $this->redirect(request()->fullUrl(), navigate: false);
+        $this->redirect($this->pageUrl, navigate: false);
     }
 
     public function supprimer(int $docId): void
@@ -121,7 +128,7 @@ final class IncomingDocumentsList extends Component
         Storage::disk('local')->delete($doc->storage_path);
         $doc->delete();
         session()->flash('success', 'Document supprimé.');
-        $this->redirect(request()->fullUrl(), navigate: false);
+        $this->redirect($this->pageUrl, navigate: false);
     }
 
     public function render(): View
