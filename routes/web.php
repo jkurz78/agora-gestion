@@ -20,6 +20,7 @@ use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
+use App\Http\Controllers\SeanceFeuilleController;
 use App\Http\Controllers\SeancePdfController;
 use App\Http\Controllers\SousCategorieController;
 use App\Http\Controllers\TiersExportController;
@@ -148,6 +149,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
             ->name('operations.seances.matrice-pdf');
         Route::get('/operations/{operation}/seances/{seance}/emargement-pdf', [SeancePdfController::class, 'emargement'])
             ->name('operations.seances.emargement-pdf');
+        Route::get('/operations/{operation}/seances/{seance}/feuille-signee/download', [SeanceFeuilleController::class, 'download'])
+            ->name('operations.seances.feuille-signee.download');
         Route::get('/operations/{operation}/seances/export', SeanceExportController::class)
             ->name('operations.seances.export');
         Route::get('/operations/{operation}/seances/{seance}/attestation-pdf', [AttestationPresencePdfController::class, 'seance'])
