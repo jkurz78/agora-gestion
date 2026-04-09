@@ -156,6 +156,8 @@ final class TransactionForm extends Component
     public function openFormFromIncoming(int $docId): void
     {
         if (! $this->canEdit) {
+            session()->flash('error', 'Vous n\'avez pas les droits pour créer une dépense.');
+
             return;
         }
 
@@ -481,23 +483,8 @@ final class TransactionForm extends Component
         // Sauvegarder depuis un IncomingDocument (flux inbox)
         if ($this->incomingDocumentId !== null && $this->type === 'depense') {
             $tx = $createdTransaction ?? Transaction::find($this->transactionId);
-            $doc = IncomingDocument::find($this->incomingDocumentId);
-            if ($tx !== null && $doc !== null) {
-                $diskPath = Storage::disk('local')->path($doc->storage_path);
-                if (file_exists($diskPath)) {
-                    $service->storePieceJointeFromPath(
-                        $tx,
-                        $diskPath,
-                        $doc->original_filename,
-                        'application/pdf',
-                    );
-                }
-                // Cleanup inbox (row + fichier) uniquement après succès
-                Storage::disk('local')->delete($doc->storage_path);
-                // Cleanup vignette si elle existe (générée en Task 9-10)
-                $thumbPath = IncomingDocument::thumbnailPath($doc->storage_path);
-                Storage::disk('local')->delete($thumbPath);
-                $doc->delete();
+            if ($tx !== null) {
+                $this->finalizeIncomingDocumentCleanup($tx, $service);
             }
         }
 
@@ -546,12 +533,22 @@ final class TransactionForm extends Component
         if ($this->incomingDocumentId !== null) {
             $doc = IncomingDocument::find($this->incomingDocumentId);
             if ($doc === null) {
+                $this->ocrError = 'Le document a été supprimé.';
+
                 return;
             }
             $diskPath = Storage::disk('local')->path($doc->storage_path);
-            if (! file_exists($diskPath) || ! InvoiceOcrService::isConfigured()) {
+            if (! file_exists($diskPath)) {
+                $this->ocrError = 'Fichier introuvable sur le disque.';
+
                 return;
             }
+            if (! InvoiceOcrService::isConfigured()) {
+                $this->ocrError = 'Service OCR non configuré.';
+
+                return;
+            }
+
             $this->runOcrAnalysis(fn ($svc) => $svc->analyzeFromPath($diskPath, 'application/pdf'));
 
             return;
@@ -561,6 +558,44 @@ final class TransactionForm extends Component
         if ($this->pieceJointe !== null) {
             $this->updatedPieceJointe();
         }
+    }
+
+    private function finalizeIncomingDocumentCleanup(Transaction $tx, TransactionService $service): void
+    {
+        if ($this->incomingDocumentId === null) {
+            return;
+        }
+
+        $doc = IncomingDocument::find($this->incomingDocumentId);
+        if ($doc === null) {
+            return;
+        }
+
+        $diskPath = Storage::disk('local')->path($doc->storage_path);
+        if (! file_exists($diskPath)) {
+            session()->flash('warning', 'Le fichier inbox a disparu pendant la sauvegarde ; la dépense a été créée sans justificatif.');
+
+            return;
+        }
+
+        $service->storePieceJointeFromPath(
+            $tx,
+            $diskPath,
+            $doc->original_filename,
+            'application/pdf',
+        );
+
+        $storagePath = $doc->storage_path;
+        $thumbPath = IncomingDocument::thumbnailPath($storagePath);
+
+        // Ordre : on supprime la row d'abord (source de vérité). Si la row-delete
+        // échoue (exception DB), la méthode propage et les fichiers disque restent
+        // en place — pas d'orphelin. Si la suppression disque échoue ensuite
+        // (très rare sur le disk local), on a au pire des fichiers orphelins
+        // sans row — le backfill artisan les détectera.
+        $doc->delete();
+
+        Storage::disk('local')->delete([$storagePath, $thumbPath]);
     }
 
     /**

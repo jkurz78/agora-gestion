@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Espace;
+use App\Enums\Role;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Categorie;
@@ -211,6 +212,67 @@ it('save conserve l\'IncomingDocument si la validation échoue', function () {
 
     expect(IncomingDocument::find($doc->id))->not->toBeNull()
         ->and(Storage::disk('local')->exists($doc->storage_path))->toBeTrue();
+});
+
+it('openFormFromIncoming flash une erreur pour un utilisateur Gestionnaire (sans droit canEdit)', function () {
+    $gestionnaire = User::factory()->create(['role' => Role::Gestionnaire]);
+    $doc = createInboxDocument();
+
+    // Cf. test « file missing » plus haut : Livewire::test désactive StartSession dans son
+    // sous-request, donc les flashs depuis un dispatch/call sont perdus. On appelle la
+    // méthode via instance() pour exécuter dans le contexte Laravel du test parent.
+    $this->actingAs($gestionnaire);
+    $test = Livewire::test(TransactionForm::class);
+    $test->instance()->openFormFromIncoming($doc->id);
+
+    expect($test->instance()->showForm)->toBeFalse();
+    expect($test->instance()->incomingDocumentId)->toBeNull();
+    expect(session('error'))->toContain('droits');
+});
+
+it('save flash un warning et crée la dépense sans justificatif si le fichier inbox disparaît', function () {
+    Http::fake([
+        'api.anthropic.com/*' => Http::response([
+            'content' => [[
+                'type' => 'text',
+                'text' => json_encode([
+                    'date' => '2025-11-22',
+                    'reference' => 'FAC-GHOST',
+                    'tiers_id' => null,
+                    'tiers_nom' => 'EDF',
+                    'montant_total' => 10.00,
+                    'lignes' => [
+                        ['description' => 'X', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 10.00],
+                    ],
+                    'warnings' => [],
+                ]),
+            ]],
+        ]),
+    ]);
+
+    $compte = CompteBancaire::factory()->create();
+    $doc = createInboxDocument();
+
+    // Simuler la disparition du fichier entre le dispatch et le save
+    $component = Livewire::test(TransactionForm::class)
+        ->dispatch('open-transaction-form-from-incoming', docId: $doc->id);
+
+    Storage::disk('local')->delete($doc->storage_path);
+
+    $component
+        ->set('date', '2025-11-22')
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $compte->id)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    // La transaction est créée sans justificatif
+    $tx = Transaction::where('reference', 'FAC-GHOST')->first();
+    expect($tx)->not->toBeNull()
+        ->and($tx->piece_jointe_path)->toBeNull();
+
+    // L'IncomingDocument est toujours là (on ne l'a pas supprimée car on n'a pas pu copier)
+    expect(IncomingDocument::find($doc->id))->not->toBeNull();
 });
 
 it('retryOcr en mode inbox relance analyzeFromPath sur le fichier disque', function () {
