@@ -109,7 +109,7 @@
 
                         @if($selectedOperationId)
                             <label class="form-label mt-3">Séance</label>
-                            <select class="form-select" wire:model="selectedSeanceId">
+                            <select class="form-select" wire:model.live="selectedSeanceId">
                                 <option value="">Choisir…</option>
                                 @foreach($seances as $s)
                                     <option value="{{ $s->id }}">
