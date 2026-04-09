@@ -20,6 +20,10 @@
                                 ({{ $seance->feuille_signee_source === 'email' ? 'par email' : 'upload manuel' }}).
                             </div>
 
+                            <a href="{{ route('gestion.operations.seances.feuille-signee.view', [$seance->operation_id, $seance]) }}"
+                               class="btn btn-outline-primary btn-sm" target="_blank">
+                                👁 Ouvrir le PDF
+                            </a>
                             <a href="{{ route('gestion.operations.seances.feuille-signee.download', [$seance->operation_id, $seance]) }}"
                                class="btn btn-outline-secondary btn-sm">
                                 📥 Télécharger

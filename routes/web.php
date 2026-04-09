@@ -163,6 +163,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
             ->name('operations.seances.emargement-pdf');
         Route::get('/operations/{operation}/seances/{seance}/feuille-signee/download', [SeanceFeuilleController::class, 'download'])
             ->name('operations.seances.feuille-signee.download');
+        Route::get('/operations/{operation}/seances/{seance}/feuille-signee/view', [SeanceFeuilleController::class, 'view'])
+            ->name('operations.seances.feuille-signee.view');
         Route::get('/operations/{operation}/seances/export', SeanceExportController::class)
             ->name('operations.seances.export');
         Route::get('/operations/{operation}/seances/{seance}/attestation-pdf', [AttestationPresencePdfController::class, 'seance'])
