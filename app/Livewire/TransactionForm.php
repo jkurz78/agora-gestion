@@ -12,6 +12,7 @@ use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
+use App\Models\IncomingDocument;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -23,6 +24,7 @@ use App\Services\TransactionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -79,6 +81,10 @@ final class TransactionForm extends Component
 
     public ?string $ocrTiersNom = null;
 
+    public ?int $incomingDocumentId = null;
+
+    public ?string $incomingDocumentPreviewUrl = null;
+
     /** @var array<string> */
     public array $ocrWarnings = [];
 
@@ -111,7 +117,8 @@ final class TransactionForm extends Component
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
-            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom']);
+            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
+            'incomingDocumentId', 'incomingDocumentPreviewUrl']);
         $this->type = $type;
         $this->isLocked = false;
         $this->resetValidation();
@@ -143,6 +150,55 @@ final class TransactionForm extends Component
         $this->ocrWaitingForFile = true;
         $this->ocrWarnings = [];
         $this->ocrError = null;
+    }
+
+    #[On('open-transaction-form-from-incoming')]
+    public function openFormFromIncoming(int $docId): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $doc = IncomingDocument::find($docId);
+        if ($doc === null) {
+            return;
+        }
+
+        $diskPath = Storage::disk('local')->path($doc->storage_path);
+        if (! file_exists($diskPath)) {
+            session()->flash('error', 'Fichier introuvable sur le disque.');
+
+            return;
+        }
+
+        $this->showNewForm('depense');
+        $this->ocrMode = true;
+        $this->ocrWaitingForFile = false;
+        $this->incomingDocumentId = $doc->id;
+        $this->existingPieceJointeNom = $doc->original_filename;
+
+        // URL servie depuis le controller pour que l'iframe de prévisu puisse la lire
+        // (route partagée compta/gestion selon l'espace courant)
+        $prefix = request()->routeIs('compta.*') ? 'compta' : 'gestion';
+        $this->incomingDocumentPreviewUrl = route($prefix.'.documents-en-attente.download', $doc);
+
+        if (! InvoiceOcrService::isConfigured()) {
+            return;
+        }
+
+        $this->ocrAnalyzing = true;
+        $this->ocrError = null;
+
+        try {
+            $result = app(InvoiceOcrService::class)->analyzeFromPath($diskPath, 'application/pdf');
+            $this->applyOcrResult($result);
+        } catch (OcrAnalysisException|OcrNotConfiguredException $e) {
+            $this->ocrError = $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->ocrError = 'Erreur inattendue : '.$e->getMessage();
+        } finally {
+            $this->ocrAnalyzing = false;
+        }
     }
 
     public function addLigne(): void
@@ -325,6 +381,7 @@ final class TransactionForm extends Component
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
+            'incomingDocumentId', 'incomingDocumentPreviewUrl',
         ]);
         $this->resetValidation();
     }
