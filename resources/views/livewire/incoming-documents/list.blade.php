@@ -33,7 +33,7 @@
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Reçu le</th>
-                            <th>Expéditeur</th>
+                            <th style="width:120px">Expéditeur</th>
                             <th>Fichier</th>
                             <th>Sujet</th>
                             <th>Raison</th>
@@ -47,7 +47,7 @@
                         @foreach($documents as $doc)
                             <tr>
                                 <td>{{ $doc->received_at->format('d/m H:i') }}</td>
-                                <td>{{ $doc->sender_email }}</td>
+                                <td class="text-truncate" style="max-width:120px" title="{{ $doc->sender_email }}">{{ Str::before($doc->sender_email, '@') }}</td>
                                 <td>{{ $doc->original_filename }}</td>
                                 <td>{{ Str::limit($doc->subject ?? '—', 30) }}</td>
                                 <td>
