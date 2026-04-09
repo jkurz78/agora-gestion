@@ -50,6 +50,7 @@ $registerParametres = function (): void {
     Route::prefix('parametres')->name('parametres.')->middleware(CheckEspaceAccess::class.':parametres')->group(function (): void {
         Route::view('/association', 'parametres.association')->name('association');
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
+        Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
         Route::resource('comptes-bancaires', CompteBancaireController::class)->except(['show']);
