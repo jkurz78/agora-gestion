@@ -11,6 +11,7 @@ use App\Http\Controllers\DocumentPrevisionnelPdfController;
 use App\Http\Controllers\DroitImagePdfController;
 use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\FormulaireController;
+use App\Http\Controllers\IncomingDocumentsController;
 use App\Http\Controllers\OperationController;
 use App\Http\Controllers\ParticipantDocumentController;
 use App\Http\Controllers\ParticipantExportController;
@@ -72,11 +73,21 @@ $registerParametres = function (): void {
         ->name('factures.pdf');
 };
 
+// ── Shared route registrar (documents en attente) ──
+$registerDocumentsEntrants = function (): void {
+    Route::get('/documents-en-attente', function () {
+        return view('incoming-documents.index');
+    })->name('documents-en-attente');
+
+    Route::get('/documents-en-attente/{document}/download', [IncomingDocumentsController::class, 'download'])
+        ->name('documents-en-attente.download');
+};
+
 // ── Espace Comptabilité ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::class.':compta'])
     ->prefix('compta')
     ->name('compta.')
-    ->group(function () use ($registerParametres): void {
+    ->group(function () use ($registerParametres, $registerDocumentsEntrants): void {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
         Route::view('/transactions', 'transactions.index')->name('transactions.index');
@@ -123,6 +134,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
         Route::resource('operations', OperationController::class)->except(['destroy']);
 
         // Shared registrations
+        $registerDocumentsEntrants();
         $registerParametres();
     });
 
@@ -130,7 +142,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::class.':gestion'])
     ->prefix('gestion')
     ->name('gestion.')
-    ->group(function () use ($registerParametres): void {
+    ->group(function () use ($registerParametres, $registerDocumentsEntrants): void {
         Route::view('/dashboard', 'gestion.dashboard')->name('dashboard');
         Route::view('/adherents', 'gestion.adherents')->name('adherents');
         Route::view('/analyse', 'gestion.analyse.index')->name('analyse');
@@ -187,6 +199,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
             ->name('documents-previsionnels.pdf');
 
         // Shared registrations
+        $registerDocumentsEntrants();
         $registerParametres();
     });
 
