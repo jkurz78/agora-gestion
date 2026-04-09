@@ -112,6 +112,12 @@ final class SeanceTable extends Component
         // Verify seance belongs to this operation
         $seance = Seance::where('operation_id', $this->operation->id)->findOrFail($seanceId);
 
+        // Verrouillage partiel : si la feuille signée est attachée, le statut devient RO.
+        // kine et commentaire restent éditables.
+        if ($field === 'statut' && $seance->feuille_signee_path !== null) {
+            return;
+        }
+
         Presence::updateOrCreate(
             ['seance_id' => $seance->id, 'participant_id' => $participantId],
             [$field => $value !== '' ? $value : null]
