@@ -10,11 +10,13 @@
     @endif
 
     <div class="card mb-3">
-        <div class="card-body">
-            <label class="form-label">Ajouter un document à la boîte</label>
-            <div class="d-flex gap-2">
-                <input type="file" class="form-control" wire:model="fichierAjoute" accept="application/pdf">
-                <button class="btn btn-primary" wire:click="ajouter">+ Ajouter</button>
+        <div class="card-body py-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <label class="form-label mb-0 text-nowrap small">Ajouter un document :</label>
+                <input type="file" class="form-control form-control-sm" wire:model="fichierAjoute" accept="application/pdf" style="max-width:400px">
+                <button class="btn btn-sm btn-primary text-nowrap" wire:click="ajouter">
+                    <i class="bi bi-plus-lg"></i> Ajouter
+                </button>
             </div>
             @error('fichierAjoute')
                 <div class="text-danger small mt-1">{{ $message }}</div>
