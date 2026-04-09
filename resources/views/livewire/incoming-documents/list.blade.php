@@ -47,7 +47,7 @@
                         @foreach($documents as $doc)
                             <tr>
                                 <td>{{ $doc->received_at->format('d/m H:i') }}</td>
-                                <td class="text-truncate" style="max-width:120px" title="{{ $doc->sender_email }}">{{ Str::before($doc->sender_email, '@') }}</td>
+                                <td class="text-truncate" style="max-width:120px" title="{{ $doc->sender_email }}">{{ $senderLabels[$doc->sender_email] ?? Str::before($doc->sender_email, '@') }}</td>
                                 <td>{{ $doc->original_filename }}</td>
                                 <td>{{ Str::limit($doc->subject ?? '—', 30) }}</td>
                                 <td>

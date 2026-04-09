@@ -152,6 +152,9 @@ final class IncomingDocumentsList extends Component
             'documents' => IncomingDocument::where('association_id', 1)
                 ->orderBy('received_at', 'desc')
                 ->paginate(20),
+            'senderLabels' => \App\Models\IncomingMailAllowedSender::where('association_id', 1)
+                ->whereNotNull('label')
+                ->pluck('label', 'email'),
             'operations' => $this->showAssignModal
                 ? Operation::orderBy('nom')->get()
                 : collect(),
