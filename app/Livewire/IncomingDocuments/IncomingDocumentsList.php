@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Livewire\IncomingDocuments;
 
+use App\Enums\Espace;
 use App\Models\IncomingDocument;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
+use App\Services\InvoiceOcrService;
 use DateTimeImmutable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -133,6 +136,12 @@ final class IncomingDocumentsList extends Component
 
     public function creerDepense(int $docId): void
     {
+        abort_unless(
+            InvoiceOcrService::isConfigured()
+                && Auth::user()?->role->canWrite(Espace::Compta),
+            403
+        );
+
         $doc = IncomingDocument::findOrFail($docId);
         $this->dispatch('open-transaction-form-from-incoming', docId: $doc->id);
     }
