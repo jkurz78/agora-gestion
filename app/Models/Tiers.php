@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 final class Tiers extends Model
 {
@@ -57,10 +58,10 @@ final class Tiers extends Model
      * Return disambiguation suffixes for a collection of tiers.
      * Only homonymes get a non-empty suffix.
      *
-     * @param  \Illuminate\Support\Collection<int, Tiers>  $collection
+     * @param  Collection<int, Tiers>  $collection
      * @return array<int, string> Map of tiers ID => suffix (empty string if no disambiguation needed)
      */
-    public static function disambiguationSuffixes(\Illuminate\Support\Collection $collection): array
+    public static function disambiguationSuffixes(Collection $collection): array
     {
         $grouped = $collection->groupBy(fn (Tiers $t): string => mb_strtolower($t->displayName()));
         $suffixes = [];
@@ -85,10 +86,10 @@ final class Tiers extends Model
      * When multiple tiers share the same displayName(), a suffix is appended:
      * email > ville > code_postal > (#id) as last resort.
      *
-     * @param  \Illuminate\Support\Collection<int, Tiers>  $collection
+     * @param  Collection<int, Tiers>  $collection
      * @return array<int, string> Map of tiers ID => disambiguated label
      */
-    public static function disambiguate(\Illuminate\Support\Collection $collection): array
+    public static function disambiguate(Collection $collection): array
     {
         // Group by displayName to find homonymes
         $grouped = $collection->groupBy(fn (Tiers $t): string => mb_strtolower($t->displayName()));
@@ -116,9 +117,9 @@ final class Tiers extends Model
     /**
      * Find the best disambiguation suffix for a tiers within a group of homonymes.
      *
-     * @param  \Illuminate\Support\Collection<int, Tiers>  $group
+     * @param  Collection<int, Tiers>  $group
      */
-    private static function findSuffix(Tiers $tiers, \Illuminate\Support\Collection $group): string
+    private static function findSuffix(Tiers $tiers, Collection $group): string
     {
         // Try email
         if (! empty($tiers->email)) {
@@ -126,6 +127,7 @@ final class Tiers extends Model
             if (! in_array(mb_strtolower($tiers->email), $othersEmails, true)) {
                 return $tiers->email;
             }
+
             // Email exists but is not unique — still use it, it's informative
             return $tiers->email;
         }
