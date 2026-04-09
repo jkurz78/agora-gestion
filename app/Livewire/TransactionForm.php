@@ -478,6 +478,29 @@ final class TransactionForm extends Component
             }
         }
 
+        // Sauvegarder depuis un IncomingDocument (flux inbox)
+        if ($this->incomingDocumentId !== null && $this->type === 'depense') {
+            $tx = $createdTransaction ?? Transaction::find($this->transactionId);
+            $doc = IncomingDocument::find($this->incomingDocumentId);
+            if ($tx !== null && $doc !== null) {
+                $diskPath = Storage::disk('local')->path($doc->storage_path);
+                if (file_exists($diskPath)) {
+                    $service->storePieceJointeFromPath(
+                        $tx,
+                        $diskPath,
+                        $doc->original_filename,
+                        'application/pdf',
+                    );
+                }
+                // Cleanup inbox (row + fichier) uniquement après succès
+                Storage::disk('local')->delete($doc->storage_path);
+                // Cleanup vignette si elle existe (générée en Task 9-10)
+                $thumbPath = 'incoming-documents/thumbs/'.pathinfo($doc->storage_path, PATHINFO_FILENAME).'.jpg';
+                Storage::disk('local')->delete($thumbPath);
+                $doc->delete();
+            }
+        }
+
         $this->dispatch('transaction-saved');
         $this->resetForm();
     }

@@ -5,8 +5,11 @@ declare(strict_types=1);
 use App\Enums\Espace;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
+use App\Models\Categorie;
+use App\Models\CompteBancaire;
 use App\Models\IncomingDocument;
 use App\Models\SousCategorie;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -21,7 +24,9 @@ beforeEach(function () {
     $asso = Association::firstOrCreate(['id' => 1], ['nom' => 'Test']);
     $asso->update(['anthropic_api_key' => 'sk-test']);
 
-    SousCategorie::factory()->create();
+    SousCategorie::factory()
+        ->for(Categorie::factory()->depense())
+        ->create();
 });
 
 function createInboxDocument(string $content = '%PDF-1.4 fake'): IncomingDocument
@@ -129,4 +134,81 @@ it('open-transaction-form-from-incoming flash une erreur si le fichier disque ma
 
     expect($test->instance()->showForm)->toBeFalse();
     expect(session('error'))->toBe('Fichier introuvable sur le disque.');
+});
+
+it('save transfère le fichier inbox vers pieces-jointes et supprime l\'IncomingDocument', function () {
+    Http::fake([
+        'api.anthropic.com/*' => Http::response([
+            'content' => [[
+                'type' => 'text',
+                'text' => json_encode([
+                    'date' => '2025-11-22',
+                    'reference' => 'FAC-42',
+                    'tiers_id' => null,
+                    'tiers_nom' => 'EDF',
+                    'montant_total' => 123.45,
+                    'lignes' => [
+                        ['description' => 'Élec', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
+                    ],
+                    'warnings' => [],
+                ]),
+            ]],
+        ]),
+    ]);
+
+    $compte = CompteBancaire::factory()->create();
+    $doc = createInboxDocument('FAKE PDF BYTES');
+    $storagePath = $doc->storage_path;
+
+    Livewire::test(TransactionForm::class)
+        ->dispatch('open-transaction-form-from-incoming', docId: $doc->id)
+        ->set('date', '2025-11-22')
+        ->set('mode_paiement', 'virement')
+        ->set('compte_id', $compte->id)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    // Transaction créée avec le justificatif
+    $tx = Transaction::where('reference', 'FAC-42')->first();
+    expect($tx)->not->toBeNull()
+        ->and($tx->piece_jointe_nom)->toBe('facture-fournisseur.pdf')
+        ->and($tx->piece_jointe_mime)->toBe('application/pdf')
+        ->and($tx->piece_jointe_path)->toBe("pieces-jointes/{$tx->id}/justificatif.pdf")
+        ->and(Storage::disk('local')->get($tx->piece_jointe_path))->toBe('FAKE PDF BYTES');
+
+    // IncomingDocument supprimé (row + fichier disque)
+    expect(IncomingDocument::find($doc->id))->toBeNull()
+        ->and(Storage::disk('local')->exists($storagePath))->toBeFalse();
+});
+
+it('save conserve l\'IncomingDocument si la validation échoue', function () {
+    Http::fake([
+        'api.anthropic.com/*' => Http::response([
+            'content' => [[
+                'type' => 'text',
+                'text' => json_encode([
+                    'date' => '2025-11-22',
+                    'reference' => 'FAC-42',
+                    'tiers_id' => null,
+                    'tiers_nom' => 'EDF',
+                    'montant_total' => 123.45,
+                    'lignes' => [
+                        ['description' => 'Élec', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
+                    ],
+                    'warnings' => [],
+                ]),
+            ]],
+        ]),
+    ]);
+
+    $doc = createInboxDocument();
+
+    Livewire::test(TransactionForm::class)
+        ->dispatch('open-transaction-form-from-incoming', docId: $doc->id)
+        ->set('reference', '') // forcer l'échec de validation
+        ->call('save')
+        ->assertHasErrors('reference');
+
+    expect(IncomingDocument::find($doc->id))->not->toBeNull()
+        ->and(Storage::disk('local')->exists($doc->storage_path))->toBeTrue();
 });
