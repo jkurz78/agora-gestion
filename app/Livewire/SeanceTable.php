@@ -11,6 +11,7 @@ use App\Models\Presence;
 use App\Models\Seance;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 final class SeanceTable extends Component
@@ -18,6 +19,12 @@ final class SeanceTable extends Component
     public Operation $operation;
 
     public bool $showProches = false;
+
+    #[On('feuille-updated')]
+    public function refreshTable(): void
+    {
+        // Force re-render — les données sont rechargées dans render()
+    }
 
     public function mount(Operation $operation): void
     {
