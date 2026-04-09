@@ -56,7 +56,7 @@
         }
         .data-table tr:nth-child(even) td { background-color: #f8f9fa; }
         .data-table .col-name { width: 25%; }
-        .data-table .col-signature { width: 30%; border-left: 1px solid #999; border-right: 1px solid #999; }
+        .data-table .col-signature { width: 30%; text-align: center; border-left: 1px solid #999; border-right: 1px solid #999; }
         .data-table .col-kine { width: 10%; text-align: center; border-right: 1px solid #999; }
         .data-table .col-obs { width: 35%; }
 
