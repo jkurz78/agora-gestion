@@ -408,6 +408,14 @@
                                 </a>
                             </li>
                             @endif
+                            @if (Route::has($espacePrefix . '.parametres.reception-documents'))
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.reception-documents') ? 'active' : '' }}"
+                                   href="{{ route($espacePrefix . '.parametres.reception-documents') }}">
+                                    <i class="bi bi-envelope-arrow-down"></i> Réception de documents
+                                </a>
+                            </li>
+                            @endif
                             <li><hr class="dropdown-divider"></li>
                             @if (Route::has($espacePrefix . '.parametres.categories.index'))
                             <li>
