@@ -29,7 +29,7 @@
             @if($documents->total() === 0)
                 <p class="text-muted text-center my-4">Aucun document en attente.</p>
             @else
-                <table class="table">
+                <table class="table table-sm align-middle" style="font-size:0.875rem">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Reçu le</th>
@@ -66,7 +66,7 @@
                                         } }}
                                     </span>
                                 </td>
-                                <td>
+                                <td class="text-nowrap">
                                     <a href="{{ route($espacePrefix.'.documents-en-attente.download', $doc) }}"
                                        class="btn btn-sm btn-outline-secondary" target="_blank" title="Aperçu">
                                         👁
