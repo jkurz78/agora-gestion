@@ -22,8 +22,8 @@
         .doc-subtitle { font-size: 10px; color: #6c757d; text-align: right; margin-top: 2px; }
         .qr-top-right {
             position: absolute;
-            top: 0;
-            right: 0;
+            top: 10mm;
+            right: 10mm;
             width: 96px;
             height: 96px;
         }
