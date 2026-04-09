@@ -61,6 +61,7 @@ final class IncomingDocumentsList extends Component
         }
 
         $this->reset('fichierAjoute');
+        $this->redirect(request()->fullUrl(), navigate: false);
     }
 
     public function ouvrirAssignation(int $docId): void
@@ -111,6 +112,7 @@ final class IncomingDocumentsList extends Component
 
         session()->flash('success', 'Document attaché à la séance '.$seance->numero.'.');
         $this->fermerAssignation();
+        $this->redirect(request()->fullUrl(), navigate: false);
     }
 
     public function supprimer(int $docId): void
@@ -119,6 +121,7 @@ final class IncomingDocumentsList extends Component
         Storage::disk('local')->delete($doc->storage_path);
         $doc->delete();
         session()->flash('success', 'Document supprimé.');
+        $this->redirect(request()->fullUrl(), navigate: false);
     }
 
     public function render(): View
