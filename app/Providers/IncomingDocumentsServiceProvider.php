@@ -8,7 +8,6 @@ use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Services\Emargement\EmargementDocumentHandler;
 use App\Services\Emargement\ImagickQrCodeExtractor;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
-use App\Services\IncomingDocuments\IncomingDocumentThumbnailGenerator;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,13 +21,10 @@ final class IncomingDocumentsServiceProvider extends ServiceProvider
         // Bind the ingester with its handler chain.
         // Order matters: handlers are tried in the order listed.
         $this->app->bind(IncomingDocumentIngester::class, function (Application $app): IncomingDocumentIngester {
-            return new IncomingDocumentIngester(
-                handlers: [
-                    $app->make(EmargementDocumentHandler::class),
-                    // v2.9+ : ajouter d'autres handlers ici (ex: FactureDocumentHandler)
-                ],
-                thumbnailGenerator: $app->make(IncomingDocumentThumbnailGenerator::class),
-            );
+            return new IncomingDocumentIngester([
+                $app->make(EmargementDocumentHandler::class),
+                // v2.9+ : ajouter d'autres handlers ici (ex: FactureDocumentHandler)
+            ]);
         });
     }
 }

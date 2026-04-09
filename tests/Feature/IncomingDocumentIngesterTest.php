@@ -8,9 +8,7 @@ use App\Services\IncomingDocuments\Contracts\DocumentHandler;
 use App\Services\IncomingDocuments\HandlerAttempt;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
-use App\Services\IncomingDocuments\IncomingDocumentThumbnailGenerator;
 use Illuminate\Support\Facades\Storage;
-use Tests\Support\GenerateTestPdf;
 
 function makeIncomingFile(string $content = '%PDF-1.4 fake', ?string $messageId = null): IncomingDocumentFile
 {
@@ -173,51 +171,4 @@ it('cleans up the temp file after ingestion (success path)', function () {
     expect(file_exists($tempPath))->toBeTrue();
     $ingester->ingest($file);
     expect(file_exists($tempPath))->toBeFalse();
-});
-
-it('génère une vignette pour chaque document parqué en inbox', function () {
-    // Créer un PDF source via le helper de test existant (renvoie des bytes PDF)
-    $pdfBytes = GenerateTestPdf::withoutQr();
-    $tempCopy = tempnam(sys_get_temp_dir(), 'ingester-thumb-').'.pdf';
-    file_put_contents($tempCopy, $pdfBytes);
-
-    $file = new IncomingDocumentFile(
-        tempPath: $tempCopy,
-        originalFilename: 'test.pdf',
-        source: 'test',
-        senderEmail: 'test@test.fr',
-        recipientEmail: null,
-        subject: null,
-        receivedAt: new DateTimeImmutable,
-        sourceMessageId: null,
-    );
-
-    // Handler qui fait "pass" systématiquement → force le parking
-    $handler = new class implements DocumentHandler
-    {
-        public function tryHandle(IncomingDocumentFile $file): HandlerAttempt
-        {
-            return HandlerAttempt::pass();
-        }
-
-        public function name(): string
-        {
-            return 'test-handler';
-        }
-    };
-
-    // Instancier le ingester avec un vrai generator
-    $ingester = new IncomingDocumentIngester(
-        handlers: [$handler],
-        thumbnailGenerator: app(IncomingDocumentThumbnailGenerator::class),
-    );
-
-    $result = $ingester->ingest($file);
-
-    expect($result->outcome)->toBe('pending')
-        ->and($result->incomingDocument)->not->toBeNull();
-
-    // Vérifier que la vignette existe au chemin conventionnel
-    $thumbPath = IncomingDocument::thumbnailPath($result->incomingDocument->storage_path);
-    expect(Storage::disk('local')->exists($thumbPath))->toBeTrue();
 });
