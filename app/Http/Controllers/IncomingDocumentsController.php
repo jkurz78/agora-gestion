@@ -14,9 +14,10 @@ final class IncomingDocumentsController extends Controller
     {
         abort_if(! Storage::disk('local')->exists($document->storage_path), 404);
 
-        return Storage::disk('local')->download(
+        return Storage::disk('local')->response(
             $document->storage_path,
             $document->original_filename,
+            ['Content-Type' => 'application/pdf'],
         );
     }
 }
