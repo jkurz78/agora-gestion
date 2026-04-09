@@ -32,7 +32,7 @@
             text-align: center;
             font-size: 20px;
             font-weight: 600;
-            color: #333;
+            color: #A9014F;
             margin: 8px 0 20px 0;
         }
         .data-table { margin-top: 0; border: 1px solid #999; }
