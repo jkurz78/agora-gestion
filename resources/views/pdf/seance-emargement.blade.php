@@ -74,9 +74,9 @@
 
     <table class="header">
         <tr>
-            <td style="width:60%">
+            <td style="width:60%;vertical-align:top;padding-top:0">
                 @if($headerLogoBase64)
-                    <img class="logo" src="data:{{ $headerLogoMime }};base64,{{ $headerLogoBase64 }}" alt="Logo">
+                    <img class="logo" src="data:{{ $headerLogoMime }};base64,{{ $headerLogoBase64 }}" alt="Logo" style="margin-top:-5mm">
                 @endif
                 @if($association)
                     <div class="association-name">{{ $association->nom }}</div>
