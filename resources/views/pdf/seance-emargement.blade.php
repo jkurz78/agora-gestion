@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <title>Feuille de présence — {{ $operation->nom }} — Séance {{ $seance->numero }}</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: DejaVu Sans, sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: helvetica, sans-serif; }
         body {
-            font-family: DejaVu Sans, sans-serif;
+            font-family: helvetica, sans-serif;
             font-size: 11px;
             color: #212529;
             line-height: 1.4;
