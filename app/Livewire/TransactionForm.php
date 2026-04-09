@@ -12,6 +12,7 @@ use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
+use App\Models\IncomingDocument;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -23,6 +24,7 @@ use App\Services\TransactionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -79,6 +81,10 @@ final class TransactionForm extends Component
 
     public ?string $ocrTiersNom = null;
 
+    public ?int $incomingDocumentId = null;
+
+    public ?string $incomingDocumentPreviewUrl = null;
+
     /** @var array<string> */
     public array $ocrWarnings = [];
 
@@ -111,7 +117,8 @@ final class TransactionForm extends Component
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
-            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom']);
+            'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
+            'incomingDocumentId', 'incomingDocumentPreviewUrl']);
         $this->type = $type;
         $this->isLocked = false;
         $this->resetValidation();
@@ -143,6 +150,47 @@ final class TransactionForm extends Component
         $this->ocrWaitingForFile = true;
         $this->ocrWarnings = [];
         $this->ocrError = null;
+    }
+
+    #[On('open-transaction-form-from-incoming')]
+    public function openFormFromIncoming(int $docId): void
+    {
+        if (! $this->canEdit) {
+            session()->flash('error', 'Vous n\'avez pas les droits pour créer une dépense.');
+
+            return;
+        }
+
+        $doc = IncomingDocument::find($docId);
+        if ($doc === null) {
+            return;
+        }
+
+        $diskPath = Storage::disk('local')->path($doc->storage_path);
+        if (! file_exists($diskPath)) {
+            session()->flash('error', 'Fichier introuvable sur le disque.');
+
+            return;
+        }
+
+        $this->showNewForm('depense');
+        $this->ocrMode = true;
+        $this->ocrWaitingForFile = false;
+        $this->incomingDocumentId = $doc->id;
+        $this->existingPieceJointeNom = $doc->original_filename;
+
+        // URL servie depuis le controller pour que l'iframe de prévisu puisse la lire.
+        // Détection de l'espace via $user->dernier_espace (persisté par DetecteEspace middleware
+        // au dernier chargement full-page), car pendant un update Livewire la route courante
+        // est 'livewire.update', pas 'compta.*' ou 'gestion.*'.
+        $espace = (Auth::user()->dernier_espace ?? Espace::Compta)->value;
+        $this->incomingDocumentPreviewUrl = route($espace.'.documents-en-attente.download', $doc);
+
+        if (! InvoiceOcrService::isConfigured()) {
+            return;
+        }
+
+        $this->runOcrAnalysis(fn ($svc) => $svc->analyzeFromPath($diskPath, 'application/pdf'));
     }
 
     public function addLigne(): void
@@ -325,6 +373,7 @@ final class TransactionForm extends Component
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
+            'incomingDocumentId', 'incomingDocumentPreviewUrl',
         ]);
         $this->resetValidation();
     }
@@ -431,6 +480,14 @@ final class TransactionForm extends Component
             }
         }
 
+        // Sauvegarder depuis un IncomingDocument (flux inbox)
+        if ($this->incomingDocumentId !== null && $this->type === 'depense') {
+            $tx = $createdTransaction ?? Transaction::find($this->transactionId);
+            if ($tx !== null) {
+                $this->finalizeIncomingDocumentCleanup($tx, $service);
+            }
+        }
+
         $this->dispatch('transaction-saved');
         $this->resetForm();
     }
@@ -461,15 +518,96 @@ final class TransactionForm extends Component
             return;
         }
 
-        $this->ocrAnalyzing = true;
-        $this->ocrError = null;
-
-        try {
+        $this->runOcrAnalysis(function ($svc) {
             $this->validate([
                 'pieceJointe' => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
             ]);
 
-            $result = app(InvoiceOcrService::class)->analyze($this->pieceJointe);
+            return $svc->analyze($this->pieceJointe);
+        });
+    }
+
+    public function retryOcr(): void
+    {
+        // Mode inbox : relancer depuis le fichier disque
+        if ($this->incomingDocumentId !== null) {
+            $doc = IncomingDocument::find($this->incomingDocumentId);
+            if ($doc === null) {
+                $this->ocrError = 'Le document a été supprimé.';
+
+                return;
+            }
+            $diskPath = Storage::disk('local')->path($doc->storage_path);
+            if (! file_exists($diskPath)) {
+                $this->ocrError = 'Fichier introuvable sur le disque.';
+
+                return;
+            }
+            if (! InvoiceOcrService::isConfigured()) {
+                $this->ocrError = 'Service OCR non configuré.';
+
+                return;
+            }
+
+            $this->runOcrAnalysis(fn ($svc) => $svc->analyzeFromPath($diskPath, 'application/pdf'));
+
+            return;
+        }
+
+        // Mode upload (existant) : re-déclenche updatedPieceJointe() qui utilise déjà le helper
+        if ($this->pieceJointe !== null) {
+            $this->updatedPieceJointe();
+        }
+    }
+
+    private function finalizeIncomingDocumentCleanup(Transaction $tx, TransactionService $service): void
+    {
+        if ($this->incomingDocumentId === null) {
+            return;
+        }
+
+        $doc = IncomingDocument::find($this->incomingDocumentId);
+        if ($doc === null) {
+            return;
+        }
+
+        $diskPath = Storage::disk('local')->path($doc->storage_path);
+        if (! file_exists($diskPath)) {
+            session()->flash('warning', 'Le fichier inbox a disparu pendant la sauvegarde ; la dépense a été créée sans justificatif.');
+
+            return;
+        }
+
+        $service->storePieceJointeFromPath(
+            $tx,
+            $diskPath,
+            $doc->original_filename,
+            'application/pdf',
+        );
+
+        $storagePath = $doc->storage_path;
+
+        // Ordre : on supprime la row d'abord (source de vérité). Si la row-delete
+        // échoue (exception DB), la méthode propage et les fichiers disque restent
+        // en place — pas d'orphelin. Si la suppression disque échoue ensuite
+        // (très rare sur le disk local), on a au pire des fichiers orphelins
+        // sans row — le backfill artisan les détectera.
+        $doc->delete();
+
+        Storage::disk('local')->delete($storagePath);
+    }
+
+    /**
+     * Exécute une analyse OCR avec gestion d'état uniforme.
+     * Le callable reçoit l'instance de InvoiceOcrService et doit retourner un InvoiceOcrResult.
+     */
+    private function runOcrAnalysis(callable $analyze): void
+    {
+        $this->ocrAnalyzing = true;
+        $this->ocrError = null;
+
+        try {
+            $result = $analyze(app(InvoiceOcrService::class));
             $this->applyOcrResult($result);
         } catch (OcrAnalysisException|OcrNotConfiguredException $e) {
             $this->ocrError = $e->getMessage();
@@ -477,13 +615,6 @@ final class TransactionForm extends Component
             $this->ocrError = 'Erreur inattendue : '.$e->getMessage();
         } finally {
             $this->ocrAnalyzing = false;
-        }
-    }
-
-    public function retryOcr(): void
-    {
-        if ($this->pieceJointe !== null) {
-            $this->updatedPieceJointe();
         }
     }
 

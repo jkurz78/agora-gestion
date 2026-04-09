@@ -10,11 +10,13 @@
     @endif
 
     <div class="card mb-3">
-        <div class="card-body">
-            <label class="form-label">Ajouter un document à la boîte</label>
-            <div class="d-flex gap-2">
-                <input type="file" class="form-control" wire:model="fichierAjoute" accept="application/pdf">
-                <button class="btn btn-primary" wire:click="ajouter">+ Ajouter</button>
+        <div class="card-body py-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <label class="form-label mb-0 text-nowrap small">Ajouter un document :</label>
+                <input type="file" class="form-control form-control-sm" wire:model="fichierAjoute" accept="application/pdf" style="max-width:400px">
+                <button class="btn btn-sm btn-primary text-nowrap" wire:click="ajouter">
+                    <i class="bi bi-plus-lg"></i> Ajouter
+                </button>
             </div>
             @error('fichierAjoute')
                 <div class="text-danger small mt-1">{{ $message }}</div>
@@ -27,15 +29,15 @@
             @if($documents->total() === 0)
                 <p class="text-muted text-center my-4">Aucun document en attente.</p>
             @else
-                <table class="table">
+                <table class="table table-sm align-middle" style="font-size:0.875rem">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Reçu le</th>
-                            <th>Expéditeur</th>
+                            <th style="width:120px">Expéditeur</th>
                             <th>Fichier</th>
                             <th>Sujet</th>
                             <th>Raison</th>
-                            <th style="width:280px">Actions</th>
+                            <th style="width:380px">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -45,7 +47,7 @@
                         @foreach($documents as $doc)
                             <tr>
                                 <td>{{ $doc->received_at->format('d/m H:i') }}</td>
-                                <td>{{ $doc->sender_email }}</td>
+                                <td class="text-truncate" style="max-width:120px" title="{{ $doc->sender_email }}">{{ $senderLabels[$doc->sender_email] ?? Str::before($doc->sender_email, '@') }}</td>
                                 <td>{{ $doc->original_filename }}</td>
                                 <td>{{ Str::limit($doc->subject ?? '—', 30) }}</td>
                                 <td>
@@ -64,7 +66,7 @@
                                         } }}
                                     </span>
                                 </td>
-                                <td>
+                                <td class="text-nowrap">
                                     <a href="{{ route($espacePrefix.'.documents-en-attente.download', $doc) }}"
                                        class="btn btn-sm btn-outline-secondary" target="_blank" title="Aperçu">
                                         👁
@@ -73,6 +75,13 @@
                                             wire:click="ouvrirAssignation({{ $doc->id }})">
                                         Attacher à une séance
                                     </button>
+                                    @if(\App\Services\InvoiceOcrService::isConfigured() && Auth::user()->role->canWrite(\App\Enums\Espace::Compta))
+                                        <button class="btn btn-sm btn-outline-success"
+                                                wire:click="creerDepense({{ $doc->id }})"
+                                                title="Créer une dépense depuis ce PDF">
+                                            <i class="bi bi-receipt"></i> Créer dépense
+                                        </button>
+                                    @endif
                                     <button class="btn btn-sm btn-outline-danger"
                                             wire:click="supprimer({{ $doc->id }})"
                                             wire:confirm="Supprimer ce document ?"
