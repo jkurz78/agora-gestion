@@ -202,3 +202,54 @@ php artisan test --filter=Xxx          # Tests cibles
 php artisan migrate:fresh --seed       # Reset complet
 ./vendor/bin/pint                      # Formatage PSR-12
 ```
+
+---
+
+## Reception de documents par mail (v2.8)
+
+L'application peut recevoir automatiquement des documents PDF par email -- en particulier
+les feuilles d'emargement signees scannees par un copieur multifonction.
+
+### Prerequis
+
+- Extension PHP `imagick` (disponible sur la plupart des hebergeurs Laravel, activable
+  via le support ou cPanel si absente)
+- Une boite mail dediee sur votre domaine (ex: `emargement@votreasso.fr`)
+- Le scheduler Laravel active dans cron :
+
+  ```
+  * * * * * cd /chemin/vers/agora-gestion && php artisan schedule:run >> /dev/null 2>&1
+  ```
+
+### Configuration
+
+1. Se connecter en tant qu'admin
+2. Parametres -> Reception de documents par mail
+3. Onglet « Configuration IMAP » : saisir les credentials de la boite mail dediee
+4. Cliquer « Tester la connexion » pour verifier
+5. Onglet « Expediteurs autorises » : ajouter au moins l'adresse de votre copieur
+6. Retour onglet Configuration : activer l'ingestion
+7. Optionnel : lancer manuellement `php artisan incoming-mail:fetch` pour un premier test
+
+### Parcours de la feuille d'emargement
+
+1. Generer la feuille PDF dans l'application (onglet seances d'une operation)
+2. Imprimer la feuille -- elle contient un QR code unique en haut a droite
+3. Faire signer en seance
+4. Scanner la feuille (PDF, page 1 doit etre la feuille avec le QR)
+5. Envoyer le scan par mail depuis une adresse whitelistee a votre boite dediee
+6. Dans les 5 minutes, la feuille est automatiquement attachee a la bonne seance
+
+Alternative : upload manuel depuis la vue seance (bouton « Attacher »).
+
+### Documents non auto-routes
+
+Les PDFs qui n'ont pas de QR code valide (ou pas de QR du tout) atterrissent dans
+« Documents en attente » (menu principal). Un humain peut les attacher manuellement
+a la bonne seance.
+
+### Rotation de APP_KEY
+
+Si la cle Laravel est rotee, le mot de passe IMAP stocke en base devient illisible.
+Il faudra le ressaisir dans la page Parametres apres rotation. Cette operation est
+rare (deja necessaire pour les session cookies, password reset tokens, etc.).

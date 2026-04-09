@@ -377,6 +377,15 @@
                 {{-- Dropdown Paramètres (poussé à droite) --}}
                 @php $espacePrefix = ($espace ?? \App\Enums\Espace::Compta)->value; @endphp
                 <ul class="navbar-nav ms-auto me-3 align-items-end">
+                    <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs($espacePrefix.'.documents-en-attente') ? 'active' : '' }}"
+                           href="{{ route($espacePrefix.'.documents-en-attente') }}">
+                            <i class="bi bi-inbox"></i> Documents
+                            @if(($incomingDocumentsCount ?? 0) > 0)
+                                <span class="badge bg-warning text-dark">{{ $incomingDocumentsCount }}</span>
+                            @endif
+                        </a>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ (request()->routeIs($espacePrefix . '.parametres.*') && !request()->routeIs($espacePrefix . '.parametres.comptes-bancaires.*')) || request()->routeIs($espacePrefix . '.operations.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
