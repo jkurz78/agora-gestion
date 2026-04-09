@@ -34,8 +34,41 @@ final class InvoiceOcrService
             throw new OcrNotConfiguredException;
         }
 
-        $base64 = base64_encode(file_get_contents($file->getRealPath()));
-        $mime = $file->getMimeType();
+        return $this->performAnalysis(
+            apiKey: $apiKey,
+            base64: base64_encode(file_get_contents($file->getRealPath())),
+            mime: $file->getMimeType(),
+            context: $context,
+        );
+    }
+
+    /**
+     * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int}|null  $context
+     */
+    public function analyzeFromPath(string $path, string $mime, ?array $context = null): InvoiceOcrResult
+    {
+        $apiKey = Association::first()?->anthropic_api_key;
+        if ($apiKey === null) {
+            throw new OcrNotConfiguredException;
+        }
+
+        if (! file_exists($path)) {
+            throw new OcrAnalysisException('Fichier introuvable : '.$path);
+        }
+
+        return $this->performAnalysis(
+            apiKey: $apiKey,
+            base64: base64_encode(file_get_contents($path)),
+            mime: $mime,
+            context: $context,
+        );
+    }
+
+    /**
+     * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int}|null  $context
+     */
+    private function performAnalysis(string $apiKey, string $base64, string $mime, ?array $context): InvoiceOcrResult
+    {
         $prompt = $this->buildPrompt($context);
 
         $sourceType = $mime === 'application/pdf' ? 'document' : 'image';

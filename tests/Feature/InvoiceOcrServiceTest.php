@@ -136,3 +136,55 @@ it('analyze lance OcrAnalysisException si JSON invalide', function () {
     $file = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
     app(InvoiceOcrService::class)->analyze($file);
 })->throws(OcrAnalysisException::class);
+
+it('analyzeFromPath parse correctement la réponse API depuis un fichier sur disque', function () {
+    $asso = Association::create(['id' => 1, 'nom' => 'Test']);
+    $asso->update(['anthropic_api_key' => 'sk-test-key']);
+    SousCategorie::factory()->create();
+
+    Http::fake([
+        'api.anthropic.com/*' => Http::response([
+            'content' => [[
+                'type' => 'text',
+                'text' => json_encode([
+                    'date' => '2025-11-22',
+                    'reference' => 'FAC-42',
+                    'tiers_id' => null,
+                    'tiers_nom' => 'EDF',
+                    'montant_total' => 123.45,
+                    'lignes' => [
+                        ['description' => 'Électricité', 'sous_categorie_id' => 1, 'operation_id' => null, 'seance' => null, 'montant' => 123.45],
+                    ],
+                    'warnings' => [],
+                ]),
+            ]],
+        ]),
+    ]);
+
+    $tempPath = tempnam(sys_get_temp_dir(), 'invoice-ocr-').'.pdf';
+    file_put_contents($tempPath, '%PDF-1.4 fake content');
+
+    try {
+        $result = app(InvoiceOcrService::class)->analyzeFromPath($tempPath, 'application/pdf');
+
+        expect($result)->toBeInstanceOf(InvoiceOcrResult::class)
+            ->and($result->reference)->toBe('FAC-42')
+            ->and($result->tiers_nom)->toBe('EDF')
+            ->and($result->montant_total)->toBe(123.45);
+    } finally {
+        @unlink($tempPath);
+    }
+});
+
+it('analyzeFromPath lance OcrNotConfiguredException sans clé API', function () {
+    Association::create(['id' => 1, 'nom' => 'Test']);
+
+    $tempPath = tempnam(sys_get_temp_dir(), 'invoice-ocr-').'.pdf';
+    file_put_contents($tempPath, '%PDF-1.4 fake');
+
+    try {
+        app(InvoiceOcrService::class)->analyzeFromPath($tempPath, 'application/pdf');
+    } finally {
+        @unlink($tempPath);
+    }
+})->throws(OcrNotConfiguredException::class);

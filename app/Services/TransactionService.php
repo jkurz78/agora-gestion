@@ -232,6 +232,38 @@ final class TransactionService
         ]);
     }
 
+    public function storePieceJointeFromPath(
+        Transaction $transaction,
+        string $sourcePath,
+        string $originalFilename,
+        string $mime,
+    ): void {
+        if (! in_array($mime, self::ALLOWED_MIMES, true)) {
+            throw new \InvalidArgumentException('Type de fichier non autorisé : '.$mime);
+        }
+
+        if (! file_exists($sourcePath)) {
+            throw new \InvalidArgumentException('Fichier source introuvable : '.$sourcePath);
+        }
+
+        $dir = "pieces-jointes/{$transaction->id}";
+
+        if ($transaction->piece_jointe_path !== null) {
+            Storage::disk('local')->deleteDirectory($dir);
+        }
+
+        $extension = pathinfo($originalFilename, PATHINFO_EXTENSION) ?: 'bin';
+        $storedPath = "{$dir}/justificatif.{$extension}";
+
+        Storage::disk('local')->put($storedPath, file_get_contents($sourcePath));
+
+        $transaction->update([
+            'piece_jointe_path' => $storedPath,
+            'piece_jointe_nom' => $originalFilename,
+            'piece_jointe_mime' => $mime,
+        ]);
+    }
+
     public function deletePieceJointe(Transaction $transaction): void
     {
         if ($transaction->piece_jointe_path === null) {

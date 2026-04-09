@@ -167,3 +167,61 @@ it('la suppression d\'une transaction supprime aussi la pièce jointe du disque'
 
     expect(Storage::disk('local')->exists($path))->toBeFalse();
 });
+
+it('storePieceJointeFromPath copie le fichier depuis un chemin et met à jour la transaction', function () {
+    Storage::fake('local');
+    $transaction = Transaction::factory()->create();
+
+    // Créer un fichier source sur disque (hors du dossier pieces-jointes)
+    Storage::disk('local')->put('incoming-documents/source-abc.pdf', 'FAKE PDF BYTES');
+    $sourcePath = Storage::disk('local')->path('incoming-documents/source-abc.pdf');
+
+    app(TransactionService::class)->storePieceJointeFromPath(
+        $transaction,
+        $sourcePath,
+        'facture-edf.pdf',
+        'application/pdf',
+    );
+
+    $transaction->refresh();
+    expect($transaction->piece_jointe_path)->toBe("pieces-jointes/{$transaction->id}/justificatif.pdf")
+        ->and($transaction->piece_jointe_nom)->toBe('facture-edf.pdf')
+        ->and($transaction->piece_jointe_mime)->toBe('application/pdf')
+        ->and(Storage::disk('local')->exists($transaction->piece_jointe_path))->toBeTrue()
+        ->and(Storage::disk('local')->get($transaction->piece_jointe_path))->toBe('FAKE PDF BYTES');
+});
+
+it('storePieceJointeFromPath rejette un MIME non autorisé', function () {
+    Storage::fake('local');
+    $transaction = Transaction::factory()->create();
+    Storage::disk('local')->put('incoming-documents/x.exe', 'MZ');
+
+    app(TransactionService::class)->storePieceJointeFromPath(
+        $transaction,
+        Storage::disk('local')->path('incoming-documents/x.exe'),
+        'virus.exe',
+        'application/x-msdownload',
+    );
+})->throws(InvalidArgumentException::class, 'Type de fichier non autorisé');
+
+it('storePieceJointeFromPath remplace la pièce jointe précédente', function () {
+    Storage::fake('local');
+    $transaction = Transaction::factory()->create();
+
+    // Première pièce jointe via la méthode existante
+    $file1 = UploadedFile::fake()->create('ancienne.pdf', 100, 'application/pdf');
+    app(TransactionService::class)->storePieceJointe($transaction, $file1);
+
+    // Remplacer par un fichier depuis disque
+    Storage::disk('local')->put('incoming-documents/nouveau.pdf', 'NOUVEAU');
+    app(TransactionService::class)->storePieceJointeFromPath(
+        $transaction,
+        Storage::disk('local')->path('incoming-documents/nouveau.pdf'),
+        'nouveau.pdf',
+        'application/pdf',
+    );
+
+    $transaction->refresh();
+    expect($transaction->piece_jointe_nom)->toBe('nouveau.pdf')
+        ->and(Storage::disk('local')->get($transaction->piece_jointe_path))->toBe('NOUVEAU');
+});

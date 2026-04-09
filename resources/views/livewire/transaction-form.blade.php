@@ -465,7 +465,7 @@
 
                 @if ($ocrMode && ($pieceJointe || $existingPieceJointeNom))
                     <hr class="my-3">
-                    <div style="height:40vh" x-data="{ pUrl: sessionStorage.getItem('pj-ocr-preview-url') }">
+                    <div style="height:40vh" x-data="{ pUrl: @js($incomingDocumentPreviewUrl) || sessionStorage.getItem('pj-ocr-preview-url') }">
                         <template x-if="pUrl">
                             <div class="position-relative rounded" style="height:100%;overflow:hidden">
                                 <iframe :src="pUrl + '#navpanes=0'" style="position:absolute;top:0;left:0;right:0;bottom:0;border:none;width:100%;height:100%"></iframe>
