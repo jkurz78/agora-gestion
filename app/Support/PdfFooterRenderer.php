@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use Barryvdh\DomPDF\PDF;
+use Dompdf\Dompdf;
 
 /**
  * Inject a uniform textual footer on every page of a DomPDF document.
@@ -27,6 +28,7 @@ use Barryvdh\DomPDF\PDF;
  *   return $pdf->stream($filename);
  *
  * Usage (Blade template) :
+ *
  *   @include('pdf.partials.footer-logos')
  *   // body { margin: 15mm 15mm 25mm 15mm; } — reserve footer space
  *
@@ -60,7 +62,7 @@ final class PdfFooterRenderer
         } catch (\Throwable) {
             return;
         }
-        if (! $domPdf instanceof \Dompdf\Dompdf) {
+        if (! $domPdf instanceof Dompdf) {
             return;
         }
 
