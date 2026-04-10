@@ -37,31 +37,17 @@
                             </div>
                         @endif
 
-                        <form wire:submit="analyzeFile">
-                            <div class="mb-3">
-                                <label class="form-label">Fichier CSV ou XLSX</label>
-                                <input type="file" wire:model="importFile"
-                                       class="form-control @error('importFile') is-invalid @enderror"
-                                       accept=".csv,.txt,.xlsx">
-                                @error('importFile') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                                <div wire:loading wire:target="importFile" class="form-text text-muted">
-                                    <span class="spinner-border spinner-border-sm" role="status"></span>
-                                    Chargement du fichier...
-                                </div>
+                        <div class="mb-3">
+                            <label class="form-label">Fichier CSV ou XLSX</label>
+                            <input type="file" wire:model="importFile"
+                                   class="form-control @error('importFile') is-invalid @enderror"
+                                   accept=".csv,.txt,.xlsx">
+                            @error('importFile') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div wire:loading wire:target="importFile,analyzeFile" class="form-text text-muted mt-2">
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                Analyse en cours...
                             </div>
-                            <div class="d-flex gap-2 align-items-center">
-                                <button type="submit" class="btn btn-primary btn-sm"
-                                        wire:loading.attr="disabled" wire:target="importFile,analyzeFile">
-                                    <span wire:loading.remove wire:target="analyzeFile">
-                                        <i class="bi bi-search"></i> Analyser le fichier
-                                    </span>
-                                    <span wire:loading wire:target="analyzeFile">
-                                        <span class="spinner-border spinner-border-sm" role="status"></span>
-                                        Analyse en cours...
-                                    </span>
-                                </button>
-                            </div>
-                        </form>
+                        </div>
 
                         <hr>
                         <p class="text-muted small mb-1">

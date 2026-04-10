@@ -48,6 +48,11 @@ final class ImportCsvTiers extends Component
         }
     }
 
+    public function updatedImportFile(): void
+    {
+        $this->analyzeFile();
+    }
+
     public function analyzeFile(): void
     {
         $this->parseErrors = [];

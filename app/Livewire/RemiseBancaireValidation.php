@@ -22,7 +22,10 @@ final class RemiseBancaireValidation extends Component
     public function mount(RemiseBancaire $remise): void
     {
         $this->remise = $remise;
-        $this->selectedIds = session('remise_selected_ids', []);
+
+        // Lire depuis la DB (brouillon persisté), fallback session pour rétrocompatibilité
+        $dbIds = Reglement::where('remise_id', $remise->id)->pluck('id')->toArray();
+        $this->selectedIds = count($dbIds) > 0 ? $dbIds : session('remise_selected_ids', []);
     }
 
     public function getCanEditProperty(): bool

@@ -42,23 +42,22 @@
                             </div>
                         @endif
 
-                        <form wire:submit="import">
-                            <div class="mb-3">
-                                <input type="file" wire:model="csvFile"
-                                       class="form-control @error('csvFile') is-invalid @enderror"
-                                       accept=".csv">
-                                @error('csvFile') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        <div class="mb-3">
+                            <input type="file" wire:model="csvFile"
+                                   class="form-control @error('csvFile') is-invalid @enderror"
+                                   accept=".csv">
+                            @error('csvFile') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div wire:loading wire:target="csvFile,import" class="form-text text-muted mt-2">
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                Import en cours...
                             </div>
-                            <div class="d-flex gap-2 align-items-center">
-                                <button type="submit" class="btn btn-primary btn-sm">
-                                    <i class="bi bi-upload"></i> Lancer l'import
-                                </button>
-                                <a href="{{ route('compta.transactions.import.template', ['type' => $type]) }}"
-                                   class="btn btn-outline-secondary btn-sm">
-                                    <i class="bi bi-download"></i> Télécharger le modèle
-                                </a>
-                            </div>
-                        </form>
+                        </div>
+                        <div>
+                            <a href="{{ route('compta.transactions.import.template', ['type' => $type]) }}"
+                               class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-download"></i> Télécharger le modèle
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>

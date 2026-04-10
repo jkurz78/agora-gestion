@@ -5,11 +5,6 @@
         </div>
     @endif
 
-    {{-- Header --}}
-    <div class="mb-4">
-        <h1 class="mb-0">Tableau de bord</h1>
-    </div>
-
     {{-- Row 1: Solde général + Comptes bancaires --}}
     <div class="row mb-4">
         <div class="col-md-4">
@@ -29,7 +24,7 @@
         <div class="col-md-8">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-bank"></i> Comptes bancaires</h5>
+                    <h5 class="mb-0"><a href="{{ route('compta.banques.comptes.index') }}" class="text-decoration-none text-dark"><i class="bi bi-bank"></i> Comptes bancaires</a></h5>
                 </div>
                 <div class="card-body d-flex align-items-center">
                     @if ($comptesAvecSolde->isEmpty())
@@ -65,7 +60,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Résumé budget</h5>
+                    <h5 class="mb-0"><a href="{{ route('compta.budget.index') }}" class="text-decoration-none text-dark">Résumé budget</a></h5>
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
@@ -95,7 +90,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">Dernières dépenses</h5>
+                    <h5 class="mb-0"><a href="{{ route('compta.transactions.index') }}" class="text-decoration-none text-dark">Dernières dépenses</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -128,7 +123,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">Dernières recettes</h5>
+                    <h5 class="mb-0"><a href="{{ route('compta.transactions.index') }}" class="text-decoration-none text-dark">Dernières recettes</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -165,7 +160,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">Derniers dons</h5>
+                    <h5 class="mb-0"><a href="{{ route('compta.dons.index') }}" class="text-decoration-none text-dark">Derniers dons</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -198,26 +193,89 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0">Membres sans cotisation</h5>
+                    <h5 class="mb-0"><a href="{{ route('compta.cotisations.index') }}" class="text-decoration-none text-dark"><i class="bi bi-person-check"></i> Dernières adhésions</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-striped mb-0">
                             <thead>
                                 <tr>
-                                    <th>Nom</th>
-                                    <th>Prénom</th>
+                                    <th>Date</th>
+                                    <th>Adhérent</th>
+                                    <th class="text-end">Montant</th>
                                 </tr>
                             </thead>
                             <tbody style="color:#555">
-                                @forelse ($membresSansCotisation as $membre)
+                                @forelse ($dernieresAdhesions as $tx)
                                     <tr>
-                                        <td class="small">{{ $membre->nom }}</td>
-                                        <td class="small">{{ $membre->prenom }}</td>
+                                        <td class="small text-nowrap">{{ $tx->date->format('d/m/Y') }}</td>
+                                        <td class="small">{{ $tx->tiers?->displayName() ?? '—' }}</td>
+                                        <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $tx->montant_total, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="2" class="text-muted text-center">Tous les membres ont cotisé.</td>
+                                        <td colspan="3" class="text-muted text-center">Aucune adhésion récente.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Row 5: Opérations (en cours / à venir) --}}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><a href="{{ route('gestion.operations') }}" class="text-decoration-none text-dark"><i class="bi bi-calendar-event"></i> Opérations en cours</a></h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Activité</th>
+                                    <th>Type</th>
+                                    <th>Opération</th>
+                                    <th>Période</th>
+                                    <th>Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody style="color:#555">
+                                @forelse ($operations as $op)
+                                    @php
+                                        $scNom = $op->typeOperation?->sousCategorie?->nom ?? '—';
+                                        $typeNom = $op->typeOperation?->nom ?? '—';
+
+                                        $debut = $op->date_debut?->format('d/m/Y') ?? '?';
+                                        $fin = $op->date_fin?->format('d/m/Y') ?? '…';
+                                        $periode = "{$debut} → {$fin}";
+
+                                        if ($op->date_debut && $op->date_debut->isFuture()) {
+                                            $days = (int) now()->diffInDays($op->date_debut);
+                                            $badge = ["Dans {$days} j.", 'bg-info'];
+                                        } else {
+                                            $badge = ['En cours', 'bg-success'];
+                                        }
+                                    @endphp
+                                    <tr>
+                                        <td class="small text-muted">{{ $scNom }}</td>
+                                        <td class="small">{{ $typeNom }}</td>
+                                        <td>
+                                            <a href="{{ route('gestion.operations.show', $op) }}" class="text-decoration-none">
+                                                {{ $op->nom }}
+                                            </a>
+                                            <span class="text-muted small">({{ $op->participants_count }})</span>
+                                        </td>
+                                        <td class="small text-nowrap">{{ $periode }}</td>
+                                        <td><span class="badge {{ $badge[1] }}">{{ $badge[0] }}</span></td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-muted text-center">Aucune opération en cours.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

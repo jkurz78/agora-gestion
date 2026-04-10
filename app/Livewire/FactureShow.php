@@ -194,11 +194,24 @@ final class FactureShow extends Component
             $this->encaissementCompteId = $comptesDestination->first()->id;
         }
 
+        // Opérations liées via transactions
+        $operationIds = TransactionLigne::whereIn(
+            'transaction_id',
+            $this->facture->transactions->pluck('id')
+        )->whereNotNull('operation_id')
+            ->distinct()
+            ->pluck('operation_id');
+
+        $operationsLiees = $operationIds->isNotEmpty()
+            ? Operation::whereIn('id', $operationIds)->orderBy('nom')->get()
+            : collect();
+
         return view('livewire.facture-show', [
             'montantRegle' => $montantRegle,
             'isAcquittee' => $isAcquittee,
             'transactionsAEncaisser' => $transactionsAEncaisser,
             'comptesDestination' => $comptesDestination,
+            'operationsLiees' => $operationsLiees,
         ]);
     }
 

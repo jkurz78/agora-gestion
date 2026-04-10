@@ -92,8 +92,5 @@
                 {{ $remise->virement_id !== null ? 'Modifier la remise' : 'Comptabiliser' }}
             </button>
         @endif
-        <a href="{{ route('compta.banques.remises.selection', $remise) }}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Retour
-        </a>
     </div>
 </div>
