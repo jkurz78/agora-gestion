@@ -466,6 +466,14 @@ final class ParticipantShow extends Component
         $this->loadParticipantData();
     }
 
+    #[On('document-uploaded')]
+    public function onDocumentUploaded(): void
+    {
+        $this->editDocuments = Auth::user()?->peut_voir_donnees_sensibles
+            ? $this->getParticipantDocuments($this->participant->id)
+            : [];
+    }
+
     public function getCanEditProperty(): bool
     {
         return Auth::user()->role->canWrite(Espace::Gestion);
