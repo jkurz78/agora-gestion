@@ -51,7 +51,7 @@ final class ParticipantEngagementUpload extends Component
         $dir = "participants/{$participant->id}";
         $originalName = $this->scanFormulaire->getClientOriginalName();
         $extension = $this->scanFormulaire->getClientOriginalExtension();
-        $filename = 'doc-' . now()->format('Y-m-d-His') . '.' . $extension;
+        $filename = 'doc-'.now()->format('Y-m-d-His').'.'.$extension;
 
         $this->scanFormulaire->storeAs($dir, $filename, 'local');
 

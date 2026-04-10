@@ -8,6 +8,8 @@ use App\Enums\Espace;
 use App\Models\IncomingDocument;
 use App\Models\IncomingMailAllowedSender;
 use App\Models\Operation;
+use App\Models\Participant;
+use App\Models\ParticipantDocument;
 use App\Models\Seance;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
@@ -159,18 +161,18 @@ final class IncomingDocumentsList extends Component
         ]);
 
         $doc = IncomingDocument::findOrFail($this->docIdToAssignParticipant);
-        $participant = \App\Models\Participant::findOrFail($this->selectedParticipantId);
+        $participant = Participant::findOrFail($this->selectedParticipantId);
 
         DB::transaction(function () use ($doc, $participant): void {
             $dir = "participants/{$participant->id}";
             $extension = pathinfo($doc->original_filename, PATHINFO_EXTENSION) ?: 'pdf';
-            $filename = 'doc-' . now()->format('Y-m-d-His') . '.' . $extension;
+            $filename = 'doc-'.now()->format('Y-m-d-His').'.'.$extension;
             $finalPath = "{$dir}/{$filename}";
 
             Storage::disk('local')->makeDirectory($dir);
             Storage::disk('local')->move($doc->storage_path, $finalPath);
 
-            \App\Models\ParticipantDocument::create([
+            ParticipantDocument::create([
                 'participant_id' => $participant->id,
                 'label' => $this->assignParticipantLabel,
                 'storage_path' => $finalPath,
@@ -228,7 +230,7 @@ final class IncomingDocumentsList extends Component
                 ? Operation::orderBy('nom')->get()
                 : collect(),
             'participantsForAssign' => $this->selectedParticipantOperationId !== null
-                ? \App\Models\Participant::where('operation_id', $this->selectedParticipantOperationId)
+                ? Participant::where('operation_id', $this->selectedParticipantOperationId)
                     ->with('tiers')
                     ->get()
                     ->sortBy(fn ($p) => $p->tiers?->nom)
