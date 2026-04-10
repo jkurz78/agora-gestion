@@ -8,6 +8,7 @@ use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
+use App\Services\ProvisionService;
 use App\Services\SoldeService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -63,6 +64,11 @@ final class FluxTresorerieBuilder
         $totalDepenses = round((float) Transaction::where('type', 'depense')->forExercice($exercice)->sum('montant_total'), 2);
         $variation = round($totalRecettes - $totalDepenses, 2);
         $soldeTheorique = round($soldeOuverture + $variation, 2);
+
+        // --- Provisions de fin d'exercice ---
+        $provisionService = app(ProvisionService::class);
+        $totalProvisions = $provisionService->totalProvisions($exercice);
+        $totalExtournes = $provisionService->totalExtournes($exercice);
 
         // --- Rapprochement (comptes réels uniquement, pas les comptes système) ---
         $comptesReelsIds = CompteBancaire::where('est_systeme', false)->pluck('id');
@@ -183,6 +189,8 @@ final class FluxTresorerieBuilder
                 'total_depenses' => $totalDepenses,
                 'variation' => $variation,
                 'solde_theorique' => $soldeTheorique,
+                'total_provisions' => $totalProvisions,
+                'total_extournes' => $totalExtournes,
             ],
             'rapprochement' => [
                 'solde_theorique' => $soldeTheorique,

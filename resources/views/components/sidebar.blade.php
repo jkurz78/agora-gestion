@@ -444,6 +444,13 @@ $activeGroup = match(true) {
                             @endif
 
                             <li class="nav-item">
+                                <a href="{{ route('compta.exercices.provisions') }}"
+                                   class="nav-link {{ request()->routeIs('compta.exercices.provisions') ? 'active' : '' }}">
+                                    <i class="bi bi-journal-arrow-down me-1"></i> Écritures de provisions
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
                                 <a href="{{ route('compta.exercices.changer') }}"
                                    class="nav-link {{ request()->routeIs('compta.exercices.changer') ? 'active' : '' }}">
                                     <i class="bi bi-arrow-left-right me-1"></i> Changer d'exercice

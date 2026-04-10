@@ -40,7 +40,7 @@ it('affiche les catégories et sous-catégories', function () {
         ->assertSee('250,00');
 });
 
-it('affiche EXCÉDENT quand recettes > dépenses', function () {
+it('affiche le résultat avec couleur verte quand excédent', function () {
     $catD = Categorie::factory()->depense()->create();
     $catR = Categorie::factory()->recette()->create();
     $scD = SousCategorie::factory()->create(['categorie_id' => $catD->id, 'nom' => 'Frais']);
@@ -54,17 +54,21 @@ it('affiche EXCÉDENT quand recettes > dépenses', function () {
     $r->lignes()->forceDelete();
     TransactionLigne::factory()->create(['transaction_id' => $r->id, 'sous_categorie_id' => $scR->id, 'montant' => 500.00]);
 
-    Livewire::test(RapportCompteResultat::class)->assertSeeHtml('EXC&Eacute;DENT');
+    Livewire::test(RapportCompteResultat::class)
+        ->assertSeeHtml('#2E7D32')
+        ->assertSee('RÉSULTAT');
 });
 
-it('affiche DÉFICIT quand dépenses > recettes', function () {
+it('affiche le résultat avec couleur rouge quand déficit', function () {
     $cat = Categorie::factory()->depense()->create();
     $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Lourdes charges']);
     $d = Transaction::factory()->asDepense()->create(['date' => '2025-11-01', 'saisi_par' => $this->user->id]);
     $d->lignes()->forceDelete();
     TransactionLigne::factory()->create(['transaction_id' => $d->id, 'sous_categorie_id' => $sc->id, 'montant' => 5000.00]);
 
-    Livewire::test(RapportCompteResultat::class)->assertSeeHtml('DÉFICIT');
+    Livewire::test(RapportCompteResultat::class)
+        ->assertSeeHtml('#B5453A')
+        ->assertSee('RÉSULTAT');
 });
 
 it('affiche la barre de budget quand un budget existe', function () {

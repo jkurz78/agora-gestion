@@ -204,6 +204,33 @@
                     </tbody>
                 </table>
 
+                @if(($summary['nbProvisions'] ?? 0) > 0)
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">
+                        <i class="bi bi-journal-arrow-down me-1"></i> Provisions de fin d'exercice
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm mb-0">
+                            <tbody>
+                                @foreach($summary['provisions'] as $p)
+                                <tr>
+                                    <td>{{ $p['libelle'] }}</td>
+                                    <td>{{ $p['sous_categorie_nom'] }}</td>
+                                    <td class="text-end">{{ number_format($p['montant_signe'], 2, ',', ' ') }} €</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-bold">
+                                    <td colspan="2">Impact net provisions</td>
+                                    <td class="text-end">{{ number_format($summary['totalProvisions'], 2, ',', ' ') }} €</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                @endif
+
                 <div class="d-flex justify-content-between mt-3">
                     <button class="btn btn-outline-secondary" wire:click="goToStep(1)"><i class="bi bi-arrow-left"></i> Retour</button>
                     <button class="btn btn-primary" wire:click="suite">Suite <i class="bi bi-arrow-right"></i></button>

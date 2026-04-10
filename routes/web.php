@@ -147,6 +147,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
         Route::view('/exercices/changer', 'exercices.changer')->name('exercices.changer');
         Route::view('/exercices/reouvrir', 'exercices.reouvrir')->name('exercices.reouvrir');
         Route::view('/exercices/audit', 'exercices.audit')->name('exercices.audit');
+        Route::view('/exercices/provisions', 'exercices.provisions')->name('exercices.provisions');
 
         // Shared registrations
         $registerDocumentsEntrants();
