@@ -4,35 +4,46 @@
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
 
-    {{-- Filtres --}}
-    <div class="row g-2 mb-3 align-items-center">
-        <div class="col-md-5">
-            <input
-                type="text"
-                wire:model.live.debounce.300ms="search"
-                class="form-control"
-                placeholder="Rechercher un tiers..."
-            >
+    {{-- Filtres + actions --}}
+    <div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
+        <input type="text" wire:model.live.debounce.300ms="search"
+               class="form-control form-control-sm" style="max-width:220px;"
+               placeholder="Rechercher un tiers…">
+        <select wire:model.live="filtre" class="form-select form-select-sm" style="max-width:200px;">
+            <option value="">Tous les tiers</option>
+            <option value="depenses">Utilisables en dépenses</option>
+            <option value="recettes">Utilisables en recettes</option>
+        </select>
+        <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox"
+                   wire:model.live="filtreHelloasso" id="filtreHelloasso">
+            <label class="form-check-label small" for="filtreHelloasso">HelloAsso</label>
         </div>
-        <div class="col-md-3">
-            <select wire:model.live="filtre" class="form-select">
-                <option value="">Tous les tiers</option>
-                <option value="depenses">Utilisables en dépenses</option>
-                <option value="recettes">Utilisables en recettes</option>
-            </select>
-        </div>
-        <div class="col-md-auto d-flex align-items-center">
-            <div class="form-check mb-0">
-                <input class="form-check-input" type="checkbox"
-                       wire:model.live="filtreHelloasso" id="filtreHelloasso">
-                <label class="form-check-label" for="filtreHelloasso">HelloAsso uniquement</label>
+        @if($showActions)
+            <div class="d-flex gap-2 ms-auto align-items-center">
+                @if(auth()->user()->role->canWrite(\App\Enums\Espace::Compta) || auth()->user()->role->canWrite(\App\Enums\Espace::Gestion))
+                    @livewire('import-csv-tiers')
+                @endif
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-download"></i> Exporter
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{{ route('compta.tiers.export', ['format' => 'xlsx']) }}"><i class="bi bi-file-earmark-excel me-1"></i> Excel (.xlsx)</a></li>
+                        <li><a class="dropdown-item" href="{{ route('compta.tiers.export', ['format' => 'csv']) }}"><i class="bi bi-file-earmark-text me-1"></i> CSV</a></li>
+                    </ul>
+                </div>
+                <button class="btn btn-sm btn-primary"
+                        onclick="Livewire.dispatch('open-tiers-form', {prefill: {}})">
+                    <i class="bi bi-plus-lg"></i> Nouveau tiers
+                </button>
             </div>
-        </div>
+        @endif
     </div>
 
     {{-- Tableau --}}
     <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle">
+        <table class="table table-sm table-hover align-middle" style="font-size:.82rem;">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
                     <th>
@@ -69,7 +80,7 @@
                 @forelse ($tiersList as $tiers)
                     <tr>
                         <td class="fw-semibold">
-                            {{ $tiers->type === 'entreprise' ? '🏢' : '👤' }}
+                            <span style="font-size:.65rem;">{{ $tiers->type === 'entreprise' ? '🏢' : '👤' }}</span>
                             {{ $tiers->displayName() }}
                             <x-tiers-info-icon :tiersId="$tiers->id" />
                             @if ($tiers->est_helloasso)

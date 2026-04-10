@@ -50,7 +50,7 @@ it('generates a PDF for a comptabilised remise', function () {
     ]);
     $service->comptabiliser($remise, [$reglement->id]);
 
-    $response = $this->get(route('gestion.remises-bancaires.pdf', $remise));
+    $response = $this->get(route('compta.banques.remises.pdf', $remise));
 
     $response->assertStatus(200);
     $response->assertHeader('content-type', 'application/pdf');
@@ -89,7 +89,7 @@ it('streams PDF inline when mode=inline', function () {
     ]);
     $service->comptabiliser($remise, [$reglement->id]);
 
-    $response = $this->get(route('gestion.remises-bancaires.pdf', ['remise' => $remise->id, 'mode' => 'inline']));
+    $response = $this->get(route('compta.banques.remises.pdf', ['remise' => $remise->id, 'mode' => 'inline']));
 
     $response->assertStatus(200);
     $response->assertHeader('content-type', 'application/pdf');

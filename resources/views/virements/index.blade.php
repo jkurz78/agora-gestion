@@ -1,4 +1,4 @@
 <x-app-layout>
-    <h1 class="mb-4">Virements internes</h1>
+    <x-slot:title>Virements internes</x-slot:title>
     <livewire:virement-interne-list />
 </x-app-layout>

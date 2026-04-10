@@ -1,5 +1,5 @@
 <x-app-layout>
-    <h1 class="mb-4">Catégories</h1>
+    <x-slot:title>Catégories</x-slot:title>
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible">
@@ -15,11 +15,7 @@
     @endif
 
     <div class="mb-3 d-flex gap-2 align-items-center flex-wrap">
-        <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
-                data-bs-target="#addCategorieForm">
-            <i class="bi bi-plus-lg"></i> Ajouter une catégorie
-        </button>
-        <div class="btn-group btn-group-sm ms-auto" role="group" aria-label="Filtre catégories">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Filtre catégories">
             <input type="radio" class="btn-check" name="catFilter" id="catAll" value="all" checked autocomplete="off">
             <label class="btn btn-outline-secondary" for="catAll">Tout</label>
             <input type="radio" class="btn-check" name="catFilter" id="catRecette" value="recette" autocomplete="off">
@@ -27,6 +23,10 @@
             <input type="radio" class="btn-check" name="catFilter" id="catDepense" value="depense" autocomplete="off">
             <label class="btn btn-outline-secondary" for="catDepense">Dépenses</label>
         </div>
+        <button class="btn btn-primary btn-sm ms-auto" type="button" data-bs-toggle="collapse"
+                data-bs-target="#addCategorieForm">
+            <i class="bi bi-plus-lg"></i> Ajouter une catégorie
+        </button>
     </div>
 
     <div class="collapse mb-3" id="addCategorieForm">
@@ -53,7 +53,7 @@
         </div>
     </div>
 
-    <table class="table table-striped table-hover">
+    <table class="table table-sm table-striped table-hover">
         <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
             <tr>
                 <th>Nom</th>

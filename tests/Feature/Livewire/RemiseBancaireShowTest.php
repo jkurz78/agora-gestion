@@ -53,7 +53,7 @@ beforeEach(function () {
 });
 
 it('renders the show page', function () {
-    $this->get(route('gestion.remises-bancaires.show', $this->remise))
+    $this->get(route('compta.banques.remises.show', $this->remise))
         ->assertStatus(200)
         ->assertSeeLivewire(RemiseBancaireShow::class);
 });

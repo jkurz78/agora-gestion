@@ -19,8 +19,8 @@ test('GET /compta/parametres/sous-categories retourne 200', function () {
     $response->assertStatus(200);
 });
 
-test('GET /compta/parametres/comptes-bancaires retourne 200', function () {
-    $response = $this->get('/compta/parametres/comptes-bancaires');
+test('GET /compta/banques/comptes retourne 200', function () {
+    $response = $this->get('/compta/banques/comptes');
     $response->assertStatus(200);
 });
 
@@ -42,13 +42,13 @@ test('POST /compta/parametres/categories redirige vers /compta/parametres/catego
     $response->assertRedirect('/compta/parametres/categories');
 });
 
-test('POST /compta/parametres/comptes-bancaires redirige vers /compta/parametres/comptes-bancaires', function () {
-    $response = $this->post('/compta/parametres/comptes-bancaires', [
+test('POST /compta/banques/comptes redirige vers /compta/banques/comptes', function () {
+    $response = $this->post('/compta/banques/comptes', [
         'nom' => 'Compte Test',
         'solde_initial' => 0,
         'date_solde_initial' => '2025-09-01',
     ]);
-    $response->assertRedirect('/compta/parametres/comptes-bancaires');
+    $response->assertRedirect('/compta/banques/comptes');
 });
 
 test('POST /compta/parametres/utilisateurs redirige vers /compta/parametres/utilisateurs', function () {

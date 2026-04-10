@@ -15,7 +15,7 @@
     {{-- En-tête --}}
     <div class="d-flex justify-content-between align-items-start mb-4">
         <h1 class="mb-0">{{ $remise->libelle }}</h1>
-        <a href="{{ route('gestion.remises-bancaires') }}" class="btn btn-outline-secondary">
+        <a href="{{ route('compta.banques.remises.index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour à la liste
         </a>
     </div>
@@ -116,13 +116,13 @@
     {{-- Actions --}}
     <div class="d-flex gap-2 mt-3">
         @if ($remise->virement_id !== null)
-            <a href="{{ route('gestion.remises-bancaires.pdf', $remise) }}?mode=inline"
+            <a href="{{ route('compta.banques.remises.pdf', $remise) }}?mode=inline"
                class="btn btn-outline-dark" target="_blank">
                 <i class="bi bi-file-pdf"></i> PDF
             </a>
         @endif
         @if (! $verrouille && $this->canEdit)
-            <a href="{{ route('gestion.remises-bancaires.selection', $remise) }}"
+            <a href="{{ route('compta.banques.remises.selection', $remise) }}"
                class="btn btn-outline-secondary">
                 <i class="bi bi-pencil"></i> Modifier
             </a>
@@ -132,7 +132,7 @@
                 <i class="bi bi-trash"></i> Supprimer
             </button>
         @endif
-        <a href="{{ route('gestion.remises-bancaires') }}" class="btn btn-secondary">
+        <a href="{{ route('compta.banques.remises.index') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Retour
         </a>
     </div>

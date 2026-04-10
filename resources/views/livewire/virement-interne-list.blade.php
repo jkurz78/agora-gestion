@@ -8,7 +8,7 @@
 
     {{-- Toolbar --}}
     @if (! $exerciceCloture)
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-end mb-3">
         <button wire:click="$dispatch('open-virement-form', { id: null })"
                 class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg"></i> Nouveau virement

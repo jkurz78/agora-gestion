@@ -10,7 +10,7 @@ test('gestion operations page loads with operation list', function (): void {
     $this->actingAs($user)
         ->get('/gestion/operations')
         ->assertOk()
-        ->assertSee('Gestion des opérations');
+        ->assertSee('Liste des opérations');
 });
 
 test('operations are listed in table', function (): void {

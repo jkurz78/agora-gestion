@@ -1,4 +1,6 @@
 {{-- resources/views/components/operation-breadcrumb.blade.php --}}
+{{-- Navigation breadcrumb is now in the top bar (layout slots).
+     This component only renders contextual info: badge, meta, and action buttons. --}}
 @props([
     'operation' => null,
     'participant' => null,
@@ -7,15 +9,6 @@
 ])
 
 @php
-    // Determine breadcrumb level
-    $level = 1;
-    if ($operation && $participant) {
-        $level = 3;
-    } elseif ($operation) {
-        $level = 2;
-    }
-
-    // Badge colors by sous-catégorie name
     $badgeBg = '#f0f0f0';
     $badgeText = '#555';
     if ($operation?->typeOperation?->sousCategorie) {
@@ -28,50 +21,18 @@
             $badgeText = '#A9014F';
         }
     }
-
-    $linkColor = '#A9014F';
+    $meta = $participant ? ($participantMeta ?? null) : ($operationMeta ?? null);
 @endphp
 
 <div class="d-flex justify-content-between align-items-center mb-2" style="font-size: 13px; min-height: 31px;">
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        {{-- "← Retour" button on levels 2 and 3 --}}
-        @if ($level === 2)
-            <a href="{{ route('gestion.operations') }}" class="text-decoration-none me-2" style="color: {{ $linkColor }};">
-                <i class="bi bi-arrow-left me-1"></i>Retour
-            </a>
-        @elseif ($level === 3)
-            <a href="{{ route('gestion.operations.show', $operation) }}" class="text-decoration-none me-2" style="color: {{ $linkColor }};">
-                <i class="bi bi-arrow-left me-1"></i>Retour
-            </a>
+        @if ($operation && !$participant && $operation->typeOperation?->sousCategorie)
+            <span class="badge rounded-pill" style="background-color: {{ $badgeBg }}; color: {{ $badgeText }}; font-size: 11px;">
+                {{ $operation->typeOperation->sousCategorie->nom }}
+            </span>
         @endif
-
-        {{-- Breadcrumb segments --}}
-        @if ($level === 1)
-            <span class="fw-bold text-dark">Gestion des opérations</span>
-        @elseif ($level === 2)
-            <a href="{{ route('gestion.operations') }}" class="text-decoration-none" style="color: {{ $linkColor }};">Gestion des opérations</a>
-            <span class="text-muted">/</span>
-            <span class="fw-bold text-dark">{{ $operation->nom }}</span>
-
-            @if ($operation->typeOperation?->sousCategorie)
-                <span class="badge rounded-pill" style="background-color: {{ $badgeBg }}; color: {{ $badgeText }}; font-size: 11px;">
-                    {{ $operation->typeOperation->sousCategorie->nom }}
-                </span>
-            @endif
-
-            @if ($operationMeta)
-                <span class="text-muted">{{ $operationMeta }}</span>
-            @endif
-        @elseif ($level === 3)
-            <a href="{{ route('gestion.operations') }}" class="text-decoration-none" style="color: {{ $linkColor }};">Gestion des opérations</a>
-            <span class="text-muted">/</span>
-            <a href="{{ route('gestion.operations.show', $operation) }}" class="text-decoration-none" style="color: {{ $linkColor }};">{{ $operation->nom }}</a>
-            <span class="text-muted">/</span>
-            <span class="fw-bold text-dark">{{ $participant->tiers?->displayName() ?? 'Participant' }}</span>
-
-            @if ($participantMeta)
-                <span class="text-muted">{{ $participantMeta }}</span>
-            @endif
+        @if ($meta)
+            <span class="text-muted">{{ $meta }}</span>
         @endif
     </div>
 

@@ -12,37 +12,30 @@
         </div>
     @endif
 
-    {{-- Barre de création + filtres --}}
-    <div class="row g-3 mb-4 align-items-end">
+    {{-- Filtres + création --}}
+    <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
+        <select wire:model.live="filterStatut" class="form-select form-select-sm" style="max-width:180px;">
+            <option value="">Tous les statuts</option>
+            <option value="brouillon">Brouillon</option>
+            <option value="validee">Validée (toutes)</option>
+            <option value="non_reglee">Non réglée</option>
+            <option value="acquittee">Acquittée</option>
+            <option value="annulee">Annulée</option>
+        </select>
+        <input type="text" wire:model.live.debounce.300ms="filterTiers" class="form-control form-control-sm" style="max-width:220px;" placeholder="Rechercher un tiers…">
+
         @if($this->canEdit)
-        <div class="col-md-4">
-            <label class="form-label">Nouvelle facture</label>
-            <div class="d-flex gap-2">
-                <div class="flex-grow-1">
+            <div class="d-flex gap-2 align-items-center ms-auto">
+                <label class="form-label mb-0 small text-muted text-nowrap">Tiers à facturer</label>
+                <div style="min-width:220px;">
                     <livewire:tiers-autocomplete wire:model="newFactureTiersId" filtre="recettes" />
                     @error('newFactureTiersId') <div class="text-danger small">{{ $message }}</div> @enderror
                 </div>
-                <button wire:click="creer" class="btn btn-primary align-self-start">
-                    <i class="bi bi-plus-lg"></i> Créer
+                <button wire:click="creer" class="btn btn-primary btn-sm text-nowrap">
+                    <i class="bi bi-plus-lg"></i> Créer facture
                 </button>
             </div>
-        </div>
         @endif
-        <div class="col-md-3">
-            <label class="form-label">Statut</label>
-            <select wire:model.live="filterStatut" class="form-select">
-                <option value="">Tous</option>
-                <option value="brouillon">Brouillon</option>
-                <option value="validee">Validée (toutes)</option>
-                <option value="non_reglee">Non réglée</option>
-                <option value="acquittee">Acquittée</option>
-                <option value="annulee">Annulée</option>
-            </select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Recherche tiers</label>
-            <input type="text" wire:model.live.debounce.300ms="filterTiers" class="form-control" placeholder="Nom, prénom, entreprise...">
-        </div>
     </div>
 
     {{-- Liste des factures --}}

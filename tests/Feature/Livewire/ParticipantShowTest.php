@@ -40,14 +40,14 @@ beforeEach(function () {
     ]);
 });
 
-it('renders participant show with participant name', function () {
+it('renders participant show', function () {
     Livewire::test(ParticipantShow::class, [
         'operation' => $this->operation,
         'participant' => $this->participant,
     ])
         ->assertOk()
-        ->assertSee('Marie')
-        ->assertSee('DUPONT');
+        ->assertSet('editPrenom', 'Marie')
+        ->assertSet('editNom', 'DUPONT');
 });
 
 it('can save coordonnées changes and shows success message', function () {
@@ -68,12 +68,11 @@ it('can save coordonnées changes and shows success message', function () {
     expect($this->tiers->email)->toBe('jean@example.com');
 });
 
-it('shows breadcrumb with operation name', function () {
+it('shows save button', function () {
     Livewire::test(ParticipantShow::class, [
         'operation' => $this->operation,
         'participant' => $this->participant,
     ])
-        ->assertSee($this->operation->nom)
         ->assertSee('Enregistrer');
 });
 

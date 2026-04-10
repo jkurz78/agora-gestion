@@ -1,29 +1,10 @@
 <div>
-    {{-- Header --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="mb-0">Gestion des operations</h1>
-        @if($this->canEdit)
-            <button class="btn btn-sm text-white" style="background-color:#A9014F"
-                    wire:click="openCreateModal">
-                <i class="bi bi-plus-lg me-1"></i> Nouvelle operation
-            </button>
-        @endif
-    </div>
-
-    {{-- Filters --}}
+    {{-- Filters + action --}}
     <div class="d-flex align-items-center gap-3 mb-3">
         <div>
             <select class="form-select form-select-sm" wire:model.live="filterExercice">
                 @foreach($exerciceYears as $year)
                     <option value="{{ $year }}">{{ $exerciceService->label($year) }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div>
-            <select class="form-select form-select-sm" wire:model.live="filterTypeId">
-                <option value="">Tous les types</option>
-                @foreach($typeOperations as $type)
-                    <option value="{{ $type->id }}">{{ $type->nom }}</option>
                 @endforeach
             </select>
         </div>
@@ -36,116 +17,124 @@
             </select>
         </div>
         <div class="text-muted small">
-            {{ $operations->count() }} operation{{ $operations->count() > 1 ? 's' : '' }}
+            {{ $operations->count() }} opération{{ $operations->count() > 1 ? 's' : '' }}
         </div>
+        @if($this->canEdit)
+            <button class="btn btn-sm btn-primary ms-auto"
+                    wire:click="openCreateModal">
+                <i class="bi bi-plus-lg me-1"></i> Nouvelle opération
+            </button>
+        @endif
     </div>
 
-    {{-- Table --}}
+    {{-- Vue hiérarchique --}}
     @if($operations->isEmpty())
         <div class="text-center py-5 text-muted">
             <i class="bi bi-calendar-x fs-1 d-block mb-2"></i>
-            Aucune operation pour cet exercice
+            Aucune opération pour cet exercice
         </div>
     @else
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                    <tr>
-                        <th>Type</th>
-                        <th>Operation</th>
-                        <th>Periode</th>
-                        <th class="text-center">Participants</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($operations as $op)
-                        @php
-                            $now = \Carbon\Carbon::now();
-                            $debut = $op->date_debut;
-                            $fin = $op->date_fin;
-                            $contextLabel = null;
-                            $contextColor = '#6c757d';
+        @foreach($grouped as $sousCatNom => $typeGroups)
+            @php
+                // Badge couleur par sous-catégorie
+                if (str_contains($sousCatNom, 'Parcours')) {
+                    $catBg = '#e8f0fe'; $catText = '#1a56db';
+                } elseif (str_contains($sousCatNom, 'Formation')) {
+                    $catBg = '#fce8f0'; $catText = '#A9014F';
+                } else {
+                    $catBg = '#f0f0f0'; $catText = '#555';
+                }
+                $catCount = $typeGroups->flatten()->count();
+            @endphp
 
-                            if ($debut && $fin) {
-                                if ($now->lt($debut)) {
-                                    $days = (int) $now->diffInDays($debut);
-                                    $contextLabel = "Debute dans {$days} jour" . ($days > 1 ? 's' : '');
-                                    $contextColor = '#198754';
-                                } elseif ($now->lte($fin)) {
-                                    $days = (int) $debut->diffInDays($now);
-                                    $contextLabel = "En cours depuis {$days} jour" . ($days > 1 ? 's' : '');
-                                    $contextColor = '#0d6efd';
-                                } else {
-                                    $daysSinceEnd = (int) $fin->diffInDays($now);
-                                    if ($daysSinceEnd > 60) {
-                                        $months = (int) $fin->diffInMonths($now);
-                                        $contextLabel = "Terminee depuis {$months} mois";
-                                    } else {
-                                        $contextLabel = "Terminee depuis {$daysSinceEnd} jour" . ($daysSinceEnd > 1 ? 's' : '');
+            {{-- Niveau 1 : sous-catégorie --}}
+            <div class="mb-4">
+                <div class="d-flex align-items-center gap-2 mb-2 pb-1" style="border-bottom: 2px solid {{ $catBg }};">
+                    <span class="badge rounded-pill px-2 py-1" style="background-color:{{ $catBg }}; color:{{ $catText }}; font-size: .8rem;">
+                        {{ $sousCatNom }}
+                    </span>
+                    <span class="text-muted small">{{ $catCount }} opération{{ $catCount > 1 ? 's' : '' }}</span>
+                </div>
+
+                @foreach($typeGroups as $typeNom => $ops)
+                    {{-- Niveau 2 : type d'opération --}}
+                    <div class="ms-3 mb-3">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-collection text-muted" style="font-size: .75rem;"></i>
+                            <span class="fw-semibold text-dark" style="font-size: .85rem;">{{ $typeNom }}</span>
+                            <span class="text-muted small">({{ $ops->count() }})</span>
+                        </div>
+
+                        {{-- Niveau 3 : opérations --}}
+                        <div class="ms-3">
+                            @foreach($ops as $op)
+                                @php
+                                    $now = \Carbon\Carbon::now();
+                                    $debut = $op->date_debut;
+                                    $fin = $op->date_fin;
+                                    $contextLabel = null;
+                                    $contextColor = '#6c757d';
+
+                                    if ($debut && $fin) {
+                                        if ($now->lt($debut)) {
+                                            $days = (int) $now->diffInDays($debut);
+                                            $contextLabel = "Dans {$days} j";
+                                            $contextColor = '#198754';
+                                        } elseif ($now->lte($fin)) {
+                                            $days = (int) $debut->diffInDays($now);
+                                            $contextLabel = "En cours";
+                                            $contextColor = '#0d6efd';
+                                        } else {
+                                            $daysSinceEnd = (int) $fin->diffInDays($now);
+                                            $contextLabel = $daysSinceEnd > 60
+                                                ? "Terminée il y a " . (int) $fin->diffInMonths($now) . " mois"
+                                                : "Terminée il y a {$daysSinceEnd} j";
+                                        }
                                     }
-                                }
-                            }
 
-                            // Badge colors by sous-categorie
-                            $sousCatNom = $op->typeOperation?->sousCategorie?->nom ?? '';
-                            if (str_contains($sousCatNom, 'Parcours')) {
-                                $badgeBg = '#e8f0fe';
-                                $badgeText = '#1a56db';
-                            } elseif (str_contains($sousCatNom, 'Formation')) {
-                                $badgeBg = '#fce8f0';
-                                $badgeText = '#A9014F';
-                            } else {
-                                $badgeBg = '#f0f0f0';
-                                $badgeText = '#555';
-                            }
+                                    $isCloturee = $op->statut === \App\Enums\StatutOperation::Cloturee;
+                                @endphp
+                                <div class="d-flex align-items-center gap-3 py-2 px-2 rounded {{ !$loop->last ? 'border-bottom' : '' }}"
+                                     style="cursor:pointer;{{ $isCloturee ? 'opacity:0.5;' : '' }}"
+                                     onclick="window.location='{{ route('gestion.operations.show', $op) }}';"
+                                     onmouseover="this.style.background='rgba(114,34,129,.04)'"
+                                     onmouseout="this.style.background='transparent'">
 
-                            $isCloturee = $op->statut === \App\Enums\StatutOperation::Cloturee;
-                        @endphp
-                        <tr style="cursor:pointer;{{ $isCloturee ? 'opacity:0.5;' : '' }}"
-                            onclick="window.location='{{ route('gestion.operations.show', $op) }}'">
-                            <td data-sort="{{ $op->typeOperation?->nom ?? '' }}">
-                                <span class="badge rounded-pill px-2 py-1 small"
-                                      style="background-color:{{ $badgeBg }};color:{{ $badgeText }}">
-                                    {{ $op->typeOperation?->nom ?? 'Sans type' }}
-                                </span>
-                            </td>
-                            <td data-sort="{{ $op->nom }}">
-                                <span class="fw-semibold">{{ $op->nom }}</span>
-                            </td>
-                            <td data-sort="{{ $debut?->format('Y-m-d') ?? '' }}">
-                                @if($contextLabel)
-                                    <small style="color:{{ $contextColor }}">{{ $contextLabel }}</small><br>
-                                @endif
-                                <small class="text-muted">
-                                    @if($debut && $fin)
-                                        {{ $debut->format('d/m/Y') }} &rarr; {{ $fin->format('d/m/Y') }}
-                                    @else
-                                        &mdash;
+                                    <a href="{{ route('gestion.operations.show', $op) }}" class="fw-semibold text-decoration-none" style="color:#333; min-width:180px;">
+                                        {{ $op->nom }}
+                                    </a>
+
+                                    <small class="text-muted" style="min-width:160px;">
+                                        @if($debut && $fin)
+                                            {{ $debut->format('d/m/Y') }} &rarr; {{ $fin->format('d/m/Y') }}
+                                        @else
+                                            &mdash;
+                                        @endif
+                                    </small>
+
+                                    @if($contextLabel)
+                                        <small class="text-nowrap" style="color:{{ $contextColor }}; min-width:100px;">{{ $contextLabel }}</small>
                                     @endif
-                                </small>
-                            </td>
-                            <td class="text-center" data-sort="{{ $op->participants_count }}">
-                                @if($op->participants_count > 0)
-                                    <span class="badge bg-secondary rounded-pill">{{ $op->participants_count }}</span>
-                                @else
-                                    <span class="text-muted">&mdash;</span>
-                                @endif
-                            </td>
-                            <td class="text-end">
-                                @if($this->canEdit)
-                                    <button class="btn btn-sm btn-outline-secondary"
-                                            wire:click.stop="openEditModal({{ $op->id }})"
-                                            title="Modifier l'opération">
-                                        <i class="bi bi-gear"></i> Modifier
-                                    </button>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
+
+                                    @if($op->participants_count > 0)
+                                        <span class="badge bg-secondary rounded-pill">{{ $op->participants_count }} <i class="bi bi-people"></i></span>
+                                    @endif
+
+                                    @if($this->canEdit)
+                                        <button class="btn btn-sm btn-outline-secondary ms-auto text-nowrap"
+                                                wire:click.stop="openEditModal({{ $op->id }})"
+                                                title="Modifier l'opération"
+                                                onclick="event.stopPropagation()">
+                                            <i class="bi bi-gear"></i>
+                                        </button>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endforeach
     @endif
 
     {{-- Create Modal --}}

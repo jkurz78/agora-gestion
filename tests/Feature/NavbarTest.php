@@ -28,7 +28,7 @@ it('page title is updated', function () {
 
     $response = $this->actingAs($user)->get(route('compta.dashboard'));
 
-    $response->assertSee('Mon Association Comptabilité', false);
+    $response->assertSee('Mon Association', false);
 });
 
 it('login page shows logo and new app name', function () {

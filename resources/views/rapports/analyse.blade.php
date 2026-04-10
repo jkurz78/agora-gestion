@@ -16,7 +16,7 @@
         .pvtTable .toggle { cursor: pointer; color: #3d5473; font-size: 0.9rem; }
     </style>
 
-    <h1 class="mb-4">Analyse financière</h1>
+    <x-slot:title>Analyse financière</x-slot:title>
     <livewire:analyse-pivot mode="financier" />
 
     @push('scripts')

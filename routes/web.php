@@ -12,7 +12,6 @@ use App\Http\Controllers\DroitImagePdfController;
 use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\FormulaireController;
 use App\Http\Controllers\IncomingDocumentsController;
-use App\Http\Controllers\OperationController;
 use App\Http\Controllers\ParticipantDocumentController;
 use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantFichePdfController;
@@ -55,12 +54,9 @@ $registerParametres = function (): void {
         Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
-        Route::resource('comptes-bancaires', CompteBancaireController::class)->except(['show']);
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::view('type-operations', 'parametres.type-operations.index')->name('type-operations.index');
     });
-    Route::view('/helloasso-sync', 'banques.helloasso-sync')->name('helloasso-sync');
-
     // Factures (accessibles depuis les deux espaces)
     Route::view('/factures', 'gestion.factures.index')->name('factures');
     Route::get('/factures/{facture}/edit', function (Facture $facture) {
@@ -106,16 +102,38 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
         })->name('tiers.transactions');
         Route::view('/budget', 'budget.index')->name('budget.index');
         Route::get('/budget/export', BudgetExportController::class)->name('budget.export');
-        Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
-        Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
-            return view('rapprochement.detail', compact('rapprochement'));
-        })->name('rapprochement.detail');
-        Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
-            ->name('rapprochement.pdf');
-        Route::view('/virements', 'virements.index')->name('virements.index');
-        Route::get('comptes-bancaires/{compte}/transactions', function (CompteBancaire $compte) {
-            return view('comptes-bancaires.transactions', compact('compte'));
-        })->name('comptes-bancaires.transactions');
+        // Banques
+        Route::prefix('banques')->name('banques.')->group(function (): void {
+            Route::resource('comptes', CompteBancaireController::class)->except(['show'])->parameters(['comptes' => 'comptesBancaire']);
+            Route::get('comptes/{compte}/transactions', function (CompteBancaire $compte) {
+                return view('comptes-bancaires.transactions', compact('compte'));
+            })->name('comptes.transactions');
+
+            Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
+            Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
+                return view('rapprochement.detail', compact('rapprochement'));
+            })->name('rapprochement.detail');
+            Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
+                ->name('rapprochement.pdf');
+
+            Route::view('/virements', 'virements.index')->name('virements.index');
+
+            Route::view('/remises', 'gestion.remises-bancaires.index')->name('remises.index');
+            Route::get('/remises/{remise}', function (RemiseBancaire $remise) {
+                return view('gestion.remises-bancaires.show', compact('remise'));
+            })->name('remises.show');
+            Route::get('/remises/{remise}/selection', function (RemiseBancaire $remise) {
+                return view('gestion.remises-bancaires.selection', compact('remise'));
+            })->name('remises.selection');
+            Route::get('/remises/{remise}/validation', function (RemiseBancaire $remise) {
+                return view('gestion.remises-bancaires.validation', compact('remise'));
+            })->name('remises.validation');
+            Route::get('/remises/{remise}/pdf', RemiseBancairePdfController::class)
+                ->name('remises.pdf');
+
+            Route::view('/helloasso-sync', 'banques.helloasso-sync')->name('helloasso-sync');
+        });
+
         // Rapports — écrans dédiés
         Route::view('/rapports/compte-resultat', 'rapports.compte-resultat')->name('rapports.compte-resultat');
         Route::view('/rapports/operations', 'rapports.operations')->name('rapports.operations');
@@ -129,9 +147,6 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
         Route::view('/exercices/changer', 'exercices.changer')->name('exercices.changer');
         Route::view('/exercices/reouvrir', 'exercices.reouvrir')->name('exercices.reouvrir');
         Route::view('/exercices/audit', 'exercices.audit')->name('exercices.audit');
-
-        // Operations
-        Route::resource('operations', OperationController::class)->except(['destroy']);
 
         // Shared registrations
         $registerDocumentsEntrants();
@@ -182,20 +197,6 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::cl
         Route::get('/participants/{participant}/documents/{filename}', ParticipantDocumentController::class)
             ->name('participants.documents.download');
 
-        // Remises en banque
-        Route::view('/remises-bancaires', 'gestion.remises-bancaires.index')->name('remises-bancaires');
-        Route::get('/remises-bancaires/{remise}', function (RemiseBancaire $remise) {
-            return view('gestion.remises-bancaires.show', compact('remise'));
-        })->name('remises-bancaires.show');
-        Route::get('/remises-bancaires/{remise}/selection', function (RemiseBancaire $remise) {
-            return view('gestion.remises-bancaires.selection', compact('remise'));
-        })->name('remises-bancaires.selection');
-        Route::get('/remises-bancaires/{remise}/validation', function (RemiseBancaire $remise) {
-            return view('gestion.remises-bancaires.validation', compact('remise'));
-        })->name('remises-bancaires.validation');
-        Route::get('/remises-bancaires/{remise}/pdf', RemiseBancairePdfController::class)
-            ->name('remises-bancaires.pdf');
-
         // Documents prévisionnels (devis / pro forma)
         Route::get('/documents-previsionnels/{document}/pdf', DocumentPrevisionnelPdfController::class)
             ->name('documents-previsionnels.pdf');
@@ -221,11 +222,11 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/cotisations', '/compta/cotisations');
     Route::permanentRedirect('/tiers', '/compta/tiers');
     Route::permanentRedirect('/budget', '/compta/budget');
-    Route::permanentRedirect('/rapprochement', '/compta/rapprochement');
-    Route::permanentRedirect('/virements', '/compta/virements');
+    Route::permanentRedirect('/rapprochement', '/compta/banques/rapprochement');
+    Route::permanentRedirect('/virements', '/compta/banques/virements');
     Route::permanentRedirect('/rapports', '/compta/rapports/compte-resultat');
     Route::permanentRedirect('/membres', '/gestion/adherents');
-    Route::permanentRedirect('/banques/helloasso-sync', '/compta/helloasso-sync');
+    Route::permanentRedirect('/banques/helloasso-sync', '/compta/banques/helloasso-sync');
     Route::permanentRedirect('/exercices/cloture', '/compta/exercices/cloture');
     Route::permanentRedirect('/exercices/changer', '/compta/exercices/changer');
     Route::permanentRedirect('/exercices/reouvrir', '/compta/exercices/reouvrir');

@@ -26,7 +26,7 @@ beforeEach(function () {
 it('renders the facture list component', function () {
     Livewire::test(FactureList::class)
         ->assertStatus(200)
-        ->assertSee('Nouvelle facture');
+        ->assertSee('Créer facture');
 });
 
 it('displays existing factures with correct data', function () {

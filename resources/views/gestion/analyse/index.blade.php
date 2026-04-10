@@ -1,4 +1,5 @@
 <x-app-layout>
+    <x-slot:title>Analyse pivot</x-slot:title>
     {{-- PivotTable.js CDN dependencies --}}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pivottable/2.23.0/pivot.min.css">
     <style>

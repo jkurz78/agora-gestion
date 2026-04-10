@@ -1,5 +1,5 @@
 <x-app-layout>
-    <h1 class="mb-4">Sous-catégories</h1>
+    <x-slot:title>Sous-catégories</x-slot:title>
 
     <livewire:sous-categorie-list />
 </x-app-layout>

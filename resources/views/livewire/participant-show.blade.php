@@ -15,11 +15,10 @@
      }"
      x-on:focusin.once="$nextTick(() => ready = true)"
      x-on:input="if (ready) isDirty = true"
-     x-on:beforeunload.window="if (isDirty) { $event.preventDefault(); $event.returnValue = ''; }"
-     x-on:click="
+     x-on:click.window="
         if (isDirty) {
             const link = $event.target.closest('a[href]');
-            if (link && link.getAttribute('href') !== '#' && link.href.includes('/gestion/operations') && !link.classList.contains('btn-primary') && !link.getAttribute('target')) {
+            if (link && link.getAttribute('href') !== '#' && !link.classList.contains('btn-primary') && !link.getAttribute('target')) {
                 $event.preventDefault();
                 pendingUrl = link.href;
                 showUnsavedModal = true;

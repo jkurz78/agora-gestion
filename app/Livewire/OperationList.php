@@ -168,6 +168,12 @@ final class OperationList extends Component
 
         $operations = $operationsQuery->orderBy('date_debut')->get();
 
+        // Grouper par sous-catégorie → type d'opération
+        $grouped = $operations
+            ->groupBy(fn ($op) => $op->typeOperation?->sousCategorie?->nom ?? 'Sans catégorie')
+            ->map(fn ($ops) => $ops->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type'))
+            ->sortKeys();
+
         $typeOperations = TypeOperation::actif()->orderBy('nom')->get();
 
         // Exercice years for dropdown: from now+1 down to now-3
@@ -176,6 +182,7 @@ final class OperationList extends Component
 
         return view('livewire.operation-list', [
             'operations' => $operations,
+            'grouped' => $grouped,
             'typeOperations' => $typeOperations,
             'exerciceYears' => $exerciceYears,
             'exerciceService' => $exerciceService,

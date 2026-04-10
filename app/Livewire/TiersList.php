@@ -26,6 +26,8 @@ final class TiersList extends Component
 
     public bool $filtreHelloasso = false;
 
+    public bool $showActions = false;
+
     public string $sortBy = 'nom';
 
     public string $sortDir = 'asc';
@@ -105,7 +107,9 @@ final class TiersList extends Component
 
         $dir = $this->sortDir === 'desc' ? 'desc' : 'asc';
         if ($this->sortBy === 'nom') {
-            $query->orderByRaw('COALESCE(entreprise, nom) '.$dir);
+            // Trier par nom d'affichage : entreprise pour les entreprises, nom+prénom pour les particuliers
+            $query->orderByRaw("CASE WHEN type = 'entreprise' THEN entreprise ELSE nom END {$dir}")
+                  ->orderBy('prenom', $dir);
         } else {
             $query->orderBy($this->sortBy, $dir);
         }
