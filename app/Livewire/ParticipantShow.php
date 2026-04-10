@@ -123,8 +123,8 @@ final class ParticipantShow extends Component
     // ── Notes ───────────────────────────────────────────────────
     public string $medNotes = '';
 
-    // ── Engagements (read-only) ─────────────────────────────────
-    public ?string $editDroitImageLabel = null;
+    // ── Engagements ─────────────────────────────────────────────
+    public ?string $editDroitImage = null;
 
     public ?string $editModePaiement = null;
 
@@ -135,6 +135,8 @@ final class ParticipantShow extends Component
     public ?string $editRgpdAccepteAt = null;
 
     public ?string $editFormulaireRempliAt = null;
+
+    public bool $engagementEditable = false;
 
     // ── Documents ───────────────────────────────────────────────
     /** @var array<int, array{name: string, size: int, url: string}> */
@@ -186,6 +188,17 @@ final class ParticipantShow extends Component
             'adresse_par_code_postal' => $this->editAdresseParCodePostal !== '' ? $this->editAdresseParCodePostal : null,
             'adresse_par_ville' => $this->editAdresseParVille !== '' ? $this->editAdresseParVille : null,
         ]);
+
+        // Engagement fields (only if formulaire not already filled online)
+        if ($this->engagementEditable) {
+            $participant->update([
+                'droit_image' => $this->editDroitImage !== '' && $this->editDroitImage !== null
+                    ? $this->editDroitImage : null,
+                'mode_paiement_choisi' => $this->editModePaiement !== '' ? $this->editModePaiement : null,
+                'moyen_paiement_choisi' => $this->editMoyenPaiement !== '' ? $this->editMoyenPaiement : null,
+                'autorisation_contact_medecin' => $this->editAutorisationContactMedecin,
+            ]);
+        }
 
         // Update medical data if user has permission
         if (Auth::user()?->peut_voir_donnees_sensibles) {
@@ -631,13 +644,14 @@ final class ParticipantShow extends Component
         // Notes
         $this->medNotes = $med?->notes ?? '';
 
-        // Engagements (read-only)
-        $this->editDroitImageLabel = $participant->droit_image?->label();
+        // Engagements
+        $this->editDroitImage = $participant->droit_image?->value;
         $this->editModePaiement = $participant->mode_paiement_choisi;
         $this->editMoyenPaiement = $participant->moyen_paiement_choisi;
         $this->editAutorisationContactMedecin = $participant->autorisation_contact_medecin;
         $this->editRgpdAccepteAt = $participant->rgpd_accepte_at?->format('d/m/Y à H:i');
         $this->editFormulaireRempliAt = $participant->formulaireToken?->rempli_at?->format('d/m/Y à H:i');
+        $this->engagementEditable = $participant->formulaireToken?->rempli_at === null;
 
         // Documents
         $this->editDocuments = Auth::user()?->peut_voir_donnees_sensibles
