@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Enums\Espace;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
+use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -19,6 +20,8 @@ final class RemiseBancaireSelection extends Component
     public array $selectedIds = [];
 
     public string $filterOperation = '';
+
+    public string $filterSeance = '';
 
     public string $filterTiers = '';
 
@@ -35,6 +38,26 @@ final class RemiseBancaireSelection extends Component
     public function getCanEditProperty(): bool
     {
         return Auth::user()->role->canWrite(Espace::Gestion);
+    }
+
+    public function updatedFilterOperation(): void
+    {
+        $this->filterSeance = '';
+    }
+
+    public function toggleAll(array $visibleIds): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $allSelected = count(array_intersect($visibleIds, $this->selectedIds)) === count($visibleIds);
+
+        if ($allSelected) {
+            $this->selectedIds = array_values(array_diff($this->selectedIds, $visibleIds));
+        } else {
+            $this->selectedIds = array_values(array_unique(array_merge($this->selectedIds, $visibleIds)));
+        }
     }
 
     public function toggleReglement(int $id): void
@@ -62,13 +85,16 @@ final class RemiseBancaireSelection extends Component
             return;
         }
 
+        app(RemiseBancaireService::class)->enregistrerBrouillon($this->remise, $this->selectedIds);
+
         session(['remise_selected_ids' => $this->selectedIds]);
         $this->redirect(route('compta.banques.remises.validation', $this->remise));
     }
 
     public function render(): View
     {
-        $query = Reglement::with(['participant.tiers', 'seance.operation'])
+        // Base : tous les règlements éligibles (pour les listes de filtres)
+        $baseQuery = Reglement::with(['participant.tiers', 'seance.operation'])
             ->where('mode_paiement', $this->remise->mode_paiement->value)
             ->where('montant_prevu', '>', 0)
             ->where(function ($q) {
@@ -76,18 +102,36 @@ final class RemiseBancaireSelection extends Component
                     ->orWhere('remise_id', $this->remise->id);
             });
 
+        $allReglements = $baseQuery->get();
+
+        // Options de filtre : opérations toujours complètes
+        $operations = $allReglements->map(fn ($r) => $r->seance->operation)->unique('id')->sortBy('nom')->values();
+
+        // Séances : filtrées par opération sélectionnée uniquement
+        $seancesSource = $this->filterOperation !== ''
+            ? $allReglements->filter(fn ($r) => (string) $r->seance->operation->id === $this->filterOperation)
+            : $allReglements;
+        $seances = $seancesSource->map(fn ($r) => $r->seance)->unique('id')->sortBy('numero')->values();
+
+        // Résultats filtrés
+        $reglements = $allReglements;
+
         if ($this->filterOperation !== '') {
-            $query->whereHas('seance.operation', fn ($q) => $q->where('id', $this->filterOperation));
+            $reglements = $reglements->filter(fn ($r) => (string) $r->seance->operation->id === $this->filterOperation);
+        }
+
+        if ($this->filterSeance !== '') {
+            $reglements = $reglements->filter(fn ($r) => (string) $r->seance_id === $this->filterSeance);
         }
 
         if ($this->filterTiers !== '') {
-            $query->whereHas('participant.tiers', fn ($q) => $q
-                ->where('nom', 'like', "%{$this->filterTiers}%")
-                ->orWhere('prenom', 'like', "%{$this->filterTiers}%")
+            $search = mb_strtolower($this->filterTiers);
+            $reglements = $reglements->filter(fn ($r) => str_contains(mb_strtolower($r->participant->tiers->nom ?? ''), $search)
+                || str_contains(mb_strtolower($r->participant->tiers->prenom ?? ''), $search)
             );
         }
 
-        $reglements = $query->get()->sortBy(fn ($r) => [
+        $reglements = $reglements->sortBy(fn ($r) => [
             $r->seance->operation->nom ?? '',
             $r->seance->numero ?? 0,
             $r->participant->tiers->nom ?? '',
@@ -96,13 +140,12 @@ final class RemiseBancaireSelection extends Component
         $totalSelected = $reglements->whereIn('id', $this->selectedIds)->sum('montant_prevu');
         $countSelected = count($this->selectedIds);
 
-        $operations = $reglements->map(fn ($r) => $r->seance->operation)->unique('id')->sortBy('nom')->values();
-
         return view('livewire.remise-bancaire-selection', [
             'reglements' => $reglements,
             'totalSelected' => $totalSelected,
             'countSelected' => $countSelected,
             'operations' => $operations,
+            'seances' => $seances,
         ]);
     }
 }

@@ -74,6 +74,15 @@
                 </div>
             </div>
 
+            @if ($operationsLiees->isNotEmpty())
+            <div class="mb-4 small text-muted">
+                <i class="bi bi-calendar-event me-1"></i> Opérations liées :
+                @foreach ($operationsLiees as $op)
+                    <a href="{{ route('gestion.operations.show', $op) }}" class="text-decoration-none me-2">{{ $op->nom }}</a>
+                @endforeach
+            </div>
+            @endif
+
             @if ($facture->statut !== \App\Enums\StatutFacture::Annulee)
             {{-- Statut de paiement --}}
             <div class="card mb-4">

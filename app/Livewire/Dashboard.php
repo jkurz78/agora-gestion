@@ -7,8 +7,8 @@ namespace App\Livewire;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
+use App\Models\Operation;
 use App\Models\SousCategorie;
-use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
@@ -68,20 +68,41 @@ final class Dashboard extends Component
             ->take(5)
             ->get();
 
-        // Membres sans cotisation pour l'exercice courant
-        // Un "membre" est un tiers ayant déjà eu au moins une ligne de cotisation (tous exercices)
+        // Dernières adhésions (cotisations)
         $cotSousCategorieIds = SousCategorie::where('pour_cotisations', true)->pluck('id');
-        $membresSansCotisation = Tiers::whereHas('transactions', function ($q) use ($cotSousCategorieIds) {
-            $q->whereHas('lignes', fn ($lq) => $lq->whereIn('sous_categorie_id', $cotSousCategorieIds));
-        })
-            ->whereDoesntHave('transactions', function ($q) use ($cotSousCategorieIds, $exercice) {
-                $q->forExercice($exercice)
-                    ->whereHas('lignes', function ($lq) use ($cotSousCategorieIds) {
-                        $lq->whereIn('sous_categorie_id', $cotSousCategorieIds);
-                    });
-            })
-            ->orderBy('nom')
+        $dernieresAdhesions = Transaction::where('type', 'recette')
+            ->forExercice($exercice)
+            ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $cotSousCategorieIds))
+            ->with('tiers')
+            ->latest('date')->latest('id')
+            ->take(5)
             ->get();
+
+        // Opérations de l'exercice (hors terminées)
+        $range = $exerciceService->dateRange($exercice);
+        $operations = Operation::query()
+            ->with(['typeOperation.sousCategorie.categorie'])
+            ->withCount('participants')
+            ->where('statut', '!=', \App\Enums\StatutOperation::Cloturee)
+            ->where(function ($q) use ($range): void {
+                $q->where(function ($inner) use ($range): void {
+                    $inner->whereNotNull('date_debut')
+                        ->whereNotNull('date_fin')
+                        ->where('date_debut', '<=', $range['end']->toDateString())
+                        ->where('date_fin', '>=', $range['start']->toDateString());
+                })->orWhere(function ($inner) use ($range): void {
+                    $inner->whereNotNull('date_debut')
+                        ->whereNull('date_fin')
+                        ->where('date_debut', '<=', $range['end']->toDateString())
+                        ->where('date_debut', '>=', $range['start']->toDateString());
+                });
+            })
+            ->get()
+            ->sortBy([
+                fn ($a, $b) => ($a->typeOperation?->sousCategorie?->nom ?? '') <=> ($b->typeOperation?->sousCategorie?->nom ?? ''),
+                fn ($a, $b) => ($a->typeOperation?->nom ?? '') <=> ($b->typeOperation?->nom ?? ''),
+                fn ($a, $b) => $a->nom <=> $b->nom,
+            ])->values();
 
         // Comptes bancaires avec soldes courants
         $soldeService = app(SoldeService::class);
@@ -100,7 +121,8 @@ final class Dashboard extends Component
             'dernieresDepenses' => $dernieresDepenses,
             'dernieresRecettes' => $dernieresRecettes,
             'derniersDons' => $derniersDons,
-            'membresSansCotisation' => $membresSansCotisation,
+            'dernieresAdhesions' => $dernieresAdhesions,
+            'operations' => $operations,
             'comptesAvecSolde' => $comptesAvecSolde,
         ]);
     }

@@ -8,7 +8,6 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Services\ExerciceService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -36,17 +35,15 @@ it('shows recent donations from transaction_lignes with pour_dons sous-categorie
         ->assertSee('Don test');
 });
 
-it('shows tiers without cotisation for current exercice', function () {
+it('shows recent adhesions on dashboard', function () {
     $compte = CompteBancaire::factory()->create();
     $scCot = SousCategorie::factory()->pourCotisations()->create();
-    $exercice = app(ExerciceService::class)->current();
 
-    $tiersAvec = Tiers::factory()->create(['nom' => 'Avec', 'prenom' => 'Cot']);
     $tx = Transaction::factory()->asRecette()->create([
         'compte_id' => $compte->id,
-        'tiers_id' => $tiersAvec->id,
         'date' => now(),
         'montant_total' => 50.00,
+        'libelle' => 'Adhésion test',
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
@@ -54,21 +51,6 @@ it('shows tiers without cotisation for current exercice', function () {
         'montant' => 50.00,
     ]);
 
-    // Tiers who has had cotisations before but not this exercice
-    $tiersSans = Tiers::factory()->create(['nom' => 'Sans', 'prenom' => 'Cot']);
-    $txOld = Transaction::factory()->asRecette()->create([
-        'compte_id' => $compte->id,
-        'tiers_id' => $tiersSans->id,
-        'date' => now()->subYear(),
-        'montant_total' => 50.00,
-    ]);
-    TransactionLigne::factory()->create([
-        'transaction_id' => $txOld->id,
-        'sous_categorie_id' => $scCot->id,
-        'montant' => 50.00,
-    ]);
-
     Livewire::test(Dashboard::class)
-        ->assertDontSee('Cot AVEC')
-        ->assertSee('SANS');
+        ->assertSee('50,00');
 });

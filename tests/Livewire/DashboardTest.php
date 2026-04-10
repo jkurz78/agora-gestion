@@ -3,7 +3,6 @@
 use App\Livewire\Dashboard;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
-use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -28,7 +27,8 @@ it('renders for authenticated user', function () {
         ->assertSee('Dernières dépenses')
         ->assertSee('Dernières recettes')
         ->assertSee('Derniers dons')
-        ->assertSee('Membres sans cotisation')
+        ->assertSee('Dernières adhésions')
+        ->assertSee('Opérations')
         ->assertSee('Comptes bancaires')
         ->assertSee('Aucun compte bancaire configuré');
 });
@@ -56,46 +56,23 @@ it('displays solde general', function () {
         ->assertSee('1 200,00');
 });
 
-it('shows membres without cotisation', function () {
+it('shows dernieres adhesions', function () {
     $cotSc = SousCategorie::factory()->create(['pour_cotisations' => true]);
 
-    $tiersWithCotisation = Tiers::factory()->membre()->create([
-        'nom' => 'Durand',
-        'prenom' => 'Marie',
-    ]);
-    $txCurrent = Transaction::factory()->asRecette()->create([
-        'tiers_id' => $tiersWithCotisation->id,
+    $tx = Transaction::factory()->asRecette()->create([
         'date' => $this->exercice.'-10-01',
+        'montant_total' => 30.00,
         'saisi_par' => $this->user->id,
     ]);
-    $txCurrent->lignes()->forceDelete();
+    $tx->lignes()->forceDelete();
     TransactionLigne::factory()->create([
-        'transaction_id' => $txCurrent->id,
-        'sous_categorie_id' => $cotSc->id,
-        'montant' => 30.00,
-    ]);
-
-    $tiersSansCotisation = Tiers::factory()->membre()->create([
-        'nom' => 'Martin',
-        'prenom' => 'Pierre',
-    ]);
-    // Martin a une cotisation d'un exercice précédent (il est "membre") mais pas pour l'exercice courant
-    $txPrev = Transaction::factory()->asRecette()->create([
-        'tiers_id' => $tiersSansCotisation->id,
-        'date' => ($this->exercice - 1).'-10-01',
-        'saisi_par' => $this->user->id,
-    ]);
-    $txPrev->lignes()->forceDelete();
-    TransactionLigne::factory()->create([
-        'transaction_id' => $txPrev->id,
+        'transaction_id' => $tx->id,
         'sous_categorie_id' => $cotSc->id,
         'montant' => 30.00,
     ]);
 
     Livewire::test(Dashboard::class)
-        ->assertSee('MARTIN')
-        ->assertSee('Pierre')
-        ->assertDontSee('DURAND');
+        ->assertSee('30,00');
 });
 
 it('displays comptes bancaires with soldes', function () {

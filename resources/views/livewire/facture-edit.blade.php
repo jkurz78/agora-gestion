@@ -121,11 +121,13 @@
                                             </td>
                                             <td class="text-center">
                                                 <button wire:click="moveUp({{ $ligne->id }})"
+                                                        wire:loading.attr="disabled" wire:target="updateLibelle"
                                                         class="btn btn-sm btn-outline-secondary"
                                                         title="Monter">
                                                     <i class="bi bi-arrow-up"></i>
                                                 </button>
                                                 <button wire:click="moveDown({{ $ligne->id }})"
+                                                        wire:loading.attr="disabled" wire:target="updateLibelle"
                                                         class="btn btn-sm btn-outline-secondary"
                                                         title="Descendre">
                                                     <i class="bi bi-arrow-down"></i>
@@ -135,6 +137,7 @@
                                                 @if ($ligne->type === \App\Enums\TypeLigneFacture::Texte)
                                                     <button wire:click="deleteTexte({{ $ligne->id }})"
                                                             wire:confirm="Supprimer cette ligne de texte ?"
+                                                            wire:loading.attr="disabled" wire:target="updateLibelle"
                                                             class="btn btn-sm btn-outline-danger"
                                                             title="Supprimer">
                                                         <i class="bi bi-trash"></i>

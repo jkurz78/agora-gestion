@@ -22,7 +22,7 @@
     <div class="card mb-3">
         <div class="card-body py-2">
             <div class="row g-3 align-items-end">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <label class="form-label small mb-1">Opération</label>
                     <select wire:model.live="filterOperation" class="form-select form-select-sm">
                         <option value="">Toutes</option>
@@ -31,7 +31,19 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Séance</label>
+                    <select wire:model.live="filterSeance" class="form-select form-select-sm">
+                        <option value="">Toutes</option>
+                        @foreach ($seances as $seance)
+                            <option value="{{ $seance->id }}">
+                                S{{ $seance->numero }}
+                                @if ($seance->titre) — {{ $seance->titre }} @endif
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
                     <label class="form-label small mb-1">Participant</label>
                     <input type="text" wire:model.live.debounce.300ms="filterTiers"
                            class="form-control form-control-sm" placeholder="Nom ou prénom…">
@@ -49,8 +61,21 @@
         <div class="table-responsive" style="margin-bottom: 80px;">
             <table class="table table-striped table-hover align-middle">
                 <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                    @php
+                        $visibleIds = $reglements->pluck('id')->toArray();
+                        $allVisibleSelected = count($visibleIds) > 0 && count(array_intersect($visibleIds, $selectedIds)) === count($visibleIds);
+                    @endphp
                     <tr>
-                        <th style="width: 40px;"></th>
+                        <th style="width: 40px;">
+                            @if ($this->canEdit && count($visibleIds) > 0)
+                                <input type="checkbox"
+                                       class="form-check-input"
+                                       wire:key="select-all-{{ $filterOperation }}-{{ $filterSeance }}-{{ count($visibleIds) }}"
+                                       @checked($allVisibleSelected)
+                                       wire:click="toggleAll({{ json_encode($visibleIds) }})"
+                                       title="Tout sélectionner / désélectionner">
+                            @endif
+                        </th>
                         <th>Participant</th>
                         <th>Opération</th>
                         <th>Séance</th>
@@ -92,7 +117,12 @@
     @endif
 
     {{-- Barre de pied fixe --}}
-    <div class="fixed-bottom bg-white border-top shadow-sm py-2 px-4" style="z-index: 1040; margin-bottom: 32px;">
+    <style>
+        @media (min-width: 992px) {
+            #selectionFooter { left: 220px; }
+        }
+    </style>
+    <div class="fixed-bottom bg-white border-top shadow-sm py-2 px-4" style="z-index: 1040; margin-bottom: 32px;" id="selectionFooter">
         <div class="container-fluid d-flex justify-content-between align-items-center">
             <div>
                 <strong>{{ $countSelected }}</strong> règlement{{ $countSelected > 1 ? 's' : '' }} sélectionné{{ $countSelected > 1 ? 's' : '' }}

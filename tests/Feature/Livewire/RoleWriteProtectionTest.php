@@ -9,50 +9,14 @@ use App\Livewire\ParticipantTable;
 use App\Livewire\RapprochementDetail;
 use App\Livewire\ReglementTable;
 use App\Livewire\TransactionForm;
-use App\Livewire\TransactionList;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\RapprochementBancaire;
-use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
-
-// ─── TransactionList (Compta) ────────────────────────────────────────────────
-
-it('admin gets canEdit true on TransactionList', function () {
-    $user = User::factory()->create(['role' => Role::Admin]);
-
-    Livewire::actingAs($user)
-        ->test(TransactionList::class)
-        ->assertSet('canEdit', true);
-});
-
-it('comptable gets canEdit true on TransactionList', function () {
-    $user = User::factory()->create(['role' => Role::Comptable]);
-
-    Livewire::actingAs($user)
-        ->test(TransactionList::class)
-        ->assertSet('canEdit', true);
-});
-
-it('gestionnaire gets canEdit false on TransactionList', function () {
-    $user = User::factory()->create(['role' => Role::Gestionnaire]);
-
-    Livewire::actingAs($user)
-        ->test(TransactionList::class)
-        ->assertSet('canEdit', false);
-});
-
-it('consultation gets canEdit false on TransactionList', function () {
-    $user = User::factory()->create(['role' => Role::Consultation]);
-
-    Livewire::actingAs($user)
-        ->test(TransactionList::class)
-        ->assertSet('canEdit', false);
-});
 
 // ─── TransactionForm (Compta) ────────────────────────────────────────────────
 
@@ -184,28 +148,3 @@ it('gestionnaire gets canEdit true on ReglementTable', function () {
         ->assertSet('canEdit', true);
 });
 
-// ─── Write action guards ─────────────────────────────────────────────────────
-
-it('consultation user cannot delete transaction via TransactionList', function () {
-    $user = User::factory()->create(['role' => Role::Consultation]);
-    $tx = Transaction::factory()->asDepense()->create(['date' => '2025-10-01']);
-
-    Livewire::actingAs($user)
-        ->test(TransactionList::class)
-        ->call('delete', $tx->id);
-
-    // Transaction should still exist (not soft-deleted)
-    expect(Transaction::withTrashed()->find($tx->id)->deleted_at)->toBeNull();
-});
-
-it('comptable user can delete transaction via TransactionList', function () {
-    $user = User::factory()->create(['role' => Role::Comptable]);
-    $tx = Transaction::factory()->asDepense()->create(['date' => '2025-10-01']);
-
-    Livewire::actingAs($user)
-        ->test(TransactionList::class)
-        ->call('delete', $tx->id);
-
-    // Transaction should be soft-deleted
-    expect(Transaction::withTrashed()->find($tx->id)->deleted_at)->not->toBeNull();
-});

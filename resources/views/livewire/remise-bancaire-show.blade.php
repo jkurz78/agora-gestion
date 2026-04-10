@@ -65,52 +65,93 @@
         </div>
     </div>
 
-    {{-- Tableau des transactions --}}
-    @if ($transactions->isEmpty())
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i> Aucune transaction comptable. Cette remise est en brouillon.
-        </div>
-    @else
-        <div class="table-responsive">
-            <table class="table table-striped align-middle">
-                <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                    <tr>
-                        <th>N°</th>
-                        <th>Référence</th>
-                        <th>N° pièce</th>
-                        <th>Participant</th>
-                        <th>Opération</th>
-                        <th>Séance</th>
-                        <th class="text-end">Montant</th>
-                    </tr>
-                </thead>
-                <tbody style="color:#555">
-                    @foreach ($transactions as $index => $transaction)
+    {{-- Brouillon : tableau des règlements --}}
+    @if ($isBrouillon)
+        @if ($reglements->isEmpty())
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Aucun règlement sélectionné. Cliquez sur « Modifier » pour ajouter des règlements.
+            </div>
+        @else
+            <h6 class="text-muted mb-2"><i class="bi bi-list-check"></i> Règlements sélectionnés</h6>
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
-                            <td class="small">{{ $index + 1 }}</td>
-                            <td class="small fw-semibold">{{ $transaction->reference }}</td>
-                            <td class="small">{{ $transaction->numero_piece ?? '—' }}</td>
-                            <td class="small">{{ $transaction->tiers?->displayName() ?? '—' }}</td>
-                            <td class="small">{{ $transaction->lignes->first()?->operation?->nom ?? '—' }}</td>
-                            <td class="small">
-                                @if ($transaction->lignes->first()?->seance)
-                                    S{{ $transaction->lignes->first()->seance }}
-                                @else
-                                    —
-                                @endif
-                            </td>
-                            <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $transaction->montant_total, 2, ',', ' ') }} €</td>
+                            <th>N°</th>
+                            <th>Participant</th>
+                            <th>Opération</th>
+                            <th>Séance</th>
+                            <th class="text-end">Montant</th>
                         </tr>
-                    @endforeach
-                </tbody>
-                <tfoot>
-                    <tr class="fw-bold">
-                        <td colspan="6" class="text-end">Total</td>
-                        <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
+                    </thead>
+                    <tbody style="color:#555">
+                        @foreach ($reglements as $index => $reglement)
+                            <tr>
+                                <td class="small">{{ $index + 1 }}</td>
+                                <td class="small">{{ $reglement->participant->tiers->displayName() }}</td>
+                                <td class="small">{{ $reglement->seance->operation->nom }}</td>
+                                <td class="small">S{{ $reglement->seance->numero }}</td>
+                                <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $reglement->montant_prevu, 2, ',', ' ') }} €</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold">
+                            <td colspan="4" class="text-end">Total</td>
+                            <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        @endif
+    @else
+        {{-- Comptabilisée : tableau des transactions --}}
+        @if ($transactions->isEmpty())
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Aucune transaction comptable.
+            </div>
+        @else
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                        <tr>
+                            <th>N°</th>
+                            <th>Référence</th>
+                            <th>N° pièce</th>
+                            <th>Participant</th>
+                            <th>Opération</th>
+                            <th>Séance</th>
+                            <th class="text-end">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody style="color:#555">
+                        @foreach ($transactions as $index => $transaction)
+                            <tr>
+                                <td class="small">{{ $index + 1 }}</td>
+                                <td class="small fw-semibold">{{ $transaction->reference }}</td>
+                                <td class="small">{{ $transaction->numero_piece ?? '—' }}</td>
+                                <td class="small">{{ $transaction->tiers?->displayName() ?? '—' }}</td>
+                                <td class="small">{{ $transaction->lignes->first()?->operation?->nom ?? '—' }}</td>
+                                <td class="small">
+                                    @if ($transaction->lignes->first()?->seance)
+                                        S{{ $transaction->lignes->first()->seance }}
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $transaction->montant_total, 2, ',', ' ') }} €</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold">
+                            <td colspan="6" class="text-end">Total</td>
+                            <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        @endif
     @endif
 
     {{-- Actions --}}

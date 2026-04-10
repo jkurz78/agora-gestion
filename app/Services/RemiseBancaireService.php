@@ -41,6 +41,26 @@ final class RemiseBancaireService
         });
     }
 
+    public function enregistrerBrouillon(RemiseBancaire $remise, array $reglementIds): void
+    {
+        DB::transaction(function () use ($remise, $reglementIds) {
+            // Détacher les règlements qui ne sont plus sélectionnés
+            Reglement::where('remise_id', $remise->id)
+                ->whereNotIn('id', $reglementIds)
+                ->update(['remise_id' => null]);
+
+            // Attacher les nouveaux règlements sélectionnés
+            if (count($reglementIds) > 0) {
+                Reglement::whereIn('id', $reglementIds)
+                    ->where(function ($q) use ($remise) {
+                        $q->whereNull('remise_id')
+                            ->orWhere('remise_id', $remise->id);
+                    })
+                    ->update(['remise_id' => $remise->id]);
+            }
+        });
+    }
+
     public function comptabiliser(RemiseBancaire $remise, array $reglementIds): void
     {
         if ($remise->virement_id !== null) {

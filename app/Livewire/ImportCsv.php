@@ -49,6 +49,11 @@ final class ImportCsv extends Component
         }
     }
 
+    public function updatedCsvFile(): void
+    {
+        $this->import();
+    }
+
     public function import(): void
     {
         $this->validate();
