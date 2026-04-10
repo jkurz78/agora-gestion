@@ -115,6 +115,11 @@ final class Participant extends Model
         return $this->hasMany(DocumentPrevisionnel::class);
     }
 
+    public function documents(): HasMany
+    {
+        return $this->hasMany(ParticipantDocument::class);
+    }
+
     protected static function booted(): void
     {
         self::deleting(function (Participant $participant) {
