@@ -478,7 +478,10 @@ final class ParticipantShow extends Component
         $hasParcours = $typeOp?->formulaire_parcours_therapeutique && $canSeeSensible;
         $hasPrescripteur = (bool) $typeOp?->formulaire_prescripteur;
         $hasEngagements = $typeOp?->formulaire_parcours_therapeutique || $typeOp?->formulaire_droit_image;
-        $hasDocuments = $canSeeSensible && $typeOp?->formulaire_parcours_therapeutique;
+        $hasDocuments = $canSeeSensible && (
+            $typeOp?->formulaire_parcours_therapeutique
+            || \App\Models\ParticipantDocument::where('participant_id', $this->participant->id)->exists()
+        );
 
         $this->operation->loadMissing('typeOperation.tarifs');
 
@@ -575,6 +578,24 @@ final class ParticipantShow extends Component
             ]);
         }
 
+        // Documents participant (scans formulaires papier, etc.)
+        $participantDocs = \App\Models\ParticipantDocument::where('participant_id', $this->participant->id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        foreach ($participantDocs as $doc) {
+            $timeline->push([
+                'date' => $doc->created_at,
+                'type' => 'document_attache',
+                'categorie' => 'document',
+                'icon' => 'bi-paperclip',
+                'color' => 'secondary',
+                'description' => "Document : {$doc->label}",
+                'detail' => "Source : {$doc->source}",
+                'copyable' => null,
+            ]);
+        }
+
         $timeline = $timeline->sortByDesc('date')->values();
 
         return view('livewire.participant-show', [
@@ -665,24 +686,25 @@ final class ParticipantShow extends Component
     }
 
     /**
-     * @return array<int, array{name: string, size: int, url: string}>
+     * @return array<int, array{id: int, name: string, label: string, size: int, url: string}>
      */
     private function getParticipantDocuments(int $participantId): array
     {
-        $dir = "participants/{$participantId}";
-        if (! Storage::disk('local')->exists($dir)) {
-            return [];
-        }
-
-        return collect(Storage::disk('local')->files($dir))
-            ->map(fn (string $path) => [
-                'name' => basename($path),
-                'size' => Storage::disk('local')->size($path),
+        return \App\Models\ParticipantDocument::where('participant_id', $participantId)
+            ->orderByDesc('created_at')
+            ->get()
+            ->filter(fn ($doc) => Storage::disk('local')->exists($doc->storage_path))
+            ->map(fn ($doc) => [
+                'id' => $doc->id,
+                'name' => $doc->original_filename,
+                'label' => $doc->label,
+                'size' => Storage::disk('local')->size($doc->storage_path),
                 'url' => route('gestion.participants.documents.download', [
                     'participant' => $participantId,
-                    'filename' => basename($path),
+                    'filename' => basename($doc->storage_path),
                 ]),
             ])
+            ->values()
             ->toArray();
     }
 
