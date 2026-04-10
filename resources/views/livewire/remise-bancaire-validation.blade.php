@@ -9,7 +9,7 @@
     {{-- En-tête --}}
     <div class="d-flex justify-content-between align-items-start mb-4">
         <h1 class="mb-0">Validation de la remise</h1>
-        <a href="{{ route('gestion.remises-bancaires.selection', $remise) }}" class="btn btn-outline-secondary">
+        <a href="{{ route('compta.banques.remises.selection', $remise) }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour à la sélection
         </a>
     </div>
@@ -92,7 +92,7 @@
                 {{ $remise->virement_id !== null ? 'Modifier la remise' : 'Comptabiliser' }}
             </button>
         @endif
-        <a href="{{ route('gestion.remises-bancaires.selection', $remise) }}" class="btn btn-secondary">
+        <a href="{{ route('compta.banques.remises.selection', $remise) }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Retour
         </a>
     </div>

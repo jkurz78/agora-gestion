@@ -1,4 +1,4 @@
 <x-app-layout>
-    <h1 class="mb-4">Compte de résultat</h1>
+    <x-slot:title>Compte de résultat</x-slot:title>
     <livewire:rapport-compte-resultat />
 </x-app-layout>

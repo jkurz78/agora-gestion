@@ -1,5 +1,5 @@
 <x-app-layout>
-    <h1 class="mb-4">Utilisateurs</h1>
+    <x-slot:title>Utilisateurs</x-slot:title>
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible">
@@ -14,7 +14,7 @@
         </div>
     @endif
 
-    <div class="mb-3">
+    <div class="d-flex justify-content-end mb-3">
         <button class="btn btn-primary btn-sm" type="button"
                 data-bs-toggle="collapse" data-bs-target="#addUserForm">
             <i class="bi bi-plus-lg"></i> Ajouter un utilisateur

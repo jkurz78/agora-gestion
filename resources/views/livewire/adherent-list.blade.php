@@ -1,13 +1,5 @@
 <div>
-    {{-- Toolbar --}}
-    <div class="mb-3">
-        <a href="{{ route('compta.transactions.index') }}"
-           class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg"></i> Nouvelle cotisation
-        </a>
-    </div>
-
-    {{-- Barre de filtres --}}
+    {{-- Filtres + action --}}
     <div class="d-flex gap-3 align-items-center mb-3 flex-wrap">
         <div class="btn-group" role="group">
             <input type="radio" class="btn-check" wire:model.live="filtre" value="a_jour" id="filtre-a-jour">
@@ -25,6 +17,11 @@
                class="form-control form-control-sm"
                style="max-width:250px"
                placeholder="Rechercher un adhérent…">
+
+        <a href="{{ route('compta.transactions.index') }}"
+           class="btn btn-primary btn-sm ms-auto">
+            <i class="bi bi-plus-lg"></i> Nouvelle cotisation
+        </a>
     </div>
 
     {{-- Tableau --}}

@@ -30,8 +30,7 @@
     </ul>
 
     @if ($tab === 'configuration')
-        <div class="card">
-            <div class="card-body">
+        <div class="pt-2">
                 <div class="form-check form-switch mb-4">
                     <input class="form-check-input" type="checkbox"
                            id="enabled" wire:click="toggleEnabled"
@@ -151,13 +150,11 @@
                         @endif
                     </div>
                 @endif
-            </div>
         </div>
     @endif
 
     @if ($tab === 'expediteurs')
-        <div class="card">
-            <div class="card-body">
+        <div class="pt-2">
                 <table class="table">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
@@ -202,7 +199,7 @@
                         </button>
                     </div>
                 </div>
-            </div>
         </div>
     @endif
 </div>
+

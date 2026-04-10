@@ -1,5 +1,5 @@
 <x-app-layout>
-    <h1 class="mb-4">Comptes bancaires</h1>
+    <x-slot:title>Comptes bancaires</x-slot:title>
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible">
@@ -14,7 +14,7 @@
         </div>
     @endif
 
-    <div class="mb-3">
+    <div class="d-flex justify-content-end mb-3">
         <button class="btn btn-primary btn-sm" type="button" data-bs-toggle="collapse"
                 data-bs-target="#addCompteForm">
             <i class="bi bi-plus-lg"></i> Ajouter un compte bancaire
@@ -23,7 +23,7 @@
 
     <div class="collapse mb-3" id="addCompteForm">
         <div class="card card-body">
-            <form action="{{ route($espace->value . '.parametres.comptes-bancaires.store') }}" method="POST" class="row g-2 align-items-end">
+            <form action="{{ route('compta.banques.comptes.store') }}" method="POST" class="row g-2 align-items-end">
                 @csrf
                 <div class="col-md-3">
                     <label for="cb_nom" class="form-label">Nom</label>
@@ -98,7 +98,7 @@
                         @endif
                     </td>
                     <td>
-                        <a href="{{ route('compta.comptes-bancaires.transactions', $compte) }}"
+                        <a href="{{ route('compta.banques.comptes.transactions', $compte) }}"
                            class="btn btn-sm btn-outline-secondary"
                            data-bs-toggle="tooltip" title="Voir les transactions">
                             <i class="bi bi-list-ul"></i>
@@ -107,7 +107,7 @@
                             <button type="button" class="btn btn-sm btn-outline-primary"
                                     data-bs-toggle="modal"
                                     data-bs-target="#editCompteModal"
-                                    data-update-url="{{ route($espace->value . '.parametres.comptes-bancaires.update', $compte) }}"
+                                    data-update-url="{{ route('compta.banques.comptes.update', $compte) }}"
                                     data-nom="{{ $compte->nom }}"
                                     data-iban="{{ $compte->iban ?? '' }}"
                                     data-bic="{{ $compte->bic ?? '' }}"
@@ -118,7 +118,7 @@
                                         onclick="fillEditModal(this)">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <form action="{{ route($espace->value . '.parametres.comptes-bancaires.destroy', $compte) }}" method="POST" class="d-inline"
+                            <form action="{{ route('compta.banques.comptes.destroy', $compte) }}" method="POST" class="d-inline"
                                   onsubmit="return confirm('Supprimer ce compte bancaire ?')">
                                 @csrf
                                 @method('DELETE')

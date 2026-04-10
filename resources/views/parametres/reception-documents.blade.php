@@ -1,6 +1,6 @@
 <x-app-layout>
-    <div class="container py-3">
-        <h1 class="mb-4">Réception de documents par mail</h1>
+    <x-slot:title>Réception de documents par mail</x-slot:title>
+    <div>
         <livewire:parametres.incoming-mail-form />
     </div>
 </x-app-layout>

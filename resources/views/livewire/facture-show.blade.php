@@ -12,42 +12,27 @@
         </div>
     @endif
 
-    {{-- En-tete --}}
-    <div class="d-flex justify-content-between align-items-start mb-4">
-        <div>
-            <h1 class="mb-1">
-                <i class="bi bi-file-earmark-text"></i>
-                @if ($facture->statut === \App\Enums\StatutFacture::Annulee && $facture->numero_avoir)
-                    Avoir {{ $facture->numero_avoir }}
-                @else
-                    Facture {{ $facture->numero }}
-                @endif
-
-                @if ($isAcquittee)
-                    <span class="badge bg-success fs-6">Acquittée</span>
-                @elseif ($facture->statut === \App\Enums\StatutFacture::Annulee)
-                    <span class="badge bg-danger fs-6">Annulée</span>
-                @elseif ($montantRegle > 0)
-                    <span class="badge bg-warning text-dark fs-6">Partiellement réglée</span>
-                @else
-                    <span class="badge bg-secondary fs-6">Non réglée</span>
-                @endif
-            </h1>
-            <p class="text-muted mb-0">
-                Date d'émission : <strong>{{ $facture->date->format('d/m/Y') }}</strong>
-                — Exercice {{ $facture->exercice }}/{{ $facture->exercice + 1 }}
-            </p>
-            @if ($facture->statut === \App\Enums\StatutFacture::Annulee && $facture->numero_avoir)
-                <p class="text-muted mb-0">
-                    Avoir <strong>{{ $facture->numero_avoir }}</strong>
-                    émis le <strong>{{ $facture->date_annulation->format('d/m/Y') }}</strong>
-                    — Annule la facture {{ $facture->numero }}
-                </p>
-            @endif
-        </div>
-        <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Retour à la liste
-        </a>
+    {{-- En-tête contextuel --}}
+    <div class="d-flex align-items-center gap-2 mb-3">
+        @if ($isAcquittee)
+            <span class="badge bg-success">Acquittée</span>
+        @elseif ($facture->statut === \App\Enums\StatutFacture::Annulee)
+            <span class="badge bg-danger">Annulée</span>
+        @elseif ($montantRegle > 0)
+            <span class="badge bg-warning text-dark">Partiellement réglée</span>
+        @else
+            <span class="badge bg-secondary">Non réglée</span>
+        @endif
+        <span class="text-muted small">
+            Émission : <strong>{{ $facture->date->format('d/m/Y') }}</strong>
+            — Exercice {{ $facture->exercice }}/{{ $facture->exercice + 1 }}
+        </span>
+        @if ($facture->statut === \App\Enums\StatutFacture::Annulee && $facture->numero_avoir)
+            <span class="text-muted small">
+                — Avoir <strong>{{ $facture->numero_avoir }}</strong>
+                émis le <strong>{{ $facture->date_annulation->format('d/m/Y') }}</strong>
+            </span>
+        @endif
     </div>
 
     <div class="row">

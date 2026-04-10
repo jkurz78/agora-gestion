@@ -46,7 +46,6 @@ beforeEach(function () {
 it('renders with facture data', function () {
     Livewire::test(FactureEdit::class, ['facture' => $this->facture])
         ->assertStatus(200)
-        ->assertSee('Brouillon de facture')
         ->assertSee('Sophie MARTIN');
 });
 

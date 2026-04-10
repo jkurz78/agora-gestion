@@ -189,41 +189,41 @@
 
                     {{-- Dropdown Banques --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('compta.comptes-bancaires.*') || request()->routeIs('compta.rapprochement.*') || request()->routeIs('compta.virements.*') || request()->routeIs('compta.parametres.comptes-bancaires.*') || request()->routeIs('compta.helloasso-sync') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('compta.banques.comptes.*') || request()->routeIs('compta.banques.rapprochement.*') || request()->routeIs('compta.banques.virements.*') || request()->routeIs('compta.banques.helloasso-sync') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-bank2"></i> Banques
                         </a>
                         <ul class="dropdown-menu">
-                            @if (Route::has('compta.rapprochement.index'))
+                            @if (Route::has('compta.banques.rapprochement.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.rapprochement.*') ? 'active' : '' }}"
-                                   href="{{ route('compta.rapprochement.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('compta.banques.rapprochement.*') ? 'active' : '' }}"
+                                   href="{{ route('compta.banques.rapprochement.index') }}">
                                     <i class="bi bi-bank"></i> Rapprochement
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has('compta.virements.index'))
+                            @if (Route::has('compta.banques.virements.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.virements.*') ? 'active' : '' }}"
-                                   href="{{ route('compta.virements.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('compta.banques.virements.*') ? 'active' : '' }}"
+                                   href="{{ route('compta.banques.virements.index') }}">
                                     <i class="bi bi-arrow-left-right"></i> Virements
                                 </a>
                             </li>
                             @endif
                             <li><hr class="dropdown-divider"></li>
-                            @if (Route::has('compta.helloasso-sync'))
+                            @if (Route::has('compta.banques.helloasso-sync'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.helloasso-sync') ? 'active' : '' }}"
-                                   href="{{ route('compta.helloasso-sync') }}">
+                                <a class="dropdown-item {{ request()->routeIs('compta.banques.helloasso-sync') ? 'active' : '' }}"
+                                   href="{{ route('compta.banques.helloasso-sync') }}">
                                     <i class="bi bi-arrow-repeat"></i> Synchronisation HelloAsso
                                 </a>
                             </li>
                             @endif
                             <li><hr class="dropdown-divider"></li>
-                            @if (Route::has('compta.parametres.comptes-bancaires.index'))
+                            @if (Route::has('compta.banques.comptes.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.parametres.comptes-bancaires.*') ? 'active' : '' }}"
-                                   href="{{ route('compta.parametres.comptes-bancaires.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('compta.banques.comptes.*') ? 'active' : '' }}"
+                                   href="{{ route('compta.banques.comptes.index') }}">
                                     <i class="bi bi-credit-card"></i> Comptes bancaires
                                 </a>
                             </li>
@@ -326,7 +326,7 @@
 
                     {{-- Dropdown Opérations --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('gestion.operations*') || request()->routeIs('gestion.remises-bancaires*') || request()->routeIs('gestion.analyse*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('gestion.operations*') || request()->routeIs('compta.banques.remises*') || request()->routeIs('gestion.analyse*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-calendar-event"></i> Opérations
                         </a>
@@ -338,8 +338,8 @@
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('gestion.remises-bancaires*') ? 'active' : '' }}"
-                                   href="{{ route('gestion.remises-bancaires') }}">
+                                <a class="dropdown-item {{ request()->routeIs('compta.banques.remises*') ? 'active' : '' }}"
+                                   href="{{ route('compta.banques.remises.index') }}">
                                     <i class="bi bi-bank"></i> Remises en banque
                                 </a>
                             </li>
@@ -387,7 +387,7 @@
                         </a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ (request()->routeIs($espacePrefix . '.parametres.*') && !request()->routeIs($espacePrefix . '.parametres.comptes-bancaires.*')) || request()->routeIs($espacePrefix . '.operations.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs($espacePrefix . '.parametres.*') || request()->routeIs($espacePrefix . '.operations.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-gear"></i> Paramètres
                         </a>

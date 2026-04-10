@@ -52,7 +52,7 @@ it('la page /transactions rend TransactionUniverselle avec lockedTypes depense+r
 
 it('la page /comptes-bancaires/{id}/transactions rend TransactionUniverselle avec compteId', function () {
     $compte = CompteBancaire::factory()->create();
-    $this->get("/compta/comptes-bancaires/{$compte->id}/transactions")
+    $this->get("/compta/banques/comptes/{$compte->id}/transactions")
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 

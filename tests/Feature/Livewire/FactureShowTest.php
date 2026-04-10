@@ -80,7 +80,7 @@ beforeEach(function () {
 it('renders with all facture data', function () {
     Livewire::test(FactureShow::class, ['facture' => $this->facture])
         ->assertStatus(200)
-        ->assertSee('Facture F-'.$this->exercice.'-0001')
+        ->assertSee('F-'.$this->exercice.'-0001')
         ->assertSee($this->facture->date->format('d/m/Y'))
         ->assertSee('Marie DUPONT')
         ->assertSee('Prestations associatives')

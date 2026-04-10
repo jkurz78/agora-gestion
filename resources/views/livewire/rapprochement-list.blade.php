@@ -12,72 +12,62 @@
         </div>
     @endif
 
-    {{-- Sélection du compte --}}
-    <div class="card mb-4">
-        <div class="card-body">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label for="compte-select" class="form-label">Compte bancaire</label>
-                    <select wire:model.live="compte_id" id="compte-select" class="form-select">
-                        <option value="">-- Sélectionner un compte --</option>
-                        @foreach ($comptes as $compte)
-                            <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                @if (! $exerciceCloture)
-                @if ($compte_id && ! $aEnCours)
-                    <div class="col-md-auto">
-                        <button wire:click="$set('showCreateForm', true)"
-                                class="btn btn-primary">
-                            <i class="bi bi-plus-lg"></i> Nouveau rapprochement
-                        </button>
-                    </div>
-                @elseif ($compte_id && $aEnCours)
-                    <div class="col-md-auto">
-                        <button class="btn btn-primary" disabled
-                                title="Finalisez le rapprochement en cours avant d'en créer un nouveau.">
-                            <i class="bi bi-plus-lg"></i> Nouveau rapprochement
-                        </button>
-                        <div class="form-text text-warning">
-                            <i class="bi bi-exclamation-triangle"></i> Un rapprochement est en cours.
-                        </div>
-                    </div>
-                @endif
-                @endif
-            </div>
-
-            {{-- Formulaire de création --}}
-            @if ($showCreateForm && ! $exerciceCloture)
-                <div class="mt-3 p-3 border rounded bg-light">
-                    <h6 class="mb-3">Nouveau relevé bancaire</h6>
-                    @if ($soldeOuverture !== null)
-                        <p class="mb-2 text-muted small">
-                            Solde d'ouverture automatique :
-                            <strong>{{ number_format($soldeOuverture, 2, ',', ' ') }} €</strong>
-                        </p>
-                    @endif
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-3">
-                            <label class="form-label">Date de fin du relevé <span class="text-danger">*</span></label>
-                            <x-date-input name="date_fin" wire:model="date_fin" :value="$date_fin" />
-                            @error('date_fin') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Solde de fin du relevé <span class="text-danger">*</span></label>
-                            <input type="number" wire:model="solde_fin" step="0.01"
-                                   class="form-control @error('solde_fin') is-invalid @enderror">
-                            @error('solde_fin') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                        </div>
-                        <div class="col-md-auto">
-                            <button wire:click="create" class="btn btn-success">Créer</button>
-                            <button wire:click="$set('showCreateForm', false)" class="btn btn-secondary">Annuler</button>
-                        </div>
-                    </div>
-                </div>
+    {{-- Sélection du compte + action --}}
+    <div class="d-flex align-items-center gap-3 mb-3">
+        <label for="compte-select" class="form-label mb-0 small text-muted">Compte</label>
+        <select wire:model.live="compte_id" id="compte-select" class="form-select form-select-sm" style="max-width:250px;">
+            <option value="">-- Sélectionner un compte --</option>
+            @foreach ($comptes as $compte)
+                <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+            @endforeach
+        </select>
+        @if (! $exerciceCloture && $compte_id)
+            @if (! $aEnCours)
+                <button wire:click="$set('showCreateForm', true)"
+                        class="btn btn-primary btn-sm ms-auto">
+                    <i class="bi bi-plus-lg"></i> Nouveau rapprochement
+                </button>
+            @else
+                <button class="btn btn-primary btn-sm ms-auto" disabled
+                        title="Finalisez le rapprochement en cours avant d'en créer un nouveau.">
+                    <i class="bi bi-plus-lg"></i> Nouveau rapprochement
+                </button>
+                <span class="text-warning small">
+                    <i class="bi bi-exclamation-triangle"></i> En cours
+                </span>
             @endif
-        </div>
+        @endif
     </div>
+
+    {{-- Formulaire de création --}}
+    @if ($showCreateForm && ! $exerciceCloture)
+        <div class="p-3 border rounded bg-light mb-3">
+            <h6 class="mb-3">Nouveau relevé bancaire</h6>
+            @if ($soldeOuverture !== null)
+                <p class="mb-2 text-muted small">
+                    Solde d'ouverture automatique :
+                    <strong>{{ number_format($soldeOuverture, 2, ',', ' ') }} €</strong>
+                </p>
+            @endif
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Date de fin du relevé <span class="text-danger">*</span></label>
+                    <x-date-input name="date_fin" wire:model="date_fin" :value="$date_fin" />
+                    @error('date_fin') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Solde de fin du relevé <span class="text-danger">*</span></label>
+                    <input type="number" wire:model="solde_fin" step="0.01"
+                           class="form-control @error('solde_fin') is-invalid @enderror">
+                    @error('solde_fin') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+                <div class="col-md-auto">
+                    <button wire:click="create" class="btn btn-success">Créer</button>
+                    <button wire:click="$set('showCreateForm', false)" class="btn btn-secondary">Annuler</button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Liste des rapprochements --}}
     @if ($compte_id)
@@ -118,7 +108,7 @@
                                 <td class="small text-muted text-nowrap">{{ $rapprochement->verrouille_at?->format('d/m/Y H:i') ?? '—' }}</td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        <a href="{{ route('compta.rapprochement.detail', $rapprochement) }}"
+                                        <a href="{{ route('compta.banques.rapprochement.detail', $rapprochement) }}"
                                            class="btn btn-sm btn-outline-primary">
                                             <i class="bi bi-eye"></i>
                                             {{ $rapprochement->isEnCours() && ! $exerciceCloture ? 'Continuer' : 'Consulter' }}

@@ -7,11 +7,11 @@
 @endphp
 
 <x-app-layout>
+    <x-slot:title>Mon profil</x-slot:title>
     <div class="d-flex align-items-center mb-4">
         <a href="{{ $retourRoute }}" class="btn btn-sm btn-outline-secondary me-3">
             <i class="bi bi-arrow-left me-1"></i>Retour
         </a>
-        <h1 class="mb-0">Mon profil</h1>
     </div>
     <livewire:mon-profil />
     <livewire:two-factor-setup />

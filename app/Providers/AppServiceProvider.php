@@ -20,7 +20,7 @@ final class AppServiceProvider extends ServiceProvider
             VersionStampCommand::writeVersionFile($data);
         }
 
-        View::composer('layouts.app', function (\Illuminate\View\View $view): void {
+        View::composer(['layouts.app', 'layouts.app-sidebar'], function (\Illuminate\View\View $view): void {
             $view->with('incomingDocumentsCount', IncomingDocument::count());
         });
     }

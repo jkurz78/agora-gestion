@@ -1,10 +1,7 @@
 <x-app-layout>
+    <x-slot:title>Transactions — {{ $tiers->displayName() }}</x-slot:title>
+    <x-slot:breadcrumbParent url="{{ route('compta.tiers.index') }}">Liste des tiers</x-slot:breadcrumbParent>
     <div class="container-fluid py-3">
-        <div class="mb-2">
-            <a href="{{ route('compta.tiers.index') }}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Tiers
-            </a>
-        </div>
         <livewire:transaction-universelle
             :tiers-id="$tiers->id"
             :locked-types="['depense', 'recette', 'don', 'cotisation']"

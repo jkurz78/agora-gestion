@@ -110,7 +110,7 @@ final class TransactionCompteList extends Component
     {
         $url = match ($sourceType) {
             'depense', 'recette' => url('/compta/transactions').'?edit='.$id,
-            'virement_sortant', 'virement_entrant' => route('compta.virements.index').'?edit='.$id,
+            'virement_sortant', 'virement_entrant' => route('compta.banques.virements.index').'?edit='.$id,
             default => route('compta.dashboard'),
         };
 

@@ -55,7 +55,7 @@ beforeEach(function () {
 });
 
 it('renders the selection page', function () {
-    $this->get(route('gestion.remises-bancaires.selection', $this->remise))
+    $this->get(route('compta.banques.remises.selection', $this->remise))
         ->assertStatus(200)
         ->assertSeeLivewire(RemiseBancaireSelection::class);
 });

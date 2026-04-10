@@ -1,18 +1,10 @@
 <div>
-    {{-- En-tete --}}
-    <div class="d-flex justify-content-between align-items-start mb-4">
-        <div>
-            <h1 class="mb-1">
-                <i class="bi bi-pencil-square"></i> Brouillon de facture
-            </h1>
-            <p class="text-muted mb-0">
-                Tiers : <strong>{{ $facture->tiers->displayName() }}</strong>
-                — Exercice {{ $facture->exercice }}/{{ $facture->exercice + 1 }}
-            </p>
-        </div>
-        <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Retour
-        </a>
+    {{-- En-tete contextuel --}}
+    <div class="mb-3">
+        <p class="text-muted mb-0 small">
+            Tiers : <strong>{{ $facture->tiers->displayName() }}</strong>
+            — Exercice {{ $facture->exercice }}/{{ $facture->exercice + 1 }}
+        </p>
     </div>
 
     @if (session()->has('success'))

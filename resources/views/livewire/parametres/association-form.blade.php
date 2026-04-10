@@ -31,8 +31,7 @@
     <div class="tab-content">
         {{-- Onglet Informations --}}
         <div class="tab-pane fade show active" id="pane-infos" role="tabpanel" aria-labelledby="tab-infos">
-            <div class="card" style="max-width: 640px;">
-                <div class="card-body">
+            <div style="max-width: 640px;">
 
                     @if ($logoUrl)
                         <div class="mb-3">
@@ -99,14 +98,12 @@
                         <span wire:loading>Enregistrement…</span>
                     </button>
 
-                </div>
             </div>
         </div>
 
         {{-- Onglet Facturation --}}
         <div class="tab-pane fade" id="pane-facturation" role="tabpanel" aria-labelledby="tab-facturation">
-            <div class="card" style="max-width: 640px;">
-                <div class="card-body">
+            <div style="max-width: 640px;">
 
                     <div class="mb-3">
                         <label class="form-label">SIRET</label>
@@ -163,14 +160,12 @@
                         <span wire:loading>Enregistrement…</span>
                     </button>
 
-                </div>
             </div>
         </div>
 
         {{-- Onglet OCR / IA --}}
         <div class="tab-pane fade" id="pane-ocr" role="tabpanel" aria-labelledby="tab-ocr">
-            <div class="card" style="max-width: 640px;">
-                <div class="card-body">
+            <div style="max-width: 640px;">
                     <p class="text-muted small mb-3">
                         Renseignez une clé API Anthropic pour activer l'analyse automatique des factures fournisseur.
                         L'analyse utilise Claude Vision pour extraire la date, le tiers, les lignes et montants.
@@ -193,7 +188,6 @@
                         <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
                         <span wire:loading>Enregistrement…</span>
                     </button>
-                </div>
             </div>
         </div>
     </div>

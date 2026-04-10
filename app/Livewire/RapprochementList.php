@@ -29,6 +29,12 @@ final class RapprochementList extends Component
 
     public bool $showCreateForm = false;
 
+    public function mount(): void
+    {
+        $premier = CompteBancaire::where('est_systeme', false)->orderBy('nom')->first();
+        $this->compte_id = $premier?->id;
+    }
+
     public string $date_fin = '';
 
     public string $solde_fin = '';
@@ -82,7 +88,7 @@ final class RapprochementList extends Component
             $this->solde_fin = '';
             $this->resetValidation();
 
-            $this->redirect(route('compta.rapprochement.detail', $rapprochement));
+            $this->redirect(route('compta.banques.rapprochement.detail', $rapprochement));
         } catch (\RuntimeException $e) {
             $this->addError('date_fin', $e->getMessage());
         }

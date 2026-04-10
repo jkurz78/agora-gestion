@@ -15,7 +15,7 @@ beforeEach(function () {
 });
 
 it('renders the list page', function () {
-    $this->get(route('gestion.remises-bancaires'))
+    $this->get(route('compta.banques.remises.index'))
         ->assertStatus(200)
         ->assertSeeLivewire(RemiseBancaireList::class);
 });
