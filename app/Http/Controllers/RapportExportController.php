@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\ResolvesLogos;
 use App\Livewire\AnalysePivot;
 use App\Models\Association;
 use App\Services\ExerciceService;
+use App\Services\ProvisionService;
 use App\Services\RapportService;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -114,6 +115,17 @@ final class RapportExportController extends Controller
     private function xlsxCompteResultat(RapportService $rapportService, int $exercice, string $label): Spreadsheet
     {
         $data = $rapportService->compteDeResultat($exercice);
+
+        $provisionService = app(ProvisionService::class);
+        $provisions = $provisionService->provisionsExercice($exercice);
+        $provisionsN1 = $provisionService->provisionsExercice($exercice - 1);
+        $extournes = $provisionService->extournesExercice($exercice);
+        $extournesN1 = $provisionService->extournesExercice($exercice - 1);
+        $totalProvisions = $provisionService->totalProvisions($exercice);
+        $totalProvisionsN1 = $provisionService->totalProvisions($exercice - 1);
+        $totalExtournes = $provisionService->totalExtournes($exercice);
+        $totalExtournesN1 = $provisionService->totalExtournes($exercice - 1);
+
         $labelN1 = ($exercice - 1).'-'.$exercice;
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
@@ -156,7 +168,122 @@ final class RapportExportController extends Controller
             }
         }
 
-        // Format number columns
+        // Compute résultat values
+        $totalChargesN = collect($data['charges'])->sum('montant_n');
+        $totalProduitsN = collect($data['produits'])->sum('montant_n');
+        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
+        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        $resultatCourant = (float) $totalProduitsN - (float) $totalChargesN;
+        $resultatCourantN1 = (float) $totalProduitsN1 - (float) $totalChargesN1;
+        $resultatBrut = $resultatCourant + $totalExtournes;
+        $resultatBrutN1 = $resultatCourantN1 + $totalExtournesN1;
+        $resultatNet = $resultatBrut + $totalProvisions;
+        $resultatNetN1 = $resultatBrutN1 + $totalProvisionsN1;
+
+        // Blank separator row
+        $row++;
+
+        // Extournes section
+        if ($extournes->isNotEmpty() || $extournesN1->isNotEmpty()) {
+            $extournesN1Keyed = $extournesN1->keyBy(fn (array $e) => $e['libelle'].'|'.$e['sous_categorie_id']);
+            $extournesNKeyed = $extournes->keyBy(fn (array $e) => $e['libelle'].'|'.$e['sous_categorie_id']);
+            $allExtourneKeys = $extournesN1Keyed->keys()->merge($extournesNKeyed->keys())->unique();
+
+            foreach ($allExtourneKeys as $key) {
+                $eN = $extournesNKeyed->get($key);
+                $eN1 = $extournesN1Keyed->get($key);
+                $scNom = $eN['sous_categorie_nom'] ?? $eN1['sous_categorie_nom'];
+                $libelle = $eN['libelle'] ?? $eN1['libelle'];
+                $sheet->fromArray([[
+                    'Extourne',
+                    $scNom,
+                    $libelle,
+                    $eN1 !== null ? $eN1['montant_signe'] : null,
+                    $eN !== null ? $eN['montant_signe'] : null,
+                    null,
+                    null,
+                ]], null, 'A'.$row);
+                $row++;
+            }
+
+            // Extournes total row
+            $sheet->fromArray([[
+                'Extourne',
+                '',
+                'TOTAL EXTOURNES',
+                $totalExtournesN1 !== 0.0 ? $totalExtournesN1 : null,
+                $totalExtournes !== 0.0 ? $totalExtournes : null,
+                null,
+                null,
+            ]], null, 'A'.$row);
+            $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
+            $row++;
+        }
+
+        // Résultat brut row
+        $sheet->fromArray([[
+            '',
+            '',
+            'RÉSULTAT BRUT',
+            $resultatBrutN1,
+            $resultatBrut,
+            null,
+            null,
+        ]], null, 'A'.$row);
+        $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
+        $row++;
+
+        // Provisions section
+        if ($provisions->isNotEmpty() || $provisionsN1->isNotEmpty()) {
+            $provisionsN1Keyed = $provisionsN1->keyBy(fn (array $p) => $p['libelle'].'|'.$p['sous_categorie_id']);
+            $provisionsNKeyed = $provisions->keyBy(fn (array $p) => $p['libelle'].'|'.$p['sous_categorie_id']);
+            $allProvisionKeys = $provisionsN1Keyed->keys()->merge($provisionsNKeyed->keys())->unique();
+
+            foreach ($allProvisionKeys as $key) {
+                $pN = $provisionsNKeyed->get($key);
+                $pN1 = $provisionsN1Keyed->get($key);
+                $scNom = $pN['sous_categorie_nom'] ?? $pN1['sous_categorie_nom'];
+                $libelle = $pN['libelle'] ?? $pN1['libelle'];
+                $sheet->fromArray([[
+                    'Provision',
+                    $scNom,
+                    $libelle,
+                    $pN1 !== null ? $pN1['montant_signe'] : null,
+                    $pN !== null ? $pN['montant_signe'] : null,
+                    null,
+                    null,
+                ]], null, 'A'.$row);
+                $row++;
+            }
+
+            // Provisions total row
+            $sheet->fromArray([[
+                'Provision',
+                '',
+                'TOTAL PROVISIONS',
+                $totalProvisionsN1 !== 0.0 ? $totalProvisionsN1 : null,
+                $totalProvisions !== 0.0 ? $totalProvisions : null,
+                null,
+                null,
+            ]], null, 'A'.$row);
+            $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
+            $row++;
+        }
+
+        // Résultat net ajusté row
+        $sheet->fromArray([[
+            '',
+            '',
+            'RÉSULTAT AJUSTÉ',
+            $resultatNetN1,
+            $resultatNet,
+            null,
+            null,
+        ]], null, 'A'.$row);
+        $sheet->getStyle('A'.$row.':G'.$row)->getFont()->setBold(true);
+        $row++;
+
+        // Format number columns (covers all rows including provisions/extournes)
         $sheet->getStyle('D2:G'.$row)->getNumberFormat()->setFormatCode('#,##0.00');
 
         return $spreadsheet;
@@ -431,6 +558,25 @@ final class RapportExportController extends Controller
         $data = $rapportService->compteDeResultat($exercice);
         $totalChargesN = collect($data['charges'])->sum('montant_n');
         $totalProduitsN = collect($data['produits'])->sum('montant_n');
+        $totalChargesN1 = collect($data['charges'])->sum('montant_n1');
+        $totalProduitsN1 = collect($data['produits'])->sum('montant_n1');
+        $resultatCourant = $totalProduitsN - $totalChargesN;
+        $resultatCourantN1 = $totalProduitsN1 - $totalChargesN1;
+
+        $provisionService = app(ProvisionService::class);
+        $provisions = $provisionService->provisionsExercice($exercice);
+        $provisionsN1 = $provisionService->provisionsExercice($exercice - 1);
+        $extournes = $provisionService->extournesExercice($exercice);
+        $extournesN1 = $provisionService->extournesExercice($exercice - 1);
+        $totalProvisions = $provisionService->totalProvisions($exercice);
+        $totalProvisionsN1 = $provisionService->totalProvisions($exercice - 1);
+        $totalExtournes = $provisionService->totalExtournes($exercice);
+        $totalExtournesN1 = $provisionService->totalExtournes($exercice - 1);
+
+        $resultatBrut = $resultatCourant + $totalExtournes;
+        $resultatBrutN1 = $resultatCourantN1 + $totalExtournesN1;
+        $resultatNet = $resultatBrut + $totalProvisions;
+        $resultatNetN1 = $resultatBrutN1 + $totalProvisionsN1;
 
         return [
             'charges' => $data['charges'],
@@ -439,7 +585,20 @@ final class RapportExportController extends Controller
             'labelN1' => ($exercice - 1).'-'.$exercice,
             'totalChargesN' => $totalChargesN,
             'totalProduitsN' => $totalProduitsN,
-            'resultatNet' => $totalProduitsN - $totalChargesN,
+            'totalChargesN1' => $totalChargesN1,
+            'totalProduitsN1' => $totalProduitsN1,
+            'provisions' => $provisions,
+            'provisionsN1' => $provisionsN1,
+            'extournes' => $extournes,
+            'extournesN1' => $extournesN1,
+            'totalProvisions' => $totalProvisions,
+            'totalProvisionsN1' => $totalProvisionsN1,
+            'totalExtournes' => $totalExtournes,
+            'totalExtournesN1' => $totalExtournesN1,
+            'resultatBrut' => $resultatBrut,
+            'resultatBrutN1' => $resultatBrutN1,
+            'resultatNet' => $resultatNet,
+            'resultatNetN1' => $resultatNetN1,
         ];
     }
 

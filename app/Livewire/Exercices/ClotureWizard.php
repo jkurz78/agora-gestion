@@ -9,6 +9,7 @@ use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\ClotureCheckService;
 use App\Services\ExerciceService;
+use App\Services\ProvisionService;
 use App\Services\RapprochementBancaireService;
 use App\Services\SoldeService;
 use Illuminate\View\View;
@@ -177,6 +178,10 @@ final class ClotureWizard extends Component
         // Réconciliation : solde rapprochement + non pointées = solde comptable actuel
         $ecartReconciliation = round($totalSoldeReel - $totalSoldeRapprochement - $montantNetNonPointeesTx, 2);
 
+        $provisionService = app(ProvisionService::class);
+        $provisions = $provisionService->provisionsExercice($this->annee);
+        $totalProvisions = $provisionService->totalProvisions($this->annee);
+
         return [
             'comptesData' => $comptesData,
             'totalSoldeOuverture' => $totalSoldeOuverture,
@@ -189,6 +194,9 @@ final class ClotureWizard extends Component
             'nombreNonPointees' => $nombreNonPointees,
             'montantNetNonPointeesTx' => $montantNetNonPointeesTx,
             'ecartReconciliation' => $ecartReconciliation,
+            'provisions' => $provisions,
+            'totalProvisions' => $totalProvisions,
+            'nbProvisions' => $provisions->count(),
         ];
     }
 
