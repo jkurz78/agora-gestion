@@ -448,80 +448,109 @@
                 @if($hasEngagements)
                     <hr class="my-3">
 
-                    @if($editFormulaireRempliAt)
+                    @if(!$engagementEditable)
+                        {{-- Formulaire soumis en ligne → lecture seule --}}
                         <div class="alert alert-info py-2 small mb-3">
                             <i class="bi bi-check-circle-fill me-1"></i>
                             Formulaire soumis le {{ $editFormulaireRempliAt }}
                         </div>
-                    @else
-                        <div class="alert alert-secondary py-2 small mb-3">
-                            <i class="bi bi-hourglass me-1"></i>
-                            Formulaire non soumis
-                        </div>
-                    @endif
 
-                    <table class="table table-sm table-borderless">
-                        <tbody>
-                            @if($typeOp?->formulaire_droit_image)
+                        <table class="table table-sm table-borderless">
+                            <tbody>
+                                @if($typeOp?->formulaire_droit_image)
+                                    <tr>
+                                        <td class="text-muted small" style="width:200px">Droit à l'image</td>
+                                        <td class="small">{{ $editDroitImage ? \App\Enums\DroitImage::tryFrom($editDroitImage)?->label() : '—' }}</td>
+                                    </tr>
+                                @endif
+                                @if($typeOp?->formulaire_parcours_therapeutique)
+                                    <tr>
+                                        <td class="text-muted small">Mode de paiement</td>
+                                        <td class="small">{{ $editModePaiement ?: '—' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted small">Moyen de paiement</td>
+                                        <td class="small">{{ $editMoyenPaiement ?: '—' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted small">Autorisation contact médecin</td>
+                                        <td class="small">
+                                            @if($editAutorisationContactMedecin !== null)
+                                                @if($editAutorisationContactMedecin)
+                                                    <i class="bi bi-check-lg text-success"></i> Oui
+                                                @else
+                                                    <i class="bi bi-x-lg text-danger"></i> Non
+                                                @endif
+                                            @else
+                                                <span class="text-muted">—</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endif
                                 <tr>
-                                    <td class="text-muted small" style="width:200px">Droit à l'image</td>
+                                    <td class="text-muted small">RGPD accepté</td>
                                     <td class="small">
-                                        @if($editDroitImageLabel)
-                                            {{ $editDroitImageLabel }}
+                                        @if($editRgpdAccepteAt)
+                                            <i class="bi bi-check-lg text-success"></i> {{ $editRgpdAccepteAt }}
                                         @else
                                             <span class="text-muted">—</span>
                                         @endif
                                     </td>
                                 </tr>
+                            </tbody>
+                        </table>
+                    @else
+                        {{-- Formulaire non soumis → mode édition --}}
+                        <div class="alert alert-warning py-2 small mb-3">
+                            <i class="bi bi-pencil-square me-1"></i>
+                            Formulaire non soumis — saisie manuelle
+                        </div>
+
+                        <div class="row g-2">
+                            @if($typeOp?->formulaire_droit_image)
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Droit à l'image</label>
+                                    <select wire:model="editDroitImage" class="form-select form-select-sm">
+                                        <option value="">— Non renseigné —</option>
+                                        @foreach(\App\Enums\DroitImage::cases() as $di)
+                                            <option value="{{ $di->value }}">{{ $di->label() }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
                             @endif
                             @if($typeOp?->formulaire_parcours_therapeutique)
-                                <tr>
-                                    <td class="text-muted small">Mode de paiement</td>
-                                    <td class="small">
-                                        @if($editModePaiement)
-                                            {{ $editModePaiement }}
-                                        @else
-                                            <span class="text-muted">—</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted small">Moyen de paiement</td>
-                                    <td class="small">
-                                        @if($editMoyenPaiement)
-                                            {{ $editMoyenPaiement }}
-                                        @else
-                                            <span class="text-muted">—</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="text-muted small">Autorisation contact médecin</td>
-                                    <td class="small">
-                                        @if($editAutorisationContactMedecin !== null)
-                                            @if($editAutorisationContactMedecin)
-                                                <i class="bi bi-check-lg text-success"></i> Oui
-                                            @else
-                                                <i class="bi bi-x-lg text-danger"></i> Non
-                                            @endif
-                                        @else
-                                            <span class="text-muted">—</span>
-                                        @endif
-                                    </td>
-                                </tr>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Mode de paiement</label>
+                                    <select wire:model="editModePaiement" class="form-select form-select-sm">
+                                        <option value="">— Non renseigné —</option>
+                                        <option value="comptant">Comptant</option>
+                                        <option value="par_seance">Par séance</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Moyen de paiement</label>
+                                    <select wire:model="editMoyenPaiement" class="form-select form-select-sm">
+                                        <option value="">— Non renseigné —</option>
+                                        <option value="especes">Espèces</option>
+                                        <option value="cheque">Chèque</option>
+                                        <option value="virement">Virement</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-semibold">Autorisation contact médecin</label>
+                                    <select wire:model="editAutorisationContactMedecin" class="form-select form-select-sm">
+                                        <option value="">— Non renseigné —</option>
+                                        <option value="1">Oui</option>
+                                        <option value="0">Non</option>
+                                    </select>
+                                </div>
                             @endif
-                            <tr>
-                                <td class="text-muted small">RGPD accepté</td>
-                                <td class="small">
-                                    @if($editRgpdAccepteAt)
-                                        <i class="bi bi-check-lg text-success"></i> {{ $editRgpdAccepteAt }}
-                                    @else
-                                        <span class="text-muted">—</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                        </div>
+
+                        {{-- Upload scan formulaire papier --}}
+                        <hr class="my-3">
+                        <livewire:participant-engagement-upload :participantId="$participant->id" :key="'upload-'.$participant->id" />
+                    @endif
 
                     @if($operation->typeOperation?->formulaire_droit_image && $participant->droit_image)
                         <hr class="my-3">
@@ -539,7 +568,10 @@
                     <ul class="list-group list-group-sm">
                         @foreach ($editDocuments as $doc)
                             <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <span class="small">{{ $doc['name'] }} ({{ number_format($doc['size'] / 1024, 0) }} Ko)</span>
+                                <div>
+                                    <span class="small fw-semibold">{{ $doc['label'] }}</span>
+                                    <span class="text-muted small ms-2">{{ $doc['name'] }} ({{ number_format($doc['size'] / 1024, 0) }} Ko)</span>
+                                </div>
                                 <a href="{{ $doc['url'] }}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-download"></i>
                                 </a>
