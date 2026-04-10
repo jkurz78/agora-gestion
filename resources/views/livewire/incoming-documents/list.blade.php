@@ -82,6 +82,9 @@
                                             <i class="bi bi-receipt"></i> Créer dépense
                                         </button>
                                     @endif
+                                    <button wire:click="ouvrirAssignationParticipant({{ $doc->id }})" class="btn btn-sm btn-outline-success" title="Assigner à un participant">
+                                        <i class="bi bi-person-check"></i>
+                                    </button>
                                     <button class="btn btn-sm btn-outline-danger"
                                             wire:click="supprimer({{ $doc->id }})"
                                             wire:confirm="Supprimer ce document ?"
@@ -142,5 +145,51 @@
                 </div>
             </div>
         </div>
+    @endif
+
+    {{-- Modale assignation participant --}}
+    @if($showAssignParticipantModal)
+    <div class="modal d-block" tabindex="-1" style="background:rgba(0,0,0,.5)">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">Assigner à un participant</h6>
+                    <button type="button" class="btn-close" wire:click="fermerAssignationParticipant"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small">Libellé du document</label>
+                        <input type="text" wire:model="assignParticipantLabel" class="form-control form-control-sm" placeholder="Ex: Formulaire papier">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">Opération</label>
+                        <select wire:model.live="selectedParticipantOperationId" class="form-select form-select-sm">
+                            <option value="">— Choisir —</option>
+                            @foreach($participantOperations as $op)
+                                <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @if($selectedParticipantOperationId)
+                        <div class="mb-3">
+                            <label class="form-label small">Participant</label>
+                            <select wire:model="selectedParticipantId" class="form-select form-select-sm">
+                                <option value="">— Choisir —</option>
+                                @foreach($participantsForAssign as $p)
+                                    <option value="{{ $p->id }}">{{ $p->tiers?->nom }} {{ $p->tiers?->prenom }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                </div>
+                <div class="modal-footer">
+                    <button wire:click="fermerAssignationParticipant" class="btn btn-sm btn-secondary">Annuler</button>
+                    <button wire:click="assignerAParticipant" class="btn btn-sm btn-success" @if(!$selectedParticipantId) disabled @endif>
+                        <i class="bi bi-check-lg me-1"></i>Assigner
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     @endif
 </div>
