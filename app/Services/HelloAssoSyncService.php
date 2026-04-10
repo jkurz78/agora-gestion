@@ -145,7 +145,7 @@ final class HelloAssoSyncService
                         'mode_paiement' => $modePaiement,
                         'tiers_id' => $tiers->id,
                         'reference' => $this->buildReference($order),
-                        'compte_id' => $this->parametres->compte_helloasso_id,
+                        'compte_id' => $this->resolveCompteId($modePaiement),
                         'helloasso_order_id' => $order['id'],
                         'helloasso_payment_id' => $order['payments'][0]['id'] ?? null,
                         'saisi_par' => auth()->id(),
@@ -325,6 +325,23 @@ final class HelloAssoSyncService
             'Cash' => ModePaiement::Especes,
             'BankTransfer' => ModePaiement::Virement,
             default => ModePaiement::Cb,
+        };
+    }
+
+    /**
+     * Route la transaction vers le bon compte selon le mode de paiement.
+     * CB/Prélèvement → compte HelloAsso (cashout réconcilie)
+     * Chèque/Espèces → compte "Remises en banque" (circuit remise bancaire)
+     * Virement       → compte courant (arrive directement)
+     */
+    private function resolveCompteId(ModePaiement $mode): int
+    {
+        return match ($mode) {
+            ModePaiement::Cheque, ModePaiement::Especes => CompteBancaire::where('nom', 'Remises en banque')
+                ->where('est_systeme', true)
+                ->value('id') ?? $this->parametres->compte_helloasso_id,
+            ModePaiement::Virement => $this->parametres->compte_versement_id ?? $this->parametres->compte_helloasso_id,
+            default => $this->parametres->compte_helloasso_id,
         };
     }
 
