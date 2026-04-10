@@ -144,7 +144,7 @@ it('affiche le document dans la timeline', function () {
     ParticipantDocument::create([
         'participant_id' => $this->participant->id,
         'label' => 'Formulaire papier',
-        'storage_path' => 'participants/' . $this->participant->id . '/test.pdf',
+        'storage_path' => 'participants/'.$this->participant->id.'/test.pdf',
         'original_filename' => 'test.pdf',
         'source' => 'manual-upload',
     ]);

@@ -13,6 +13,7 @@ use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\ParticipantDocument;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use App\Services\DocumentPrevisionnelService;
@@ -191,13 +192,20 @@ final class ParticipantShow extends Component
 
         // Engagement fields (only if formulaire not already filled online)
         if ($this->engagementEditable) {
-            $participant->update([
+            $engagementData = array_filter([
                 'droit_image' => $this->editDroitImage !== '' && $this->editDroitImage !== null
                     ? $this->editDroitImage : null,
                 'mode_paiement_choisi' => $this->editModePaiement !== '' ? $this->editModePaiement : null,
                 'moyen_paiement_choisi' => $this->editMoyenPaiement !== '' ? $this->editMoyenPaiement : null,
-                'autorisation_contact_medecin' => $this->editAutorisationContactMedecin,
-            ]);
+            ], fn ($v) => $v !== null);
+
+            if ($this->editAutorisationContactMedecin !== null) {
+                $engagementData['autorisation_contact_medecin'] = $this->editAutorisationContactMedecin;
+            }
+
+            if ($engagementData !== []) {
+                $participant->update($engagementData);
+            }
         }
 
         // Update medical data if user has permission
@@ -488,7 +496,7 @@ final class ParticipantShow extends Component
         $hasEngagements = $typeOp?->formulaire_parcours_therapeutique || $typeOp?->formulaire_droit_image;
         $hasDocuments = $canSeeSensible && (
             $typeOp?->formulaire_parcours_therapeutique
-            || \App\Models\ParticipantDocument::where('participant_id', $this->participant->id)->exists()
+            || ParticipantDocument::where('participant_id', $this->participant->id)->exists()
         );
 
         $this->operation->loadMissing('typeOperation.tarifs');
@@ -587,7 +595,7 @@ final class ParticipantShow extends Component
         }
 
         // Documents participant (scans formulaires papier, etc.)
-        $participantDocs = \App\Models\ParticipantDocument::where('participant_id', $this->participant->id)
+        $participantDocs = ParticipantDocument::where('participant_id', $this->participant->id)
             ->orderByDesc('created_at')
             ->get();
 
@@ -698,7 +706,7 @@ final class ParticipantShow extends Component
      */
     private function getParticipantDocuments(int $participantId): array
     {
-        return \App\Models\ParticipantDocument::where('participant_id', $participantId)
+        return ParticipantDocument::where('participant_id', $participantId)
             ->orderByDesc('created_at')
             ->get()
             ->filter(fn ($doc) => Storage::disk('local')->exists($doc->storage_path))
