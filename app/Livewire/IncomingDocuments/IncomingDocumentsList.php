@@ -39,6 +39,16 @@ final class IncomingDocumentsList extends Component
 
     public string $pageUrl = '';
 
+    public bool $showAssignParticipantModal = false;
+
+    public ?int $docIdToAssignParticipant = null;
+
+    public ?int $selectedParticipantOperationId = null;
+
+    public ?int $selectedParticipantId = null;
+
+    public string $assignParticipantLabel = 'Formulaire papier';
+
     public function mount(): void
     {
         $this->pageUrl = url()->current();
@@ -126,6 +136,56 @@ final class IncomingDocumentsList extends Component
         $this->redirect($this->pageUrl, navigate: false);
     }
 
+    public function ouvrirAssignationParticipant(int $docId): void
+    {
+        $this->docIdToAssignParticipant = $docId;
+        $this->selectedParticipantOperationId = null;
+        $this->selectedParticipantId = null;
+        $this->assignParticipantLabel = 'Formulaire papier';
+        $this->showAssignParticipantModal = true;
+    }
+
+    public function fermerAssignationParticipant(): void
+    {
+        $this->showAssignParticipantModal = false;
+        $this->docIdToAssignParticipant = null;
+    }
+
+    public function assignerAParticipant(): void
+    {
+        $this->validate([
+            'selectedParticipantId' => ['required', 'integer', 'exists:participants,id'],
+            'assignParticipantLabel' => ['required', 'string', 'max:255'],
+        ]);
+
+        $doc = IncomingDocument::findOrFail($this->docIdToAssignParticipant);
+        $participant = \App\Models\Participant::findOrFail($this->selectedParticipantId);
+
+        DB::transaction(function () use ($doc, $participant): void {
+            $dir = "participants/{$participant->id}";
+            $extension = pathinfo($doc->original_filename, PATHINFO_EXTENSION) ?: 'pdf';
+            $filename = 'doc-' . now()->format('Y-m-d-His') . '.' . $extension;
+            $finalPath = "{$dir}/{$filename}";
+
+            Storage::disk('local')->makeDirectory($dir);
+            Storage::disk('local')->move($doc->storage_path, $finalPath);
+
+            \App\Models\ParticipantDocument::create([
+                'participant_id' => $participant->id,
+                'label' => $this->assignParticipantLabel,
+                'storage_path' => $finalPath,
+                'original_filename' => $doc->original_filename,
+                'source' => 'inbox',
+            ]);
+
+            $doc->delete();
+        });
+
+        session()->flash('success', 'Document attaché au participant.');
+        $this->fermerAssignationParticipant();
+        $this->redirect($this->pageUrl, navigate: false);
+    }
+
     public function supprimer(int $docId): void
     {
         $doc = IncomingDocument::findOrFail($docId);
@@ -163,6 +223,15 @@ final class IncomingDocumentsList extends Component
                 ? Seance::where('operation_id', $this->selectedOperationId)
                     ->orderBy('numero', 'desc')
                     ->get()
+                : collect(),
+            'participantOperations' => $this->showAssignParticipantModal
+                ? Operation::orderBy('nom')->get()
+                : collect(),
+            'participantsForAssign' => $this->selectedParticipantOperationId !== null
+                ? \App\Models\Participant::where('operation_id', $this->selectedParticipantOperationId)
+                    ->with('tiers')
+                    ->get()
+                    ->sortBy(fn ($p) => $p->tiers?->nom)
                 : collect(),
         ]);
     }
