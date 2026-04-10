@@ -147,4 +147,3 @@ it('gestionnaire gets canEdit true on ReglementTable', function () {
         ->test(ReglementTable::class, ['operation' => $operation])
         ->assertSet('canEdit', true);
 });
-

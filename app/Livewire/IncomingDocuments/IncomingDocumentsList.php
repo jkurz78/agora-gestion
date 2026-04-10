@@ -6,6 +6,7 @@ namespace App\Livewire\IncomingDocuments;
 
 use App\Enums\Espace;
 use App\Models\IncomingDocument;
+use App\Models\IncomingMailAllowedSender;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
@@ -152,7 +153,7 @@ final class IncomingDocumentsList extends Component
             'documents' => IncomingDocument::where('association_id', 1)
                 ->orderBy('received_at', 'desc')
                 ->paginate(20),
-            'senderLabels' => \App\Models\IncomingMailAllowedSender::where('association_id', 1)
+            'senderLabels' => IncomingMailAllowedSender::where('association_id', 1)
                 ->whereNotNull('label')
                 ->pluck('label', 'email'),
             'operations' => $this->showAssignModal

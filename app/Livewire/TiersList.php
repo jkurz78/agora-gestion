@@ -109,7 +109,7 @@ final class TiersList extends Component
         if ($this->sortBy === 'nom') {
             // Trier par nom d'affichage : entreprise pour les entreprises, nom+prénom pour les particuliers
             $query->orderByRaw("CASE WHEN type = 'entreprise' THEN entreprise ELSE nom END {$dir}")
-                  ->orderBy('prenom', $dir);
+                ->orderBy('prenom', $dir);
         } else {
             $query->orderBy($this->sortBy, $dir);
         }

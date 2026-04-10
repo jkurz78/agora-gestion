@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\StatutOperation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
@@ -83,7 +84,7 @@ final class Dashboard extends Component
         $operations = Operation::query()
             ->with(['typeOperation.sousCategorie.categorie'])
             ->withCount('participants')
-            ->where('statut', '!=', \App\Enums\StatutOperation::Cloturee)
+            ->where('statut', '!=', StatutOperation::Cloturee)
             ->where(function ($q) use ($range): void {
                 $q->where(function ($inner) use ($range): void {
                     $inner->whereNotNull('date_debut')
