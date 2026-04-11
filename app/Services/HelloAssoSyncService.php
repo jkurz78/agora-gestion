@@ -24,6 +24,8 @@ final class HelloAssoSyncService
     /** @var array<int, ?int> operation_id => sous_categorie_id */
     private array $operationSousCategorieCache = [];
 
+    private readonly ?int $compteCreancesId;
+
     public function __construct(
         private readonly HelloAssoParametres $parametres,
     ) {
@@ -33,6 +35,11 @@ final class HelloAssoSyncService
                 $this->formMappingCache[$mapping->form_slug] = $mapping->operation_id;
             }
         }
+
+        // Cache le compte "Créances à recevoir" pour le routage chèque/espèces
+        $this->compteCreancesId = CompteBancaire::where('nom', 'Créances à recevoir')
+            ->where('est_systeme', true)
+            ->value('id');
     }
 
     /**
@@ -331,12 +338,14 @@ final class HelloAssoSyncService
     /**
      * Route la transaction vers le bon compte selon le mode de paiement.
      * CB/Prélèvement      → compte HelloAsso (cashout réconcilie)
-     * Chèque/Espèces/Virement → compte courant (dépôt manuel, rapprochement bancaire)
+     * Chèque/Espèces       → Créances à recevoir (dépôt via remise bancaire)
+     * Virement              → compte courant (rapprochement bancaire)
      */
     private function resolveCompteId(ModePaiement $mode): int
     {
         return match ($mode) {
-            ModePaiement::Cheque, ModePaiement::Especes, ModePaiement::Virement => $this->parametres->compte_versement_id ?? $this->parametres->compte_helloasso_id,
+            ModePaiement::Cheque, ModePaiement::Especes => $this->compteCreancesId ?? $this->parametres->compte_versement_id ?? $this->parametres->compte_helloasso_id,
+            ModePaiement::Virement => $this->parametres->compte_versement_id ?? $this->parametres->compte_helloasso_id,
             default => $this->parametres->compte_helloasso_id,
         };
     }
