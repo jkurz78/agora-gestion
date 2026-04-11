@@ -228,7 +228,7 @@ final class FactureShow extends Component
         $modesDirects = [ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement];
 
         $transactionsAEncaisser = $this->facture->transactions
-            ->filter(fn ($t) => $t->compte->est_systeme);
+            ->filter(fn ($t) => $t->compte->est_systeme && $t->remise_id === null && $t->date_reglement === null);
 
         $hasTransactionsDirectes = $transactionsAEncaisser->contains(
             fn ($t) => in_array($t->mode_paiement, $modesDirects, true)
