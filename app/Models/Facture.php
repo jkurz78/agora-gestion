@@ -78,6 +78,7 @@ final class Facture extends Model
             ->where(fn ($q) => $q
                 ->whereHas('compte', fn ($cq) => $cq->where('est_systeme', false))
                 ->orWhereNotNull('remise_id')
+                ->orWhereNotNull('date_reglement')
             )
             ->sum('montant_total');
     }
