@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
 use App\Models\CompteBancaire;
+use App\Models\FactureLigne;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final class RemiseBancaireService
@@ -238,6 +241,9 @@ final class RemiseBancaireService
                     ->pluck('id');
 
                 if ($txToRemove->isNotEmpty()) {
+                    // Nettoyer les factures brouillon avant suppression
+                    $this->nettoyerFacturesBrouillon($txToRemove);
+
                     $ligneIds = TransactionLigne::whereIn('transaction_id', $txToRemove)->pluck('id');
                     if ($ligneIds->isNotEmpty()) {
                         TransactionLigneAffectation::whereIn('transaction_ligne_id', $ligneIds)->delete();
@@ -421,6 +427,9 @@ final class RemiseBancaireService
                 ->pluck('id');
 
             if ($txReglementIds->isNotEmpty()) {
+                // Nettoyer les factures brouillon avant suppression
+                $this->nettoyerFacturesBrouillon($txReglementIds);
+
                 $ligneIds = TransactionLigne::whereIn('transaction_id', $txReglementIds)->pluck('id');
                 if ($ligneIds->isNotEmpty()) {
                     TransactionLigneAffectation::whereIn('transaction_ligne_id', $ligneIds)->delete();
@@ -437,5 +446,37 @@ final class RemiseBancaireService
             // Soft-delete remise
             $remise->delete();
         });
+    }
+
+    /**
+     * Nettoyer les factures brouillon liées aux transactions qui vont être supprimées.
+     * Détache les transactions du pivot et supprime les FactureLigne orphelines.
+     *
+     * @param  Collection<int, int>  $transactionIds
+     */
+    private function nettoyerFacturesBrouillon(Collection $transactionIds): void
+    {
+        if ($transactionIds->isEmpty()) {
+            return;
+        }
+
+        $ligneIds = TransactionLigne::whereIn('transaction_id', $transactionIds)->pluck('id');
+
+        // Supprimer les FactureLigne de brouillons qui pointent vers ces transaction_lignes
+        if ($ligneIds->isNotEmpty()) {
+            FactureLigne::whereIn('transaction_ligne_id', $ligneIds)
+                ->whereHas('facture', fn ($q) => $q->where('statut', StatutFacture::Brouillon))
+                ->delete();
+        }
+
+        // Détacher les transactions du pivot facture_transaction pour les brouillons
+        foreach ($transactionIds as $txId) {
+            DB::table('facture_transaction')
+                ->where('transaction_id', $txId)
+                ->whereIn('facture_id', function ($sub) {
+                    $sub->select('id')->from('factures')->where('statut', StatutFacture::Brouillon);
+                })
+                ->delete();
+        }
     }
 }
