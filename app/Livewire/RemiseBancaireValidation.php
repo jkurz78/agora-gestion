@@ -19,6 +19,9 @@ final class RemiseBancaireValidation extends Component
     /** @var list<int> */
     public array $selectedIds = [];
 
+    /** @var list<int> */
+    public array $selectedTransactionIds = [];
+
     public function mount(RemiseBancaire $remise): void
     {
         $this->remise = $remise;
@@ -26,6 +29,8 @@ final class RemiseBancaireValidation extends Component
         // Lire depuis la DB (brouillon persisté), fallback session pour rétrocompatibilité
         $dbIds = Reglement::where('remise_id', $remise->id)->pluck('id')->toArray();
         $this->selectedIds = count($dbIds) > 0 ? $dbIds : session('remise_selected_ids', []);
+
+        $this->selectedTransactionIds = $remise->transactionsDirectes()->pluck('id')->all();
     }
 
     public function getCanEditProperty(): bool
@@ -45,7 +50,7 @@ final class RemiseBancaireValidation extends Component
             if ($this->remise->virement_id !== null) {
                 $service->modifier($this->remise, $this->selectedIds);
             } else {
-                $service->comptabiliser($this->remise, $this->selectedIds);
+                $service->comptabiliser($this->remise, $this->selectedIds, $this->selectedTransactionIds);
             }
 
             session()->forget('remise_selected_ids');
