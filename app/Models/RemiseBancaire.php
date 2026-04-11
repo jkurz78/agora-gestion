@@ -87,6 +87,7 @@ final class RemiseBancaire extends Model
 
     public function montantTotal(): float
     {
-        return (float) $this->reglements()->sum('montant_prevu');
+        return (float) $this->reglements()->sum('montant_prevu')
+            + (float) $this->transactionsDirectes()->sum('montant_total');
     }
 }
