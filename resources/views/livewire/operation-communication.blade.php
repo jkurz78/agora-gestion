@@ -27,10 +27,27 @@
                 <input type="text" class="form-control form-control-sm" wire:model="objet" placeholder="Objet du message">
             </div>
 
-            {{-- Body (plain textarea — TinyMCE will replace in a later step) --}}
+            {{-- Body — TinyMCE --}}
             <div class="mb-3">
                 <label class="form-label small fw-semibold">Corps</label>
-                <textarea class="form-control" rows="6" wire:model="corps" placeholder="Corps du message..."></textarea>
+                <style>.tox-tinymce-aux { z-index: 2100 !important; }</style>
+                <div wire:ignore
+                     x-data="messageTinymce()"
+                     x-init="init()">
+                    <textarea x-ref="editor">{!! $corps !!}</textarea>
+                </div>
+
+                {{-- Unresolved variables warning --}}
+                @if(!empty($unresolvedVariables))
+                    <div class="alert alert-warning py-1 px-2 mt-2 small mb-0">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Variable{{ count($unresolvedVariables) > 1 ? 's' : '' }} sans valeur pour cette opération :
+                        @foreach($unresolvedVariables as $var)
+                            <code>{{ $var }}</code>{{ !$loop->last ? ', ' : '' }}
+                        @endforeach
+                    </div>
+                @endif
+
                 <div class="form-text small mt-1">
                     Variables :
                     @foreach($messageVariables as $var => $desc)
@@ -108,3 +125,122 @@
         </div>
     </div>
 </div>
+
+@script
+<script>
+    function stripVariableSpans(html) {
+        return html.replace(/<span class="mce-variable[^"]*">(\{[^}]+\})<\/span>/g, '$1');
+    }
+
+    const messageVariables = {
+        '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
+        '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
+        '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
+        '{date_prochaine_seance}': 'Date prochaine séance',
+        '{date_precedente_seance}': 'Date précédente séance',
+        '{numero_prochaine_seance}': 'N° prochaine séance',
+        '{numero_precedente_seance}': 'N° précédente séance',
+        '{logo}': 'Logo association',
+        '{logo_operation}': 'Logo opération',
+    };
+
+    Alpine.data('messageTinymce', () => ({
+        editor: null,
+
+        init() {
+            this.$nextTick(() => this.setup());
+            this.$cleanup(() => this.destroy());
+        },
+
+        setup() {
+            if (typeof tinymce === 'undefined') {
+                setTimeout(() => this.setup(), 300);
+                return;
+            }
+
+            const textarea = this.$refs.editor;
+            if (!textarea) return;
+
+            const self = this;
+
+            const menuItems = Object.entries(messageVariables).map(([key, label]) => ({
+                type: 'menuitem',
+                text: key + ' — ' + label,
+                onAction: () => {
+                    if (self.editor) {
+                        self.editor.insertContent('<span class="mce-variable mce-noneditable">' + key + '</span>&nbsp;');
+                    }
+                },
+            }));
+
+            tinymce.init({
+                target: textarea,
+                language: 'fr_FR',
+                language_url: '/vendor/tinymce/langs/fr_FR.js',
+                height: 250,
+                menubar: false,
+                statusbar: false,
+                plugins: 'lists link noneditable',
+                toolbar: 'bold italic underline | bullist numlist | link | variablesButton',
+                noneditable_class: 'mce-variable',
+                content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .mce-variable { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 1px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
+                setup: function (editor) {
+                    self.editor = editor;
+
+                    editor.ui.registry.addMenuButton('variablesButton', {
+                        text: 'Variables',
+                        fetch: function (callback) { callback(menuItems); },
+                    });
+
+                    // On init: convert {variable} text to styled spans
+                    editor.on('init', function () {
+                        let content = editor.getContent();
+                        const allVarKeys = Object.keys(messageVariables);
+                        allVarKeys.forEach(v => {
+                            const escaped = v.replace(/[{}]/g, '\\$&');
+                            const regex = new RegExp('(?!<span[^>]*>)' + escaped + '(?!</span>)', 'g');
+                            content = content.replace(regex, '<span class="mce-variable mce-noneditable">' + v + '</span>');
+                        });
+                        editor.setContent(content);
+                    });
+                },
+            });
+        },
+
+        destroy() {
+            if (this.editor) {
+                try { tinymce.remove(this.editor); } catch (e) {}
+                this.editor = null;
+            }
+        },
+
+        getContent() {
+            if (this.editor) {
+                return stripVariableSpans(this.editor.getContent());
+            }
+            return '';
+        },
+
+        setContent(html) {
+            if (this.editor) {
+                // Convert variable placeholders to styled spans
+                const allVarKeys = Object.keys(messageVariables);
+                allVarKeys.forEach(v => {
+                    const escaped = v.replace(/[{}]/g, '\\$&');
+                    const regex = new RegExp('(?!<span[^>]*>)' + escaped + '(?!</span>)', 'g');
+                    html = html.replace(regex, '<span class="mce-variable mce-noneditable">' + v + '</span>');
+                });
+                this.editor.setContent(html);
+            }
+        },
+    }));
+
+    // Listen for template loaded event to update TinyMCE content
+    $wire.on('template-loaded', (data) => {
+        const el = document.querySelector('[x-data="messageTinymce()"]');
+        if (el && el.__x) {
+            el.__x.$data.setContent(data[0].corps);
+        }
+    });
+</script>
+@endscript
