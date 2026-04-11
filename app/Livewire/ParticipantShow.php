@@ -35,6 +35,8 @@ final class ParticipantShow extends Component
 
     public string $activeTab = 'coordonnees';
 
+    public ?int $previewEmailLogId = null;
+
     // ── Coordonnées (Tiers) ─────────────────────────────────────
     public string $editNom = '';
 
@@ -502,6 +504,7 @@ final class ParticipantShow extends Component
         $this->operation->loadMissing('typeOperation.tarifs');
 
         $emailLogs = EmailLog::where('participant_id', $this->participant->id)
+            ->with('opens')
             ->orderByDesc('created_at')
             ->get();
 
@@ -524,6 +527,11 @@ final class ParticipantShow extends Component
         ]);
 
         foreach ($emailLogs as $log) {
+            $firstOpen = $log->opens->sortBy('opened_at')->first();
+            $openInfo = $firstOpen
+                ? ' — ouvert le '.$firstOpen->opened_at->format('d/m/Y à H:i').($log->opens->count() > 1 ? ' ('.$log->opens->count().'x)' : '')
+                : '';
+
             $timeline->push([
                 'date' => $log->created_at,
                 'type' => 'email',
@@ -531,10 +539,11 @@ final class ParticipantShow extends Component
                 'icon' => 'bi-envelope',
                 'color' => $log->statut === 'envoye' ? 'success' : 'danger',
                 'description' => $log->statut === 'envoye'
-                    ? "Email {$log->categorie} envoyé à {$log->destinataire_email}"
+                    ? "Email {$log->categorie} envoyé à {$log->destinataire_email}{$openInfo}"
                     : "Erreur envoi {$log->categorie} à {$log->destinataire_email}",
-                'detail' => $log->objet,
+                'detail' => $log->objet_rendu ?? $log->objet,
                 'copyable' => null,
+                'email_log_id' => $log->corps_html ? $log->id : null,
             ]);
         }
 

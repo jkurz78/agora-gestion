@@ -15,12 +15,14 @@ final class MessageLibreMail extends Mailable
 {
     public readonly string $corpsHtml;
 
-    /** @param array<int, string> $attachmentPaths */
+    /** @param array<int, array{path: string, nom: string}|string> $attachmentPaths */
     public function __construct(
         public readonly string $prenomParticipant,
         public readonly string $nomParticipant,
+        public readonly string $emailParticipant,
         public readonly string $operationNom,
         public readonly string $typeOperationNom,
+        public readonly ?string $libelleArticle,
         public readonly string $dateDebut,
         public readonly string $dateFin,
         public readonly int $nbSeances,
@@ -28,10 +30,16 @@ final class MessageLibreMail extends Mailable
         public readonly ?string $datePrecedenteSeance,
         public readonly ?int $numeroProchainSeance,
         public readonly ?int $numeroPrecedenteSeance,
+        public readonly ?string $titreProchainSeance,
+        public readonly ?string $titrePrecedenteSeance,
+        public readonly ?int $joursAvantProchaineSeance,
+        public readonly int $nbSeancesEffectuees,
+        public readonly int $nbSeancesRestantes,
         public readonly string $objet,
         public readonly string $corps,
         public readonly array $attachmentPaths = [],
         public readonly ?int $typeOperationId = null,
+        public readonly ?string $trackingToken = null,
     ) {
         $allVars = $this->variables() + EmailLogo::variables($this->typeOperationId);
         $corps = str_replace(
@@ -39,7 +47,15 @@ final class MessageLibreMail extends Mailable
             array_values($allVars),
             strip_tags($this->corps, EmailLogo::ALLOWED_TAGS)
         );
-        $this->corpsHtml = ArticleFr::contracter($corps);
+        $html = ArticleFr::contracter($corps);
+
+        // Append tracking pixel if token provided
+        if ($this->trackingToken) {
+            $pixelUrl = route('email.tracking', ['token' => $this->trackingToken]);
+            $html .= '<img src="'.htmlspecialchars($pixelUrl).'" width="1" height="1" alt="" style="display:none">';
+        }
+
+        $this->corpsHtml = $html;
     }
 
     public function envelope(): Envelope
@@ -62,7 +78,13 @@ final class MessageLibreMail extends Mailable
     public function attachments(): array
     {
         return array_map(
-            static fn (string $path) => Attachment::fromPath($path),
+            static function (array|string $item): Attachment {
+                if (is_array($item)) {
+                    return Attachment::fromPath($item['path'])->as($item['nom']);
+                }
+
+                return Attachment::fromPath($item);
+            },
             $this->attachmentPaths
         );
     }
@@ -91,15 +113,21 @@ final class MessageLibreMail extends Mailable
         return [
             '{prenom}' => $this->prenomParticipant,
             '{nom}' => $this->nomParticipant,
+            '{email_participant}' => $this->emailParticipant,
             '{operation}' => $this->operationNom,
-            '{type_operation}' => $this->typeOperationNom,
+            '{type_operation}' => $this->libelleArticle ?? $this->typeOperationNom,
             '{date_debut}' => $this->dateDebut,
             '{date_fin}' => $this->dateFin,
             '{nb_seances}' => (string) $this->nbSeances,
             '{date_prochaine_seance}' => $this->dateProchainSeance ?? '',
-            '{date_precedente_seance}' => $this->datePrecedenteSeance ?? '',
             '{numero_prochaine_seance}' => $this->numeroProchainSeance !== null ? (string) $this->numeroProchainSeance : '',
+            '{titre_prochaine_seance}' => $this->titreProchainSeance ?? '',
+            '{jours_avant_prochaine_seance}' => $this->joursAvantProchaineSeance !== null ? (string) $this->joursAvantProchaineSeance : '',
+            '{date_precedente_seance}' => $this->datePrecedenteSeance ?? '',
             '{numero_precedente_seance}' => $this->numeroPrecedenteSeance !== null ? (string) $this->numeroPrecedenteSeance : '',
+            '{titre_precedente_seance}' => $this->titrePrecedenteSeance ?? '',
+            '{nb_seances_effectuees}' => (string) $this->nbSeancesEffectuees,
+            '{nb_seances_restantes}' => (string) $this->nbSeancesRestantes,
         ];
     }
 }

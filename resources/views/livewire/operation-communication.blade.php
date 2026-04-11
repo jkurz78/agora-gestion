@@ -1,4 +1,4 @@
-<div>
+<div id="operation-communication">
     <div class="card mt-2">
         <div class="card-header d-flex align-items-center justify-content-between">
             <h6 class="mb-0"><i class="bi bi-envelope me-1"></i> Nouveau message</h6>
@@ -23,14 +23,53 @@
 
             {{-- Subject --}}
             <div class="mb-3">
-                <label class="form-label small fw-semibold">Objet</label>
-                <input type="text" class="form-control form-control-sm" wire:model="objet" placeholder="Objet du message">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <label class="form-label small fw-semibold mb-0">Objet</label>
+                    <div x-data="{ openGroup: null }" @click.outside="openGroup = null" class="position-relative">
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size:11px" @click="openGroup = openGroup ? null : 'root'">
+                            <i class="bi bi-braces me-1"></i>Variables
+                        </button>
+                        <div class="dropdown-menu" :class="openGroup && 'show'" style="min-width:160px;font-size:12px">
+                            @php
+                                $varGroups = [
+                                    'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email_participant}' => 'Email'],
+                                    'Opération' => ['{operation}' => 'Nom', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
+                                    'Séances' => ['{date_prochaine_seance}' => 'Date prochaine', '{numero_prochaine_seance}' => 'N° prochaine', '{titre_prochaine_seance}' => 'Titre prochaine', '{jours_avant_prochaine_seance}' => 'Jours avant prochaine', '{date_precedente_seance}' => 'Date précédente', '{numero_precedente_seance}' => 'N° précédente', '{titre_precedente_seance}' => 'Titre précédente', '{nb_seances_effectuees}' => 'Nb effectuées', '{nb_seances_restantes}' => 'Nb restantes'],
+                                ];
+                            @endphp
+                            @foreach($varGroups as $groupName => $vars)
+                                <div class="position-relative" @mouseenter="openGroup = '{{ $groupName }}'" @mouseleave="openGroup = openGroup === '{{ $groupName }}' ? 'root' : openGroup">
+                                    <a class="dropdown-item d-flex justify-content-between" href="#">
+                                        {{ $groupName }} <i class="bi bi-chevron-right"></i>
+                                    </a>
+                                    <div class="dropdown-menu" :class="openGroup === '{{ $groupName }}' && 'show'"
+                                         style="position:absolute;left:100%;top:0;min-width:260px">
+                                        @foreach($vars as $var => $desc)
+                                            <a class="dropdown-item" href="#"
+                                               @click.prevent="
+                                                   const input = document.getElementById('objet-input');
+                                                   const pos = input.selectionStart || input.value.length;
+                                                   const val = input.value;
+                                                   input.value = val.substring(0, pos) + '{{ $var }}' + val.substring(pos);
+                                                   input.dispatchEvent(new Event('input'));
+                                                   openGroup = null;
+                                                   input.focus();
+                                               ">
+                                                <code class="text-primary">{{ $var }}</code> <span class="text-muted">{{ $desc }}</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+                <input type="text" class="form-control form-control-sm" wire:model="objet" placeholder="Objet du message" id="objet-input">
             </div>
 
             {{-- Body — TinyMCE --}}
             <div class="mb-3">
                 <label class="form-label small fw-semibold">Corps</label>
-                <style>.tox-tinymce-aux { z-index: 2100 !important; }</style>
                 <div wire:ignore
                      x-data="messageTinymce()"
                      x-init="init()">
@@ -48,12 +87,6 @@
                     </div>
                 @endif
 
-                <div class="form-text small mt-1">
-                    Variables :
-                    @foreach($messageVariables as $var => $desc)
-                        <code title="{{ $desc }}">{{ $var }}</code>
-                    @endforeach
-                </div>
             </div>
 
             {{-- Save as template --}}
@@ -80,7 +113,7 @@
                             </div>
                             <div class="col-md-3 d-flex gap-1">
                                 <button type="button" class="btn btn-sm btn-primary"
-                                        onclick="syncMessageEditor(); $wire.saveAsTemplate()">
+                                        onclick="window.syncAndSaveTemplate()">
                                     <i class="bi bi-check-lg"></i> Enregistrer
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showSaveTemplate', false)">
@@ -91,13 +124,18 @@
                     </div>
                 @else
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showSaveTemplate', true)">
-                            <i class="bi bi-bookmark-plus me-1"></i>Enregistrer comme modèle
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="openSaveAsTemplate">
+                            <i class="bi bi-bookmark-plus me-1"></i>{{ $selectedTemplateId ? 'Enregistrer comme variante' : 'Enregistrer comme modèle' }}
                         </button>
                         @if($selectedTemplateId)
                             <button type="button" class="btn btn-sm btn-outline-primary"
-                                    onclick="syncMessageEditor(); $wire.updateTemplate()">
+                                    onclick="window.syncAndUpdateTemplate()">
                                 <i class="bi bi-pencil me-1"></i>Mettre à jour « {{ $templates->flatten()->firstWhere('id', $selectedTemplateId)?->nom }} »
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    wire:click="deleteTemplate"
+                                    wire:confirm="Supprimer ce modèle ?">
+                                <i class="bi bi-trash"></i>
                             </button>
                         @endif
                     </div>
@@ -127,10 +165,25 @@
 
             {{-- Participants --}}
             <div class="mb-3">
-                <label class="form-label small fw-semibold">
-                    Destinataires
-                    <span class="badge bg-secondary ms-1">{{ count($selectedParticipants) }} sélectionné{{ count($selectedParticipants) > 1 ? 's' : '' }}</span>
-                </label>
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label small fw-semibold mb-0">
+                        Destinataires
+                        <span class="badge bg-secondary ms-1">{{ count($selectedParticipants) }} sélectionné{{ count($selectedParticipants) > 1 ? 's' : '' }}</span>
+                        @if($sansEmailCount > 0)
+                            <span class="badge bg-warning text-dark ms-1">{{ $sansEmailCount }} sans email</span>
+                        @endif
+                    </label>
+                    @if($seances->count() > 0)
+                        <select class="form-select form-select-sm" wire:model.live="filtreSeanceId" style="width:auto;min-width:200px">
+                            <option value="">Tous les participants</option>
+                            @foreach($seances as $seance)
+                                <option value="{{ $seance->id }}">
+                                    Séance {{ $seance->numero }}{{ $seance->date ? ' — '.$seance->date->format('d/m/Y') : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    @endif
+                </div>
                 <div class="border rounded" style="max-height: 250px; overflow-y: auto;">
                     <table class="table table-sm table-hover mb-0">
                         <thead>
@@ -202,11 +255,15 @@
             {{-- Action buttons --}}
             <div class="d-flex gap-2 justify-content-end">
                 <button type="button" class="btn btn-sm btn-outline-secondary"
-                        onclick="syncMessageEditor(); setTimeout(() => $wire.set('showTestModal', true), 100)">
+                        onclick="window.syncAndShowPreview()">
+                    <i class="bi bi-eye me-1"></i>Aperçu
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-primary"
+                        onclick="window.syncAndShowTestModal()">
                     <i class="bi bi-send me-1"></i>Envoyer un test
                 </button>
                 <button type="button" class="btn btn-sm btn-primary"
-                        onclick="syncMessageEditor(); setTimeout(() => $wire.set('showConfirmSend', true), 100)"
+                        onclick="window.syncAndShowConfirmSend()"
                         {{ count($selectedParticipants) === 0 ? 'disabled' : '' }}>
                     <i class="bi bi-envelope-paper me-1"></i>Envoyer à {{ count($selectedParticipants) }} participant{{ count($selectedParticipants) > 1 ? 's' : '' }}
                 </button>
@@ -240,7 +297,13 @@
                                     </span>
                                 </div>
                                 <div>
+                                    @php
+                                        $nbOuverts = $campagne->emailLogs()->whereHas('opens')->count();
+                                    @endphp
                                     <span class="badge bg-success">{{ $campagne->nb_destinataires - $campagne->nb_erreurs }} envoyé(s)</span>
+                                    @if($nbOuverts > 0)
+                                        <span class="badge bg-info">{{ $nbOuverts }} ouvert(s)</span>
+                                    @endif
                                     @if($campagne->nb_erreurs > 0)
                                         <span class="badge bg-danger">{{ $campagne->nb_erreurs }} erreur(s)</span>
                                     @endif
@@ -249,17 +312,46 @@
 
                             @if($expandedCampagneId === $campagne->id)
                                 <div class="mt-2">
+                                    {{-- Message preview --}}
+                                    <div class="border rounded p-2 mb-2 bg-light small">
+                                        <div class="mb-1"><strong>Objet :</strong> {{ $campagne->objet }}</div>
+                                        <div class="text-muted" style="max-height:100px;overflow-y:auto">{!! \Illuminate\Support\Str::limit(strip_tags($campagne->corps), 300) !!}</div>
+                                    </div>
+
+                                    {{-- Attachments --}}
+                                    @if(!empty($campagne->pieces_jointes))
+                                        <div class="mb-2 small">
+                                            <strong>Pièces jointes :</strong>
+                                            @foreach($campagne->pieces_jointes as $index => $pj)
+                                                <a href="#" wire:click.prevent="telechargerPieceJointe({{ $campagne->id }}, {{ $index }})" class="me-2">
+                                                    <i class="bi bi-paperclip"></i> {{ $pj['nom'] }}
+                                                    <span class="text-muted">({{ number_format($pj['taille'] / 1024, 0) }} Ko)</span>
+                                                </a>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    {{-- Reuse button --}}
+                                    <div class="mb-2">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                wire:click="reutiliserCampagne({{ $campagne->id }})">
+                                            <i class="bi bi-arrow-repeat me-1"></i>Réutiliser ce message
+                                        </button>
+                                    </div>
+
+                                    {{-- Recipients table --}}
                                     <table class="table table-sm table-bordered mb-0 small">
                                         <thead>
                                             <tr style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880" class="table-dark">
                                                 <th>Destinataire</th>
                                                 <th>Email</th>
                                                 <th>Statut</th>
+                                                <th>Ouvert</th>
                                                 <th>Détail</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @foreach($campagne->emailLogs()->orderBy('created_at')->get() as $log)
+                                            @foreach($campagne->emailLogs()->with('opens')->orderBy('created_at')->get() as $log)
                                                 <tr>
                                                     <td>{{ $log->destinataire_nom }}</td>
                                                     <td>{{ $log->destinataire_email }}</td>
@@ -268,6 +360,19 @@
                                                             <span class="badge bg-success">Envoyé</span>
                                                         @else
                                                             <span class="badge bg-danger">Erreur</span>
+                                                        @endif
+                                                    </td>
+                                                    <td>
+                                                        @if($log->opens->isNotEmpty())
+                                                            @php $firstOpen = $log->opens->sortBy('opened_at')->first(); @endphp
+                                                            <span class="text-success">
+                                                                <i class="bi bi-eye-fill me-1"></i>{{ $firstOpen->opened_at->format('d/m H:i') }}
+                                                                @if($log->opens->count() > 1)
+                                                                    <span class="text-muted">({{ $log->opens->count() }}x)</span>
+                                                                @endif
+                                                            </span>
+                                                        @else
+                                                            <span class="text-muted">—</span>
                                                         @endif
                                                     </td>
                                                     <td class="text-muted">{{ $log->erreur_message ?? '—' }}</td>
@@ -344,133 +449,210 @@
         </div>
     </div>
     @endif
+
+    {{-- Preview modal --}}
+    @if($showPreview)
+        @php $preview = $this->getPreviewHtml(); @endphp
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+             style="background:rgba(0,0,0,.4);z-index:2100"
+             wire:click.self="$set('showPreview', false)">
+            <div class="bg-white rounded-3 shadow" style="max-width:700px;width:95%;max-height:80vh;display:flex;flex-direction:column">
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0"><i class="bi bi-eye me-1"></i> Aperçu du message</h6>
+                        @if(isset($preview['participant']))
+                            <small class="text-muted">Variables substituées pour : {{ $preview['participant'] }}</small>
+                        @endif
+                    </div>
+                    <button type="button" class="btn-close" wire:click="$set('showPreview', false)"></button>
+                </div>
+                <div class="p-3 border-bottom bg-light">
+                    <strong class="small">Objet :</strong> {{ $preview['objet'] }}
+                </div>
+                <div class="p-3" style="overflow-y:auto;flex:1">
+                    {!! $preview['corps'] !!}
+                </div>
+            </div>
+        </div>
+    @endif
+
 </div>
 
-@script
+@assets
 <script>
-    function stripVariableSpans(html) {
+    // --- Alpine component for TinyMCE (registered once, before Alpine init) ---
+    function _msgStripVarSpans(html) {
         return html.replace(/<span class="mce-variable[^"]*">(\{[^}]+\})<\/span>/g, '$1');
     }
 
-    const messageVariables = {
-        '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
-        '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
-        '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
-        '{date_prochaine_seance}': 'Date prochaine séance',
-        '{date_precedente_seance}': 'Date précédente séance',
-        '{numero_prochaine_seance}': 'N° prochaine séance',
-        '{numero_precedente_seance}': 'N° précédente séance',
-        '{logo}': 'Logo association',
-        '{logo_operation}': 'Logo opération',
+    window._msgVariableGroups = {
+        'Participant': {
+            '{prenom}': 'Prénom',
+            '{nom}': 'Nom',
+            '{email_participant}': 'Email',
+        },
+        'Opération': {
+            '{operation}': 'Nom',
+            '{type_operation}': 'Type',
+            '{date_debut}': 'Date début',
+            '{date_fin}': 'Date fin',
+            '{nb_seances}': 'Nb séances',
+        },
+        'Séances': {
+            '{date_prochaine_seance}': 'Date prochaine',
+            '{numero_prochaine_seance}': 'N° prochaine',
+            '{titre_prochaine_seance}': 'Titre prochaine',
+            '{jours_avant_prochaine_seance}': 'Jours avant prochaine',
+            '{date_precedente_seance}': 'Date précédente',
+            '{numero_precedente_seance}': 'N° précédente',
+            '{titre_precedente_seance}': 'Titre précédente',
+            '{nb_seances_effectuees}': 'Nb effectuées',
+            '{nb_seances_restantes}': 'Nb restantes',
+        },
+        'Logos': {
+            '{logo}': 'Association',
+            '{logo_operation}': 'Opération',
+        },
     };
 
-    Alpine.data('messageTinymce', () => ({
-        editor: null,
+    // Flat version for wrapping/stripping
+    window._msgVariables = {};
+    Object.values(window._msgVariableGroups).forEach(group => {
+        Object.assign(window._msgVariables, group);
+    });
 
-        init() {
-            this.$nextTick(() => this.setup());
-            this.$cleanup(() => this.destroy());
-        },
+    function _msgWrapVars(html) {
+        Object.keys(window._msgVariables).forEach(v => {
+            const escaped = v.replace(/[{}]/g, '\\$&');
+            const regex = new RegExp('(?!<span[^>]*>)' + escaped + '(?!</span>)', 'g');
+            html = html.replace(regex, '<span class="mce-variable mce-noneditable">' + v + '</span>');
+        });
+        return html;
+    }
 
-        setup() {
-            if (typeof tinymce === 'undefined') {
-                setTimeout(() => this.setup(), 300);
-                return;
-            }
+    if (typeof Alpine !== 'undefined' && !Alpine.components?.messageTinymce) {
+        Alpine.data('messageTinymce', () => ({
+            editor: null,
 
-            const textarea = this.$refs.editor;
-            if (!textarea) return;
+            init() {
+                this.$nextTick(() => this.setup());
+                this.$cleanup(() => this.destroy());
+            },
 
-            const self = this;
+            setup() {
+                if (typeof tinymce === 'undefined') {
+                    setTimeout(() => this.setup(), 300);
+                    return;
+                }
 
-            const menuItems = Object.entries(messageVariables).map(([key, label]) => ({
-                type: 'menuitem',
-                text: key + ' — ' + label,
-                onAction: () => {
-                    if (self.editor) {
-                        self.editor.insertContent('<span class="mce-variable mce-noneditable">' + key + '</span>&nbsp;');
-                    }
-                },
-            }));
+                const textarea = this.$refs.editor;
+                if (!textarea) return;
 
-            tinymce.init({
-                target: textarea,
-                language: 'fr_FR',
-                language_url: '/vendor/tinymce/langs/fr_FR.js',
-                height: 250,
-                menubar: false,
-                statusbar: false,
-                plugins: 'lists link noneditable',
-                toolbar: 'bold italic underline | bullist numlist | link | variablesButton',
-                noneditable_class: 'mce-variable',
-                content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .mce-variable { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 1px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
-                setup: function (editor) {
-                    self.editor = editor;
+                const self = this;
 
-                    editor.ui.registry.addMenuButton('variablesButton', {
-                        text: 'Variables',
-                        fetch: function (callback) { callback(menuItems); },
-                    });
+                // Build nested menu items from groups
+                const menuItems = Object.entries(window._msgVariableGroups).map(([groupName, vars]) => ({
+                    type: 'nestedmenuitem',
+                    text: groupName,
+                    getSubmenuItems: () => Object.entries(vars).map(([key, label]) => ({
+                        type: 'menuitem',
+                        text: key + ' — ' + label,
+                        onAction: () => {
+                            if (self.editor) {
+                                self.editor.insertContent('<span class="mce-variable mce-noneditable">' + key + '</span>&nbsp;');
+                            }
+                        },
+                    })),
+                }));
 
-                    // On init: convert {variable} text to styled spans
-                    editor.on('init', function () {
-                        let content = editor.getContent();
-                        const allVarKeys = Object.keys(messageVariables);
-                        allVarKeys.forEach(v => {
-                            const escaped = v.replace(/[{}]/g, '\\$&');
-                            const regex = new RegExp('(?!<span[^>]*>)' + escaped + '(?!</span>)', 'g');
-                            content = content.replace(regex, '<span class="mce-variable mce-noneditable">' + v + '</span>');
+                tinymce.init({
+                    target: textarea,
+                    language: 'fr_FR',
+                    language_url: '/vendor/tinymce/langs/fr_FR.js',
+                    height: 250,
+                    menubar: false,
+                    statusbar: false,
+                    plugins: 'lists link noneditable',
+                    toolbar: 'bold italic underline | bullist numlist | link | variablesButton',
+                    noneditable_class: 'mce-variable',
+                    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .mce-variable { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 1px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
+                    setup: function (editor) {
+                        self.editor = editor;
+
+                        editor.ui.registry.addMenuButton('variablesButton', {
+                            text: 'Variables',
+                            fetch: function (callback) { callback(menuItems); },
                         });
-                        editor.setContent(content);
-                    });
-                },
-            });
-        },
 
-        destroy() {
-            if (this.editor) {
-                try { tinymce.remove(this.editor); } catch (e) {}
-                this.editor = null;
-            }
-        },
-
-        getContent() {
-            if (this.editor) {
-                return stripVariableSpans(this.editor.getContent());
-            }
-            return '';
-        },
-
-        setContent(html) {
-            if (this.editor) {
-                // Convert variable placeholders to styled spans
-                const allVarKeys = Object.keys(messageVariables);
-                allVarKeys.forEach(v => {
-                    const escaped = v.replace(/[{}]/g, '\\$&');
-                    const regex = new RegExp('(?!<span[^>]*>)' + escaped + '(?!</span>)', 'g');
-                    html = html.replace(regex, '<span class="mce-variable mce-noneditable">' + v + '</span>');
+                        editor.on('init', function () {
+                            editor.setContent(_msgWrapVars(editor.getContent()));
+                        });
+                    },
                 });
-                this.editor.setContent(html);
-            }
-        },
-    }));
+            },
 
-    // Sync TinyMCE content to Livewire before any action
-    window.syncMessageEditor = function() {
+            destroy() {
+                if (this.editor) {
+                    try { tinymce.remove(this.editor); } catch (e) {}
+                    this.editor = null;
+                }
+            },
+
+            getContent() {
+                return this.editor ? _msgStripVarSpans(this.editor.getContent()) : '';
+            },
+
+            setContent(html) {
+                if (this.editor) {
+                    this.editor.setContent(_msgWrapVars(html));
+                }
+            },
+        }));
+    }
+
+    // --- Helper: get Alpine data from element ---
+    function _msgGetAlpineData(el) {
+        if (!el) return null;
+        if (el._x_dataStack && el._x_dataStack[0]) return el._x_dataStack[0];
+        if (el.__x && el.__x.$data) return el.__x.$data;
+        return null;
+    }
+
+    // --- Helper: find Livewire component ---
+    function _msgGetWire() {
+        const el = document.getElementById('operation-communication');
+        if (!el) return null;
+        const wireId = el.closest('[wire\\:id]')?.getAttribute('wire:id') || el.getAttribute('wire:id');
+        return wireId ? Livewire.find(wireId) : null;
+    }
+
+    // --- Sync TinyMCE -> Livewire ---
+    function _msgSyncEditor() {
         const el = document.querySelector('[x-data="messageTinymce()"]');
-        if (el && el._x_dataStack) {
-            const data = el._x_dataStack[0];
-            if (data && data.getContent) {
-                $wire.set('corps', data.getContent());
-            }
+        const data = _msgGetAlpineData(el);
+        const wire = _msgGetWire();
+        if (data && data.getContent && wire) {
+            wire.set('corps', data.getContent());
         }
-    };
+    }
 
-    // Listen for template loaded event to update TinyMCE content
-    $wire.on('template-loaded', (data) => {
+    window.syncMessageEditor = _msgSyncEditor;
+    window.syncAndSaveTemplate = function() { _msgSyncEditor(); setTimeout(() => { const w = _msgGetWire(); if (w) w.saveAsTemplate(); }, 150); };
+    window.syncAndUpdateTemplate = function() { _msgSyncEditor(); setTimeout(() => { const w = _msgGetWire(); if (w) w.updateTemplate(); }, 150); };
+    window.syncAndShowTestModal = function() { _msgSyncEditor(); setTimeout(() => { const w = _msgGetWire(); if (w) w.set('showTestModal', true); }, 150); };
+    window.syncAndShowConfirmSend = function() { _msgSyncEditor(); setTimeout(() => { const w = _msgGetWire(); if (w) w.set('showConfirmSend', true); }, 150); };
+    window.syncAndShowPreview = function() { _msgSyncEditor(); setTimeout(() => { const w = _msgGetWire(); if (w) w.set('showPreview', true); }, 150); };
+</script>
+@endassets
+
+@script
+<script>
+    $wire.on('template-loaded', (eventData) => {
         const el = document.querySelector('[x-data="messageTinymce()"]');
-        if (el && el.__x) {
-            el.__x.$data.setContent(data[0].corps);
+        const data = _msgGetAlpineData(el);
+        if (data && data.setContent) {
+            const corps = Array.isArray(eventData) ? eventData[0].corps : eventData.corps;
+            data.setContent(corps);
         }
     });
 </script>

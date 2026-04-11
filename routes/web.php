@@ -242,4 +242,7 @@ Route::prefix('formulaire')->middleware('throttle:10,1')->group(function (): voi
     Route::get('/merci', [FormulaireController::class, 'merci'])->name('formulaire.merci');
 });
 
+// Email tracking pixel (no auth, no throttle — called by mail clients)
+Route::get('/t/{token}.gif', \App\Http\Controllers\EmailTrackingController::class)->name('email.tracking');
+
 require __DIR__.'/auth.php';
