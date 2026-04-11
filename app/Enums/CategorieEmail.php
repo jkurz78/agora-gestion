@@ -65,10 +65,16 @@ enum CategorieEmail: string
                 '{montant_total}' => 'Montant total',
             ] + $logos,
             self::Message => $common + [
+                '{email_participant}' => 'Email du participant',
                 '{date_prochaine_seance}' => 'Date de la prochaine séance',
-                '{date_precedente_seance}' => 'Date de la précédente séance',
                 '{numero_prochaine_seance}' => 'Numéro de la prochaine séance',
+                '{titre_prochaine_seance}' => 'Titre de la prochaine séance',
+                '{jours_avant_prochaine_seance}' => 'Nombre de jours avant la prochaine séance',
+                '{date_precedente_seance}' => 'Date de la précédente séance',
                 '{numero_precedente_seance}' => 'Numéro de la précédente séance',
+                '{titre_precedente_seance}' => 'Titre de la précédente séance',
+                '{nb_seances_effectuees}' => 'Nombre de séances effectuées',
+                '{nb_seances_restantes}' => 'Nombre de séances restantes',
             ],
         };
     }

@@ -11,11 +11,14 @@ use App\Models\EmailLog;
 use App\Models\MessageTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\Presence;
 use App\Models\Seance;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -43,6 +46,11 @@ final class OperationCommunication extends Component
     // Participant selection
     /** @var array<int> */
     public array $selectedParticipants = [];
+
+    public ?int $filtreSeanceId = null;
+
+    // Preview
+    public bool $showPreview = false;
 
     // File attachments
     /** @var array<int, TemporaryUploadedFile> */
@@ -72,6 +80,36 @@ final class OperationCommunication extends Component
         $this->expandedCampagneId = $this->expandedCampagneId === $id ? null : $id;
     }
 
+    public function reutiliserCampagne(int $id): void
+    {
+        $campagne = CampagneEmail::find($id);
+        if (! $campagne) {
+            return;
+        }
+
+        $this->objet = $campagne->objet;
+        $this->corps = $campagne->corps;
+        $this->selectedTemplateId = null;
+        $this->dispatch('template-loaded', corps: $this->corps);
+    }
+
+    public function telechargerPieceJointe(int $campagneId, int $index): mixed
+    {
+        $campagne = CampagneEmail::find($campagneId);
+        if (! $campagne || ! is_array($campagne->pieces_jointes)) {
+            return null;
+        }
+
+        $pj = $campagne->pieces_jointes[$index] ?? null;
+        if (! $pj || ! Storage::disk('local')->exists($pj['path'])) {
+            session()->flash('error', 'Fichier introuvable.');
+
+            return null;
+        }
+
+        return Storage::disk('local')->download($pj['path'], $pj['nom']);
+    }
+
     public function mount(Operation $operation): void
     {
         $this->operation = $operation;
@@ -89,17 +127,26 @@ final class OperationCommunication extends Component
 
     public function getParticipantsWithEmail(): Collection
     {
-        return $this->operation->participants()
-            ->with('tiers')
-            ->get()
+        return $this->getAllParticipants()
             ->filter(fn (Participant $p) => ! empty($p->tiers?->email));
     }
 
     public function getAllParticipants(): Collection
     {
-        return $this->operation->participants()
-            ->with('tiers')
-            ->get();
+        $query = $this->operation->participants()->with('tiers');
+
+        if ($this->filtreSeanceId) {
+            $presentIds = Presence::where('seance_id', $this->filtreSeanceId)
+                ->pluck('participant_id');
+            $query->whereIn('id', $presentIds);
+        }
+
+        return $query->get();
+    }
+
+    public function updatedFiltreSeanceId(): void
+    {
+        $this->initParticipants();
     }
 
     public function toggleSelectAll(): void
@@ -143,9 +190,12 @@ final class OperationCommunication extends Component
 
         $values = [
             '{date_prochaine_seance}' => $prochaine?->date?->format('d/m/Y') ?? '',
-            '{date_precedente_seance}' => $precedente?->date?->format('d/m/Y') ?? '',
             '{numero_prochaine_seance}' => $prochaine ? (string) $prochaine->numero : '',
+            '{titre_prochaine_seance}' => $prochaine?->titre ?? '',
+            '{jours_avant_prochaine_seance}' => $prochaine?->date ? (string) (int) $today->diffInDays($prochaine->date, false) : '',
+            '{date_precedente_seance}' => $precedente?->date?->format('d/m/Y') ?? '',
             '{numero_precedente_seance}' => $precedente ? (string) $precedente->numero : '',
+            '{titre_precedente_seance}' => $precedente?->titre ?? '',
         ];
 
         $unresolved = [];
@@ -156,6 +206,19 @@ final class OperationCommunication extends Component
         }
 
         return $unresolved;
+    }
+
+    public function openSaveAsTemplate(): void
+    {
+        if ($this->selectedTemplateId) {
+            $source = MessageTemplate::find($this->selectedTemplateId);
+            $this->templateNom = $source ? 'Copie de '.$source->nom : '';
+            $this->templateTypeOperationId = $source?->type_operation_id;
+        } else {
+            $this->templateNom = '';
+            $this->templateTypeOperationId = null;
+        }
+        $this->showSaveTemplate = true;
     }
 
     public function saveAsTemplate(): void
@@ -194,6 +257,17 @@ final class OperationCommunication extends Component
             ]);
             session()->flash('message', 'Modèle mis à jour.');
         }
+    }
+
+    public function deleteTemplate(): void
+    {
+        if (! $this->selectedTemplateId) {
+            return;
+        }
+
+        MessageTemplate::destroy($this->selectedTemplateId);
+        $this->selectedTemplateId = null;
+        session()->flash('message', 'Modèle supprimé.');
     }
 
     public function getAvailableTemplates(): Collection
@@ -255,7 +329,7 @@ final class OperationCommunication extends Component
             return;
         }
 
-        $mail = $this->buildMail($participant, $operation);
+        $mail = $this->buildMail($participant, $operation, test: true);
 
         try {
             Mail::mailer()
@@ -301,10 +375,25 @@ final class OperationCommunication extends Component
         $this->envoiResultat = '';
         $this->showConfirmSend = false;
 
+        // Persist attachments to permanent storage (capture metadata before store moves the file)
+        $piecesJointes = [];
+        foreach ($this->emailAttachments as $file) {
+            $nom = $file->getClientOriginalName();
+            $taille = $file->getSize();
+            $uniqueName = time().'_'.$nom;
+            $path = $file->storeAs('campagnes-email', $uniqueName, 'local');
+            $piecesJointes[] = [
+                'nom' => $nom,
+                'path' => $path,
+                'taille' => $taille,
+            ];
+        }
+
         $campagne = CampagneEmail::create([
             'operation_id' => $operation->id,
             'objet' => $this->objet,
             'corps' => $this->corps,
+            'pieces_jointes' => $piecesJointes ?: null,
             'nb_destinataires' => $this->envoiTotal,
             'nb_erreurs' => 0,
             'envoye_par' => Auth::id(),
@@ -324,7 +413,12 @@ final class OperationCommunication extends Component
             }
 
             try {
-                $mail = $this->buildMail($participant, $operation);
+                $trackingToken = Str::random(32);
+                $permanentPaths = array_map(
+                    fn (array $pj) => ['path' => Storage::disk('local')->path($pj['path']), 'nom' => $pj['nom']],
+                    $piecesJointes
+                );
+                $mail = $this->buildMail($participant, $operation, trackingToken: $trackingToken, storedAttachmentPaths: $permanentPaths);
 
                 Mail::mailer()
                     ->to($email)
@@ -338,7 +432,10 @@ final class OperationCommunication extends Component
                     'destinataire_email' => $email,
                     'destinataire_nom' => $tiers->displayName(),
                     'objet' => $mail->envelope()->subject,
+                    'objet_rendu' => $mail->envelope()->subject,
+                    'corps_html' => $mail->corpsHtml,
                     'statut' => 'envoye',
+                    'tracking_token' => $trackingToken,
                     'envoye_par' => Auth::id(),
                     'campagne_id' => $campagne->id,
                 ]);
@@ -379,7 +476,10 @@ final class OperationCommunication extends Component
         $this->dispatch('template-loaded', corps: '');
     }
 
-    private function buildMail(Participant $participant, Operation $operation): MessageLibreMail
+    /**
+     * @param  array<int, string>|null  $storedAttachmentPaths  Permanent paths (after store). If null, uses temp Livewire files.
+     */
+    private function buildMail(Participant $participant, Operation $operation, bool $test = false, ?string $trackingToken = null, ?array $storedAttachmentPaths = null): MessageLibreMail
     {
         $tiers = $participant->tiers;
         $seances = $operation->seances->sortBy('date');
@@ -388,16 +488,27 @@ final class OperationCommunication extends Component
         $prochaine = $seances->first(fn (Seance $s) => $s->date && $s->date->gte($today));
         $precedente = $seances->last(fn (Seance $s) => $s->date && $s->date->lt($today));
 
-        $attachmentPaths = [];
-        foreach ($this->emailAttachments as $file) {
-            $attachmentPaths[] = $file->getRealPath();
+        if ($storedAttachmentPaths !== null) {
+            $attachmentPaths = $storedAttachmentPaths;
+        } else {
+            $attachmentPaths = [];
+            foreach ($this->emailAttachments as $file) {
+                $attachmentPaths[] = ['path' => $file->getRealPath(), 'nom' => $file->getClientOriginalName()];
+            }
         }
+
+        // Count seances done (date in the past) and remaining
+        $seancesEffectuees = $seances->filter(fn (Seance $s) => $s->date && $s->date->lt($today))->count();
+        $seancesRestantes = $seances->filter(fn (Seance $s) => $s->date && $s->date->gte($today))->count();
+        $joursAvant = $prochaine?->date ? (int) $today->diffInDays($prochaine->date, false) : null;
 
         return new MessageLibreMail(
             prenomParticipant: $tiers?->prenom ?? '',
             nomParticipant: $tiers?->nom ?? '',
+            emailParticipant: $tiers?->email ?? '',
             operationNom: $operation->nom,
             typeOperationNom: $operation->typeOperation?->nom ?? '',
+            libelleArticle: $operation->typeOperation?->libelle_article,
             dateDebut: $operation->date_debut?->format('d/m/Y') ?? '',
             dateFin: $operation->date_fin?->format('d/m/Y') ?? '',
             nbSeances: $operation->nombre_seances ?? 0,
@@ -405,18 +516,56 @@ final class OperationCommunication extends Component
             datePrecedenteSeance: $precedente?->date?->format('d/m/Y'),
             numeroProchainSeance: $prochaine?->numero,
             numeroPrecedenteSeance: $precedente?->numero,
-            objet: $this->objet,
+            titreProchainSeance: $prochaine?->titre,
+            titrePrecedenteSeance: $precedente?->titre,
+            joursAvantProchaineSeance: $joursAvant,
+            nbSeancesEffectuees: $seancesEffectuees,
+            nbSeancesRestantes: $seancesRestantes,
+            objet: $test ? '[Test] '.$this->objet : $this->objet,
             corps: $this->corps,
             attachmentPaths: $attachmentPaths,
             typeOperationId: $operation->typeOperation?->id,
+            trackingToken: $trackingToken,
         );
+    }
+
+    public function openPreview(): void
+    {
+        $this->showPreview = true;
+    }
+
+    public function getPreviewHtml(): array
+    {
+        if (empty($this->selectedParticipants) || empty($this->corps)) {
+            return ['objet' => $this->objet, 'corps' => '<p class="text-muted"><em>Saisissez un corps et sélectionnez au moins un participant.</em></p>'];
+        }
+
+        $operation = $this->operation->loadMissing(['typeOperation', 'seances']);
+        $participant = Participant::with('tiers')->find($this->selectedParticipants[0]);
+        if (! $participant) {
+            return ['objet' => $this->objet, 'corps' => ''];
+        }
+
+        $mail = $this->buildMail($participant, $operation);
+
+        return [
+            'objet' => $mail->envelope()->subject,
+            'corps' => $mail->corpsHtml,
+            'participant' => $participant->tiers?->displayName() ?? '—',
+        ];
     }
 
     public function render(): View
     {
+        $allParticipants = $this->getAllParticipants();
+        $withEmail = $allParticipants->filter(fn (Participant $p) => ! empty($p->tiers?->email));
+        $sansEmail = $allParticipants->count() - $withEmail->count();
+
         return view('livewire.operation-communication', [
-            'participants' => $this->getAllParticipants(),
-            'participantsWithEmailCount' => $this->getParticipantsWithEmail()->count(),
+            'participants' => $allParticipants,
+            'participantsWithEmailCount' => $withEmail->count(),
+            'sansEmailCount' => $sansEmail,
+            'seances' => $this->operation->seances()->orderBy('numero')->get(),
             'templates' => $this->getAvailableTemplates(),
             'messageVariables' => CategorieEmail::Message->variables(),
             'unresolvedVariables' => $this->getUnresolvedVariables(),

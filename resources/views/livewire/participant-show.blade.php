@@ -628,6 +628,12 @@
                                                     <i class="bi bi-clipboard"></i>
                                                 </button>
                                             @endif
+                                            @if($event['email_log_id'] ?? false)
+                                                <button type="button" class="btn btn-link btn-sm p-0 text-primary" title="Voir le mail envoyé"
+                                                    wire:click="$set('previewEmailLogId', {{ $event['email_log_id'] }})">
+                                                    <i class="bi bi-eye"></i>
+                                                </button>
+                                            @endif
                                         </div>
                                     @endif
                                 </div>
@@ -642,6 +648,35 @@
         </div>
 
     </div>
+
+    {{-- Modale prévisualisation email --}}
+    @if($previewEmailLogId)
+        @php $previewLog = \App\Models\EmailLog::find($previewEmailLogId); @endphp
+        @if($previewLog)
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+             style="background:rgba(0,0,0,.4);z-index:2100"
+             wire:click.self="$set('previewEmailLogId', null)">
+            <div class="bg-white rounded-3 shadow" style="max-width:700px;width:95%;max-height:80vh;display:flex;flex-direction:column">
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0"><i class="bi bi-envelope-open me-1"></i> Email envoyé</h6>
+                        <small class="text-muted">
+                            {{ $previewLog->created_at->format('d/m/Y à H:i') }}
+                            — à {{ $previewLog->destinataire_email }}
+                        </small>
+                    </div>
+                    <button type="button" class="btn-close" wire:click="$set('previewEmailLogId', null)"></button>
+                </div>
+                <div class="p-3 border-bottom bg-light">
+                    <strong class="small">Objet :</strong> {{ $previewLog->objet_rendu ?? $previewLog->objet }}
+                </div>
+                <div class="p-3" style="overflow-y:auto;flex:1">
+                    {!! $previewLog->corps_html !!}
+                </div>
+            </div>
+        </div>
+        @endif
+    @endif
 
     {{-- Bouton Enregistrer flottant (onglets éditables uniquement) --}}
     @if($this->canEdit)

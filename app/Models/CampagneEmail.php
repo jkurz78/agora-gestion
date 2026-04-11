@@ -19,6 +19,7 @@ final class CampagneEmail extends Model
         'nb_destinataires',
         'nb_erreurs',
         'envoye_par',
+        'pieces_jointes',
     ];
 
     protected function casts(): array
@@ -28,6 +29,7 @@ final class CampagneEmail extends Model
             'nb_destinataires' => 'integer',
             'nb_erreurs' => 'integer',
             'envoye_par' => 'integer',
+            'pieces_jointes' => 'array',
         ];
     }
 
