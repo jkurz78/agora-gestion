@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\TypeTransaction;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
+use App\Models\Transaction;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -18,6 +21,9 @@ final class RemiseBancaireSelection extends Component
 
     /** @var list<int> */
     public array $selectedIds = [];
+
+    /** @var list<int> */
+    public array $selectedTransactionIds = [];
 
     public string $filterOperation = '';
 
@@ -33,6 +39,9 @@ final class RemiseBancaireSelection extends Component
         $this->selectedIds = Reglement::where('remise_id', $remise->id)
             ->pluck('id')
             ->toArray();
+
+        // Pre-select already-linked direct transactions (for modification flow)
+        $this->selectedTransactionIds = $this->remise->transactionsDirectes()->pluck('id')->all();
     }
 
     public function getCanEditProperty(): bool
@@ -73,19 +82,61 @@ final class RemiseBancaireSelection extends Component
         }
     }
 
+    public function toggleTransaction(int $id): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        if (in_array($id, $this->selectedTransactionIds, true)) {
+            $this->selectedTransactionIds = array_values(array_diff($this->selectedTransactionIds, [$id]));
+        } else {
+            $this->selectedTransactionIds[] = $id;
+        }
+    }
+
+    public function toggleAllTransactions(): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $visibleIds = $this->getTransactionsEligibles()->pluck('id')->all();
+        $allSelected = collect($visibleIds)->every(fn ($id) => in_array($id, $this->selectedTransactionIds, true));
+        $this->selectedTransactionIds = $allSelected ? [] : $visibleIds;
+    }
+
+    private function getTransactionsEligibles(): Collection
+    {
+        return Transaction::where('type', TypeTransaction::Recette)
+            ->where('mode_paiement', $this->remise->mode_paiement)
+            ->where('montant_total', '>', 0)
+            ->whereNull('reglement_id')
+            ->whereHas('compte', fn ($q) => $q->where('est_systeme', true))
+            ->where(fn ($q) => $q->whereNull('remise_id')->orWhere('remise_id', $this->remise->id))
+            ->whereNull('rapprochement_id')
+            ->with(['tiers', 'compte'])
+            ->orderByDesc('date')
+            ->get();
+    }
+
     public function valider(): void
     {
         if (! $this->canEdit) {
             return;
         }
 
-        if (count($this->selectedIds) === 0) {
+        if (count($this->selectedIds) === 0 && count($this->selectedTransactionIds) === 0) {
             $this->addError('selection', 'Sélectionnez au moins un règlement.');
 
             return;
         }
 
-        app(RemiseBancaireService::class)->enregistrerBrouillon($this->remise, $this->selectedIds);
+        app(RemiseBancaireService::class)->enregistrerBrouillon(
+            $this->remise,
+            $this->selectedIds,
+            $this->selectedTransactionIds,
+        );
 
         session(['remise_selected_ids' => $this->selectedIds]);
         $this->redirect(route('compta.banques.remises.validation', $this->remise));
@@ -137,11 +188,20 @@ final class RemiseBancaireSelection extends Component
             $r->participant->tiers->nom ?? '',
         ])->values();
 
-        $totalSelected = $reglements->whereIn('id', $this->selectedIds)->sum('montant_prevu');
-        $countSelected = count($this->selectedIds);
+        $transactionsEligibles = $this->getTransactionsEligibles();
+
+        $totalSelectedReglements = (float) $reglements->whereIn('id', $this->selectedIds)->sum('montant_prevu');
+        $totalSelectedTransactions = (float) $transactionsEligibles
+            ->whereIn('id', $this->selectedTransactionIds)
+            ->sum('montant_total');
+
+        $totalSelected = $totalSelectedReglements + $totalSelectedTransactions;
+        $countSelected = count($this->selectedIds) + count($this->selectedTransactionIds);
 
         return view('livewire.remise-bancaire-selection', [
             'reglements' => $reglements,
+            'transactionsEligibles' => $transactionsEligibles,
+            'selectedTransactionIds' => $this->selectedTransactionIds,
             'totalSelected' => $totalSelected,
             'countSelected' => $countSelected,
             'operations' => $operations,

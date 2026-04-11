@@ -503,6 +503,61 @@ test('FactureLigne transactionLigne relation', function (): void {
     expect($ligne->transactionLigne->id)->toBe($transactionLigne->id);
 });
 
+it('compte une transaction avec date_reglement sur un compte système', function (): void {
+    $compteSysteme = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
+    $tiers = Tiers::factory()->create();
+    $user = User::factory()->create();
+
+    $facture = Facture::create([
+        'date' => now(),
+        'statut' => StatutFacture::Validee,
+        'tiers_id' => $tiers->id,
+        'montant_total' => 120.00,
+        'saisi_par' => $user->id,
+        'exercice' => now()->month >= 9 ? now()->year : now()->year - 1,
+    ]);
+
+    $transaction = Transaction::factory()->asRecette()->create([
+        'tiers_id' => $tiers->id,
+        'compte_id' => $compteSysteme->id,
+        'montant_total' => 120.00,
+        'date_reglement' => now(),
+        'reference_reglement' => 'CHQ-12345',
+    ]);
+
+    $facture->transactions()->attach($transaction->id);
+
+    expect($facture->montantRegle())->toBe(120.00);
+    expect($facture->isAcquittee())->toBeTrue();
+});
+
+it('ne compte pas une transaction sur compte système sans date_reglement ni remise_id', function (): void {
+    $compteSysteme = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
+    $tiers = Tiers::factory()->create();
+    $user = User::factory()->create();
+
+    $facture = Facture::create([
+        'date' => now(),
+        'statut' => StatutFacture::Validee,
+        'tiers_id' => $tiers->id,
+        'montant_total' => 120.00,
+        'saisi_par' => $user->id,
+        'exercice' => now()->month >= 9 ? now()->year : now()->year - 1,
+    ]);
+
+    $transaction = Transaction::factory()->asRecette()->create([
+        'tiers_id' => $tiers->id,
+        'compte_id' => $compteSysteme->id,
+        'montant_total' => 120.00,
+        'date_reglement' => null,
+    ]);
+
+    $facture->transactions()->attach($transaction->id);
+
+    expect($facture->montantRegle())->toBe(0.0);
+    expect($facture->isAcquittee())->toBeFalse();
+});
+
 test('Transaction factures relation via pivot', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();

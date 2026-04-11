@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Enums\Espace;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
+use App\Models\Transaction;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +20,9 @@ final class RemiseBancaireValidation extends Component
     /** @var list<int> */
     public array $selectedIds = [];
 
+    /** @var list<int> */
+    public array $selectedTransactionIds = [];
+
     public function mount(RemiseBancaire $remise): void
     {
         $this->remise = $remise;
@@ -26,6 +30,8 @@ final class RemiseBancaireValidation extends Component
         // Lire depuis la DB (brouillon persisté), fallback session pour rétrocompatibilité
         $dbIds = Reglement::where('remise_id', $remise->id)->pluck('id')->toArray();
         $this->selectedIds = count($dbIds) > 0 ? $dbIds : session('remise_selected_ids', []);
+
+        $this->selectedTransactionIds = $remise->transactionsDirectes()->pluck('id')->all();
     }
 
     public function getCanEditProperty(): bool
@@ -43,9 +49,9 @@ final class RemiseBancaireValidation extends Component
             $service = app(RemiseBancaireService::class);
 
             if ($this->remise->virement_id !== null) {
-                $service->modifier($this->remise, $this->selectedIds);
+                $service->modifier($this->remise, $this->selectedIds, $this->selectedTransactionIds);
             } else {
-                $service->comptabiliser($this->remise, $this->selectedIds);
+                $service->comptabiliser($this->remise, $this->selectedIds, $this->selectedTransactionIds);
             }
 
             session()->forget('remise_selected_ids');
@@ -67,11 +73,17 @@ final class RemiseBancaireValidation extends Component
                 $r->participant->tiers->nom ?? '',
             ])->values();
 
-        $totalMontant = $reglements->sum('montant_prevu');
+        $transactionsDirectes = Transaction::whereIn('id', $this->selectedTransactionIds)
+            ->with(['tiers', 'compte'])
+            ->get();
+
+        $totalMontant = $reglements->sum('montant_prevu') + $transactionsDirectes->sum('montant_total');
 
         return view('livewire.remise-bancaire-validation', [
             'reglements' => $reglements,
+            'transactionsDirectes' => $transactionsDirectes,
             'totalMontant' => $totalMontant,
+            'countTotal' => $reglements->count() + $transactionsDirectes->count(),
         ]);
     }
 }
