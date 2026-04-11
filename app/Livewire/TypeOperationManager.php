@@ -85,6 +85,8 @@ final class TypeOperationManager extends Component
     // ── Email template state ──────────────────────────────────────
     public string $emailSubTab = 'formulaire';
 
+    public bool $showPromoteConfirm = false;
+
     /** @var array<string, array{id: int|null, objet: string, corps: string, is_default: bool}> */
     public array $emailTemplates = [];
 
