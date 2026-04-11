@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Livewire\OperationCommunication;
 use App\Livewire\OperationDetail;
+use App\Mail\MessageLibreMail;
+use App\Models\CampagneEmail;
+use App\Models\EmailLog;
 use App\Models\MessageTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -12,6 +15,8 @@ use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -205,4 +210,193 @@ it('groups templates by type operation', function () {
 
     $component->assertSee('Gabarit global')
         ->assertSee('Gabarit sophrologie');
+});
+
+// Step 11 tests
+
+it('validates file attachment mime types', function () {
+    $component = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);
+
+    $badFile = UploadedFile::fake()->create('script.exe', 100, 'application/octet-stream');
+
+    $component->set('emailAttachments', [$badFile])
+        ->assertHasErrors(['emailAttachments.*']);
+});
+
+it('validates file attachment count does not exceed 5', function () {
+    $component = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);
+
+    $files = [];
+    for ($i = 0; $i < 6; $i++) {
+        $files[] = UploadedFile::fake()->create("file{$i}.pdf", 100, 'application/pdf');
+    }
+
+    $component->set('emailAttachments', $files)
+        ->assertHasErrors(['emailAttachments']);
+});
+
+it('removes an attachment by index', function () {
+    // Test removeAttachment logic directly on the component instance
+    $component = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);
+
+    // Verify removeAttachment re-indexes the array correctly
+    $instance = $component->instance();
+    $file0 = UploadedFile::fake()->create('a.pdf', 100, 'application/pdf');
+    $file1 = UploadedFile::fake()->create('b.pdf', 100, 'application/pdf');
+    $instance->emailAttachments = [$file0, $file1];
+    $instance->removeAttachment(0);
+
+    expect($instance->emailAttachments)->toHaveCount(1);
+    expect($instance->emailAttachments[0]->getClientOriginalName())->toBe('b.pdf');
+});
+
+// Step 12 tests
+
+it('sends test email to specified address', function () {
+    Mail::fake();
+
+    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+
+    $tiers = Tiers::factory()->create(['email' => 'alice@example.com', 'prenom' => 'Alice', 'nom' => 'Dupont']);
+    Participant::create([
+        'tiers_id' => $tiers->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => now(),
+    ]);
+
+    Livewire::test(OperationCommunication::class, ['operation' => $operation])
+        ->set('objet', 'Bonjour {prenom}')
+        ->set('corps', 'Corps du message')
+        ->set('testEmail', 'test@admin.fr')
+        ->call('envoyerTest');
+
+    Mail::assertSent(MessageLibreMail::class, fn ($mail) => $mail->hasTo('test@admin.fr'));
+});
+
+it('requires email_from configured for test send', function () {
+    Mail::fake();
+
+    $typeOp = TypeOperation::factory()->create(['email_from' => null]);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+
+    $tiers = Tiers::factory()->create(['email' => 'alice@example.com']);
+    Participant::create([
+        'tiers_id' => $tiers->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => now(),
+    ]);
+
+    Livewire::test(OperationCommunication::class, ['operation' => $operation])
+        ->set('objet', 'Sujet')
+        ->set('corps', 'Corps')
+        ->set('testEmail', 'test@admin.fr')
+        ->call('envoyerTest')
+        ->assertSee("Adresse d'expédition non configurée");
+
+    Mail::assertNothingSent();
+});
+
+it('requires selected participant for test send', function () {
+    Mail::fake();
+
+    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+
+    Livewire::test(OperationCommunication::class, ['operation' => $operation])
+        ->set('objet', 'Sujet')
+        ->set('corps', 'Corps')
+        ->set('testEmail', 'test@admin.fr')
+        ->set('selectedParticipants', [])
+        ->call('envoyerTest')
+        ->assertSee('Aucun participant sélectionné');
+
+    Mail::assertNothingSent();
+});
+
+// Step 13 tests
+
+it('sends emails to all selected participants and creates campaign', function () {
+    Mail::fake();
+
+    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+
+    $participants = [];
+    for ($i = 1; $i <= 3; $i++) {
+        $tiers = Tiers::factory()->create(['email' => "p{$i}@example.com"]);
+        $participants[] = Participant::create([
+            'tiers_id' => $tiers->id,
+            'operation_id' => $operation->id,
+            'date_inscription' => now(),
+        ]);
+    }
+
+    $pIds = array_column($participants, 'id');
+
+    Livewire::test(OperationCommunication::class, ['operation' => $operation])
+        ->set('objet', 'Message de test')
+        ->set('corps', 'Bonjour {prenom}')
+        ->set('selectedParticipants', $pIds)
+        ->call('envoyerMessages');
+
+    Mail::assertSentCount(3);
+
+    $campagne = CampagneEmail::first();
+    expect($campagne)->not->toBeNull();
+    expect($campagne->operation_id)->toBe($operation->id);
+    expect($campagne->nb_erreurs)->toBe(0);
+
+    expect(EmailLog::where('operation_id', $operation->id)->count())->toBe(3);
+    expect(EmailLog::where('campagne_id', $campagne->id)->count())->toBe(3);
+    expect(EmailLog::where('statut', 'envoye')->count())->toBe(3);
+});
+
+it('logs error and updates campaign nb_erreurs on send failure', function () {
+    Mail::fake();
+    Mail::shouldReceive('mailer')->andReturnSelf();
+    Mail::shouldReceive('to')->andReturnSelf();
+    Mail::shouldReceive('send')->andThrow(new Exception('SMTP error'));
+
+    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+
+    $tiers = Tiers::factory()->create(['email' => 'fail@example.com']);
+    $participant = Participant::create([
+        'tiers_id' => $tiers->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => now(),
+    ]);
+
+    Livewire::test(OperationCommunication::class, ['operation' => $operation])
+        ->set('objet', 'Sujet')
+        ->set('corps', 'Corps')
+        ->set('selectedParticipants', [$participant->id])
+        ->call('envoyerMessages');
+
+    expect(EmailLog::where('statut', 'erreur')->count())->toBe(1);
+    expect(CampagneEmail::first()->nb_erreurs)->toBe(1);
+});
+
+it('resets form after successful send', function () {
+    Mail::fake();
+
+    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+
+    $tiers = Tiers::factory()->create(['email' => 'alice@example.com']);
+    $participant = Participant::create([
+        'tiers_id' => $tiers->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => now(),
+    ]);
+
+    Livewire::test(OperationCommunication::class, ['operation' => $operation])
+        ->set('objet', 'Un sujet')
+        ->set('corps', 'Un corps')
+        ->set('selectedParticipants', [$participant->id])
+        ->call('envoyerMessages')
+        ->assertSet('objet', '')
+        ->assertSet('corps', '')
+        ->assertSet('selectedTemplateId', null);
 });
