@@ -122,6 +122,59 @@
                 </div>
             </div>
             @endif
+
+            @if($transactionsReglementRecu->isNotEmpty() && $this->canEdit && !$isAcquittee)
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">Règlement reçu (chèque / espèces)</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">Marquez les transactions dont vous avez reçu le paiement. La facture sera acquittée immédiatement. La remise en banque pourra être faite ultérieurement.</p>
+
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px"></th>
+                                <th>Libellé</th>
+                                <th>Mode</th>
+                                <th class="text-end">Montant</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($transactionsReglementRecu as $tx)
+                            <tr wire:key="reglement-{{ $tx->id }}">
+                                <td>
+                                    <input type="checkbox" wire:click="toggleTransaction({{ $tx->id }})"
+                                        @checked(in_array($tx->id, $selectedTransactionIds))>
+                                </td>
+                                <td>{{ $tx->libelle }}</td>
+                                <td>{{ $tx->mode_paiement?->value }}</td>
+                                <td class="text-end">{{ number_format($tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+
+                    <div class="row g-2 align-items-end">
+                        <div class="col-auto">
+                            <label class="form-label small">Date de règlement</label>
+                            <input type="date" class="form-control form-control-sm" wire:model="dateReglement">
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label small">Référence <span class="text-muted" title="ex: n° de chèque" data-bs-toggle="tooltip">&#9432;</span></label>
+                            <input type="text" class="form-control form-control-sm" wire:model="referenceReglement"
+                                placeholder="ex: n° de chèque">
+                        </div>
+                        <div class="col-auto">
+                            <button class="btn btn-sm btn-success" wire:click="marquerReglementRecu"
+                                wire:confirm="Confirmer le règlement reçu ?">
+                                Règlement reçu
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
         </div>
 
         <div class="col-lg-4">

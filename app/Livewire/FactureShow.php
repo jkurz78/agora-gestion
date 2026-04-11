@@ -32,6 +32,10 @@ final class FactureShow extends Component
 
     public ?int $encaissementCompteId = null;
 
+    public ?string $dateReglement = null;
+
+    public ?string $referenceReglement = null;
+
     // ── Email state ──
     public string $emailMessage = '';
 
@@ -102,6 +106,43 @@ final class FactureShow extends Component
             $this->facture->load(['transactions.compte']);
 
             session()->flash('success', 'Encaissement enregistré.');
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function marquerReglementRecu(): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        if ($this->dateReglement === null) {
+            session()->flash('error', 'Veuillez saisir une date de règlement.');
+
+            return;
+        }
+
+        if (count($this->selectedTransactionIds) === 0) {
+            session()->flash('error', 'Veuillez sélectionner au moins une transaction.');
+
+            return;
+        }
+
+        try {
+            app(FactureService::class)->marquerReglementRecu(
+                $this->facture,
+                $this->selectedTransactionIds,
+                $this->dateReglement,
+                $this->referenceReglement ?: null,
+            );
+
+            $this->selectedTransactionIds = [];
+            $this->dateReglement = null;
+            $this->referenceReglement = null;
+            $this->facture->load(['transactions.compte']);
+
+            session()->flash('success', 'Règlement enregistré.');
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -185,6 +226,9 @@ final class FactureShow extends Component
         $transactionsAEncaisser = $this->facture->transactions
             ->filter(fn ($t) => $t->compte->est_systeme);
 
+        $transactionsReglementRecu = $this->facture->transactions
+            ->filter(fn ($t) => $t->compte->est_systeme && $t->date_reglement === null);
+
         $comptesDestination = CompteBancaire::where('est_systeme', false)
             ->where('actif_recettes_depenses', true)
             ->orderBy('nom')
@@ -210,6 +254,7 @@ final class FactureShow extends Component
             'montantRegle' => $montantRegle,
             'isAcquittee' => $isAcquittee,
             'transactionsAEncaisser' => $transactionsAEncaisser,
+            'transactionsReglementRecu' => $transactionsReglementRecu,
             'comptesDestination' => $comptesDestination,
             'operationsLiees' => $operationsLiees,
         ]);
