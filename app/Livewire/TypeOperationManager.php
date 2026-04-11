@@ -493,21 +493,35 @@ final class TypeOperationManager extends Component
             ->whereNull('type_operation_id')
             ->first();
 
+        $objet = $this->emailTemplates[$categorie]['objet'];
+        $corps = $this->emailTemplates[$categorie]['corps'];
+
+        // Update or create the default template
         if ($default) {
-            $default->update([
-                'objet' => $this->emailTemplates[$categorie]['objet'],
-                'corps' => $this->emailTemplates[$categorie]['corps'],
-            ]);
+            $default->update(['objet' => $objet, 'corps' => $corps]);
         } else {
-            EmailTemplate::create([
+            $default = EmailTemplate::create([
                 'categorie' => $categorie,
                 'type_operation_id' => null,
-                'objet' => $this->emailTemplates[$categorie]['objet'],
-                'corps' => $this->emailTemplates[$categorie]['corps'],
+                'objet' => $objet,
+                'corps' => $corps,
             ]);
         }
 
-        session()->flash('message', 'Modèle par défaut mis à jour.');
+        // Delete the custom template (it's now the default)
+        if ($this->emailTemplates[$categorie]['id'] !== null) {
+            EmailTemplate::where('id', $this->emailTemplates[$categorie]['id'])->delete();
+        }
+
+        // Switch view to default mode
+        $this->emailTemplates[$categorie] = [
+            'id' => $default->id,
+            'objet' => $default->objet,
+            'corps' => $default->corps,
+            'is_default' => true,
+        ];
+
+        session()->flash('message', 'Modèle par défaut mis à jour. La personnalisation a été supprimée.');
     }
 
     // ── Private helpers ──────────────────────────────────────────
