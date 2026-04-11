@@ -43,12 +43,15 @@
         </div>
     </div>
 
-    {{-- Tableau des règlements --}}
-    @if ($reglements->isEmpty())
+    @if ($countTotal === 0)
         <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle"></i> Aucun règlement sélectionné.
+            <i class="bi bi-exclamation-triangle"></i> Aucun élément sélectionné.
         </div>
-    @else
+    @endif
+
+    {{-- Tableau des règlements séances --}}
+    @if ($reglements->isNotEmpty())
+        <h6>Règlements séances</h6>
         <div class="table-responsive">
             <table class="table table-striped align-middle">
                 <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
@@ -73,16 +76,18 @@
                 </tbody>
                 <tfoot>
                     <tr class="fw-bold">
-                        <td colspan="4" class="text-end">Total</td>
-                        <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                        <td colspan="4" class="text-end">Sous-total</td>
+                        <td class="text-end text-nowrap">{{ number_format((float) $reglements->sum('montant_prevu'), 2, ',', "\u{00A0}") }}&nbsp;€</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
+    @endif
 
-        @if($transactionsDirectes->isNotEmpty())
-        <h6 class="mt-3">Transactions (hors séances)</h6>
-        <table class="table table-sm">
+    {{-- Tableau des transactions hors séances --}}
+    @if ($transactionsDirectes->isNotEmpty())
+        <h6 class="{{ $reglements->isNotEmpty() ? 'mt-3' : '' }}">Transactions (hors séances)</h6>
+        <table class="table table-sm table-striped align-middle">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
                     <th>#</th>
@@ -93,20 +98,25 @@
                     <th class="text-end">Montant</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody style="color:#555">
                 @foreach($transactionsDirectes as $tx)
                 <tr>
-                    <td>{{ $loop->iteration }}</td>
-                    <td>{{ $tx->date->format('d/m/Y') }}</td>
-                    <td>{{ $tx->libelle }}</td>
-                    <td>{{ $tx->tiers?->displayName() ?? '—' }}</td>
-                    <td>{{ $tx->compte->nom }}</td>
-                    <td class="text-end">{{ number_format($tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                    <td class="small">{{ $loop->iteration }}</td>
+                    <td class="small">{{ $tx->date->format('d/m/Y') }}</td>
+                    <td class="small">{{ $tx->libelle }}</td>
+                    <td class="small">{{ $tx->tiers?->displayName() ?? '—' }}</td>
+                    <td class="small">{{ $tx->compte->nom }}</td>
+                    <td class="text-end small fw-semibold text-nowrap">{{ number_format($tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
                 </tr>
                 @endforeach
             </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="5" class="text-end">Sous-total</td>
+                    <td class="text-end text-nowrap">{{ number_format((float) $transactionsDirectes->sum('montant_total'), 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                </tr>
+            </tfoot>
         </table>
-        @endif
     @endif
 
     {{-- Actions --}}
