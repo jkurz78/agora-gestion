@@ -418,6 +418,9 @@ final class TypeOperationManager extends Component
     public function loadEmailTemplates(?int $typeOperationId): void
     {
         foreach (CategorieEmail::cases() as $cat) {
+            if ($cat === CategorieEmail::Message) {
+                continue;
+            }
             $custom = $typeOperationId !== null
                 ? EmailTemplate::where('categorie', $cat->value)
                     ->where('type_operation_id', $typeOperationId)
@@ -476,6 +479,33 @@ final class TypeOperationManager extends Component
             'corps' => $default?->corps ?? '',
             'is_default' => true,
         ];
+    }
+
+    public function promouvoirEnDefaut(string $categorie): void
+    {
+        if (! isset($this->emailTemplates[$categorie]) || $this->emailTemplates[$categorie]['is_default']) {
+            return;
+        }
+
+        $default = EmailTemplate::where('categorie', $categorie)
+            ->whereNull('type_operation_id')
+            ->first();
+
+        if ($default) {
+            $default->update([
+                'objet' => $this->emailTemplates[$categorie]['objet'],
+                'corps' => $this->emailTemplates[$categorie]['corps'],
+            ]);
+        } else {
+            EmailTemplate::create([
+                'categorie' => $categorie,
+                'type_operation_id' => null,
+                'objet' => $this->emailTemplates[$categorie]['objet'],
+                'corps' => $this->emailTemplates[$categorie]['corps'],
+            ]);
+        }
+
+        session()->flash('message', 'Modèle par défaut mis à jour.');
     }
 
     // ── Private helpers ──────────────────────────────────────────

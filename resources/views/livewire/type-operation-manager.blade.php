@@ -339,6 +339,7 @@
                 {{-- Sous-onglets email --}}
                 <ul class="nav nav-pills nav-fill mb-3">
                     @foreach (\App\Enums\CategorieEmail::cases() as $cat)
+                        @if($cat === \App\Enums\CategorieEmail::Message) @continue @endif
                         <li class="nav-item">
                             <button class="nav-link {{ $emailSubTab === $cat->value ? 'active' : '' }}"
                                     wire:click="$set('emailSubTab', '{{ $cat->value }}')" type="button">
@@ -368,17 +369,82 @@
                                     <i class="bi bi-pencil"></i> Personnaliser
                                 </button>
                             @else
-                                <button type="button" class="btn btn-sm btn-outline-secondary"
-                                        wire:click="revenirAuDefaut('{{ $emailSubTab }}')">
-                                    <i class="bi bi-arrow-counterclockwise"></i> Revenir au défaut
-                                </button>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            wire:click="revenirAuDefaut('{{ $emailSubTab }}')">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Revenir au défaut
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning"
+                                            wire:click="promouvoirEnDefaut('{{ $emailSubTab }}')"
+                                            wire:confirm="Remplacer le modèle par défaut par cette version personnalisée ?">
+                                        <i class="bi bi-arrow-up-circle"></i> Promouvoir en défaut
+                                    </button>
+                                </div>
                             @endif
                         </div>
 
                         {{-- Subject --}}
                         <div class="mb-3">
-                            <label class="form-label small fw-semibold">Objet</label>
+                            @php $isEditable = !$tplData['is_default']; @endphp
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <label class="form-label small fw-semibold mb-0">Objet</label>
+                                @if($isEditable)
+                                <div x-data="{ openGroup: null }" @click.outside="openGroup = null" class="position-relative">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size:11px" @click="openGroup = openGroup ? null : 'root'">
+                                        <i class="bi bi-braces me-1"></i>Variables
+                                    </button>
+                                    <div class="dropdown-menu" :class="openGroup && 'show'" style="min-width:160px;font-size:12px;z-index:2200">
+                                        @php
+                                            $objtVarGroups = match($emailSubTab) {
+                                                'formulaire' => [
+                                                    'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom'],
+                                                    'Opération' => ['{operation}' => 'Opération', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
+                                                    'Formulaire' => ['{url}' => 'URL', '{code}' => 'Code', '{date_expiration}' => 'Date expiration'],
+                                                ],
+                                                'attestation' => [
+                                                    'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom'],
+                                                    'Opération' => ['{operation}' => 'Opération', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
+                                                    'Séance' => ['{numero_seance}' => 'N° séance', '{date_seance}' => 'Date séance'],
+                                                ],
+                                                'document' => [
+                                                    'Destinataire' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom'],
+                                                    'Document' => ['{type_document}' => 'Type', '{type_document_uc}' => 'Type (maj.)', '{type_document_article}' => 'Avec article', '{numero_document}' => 'Numéro', '{date_document}' => 'Date', '{montant_total}' => 'Montant'],
+                                                ],
+                                                default => [],
+                                            };
+                                        @endphp
+                                        @foreach($objtVarGroups as $groupName => $vars)
+                                            <div class="position-relative" @mouseenter="openGroup = '{{ $groupName }}'" @mouseleave="openGroup = openGroup === '{{ $groupName }}' ? 'root' : openGroup">
+                                                <a class="dropdown-item d-flex justify-content-between" href="#">
+                                                    {{ $groupName }} <i class="bi bi-chevron-right"></i>
+                                                </a>
+                                                <div class="dropdown-menu" :class="openGroup === '{{ $groupName }}' && 'show'"
+                                                     style="position:absolute;left:100%;top:0;min-width:260px;z-index:2200">
+                                                    @foreach($vars as $var => $desc)
+                                                        @if(!str_starts_with($var, '{logo'))
+                                                        <a class="dropdown-item" href="#"
+                                                           @click.prevent="
+                                                               const input = document.getElementById('objet-input-{{ $emailSubTab }}');
+                                                               const pos = input.selectionStart || input.value.length;
+                                                               const val = input.value;
+                                                               input.value = val.substring(0, pos) + '{{ $var }}' + val.substring(pos);
+                                                               input.dispatchEvent(new Event('input'));
+                                                               openGroup = null;
+                                                               input.focus();
+                                                           ">
+                                                            <code class="text-primary">{{ $var }}</code> <span class="text-muted">{{ $desc }}</span>
+                                                        </a>
+                                                        @endif
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                                @endif
+                            </div>
                             <input type="text" class="form-control form-control-sm"
+                                   id="objet-input-{{ $emailSubTab }}"
                                    wire:model="emailTemplates.{{ $emailSubTab }}.objet"
                                    {{ $tplData['is_default'] ? 'readonly' : '' }}>
                         </div>
@@ -396,17 +462,11 @@
                             <textarea x-ref="editor">{!! $tplData['corps'] !!}</textarea>
                         </div>
 
-                        <div class="form-text small mt-2">
-                            Variables :
-                            @foreach (\App\Enums\CategorieEmail::from($emailSubTab)->variables() as $var => $desc)
-                                <code title="{{ $desc }}">{{ $var }}</code>
-                            @endforeach
-                            @if($emailSubTab === 'formulaire')
-                                — Le lien, le code et la date d'expiration sont ajoutés automatiquement sous le corps.
-                            @else
-                                — Le document est joint automatiquement à l'email.
-                            @endif
-                        </div>
+                        @if($emailSubTab === 'formulaire')
+                            <div class="form-text small mt-2">Le lien, le code et la date d'expiration sont ajoutés automatiquement sous le corps.</div>
+                        @elseif($emailSubTab === 'document')
+                            <div class="form-text small mt-2">Le document est joint automatiquement à l'email.</div>
+                        @endif
                     </div>
                 @endif
 
@@ -599,30 +659,32 @@
             $wire.call('saveWithEditorContent', content);
         };
 
-        const emailVariables = {
+        const emailVariableGroups = {
             formulaire: {
-                '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
-                '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
-                '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
-                '{bloc_liens}': 'Bloc liens (bouton + code + expiration)',
-                '{url}': 'URL du formulaire', '{code}': 'Code formulaire',
-                '{date_expiration}': 'Date expiration',
+                'Participant': { '{prenom}': 'Prénom', '{nom}': 'Nom' },
+                'Opération': { '{operation}': 'Opération', '{type_operation}': 'Type opération', '{date_debut}': 'Date début', '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances' },
+                'Formulaire': { '{bloc_liens}': 'Bloc liens (bouton + code + expiration)', '{url}': 'URL', '{code}': 'Code', '{date_expiration}': 'Date expiration' },
+                'Logos': { '{logo}': 'Association', '{logo_operation}': 'Opération' },
             },
             attestation: {
-                '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
-                '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
-                '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
-                '{numero_seance}': 'N° séance', '{date_seance}': 'Date séance',
-                '{bloc_seances}': 'Bloc séance(s) : détail ou tableau récap',
+                'Participant': { '{prenom}': 'Prénom', '{nom}': 'Nom' },
+                'Opération': { '{operation}': 'Opération', '{type_operation}': 'Type opération', '{date_debut}': 'Date début', '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances' },
+                'Séance': { '{numero_seance}': 'N° séance', '{date_seance}': 'Date séance', '{bloc_seances}': 'Bloc séance(s)' },
+                'Logos': { '{logo}': 'Association', '{logo_operation}': 'Opération' },
             },
-            facture: {
-                '{prenom}': 'Prénom', '{nom}': 'Nom', '{operation}': 'Opération',
-                '{type_operation}': 'Type opération', '{date_debut}': 'Date début',
-                '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances',
-                '{numero_seance}': 'N° séance', '{date_seance}': 'Date séance',
-                '{date_facture}': 'Date facture', '{numero_facture}': 'N° facture',
+            document: {
+                'Destinataire': { '{prenom}': 'Prénom', '{nom}': 'Nom' },
+                'Document': { '{type_document}': 'Type', '{type_document_uc}': 'Type (majuscule)', '{type_document_article}': 'Type avec article', '{type_document_article_de}': 'Type avec de', '{numero_document}': 'Numéro', '{date_document}': 'Date', '{montant_total}': 'Montant total' },
+                'Logos': { '{logo}': 'Association', '{logo_operation}': 'Opération' },
             },
         };
+
+        // Flat version for wrapping/stripping
+        const emailVariables = {};
+        Object.entries(emailVariableGroups).forEach(([cat, groups]) => {
+            emailVariables[cat] = {};
+            Object.values(groups).forEach(vars => Object.assign(emailVariables[cat], vars));
+        });
 
         Alpine.data('tinymceEditor', (categorie, isReadonly) => ({
             editor: null,
@@ -645,15 +707,20 @@
 
                 const self = this;
 
+                const groups = emailVariableGroups[categorie] || {};
                 const variables = emailVariables[categorie] || {};
-                const menuItems = Object.entries(variables).map(([key, label]) => ({
-                    type: 'menuitem',
-                    text: key + ' — ' + label,
-                    onAction: () => {
-                        if (self.editor) {
-                            self.editor.insertContent('<span class="mce-variable mce-noneditable">' + key + '</span>&nbsp;');
-                        }
-                    },
+                const menuItems = Object.entries(groups).map(([groupName, vars]) => ({
+                    type: 'nestedmenuitem',
+                    text: groupName,
+                    getSubmenuItems: () => Object.entries(vars).map(([key, label]) => ({
+                        type: 'menuitem',
+                        text: key + ' — ' + label,
+                        onAction: () => {
+                            if (self.editor) {
+                                self.editor.insertContent('<span class="mce-variable mce-noneditable">' + key + '</span>&nbsp;');
+                            }
+                        },
+                    })),
                 }));
 
                 tinymce.init({
