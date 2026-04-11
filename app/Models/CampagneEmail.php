@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class CampagneEmail extends Model
 {
+    protected $table = 'campagnes_email';
+
     protected $fillable = [
         'operation_id',
         'objet',
