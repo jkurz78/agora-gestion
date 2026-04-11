@@ -41,6 +41,9 @@ final class Transaction extends Model
         'helloasso_order_id',
         'helloasso_cashout_id',
         'helloasso_payment_id',
+        'date_reglement',
+        'reference_reglement',
+        'compte_origine_id',
     ];
 
     protected function casts(): array
@@ -60,6 +63,8 @@ final class Transaction extends Model
             'helloasso_order_id' => 'integer',
             'helloasso_cashout_id' => 'integer',
             'helloasso_payment_id' => 'integer',
+            'date_reglement' => 'date',
+            'compte_origine_id' => 'integer',
         ];
     }
 
@@ -96,6 +101,11 @@ final class Transaction extends Model
     public function reglement(): BelongsTo
     {
         return $this->belongsTo(Reglement::class, 'reglement_id');
+    }
+
+    public function compteOrigine(): BelongsTo
+    {
+        return $this->belongsTo(CompteBancaire::class, 'compte_origine_id');
     }
 
     public function lignes(): HasMany
