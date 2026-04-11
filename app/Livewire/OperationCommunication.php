@@ -8,6 +8,7 @@ use App\Enums\CategorieEmail;
 use App\Models\MessageTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\Seance;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -75,7 +76,41 @@ final class OperationCommunication extends Component
         if ($template) {
             $this->objet = $template->objet;
             $this->corps = $template->corps;
+            $this->dispatch('template-loaded', corps: $this->corps);
         }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getUnresolvedVariables(): array
+    {
+        if (empty($this->corps)) {
+            return [];
+        }
+
+        $operation = $this->operation->loadMissing('seances');
+        $seances = $operation->seances->sortBy('date');
+        $today = now()->startOfDay();
+
+        $prochaine = $seances->first(fn (Seance $s) => $s->date && $s->date->gte($today));
+        $precedente = $seances->last(fn (Seance $s) => $s->date && $s->date->lt($today));
+
+        $values = [
+            '{date_prochaine_seance}' => $prochaine?->date?->format('d/m/Y') ?? '',
+            '{date_precedente_seance}' => $precedente?->date?->format('d/m/Y') ?? '',
+            '{numero_prochaine_seance}' => $prochaine ? (string) $prochaine->numero : '',
+            '{numero_precedente_seance}' => $precedente ? (string) $precedente->numero : '',
+        ];
+
+        $unresolved = [];
+        foreach ($values as $var => $value) {
+            if ($value === '' && str_contains($this->corps, $var)) {
+                $unresolved[] = $var;
+            }
+        }
+
+        return $unresolved;
     }
 
     public function getAvailableTemplates(): Collection
@@ -93,6 +128,7 @@ final class OperationCommunication extends Component
             'participantsWithEmailCount' => $this->getParticipantsWithEmail()->count(),
             'templates' => $this->getAvailableTemplates(),
             'messageVariables' => CategorieEmail::Message->variables(),
+            'unresolvedVariables' => $this->getUnresolvedVariables(),
         ]);
     }
 }

@@ -7,6 +7,7 @@ use App\Livewire\OperationDetail;
 use App\Models\MessageTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
@@ -111,6 +112,37 @@ it('loads template into objet and corps', function () {
         ->call('loadTemplate')
         ->assertSet('objet', 'Rappel : votre prochaine séance')
         ->assertSet('corps', 'Bonjour {prenom}, à bientôt !');
+});
+
+// Step 9 tests
+
+it('computes unresolved variables when no future seance exists', function () {
+    $component = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);
+
+    // Set corps containing a variable that requires a future seance
+    $component->set('corps', 'Prochaine séance : {date_prochaine_seance}');
+
+    $instance = $component->instance();
+    $unresolved = $instance->getUnresolvedVariables();
+
+    expect($unresolved)->toContain('{date_prochaine_seance}');
+});
+
+it('returns empty unresolved when all variables are resolvable', function () {
+    // Create a future seance for the operation
+    Seance::create([
+        'operation_id' => $this->operation->id,
+        'numero' => 1,
+        'date' => now()->addDays(7)->toDateString(),
+    ]);
+
+    $component = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);
+    $component->set('corps', 'Prochaine séance : {date_prochaine_seance}');
+
+    $instance = $component->instance();
+    $unresolved = $instance->getUnresolvedVariables();
+
+    expect($unresolved)->toBeEmpty();
 });
 
 it('groups templates by type operation', function () {
