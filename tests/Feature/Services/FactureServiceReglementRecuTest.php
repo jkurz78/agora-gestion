@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
-use App\Enums\TypeTransaction;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Tiers;
