@@ -251,12 +251,56 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="4">Total — {{ $reglements->count() }} pièce{{ $reglements->count() > 1 ? 's' : '' }}</td>
-                    <td class="text-end">{{ number_format($montantTotal, 2, ',', ' ') }} &euro;</td>
+                    <td colspan="4">Sous-total — {{ $reglements->count() }} pièce{{ $reglements->count() > 1 ? 's' : '' }}</td>
+                    <td class="text-end">{{ number_format((float) $reglements->sum('montant_prevu'), 2, ',', ' ') }} &euro;</td>
                 </tr>
             </tfoot>
         </table>
     @endif
+
+    {{-- TRANSACTIONS DIRECTES --}}
+    @if ($transactionsDirectes->isNotEmpty())
+        <div class="section-title" style="margin-top: 16px;">Autres transactions ({{ $transactionsDirectes->count() }})</div>
+
+        <table class="tx-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">N°</th>
+                    <th style="width: 15%;">Date</th>
+                    <th style="width: 30%;">Tireur</th>
+                    <th style="width: 30%;">Libellé</th>
+                    <th class="text-end" style="width: 20%;">Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($transactionsDirectes as $i => $tx)
+                    <tr class="{{ $i % 2 === 1 ? 'even' : '' }}">
+                        <td>{{ $i + 1 }}</td>
+                        <td>{{ $tx->date->format('d/m/Y') }}</td>
+                        <td>{{ $tx->tiers?->displayName() ?? '—' }}</td>
+                        <td>{{ $tx->libelle }}</td>
+                        <td class="text-end">{{ number_format((float) $tx->montant_total, 2, ',', ' ') }} &euro;</td>
+                    </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4">Sous-total — {{ $transactionsDirectes->count() }} pièce{{ $transactionsDirectes->count() > 1 ? 's' : '' }}</td>
+                    <td class="text-end">{{ number_format((float) $transactionsDirectes->sum('montant_total'), 2, ',', ' ') }} &euro;</td>
+                </tr>
+            </tfoot>
+        </table>
+    @endif
+
+    {{-- TOTAL GÉNÉRAL --}}
+    <div class="summary">
+        <table>
+            <tr>
+                <td class="label">Total général — {{ $reglements->count() + $transactionsDirectes->count() }} pièce{{ ($reglements->count() + $transactionsDirectes->count()) > 1 ? 's' : '' }}</td>
+                <td style="font-weight: bold; font-size: 13px;">{{ number_format($montantTotal, 2, ',', ' ') }} &euro;</td>
+            </tr>
+        </table>
+    </div>
 
     {{-- SIGNATURE --}}
     <div class="signature-zone">
