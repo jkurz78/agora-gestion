@@ -32,12 +32,12 @@
                     <strong>{{ $remise->mode_paiement->label() }}</strong>
                 </div>
                 <div class="col-md-2">
-                    <span class="text-muted small">Nb règlements</span><br>
-                    <strong>{{ $reglements->count() }}</strong>
+                    <span class="text-muted small">Nb éléments</span><br>
+                    <strong>{{ $countTotal }}</strong>
                 </div>
                 <div class="col-md-2">
                     <span class="text-muted small">Montant total</span><br>
-                    <strong>{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</strong>
+                    <strong>{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</strong>
                 </div>
             </div>
         </div>
@@ -74,11 +74,39 @@
                 <tfoot>
                     <tr class="fw-bold">
                         <td colspan="4" class="text-end">Total</td>
-                        <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</td>
+                        <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
+
+        @if($transactionsDirectes->isNotEmpty())
+        <h6 class="mt-3">Transactions (hors séances)</h6>
+        <table class="table table-sm">
+            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Libellé</th>
+                    <th>Tiers</th>
+                    <th>Compte</th>
+                    <th class="text-end">Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($transactionsDirectes as $tx)
+                <tr>
+                    <td>{{ $loop->iteration }}</td>
+                    <td>{{ $tx->date->format('d/m/Y') }}</td>
+                    <td>{{ $tx->libelle }}</td>
+                    <td>{{ $tx->tiers?->displayName() ?? '—' }}</td>
+                    <td>{{ $tx->compte->nom }}</td>
+                    <td class="text-end">{{ number_format($tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        @endif
     @endif
 
     {{-- Actions --}}
@@ -87,7 +115,7 @@
             <button wire:click="comptabiliser"
                     wire:confirm="Comptabiliser cette remise ? Les transactions comptables et le virement interne seront créés."
                     class="btn btn-success"
-                    @disabled($reglements->isEmpty())>
+                    @disabled($countTotal === 0)>
                 <i class="bi bi-check-circle"></i>
                 {{ $remise->virement_id !== null ? 'Modifier la remise' : 'Comptabiliser' }}
             </button>
