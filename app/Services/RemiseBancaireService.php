@@ -210,7 +210,12 @@ final class RemiseBancaireService
         }
 
         DB::transaction(function () use ($remise, $reglementIds, $transactionIds) {
-            $currentReglementIds = Reglement::where('remise_id', $remise->id)->pluck('id')->toArray();
+            // Déterminer les règlements actuels via les TRANSACTIONS (pas via Reglement.remise_id
+            // qui peut avoir été nettoyé par enregistrerBrouillon)
+            $currentReglementIds = Transaction::where('remise_id', $remise->id)
+                ->whereNotNull('reglement_id')
+                ->pluck('reglement_id')
+                ->toArray();
             $toRemove = array_diff($currentReglementIds, $reglementIds);
             $toAdd = array_diff($reglementIds, $currentReglementIds);
 
