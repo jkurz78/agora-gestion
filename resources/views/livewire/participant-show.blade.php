@@ -572,9 +572,14 @@
                                     <span class="small fw-semibold">{{ $doc['label'] }}</span>
                                     <span class="text-muted small ms-2">{{ $doc['name'] }} ({{ number_format($doc['size'] / 1024, 0) }} Ko)</span>
                                 </div>
-                                <a href="{{ $doc['url'] }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-download"></i>
-                                </a>
+                                <div class="d-flex gap-1">
+                                    <a href="{{ $doc['url'] }}?inline=1" target="_blank" class="btn btn-sm btn-outline-secondary" title="Afficher">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ $doc['url'] }}" class="btn btn-sm btn-outline-primary" title="Télécharger" download>
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                </div>
                             </li>
                         @endforeach
                     </ul>

@@ -23,6 +23,15 @@ final class ParticipantDocumentController extends Controller
             abort(404);
         }
 
+        if ($request->boolean('inline')) {
+            $mime = Storage::disk('local')->mimeType($path) ?: 'application/octet-stream';
+
+            return Storage::disk('local')->response($path, $filename, [
+                'Content-Type' => $mime,
+                'Content-Disposition' => "inline; filename=\"{$filename}\"",
+            ]);
+        }
+
         return Storage::disk('local')->download($path, $filename);
     }
 }
