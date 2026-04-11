@@ -145,6 +145,46 @@ it('returns empty unresolved when all variables are resolvable', function () {
     expect($unresolved)->toBeEmpty();
 });
 
+// Step 10 tests
+
+it('saves a new message template', function () {
+    Livewire::test(OperationCommunication::class, ['operation' => $this->operation])
+        ->set('objet', 'Rappel séance')
+        ->set('corps', 'Bonjour {prenom}')
+        ->set('showSaveTemplate', true)
+        ->set('templateNom', 'Mon modèle test')
+        ->call('saveAsTemplate');
+
+    $this->assertDatabaseHas('message_templates', [
+        'nom' => 'Mon modèle test',
+        'objet' => 'Rappel séance',
+        'corps' => 'Bonjour {prenom}',
+        'type_operation_id' => null,
+    ]);
+});
+
+it('updates existing message template', function () {
+    $template = MessageTemplate::create([
+        'nom' => 'Gabarit original',
+        'objet' => 'Objet original',
+        'corps' => 'Corps original',
+        'type_operation_id' => null,
+    ]);
+
+    Livewire::test(OperationCommunication::class, ['operation' => $this->operation])
+        ->set('selectedTemplateId', $template->id)
+        ->call('loadTemplate')
+        ->set('objet', 'Objet modifié')
+        ->set('corps', 'Corps modifié')
+        ->call('updateTemplate');
+
+    $this->assertDatabaseHas('message_templates', [
+        'id' => $template->id,
+        'objet' => 'Objet modifié',
+        'corps' => 'Corps modifié',
+    ]);
+});
+
 it('groups templates by type operation', function () {
     $typeOp = TypeOperation::factory()->create(['nom' => 'Sophrologie']);
 
