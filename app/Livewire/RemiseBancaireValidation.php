@@ -48,7 +48,7 @@ final class RemiseBancaireValidation extends Component
             $service = app(RemiseBancaireService::class);
 
             if ($this->remise->virement_id !== null) {
-                $service->modifier($this->remise, $this->selectedIds);
+                $service->modifier($this->remise, $this->selectedIds, $this->selectedTransactionIds);
             } else {
                 $service->comptabiliser($this->remise, $this->selectedIds, $this->selectedTransactionIds);
             }
