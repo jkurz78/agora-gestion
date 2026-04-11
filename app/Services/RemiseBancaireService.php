@@ -366,7 +366,14 @@ final class RemiseBancaireService
             }
 
             // ── Nouvelles transactions directes : déplacer ──
-            $txDirectesNouvelles = array_diff($transactionIds, $txDirectesActuelles);
+            // Transactions qui n'ont PAS encore été déplacées vers "Remises en banque"
+            // (soit nouvellement sélectionnées, soit brouillon sans déplacement)
+            $txDirectesDejaDeplacees = Transaction::where('remise_id', $remise->id)
+                ->whereNull('reglement_id')
+                ->whereNotNull('compte_origine_id')
+                ->pluck('id')
+                ->all();
+            $txDirectesNouvelles = array_diff($transactionIds, $txDirectesDejaDeplacees);
             if (! empty($txDirectesNouvelles)) {
                 $compteIntermediaire = $compteIntermediaire ?? CompteBancaire::where('est_systeme', true)
                     ->where('nom', 'Remises en banque')->firstOrFail();
