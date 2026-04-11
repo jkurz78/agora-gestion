@@ -57,12 +57,10 @@ final class RemiseBancaireService
                 ->update(['remise_id' => null]);
 
             // Attacher les nouveaux règlements sélectionnés
+            // (pas de filtre sur remise_id : la sélection UI garantit l'éligibilité,
+            // et un remise_id résiduel d'une opération précédente ne doit pas bloquer)
             if (count($reglementIds) > 0) {
                 Reglement::whereIn('id', $reglementIds)
-                    ->where(function ($q) use ($remise) {
-                        $q->whereNull('remise_id')
-                            ->orWhere('remise_id', $remise->id);
-                    })
                     ->update(['remise_id' => $remise->id]);
             }
 
@@ -218,12 +216,18 @@ final class RemiseBancaireService
         }
 
         DB::transaction(function () use ($remise, $reglementIds, $transactionIds) {
-            // Déterminer les règlements actuels via les TRANSACTIONS (pas via Reglement.remise_id
-            // qui peut avoir été nettoyé par enregistrerBrouillon)
-            $currentReglementIds = Transaction::where('remise_id', $remise->id)
+            // Déterminer les règlements actuels via DEUX sources :
+            // 1. Les transactions comptabilisées (reglement_id sur Transaction)
+            // 2. Les règlements brouillon (Reglement.remise_id, peut être set sans transaction)
+            $reglementIdsViaTx = Transaction::where('remise_id', $remise->id)
                 ->whereNotNull('reglement_id')
                 ->pluck('reglement_id')
                 ->toArray();
+            $reglementIdsViaModel = Reglement::where('remise_id', $remise->id)
+                ->pluck('id')
+                ->toArray();
+            $currentReglementIds = array_values(array_unique(array_merge($reglementIdsViaTx, $reglementIdsViaModel)));
+
             $toRemove = array_diff($currentReglementIds, $reglementIds);
             $toAdd = array_diff($reglementIds, $currentReglementIds);
 
