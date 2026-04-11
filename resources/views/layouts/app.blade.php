@@ -515,6 +515,7 @@
     <livewire:virement-interne-form />
     <livewire:tiers-quick-view />
     @livewireScripts
+    @include('partials.confirm-modal')
     <script>
         function initTooltips() {
             document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
