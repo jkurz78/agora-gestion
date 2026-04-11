@@ -21,6 +21,7 @@ final class EmailLog extends Model
         'statut',
         'erreur_message',
         'envoye_par',
+        'campagne_id',
     ];
 
     public function tiers(): BelongsTo
@@ -46,5 +47,10 @@ final class EmailLog extends Model
     public function envoyePar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'envoye_par');
+    }
+
+    public function campagne(): BelongsTo
+    {
+        return $this->belongsTo(CampagneEmail::class, 'campagne_id');
     }
 }
