@@ -58,10 +58,6 @@
 
             {{-- Save as template --}}
             <div class="mb-3">
-                @if(session()->has('message'))
-                    <div class="alert alert-success py-1 small">{{ session('message') }}</div>
-                @endif
-
                 @if($showSaveTemplate)
                     <div class="border rounded p-2 bg-light">
                         <div class="row g-2 align-items-end">
@@ -104,6 +100,27 @@
                                 <i class="bi bi-pencil me-1"></i>Mettre à jour « {{ $templates->flatten()->firstWhere('id', $selectedTemplateId)?->nom }} »
                             </button>
                         @endif
+                    </div>
+                @endif
+            </div>
+
+            {{-- File attachments --}}
+            <div class="mb-3">
+                <label class="form-label small fw-semibold">Pièces jointes <span class="text-muted">(max 5 fichiers, 10 Mo au total)</span></label>
+                <input type="file" class="form-control form-control-sm" wire:model="emailAttachments" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                @error('emailAttachments.*') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                @error('emailAttachments') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+
+                @if(count($emailAttachments) > 0)
+                    <div class="mt-2">
+                        @foreach($emailAttachments as $index => $attachment)
+                            <span class="badge bg-light text-dark border me-1 mb-1">
+                                <i class="bi bi-paperclip"></i> {{ $attachment->getClientOriginalName() }}
+                                <small class="text-muted">({{ number_format($attachment->getSize() / 1024, 0) }} Ko)</small>
+                                <button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.5em"
+                                        wire:click="removeAttachment({{ $index }})"></button>
+                            </span>
+                        @endforeach
                     </div>
                 @endif
             </div>
@@ -155,12 +172,42 @@
                 </div>
             </div>
 
-            {{-- Action buttons (placeholders — send functionality wired in later steps) --}}
+            {{-- Progress display during send --}}
+            @if($envoiEnCours)
+                <div class="alert alert-info py-2 mb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        <span>Envoi en cours : {{ $envoiProgression }} / {{ $envoiTotal }}</span>
+                    </div>
+                    <div class="progress mt-2" style="height: 6px;">
+                        <div class="progress-bar" style="width: {{ $envoiTotal > 0 ? ($envoiProgression / $envoiTotal * 100) : 0 }}%"></div>
+                    </div>
+                </div>
+            @endif
+
+            @if($envoiResultat)
+                <div class="alert alert-success py-2 mb-3 small">
+                    <i class="bi bi-check-circle me-1"></i> {{ $envoiResultat }}
+                </div>
+            @endif
+
+            @if(session()->has('message'))
+                <div class="alert alert-success py-1 small mb-3">{{ session('message') }}</div>
+            @endif
+
+            @if(session()->has('error'))
+                <div class="alert alert-danger py-1 small mb-3">{{ session('error') }}</div>
+            @endif
+
+            {{-- Action buttons --}}
             <div class="d-flex gap-2 justify-content-end">
-                <button type="button" class="btn btn-sm btn-outline-secondary" disabled>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="syncMessageEditor(); setTimeout(() => $wire.set('showTestModal', true), 100)">
                     <i class="bi bi-send me-1"></i>Envoyer un test
                 </button>
-                <button type="button" class="btn btn-sm btn-primary" disabled>
+                <button type="button" class="btn btn-sm btn-primary"
+                        onclick="syncMessageEditor(); setTimeout(() => $wire.set('showConfirmSend', true), 100)"
+                        {{ count($selectedParticipants) === 0 ? 'disabled' : '' }}>
                     <i class="bi bi-envelope-paper me-1"></i>Envoyer à {{ count($selectedParticipants) }} participant{{ count($selectedParticipants) > 1 ? 's' : '' }}
                 </button>
             </div>
@@ -176,6 +223,67 @@
             Aucune campagne d'envoi pour cette opération.
         </div>
     </div>
+
+    {{-- Test email modal --}}
+    @if($showTestModal)
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+         style="background:rgba(0,0,0,.3);z-index:2100"
+         wire:click.self="$set('showTestModal', false)">
+        <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
+            <h6 class="mb-3"><i class="bi bi-envelope me-1"></i> Envoyer un email de test</h6>
+            <p class="small text-muted mb-2">
+                Variables substituées pour le 1er participant sélectionné.
+            </p>
+            <div class="mb-3">
+                <label class="form-label small">Adresse destinataire</label>
+                <input type="email" wire:model="testEmail" class="form-control form-control-sm @error('testEmail') is-invalid @enderror"
+                       placeholder="votre@email.fr">
+                @error('testEmail')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="d-flex gap-2 justify-content-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        wire:click="$set('showTestModal', false)">
+                    Fermer
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" wire:click="envoyerTest">
+                    <span wire:loading.remove wire:target="envoyerTest">Envoyer</span>
+                    <span wire:loading wire:target="envoyerTest">Envoi…</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- Confirm send modal --}}
+    @if($showConfirmSend)
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+         style="background:rgba(0,0,0,.3);z-index:2100"
+         wire:click.self="$set('showConfirmSend', false)">
+        <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
+            <h6 class="mb-3"><i class="bi bi-envelope-paper me-1"></i> Confirmer l'envoi</h6>
+            <p class="mb-3">
+                Envoyer ce message à <strong>{{ count($selectedParticipants) }}</strong> participant{{ count($selectedParticipants) > 1 ? 's' : '' }} ?
+            </p>
+            @if(count($emailAttachments) > 0)
+                <p class="small text-muted mb-3">
+                    {{ count($emailAttachments) }} pièce(s) jointe(s)
+                </p>
+            @endif
+            <div class="d-flex gap-2 justify-content-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        wire:click="$set('showConfirmSend', false)">Annuler</button>
+                <button type="button" class="btn btn-sm btn-primary" wire:click="envoyerMessages">
+                    <span wire:loading.remove wire:target="envoyerMessages">Confirmer l'envoi</span>
+                    <span wire:loading wire:target="envoyerMessages">
+                        <span class="spinner-border spinner-border-sm me-1"></span>Envoi en cours…
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
 </div>
 
 @script
