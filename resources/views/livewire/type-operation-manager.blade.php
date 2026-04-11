@@ -375,9 +375,11 @@
                                         <i class="bi bi-arrow-counterclockwise"></i> Revenir au défaut
                                     </button>
                                     <button type="button" class="btn btn-sm btn-outline-warning"
-                                            wire:click="promouvoirEnDefaut('{{ $emailSubTab }}')"
-                                            wire:confirm="Remplacer le modèle par défaut par cette version personnalisée ?">
-                                        <i class="bi bi-arrow-up-circle"></i> Promouvoir en défaut
+                                            x-data="{ confirming: false }"
+                                            @click="if (!confirming) { confirming = true; setTimeout(() => confirming = false, 3000); } else { syncTinyMCEForPromote('{{ $emailSubTab }}'); confirming = false; }">
+                                        <i class="bi bi-arrow-up-circle"></i>
+                                        <span x-show="!confirming">Promouvoir en défaut</span>
+                                        <span x-show="confirming" x-cloak class="text-danger fw-bold">Confirmer ?</span>
                                     </button>
                                 </div>
                             @endif
@@ -657,6 +659,23 @@
                 });
             }
             $wire.call('saveWithEditorContent', content);
+        };
+
+        window.syncTinyMCEForPromote = function (categorie) {
+            if (typeof tinymce !== 'undefined') {
+                tinymce.get().forEach(editor => {
+                    const textarea = editor.getElement();
+                    const wrap = textarea?.closest('[wire\\:key]');
+                    if (wrap) {
+                        const key = wrap.getAttribute('wire:key');
+                        const match = key.match(/^tinymce-(\w+)-/);
+                        if (match && match[1] === categorie) {
+                            $wire.set('emailTemplates.' + categorie + '.corps', stripVariableSpans(editor.getContent()));
+                        }
+                    }
+                });
+            }
+            setTimeout(() => $wire.promouvoirEnDefaut(categorie), 150);
         };
 
         const emailVariableGroups = {
