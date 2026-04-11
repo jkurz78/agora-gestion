@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
-use App\Enums\TypeTransaction;
 use App\Livewire\RemiseBancaireSelection;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
