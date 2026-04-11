@@ -317,7 +317,7 @@ final class RemiseMultiSourceTestSeeder extends Seeder
                 'tiers_id' => $tiers->id,
                 'compte_bancaire_id' => $compteCourant?->id,
                 'conditions_reglement' => 'Payable à réception',
-                'mentions_legales' => "TVA non applicable, art. 261-7-1° du CGI",
+                'mentions_legales' => 'TVA non applicable, art. 261-7-1° du CGI',
                 'montant_total' => $montantTotal,
                 'saisi_par' => $user->id,
                 'exercice' => $exercice,
