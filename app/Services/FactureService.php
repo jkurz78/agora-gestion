@@ -470,6 +470,42 @@ XML;
 XML;
     }
 
+    /**
+     * Mark selected transactions as "payment received" without moving them.
+     * Sets date_reglement (and optional reference) so montantRegle() counts them.
+     *
+     * @param  array<int>  $transactionIds
+     */
+    public function marquerReglementRecu(
+        Facture $facture,
+        array $transactionIds,
+        string $dateReglement,
+        ?string $referenceReglement = null,
+    ): void {
+        if ($facture->statut !== StatutFacture::Validee) {
+            throw new \RuntimeException('Seule une facture validée peut être encaissée.');
+        }
+
+        if ($facture->isAcquittee()) {
+            throw new \RuntimeException('Cette facture est déjà intégralement réglée.');
+        }
+
+        DB::transaction(function () use ($facture, $transactionIds, $dateReglement, $referenceReglement): void {
+            foreach ($transactionIds as $transactionId) {
+                $transaction = $facture->transactions()->findOrFail($transactionId);
+
+                if (! $transaction->compte->est_systeme) {
+                    throw new \RuntimeException('Seules les transactions sur un compte système peuvent être marquées comme réglées.');
+                }
+
+                $transaction->update([
+                    'date_reglement' => $dateReglement,
+                    'reference_reglement' => $referenceReglement,
+                ]);
+            }
+        });
+    }
+
     private function assertBrouillon(Facture $facture): void
     {
         if ($facture->statut !== StatutFacture::Brouillon) {

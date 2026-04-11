@@ -122,6 +122,7 @@
                 </div>
             </div>
             @endif
+
         </div>
 
         <div class="col-lg-4">
@@ -247,7 +248,7 @@
     </div>
     @endif
 
-    {{-- Modale d'encaissement --}}
+    {{-- Modale de règlement (unifiée chèque/espèces et virement/CB/prélèvement) --}}
     @if ($transactionsAEncaisser->isNotEmpty())
     <div class="modal fade" id="encaissementModal" tabindex="-1" wire:ignore.self>
         <div class="modal-dialog">
@@ -257,8 +258,6 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted small mb-3">Sélectionnez les créances reçues et le compte bancaire de destination.</p>
-
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Créances en attente</label>
                         @foreach ($transactionsAEncaisser as $tx)
@@ -268,14 +267,32 @@
                                        @checked(in_array($tx->id, $selectedTransactionIds))>
                                 <label class="form-check-label" for="tx-{{ $tx->id }}">
                                     {{ $tx->libelle }}
+                                    <span class="badge bg-light text-dark ms-1">{{ $tx->mode_paiement?->label() }}</span>
                                     <span class="fw-semibold text-nowrap">— {{ number_format((float) $tx->montant_total, 2, ',', "\u{202f}") }}&nbsp;&euro;</span>
                                 </label>
                             </div>
                         @endforeach
                     </div>
 
+                    <div class="row g-2 mb-3">
+                        <div class="col">
+                            <label class="form-label fw-semibold">Date de règlement</label>
+                            <x-date-input name="dateReglement" wire:model="dateReglement" :value="$dateReglement" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label fw-semibold">
+                                Référence
+                                <span class="text-muted fw-normal" title="ex: n° de chèque, réf. virement">&#9432;</span>
+                            </label>
+                            <input type="text" class="form-control" wire:model="referenceReglement"
+                                placeholder="ex: n° de chèque">
+                        </div>
+                    </div>
+
+                    @if ($hasTransactionsDirectes)
                     <div class="mb-3">
                         <label for="encaissement-compte" class="form-label fw-semibold">Compte bancaire de destination</label>
+                        <p class="text-muted small mb-2">Pour les règlements par virement ou CB uniquement.</p>
                         <select wire:model="encaissementCompteId" id="encaissement-compte" class="form-select">
                             <option value="">-- Choisir --</option>
                             @foreach ($comptesDestination as $compte)
@@ -283,11 +300,20 @@
                             @endforeach
                         </select>
                     </div>
+                    @endif
+
+                    <div class="alert alert-info small mb-0 py-2">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Les chèques et espèces restent disponibles pour une remise en banque ultérieurement.
+                        @if ($hasTransactionsDirectes)
+                            Les virements et CB seront enregistrés directement sur le compte sélectionné.
+                        @endif
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                    <button type="button" class="btn btn-primary" wire:click="encaisser" data-bs-dismiss="modal">
-                        <i class="bi bi-check-lg"></i> Confirmer l'encaissement
+                    <button type="button" class="btn btn-primary" wire:click="enregistrerReglement" data-bs-dismiss="modal">
+                        <i class="bi bi-check-lg"></i> Enregistrer
                     </button>
                 </div>
             </div>

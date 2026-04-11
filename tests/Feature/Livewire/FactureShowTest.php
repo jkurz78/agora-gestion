@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Livewire\FactureShow;
@@ -155,6 +156,84 @@ it('shows badge Acquittee when fully paid', function () {
     Livewire::test(FactureShow::class, ['facture' => $this->facture])
         ->assertStatus(200)
         ->assertSee('Acquittée');
+});
+
+it('enregistre un règlement chèque via le bouton unifié', function () {
+    $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
+    $tiers = Tiers::factory()->create();
+    $exercice = now()->month >= 9 ? now()->year : now()->year - 1;
+
+    $facture = Facture::create([
+        'numero' => 'F-2026-0099',
+        'date' => now(),
+        'statut' => StatutFacture::Validee,
+        'tiers_id' => $tiers->id,
+        'montant_total' => 120.00,
+        'saisi_par' => $this->user->id,
+        'exercice' => $exercice,
+    ]);
+
+    $transaction = Transaction::factory()->asRecette()->create([
+        'tiers_id' => $tiers->id,
+        'compte_id' => $compteCreances->id,
+        'montant_total' => 120.00,
+        'mode_paiement' => ModePaiement::Cheque,
+    ]);
+
+    $facture->transactions()->attach($transaction->id);
+
+    Livewire::test(FactureShow::class, ['facture' => $facture])
+        ->set('selectedTransactionIds', [$transaction->id])
+        ->set('dateReglement', now()->toDateString())
+        ->set('referenceReglement', 'CHQ-12345')
+        ->call('enregistrerReglement')
+        ->assertHasNoErrors();
+
+    $transaction->refresh();
+    expect($transaction->date_reglement)->not->toBeNull();
+    expect($transaction->reference_reglement)->toBe('CHQ-12345');
+    // Chèque reste sur le compte système (remise ultérieure)
+    expect($transaction->compte_id)->toBe($compteCreances->id);
+});
+
+it('enregistre un règlement virement et déplace vers compte réel', function () {
+    $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
+    $compteReel = CompteBancaire::factory()->create(['est_systeme' => false]);
+    $tiers = Tiers::factory()->create();
+    $exercice = now()->month >= 9 ? now()->year : now()->year - 1;
+
+    $facture = Facture::create([
+        'numero' => 'F-2026-0100',
+        'date' => now(),
+        'statut' => StatutFacture::Validee,
+        'tiers_id' => $tiers->id,
+        'montant_total' => 200.00,
+        'saisi_par' => $this->user->id,
+        'exercice' => $exercice,
+    ]);
+
+    $transaction = Transaction::factory()->asRecette()->create([
+        'tiers_id' => $tiers->id,
+        'compte_id' => $compteCreances->id,
+        'montant_total' => 200.00,
+        'mode_paiement' => ModePaiement::Virement,
+    ]);
+
+    $facture->transactions()->attach($transaction->id);
+
+    Livewire::test(FactureShow::class, ['facture' => $facture])
+        ->set('selectedTransactionIds', [$transaction->id])
+        ->set('dateReglement', now()->toDateString())
+        ->set('referenceReglement', 'VIR-ABC-123')
+        ->set('encaissementCompteId', $compteReel->id)
+        ->call('enregistrerReglement')
+        ->assertHasNoErrors();
+
+    $transaction->refresh();
+    expect($transaction->date_reglement)->not->toBeNull();
+    expect($transaction->reference_reglement)->toBe('VIR-ABC-123');
+    // Virement déplacé vers le compte réel
+    expect($transaction->compte_id)->toBe($compteReel->id);
 });
 
 it('redirects to edit if facture is brouillon', function () {

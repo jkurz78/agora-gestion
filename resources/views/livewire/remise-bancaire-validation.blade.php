@@ -32,23 +32,26 @@
                     <strong>{{ $remise->mode_paiement->label() }}</strong>
                 </div>
                 <div class="col-md-2">
-                    <span class="text-muted small">Nb règlements</span><br>
-                    <strong>{{ $reglements->count() }}</strong>
+                    <span class="text-muted small">Nb éléments</span><br>
+                    <strong>{{ $countTotal }}</strong>
                 </div>
                 <div class="col-md-2">
                     <span class="text-muted small">Montant total</span><br>
-                    <strong>{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</strong>
+                    <strong>{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</strong>
                 </div>
             </div>
         </div>
     </div>
 
-    {{-- Tableau des règlements --}}
-    @if ($reglements->isEmpty())
+    @if ($countTotal === 0)
         <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle"></i> Aucun règlement sélectionné.
+            <i class="bi bi-exclamation-triangle"></i> Aucun élément sélectionné.
         </div>
-    @else
+    @endif
+
+    {{-- Tableau des règlements séances --}}
+    @if ($reglements->isNotEmpty())
+        <h6>Règlements séances</h6>
         <div class="table-responsive">
             <table class="table table-striped align-middle">
                 <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
@@ -73,12 +76,47 @@
                 </tbody>
                 <tfoot>
                     <tr class="fw-bold">
-                        <td colspan="4" class="text-end">Total</td>
-                        <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</td>
+                        <td colspan="4" class="text-end">Sous-total</td>
+                        <td class="text-end text-nowrap">{{ number_format((float) $reglements->sum('montant_prevu'), 2, ',', "\u{00A0}") }}&nbsp;€</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
+    @endif
+
+    {{-- Tableau des transactions hors séances --}}
+    @if ($transactionsDirectes->isNotEmpty())
+        <h6 class="{{ $reglements->isNotEmpty() ? 'mt-3' : '' }}">Transactions (hors séances)</h6>
+        <table class="table table-sm table-striped align-middle">
+            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Libellé</th>
+                    <th>Tiers</th>
+                    <th>Compte</th>
+                    <th class="text-end">Montant</th>
+                </tr>
+            </thead>
+            <tbody style="color:#555">
+                @foreach($transactionsDirectes as $tx)
+                <tr>
+                    <td class="small">{{ $loop->iteration }}</td>
+                    <td class="small">{{ $tx->date->format('d/m/Y') }}</td>
+                    <td class="small">{{ $tx->libelle }}</td>
+                    <td class="small">{{ $tx->tiers?->displayName() ?? '—' }}</td>
+                    <td class="small">{{ $tx->compte->nom }}</td>
+                    <td class="text-end small fw-semibold text-nowrap">{{ number_format($tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="5" class="text-end">Sous-total</td>
+                    <td class="text-end text-nowrap">{{ number_format((float) $transactionsDirectes->sum('montant_total'), 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                </tr>
+            </tfoot>
+        </table>
     @endif
 
     {{-- Actions --}}
@@ -87,7 +125,7 @@
             <button wire:click="comptabiliser"
                     wire:confirm="Comptabiliser cette remise ? Les transactions comptables et le virement interne seront créés."
                     class="btn btn-success"
-                    @disabled($reglements->isEmpty())>
+                    @disabled($countTotal === 0)>
                 <i class="bi bi-check-circle"></i>
                 {{ $remise->virement_id !== null ? 'Modifier la remise' : 'Comptabiliser' }}
             </button>

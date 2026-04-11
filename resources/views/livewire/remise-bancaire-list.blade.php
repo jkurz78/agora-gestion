@@ -78,7 +78,7 @@
                         <th>Date</th>
                         <th>Type</th>
                         <th>Banque</th>
-                        <th class="text-end">Nb règlements</th>
+                        <th class="text-end">Nb pièces</th>
                         <th class="text-end">Montant</th>
                         <th>Statut</th>
                         <th></th>
@@ -96,7 +96,7 @@
                             <td class="small text-nowrap">{{ $remise->date->format('d/m/Y') }}</td>
                             <td class="small">{{ $remise->mode_paiement->label() }}</td>
                             <td class="small">{{ $remise->compteCible->nom }}</td>
-                            <td class="text-end small">{{ $remise->reglements->count() }}</td>
+                            <td class="text-end small">{{ $remise->reglements->count() + $remise->transactionsDirectes->count() }}</td>
                             <td class="text-end small text-nowrap fw-semibold">{{ number_format($remise->montantTotal(), 2, ',', ' ') }} €</td>
                             <td>
                                 @if ($remise->virement_id === null)
