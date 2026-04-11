@@ -193,19 +193,23 @@ final class RemiseBancaireService
         });
     }
 
-    public function modifier(RemiseBancaire $remise, array $reglementIds): void
+    /**
+     * @param  array<int>  $reglementIds
+     * @param  array<int>  $transactionIds
+     */
+    public function modifier(RemiseBancaire $remise, array $reglementIds, array $transactionIds = []): void
     {
         if ($remise->isVerrouillee()) {
             throw new \RuntimeException('Cette remise est verrouillée par un rapprochement bancaire.');
         }
 
-        if (count($reglementIds) === 0) {
+        if (count($reglementIds) === 0 && count($transactionIds) === 0) {
             $this->supprimer($remise);
 
             return;
         }
 
-        DB::transaction(function () use ($remise, $reglementIds) {
+        DB::transaction(function () use ($remise, $reglementIds, $transactionIds) {
             $currentReglementIds = Reglement::where('remise_id', $remise->id)->pluck('id')->toArray();
             $toRemove = array_diff($currentReglementIds, $reglementIds);
             $toAdd = array_diff($reglementIds, $currentReglementIds);
@@ -227,6 +231,31 @@ final class RemiseBancaireService
                     Transaction::whereIn('id', $txToRemove)->forceDelete();
                 }
             }
+
+            // ── Transactions directes retirées : restaurer à leur compte d'origine ──
+            $txDirectesActuelles = Transaction::where('remise_id', $remise->id)
+                ->whereNull('reglement_id')
+                ->pluck('id')
+                ->all();
+
+            $txARestorer = array_diff($txDirectesActuelles, $transactionIds);
+            if (! empty($txARestorer)) {
+                foreach (Transaction::whereIn('id', $txARestorer)->get() as $tx) {
+                    $tx->update([
+                        'compte_id' => $tx->compte_origine_id,
+                        'compte_origine_id' => null,
+                        'remise_id' => null,
+                        'reference' => null,
+                        'pointe' => false,
+                    ]);
+                }
+            }
+
+            // Shared variables for both "add reglements" and "add transactions" blocks
+            $compteIntermediaire = null;
+            $prefix = null;
+            $numeroPadded = null;
+            $index = null;
 
             // Add new reglements
             if (count($toAdd) > 0) {
@@ -251,8 +280,7 @@ final class RemiseBancaireService
                 $numeroPadded = str_pad((string) $remise->numero, 5, '0', STR_PAD_LEFT);
 
                 // Current max index
-                $currentCount = Transaction::where('remise_id', $remise->id)->count();
-                $index = $currentCount;
+                $index = Transaction::where('remise_id', $remise->id)->count();
 
                 foreach ($newReglements as $reglement) {
                     $index++;
@@ -298,8 +326,38 @@ final class RemiseBancaireService
                 }
             }
 
-            // Update virement montant
-            $newTotal = (float) Reglement::where('remise_id', $remise->id)->sum('montant_prevu');
+            // ── Nouvelles transactions directes : déplacer ──
+            $txDirectesNouvelles = array_diff($transactionIds, $txDirectesActuelles);
+            if (! empty($txDirectesNouvelles)) {
+                $compteIntermediaire = $compteIntermediaire ?? CompteBancaire::where('est_systeme', true)
+                    ->where('nom', 'Remises en banque')->firstOrFail();
+                $prefix = $prefix ?? $remise->referencePrefix();
+                $numeroPadded = $numeroPadded ?? str_pad((string) $remise->numero, 5, '0', STR_PAD_LEFT);
+                $index = $index ?? Transaction::where('remise_id', $remise->id)->count();
+
+                foreach ($txDirectesNouvelles as $txId) {
+                    $tx = Transaction::findOrFail($txId);
+                    $index++;
+                    $indexPadded = str_pad((string) $index, 3, '0', STR_PAD_LEFT);
+                    $reference = "{$prefix}-{$numeroPadded}-{$indexPadded}";
+
+                    $tx->update([
+                        'compte_origine_id' => $tx->compte_id,
+                        'compte_id' => $compteIntermediaire->id,
+                        'remise_id' => $remise->id,
+                        'reference' => $reference,
+                        'pointe' => true,
+                    ]);
+                }
+            }
+
+            // Update virement montant — includes both reglements and direct transactions
+            $newTotalReglements = (float) Reglement::where('remise_id', $remise->id)->sum('montant_prevu');
+            $newTotalTransactions = (float) Transaction::where('remise_id', $remise->id)
+                ->whereNull('reglement_id')
+                ->sum('montant_total');
+            $newTotal = $newTotalReglements + $newTotalTransactions;
+
             $this->virementInterneService->update($remise->virement, [
                 'date' => $remise->date->format('Y-m-d'),
                 'montant' => $newTotal,
@@ -317,15 +375,34 @@ final class RemiseBancaireService
             // Free all reglements
             Reglement::where('remise_id', $remise->id)->update(['remise_id' => null]);
 
-            // Bulk-delete all transactions, lignes, and affectations
-            $txIds = Transaction::where('remise_id', $remise->id)->pluck('id');
-            if ($txIds->isNotEmpty()) {
-                $ligneIds = TransactionLigne::whereIn('transaction_id', $txIds)->pluck('id');
+            // Restore direct transactions (moved ones) to their original account
+            $txDirectes = Transaction::where('remise_id', $remise->id)
+                ->whereNull('reglement_id')
+                ->whereNotNull('compte_origine_id')
+                ->get();
+
+            foreach ($txDirectes as $tx) {
+                $tx->update([
+                    'compte_id' => $tx->compte_origine_id,
+                    'compte_origine_id' => null,
+                    'remise_id' => null,
+                    'reference' => null,
+                    'pointe' => false,
+                ]);
+            }
+
+            // Delete transactions created for reglements
+            $txReglementIds = Transaction::where('remise_id', $remise->id)
+                ->whereNotNull('reglement_id')
+                ->pluck('id');
+
+            if ($txReglementIds->isNotEmpty()) {
+                $ligneIds = TransactionLigne::whereIn('transaction_id', $txReglementIds)->pluck('id');
                 if ($ligneIds->isNotEmpty()) {
                     TransactionLigneAffectation::whereIn('transaction_ligne_id', $ligneIds)->delete();
                     TransactionLigne::whereIn('id', $ligneIds)->delete();
                 }
-                Transaction::whereIn('id', $txIds)->delete();
+                Transaction::whereIn('id', $txReglementIds)->delete();
             }
 
             // Soft-delete virement
