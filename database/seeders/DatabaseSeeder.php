@@ -62,6 +62,7 @@ class DatabaseSeeder extends Seeder
         $this->call(CategoriesSeeder::class);
         $this->call(TypeOperationSeeder::class);
         $this->call(EmailTemplateSeeder::class);
+        $this->call(MessageTemplateSeeder::class);
         $this->call(OperationsTiersSeeder::class);
 
         // Create exercice for seeded data

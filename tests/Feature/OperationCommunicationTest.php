@@ -15,6 +15,7 @@ use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use Database\Seeders\MessageTemplateSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
@@ -468,4 +469,20 @@ it('shows message email logs in participant timeline', function () {
     ])
         ->assertSee('message')
         ->assertSee('bob@example.com');
+});
+
+// Step 16 tests
+
+it('seeds default message templates', function () {
+    $this->seed(MessageTemplateSeeder::class);
+    expect(MessageTemplate::count())->toBeGreaterThanOrEqual(3);
+    expect(MessageTemplate::where('nom', 'Rappel séance J-2')->exists())->toBeTrue();
+});
+
+it('does not duplicate templates when seeded twice', function () {
+    $this->seed(MessageTemplateSeeder::class);
+    $countAfterFirst = MessageTemplate::count();
+
+    $this->seed(MessageTemplateSeeder::class);
+    expect(MessageTemplate::count())->toBe($countAfterFirst);
 });
