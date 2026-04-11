@@ -97,11 +97,16 @@ final class RemiseBancaireService
 
             // Validate all reglements
             foreach ($reglements as $reglement) {
-                if ($reglement->remise_id !== null && $reglement->remise_id !== $remise->id) {
-                    throw new \RuntimeException("Le règlement #{$reglement->id} est déjà inclus dans une autre remise.");
+                if ($reglement->remise_id !== null && (int) $reglement->remise_id !== $remise->id) {
+                    $tiers = $reglement->participant->tiers->displayName();
+                    $op = $reglement->seance->operation->nom ?? '';
+                    $autreRemise = RemiseBancaire::withTrashed()->find($reglement->remise_id);
+                    $refRemise = $autreRemise ? "remise n°{$autreRemise->numero}" : "remise #{$reglement->remise_id}";
+                    throw new \RuntimeException("Le règlement de {$tiers} ({$op}) est déjà inclus dans la {$refRemise}.");
                 }
                 if ($reglement->mode_paiement !== $remise->mode_paiement) {
-                    throw new \RuntimeException("Le règlement #{$reglement->id} n'a pas le bon mode de paiement.");
+                    $tiers = $reglement->participant->tiers->displayName();
+                    throw new \RuntimeException("Le règlement de {$tiers} n'a pas le bon mode de paiement ({$reglement->mode_paiement?->label()}).");
                 }
             }
 
