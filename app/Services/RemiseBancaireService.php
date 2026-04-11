@@ -216,20 +216,24 @@ final class RemiseBancaireService
         }
 
         DB::transaction(function () use ($remise, $reglementIds, $transactionIds) {
-            // Déterminer les règlements actuels via DEUX sources :
-            // 1. Les transactions comptabilisées (reglement_id sur Transaction)
-            // 2. Les règlements brouillon (Reglement.remise_id, peut être set sans transaction)
-            $reglementIdsViaTx = Transaction::where('remise_id', $remise->id)
+            // Règlements qui ont une transaction comptabilisée
+            $reglementIdsAvecTx = Transaction::where('remise_id', $remise->id)
                 ->whereNotNull('reglement_id')
                 ->pluck('reglement_id')
                 ->toArray();
-            $reglementIdsViaModel = Reglement::where('remise_id', $remise->id)
+
+            // Règlements rattachés au brouillon (Reglement.remise_id) mais sans transaction
+            $reglementIdsOrphelins = Reglement::where('remise_id', $remise->id)
+                ->whereNotIn('id', $reglementIdsAvecTx)
                 ->pluck('id')
                 ->toArray();
-            $currentReglementIds = array_values(array_unique(array_merge($reglementIdsViaTx, $reglementIdsViaModel)));
 
-            $toRemove = array_diff($currentReglementIds, $reglementIds);
-            $toAdd = array_diff($reglementIds, $currentReglementIds);
+            // Pour le retrait : tout ce qui est lié (avec ou sans transaction)
+            $tousReglementIds = array_values(array_unique(array_merge($reglementIdsAvecTx, $reglementIdsOrphelins)));
+            $toRemove = array_diff($tousReglementIds, $reglementIds);
+
+            // Pour l'ajout : ceux qui n'ont PAS encore de transaction (même s'ils ont déjà remise_id)
+            $toAdd = array_diff($reglementIds, $reglementIdsAvecTx);
 
             // Remove reglements — bulk delete transactions, lignes, and affectations
             if (count($toRemove) > 0) {
@@ -294,11 +298,16 @@ final class RemiseBancaireService
                     ->get();
 
                 foreach ($newReglements as $reglement) {
-                    if ($reglement->remise_id !== null) {
-                        throw new \RuntimeException("Le règlement #{$reglement->id} est déjà inclus dans une autre remise.");
+                    if ($reglement->remise_id !== null && (int) $reglement->remise_id !== $remise->id) {
+                        $tiers = $reglement->participant->tiers->displayName();
+                        $op = $reglement->seance->operation->nom ?? '';
+                        $autreRemise = RemiseBancaire::withTrashed()->find($reglement->remise_id);
+                        $refRemise = $autreRemise ? "remise n°{$autreRemise->numero}" : "remise #{$reglement->remise_id}";
+                        throw new \RuntimeException("Le règlement de {$tiers} ({$op}) est déjà inclus dans la {$refRemise}.");
                     }
                     if ($reglement->mode_paiement !== $remise->mode_paiement) {
-                        throw new \RuntimeException("Le règlement #{$reglement->id} n'a pas le bon mode de paiement.");
+                        $tiers = $reglement->participant->tiers->displayName();
+                        throw new \RuntimeException("Le règlement de {$tiers} n'a pas le bon mode de paiement ({$reglement->mode_paiement?->label()}).");
                     }
                 }
 
