@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Enums\Espace;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
+use App\Models\Transaction;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -72,11 +73,17 @@ final class RemiseBancaireValidation extends Component
                 $r->participant->tiers->nom ?? '',
             ])->values();
 
-        $totalMontant = $reglements->sum('montant_prevu');
+        $transactionsDirectes = Transaction::whereIn('id', $this->selectedTransactionIds)
+            ->with(['tiers', 'compte'])
+            ->get();
+
+        $totalMontant = $reglements->sum('montant_prevu') + $transactionsDirectes->sum('montant_total');
 
         return view('livewire.remise-bancaire-validation', [
             'reglements' => $reglements,
+            'transactionsDirectes' => $transactionsDirectes,
             'totalMontant' => $totalMontant,
+            'countTotal' => $reglements->count() + $transactionsDirectes->count(),
         ]);
     }
 }

@@ -42,7 +42,7 @@
                 </div>
                 <div class="col-md-2">
                     <span class="text-muted small">Montant total</span><br>
-                    <strong>{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</strong>
+                    <strong>{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</strong>
                 </div>
                 <div class="col-md-2">
                     <span class="text-muted small">Statut</span><br>
@@ -59,7 +59,7 @@
                 <div class="mt-2 small text-muted">
                     <i class="bi bi-arrow-left-right"></i>
                     Virement interne : <strong>{{ $remise->virement->reference }}</strong>
-                    — {{ number_format((float) $remise->virement->montant, 2, ',', ' ') }} €
+                    — {{ number_format((float) $remise->virement->montant, 2, ',', "\u{00A0}") }}&nbsp;€
                 </div>
             @endif
         </div>
@@ -91,18 +91,44 @@
                                 <td class="small">{{ $reglement->participant->tiers->displayName() }}</td>
                                 <td class="small">{{ $reglement->seance->operation->nom }}</td>
                                 <td class="small">S{{ $reglement->seance->numero }}</td>
-                                <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $reglement->montant_prevu, 2, ',', ' ') }} €</td>
+                                <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $reglement->montant_prevu, 2, ',', "\u{00A0}") }}&nbsp;€</td>
                             </tr>
                         @endforeach
                     </tbody>
                     <tfoot>
                         <tr class="fw-bold">
                             <td colspan="4" class="text-end">Total</td>
-                            <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</td>
+                            <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
+        @endif
+
+        @if($transactionsDirectes->isNotEmpty())
+        <h6 class="mt-3">Transactions (hors séances)</h6>
+        <table class="table table-sm">
+            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                <tr>
+                    <th>Date</th>
+                    <th>Libellé</th>
+                    <th>Tiers</th>
+                    <th>Compte</th>
+                    <th class="text-end">Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($transactionsDirectes as $tx)
+                <tr>
+                    <td>{{ $tx->date->format('d/m/Y') }}</td>
+                    <td>{{ $tx->libelle }}</td>
+                    <td>{{ $tx->tiers?->displayName() ?? '—' }}</td>
+                    <td>{{ $tx->compte->nom }}</td>
+                    <td class="text-end">{{ number_format($tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
         @endif
     @else
         {{-- Comptabilisée : tableau des transactions --}}
@@ -139,14 +165,14 @@
                                         —
                                     @endif
                                 </td>
-                                <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $transaction->montant_total, 2, ',', ' ') }} €</td>
+                                <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $transaction->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
                             </tr>
                         @endforeach
                     </tbody>
                     <tfoot>
                         <tr class="fw-bold">
                             <td colspan="6" class="text-end">Total</td>
-                            <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', ' ') }} €</td>
+                            <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</td>
                         </tr>
                     </tfoot>
                 </table>

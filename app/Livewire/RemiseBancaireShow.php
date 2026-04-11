@@ -58,11 +58,16 @@ final class RemiseBancaireShow extends Component
                     $r->participant->tiers->nom ?? '',
                 ])->values();
 
-            $totalMontant = $reglements->sum('montant_prevu');
+            $transactionsDirectes = $this->remise->transactionsDirectes()
+                ->with(['tiers', 'compte'])
+                ->get();
+
+            $totalMontant = $reglements->sum('montant_prevu') + $transactionsDirectes->sum('montant_total');
 
             return view('livewire.remise-bancaire-show', [
                 'transactions' => collect(),
                 'reglements' => $reglements,
+                'transactionsDirectes' => $transactionsDirectes,
                 'totalMontant' => $totalMontant,
                 'verrouille' => $verrouille,
                 'isBrouillon' => true,
