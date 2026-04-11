@@ -108,6 +108,23 @@
                         </div>
                     </div>
 
+                    @php
+                        $txReglees = $facture->transactions->filter(fn ($t) => $t->date_reglement !== null);
+                    @endphp
+                    @if ($txReglees->isNotEmpty())
+                        <div class="mt-3 small text-muted text-center">
+                            @foreach ($txReglees as $tx)
+                                <i class="bi bi-check2"></i>
+                                Réglé le {{ $tx->date_reglement->format('d/m/Y') }}
+                                @if ($tx->reference_reglement)
+                                    (réf. {{ $tx->reference_reglement }})
+                                @endif
+                                — {{ number_format((float) $tx->montant_total, 2, ',', "\u{202f}") }}&nbsp;&euro;
+                                @if (!$loop->last)<br>@endif
+                            @endforeach
+                        </div>
+                    @endif
+
                     @if ($isAcquittee)
                         <div class="text-center mt-3">
                             <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Acquittée</span>
