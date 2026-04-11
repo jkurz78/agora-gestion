@@ -375,11 +375,8 @@
                                         <i class="bi bi-arrow-counterclockwise"></i> Revenir au défaut
                                     </button>
                                     <button type="button" class="btn btn-sm btn-outline-warning"
-                                            x-data="{ confirming: false }"
-                                            @click="if (!confirming) { confirming = true; setTimeout(() => confirming = false, 3000); } else { syncTinyMCEForPromote('{{ $emailSubTab }}'); confirming = false; }">
-                                        <i class="bi bi-arrow-up-circle"></i>
-                                        <span x-show="!confirming">Promouvoir en défaut</span>
-                                        <span x-show="confirming" x-cloak class="text-danger fw-bold">Confirmer ?</span>
+                                            wire:click="$set('showPromoteConfirm', true)">
+                                        <i class="bi bi-arrow-up-circle"></i> Promouvoir en défaut
                                     </button>
                                 </div>
                             @endif
@@ -549,6 +546,28 @@
                 </div>
                 @endif
 
+                {{-- Promote confirm mini-modal --}}
+                @if($showPromoteConfirm)
+                <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+                     style="background:rgba(0,0,0,.3);z-index:2200"
+                     wire:click.self="$set('showPromoteConfirm', false)">
+                    <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
+                        <h6 class="mb-3"><i class="bi bi-arrow-up-circle me-1"></i> Promouvoir en défaut</h6>
+                        <p class="small mb-3">Remplacer le modèle par défaut <strong>{{ \App\Enums\CategorieEmail::tryFrom($emailSubTab)?->label() }}</strong> par cette version personnalisée ? Tous les types d'opération sans personnalisation utiliseront ce nouveau défaut.</p>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    wire:click="$set('showPromoteConfirm', false)">
+                                Annuler
+                            </button>
+                            <button type="button" class="btn btn-sm btn-warning"
+                                    onclick="syncTinyMCEForPromote('{{ $emailSubTab }}')">
+                                Confirmer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 {{-- Navigation buttons --}}
                 <div class="d-flex justify-content-between mt-4">
                     @if($editingId !== null)
@@ -675,6 +694,7 @@
                     }
                 });
             }
+            $wire.set('showPromoteConfirm', false);
             setTimeout(() => $wire.promouvoirEnDefaut(categorie), 150);
         };
 
