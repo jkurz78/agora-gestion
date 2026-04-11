@@ -219,11 +219,11 @@ final class RemiseBancaireService
                 // Vérifier qu'aucune transaction retirée n'est liée à une facture
                 $txFacturees = Transaction::where('remise_id', $remise->id)
                     ->whereIn('reglement_id', $toRemove)
-                    ->whereHas('factures', fn ($q) => $q->whereIn('statut', ['validee', 'annulee']))
+                    ->whereHas('factures')
                     ->count();
 
                 if ($txFacturees > 0) {
-                    throw new \RuntimeException('Impossible de retirer des règlements dont les transactions sont liées à des factures validées.');
+                    throw new \RuntimeException('Impossible de retirer des règlements dont les transactions sont liées à des factures.');
                 }
 
                 Reglement::whereIn('id', $toRemove)->update(['remise_id' => null]);
@@ -381,13 +381,13 @@ final class RemiseBancaireService
             throw new \RuntimeException('Cette remise est verrouillée par un rapprochement bancaire.');
         }
 
-        // Vérifier qu'aucune transaction n'est liée à une facture validée
+        // Vérifier qu'aucune transaction n'est liée à une facture
         $txFacturees = Transaction::where('remise_id', $remise->id)
-            ->whereHas('factures', fn ($q) => $q->whereIn('statut', ['validee', 'annulee']))
+            ->whereHas('factures')
             ->count();
 
         if ($txFacturees > 0) {
-            throw new \RuntimeException('Impossible de supprimer : des transactions de cette remise sont liées à des factures validées.');
+            throw new \RuntimeException('Impossible de supprimer : des transactions de cette remise sont liées à des factures.');
         }
 
         DB::transaction(function () use ($remise) {
