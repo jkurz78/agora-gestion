@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
 use App\Enums\Espace;
+use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Mail\DocumentMail;
 use App\Models\CompteBancaire;
@@ -76,50 +77,9 @@ final class FactureShow extends Component
         }
     }
 
-    public function encaisser(): void
+    public function enregistrerReglement(): void
     {
         if (! $this->canEdit) {
-            return;
-        }
-
-        if ($this->encaissementCompteId === null) {
-            session()->flash('error', 'Veuillez sélectionner un compte bancaire de destination.');
-
-            return;
-        }
-
-        if (count($this->selectedTransactionIds) === 0) {
-            session()->flash('error', 'Veuillez sélectionner au moins une transaction à encaisser.');
-
-            return;
-        }
-
-        try {
-            app(FactureService::class)->encaisser(
-                $this->facture,
-                $this->selectedTransactionIds,
-                $this->encaissementCompteId,
-            );
-
-            $this->selectedTransactionIds = [];
-            $this->encaissementCompteId = null;
-            $this->facture->load(['transactions.compte']);
-
-            session()->flash('success', 'Encaissement enregistré.');
-        } catch (\RuntimeException $e) {
-            session()->flash('error', $e->getMessage());
-        }
-    }
-
-    public function marquerReglementRecu(): void
-    {
-        if (! $this->canEdit) {
-            return;
-        }
-
-        if ($this->dateReglement === null) {
-            session()->flash('error', 'Veuillez saisir une date de règlement.');
-
             return;
         }
 
@@ -129,17 +89,59 @@ final class FactureShow extends Component
             return;
         }
 
+        if ($this->dateReglement === null || $this->dateReglement === '') {
+            session()->flash('error', 'Veuillez saisir une date de règlement.');
+
+            return;
+        }
+
         try {
-            app(FactureService::class)->marquerReglementRecu(
-                $this->facture,
-                $this->selectedTransactionIds,
-                $this->dateReglement,
-                $this->referenceReglement ?: null,
+            $factureService = app(FactureService::class);
+
+            $modesDirects = [ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement];
+
+            $transactions = $this->facture->transactions()
+                ->whereIn('transactions.id', $this->selectedTransactionIds)
+                ->get();
+
+            $txChequeEspeces = $transactions->filter(
+                fn ($t) => ! in_array($t->mode_paiement, $modesDirects, true)
             );
+            $txDirectes = $transactions->filter(
+                fn ($t) => in_array($t->mode_paiement, $modesDirects, true)
+            );
+
+            // 1. Chèque / espèces : marquer comme réglé (reste sur compte système, remise ultérieure)
+            if ($txChequeEspeces->isNotEmpty()) {
+                $factureService->marquerReglementRecu(
+                    $this->facture,
+                    $txChequeEspeces->pluck('id')->all(),
+                    $this->dateReglement,
+                    $this->referenceReglement ?: null,
+                );
+            }
+
+            // 2. Virement / CB / prélèvement : déplacer vers le compte réel, puis stocker date + ref
+            if ($txDirectes->isNotEmpty() && $this->encaissementCompteId) {
+                $factureService->encaisser(
+                    $this->facture->fresh(),
+                    $txDirectes->pluck('id')->all(),
+                    $this->encaissementCompteId,
+                );
+                // Appliquer date_reglement et reference_reglement après le déplacement
+                foreach ($txDirectes as $tx) {
+                    $tx->refresh();
+                    $tx->update([
+                        'date_reglement' => $this->dateReglement,
+                        'reference_reglement' => $this->referenceReglement ?: null,
+                    ]);
+                }
+            }
 
             $this->selectedTransactionIds = [];
             $this->dateReglement = null;
             $this->referenceReglement = null;
+            $this->encaissementCompteId = null;
             $this->facture->load(['transactions.compte']);
 
             session()->flash('success', 'Règlement enregistré.');
@@ -223,11 +225,14 @@ final class FactureShow extends Component
         $montantRegle = $this->facture->montantRegle();
         $isAcquittee = $this->facture->isAcquittee();
 
+        $modesDirects = [ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement];
+
         $transactionsAEncaisser = $this->facture->transactions
             ->filter(fn ($t) => $t->compte->est_systeme);
 
-        $transactionsReglementRecu = $this->facture->transactions
-            ->filter(fn ($t) => $t->compte->est_systeme && $t->date_reglement === null);
+        $hasTransactionsDirectes = $transactionsAEncaisser->contains(
+            fn ($t) => in_array($t->mode_paiement, $modesDirects, true)
+        );
 
         $comptesDestination = CompteBancaire::where('est_systeme', false)
             ->where('actif_recettes_depenses', true)
@@ -254,7 +259,7 @@ final class FactureShow extends Component
             'montantRegle' => $montantRegle,
             'isAcquittee' => $isAcquittee,
             'transactionsAEncaisser' => $transactionsAEncaisser,
-            'transactionsReglementRecu' => $transactionsReglementRecu,
+            'hasTransactionsDirectes' => $hasTransactionsDirectes,
             'comptesDestination' => $comptesDestination,
             'operationsLiees' => $operationsLiees,
         ]);
