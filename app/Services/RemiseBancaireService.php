@@ -267,10 +267,20 @@ final class RemiseBancaireService
             }
 
             // ── Transactions directes retirées : restaurer à leur compte d'origine ──
-            $txDirectesActuelles = Transaction::where('remise_id', $remise->id)
+            // Source 1 : encore rattachées à la remise (remise_id set)
+            $txDirectesViaRemise = Transaction::where('remise_id', $remise->id)
                 ->whereNull('reglement_id')
                 ->pluck('id')
                 ->all();
+
+            // Source 2 : déplacées (compte_origine_id set) mais remise_id nettoyé par enregistrerBrouillon
+            $txDirectesOrphelines = Transaction::whereNull('remise_id')
+                ->whereNull('reglement_id')
+                ->whereNotNull('compte_origine_id')
+                ->pluck('id')
+                ->all();
+
+            $txDirectesActuelles = array_values(array_unique(array_merge($txDirectesViaRemise, $txDirectesOrphelines)));
 
             $txARestorer = array_diff($txDirectesActuelles, $transactionIds);
             if (! empty($txARestorer)) {
