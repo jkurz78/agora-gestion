@@ -159,7 +159,12 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label small">Libellé du document</label>
-                        <input type="text" wire:model="assignParticipantLabel" class="form-control form-control-sm" placeholder="Ex: Formulaire papier">
+                        <input type="text" wire:model="assignParticipantLabel" list="inbox-label-suggestions" class="form-control form-control-sm" placeholder="Ex: Formulaire papier">
+                        <datalist id="inbox-label-suggestions">
+                            @foreach($labelSuggestions as $suggestion)
+                                <option value="{{ $suggestion }}">
+                            @endforeach
+                        </datalist>
                     </div>
                     <div class="mb-3">
                         <label class="form-label small">Opération</label>
@@ -173,7 +178,7 @@
                     @if($selectedParticipantOperationId)
                         <div class="mb-3">
                             <label class="form-label small">Participant</label>
-                            <select wire:model="selectedParticipantId" class="form-select form-select-sm">
+                            <select wire:model.live="selectedParticipantId" class="form-select form-select-sm">
                                 <option value="">— Choisir —</option>
                                 @foreach($participantsForAssign as $p)
                                     <option value="{{ $p->id }}">{{ $p->tiers?->nom }} {{ $p->tiers?->prenom }}</option>

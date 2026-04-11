@@ -7,7 +7,12 @@
             <div class="row g-2 align-items-end">
                 <div class="col-md-4">
                     <label class="form-label small">Libellé</label>
-                    <input type="text" wire:model="label" class="form-control form-control-sm" placeholder="Ex: Formulaire papier">
+                    <input type="text" wire:model="label" list="label-suggestions" class="form-control form-control-sm" placeholder="Ex: Formulaire papier">
+                    <datalist id="label-suggestions">
+                        @foreach($labelSuggestions as $suggestion)
+                            <option value="{{ $suggestion }}">
+                        @endforeach
+                    </datalist>
                 </div>
                 <div class="col-md-5">
                     <label class="form-label small">Fichier</label>

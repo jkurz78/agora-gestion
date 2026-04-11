@@ -235,6 +235,9 @@ final class IncomingDocumentsList extends Component
                     ->get()
                     ->sortBy(fn ($p) => $p->tiers?->nom)
                 : collect(),
+            'labelSuggestions' => $this->showAssignParticipantModal
+                ? ParticipantDocument::distinct()->pluck('label')->sort()->values()
+                : collect(),
         ]);
     }
 }

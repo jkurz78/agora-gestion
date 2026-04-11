@@ -70,6 +70,13 @@ final class ParticipantEngagementUpload extends Component
 
     public function render(): View
     {
-        return view('livewire.participant-engagement-upload');
+        $labelSuggestions = ParticipantDocument::distinct()
+            ->pluck('label')
+            ->sort()
+            ->values();
+
+        return view('livewire.participant-engagement-upload', [
+            'labelSuggestions' => $labelSuggestions,
+        ]);
     }
 }
