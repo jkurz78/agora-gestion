@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Livewire\OperationCommunication;
 use App\Livewire\OperationDetail;
+use App\Livewire\ParticipantShow;
 use App\Mail\MessageLibreMail;
 use App\Models\CampagneEmail;
 use App\Models\EmailLog;
@@ -399,4 +400,72 @@ it('resets form after successful send', function () {
         ->assertSet('objet', '')
         ->assertSet('corps', '')
         ->assertSet('selectedTemplateId', null);
+});
+
+// Step 14 tests
+
+it('shows campaign history when campaigns exist', function () {
+    $campagne = CampagneEmail::create([
+        'operation_id' => $this->operation->id,
+        'objet' => 'Newsletter test',
+        'corps' => 'Contenu test',
+        'nb_destinataires' => 2,
+        'nb_erreurs' => 0,
+        'envoye_par' => $this->user->id,
+    ]);
+
+    Livewire::test(OperationCommunication::class, ['operation' => $this->operation])
+        ->assertSee('Newsletter test')
+        ->assertSee('2 envoyé(s)');
+});
+
+it('toggles expanded campaign detail', function () {
+    $campagne = CampagneEmail::create([
+        'operation_id' => $this->operation->id,
+        'objet' => 'Sujet campagne',
+        'corps' => 'Corps',
+        'nb_destinataires' => 1,
+        'nb_erreurs' => 0,
+        'envoye_par' => $this->user->id,
+    ]);
+
+    $component = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);
+
+    $component->assertSet('expandedCampagneId', null);
+
+    $component->call('toggleCampagne', $campagne->id);
+    $component->assertSet('expandedCampagneId', $campagne->id);
+
+    $component->call('toggleCampagne', $campagne->id);
+    $component->assertSet('expandedCampagneId', null);
+});
+
+// Step 15 tests
+
+it('shows message email logs in participant timeline', function () {
+    $tiers = Tiers::factory()->create(['email' => 'bob@example.com']);
+    $participant = Participant::create([
+        'tiers_id' => $tiers->id,
+        'operation_id' => $this->operation->id,
+        'date_inscription' => now(),
+    ]);
+
+    EmailLog::create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => $participant->id,
+        'operation_id' => $this->operation->id,
+        'categorie' => 'message',
+        'destinataire_email' => 'bob@example.com',
+        'destinataire_nom' => 'Bob Dupont',
+        'objet' => 'Rappel séance du 01/05',
+        'statut' => 'envoye',
+        'envoye_par' => $this->user->id,
+    ]);
+
+    Livewire::test(ParticipantShow::class, [
+        'operation' => $this->operation,
+        'participant' => $participant,
+    ])
+        ->assertSee('message')
+        ->assertSee('bob@example.com');
 });
