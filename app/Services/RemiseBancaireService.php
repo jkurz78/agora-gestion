@@ -77,20 +77,24 @@ final class RemiseBancaireService
         });
     }
 
-    public function comptabiliser(RemiseBancaire $remise, array $reglementIds): void
+    /**
+     * @param  array<int>  $reglementIds
+     * @param  array<int>  $transactionIds
+     */
+    public function comptabiliser(RemiseBancaire $remise, array $reglementIds, array $transactionIds = []): void
     {
         if ($remise->virement_id !== null) {
             throw new \RuntimeException('Cette remise est déjà comptabilisée.');
         }
 
-        DB::transaction(function () use ($remise, $reglementIds) {
+        DB::transaction(function () use ($remise, $reglementIds, $transactionIds) {
             $reglements = Reglement::with(['participant.tiers', 'seance.operation.typeOperation'])
                 ->whereIn('id', $reglementIds)
                 ->get();
 
             // Validate all reglements
             foreach ($reglements as $reglement) {
-                if ($reglement->remise_id !== null) {
+                if ($reglement->remise_id !== null && $reglement->remise_id !== $remise->id) {
                     throw new \RuntimeException("Le règlement #{$reglement->id} est déjà inclus dans une autre remise.");
                 }
                 if ($reglement->mode_paiement !== $remise->mode_paiement) {
@@ -149,6 +153,29 @@ final class RemiseBancaireService
 
                 $reglement->update(['remise_id' => $remise->id]);
                 $totalMontant += (float) $reglement->montant_prevu;
+            }
+
+            // ── Transactions directes (nouveau flux, déplace sans créer) ──
+            foreach ($transactionIds as $transactionId) {
+                $transaction = Transaction::findOrFail($transactionId);
+
+                if ($transaction->reglement_id !== null) {
+                    throw new \RuntimeException("La transaction #{$transactionId} est liée à un règlement.");
+                }
+
+                $index++;
+                $indexPadded = str_pad((string) $index, 3, '0', STR_PAD_LEFT);
+                $reference = "{$prefix}-{$numeroPadded}-{$indexPadded}";
+
+                $transaction->update([
+                    'compte_origine_id' => $transaction->compte_id,
+                    'compte_id' => $compteIntermediaire->id,
+                    'remise_id' => $remise->id,
+                    'reference' => $reference,
+                    'pointe' => true,
+                ]);
+
+                $totalMontant += (float) $transaction->montant_total;
             }
 
             // Create the virement
