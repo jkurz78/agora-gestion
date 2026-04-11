@@ -277,6 +277,52 @@ describe('modifier()', function () {
     });
 });
 
+describe('enregistrerBrouillon avec transactions', function () {
+    it('rattache les transactions sélectionnées à la remise', function () {
+        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
+        $remise = $this->service->creer([
+            'date' => now()->toDateString(),
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        $tx = Transaction::factory()->asRecette()->create([
+            'compte_id' => $compteCreances->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 120.00,
+            'remise_id' => null,
+            'reglement_id' => null,
+        ]);
+
+        $this->service->enregistrerBrouillon($remise, [], [$tx->id]);
+
+        $tx->refresh();
+        expect($tx->remise_id)->toBe($remise->id);
+    });
+
+    it('détache les transactions désélectionnées', function () {
+        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
+        $remise = $this->service->creer([
+            'date' => now()->toDateString(),
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        $tx = Transaction::factory()->asRecette()->create([
+            'compte_id' => $compteCreances->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 80.00,
+            'remise_id' => $remise->id,
+            'reglement_id' => null,
+        ]);
+
+        $this->service->enregistrerBrouillon($remise, [], []);
+
+        $tx->refresh();
+        expect($tx->remise_id)->toBeNull();
+    });
+});
+
 describe('supprimer()', function () {
     beforeEach(function () {
         $this->sousCategorie = SousCategorie::factory()->create();

@@ -116,6 +116,58 @@
         </div>
     @endif
 
+    {{-- Tableau des transactions directes --}}
+    @if($transactionsEligibles->isNotEmpty())
+        <h6 class="mt-4 mb-2">Transactions (hors séances)</h6>
+        <div class="table-responsive" style="margin-bottom: 80px;">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                    <tr>
+                        <th style="width:40px">
+                            @if($this->canEdit)
+                                <input type="checkbox"
+                                       class="form-check-input"
+                                       wire:click="toggleAllTransactions"
+                                       @checked(collect($transactionsEligibles->pluck('id'))->every(fn($id) => in_array($id, $selectedTransactionIds)))>
+                            @endif
+                        </th>
+                        <th>Date</th>
+                        <th>Libellé</th>
+                        <th>Tiers</th>
+                        <th>Compte</th>
+                        <th class="text-end">Montant</th>
+                    </tr>
+                </thead>
+                <tbody style="color:#555">
+                    @foreach($transactionsEligibles as $tx)
+                        <tr wire:key="tx-{{ $tx->id }}"
+                            class="{{ in_array($tx->id, $selectedTransactionIds) ? 'table-primary' : '' }}"
+                            @if($this->canEdit) style="cursor:pointer" wire:click="toggleTransaction({{ $tx->id }})" @endif>
+                            <td>
+                                @if($this->canEdit)
+                                    <input type="checkbox"
+                                           class="form-check-input"
+                                           @checked(in_array($tx->id, $selectedTransactionIds))
+                                           wire:click.stop="toggleTransaction({{ $tx->id }})">
+                                @else
+                                    <input type="checkbox"
+                                           class="form-check-input"
+                                           @checked(in_array($tx->id, $selectedTransactionIds))
+                                           disabled>
+                                @endif
+                            </td>
+                            <td class="small" data-sort="{{ $tx->date->format('Y-m-d') }}">{{ $tx->date->format('d/m/Y') }}</td>
+                            <td class="small">{{ $tx->libelle }}</td>
+                            <td class="small">{{ $tx->tiers?->displayName() ?? '—' }}</td>
+                            <td class="small">{{ $tx->compte->nom }}</td>
+                            <td class="text-end small fw-semibold text-nowrap" data-sort="{{ $tx->montant_total }}">{{ number_format((float) $tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+
     {{-- Barre de pied fixe --}}
     <style>
         @media (min-width: 992px) {
