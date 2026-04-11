@@ -24,6 +24,13 @@ final class OperationCommunication extends Component
 
     public ?int $selectedTemplateId = null;
 
+    // Save as template
+    public bool $showSaveTemplate = false;
+
+    public string $templateNom = '';
+
+    public ?int $templateTypeOperationId = null;
+
     // Participant selection
     /** @var array<int> */
     public array $selectedParticipants = [];
@@ -111,6 +118,44 @@ final class OperationCommunication extends Component
         }
 
         return $unresolved;
+    }
+
+    public function saveAsTemplate(): void
+    {
+        $this->validate([
+            'templateNom' => 'required|string|max:100',
+            'objet' => 'required|string|max:255',
+            'corps' => 'required|string',
+        ]);
+
+        MessageTemplate::create([
+            'nom' => $this->templateNom,
+            'objet' => $this->objet,
+            'corps' => $this->corps,
+            'type_operation_id' => $this->templateTypeOperationId,
+        ]);
+
+        $this->showSaveTemplate = false;
+        $this->templateNom = '';
+        $this->templateTypeOperationId = null;
+
+        session()->flash('message', 'Modèle enregistré.');
+    }
+
+    public function updateTemplate(): void
+    {
+        if (! $this->selectedTemplateId) {
+            return;
+        }
+
+        $template = MessageTemplate::find($this->selectedTemplateId);
+        if ($template) {
+            $template->update([
+                'objet' => $this->objet,
+                'corps' => $this->corps,
+            ]);
+            session()->flash('message', 'Modèle mis à jour.');
+        }
     }
 
     public function getAvailableTemplates(): Collection

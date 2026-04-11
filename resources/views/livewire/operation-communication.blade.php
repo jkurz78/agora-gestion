@@ -56,6 +56,58 @@
                 </div>
             </div>
 
+            {{-- Save as template --}}
+            <div class="mb-3">
+                @if(session()->has('message'))
+                    <div class="alert alert-success py-1 small">{{ session('message') }}</div>
+                @endif
+
+                @if($showSaveTemplate)
+                    <div class="border rounded p-2 bg-light">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label small">Nom du modèle</label>
+                                <input type="text" class="form-control form-control-sm @error('templateNom') is-invalid @enderror"
+                                       wire:model="templateNom" placeholder="Ex: Rappel séance J-2">
+                                @error('templateNom')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Type d'opération <span class="text-muted">(optionnel)</span></label>
+                                <select class="form-select form-select-sm" wire:model="templateTypeOperationId">
+                                    <option value="">Modèle général</option>
+                                    @foreach(\App\Models\TypeOperation::orderBy('nom')->get() as $to)
+                                        <option value="{{ $to->id }}">{{ $to->nom }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3 d-flex gap-1">
+                                <button type="button" class="btn btn-sm btn-primary"
+                                        onclick="syncMessageEditor(); $wire.saveAsTemplate()">
+                                    <i class="bi bi-check-lg"></i> Enregistrer
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showSaveTemplate', false)">
+                                    Annuler
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                @else
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showSaveTemplate', true)">
+                            <i class="bi bi-bookmark-plus me-1"></i>Enregistrer comme modèle
+                        </button>
+                        @if($selectedTemplateId)
+                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                    onclick="syncMessageEditor(); $wire.updateTemplate()">
+                                <i class="bi bi-pencil me-1"></i>Mettre à jour « {{ $templates->flatten()->firstWhere('id', $selectedTemplateId)?->nom }} »
+                            </button>
+                        @endif
+                    </div>
+                @endif
+            </div>
+
             {{-- Participants --}}
             <div class="mb-3">
                 <label class="form-label small fw-semibold">
@@ -234,6 +286,17 @@
             }
         },
     }));
+
+    // Sync TinyMCE content to Livewire before any action
+    window.syncMessageEditor = function() {
+        const el = document.querySelector('[x-data="messageTinymce()"]');
+        if (el && el._x_dataStack) {
+            const data = el._x_dataStack[0];
+            if (data && data.getContent) {
+                $wire.set('corps', data.getContent());
+            }
+        }
+    };
 
     // Listen for template loaded event to update TinyMCE content
     $wire.on('template-loaded', (data) => {
