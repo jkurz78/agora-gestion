@@ -53,6 +53,9 @@ final class OperationCommunication extends Component
 
     public string $testEmail = '';
 
+    // Campaign history
+    public ?int $expandedCampagneId = null;
+
     // Bulk send
     public bool $showConfirmSend = false;
 
@@ -63,6 +66,11 @@ final class OperationCommunication extends Component
     public int $envoiTotal = 0;
 
     public string $envoiResultat = '';
+
+    public function toggleCampagne(int $id): void
+    {
+        $this->expandedCampagneId = $this->expandedCampagneId === $id ? null : $id;
+    }
 
     public function mount(Operation $operation): void
     {
@@ -412,6 +420,10 @@ final class OperationCommunication extends Component
             'templates' => $this->getAvailableTemplates(),
             'messageVariables' => CategorieEmail::Message->variables(),
             'unresolvedVariables' => $this->getUnresolvedVariables(),
+            'campagnes' => CampagneEmail::where('operation_id', $this->operation->id)
+                ->with('envoyePar')
+                ->orderByDesc('created_at')
+                ->get(),
         ]);
     }
 }

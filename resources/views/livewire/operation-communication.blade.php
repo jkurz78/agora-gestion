@@ -214,13 +214,73 @@
         </div>
     </div>
 
-    {{-- Campaign history placeholder --}}
+    {{-- Campaign history --}}
     <div class="card mt-3">
         <div class="card-header">
             <h6 class="mb-0"><i class="bi bi-clock-history me-1"></i> Historique des envois</h6>
         </div>
-        <div class="card-body text-muted small">
-            Aucune campagne d'envoi pour cette opération.
+        <div class="card-body">
+            @if($campagnes->isEmpty())
+                <p class="text-muted small mb-0">Aucune campagne d'envoi pour cette opération.</p>
+            @else
+                <div class="list-group list-group-flush">
+                    @foreach($campagnes as $campagne)
+                        <div class="list-group-item px-0">
+                            <div class="d-flex align-items-center justify-content-between"
+                                 style="cursor:pointer"
+                                 wire:click="toggleCampagne({{ $campagne->id }})">
+                                <div>
+                                    <i class="bi bi-chevron-{{ $expandedCampagneId === $campagne->id ? 'down' : 'right' }} me-1 small"></i>
+                                    <strong class="small">{{ $campagne->objet }}</strong>
+                                    <span class="text-muted small ms-2">
+                                        {{ $campagne->created_at->format('d/m/Y H:i') }}
+                                        @if($campagne->envoyePar)
+                                            — {{ $campagne->envoyePar->name }}
+                                        @endif
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="badge bg-success">{{ $campagne->nb_destinataires - $campagne->nb_erreurs }} envoyé(s)</span>
+                                    @if($campagne->nb_erreurs > 0)
+                                        <span class="badge bg-danger">{{ $campagne->nb_erreurs }} erreur(s)</span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @if($expandedCampagneId === $campagne->id)
+                                <div class="mt-2">
+                                    <table class="table table-sm table-bordered mb-0 small">
+                                        <thead>
+                                            <tr style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880" class="table-dark">
+                                                <th>Destinataire</th>
+                                                <th>Email</th>
+                                                <th>Statut</th>
+                                                <th>Détail</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($campagne->emailLogs()->orderBy('created_at')->get() as $log)
+                                                <tr>
+                                                    <td>{{ $log->destinataire_nom }}</td>
+                                                    <td>{{ $log->destinataire_email }}</td>
+                                                    <td>
+                                                        @if($log->statut === 'envoye')
+                                                            <span class="badge bg-success">Envoyé</span>
+                                                        @else
+                                                            <span class="badge bg-danger">Erreur</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="text-muted">{{ $log->erreur_message ?? '—' }}</td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
     </div>
 
