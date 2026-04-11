@@ -277,7 +277,7 @@
                     <div class="row g-2 mb-3">
                         <div class="col">
                             <label class="form-label fw-semibold">Date de règlement</label>
-                            <input type="date" class="form-control" wire:model="dateReglement">
+                            <x-date-input name="dateReglement" wire:model="dateReglement" :value="$dateReglement" />
                         </div>
                         <div class="col">
                             <label class="form-label fw-semibold">
