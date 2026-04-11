@@ -216,10 +216,10 @@ final class RemiseBancaireService
 
             // Remove reglements — bulk delete transactions, lignes, and affectations
             if (count($toRemove) > 0) {
-                // Vérifier qu'aucune transaction retirée n'est liée à une facture
+                // Vérifier qu'aucune transaction retirée n'est liée à une facture validée ou annulée
                 $txFacturees = Transaction::where('remise_id', $remise->id)
                     ->whereIn('reglement_id', $toRemove)
-                    ->whereHas('factures')
+                    ->whereHas('factures', fn ($q) => $q->where('statut', '!=', 'brouillon'))
                     ->count();
 
                 if ($txFacturees > 0) {
@@ -381,9 +381,9 @@ final class RemiseBancaireService
             throw new \RuntimeException('Cette remise est verrouillée par un rapprochement bancaire.');
         }
 
-        // Vérifier qu'aucune transaction n'est liée à une facture
+        // Vérifier qu'aucune transaction n'est liée à une facture validée ou annulée
         $txFacturees = Transaction::where('remise_id', $remise->id)
-            ->whereHas('factures')
+            ->whereHas('factures', fn ($q) => $q->where('statut', '!=', 'brouillon'))
             ->count();
 
         if ($txFacturees > 0) {
