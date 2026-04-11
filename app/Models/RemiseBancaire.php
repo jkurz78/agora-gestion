@@ -63,6 +63,14 @@ final class RemiseBancaire extends Model
         return $this->hasMany(Transaction::class, 'remise_id');
     }
 
+    /**
+     * Transactions directement sélectionnées (pas issues du flux règlement).
+     */
+    public function transactionsDirectes(): HasMany
+    {
+        return $this->hasMany(Transaction::class, 'remise_id')->whereNull('reglement_id');
+    }
+
     public function isVerrouillee(): bool
     {
         if ($this->virement_id === null) {
