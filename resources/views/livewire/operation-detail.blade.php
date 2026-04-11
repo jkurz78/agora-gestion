@@ -41,6 +41,11 @@
                 <i class="bi bi-wallet2 me-1"></i>Règlements
             </button>
         </li>
+        <li class="nav-item">
+            <button class="nav-link {{ $activeTab === 'communication' ? 'active' : '' }}" wire:click="setTab('communication')">
+                <i class="bi bi-envelope me-1"></i>Communication
+            </button>
+        </li>
         <li class="nav-item d-flex align-items-end" style="padding:0 4px">
             <span style="border-left:1px solid #ccc;height:20px;display:inline-block;margin-bottom:8px"></span>
         </li>
@@ -67,6 +72,10 @@
 
     @if($activeTab === 'reglements')
         <livewire:reglement-table :operation="$operation" :key="'rt-'.$operation->id" />
+    @endif
+
+    @if($activeTab === 'communication')
+        <livewire:operation-communication :operation="$operation" :key="'oc-'.$operation->id" />
     @endif
 
     @if($activeTab === 'details')
