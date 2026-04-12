@@ -306,6 +306,6 @@ Route::prefix('formulaire')->middleware('throttle:10,1')->group(function (): voi
 Route::get('/t/{token}.gif', EmailTrackingController::class)->name('email.tracking');
 
 // Email opt-out (no auth — called from email footer link)
-Route::get('/email/optout/{token}', fn (string $token) => redirect('/')->with('status', 'Vous avez été désinscrit.'))->name('email.optout');
+Route::get('/email/optout/{token}', \App\Http\Controllers\EmailOptoutController::class)->name('email.optout');
 
 require __DIR__.'/auth.php';
