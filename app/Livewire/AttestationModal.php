@@ -12,6 +12,7 @@ use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Seance;
+use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -341,7 +342,10 @@ final class AttestationModal extends Component
     {
         [$association, $headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime, $cachetBase64, $cachetMime] = $this->resolveAssociationData();
 
-        return Pdf::loadView('pdf.attestation-presence', [
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
+        $pdf = Pdf::loadView('pdf.attestation-presence', [
             'mode' => 'seance',
             'operation' => $this->operation,
             'seance' => $seance,
@@ -353,7 +357,12 @@ final class AttestationModal extends Component
             'footerLogoMime' => $footerLogoMime,
             'cachetBase64' => $cachetBase64,
             'cachetMime' => $cachetMime,
-        ])->setPaper('a4', 'portrait')->output();
+            'appLogoBase64' => $appLogoBase64,
+        ])->setPaper('a4', 'portrait');
+
+        PdfFooterRenderer::render($pdf);
+
+        return $pdf->output();
     }
 
     /** Generate recap PDF content in memory for a participant */
@@ -366,7 +375,10 @@ final class AttestationModal extends Component
 
         [$association, $headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime, $cachetBase64, $cachetMime] = $this->resolveAssociationData();
 
-        return Pdf::loadView('pdf.attestation-presence', [
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
+        $pdf = Pdf::loadView('pdf.attestation-presence', [
             'mode' => 'recap',
             'operation' => $this->operation,
             'participant' => $participant,
@@ -379,7 +391,12 @@ final class AttestationModal extends Component
             'footerLogoMime' => $footerLogoMime,
             'cachetBase64' => $cachetBase64,
             'cachetMime' => $cachetMime,
-        ])->setPaper('a4', 'portrait')->output();
+            'appLogoBase64' => $appLogoBase64,
+        ])->setPaper('a4', 'portrait');
+
+        PdfFooterRenderer::render($pdf);
+
+        return $pdf->output();
     }
 
     /**
