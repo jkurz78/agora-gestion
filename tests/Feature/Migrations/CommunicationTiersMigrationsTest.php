@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\CampagneEmail;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
@@ -17,13 +19,13 @@ it('association table has email_from and email_from_name columns', function () {
 });
 
 it('campagnes_email.operation_id is nullable', function () {
-    $campagne = \App\Models\CampagneEmail::create([
+    $campagne = CampagneEmail::create([
         'operation_id' => null,
         'objet' => 'Test sans opération',
         'corps' => 'Corps test',
         'nb_destinataires' => 0,
         'nb_erreurs' => 0,
-        'envoye_par' => \App\Models\User::factory()->create()->id,
+        'envoye_par' => User::factory()->create()->id,
     ]);
 
     expect($campagne->id)->toBeInt()
