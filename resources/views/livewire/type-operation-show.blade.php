@@ -330,7 +330,7 @@ x-on:click.window="
 
         <ul class="nav nav-pills nav-fill mb-3">
             @foreach (\App\Enums\CategorieEmail::cases() as $cat)
-                @if($cat === \App\Enums\CategorieEmail::Message) @continue @endif
+                @if($cat === \App\Enums\CategorieEmail::Message || $cat === \App\Enums\CategorieEmail::Communication) @continue @endif
                 <li class="nav-item">
                     <button class="nav-link {{ $emailSubTab === $cat->value ? 'active' : '' }}"
                             wire:click="$set('emailSubTab', '{{ $cat->value }}')" type="button">
