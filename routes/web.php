@@ -188,6 +188,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::view('/adherents', 'gestion.adherents')->name('adherents');
         Route::view('/dons', 'dons.index')->name('dons');
         Route::view('/cotisations', 'cotisations.index')->name('cotisations');
+        Route::view('/communication', 'tiers.communication')->name('communication');
     });
 
 // ── Facturation ──
