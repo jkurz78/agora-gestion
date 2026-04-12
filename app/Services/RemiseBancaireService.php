@@ -95,7 +95,7 @@ final class RemiseBancaireService
 
             // Validate all reglements
             foreach ($reglements as $reglement) {
-                if ($reglement->remise_id !== null && (int) $reglement->remise_id !== $remise->id) {
+                if ($reglement->remise_id !== null && (int) $reglement->remise_id !== (int) $remise->id) {
                     $tiers = $reglement->participant->tiers->displayName();
                     $op = $reglement->seance->operation->nom ?? '';
                     $autreRemise = RemiseBancaire::withTrashed()->find($reglement->remise_id);
@@ -308,7 +308,7 @@ final class RemiseBancaireService
                     ->get();
 
                 foreach ($newReglements as $reglement) {
-                    if ($reglement->remise_id !== null && (int) $reglement->remise_id !== $remise->id) {
+                    if ($reglement->remise_id !== null && (int) $reglement->remise_id !== (int) $remise->id) {
                         $tiers = $reglement->participant->tiers->displayName();
                         $op = $reglement->seance->operation->nom ?? '';
                         $autreRemise = RemiseBancaire::withTrashed()->find($reglement->remise_id);

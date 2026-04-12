@@ -80,7 +80,7 @@ final class FactureService
                     throw new \RuntimeException("La transaction #{$transaction->id} n'est pas une recette.");
                 }
 
-                if ($transaction->tiers_id !== $facture->tiers_id) {
+                if ((int) $transaction->tiers_id !== (int) $facture->tiers_id) {
                     throw new \RuntimeException("La transaction #{$transaction->id} n'appartient pas au même tiers que la facture.");
                 }
 
