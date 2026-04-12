@@ -53,7 +53,7 @@
                             </div>
                         </div>
                         <div>
-                            <a href="{{ route('compta.transactions.import.template', ['type' => $type]) }}"
+                            <a href="{{ route('comptabilite.transactions.import.template', ['type' => $type]) }}"
                                class="btn btn-outline-secondary btn-sm">
                                 <i class="bi bi-download"></i> Télécharger le modèle
                             </a>

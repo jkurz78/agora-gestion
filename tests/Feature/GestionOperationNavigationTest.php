@@ -14,7 +14,7 @@ use Livewire\Livewire;
 test('operations list page loads', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user)
-        ->get('/gestion/operations')
+        ->get('/operations')
         ->assertOk()
         ->assertSeeLivewire('operation-list');
 });
@@ -23,7 +23,7 @@ test('operation detail page loads', function (): void {
     $user = User::factory()->create();
     $operation = Operation::factory()->create(['nom' => 'Art-thérapie navigation']);
     $this->actingAs($user)
-        ->get("/gestion/operations/{$operation->id}")
+        ->get("/operations/{$operation->id}")
         ->assertOk()
         ->assertSeeLivewire('operation-detail')
         ->assertSee('Art-thérapie navigation');
@@ -32,7 +32,7 @@ test('operation detail page loads', function (): void {
 test('operation detail returns 404 for non-existent operation', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user)
-        ->get('/gestion/operations/99999')
+        ->get('/operations/99999')
         ->assertNotFound();
 });
 
@@ -47,7 +47,7 @@ test('participant page loads within operation context', function (): void {
     ]);
 
     $this->actingAs($user)
-        ->get("/gestion/operations/{$operation->id}/participants/{$participant->id}")
+        ->get("/operations/{$operation->id}/participants/{$participant->id}")
         ->assertOk()
         ->assertSeeLivewire('participant-show');
 });
@@ -64,18 +64,18 @@ test('participant page returns 404 when participant does not belong to operation
     ]);
 
     $this->actingAs($user)
-        ->get("/gestion/operations/{$operation1->id}/participants/{$participant->id}")
+        ->get("/operations/{$operation1->id}/participants/{$participant->id}")
         ->assertNotFound();
 });
 
 test('unauthenticated user is redirected from operations list', function (): void {
-    $this->get('/gestion/operations')
+    $this->get('/operations')
         ->assertRedirect('/login');
 });
 
 test('unauthenticated user is redirected from operation detail', function (): void {
     $operation = Operation::factory()->create();
-    $this->get("/gestion/operations/{$operation->id}")
+    $this->get("/operations/{$operation->id}")
         ->assertRedirect('/login');
 });
 
@@ -96,7 +96,7 @@ test('niveau 1: opérations listées dans le tableau', function (): void {
     Participant::create(['tiers_id' => $tiers3->id, 'operation_id' => $op->id, 'date_inscription' => now()->toDateString()]);
 
     $this->actingAs($user)
-        ->get('/gestion/operations')
+        ->get('/operations')
         ->assertSee('Parcours Cheval Bleu')
         ->assertSee('Equithérapie')
         ->assertSee('3');
@@ -124,7 +124,7 @@ test('niveau 1: opérations clôturées affichées en opacité réduite', functi
     ]);
 
     $this->actingAs($user)
-        ->get('/gestion/operations')
+        ->get('/operations')
         ->assertSee('Op Clôturée')
         ->assertSee('opacity');
 });

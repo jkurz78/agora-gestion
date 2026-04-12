@@ -18,7 +18,7 @@
                style="max-width:250px"
                placeholder="Rechercher un adhérent…">
 
-        <a href="{{ route('compta.transactions.index') }}"
+        <a href="{{ route('comptabilite.transactions') }}"
            class="btn btn-primary btn-sm ms-auto">
             <i class="bi bi-plus-lg"></i> Nouvelle cotisation
         </a>
@@ -82,12 +82,12 @@
                         </td>
                         <td class="text-end">
                             <div class="d-flex gap-1 justify-content-end">
-                                <a href="{{ route('compta.tiers.transactions', $membre->id) }}"
+                                <a href="{{ route('tiers.transactions', $membre->id) }}"
                                    class="btn btn-sm btn-outline-secondary"
                                    title="Voir les transactions">
                                     <i class="bi bi-clock-history"></i>
                                 </a>
-                                <a href="{{ route('compta.transactions.index') }}"
+                                <a href="{{ route('comptabilite.transactions') }}"
                                    class="btn btn-sm btn-outline-primary"
                                    title="Nouvelle cotisation">
                                     <i class="bi bi-plus-circle"></i>

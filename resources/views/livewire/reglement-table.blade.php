@@ -243,7 +243,7 @@
                     </div>
                     <div class="modal-body d-grid gap-2">
                         @if($docModalV && $docModalDocId)
-                            <a href="{{ route('gestion.documents-previsionnels.pdf', $docModalDocId) }}" target="_blank"
+                            <a href="{{ route('operations.documents-previsionnels.pdf', $docModalDocId) }}" target="_blank"
                                class="btn btn-outline-primary btn-sm">
                                 <i class="bi bi-file-earmark-pdf"></i> Ouvrir le PDF (v{{ $docModalV }})
                             </a>

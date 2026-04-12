@@ -28,7 +28,7 @@ it('downloads document when user has permission', function () {
     );
 
     $response = $this->actingAs($user)
-        ->get(route('gestion.participants.documents.download', [
+        ->get(route('operations.participants.documents.download', [
             'participant' => $this->participant->id,
             'filename' => 'certificat.pdf',
         ]));
@@ -49,7 +49,7 @@ it('returns 403 when user lacks permission', function () {
     );
 
     $response = $this->actingAs($user)
-        ->get(route('gestion.participants.documents.download', [
+        ->get(route('operations.participants.documents.download', [
             'participant' => $this->participant->id,
             'filename' => 'certificat.pdf',
         ]));
@@ -64,7 +64,7 @@ it('returns 404 for missing file', function () {
     $user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
 
     $response = $this->actingAs($user)
-        ->get(route('gestion.participants.documents.download', [
+        ->get(route('operations.participants.documents.download', [
             'participant' => $this->participant->id,
             'filename' => 'nonexistent.pdf',
         ]));
@@ -73,7 +73,7 @@ it('returns 404 for missing file', function () {
 });
 
 it('requires authentication', function () {
-    $response = $this->get(route('gestion.participants.documents.download', [
+    $response = $this->get(route('operations.participants.documents.download', [
         'participant' => $this->participant->id,
         'filename' => 'certificat.pdf',
     ]));

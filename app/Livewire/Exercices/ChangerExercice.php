@@ -26,7 +26,7 @@ final class ChangerExercice extends Component
         $exercice = Exercice::where('annee', $annee)->firstOrFail();
         app(ExerciceService::class)->changerExerciceAffiche($exercice);
 
-        $this->redirect(route('compta.exercices.changer'));
+        $this->redirect(route('exercices.changer'));
     }
 
     public function creer(): void

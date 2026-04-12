@@ -16,7 +16,7 @@ it('sends email when admin changes another user password', function () {
     $admin = User::factory()->create(['role' => Role::Admin]);
     $target = User::factory()->create();
 
-    $this->actingAs($admin)->put(route('compta.parametres.utilisateurs.update', $target), [
+    $this->actingAs($admin)->put(route('parametres.utilisateurs.update', $target), [
         'nom' => $target->nom,
         'email' => $target->email,
         'password' => 'newpassword123',
@@ -34,7 +34,7 @@ it('does not send email when password is not changed', function () {
     $admin = User::factory()->create(['role' => Role::Admin]);
     $target = User::factory()->create();
 
-    $this->actingAs($admin)->put(route('compta.parametres.utilisateurs.update', $target), [
+    $this->actingAs($admin)->put(route('parametres.utilisateurs.update', $target), [
         'nom' => 'New Name',
         'email' => $target->email,
     ]);

@@ -59,7 +59,7 @@ final class FactureShow extends Component
     public function mount(Facture $facture): void
     {
         if ($facture->statut === StatutFacture::Brouillon) {
-            $this->redirect(route($this->espacePrefix().'.factures.edit', $facture));
+            $this->redirect(route('facturation.factures.edit', $facture));
 
             return;
         }
@@ -390,10 +390,5 @@ final class FactureShow extends Component
         return Operation::whereIn('id', $operationIds)
             ->whereNotNull('type_operation_id')
             ->value('type_operation_id');
-    }
-
-    private function espacePrefix(): string
-    {
-        return (request()->attributes->get('espace') ?? Espace::Compta)->value;
     }
 }

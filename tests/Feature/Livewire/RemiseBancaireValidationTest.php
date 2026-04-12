@@ -65,7 +65,7 @@ it('comptabiliser creates transactions and redirects', function () {
 
     Livewire::test(RemiseBancaireValidation::class, ['remise' => $this->remise])
         ->call('comptabiliser')
-        ->assertRedirect(route('compta.banques.remises.index'));
+        ->assertRedirect(route('banques.remises.index'));
 
     expect(Transaction::where('remise_id', $this->remise->id)->count())->toBe(1);
     $this->remise->refresh();

@@ -42,7 +42,7 @@ it('ne supprime pas une transaction pointée', function () {
 });
 
 it('la page /transactions rend TransactionUniverselle avec lockedTypes depense+recette', function () {
-    $this->get('/compta/transactions')
+    $this->get('/comptabilite/transactions')
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 
@@ -52,7 +52,7 @@ it('la page /transactions rend TransactionUniverselle avec lockedTypes depense+r
 
 it('la page /comptes-bancaires/{id}/transactions rend TransactionUniverselle avec compteId', function () {
     $compte = CompteBancaire::factory()->create();
-    $this->get("/compta/banques/comptes/{$compte->id}/transactions")
+    $this->get("/banques/comptes/{$compte->id}/transactions")
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 
@@ -62,13 +62,13 @@ it('la page /comptes-bancaires/{id}/transactions rend TransactionUniverselle ave
 
 it('la page /tiers/{id}/transactions rend TransactionUniverselle avec tiersId', function () {
     $tiers = Tiers::factory()->create();
-    $this->get("/compta/tiers/{$tiers->id}/transactions")
+    $this->get("/tiers/{$tiers->id}/transactions")
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 });
 
 it('la page /dons rend TransactionUniverselle avec sousCategorieFilter pour_dons', function () {
-    $this->get('/compta/dons')
+    $this->get('/tiers/dons')
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 
@@ -77,7 +77,7 @@ it('la page /dons rend TransactionUniverselle avec sousCategorieFilter pour_dons
 });
 
 it('la page /cotisations rend TransactionUniverselle avec sousCategorieFilter pour_cotisations', function () {
-    $this->get('/compta/cotisations')
+    $this->get('/tiers/cotisations')
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 

@@ -30,7 +30,7 @@ final class ClotureWizard extends Component
 
         $exercice = $exerciceService->exerciceAffiche();
         if ($exercice?->isCloture()) {
-            $this->redirect(route('compta.exercices.changer'));
+            $this->redirect(route('exercices.changer'));
 
             return;
         }
@@ -83,7 +83,7 @@ final class ClotureWizard extends Component
         $exerciceService->cloturer($exercice, auth()->user());
 
         session()->flash('success', "L'exercice {$exercice->label()} a été clôturé avec succès.");
-        $this->redirect(route('compta.exercices.changer'));
+        $this->redirect(route('exercices.changer'));
     }
 
     /**

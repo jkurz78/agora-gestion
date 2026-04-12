@@ -15,7 +15,7 @@ beforeEach(function (): void {
 
 it('telecharge le modele CSV avec les en-tetes corrects', function (): void {
     $response = $this->actingAs($this->admin)
-        ->get(route('compta.tiers.template.csv'));
+        ->get(route('tiers.template.csv'));
 
     $response->assertOk();
     $response->assertDownload('modele-tiers.csv');
@@ -39,7 +39,7 @@ it('telecharge le modele CSV avec les en-tetes corrects', function (): void {
 
 it('le modele CSV contient le BOM UTF-8', function (): void {
     $response = $this->actingAs($this->admin)
-        ->get(route('compta.tiers.template.csv'));
+        ->get(route('tiers.template.csv'));
 
     $content = $response->streamedContent();
 
@@ -48,7 +48,7 @@ it('le modele CSV contient le BOM UTF-8', function (): void {
 
 it('le modele CSV utilise le point-virgule comme separateur', function (): void {
     $response = $this->actingAs($this->admin)
-        ->get(route('compta.tiers.template.csv'));
+        ->get(route('tiers.template.csv'));
 
     $content = $response->streamedContent();
     $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
@@ -62,7 +62,7 @@ it('le modele CSV utilise le point-virgule comme separateur', function (): void 
 
 it('telecharge le modele XLSX valide', function (): void {
     $response = $this->actingAs($this->admin)
-        ->get(route('compta.tiers.template.xlsx'));
+        ->get(route('tiers.template.xlsx'));
 
     $response->assertOk();
     $response->assertDownload('modele-tiers.xlsx');
@@ -70,7 +70,7 @@ it('telecharge le modele XLSX valide', function (): void {
 
 it('le modele XLSX contient les en-tetes et la ligne exemple', function (): void {
     $response = $this->actingAs($this->admin)
-        ->get(route('compta.tiers.template.xlsx'));
+        ->get(route('tiers.template.xlsx'));
 
     // Write response content to a temp file and read with PhpSpreadsheet
     $tempFile = tempnam(sys_get_temp_dir(), 'test_xlsx_');
@@ -100,23 +100,23 @@ it('le modele XLSX contient les en-tetes et la ligne exemple', function (): void
 // ── Auth & access control ──
 
 it('redirige les invites vers login pour le CSV', function (): void {
-    $this->get(route('compta.tiers.template.csv'))
+    $this->get(route('tiers.template.csv'))
         ->assertRedirect(route('login'));
 });
 
 it('redirige les invites vers login pour le XLSX', function (): void {
-    $this->get(route('compta.tiers.template.xlsx'))
+    $this->get(route('tiers.template.xlsx'))
         ->assertRedirect(route('login'));
 });
 
 it('les utilisateurs authentifies peuvent telecharger le CSV', function (): void {
     $this->actingAs($this->consultation)
-        ->get(route('compta.tiers.template.csv'))
+        ->get(route('tiers.template.csv'))
         ->assertOk();
 });
 
 it('les utilisateurs authentifies peuvent telecharger le XLSX', function (): void {
     $this->actingAs($this->consultation)
-        ->get(route('compta.tiers.template.xlsx'))
+        ->get(route('tiers.template.xlsx'))
         ->assertOk();
 });

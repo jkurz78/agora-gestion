@@ -138,7 +138,7 @@
             </div>
 
             <hr class="my-3">
-            <a href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+            <a href="{{ route('operations.participants.fiche-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
                 <i class="bi bi-file-person"></i> Fiche PDF
             </a>
 
@@ -554,7 +554,7 @@
 
                     @if($operation->typeOperation?->formulaire_droit_image && $participant->droit_image)
                         <hr class="my-3">
-                        <a href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
+                        <a href="{{ route('operations.participants.droit-image-pdf', [$operation, $participant]) }}" target="_blank" class="btn btn-sm btn-outline-info">
                             <i class="bi bi-camera"></i> Autorisation photo
                         </a>
                     @endif

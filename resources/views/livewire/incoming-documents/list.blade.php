@@ -41,9 +41,6 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @php
-                            $espacePrefix = request()->routeIs('compta.*') ? 'compta' : 'gestion';
-                        @endphp
                         @foreach($documents as $doc)
                             <tr>
                                 <td>{{ $doc->received_at->format('d/m H:i') }}</td>
@@ -67,7 +64,7 @@
                                     </span>
                                 </td>
                                 <td class="text-nowrap">
-                                    <a href="{{ route($espacePrefix.'.documents-en-attente.download', $doc) }}"
+                                    <a href="{{ route('facturation.documents-en-attente.download', $doc) }}"
                                        class="btn btn-sm btn-outline-secondary" target="_blank" title="Aperçu">
                                         👁
                                     </a>

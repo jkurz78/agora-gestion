@@ -135,7 +135,7 @@ final class BudgetTable extends Component
             ? $exerciceService->current() + 1
             : $exerciceService->current();
 
-        $url = route('compta.budget.export', [
+        $url = route('comptabilite.budget.export', [
             'format' => $this->exportFormat,
             'exercice' => $exerciceCible,
             'source' => $this->exportSource,

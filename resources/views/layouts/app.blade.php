@@ -133,38 +133,38 @@
                     @if(($espace ?? null) === \App\Enums\Espace::Compta)
                     {{-- Dropdown Transactions --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('compta.transactions.*') || request()->routeIs('compta.dons.*') || request()->routeIs('compta.cotisations.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('comptabilite.transactions*') || request()->routeIs('tiers.dons') || request()->routeIs('tiers.cotisations') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-arrow-down-up"></i> Transactions
                         </a>
                         <ul class="dropdown-menu">
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.transactions.index') ? 'active' : '' }}"
-                                   href="{{ route('compta.transactions.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('comptabilite.transactions') ? 'active' : '' }}"
+                                   href="{{ route('comptabilite.transactions') }}">
                                     <i class="bi bi-list-ul"></i> Recettes &amp; dépenses
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
-                            @if (Route::has('compta.dons.index'))
+                            @if (Route::has('tiers.dons'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.dons.*') ? 'active' : '' }}"
-                                   href="{{ route('compta.dons.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('tiers.dons') ? 'active' : '' }}"
+                                   href="{{ route('tiers.dons') }}">
                                     <i class="bi bi-heart"></i> Dons
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has('compta.cotisations.index'))
+                            @if (Route::has('tiers.cotisations'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.cotisations.*') ? 'active' : '' }}"
-                                   href="{{ route('compta.cotisations.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('tiers.cotisations') ? 'active' : '' }}"
+                                   href="{{ route('tiers.cotisations') }}">
                                     <i class="bi bi-person-check"></i> Cotisations
                                 </a>
                             </li>
                             @endif
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.transactions.all') ? 'active' : '' }}"
-                                   href="{{ route('compta.transactions.all') }}">
+                                <a class="dropdown-item {{ request()->routeIs('comptabilite.transactions.all') ? 'active' : '' }}"
+                                   href="{{ route('comptabilite.transactions.all') }}">
                                     <i class="bi bi-collection"></i> Toutes les transactions
                                 </a>
                             </li>
@@ -173,57 +173,57 @@
 
                     {{-- Tiers --}}
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('compta.tiers.*') ? 'active fw-semibold' : '' }}"
-                           href="{{ route('compta.tiers.index') }}">
+                        <a class="nav-link {{ request()->routeIs('tiers.*') ? 'active fw-semibold' : '' }}"
+                           href="{{ route('tiers.index') }}">
                             <i class="bi bi-building-add"></i> Tiers
                         </a>
                     </li>
 
                     {{-- Factures --}}
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('compta.factures*') ? 'active' : '' }}"
-                           href="{{ route('compta.factures') }}">
+                        <a class="nav-link {{ request()->routeIs('facturation.factures*') ? 'active' : '' }}"
+                           href="{{ route('facturation.factures') }}">
                             <i class="bi bi-receipt"></i> Factures
                         </a>
                     </li>
 
                     {{-- Dropdown Banques --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('compta.banques.comptes.*') || request()->routeIs('compta.banques.rapprochement.*') || request()->routeIs('compta.banques.virements.*') || request()->routeIs('compta.banques.helloasso-sync') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('banques.comptes.*') || request()->routeIs('banques.rapprochement.*') || request()->routeIs('banques.virements.*') || request()->routeIs('banques.helloasso-sync') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-bank2"></i> Banques
                         </a>
                         <ul class="dropdown-menu">
-                            @if (Route::has('compta.banques.rapprochement.index'))
+                            @if (Route::has('banques.rapprochement.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.banques.rapprochement.*') ? 'active' : '' }}"
-                                   href="{{ route('compta.banques.rapprochement.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('banques.rapprochement.*') ? 'active' : '' }}"
+                                   href="{{ route('banques.rapprochement.index') }}">
                                     <i class="bi bi-bank"></i> Rapprochement
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has('compta.banques.virements.index'))
+                            @if (Route::has('banques.virements.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.banques.virements.*') ? 'active' : '' }}"
-                                   href="{{ route('compta.banques.virements.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('banques.virements.*') ? 'active' : '' }}"
+                                   href="{{ route('banques.virements.index') }}">
                                     <i class="bi bi-arrow-left-right"></i> Virements
                                 </a>
                             </li>
                             @endif
                             <li><hr class="dropdown-divider"></li>
-                            @if (Route::has('compta.banques.helloasso-sync'))
+                            @if (Route::has('banques.helloasso-sync'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.banques.helloasso-sync') ? 'active' : '' }}"
-                                   href="{{ route('compta.banques.helloasso-sync') }}">
+                                <a class="dropdown-item {{ request()->routeIs('banques.helloasso-sync') ? 'active' : '' }}"
+                                   href="{{ route('banques.helloasso-sync') }}">
                                     <i class="bi bi-arrow-repeat"></i> Synchronisation HelloAsso
                                 </a>
                             </li>
                             @endif
                             <li><hr class="dropdown-divider"></li>
-                            @if (Route::has('compta.banques.comptes.index'))
+                            @if (Route::has('banques.comptes.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.banques.comptes.*') ? 'active' : '' }}"
-                                   href="{{ route('compta.banques.comptes.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('banques.comptes.*') ? 'active' : '' }}"
+                                   href="{{ route('banques.comptes.index') }}">
                                     <i class="bi bi-credit-card"></i> Comptes bancaires
                                 </a>
                             </li>
@@ -232,10 +232,10 @@
                     </li>
 
                     {{-- Budget --}}
-                    @if (Route::has('compta.budget.index'))
+                    @if (Route::has('comptabilite.budget'))
                         <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('compta.budget.*') ? 'active' : '' }}"
-                               href="{{ route('compta.budget.index') }}">
+                            <a class="nav-link {{ request()->routeIs('comptabilite.budget*') ? 'active' : '' }}"
+                               href="{{ route('comptabilite.budget') }}">
                                 <i class="bi bi-piggy-bank"></i> Budget
                             </a>
                         </li>
@@ -243,33 +243,33 @@
 
                     {{-- Dropdown Rapports --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('compta.rapports.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('rapports.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-file-earmark-bar-graph"></i> Rapports
                         </a>
                         <ul class="dropdown-menu">
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.rapports.compte-resultat') ? 'active' : '' }}"
-                                   href="{{ route('compta.rapports.compte-resultat') }}">
+                                <a class="dropdown-item {{ request()->routeIs('rapports.compte-resultat') ? 'active' : '' }}"
+                                   href="{{ route('rapports.compte-resultat') }}">
                                     <i class="bi bi-journal-text me-1"></i>Compte de résultat
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.rapports.operations') ? 'active' : '' }}"
-                                   href="{{ route('compta.rapports.operations') }}">
+                                <a class="dropdown-item {{ request()->routeIs('rapports.operations') ? 'active' : '' }}"
+                                   href="{{ route('rapports.operations') }}">
                                     <i class="bi bi-diagram-3 me-1"></i>Compte de résultat par opérations
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.rapports.flux-tresorerie') ? 'active' : '' }}"
-                                   href="{{ route('compta.rapports.flux-tresorerie') }}">
+                                <a class="dropdown-item {{ request()->routeIs('rapports.flux-tresorerie') ? 'active' : '' }}"
+                                   href="{{ route('rapports.flux-tresorerie') }}">
                                     <i class="bi bi-cash-stack me-1"></i>Flux de trésorerie
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.rapports.analyse') ? 'active' : '' }}"
-                                   href="{{ route('compta.rapports.analyse') }}">
+                                <a class="dropdown-item {{ request()->routeIs('rapports.analyse') ? 'active' : '' }}"
+                                   href="{{ route('rapports.analyse') }}">
                                     <i class="bi bi-graph-up me-1"></i>Analyse financière
                                 </a>
                             </li>
@@ -278,36 +278,36 @@
 
                     {{-- Dropdown Exercices --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('compta.exercices.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('exercices.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-journal-check"></i> Exercices
                         </a>
                         <ul class="dropdown-menu">
                             @if ($exerciceCloture)
                                 <li>
-                                    <a class="dropdown-item text-danger {{ request()->routeIs('compta.exercices.reouvrir') ? 'active' : '' }}"
-                                       href="{{ route('compta.exercices.reouvrir') }}">
+                                    <a class="dropdown-item text-danger {{ request()->routeIs('exercices.reouvrir') ? 'active' : '' }}"
+                                       href="{{ route('exercices.reouvrir') }}">
                                         <i class="bi bi-unlock"></i> Réouvrir l'exercice
                                     </a>
                                 </li>
                             @else
                                 <li>
-                                    <a class="dropdown-item {{ request()->routeIs('compta.exercices.cloture') ? 'active' : '' }}"
-                                       href="{{ route('compta.exercices.cloture') }}">
+                                    <a class="dropdown-item {{ request()->routeIs('exercices.cloture') ? 'active' : '' }}"
+                                       href="{{ route('exercices.cloture') }}">
                                         <i class="bi bi-lock"></i> Clôturer l'exercice
                                     </a>
                                 </li>
                             @endif
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.exercices.changer') ? 'active' : '' }}"
-                                   href="{{ route('compta.exercices.changer') }}">
+                                <a class="dropdown-item {{ request()->routeIs('exercices.changer') ? 'active' : '' }}"
+                                   href="{{ route('exercices.changer') }}">
                                     <i class="bi bi-arrow-left-right"></i> Changer d'exercice
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.exercices.audit') ? 'active' : '' }}"
-                                   href="{{ route('compta.exercices.audit') }}">
+                                <a class="dropdown-item {{ request()->routeIs('exercices.audit') ? 'active' : '' }}"
+                                   href="{{ route('exercices.audit') }}">
                                     <i class="bi bi-clock-history"></i> Piste d'audit
                                 </a>
                             </li>
@@ -318,35 +318,35 @@
                     @if(($espace ?? null) === \App\Enums\Espace::Gestion)
                     {{-- Adhérents --}}
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('gestion.adherents') ? 'active' : '' }}"
-                           href="{{ route('gestion.adherents') }}">
+                        <a class="nav-link {{ request()->routeIs('tiers.adherents') ? 'active' : '' }}"
+                           href="{{ route('tiers.adherents') }}">
                             <i class="bi bi-people"></i> Adhérents
                         </a>
                     </li>
 
                     {{-- Dropdown Opérations --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('gestion.operations*') || request()->routeIs('compta.banques.remises*') || request()->routeIs('gestion.analyse*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('operations.*') || request()->routeIs('banques.remises*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-calendar-event"></i> Opérations
                         </a>
                         <ul class="dropdown-menu">
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('gestion.operations*') ? 'active' : '' }}"
-                                   href="{{ route('gestion.operations') }}">
+                                <a class="dropdown-item {{ request()->routeIs('operations.index', 'operations.show', 'operations.participants.*', 'operations.seances.*') ? 'active' : '' }}"
+                                   href="{{ route('operations.index') }}">
                                     <i class="bi bi-calendar-event"></i> Gestion des opérations
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.banques.remises*') ? 'active' : '' }}"
-                                   href="{{ route('compta.banques.remises.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('banques.remises*') ? 'active' : '' }}"
+                                   href="{{ route('banques.remises.index') }}">
                                     <i class="bi bi-bank"></i> Remises en banque
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('gestion.analyse*') ? 'active' : '' }}"
-                                   href="{{ route('gestion.analyse') }}">
+                                <a class="dropdown-item {{ request()->routeIs('operations.analyse') ? 'active' : '' }}"
+                                   href="{{ route('operations.analyse') }}">
                                     <i class="bi bi-graph-up"></i> Analyse
                                 </a>
                             </li>
@@ -355,17 +355,17 @@
 
                     {{-- Factures --}}
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('gestion.factures*') ? 'active' : '' }}"
-                           href="{{ route('gestion.factures') }}">
+                        <a class="nav-link {{ request()->routeIs('facturation.factures*') ? 'active' : '' }}"
+                           href="{{ route('facturation.factures') }}">
                             <i class="bi bi-receipt"></i> Factures
                         </a>
                     </li>
 
                     {{-- Sync HelloAsso --}}
-                    @if (Route::has('gestion.helloasso-sync'))
+                    @if (Route::has('banques.helloasso-sync'))
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('gestion.helloasso-sync') ? 'active' : '' }}"
-                           href="{{ route('gestion.helloasso-sync') }}">
+                        <a class="nav-link {{ request()->routeIs('banques.helloasso-sync') ? 'active' : '' }}"
+                           href="{{ route('banques.helloasso-sync') }}">
                             <i class="bi bi-arrow-repeat"></i> Sync HelloAsso
                         </a>
                     </li>
@@ -375,11 +375,10 @@
                 </ul>
 
                 {{-- Dropdown Paramètres (poussé à droite) --}}
-                @php $espacePrefix = ($espace ?? \App\Enums\Espace::Compta)->value; @endphp
                 <ul class="navbar-nav ms-auto me-3 align-items-end">
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs($espacePrefix.'.documents-en-attente') ? 'active' : '' }}"
-                           href="{{ route($espacePrefix.'.documents-en-attente') }}">
+                        <a class="nav-link {{ request()->routeIs('facturation.documents-en-attente') ? 'active' : '' }}"
+                           href="{{ route('facturation.documents-en-attente') }}">
                             <i class="bi bi-inbox"></i> Documents
                             @if(($incomingDocumentsCount ?? 0) > 0)
                                 <span class="badge bg-warning text-dark">{{ $incomingDocumentsCount }}</span>
@@ -387,73 +386,63 @@
                         </a>
                     </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs($espacePrefix . '.parametres.*') || request()->routeIs($espacePrefix . '.operations.*') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('parametres.*') || request()->routeIs('operations.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-gear"></i> Paramètres
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            @if (Route::has($espacePrefix . '.parametres.association'))
+                            @if (Route::has('parametres.association'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.association') ? 'active' : '' }}"
-                                   href="{{ route($espacePrefix . '.parametres.association') }}">
+                                <a class="dropdown-item {{ request()->routeIs('parametres.association') ? 'active' : '' }}"
+                                   href="{{ route('parametres.association') }}">
                                     <i class="bi bi-building"></i> Association
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has($espacePrefix . '.parametres.helloasso'))
+                            @if (Route::has('parametres.helloasso'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.helloasso') ? 'active' : '' }}"
-                                   href="{{ route($espacePrefix . '.parametres.helloasso') }}">
+                                <a class="dropdown-item {{ request()->routeIs('parametres.helloasso') ? 'active' : '' }}"
+                                   href="{{ route('parametres.helloasso') }}">
                                     <i class="bi bi-plug"></i> Connexion HelloAsso
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has($espacePrefix . '.parametres.reception-documents'))
+                            @if (Route::has('parametres.reception-documents'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.reception-documents') ? 'active' : '' }}"
-                                   href="{{ route($espacePrefix . '.parametres.reception-documents') }}">
+                                <a class="dropdown-item {{ request()->routeIs('parametres.reception-documents') ? 'active' : '' }}"
+                                   href="{{ route('parametres.reception-documents') }}">
                                     <i class="bi bi-envelope-arrow-down"></i> Réception de documents
                                 </a>
                             </li>
                             @endif
                             <li><hr class="dropdown-divider"></li>
-                            @if (Route::has($espacePrefix . '.parametres.categories.index'))
+                            @if (Route::has('parametres.categories.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.categories.*') ? 'active' : '' }}"
-                                   href="{{ route($espacePrefix . '.parametres.categories.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('parametres.categories.*') ? 'active' : '' }}"
+                                   href="{{ route('parametres.categories.index') }}">
                                     <i class="bi bi-tags"></i> Catégories
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has($espacePrefix . '.parametres.sous-categories.index'))
+                            @if (Route::has('parametres.sous-categories.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.sous-categories.*') ? 'active' : '' }}"
-                                   href="{{ route($espacePrefix . '.parametres.sous-categories.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('parametres.sous-categories.*') ? 'active' : '' }}"
+                                   href="{{ route('parametres.sous-categories.index') }}">
                                     <i class="bi bi-tag"></i> Sous-catégories
                                 </a>
                             </li>
                             @endif
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('types-operation.*') ? 'active' : '' }}"
-                                   href="{{ route('types-operation.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('operations.types-operation.*') ? 'active' : '' }}"
+                                   href="{{ route('operations.types-operation.index') }}">
                                     <i class="bi bi-collection"></i> Types d'opération
                                 </a>
                             </li>
-                            @if(($espace ?? null) === \App\Enums\Espace::Compta)
-                            @if (Route::has('compta.operations.index'))
-                            <li>
-                                <a class="dropdown-item {{ request()->routeIs('compta.operations.*') ? 'active' : '' }}"
-                                   href="{{ route('compta.operations.index') }}">
-                                    <i class="bi bi-calendar-event"></i> Opérations
-                                </a>
-                            </li>
-                            @endif
-                            @endif
                             <li><hr class="dropdown-divider"></li>
-                            @if (Route::has($espacePrefix . '.parametres.utilisateurs.index'))
+                            @if (Route::has('parametres.utilisateurs.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.utilisateurs.*') ? 'active' : '' }}"
-                                   href="{{ route($espacePrefix . '.parametres.utilisateurs.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('parametres.utilisateurs.*') ? 'active' : '' }}"
+                                   href="{{ route('parametres.utilisateurs.index') }}">
                                     <i class="bi bi-people"></i> Utilisateurs
                                 </a>
                             </li>

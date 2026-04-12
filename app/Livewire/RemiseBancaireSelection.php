@@ -139,7 +139,7 @@ final class RemiseBancaireSelection extends Component
         );
 
         session(['remise_selected_ids' => $this->selectedIds]);
-        $this->redirect(route('compta.banques.remises.validation', $this->remise));
+        $this->redirect(route('banques.remises.validation', $this->remise));
     }
 
     public function render(): View

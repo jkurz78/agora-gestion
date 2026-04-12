@@ -11,7 +11,7 @@ uses(RefreshDatabase::class);
 it('can create a user with a role', function () {
     $admin = User::factory()->create(['role' => Role::Admin]);
 
-    $this->actingAs($admin)->post(route('compta.parametres.utilisateurs.store'), [
+    $this->actingAs($admin)->post(route('parametres.utilisateurs.store'), [
         'nom' => 'Test User',
         'email' => 'test@example.com',
         'password' => 'password123',
@@ -26,7 +26,7 @@ it('can update a user role', function () {
     $admin = User::factory()->create(['role' => Role::Admin]);
     $target = User::factory()->create(['role' => Role::Comptable]);
 
-    $this->actingAs($admin)->put(route('compta.parametres.utilisateurs.update', $target), [
+    $this->actingAs($admin)->put(route('parametres.utilisateurs.update', $target), [
         'nom' => $target->nom,
         'email' => $target->email,
         'role' => 'gestionnaire',
@@ -38,7 +38,7 @@ it('can update a user role', function () {
 it('defaults to admin role if not specified', function () {
     $admin = User::factory()->create(['role' => Role::Admin]);
 
-    $this->actingAs($admin)->post(route('compta.parametres.utilisateurs.store'), [
+    $this->actingAs($admin)->post(route('parametres.utilisateurs.store'), [
         'nom' => 'Default Role',
         'email' => 'default@example.com',
         'password' => 'password123',
@@ -51,7 +51,7 @@ it('defaults to admin role if not specified', function () {
 it('validates role must be a valid enum value', function () {
     $admin = User::factory()->create(['role' => Role::Admin]);
 
-    $this->actingAs($admin)->post(route('compta.parametres.utilisateurs.store'), [
+    $this->actingAs($admin)->post(route('parametres.utilisateurs.store'), [
         'nom' => 'Test',
         'email' => 'bad@example.com',
         'password' => 'password123',
@@ -65,7 +65,7 @@ it('shows role column in user list', function () {
     $comptable = User::factory()->create(['role' => Role::Comptable]);
 
     $this->actingAs($admin)
-        ->get(route('compta.parametres.utilisateurs.index'))
+        ->get(route('parametres.utilisateurs.index'))
         ->assertSee('Administrateur')
         ->assertSee('Comptable');
 });

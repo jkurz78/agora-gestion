@@ -56,10 +56,10 @@
                             Colonnes reconnues : nom, prenom, entreprise, email, telephone, adresse_ligne1, code_postal, ville, pays, pour_depenses, pour_recettes.
                         </p>
                         <div class="mt-2">
-                            <a href="{{ route('compta.tiers.template.csv') }}" class="btn btn-sm btn-outline-secondary">
+                            <a href="{{ route('tiers.template.csv') }}" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-file-earmark-text"></i> Modele CSV
                             </a>
-                            <a href="{{ route('compta.tiers.template.xlsx') }}" class="btn btn-sm btn-outline-secondary ms-1">
+                            <a href="{{ route('tiers.template.xlsx') }}" class="btn btn-sm btn-outline-secondary ms-1">
                                 <i class="bi bi-file-earmark-excel"></i> Modele Excel
                             </a>
                         </div>

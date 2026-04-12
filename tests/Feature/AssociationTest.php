@@ -40,12 +40,12 @@ it('updates existing association without creating duplicate', function () {
 
 it('association page is accessible to authenticated user', function () {
     $this->actingAs($this->user)
-        ->get(route('compta.parametres.association'))
+        ->get(route('parametres.association'))
         ->assertOk();
 });
 
 it('association page redirects guest to login', function () {
-    $this->get(route('compta.parametres.association'))
+    $this->get(route('parametres.association'))
         ->assertRedirect(route('login'));
 });
 

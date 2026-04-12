@@ -83,19 +83,19 @@
                     @if(isset($summary['recettes']) || isset($summary['dons']) || isset($summary['depenses']) || isset($summary['factures']))
                         <div class="d-flex flex-wrap gap-3 mb-3 small justify-content-center">
                             @isset($summary['recettes'])
-                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
+                                <a href="{{ route('tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
                                     <span class="badge bg-success" style="font-size:.65rem">{{ $summary['recettes']['count'] }} REC</span>
                                     {{ number_format((float)$summary['recettes']['total'], 2, ',', ' ') }} €
                                 </a>
                             @endisset
                             @isset($summary['dons'])
-                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
+                                <a href="{{ route('tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
                                     <span class="badge bg-warning text-dark" style="font-size:.65rem">{{ $summary['dons']['count'] }} DON</span>
                                     {{ number_format((float)$summary['dons']['total'], 2, ',', ' ') }} €
                                 </a>
                             @endisset
                             @isset($summary['depenses'])
-                                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
+                                <a href="{{ route('tiers.transactions', $tiers->id) }}" class="text-decoration-none text-nowrap text-dark">
                                     <span class="badge bg-danger" style="font-size:.65rem">{{ $summary['depenses']['count'] }} DEP</span>
                                     {{ number_format((float)$summary['depenses']['total'], 2, ',', ' ') }} €
                                 </a>
@@ -110,7 +110,7 @@
                             <ul class="list-unstyled ms-2 mb-0">
                                 @foreach($summary['depenses']['par_operation'] as $op)
                                     <li class="small text-muted">
-                                        <a href="{{ route('gestion.operations.show', $op['operation_id']) }}"
+                                        <a href="{{ route('operations.show', $op['operation_id']) }}"
                                            class="text-decoration-none text-muted">
                                             <i class="bi bi-link-45deg"></i>{{ $op['operation_nom'] }}
                                         </a>
@@ -132,7 +132,7 @@
                             <ul class="list-unstyled ms-3 mb-0">
                                 @foreach($summary['participations'] as $part)
                                     <li class="small text-muted">
-                                        <a href="{{ route('gestion.operations.show', $part['operation_id']) }}"
+                                        <a href="{{ route('operations.show', $part['operation_id']) }}"
                                            class="text-decoration-none text-muted" target="_blank">
                                             <i class="bi bi-link-45deg"></i>{{ $part['operation_nom'] }}
                                         </a>
@@ -155,7 +155,7 @@
                             <ul class="list-unstyled ms-3 mb-0">
                                 @foreach($summary['animations'] as $anim)
                                     <li class="small text-muted">
-                                        <a href="{{ route('gestion.operations.show', $anim['operation_id']) }}"
+                                        <a href="{{ route('operations.show', $anim['operation_id']) }}"
                                            class="text-decoration-none text-muted" target="_blank">
                                             <i class="bi bi-link-45deg"></i>{{ $anim['operation_nom'] }}
                                         </a>
@@ -211,7 +211,7 @@
 
             {{-- Footer --}}
             <div class="px-3 pb-3 pt-0 text-end">
-                <a href="{{ route('compta.tiers.transactions', $tiers->id) }}"
+                <a href="{{ route('tiers.transactions', $tiers->id) }}"
                    class="small text-decoration-none" style="color:#722281" target="_blank">
                     Toutes les transactions →
                 </a>

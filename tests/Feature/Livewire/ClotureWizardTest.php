@@ -69,7 +69,7 @@ it('can close the exercice from step 3', function () {
         ->call('suite')
         ->call('suite')
         ->call('cloturer')
-        ->assertRedirect(route('compta.exercices.changer'));
+        ->assertRedirect(route('exercices.changer'));
 
     $this->exercice->refresh();
     expect($this->exercice->statut)->toBe(StatutExercice::Cloture);
@@ -79,5 +79,5 @@ it('redirects if exercice is already closed', function () {
     $this->exercice->update(['statut' => StatutExercice::Cloture]);
 
     Livewire::test(ClotureWizard::class)
-        ->assertRedirect(route('compta.exercices.changer'));
+        ->assertRedirect(route('exercices.changer'));
 });

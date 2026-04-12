@@ -43,7 +43,7 @@
                                 onclick="
                                     var ids = @js(collect($presentParticipants)->where('checked', true)->pluck('id')->values());
                                     if (!ids.length) { alert('Aucun participant sélectionné.'); return; }
-                                    window.open('{{ route('gestion.operations.seances.attestation-pdf', [$operation, $seanceId]) }}' + '?participants=' + ids.join(','), '_blank');
+                                    window.open('{{ route('operations.seances.attestation-pdf', [$operation, $seanceId]) }}' + '?participants=' + ids.join(','), '_blank');
                                 ">
                             <i class="bi bi-download me-1"></i> Télécharger PDF
                         </button>
@@ -100,7 +100,7 @@
                     <button class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Fermer</button>
                     @if(count($seancesPresent) > 0)
                         <a class="btn btn-sm btn-outline-primary"
-                           href="{{ route('gestion.operations.participants.attestation-recap-pdf', [$operation, $participantId]) }}"
+                           href="{{ route('operations.participants.attestation-recap-pdf', [$operation, $participantId]) }}"
                            target="_blank">
                             <i class="bi bi-download me-1"></i> Télécharger PDF
                         </a>

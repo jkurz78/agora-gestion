@@ -8,7 +8,7 @@ use App\Models\User;
 test('gestion operations page loads with operation list', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user)
-        ->get('/gestion/operations')
+        ->get('/operations')
         ->assertOk()
         ->assertSee('Liste des opérations');
 });
@@ -17,7 +17,7 @@ test('operations are listed in table', function (): void {
     $user = User::factory()->create();
     $op = Operation::factory()->create(['nom' => 'Art-thérapie test']);
     $this->actingAs($user)
-        ->get('/gestion/operations')
+        ->get('/operations')
         ->assertSee('Art-thérapie test');
 });
 
@@ -25,7 +25,7 @@ test('operation detail page loads', function (): void {
     $user = User::factory()->create();
     $op = Operation::factory()->create(['nom' => 'Sophrologie test']);
     $this->actingAs($user)
-        ->get("/gestion/operations/{$op->id}")
+        ->get("/operations/{$op->id}")
         ->assertOk()
         ->assertSee('Sophrologie test');
 });

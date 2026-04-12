@@ -13,7 +13,7 @@
     <ul class="dropdown-menu" style="min-width: 180px;">
         <li>
             <a class="dropdown-item {{ $currentEspace === Espace::Compta ? 'active' : '' }}"
-               href="{{ route('compta.dashboard') }}">
+               href="{{ route('dashboard') }}">
                 @if ($currentEspace === Espace::Compta)
                     <i class="bi bi-check-lg me-1"></i>
                 @else
@@ -24,7 +24,7 @@
         </li>
         <li>
             <a class="dropdown-item {{ $currentEspace === Espace::Gestion ? 'active' : '' }}"
-               href="{{ route('gestion.dashboard') }}">
+               href="{{ route('dashboard') }}">
                 @if ($currentEspace === Espace::Gestion)
                     <i class="bi bi-check-lg me-1"></i>
                 @else

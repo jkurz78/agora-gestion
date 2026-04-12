@@ -22,39 +22,39 @@ final class CompteBancaireController extends Controller
 
     public function create(): RedirectResponse
     {
-        return redirect()->route('compta.banques.comptes.index');
+        return redirect()->route('banques.comptes.index');
     }
 
     public function store(StoreCompteBancaireRequest $request): RedirectResponse
     {
         CompteBancaire::create($request->validated());
 
-        return redirect()->route('compta.banques.comptes.index')
+        return redirect()->route('banques.comptes.index')
             ->with('success', 'Compte bancaire créé avec succès.');
     }
 
     public function edit(CompteBancaire $comptesBancaire): RedirectResponse
     {
-        return redirect()->route('compta.banques.comptes.index');
+        return redirect()->route('banques.comptes.index');
     }
 
     public function update(UpdateCompteBancaireRequest $request, CompteBancaire $comptesBancaire): RedirectResponse
     {
         if ($comptesBancaire->est_systeme) {
-            return redirect()->route('compta.banques.comptes.index')
+            return redirect()->route('banques.comptes.index')
                 ->with('error', 'Les comptes système ne peuvent pas être modifiés.');
         }
 
         $comptesBancaire->update($request->validated());
 
-        return redirect()->route('compta.banques.comptes.index')
+        return redirect()->route('banques.comptes.index')
             ->with('success', 'Compte bancaire mis à jour avec succès.');
     }
 
     public function destroy(CompteBancaire $comptesBancaire): RedirectResponse
     {
         if ($comptesBancaire->est_systeme) {
-            return redirect()->route('compta.banques.comptes.index')
+            return redirect()->route('banques.comptes.index')
                 ->with('error', 'Les comptes système ne peuvent pas être supprimés.');
         }
 
@@ -71,18 +71,18 @@ final class CompteBancaireController extends Controller
                 ->count();
 
         if ($actives > 0) {
-            return redirect()->route('compta.banques.comptes.index')
+            return redirect()->route('banques.comptes.index')
                 ->with('error', "Suppression impossible : ce compte a {$actives} transaction(s) active(s).");
         }
 
         if ($archivees > 0) {
-            return redirect()->route('compta.banques.comptes.index')
+            return redirect()->route('banques.comptes.index')
                 ->with('error', "Suppression impossible : ce compte a {$archivees} transaction(s) archivée(s) (supprimées mais conservées pour la traçabilité). Purgez-les d'abord si nécessaire.");
         }
 
         $comptesBancaire->delete();
 
-        return redirect()->route('compta.banques.comptes.index')
+        return redirect()->route('banques.comptes.index')
             ->with('success', 'Compte bancaire supprimé avec succès.');
     }
 }

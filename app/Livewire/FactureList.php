@@ -54,7 +54,7 @@ final class FactureList extends Component
 
         $facture = app(FactureService::class)->creer($this->newFactureTiersId);
 
-        $this->redirect(route($this->espacePrefix().'.factures.edit', $facture));
+        $this->redirect(route('facturation.factures.edit', $facture));
     }
 
     public function supprimer(int $id): void
@@ -124,10 +124,5 @@ final class FactureList extends Component
         return view('livewire.facture-list', [
             'factures' => $factures,
         ]);
-    }
-
-    private function espacePrefix(): string
-    {
-        return (request()->attributes->get('espace') ?? Espace::Compta)->value;
     }
 }

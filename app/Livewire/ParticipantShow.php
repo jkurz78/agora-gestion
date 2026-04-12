@@ -598,7 +598,7 @@ final class ParticipantShow extends Component
                 ),
                 'detail' => null,
                 'copyable' => null,
-                'pdf_url' => route('gestion.documents-previsionnels.pdf', $doc),
+                'pdf_url' => route('operations.documents-previsionnels.pdf', $doc),
                 'document_id' => $doc->id,
             ]);
         }
@@ -724,7 +724,7 @@ final class ParticipantShow extends Component
                 'name' => $doc->original_filename,
                 'label' => $doc->label,
                 'size' => Storage::disk('local')->size($doc->storage_path),
-                'url' => route('gestion.participants.documents.download', [
+                'url' => route('operations.participants.documents.download', [
                     'participant' => $participantId,
                     'filename' => basename($doc->storage_path),
                 ]),

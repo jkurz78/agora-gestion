@@ -34,7 +34,7 @@
                                     @endphp
                                     <tr>
                                         <td>
-                                            <a href="{{ route('gestion.operations.show', $op) }}" class="text-decoration-none">
+                                            <a href="{{ route('operations.show', $op) }}" class="text-decoration-none">
                                                 {{ $op->nom }}
                                             </a>
                                         </td>

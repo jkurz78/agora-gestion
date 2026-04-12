@@ -134,7 +134,7 @@ final class AnalysePivot extends Component
     {
         $rapport = $this->mode === 'participants' ? 'analyse-participants' : 'analyse-financier';
 
-        return route('compta.rapports.export', [
+        return route('rapports.export', [
             'rapport' => $rapport,
             'format' => 'xlsx',
             'exercice' => $this->filterExercice,

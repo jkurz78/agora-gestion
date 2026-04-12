@@ -111,15 +111,15 @@
                 {{-- Breadcrumb --}}
                 @php
                     $breadcrumbGroup = match(true) {
-                        request()->routeIs('compta.transactions.*', 'compta.budget.*') => 'Comptabilité',
-                        request()->routeIs('compta.banques.rapprochement.*', 'compta.banques.virements.*', 'compta.banques.helloasso-sync',
-                            'compta.banques.comptes.*', 'compta.banques.remises*') => 'Banques',
-                        request()->routeIs('compta.tiers.*', 'gestion.adherents', 'compta.dons.*', 'compta.cotisations.*') => 'Tiers',
-                        request()->routeIs('gestion.operations*', 'types-operation.*', 'gestion.analyse*') => 'Opérations',
-                        request()->routeIs('compta.factures*', 'gestion.factures*', '*.documents-en-attente*') => 'Facturation',
-                        request()->routeIs('compta.rapports.*') => 'Rapports',
-                        request()->routeIs('compta.exercices.*') => 'Exercices',
-                        request()->routeIs('*.parametres.*') => 'Paramètres',
+                        request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*') => 'Comptabilité',
+                        request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
+                            'banques.comptes.*', 'banques.remises*') => 'Banques',
+                        request()->routeIs('tiers.*') => 'Tiers',
+                        request()->routeIs('operations.*') => 'Opérations',
+                        request()->routeIs('facturation.factures*', 'facturation.documents-en-attente*') => 'Facturation',
+                        request()->routeIs('rapports.*') => 'Rapports',
+                        request()->routeIs('exercices.*') => 'Exercices',
+                        request()->routeIs('parametres.*') => 'Paramètres',
                         default => null,
                     };
                     $breadcrumbPage = trim(str_replace(['—', '|'], '', $title ?? ''));
@@ -152,7 +152,7 @@
 
                     {{-- Documents en attente --}}
                     @if(($incomingDocumentsCount ?? 0) > 0)
-                        <a href="{{ route('compta.documents-en-attente') }}"
+                        <a href="{{ route('facturation.documents-en-attente') }}"
                            class="text-decoration-none d-flex align-items-center gap-1"
                            style="color: rgba(255,255,255,.9);"
                            title="{{ $incomingDocumentsCount }} document(s) en attente">

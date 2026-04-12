@@ -16,7 +16,7 @@
                 <option value="inactif">Inactifs</option>
             </select>
         </div>
-        <a href="{{ route('types-operation.create') }}" class="btn btn-primary btn-sm">
+        <a href="{{ route('operations.types-operation.create') }}" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg"></i> Nouveau type
         </a>
     </div>
@@ -49,7 +49,7 @@
                             @endif
                         </td>
                         <td class="small" data-sort="{{ $type->nom }}">
-                            <a href="{{ route('types-operation.show', $type) }}" class="text-decoration-none">{{ $type->nom }}</a>
+                            <a href="{{ route('operations.types-operation.show', $type) }}" class="text-decoration-none">{{ $type->nom }}</a>
                         </td>
                         <td class="small">{{ $type->sousCategorie?->nom ?? '—' }}</td>
                         <td class="text-center small">{{ $type->nombre_seances ?? '—' }}</td>

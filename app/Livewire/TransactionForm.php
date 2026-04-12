@@ -180,11 +180,7 @@ final class TransactionForm extends Component
         $this->existingPieceJointeNom = $doc->original_filename;
 
         // URL servie depuis le controller pour que l'iframe de prévisu puisse la lire.
-        // Détection de l'espace via $user->dernier_espace (persisté par DetecteEspace middleware
-        // au dernier chargement full-page), car pendant un update Livewire la route courante
-        // est 'livewire.update', pas 'compta.*' ou 'gestion.*'.
-        $espace = (Auth::user()->dernier_espace ?? Espace::Compta)->value;
-        $this->incomingDocumentPreviewUrl = route($espace.'.documents-en-attente.download', $doc);
+        $this->incomingDocumentPreviewUrl = route('facturation.documents-en-attente.download', $doc);
 
         if (! InvoiceOcrService::isConfigured()) {
             return;

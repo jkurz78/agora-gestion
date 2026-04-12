@@ -14,7 +14,7 @@ final class RapportFluxTresorerie extends Component
     {
         $exercice = app(ExerciceService::class)->current();
 
-        return route('compta.rapports.export', [
+        return route('rapports.export', [
             'rapport' => 'flux-tresorerie',
             'format' => $format,
             'exercice' => $exercice,

@@ -40,7 +40,7 @@ it('AppServiceProvider::boot() ne régénère pas config/version.php si le fichi
 it('le footer version est présent dans les pages authentifiées', function (): void {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->get(route('compta.dashboard'));
+    $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertStatus(200);
     // Vérifier le marqueur unique du footer : "AgoraGestion &middot;" (entité HTML)

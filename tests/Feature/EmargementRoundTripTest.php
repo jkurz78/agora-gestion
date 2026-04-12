@@ -17,7 +17,7 @@ it('generates an emargement PDF that the QR extractor can read back', function (
     ]);
 
     $response = $this->actingAs($user)
-        ->get(route('gestion.operations.seances.emargement-pdf', [$operation, $seance]));
+        ->get(route('operations.seances.emargement-pdf', [$operation, $seance]));
 
     $response->assertOk();
 

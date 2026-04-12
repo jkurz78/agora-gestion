@@ -136,7 +136,7 @@ it('valider validates the facture and redirects to show', function () {
 it('supprimer deletes the brouillon and redirects to list', function () {
     Livewire::test(FactureEdit::class, ['facture' => $this->facture])
         ->call('supprimer')
-        ->assertRedirect(route('compta.factures'));
+        ->assertRedirect(route('facturation.factures'));
 
     expect(Facture::find($this->facture->id))->toBeNull();
 });
@@ -149,5 +149,5 @@ it('redirects to show if facture is not brouillon', function () {
     ]);
 
     Livewire::test(FactureEdit::class, ['facture' => $this->facture])
-        ->assertRedirect(route('compta.factures.show', $this->facture));
+        ->assertRedirect(route('facturation.factures.show', $this->facture));
 });

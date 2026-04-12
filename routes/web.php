@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\Espace;
 use App\Http\Controllers\AttestationPresencePdfController;
 use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
@@ -29,7 +28,6 @@ use App\Http\Controllers\TiersTemplateController;
 use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\CheckEspaceAccess;
-use App\Http\Middleware\DetecteEspace;
 use App\Http\Middleware\EnsureTwoFactor;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -41,171 +39,22 @@ use App\Models\Tiers;
 use App\Models\TypeOperation;
 use Illuminate\Support\Facades\Route;
 
-// Root: redirect to user's last espace
+// Root: redirect to dashboard
 Route::middleware('auth')->get('/', function () {
-    $espace = auth()->user()->dernier_espace ?? Espace::Compta;
-
-    return redirect("/{$espace->value}/dashboard");
+    return redirect('/dashboard');
 })->name('home');
 
-// ── Shared route registrar (parametres, helloasso-sync) ──
-$registerParametres = function (): void {
-    Route::prefix('parametres')->name('parametres.')->middleware(CheckEspaceAccess::class.':parametres')->group(function (): void {
+// ── Paramètres ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess::class.':parametres'])
+    ->prefix('parametres')
+    ->name('parametres.')
+    ->group(function (): void {
         Route::view('/association', 'parametres.association')->name('association');
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
-    });
-    // Factures (accessibles depuis les deux espaces)
-    Route::view('/factures', 'gestion.factures.index')->name('factures');
-    Route::get('/factures/{facture}/edit', function (Facture $facture) {
-        return view('gestion.factures.edit', compact('facture'));
-    })->name('factures.edit');
-    Route::get('/factures/{facture}', function (Facture $facture) {
-        return view('gestion.factures.show', compact('facture'));
-    })->name('factures.show');
-    Route::get('/factures/{facture}/pdf', FacturePdfController::class)
-        ->name('factures.pdf');
-};
-
-// ── Shared route registrar (documents en attente) ──
-$registerDocumentsEntrants = function (): void {
-    Route::get('/documents-en-attente', function () {
-        return view('incoming-documents.index');
-    })->name('documents-en-attente');
-
-    Route::get('/documents-en-attente/{document}/download', [IncomingDocumentsController::class, 'download'])
-        ->name('documents-en-attente.download');
-};
-
-// ── Espace Comptabilité ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::class.':compta'])
-    ->prefix('compta')
-    ->name('compta.')
-    ->group(function () use ($registerParametres, $registerDocumentsEntrants): void {
-        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-        Route::view('/transactions', 'transactions.index')->name('transactions.index');
-        Route::view('/transactions/all', 'transactions.all')->name('transactions.all');
-        Route::get('/transactions/import/template/{type}', [CsvImportController::class, 'template'])
-            ->whereIn('type', ['depense', 'recette'])
-            ->name('transactions.import.template');
-        Route::view('/dons', 'dons.index')->name('dons.index');
-        Route::view('/cotisations', 'cotisations.index')->name('cotisations.index');
-        Route::view('/tiers', 'tiers.index')->name('tiers.index');
-        Route::get('/tiers/template/csv', [TiersTemplateController::class, 'csv'])->name('tiers.template.csv');
-        Route::get('/tiers/template/xlsx', [TiersTemplateController::class, 'xlsx'])->name('tiers.template.xlsx');
-        Route::get('/tiers/export', TiersExportController::class)->name('tiers.export');
-        Route::get('/tiers/{tiers}/transactions', function (Tiers $tiers) {
-            return view('tiers.transactions', compact('tiers'));
-        })->name('tiers.transactions');
-        Route::view('/budget', 'budget.index')->name('budget.index');
-        Route::get('/budget/export', BudgetExportController::class)->name('budget.export');
-        // Banques
-        Route::prefix('banques')->name('banques.')->group(function (): void {
-            Route::resource('comptes', CompteBancaireController::class)->except(['show'])->parameters(['comptes' => 'comptesBancaire']);
-            Route::get('comptes/{compte}/transactions', function (CompteBancaire $compte) {
-                return view('comptes-bancaires.transactions', compact('compte'));
-            })->name('comptes.transactions');
-
-            Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
-            Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
-                return view('rapprochement.detail', compact('rapprochement'));
-            })->name('rapprochement.detail');
-            Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
-                ->name('rapprochement.pdf');
-
-            Route::view('/virements', 'virements.index')->name('virements.index');
-
-            Route::view('/remises', 'gestion.remises-bancaires.index')->name('remises.index');
-            Route::get('/remises/{remise}', function (RemiseBancaire $remise) {
-                return view('gestion.remises-bancaires.show', compact('remise'));
-            })->name('remises.show');
-            Route::get('/remises/{remise}/selection', function (RemiseBancaire $remise) {
-                return view('gestion.remises-bancaires.selection', compact('remise'));
-            })->name('remises.selection');
-            Route::get('/remises/{remise}/validation', function (RemiseBancaire $remise) {
-                return view('gestion.remises-bancaires.validation', compact('remise'));
-            })->name('remises.validation');
-            Route::get('/remises/{remise}/pdf', RemiseBancairePdfController::class)
-                ->name('remises.pdf');
-
-            Route::view('/helloasso-sync', 'banques.helloasso-sync')->name('helloasso-sync');
-        });
-
-        // Rapports — écrans dédiés
-        Route::view('/rapports/compte-resultat', 'rapports.compte-resultat')->name('rapports.compte-resultat');
-        Route::view('/rapports/operations', 'rapports.operations')->name('rapports.operations');
-        Route::view('/rapports/flux-tresorerie', 'rapports.flux-tresorerie')->name('rapports.flux-tresorerie');
-        Route::view('/rapports/analyse', 'rapports.analyse')->name('rapports.analyse');
-        Route::redirect('/rapports', '/compta/rapports/compte-resultat', 301)->name('rapports.index');
-        Route::get('/rapports/export/{rapport}/{format}', RapportExportController::class)->name('rapports.export');
-
-        // Exercices
-        Route::view('/exercices/cloture', 'exercices.cloture')->name('exercices.cloture');
-        Route::view('/exercices/changer', 'exercices.changer')->name('exercices.changer');
-        Route::view('/exercices/reouvrir', 'exercices.reouvrir')->name('exercices.reouvrir');
-        Route::view('/exercices/audit', 'exercices.audit')->name('exercices.audit');
-        Route::view('/exercices/provisions', 'exercices.provisions')->name('exercices.provisions');
-
-        // Shared registrations
-        $registerDocumentsEntrants();
-        $registerParametres();
-    });
-
-// ── Espace Gestion ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class, DetecteEspace::class.':gestion'])
-    ->prefix('gestion')
-    ->name('gestion.')
-    ->group(function () use ($registerParametres, $registerDocumentsEntrants): void {
-        Route::view('/dashboard', 'gestion.dashboard')->name('dashboard');
-        Route::view('/adherents', 'gestion.adherents')->name('adherents');
-        Route::view('/analyse', 'gestion.analyse.index')->name('analyse');
-        Route::view('/operations', 'gestion.operations.index')->name('operations');
-        Route::get('/operations/{operation}/participants/export', ParticipantExportController::class)
-            ->name('operations.participants.export');
-        Route::get('/operations/{operation}/participants/pdf', ParticipantPdfController::class)
-            ->name('operations.participants.pdf');
-        Route::get('/operations/{operation}/participants/{participant}/pdf', ParticipantFichePdfController::class)
-            ->name('operations.participants.fiche-pdf');
-        Route::get('/operations/{operation}/participants/{participant}/droit-image-pdf', DroitImagePdfController::class)
-            ->name('operations.participants.droit-image-pdf');
-        Route::get('/operations/{operation}/participants/{participant}/attestation-recap-pdf', [AttestationPresencePdfController::class, 'recap'])
-            ->name('operations.participants.attestation-recap-pdf');
-        Route::get('/operations/{operation}/seances/matrice-pdf', [SeancePdfController::class, 'matrice'])
-            ->name('operations.seances.matrice-pdf');
-        Route::get('/operations/{operation}/seances/{seance}/emargement-pdf', [SeancePdfController::class, 'emargement'])
-            ->name('operations.seances.emargement-pdf');
-        Route::get('/operations/{operation}/seances/{seance}/feuille-signee/download', [SeanceFeuilleController::class, 'download'])
-            ->name('operations.seances.feuille-signee.download');
-        Route::get('/operations/{operation}/seances/{seance}/feuille-signee/view', [SeanceFeuilleController::class, 'view'])
-            ->name('operations.seances.feuille-signee.view');
-        Route::get('/operations/{operation}/seances/export', SeanceExportController::class)
-            ->name('operations.seances.export');
-        Route::get('/operations/{operation}/seances/{seance}/attestation-pdf', [AttestationPresencePdfController::class, 'seance'])
-            ->name('operations.seances.attestation-pdf');
-        Route::get('/operations/{operation}/participants/{participant}', function (Operation $operation, Participant $participant) {
-            abort_unless((int) $participant->operation_id === (int) $operation->id, 404);
-
-            return view('gestion.operations.participant', compact('operation', 'participant'));
-        })->name('operations.participants.show');
-        Route::get('/operations/{operation}', function (Operation $operation) {
-            return view('gestion.operations.show', compact('operation'));
-        })->name('operations.show');
-
-        // Participant documents
-        Route::get('/participants/{participant}/documents/{filename}', ParticipantDocumentController::class)
-            ->name('participants.documents.download');
-
-        // Documents prévisionnels (devis / pro forma)
-        Route::get('/documents-previsionnels/{document}/pdf', DocumentPrevisionnelPdfController::class)
-            ->name('documents-previsionnels.pdf');
-
-        // Shared registrations
-        $registerDocumentsEntrants();
-        $registerParametres();
     });
 
 // ── Profile (espace-agnostic) ──
@@ -215,10 +64,47 @@ Route::middleware('auth')->group(function (): void {
         ->name('transactions.piece-jointe');
 });
 
-// ── Operations (espace-agnostic) ──
+// ── Operations ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->prefix('operations')
+    ->name('operations.')
     ->group(function (): void {
+        Route::view('/', 'gestion.operations.index')->name('index');
+        Route::view('/analyse', 'gestion.analyse.index')->name('analyse');
+        Route::get('/{operation}/participants/export', ParticipantExportController::class)
+            ->name('participants.export');
+        Route::get('/{operation}/participants/pdf', ParticipantPdfController::class)
+            ->name('participants.pdf');
+        Route::get('/{operation}/participants/{participant}/pdf', ParticipantFichePdfController::class)
+            ->name('participants.fiche-pdf');
+        Route::get('/{operation}/participants/{participant}/droit-image-pdf', DroitImagePdfController::class)
+            ->name('participants.droit-image-pdf');
+        Route::get('/{operation}/participants/{participant}/attestation-recap-pdf', [AttestationPresencePdfController::class, 'recap'])
+            ->name('participants.attestation-recap-pdf');
+        Route::get('/{operation}/seances/matrice-pdf', [SeancePdfController::class, 'matrice'])
+            ->name('seances.matrice-pdf');
+        Route::get('/{operation}/seances/{seance}/emargement-pdf', [SeancePdfController::class, 'emargement'])
+            ->name('seances.emargement-pdf');
+        Route::get('/{operation}/seances/{seance}/feuille-signee/download', [SeanceFeuilleController::class, 'download'])
+            ->name('seances.feuille-signee.download');
+        Route::get('/{operation}/seances/{seance}/feuille-signee/view', [SeanceFeuilleController::class, 'view'])
+            ->name('seances.feuille-signee.view');
+        Route::get('/{operation}/seances/export', SeanceExportController::class)
+            ->name('seances.export');
+        Route::get('/{operation}/seances/{seance}/attestation-pdf', [AttestationPresencePdfController::class, 'seance'])
+            ->name('seances.attestation-pdf');
+        Route::get('/{operation}/participants/{participant}', function (Operation $operation, Participant $participant) {
+            abort_unless((int) $participant->operation_id === (int) $operation->id, 404);
+
+            return view('gestion.operations.participant', compact('operation', 'participant'));
+        })->name('participants.show');
+        // Participant documents
+        Route::get('/participants/{participant}/documents/{filename}', ParticipantDocumentController::class)
+            ->name('participants.documents.download');
+        // Documents prévisionnels (devis / pro forma)
+        Route::get('/documents-previsionnels/{document}/pdf', DocumentPrevisionnelPdfController::class)
+            ->name('documents-previsionnels.pdf');
+        // ── Types d'opération (sous /operations/types-operation) ──
         Route::view('/types-operation', 'operations.types-operation.index')
             ->name('types-operation.index');
         Route::get('/types-operation/create', function () {
@@ -227,28 +113,185 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/types-operation/{typeOperation}', function (TypeOperation $typeOperation) {
             return view('operations.types-operation.show', compact('typeOperation'));
         })->name('types-operation.show');
+        // ── Show (catch-all, doit rester en dernier) ──
+        Route::get('/{operation}', function (Operation $operation) {
+            return view('gestion.operations.show', compact('operation'));
+        })->name('show');
+    });
+
+// ── Dashboard ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->get('/dashboard', [DashboardController::class, 'index'])
+    ->name('dashboard');
+
+// ── Comptabilité ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('comptabilite')
+    ->name('comptabilite.')
+    ->group(function (): void {
+        Route::view('/transactions', 'transactions.index')->name('transactions');
+        Route::view('/transactions/all', 'transactions.all')->name('transactions.all');
+        Route::get('/transactions/import/template/{type}', [CsvImportController::class, 'template'])
+            ->whereIn('type', ['depense', 'recette'])
+            ->name('transactions.import.template');
+        Route::view('/budget', 'budget.index')->name('budget');
+        Route::get('/budget/export', BudgetExportController::class)->name('budget.export');
+    });
+
+// ── Banques ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('banques')
+    ->name('banques.')
+    ->group(function (): void {
+        Route::resource('comptes', CompteBancaireController::class)->except(['show'])->parameters(['comptes' => 'comptesBancaire']);
+        Route::get('comptes/{compte}/transactions', function (CompteBancaire $compte) {
+            return view('comptes-bancaires.transactions', compact('compte'));
+        })->name('comptes.transactions');
+
+        Route::view('/rapprochement', 'rapprochement.index')->name('rapprochement.index');
+        Route::get('/rapprochement/{rapprochement}', function (RapprochementBancaire $rapprochement) {
+            return view('rapprochement.detail', compact('rapprochement'));
+        })->name('rapprochement.detail');
+        Route::get('/rapprochement/{rapprochement}/pdf', RapprochementPdfController::class)
+            ->name('rapprochement.pdf');
+
+        Route::view('/virements', 'virements.index')->name('virements.index');
+
+        Route::view('/remises', 'gestion.remises-bancaires.index')->name('remises.index');
+        Route::get('/remises/{remise}', function (RemiseBancaire $remise) {
+            return view('gestion.remises-bancaires.show', compact('remise'));
+        })->name('remises.show');
+        Route::get('/remises/{remise}/selection', function (RemiseBancaire $remise) {
+            return view('gestion.remises-bancaires.selection', compact('remise'));
+        })->name('remises.selection');
+        Route::get('/remises/{remise}/validation', function (RemiseBancaire $remise) {
+            return view('gestion.remises-bancaires.validation', compact('remise'));
+        })->name('remises.validation');
+        Route::get('/remises/{remise}/pdf', RemiseBancairePdfController::class)
+            ->name('remises.pdf');
+
+        Route::view('/helloasso-sync', 'banques.helloasso-sync')->name('helloasso-sync');
+    });
+
+// ── Tiers ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('tiers')
+    ->name('tiers.')
+    ->group(function (): void {
+        Route::view('/', 'tiers.index')->name('index');
+        Route::get('/template/csv', [TiersTemplateController::class, 'csv'])->name('template.csv');
+        Route::get('/template/xlsx', [TiersTemplateController::class, 'xlsx'])->name('template.xlsx');
+        Route::get('/export', TiersExportController::class)->name('export');
+        Route::get('/{tiers}/transactions', function (Tiers $tiers) {
+            return view('tiers.transactions', compact('tiers'));
+        })->name('transactions');
+        Route::view('/adherents', 'gestion.adherents')->name('adherents');
+        Route::view('/dons', 'dons.index')->name('dons');
+        Route::view('/cotisations', 'cotisations.index')->name('cotisations');
+    });
+
+// ── Facturation ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('facturation')
+    ->name('facturation.')
+    ->group(function (): void {
+        Route::view('/factures', 'gestion.factures.index')->name('factures');
+        Route::get('/factures/{facture}/edit', function (Facture $facture) {
+            return view('gestion.factures.edit', compact('facture'));
+        })->name('factures.edit');
+        Route::get('/factures/{facture}', function (Facture $facture) {
+            return view('gestion.factures.show', compact('facture'));
+        })->name('factures.show');
+        Route::get('/factures/{facture}/pdf', FacturePdfController::class)
+            ->name('factures.pdf');
+        Route::get('/documents-en-attente', function () {
+            return view('incoming-documents.index');
+        })->name('documents-en-attente');
+        Route::get('/documents-en-attente/{document}/download', [IncomingDocumentsController::class, 'download'])
+            ->name('documents-en-attente.download');
+    });
+
+// ── Rapports ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('rapports')
+    ->name('rapports.')
+    ->group(function (): void {
+        Route::view('/compte-resultat', 'rapports.compte-resultat')->name('compte-resultat');
+        Route::view('/operations', 'rapports.operations')->name('operations');
+        Route::view('/flux-tresorerie', 'rapports.flux-tresorerie')->name('flux-tresorerie');
+        Route::view('/analyse', 'rapports.analyse')->name('analyse');
+        Route::redirect('/', '/rapports/compte-resultat', 301)->name('index');
+        Route::get('/export/{rapport}/{format}', RapportExportController::class)->name('export');
+    });
+
+// ── Exercices ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('exercices')
+    ->name('exercices.')
+    ->group(function (): void {
+        Route::view('/cloture', 'exercices.cloture')->name('cloture');
+        Route::view('/changer', 'exercices.changer')->name('changer');
+        Route::view('/reouvrir', 'exercices.reouvrir')->name('reouvrir');
+        Route::view('/audit', 'exercices.audit')->name('audit');
+        Route::view('/provisions', 'exercices.provisions')->name('provisions');
     });
 
 // ── Legacy redirects (301) ──
 Route::middleware('auth')->group(function (): void {
-    Route::permanentRedirect('/dashboard', '/compta/dashboard');
-    Route::permanentRedirect('/transactions', '/compta/transactions');
-    Route::permanentRedirect('/transactions/all', '/compta/transactions/all');
-    Route::permanentRedirect('/dons', '/compta/dons');
-    Route::permanentRedirect('/cotisations', '/compta/cotisations');
-    Route::permanentRedirect('/tiers', '/compta/tiers');
-    Route::permanentRedirect('/budget', '/compta/budget');
-    Route::permanentRedirect('/rapprochement', '/compta/banques/rapprochement');
-    Route::permanentRedirect('/virements', '/compta/banques/virements');
-    Route::permanentRedirect('/rapports', '/compta/rapports/compte-resultat');
-    Route::permanentRedirect('/membres', '/gestion/adherents');
-    Route::permanentRedirect('/banques/helloasso-sync', '/compta/banques/helloasso-sync');
-    Route::permanentRedirect('/exercices/cloture', '/compta/exercices/cloture');
-    Route::permanentRedirect('/exercices/changer', '/compta/exercices/changer');
-    Route::permanentRedirect('/exercices/reouvrir', '/compta/exercices/reouvrir');
-    Route::permanentRedirect('/exercices/audit', '/compta/exercices/audit');
+    Route::permanentRedirect('/compta/dashboard', '/dashboard');
+    Route::permanentRedirect('/gestion/dashboard', '/dashboard');
+    Route::permanentRedirect('/compta/transactions', '/comptabilite/transactions');
+    Route::permanentRedirect('/compta/transactions/all', '/comptabilite/transactions/all');
+    Route::permanentRedirect('/compta/budget', '/comptabilite/budget');
+    Route::permanentRedirect('/transactions', '/comptabilite/transactions');
+    Route::permanentRedirect('/transactions/all', '/comptabilite/transactions/all');
+    Route::permanentRedirect('/dons', '/tiers/dons');
+    Route::permanentRedirect('/cotisations', '/tiers/cotisations');
+    Route::permanentRedirect('/budget', '/comptabilite/budget');
+    Route::permanentRedirect('/rapprochement', '/banques/rapprochement');
+    Route::permanentRedirect('/virements', '/banques/virements');
+    Route::permanentRedirect('/compta/rapports/compte-resultat', '/rapports/compte-resultat');
+    Route::permanentRedirect('/compta/rapports/operations', '/rapports/operations');
+    Route::permanentRedirect('/compta/rapports/flux-tresorerie', '/rapports/flux-tresorerie');
+    Route::permanentRedirect('/compta/rapports/analyse', '/rapports/analyse');
+    Route::permanentRedirect('/compta/rapports', '/rapports/compte-resultat');
+    // Note: /compta/rapports/export/{rapport}/{format} cannot be permanently redirected
+    // with path parameters via permanentRedirect; callers must use the new rapports.export route.
+    Route::permanentRedirect('/membres', '/tiers/adherents');
+    Route::permanentRedirect('/compta/tiers', '/tiers');
+    Route::permanentRedirect('/gestion/adherents', '/tiers/adherents');
+    Route::permanentRedirect('/compta/dons', '/tiers/dons');
+    Route::permanentRedirect('/compta/cotisations', '/tiers/cotisations');
+    Route::permanentRedirect('/compta/banques/comptes', '/banques/comptes');
+    Route::permanentRedirect('/compta/banques/rapprochement', '/banques/rapprochement');
+    Route::permanentRedirect('/compta/banques/virements', '/banques/virements');
+    Route::permanentRedirect('/compta/banques/remises', '/banques/remises');
+    Route::permanentRedirect('/compta/banques/helloasso-sync', '/banques/helloasso-sync');
+    Route::permanentRedirect('/compta/exercices/cloture', '/exercices/cloture');
+    Route::permanentRedirect('/compta/exercices/changer', '/exercices/changer');
+    Route::permanentRedirect('/compta/exercices/reouvrir', '/exercices/reouvrir');
+    Route::permanentRedirect('/compta/exercices/audit', '/exercices/audit');
+    Route::permanentRedirect('/compta/exercices/provisions', '/exercices/provisions');
     Route::permanentRedirect('/compta/parametres/type-operations', '/operations/types-operation');
     Route::permanentRedirect('/gestion/parametres/type-operations', '/operations/types-operation');
+    Route::permanentRedirect('/compta/parametres/association', '/parametres/association');
+    Route::permanentRedirect('/gestion/parametres/association', '/parametres/association');
+    Route::permanentRedirect('/compta/parametres/helloasso', '/parametres/helloasso');
+    Route::permanentRedirect('/gestion/parametres/helloasso', '/parametres/helloasso');
+    Route::permanentRedirect('/compta/parametres/reception-documents', '/parametres/reception-documents');
+    Route::permanentRedirect('/gestion/parametres/reception-documents', '/parametres/reception-documents');
+    Route::permanentRedirect('/compta/parametres/categories', '/parametres/categories');
+    Route::permanentRedirect('/gestion/parametres/categories', '/parametres/categories');
+    Route::permanentRedirect('/compta/parametres/sous-categories', '/parametres/sous-categories');
+    Route::permanentRedirect('/gestion/parametres/sous-categories', '/parametres/sous-categories');
+    Route::permanentRedirect('/compta/parametres/utilisateurs', '/parametres/utilisateurs');
+    Route::permanentRedirect('/gestion/parametres/utilisateurs', '/parametres/utilisateurs');
+    Route::permanentRedirect('/gestion/operations', '/operations');
+    Route::permanentRedirect('/gestion/analyse', '/operations/analyse');
+    Route::permanentRedirect('/compta/factures', '/facturation/factures');
+    Route::permanentRedirect('/gestion/factures', '/facturation/factures');
+    Route::permanentRedirect('/compta/documents-en-attente', '/facturation/documents-en-attente');
+    Route::permanentRedirect('/gestion/documents-en-attente', '/facturation/documents-en-attente');
 });
 
 // Public formulaire (no auth required)

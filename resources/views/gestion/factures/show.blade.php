@@ -4,6 +4,6 @@
     @else
         <x-slot:title>Facture {{ $facture->numero ?? 'brouillon' }}</x-slot:title>
     @endif
-    <x-slot:breadcrumbParent url="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures') }}">Liste des factures</x-slot:breadcrumbParent>
+    <x-slot:breadcrumbParent url="{{ route('facturation.factures') }}">Liste des factures</x-slot:breadcrumbParent>
     <livewire:facture-show :facture="$facture" />
 </x-app-layout>
