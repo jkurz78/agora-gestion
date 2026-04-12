@@ -42,10 +42,11 @@ final class AttestationPresencePdfController extends Controller
         $presentParticipantIds = $presences
             ->filter(fn (Presence $p) => $p->statut === StatutPresence::Present->value)
             ->pluck('participant_id')
+            ->map(fn ($id) => (int) $id)
             ->all();
 
         $participants = $participants->filter(
-            fn (Participant $p) => in_array($p->id, $presentParticipantIds, true)
+            fn (Participant $p) => in_array((int) $p->id, $presentParticipantIds, true)
         )->values();
 
         if ($participants->isEmpty()) {
@@ -102,10 +103,11 @@ final class AttestationPresencePdfController extends Controller
         $presentSeanceIds = $presences
             ->filter(fn (Presence $p) => $p->statut === StatutPresence::Present->value)
             ->pluck('seance_id')
+            ->map(fn ($id) => (int) $id)
             ->all();
 
         $seancesPresent = $allSeances->filter(
-            fn (Seance $s) => in_array($s->id, $presentSeanceIds, true)
+            fn (Seance $s) => in_array((int) $s->id, $presentSeanceIds, true)
         )->values();
 
         [$association, $headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime, $cachetBase64, $cachetMime] = $this->getAssociationData($operation);
