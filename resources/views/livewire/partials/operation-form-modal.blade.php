@@ -53,7 +53,7 @@
 
         @if($showEditModal)
             <div class="mb-3">
-                <a href="{{ route('types-operation.index') }}" class="small text-muted">
+                <a href="{{ route('operations.types-operation.index') }}" class="small text-muted">
                     <i class="bi bi-gear me-1"></i> Reglages avances du type d'operation
                 </a>
             </div>

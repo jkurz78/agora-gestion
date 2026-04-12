@@ -64,7 +64,7 @@ it('affiche un bouton bi-clock-history lié aux transactions du membre', functio
     Livewire::test(AdherentList::class)
         ->set('filtre', 'tous')
         ->assertSeeHtml('bi bi-clock-history')
-        ->assertSeeHtml('href="'.route('compta.tiers.transactions', $tiers->id).'"');
+        ->assertSeeHtml('href="'.route('tiers.transactions', $tiers->id).'"');
 });
 
 it('les boutons d\'action ont la classe btn-sm sans style inline de padding', function () {

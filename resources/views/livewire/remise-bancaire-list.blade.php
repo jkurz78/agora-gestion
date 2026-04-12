@@ -89,7 +89,7 @@
                         <tr wire:key="remise-{{ $remise->id }}">
                             <td class="small">{{ $remise->numero }}</td>
                             <td class="small">
-                                <a href="{{ route('compta.banques.remises.show', $remise) }}" class="text-decoration-none">
+                                <a href="{{ route('banques.remises.show', $remise) }}" class="text-decoration-none">
                                     {{ $remise->libelle }}
                                 </a>
                             </td>
@@ -115,12 +115,12 @@
                             </td>
                             <td>
                                 <div class="d-flex gap-1">
-                                    <a href="{{ route('compta.banques.remises.show', $remise) }}"
+                                    <a href="{{ route('banques.remises.show', $remise) }}"
                                        class="btn btn-sm btn-outline-primary" title="Voir">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                     @if ($this->canEdit && ! $remise->isVerrouillee())
-                                        <a href="{{ route('compta.banques.remises.selection', $remise) }}"
+                                        <a href="{{ route('banques.remises.selection', $remise) }}"
                                            class="btn btn-sm btn-outline-secondary" title="Modifier">
                                             <i class="bi bi-pencil"></i>
                                         </a>
@@ -131,7 +131,7 @@
                                         </button>
                                     @endif
                                     @if ($remise->virement_id !== null)
-                                        <a href="{{ route('compta.banques.remises.pdf', $remise) }}?mode=inline"
+                                        <a href="{{ route('banques.remises.pdf', $remise) }}?mode=inline"
                                            class="btn btn-sm btn-outline-dark" title="PDF" target="_blank">
                                             <i class="bi bi-file-pdf"></i>
                                         </a>

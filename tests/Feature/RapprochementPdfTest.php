@@ -29,19 +29,19 @@ beforeEach(function () {
 });
 
 it('requires authentication to download PDF', function () {
-    $this->get(route('compta.banques.rapprochement.pdf', $this->rapprochement))
+    $this->get(route('banques.rapprochement.pdf', $this->rapprochement))
         ->assertRedirect(route('login'));
 });
 
 it('returns 404 for non-existent rapprochement', function () {
     $this->actingAs($this->user)
-        ->get(route('compta.banques.rapprochement.pdf', 99999))
+        ->get(route('banques.rapprochement.pdf', 99999))
         ->assertNotFound();
 });
 
 it('returns a PDF for authenticated user', function () {
     $this->actingAs($this->user)
-        ->get(route('compta.banques.rapprochement.pdf', $this->rapprochement))
+        ->get(route('banques.rapprochement.pdf', $this->rapprochement))
         ->assertOk()
         ->assertHeader('Content-Type', 'application/pdf');
 });
@@ -50,7 +50,7 @@ it('generates PDF even when association is not configured', function () {
     expect(Association::find(1))->toBeNull();
 
     $this->actingAs($this->user)
-        ->get(route('compta.banques.rapprochement.pdf', $this->rapprochement))
+        ->get(route('banques.rapprochement.pdf', $this->rapprochement))
         ->assertOk()
         ->assertHeader('Content-Type', 'application/pdf');
 });
@@ -61,7 +61,7 @@ it('generates PDF even when logo file is missing', function () {
     $assoc->fill(['nom' => 'Test', 'logo_path' => 'association/logo-inexistant.png'])->save();
 
     $this->actingAs($this->user)
-        ->get(route('compta.banques.rapprochement.pdf', $this->rapprochement))
+        ->get(route('banques.rapprochement.pdf', $this->rapprochement))
         ->assertOk()
         ->assertHeader('Content-Type', 'application/pdf');
 });
@@ -98,7 +98,7 @@ it('passes only pointed transactions to PDF view', function () {
         ->andReturn(response('', 200));
 
     $this->actingAs($this->user)
-        ->get(route('compta.banques.rapprochement.pdf', $this->rapprochement))
+        ->get(route('banques.rapprochement.pdf', $this->rapprochement))
         ->assertOk();
 });
 
@@ -108,7 +108,7 @@ it('télécharge le PDF avec un nom de fichier structuré', function () {
     $assoc->fill(['nom' => 'Mon Association'])->save();
 
     $response = $this->actingAs($this->user)
-        ->get(route('compta.banques.rapprochement.pdf', $this->rapprochement));
+        ->get(route('banques.rapprochement.pdf', $this->rapprochement));
 
     $response->assertOk();
     $contentDisposition = $response->headers->get('Content-Disposition');
@@ -120,7 +120,7 @@ it('télécharge le PDF avec un nom de fichier structuré', function () {
 
 it('ouvre le PDF inline avec ?mode=inline', function () {
     $response = $this->actingAs($this->user)
-        ->get(route('compta.banques.rapprochement.pdf', $this->rapprochement).'?mode=inline');
+        ->get(route('banques.rapprochement.pdf', $this->rapprochement).'?mode=inline');
 
     $response->assertOk();
     $contentDisposition = $response->headers->get('Content-Disposition');
@@ -152,6 +152,6 @@ it('inclut l\'id et le tiers dans les données PDF', function () {
     Pdf::shouldReceive('download')->once()->andReturn(response('', 200));
 
     $this->actingAs($this->user)
-        ->get(route('compta.banques.rapprochement.pdf', $this->rapprochement))
+        ->get(route('banques.rapprochement.pdf', $this->rapprochement))
         ->assertOk();
 });

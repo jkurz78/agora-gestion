@@ -17,12 +17,12 @@
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li>
-                        <a class="dropdown-item" href="{{ route('gestion.operations.seances.export', $operation) }}">
+                        <a class="dropdown-item" href="{{ route('operations.seances.export', $operation) }}">
                             <i class="bi bi-file-earmark-spreadsheet me-2"></i>Feuille Excel
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item" target="_blank" href="{{ route('gestion.operations.seances.matrice-pdf', $operation) }}">
+                        <a class="dropdown-item" target="_blank" href="{{ route('operations.seances.matrice-pdf', $operation) }}">
                             <i class="bi bi-file-earmark-pdf me-2"></i>Fichier PDF
                         </a>
                     </li>
@@ -235,7 +235,7 @@
                         <td style="position:sticky;left:0;z-index:1;background:#f8f8f8;color:#888">Feuilles d'émargement</td>
                         @foreach($seances as $seance)
                             <td style="text-align:center">
-                                <a href="{{ route('gestion.operations.seances.emargement-pdf', [$operation, $seance]) }}"
+                                <a href="{{ route('operations.seances.emargement-pdf', [$operation, $seance]) }}"
                                    target="_blank"
                                    style="color:#A9014F;text-decoration:none"
                                    title="Feuille d'émargement S{{ $seance->numero }}">

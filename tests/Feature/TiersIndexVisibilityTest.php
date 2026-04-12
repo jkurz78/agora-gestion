@@ -9,7 +9,7 @@ it('affiche le bouton import pour un admin', function (): void {
     $admin = User::factory()->create(['role' => Role::Admin]);
 
     $this->actingAs($admin)
-        ->get(route('compta.tiers.index'))
+        ->get(route('tiers.index'))
         ->assertOk()
         ->assertSee('Importer des tiers');
 });
@@ -18,7 +18,7 @@ it('affiche le bouton import pour un comptable', function (): void {
     $comptable = User::factory()->create(['role' => Role::Comptable]);
 
     $this->actingAs($comptable)
-        ->get(route('compta.tiers.index'))
+        ->get(route('tiers.index'))
         ->assertOk()
         ->assertSee('Importer des tiers');
 });
@@ -27,7 +27,7 @@ it('masque le bouton import pour un utilisateur en consultation', function (): v
     $consultation = User::factory()->create(['role' => Role::Consultation]);
 
     $this->actingAs($consultation)
-        ->get(route('compta.tiers.index'))
+        ->get(route('tiers.index'))
         ->assertOk()
         ->assertDontSee('Importer des tiers');
 });

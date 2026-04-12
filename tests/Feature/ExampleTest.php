@@ -16,7 +16,7 @@ class ExampleTest extends TestCase
 
         $response = $this->actingAs($user)->get('/');
 
-        $response->assertRedirect('/compta/dashboard');
+        $response->assertRedirect('/dashboard');
     }
 
     public function test_root_redirects_to_login_for_guest(): void

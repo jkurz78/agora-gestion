@@ -9,7 +9,7 @@
                 Banque : <strong>{{ $remise->compteCible->nom }}</strong>
             </p>
         </div>
-        <a href="{{ route('compta.banques.remises.index') }}" class="btn btn-outline-secondary">
+        <a href="{{ route('banques.remises.index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour
         </a>
     </div>

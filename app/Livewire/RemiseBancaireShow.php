@@ -36,7 +36,7 @@ final class RemiseBancaireShow extends Component
         try {
             app(RemiseBancaireService::class)->supprimer($this->remise);
             session()->flash('success', 'Remise supprimée.');
-            $this->redirect(route('compta.banques.remises.index'));
+            $this->redirect(route('banques.remises.index'));
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }

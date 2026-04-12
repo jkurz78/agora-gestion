@@ -15,7 +15,7 @@ final class RapportCompteResultat extends Component
     {
         $exercice = app(ExerciceService::class)->current();
 
-        return route('compta.rapports.export', [
+        return route('rapports.export', [
             'rapport' => 'compte-resultat',
             'format' => $format,
             'exercice' => $exercice,

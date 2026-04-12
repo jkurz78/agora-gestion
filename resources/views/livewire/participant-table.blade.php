@@ -43,19 +43,19 @@
                 <ul class="dropdown-menu dropdown-menu-end" style="min-width:240px">
                     <li class="dropdown-header small text-muted">Excel</li>
                     <li>
-                        <a class="dropdown-item" :href="'{{ route('gestion.operations.participants.export', $operation) }}' + (sensible ? '?confidentiel=1' : '')">
+                        <a class="dropdown-item" :href="'{{ route('operations.participants.export', $operation) }}' + (sensible ? '?confidentiel=1' : '')">
                             <i class="bi bi-file-earmark-spreadsheet me-2"></i>Télécharger .xlsx
                         </a>
                     </li>
                     <li><hr class="dropdown-divider"></li>
                     <li class="dropdown-header small text-muted">PDF</li>
                     <li>
-                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'liste']) }}' + (sensible ? '&confidentiel=1' : '')">
+                        <a class="dropdown-item" target="_blank" :href="'{{ route('operations.participants.pdf', [$operation, 'format' => 'liste']) }}' + (sensible ? '&confidentiel=1' : '')">
                             <i class="bi bi-list-ul me-2"></i>Liste
                         </a>
                     </li>
                     <li>
-                        <a class="dropdown-item" target="_blank" :href="'{{ route('gestion.operations.participants.pdf', [$operation, 'format' => 'annuaire']) }}' + (sensible ? '&confidentiel=1' : '')">
+                        <a class="dropdown-item" target="_blank" :href="'{{ route('operations.participants.pdf', [$operation, 'format' => 'annuaire']) }}' + (sensible ? '&confidentiel=1' : '')">
                             <i class="bi bi-person-vcard me-2"></i>Annuaire
                         </a>
                     </li>
@@ -114,14 +114,14 @@
                     <tr wire:key="participant-row-{{ $p->id }}-{{ $p->updated_at?->timestamp }}-{{ $p->tiers?->updated_at?->timestamp }}-{{ $p->donneesMedicales?->updated_at?->timestamp }}">
                         {{-- Nom --}}
                         <td class="small" data-sort="{{ $p->tiers->nom ?? '' }}">
-                            <a href="{{ route('gestion.operations.participants.show', [$operation, $p]) }}" class="text-decoration-none fw-semibold">
+                            <a href="{{ route('operations.participants.show', [$operation, $p]) }}" class="text-decoration-none fw-semibold">
                                 {{ $p->tiers->nom ?? '—' }}
                             </a>
                         </td>
 
                         {{-- Prénom --}}
                         <td class="small" data-sort="{{ $p->tiers->prenom ?? '' }}">
-                            <a href="{{ route('gestion.operations.participants.show', [$operation, $p]) }}" class="text-decoration-none fw-semibold">
+                            <a href="{{ route('operations.participants.show', [$operation, $p]) }}" class="text-decoration-none fw-semibold">
                                 {{ $p->tiers->prenom ?? '—' }}
                             </a>
                         </td>
@@ -350,15 +350,15 @@
                         <td class="text-end">
                             <div class="d-flex gap-1 justify-content-end">
                                 <button class="btn btn-sm btn-outline-secondary"
-                                        onclick="window.location='{{ route('gestion.operations.participants.show', [$operation, $p]) }}'"
+                                        onclick="window.location='{{ route('operations.participants.show', [$operation, $p]) }}'"
                                         title="Modifier">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <a class="btn btn-sm btn-outline-info" href="{{ route('gestion.operations.participants.fiche-pdf', [$operation, $p]) }}" target="_blank" title="Fiche PDF">
+                                <a class="btn btn-sm btn-outline-info" href="{{ route('operations.participants.fiche-pdf', [$operation, $p]) }}" target="_blank" title="Fiche PDF">
                                     <i class="bi bi-file-person"></i>
                                 </a>
                                 @if($operation->typeOperation?->formulaire_droit_image && $p->droit_image)
-                                <a class="btn btn-sm btn-outline-info" href="{{ route('gestion.operations.participants.droit-image-pdf', [$operation, $p]) }}" target="_blank" title="Autorisation photo">
+                                <a class="btn btn-sm btn-outline-info" href="{{ route('operations.participants.droit-image-pdf', [$operation, $p]) }}" target="_blank" title="Autorisation photo">
                                     <i class="bi bi-camera"></i>
                                 </a>
                                 @endif

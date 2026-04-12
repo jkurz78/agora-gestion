@@ -50,7 +50,7 @@ final class RemiseBancaireList extends Component
             'compte_cible_id' => (int) $this->compte_cible_id,
         ]);
 
-        $this->redirect(route('compta.banques.remises.selection', $remise));
+        $this->redirect(route('banques.remises.selection', $remise));
     }
 
     public function supprimer(int $id): void

@@ -96,11 +96,11 @@
                                 @endphp
                                 <div class="d-flex align-items-center gap-3 py-2 px-2 rounded {{ !$loop->last ? 'border-bottom' : '' }}"
                                      style="cursor:pointer;{{ $isCloturee ? 'opacity:0.5;' : '' }}"
-                                     onclick="window.location='{{ route('gestion.operations.show', $op) }}';"
+                                     onclick="window.location='{{ route('operations.show', $op) }}';"
                                      onmouseover="this.style.background='rgba(114,34,129,.04)'"
                                      onmouseout="this.style.background='transparent'">
 
-                                    <a href="{{ route('gestion.operations.show', $op) }}" class="fw-semibold text-decoration-none" style="color:#333; min-width:180px;">
+                                    <a href="{{ route('operations.show', $op) }}" class="fw-semibold text-decoration-none" style="color:#333; min-width:180px;">
                                         {{ $op->nom }}
                                     </a>
 

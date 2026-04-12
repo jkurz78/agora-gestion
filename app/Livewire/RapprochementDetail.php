@@ -57,7 +57,7 @@ final class RapprochementDetail extends Component
 
         try {
             app(RapprochementBancaireService::class)->supprimer($this->rapprochement);
-            $this->redirect(route('compta.banques.rapprochement.index'));
+            $this->redirect(route('banques.rapprochement.index'));
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }

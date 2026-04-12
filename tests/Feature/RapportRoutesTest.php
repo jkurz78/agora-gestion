@@ -9,23 +9,28 @@ beforeEach(function () {
 });
 
 it('responds 200 on compte-resultat page', function () {
-    $this->get('/compta/rapports/compte-resultat')->assertOk();
+    $this->get('/rapports/compte-resultat')->assertOk();
 });
 
 it('responds 200 on operations page', function () {
-    $this->get('/compta/rapports/operations')->assertOk();
+    $this->get('/rapports/operations')->assertOk();
 });
 
 it('responds 200 on analyse page', function () {
-    $this->get('/compta/rapports/analyse')->assertOk();
+    $this->get('/rapports/analyse')->assertOk();
 });
 
-it('redirects old /compta/rapports to compte-resultat', function () {
-    $this->get('/compta/rapports')
-        ->assertRedirect('/compta/rapports/compte-resultat');
-});
-
-it('redirects legacy /rapports to compte-resultat', function () {
+it('redirects /rapports to compte-resultat', function () {
     $this->get('/rapports')
-        ->assertRedirect('/compta/rapports/compte-resultat');
+        ->assertRedirect('/rapports/compte-resultat');
+});
+
+it('redirects legacy /compta/rapports to compte-resultat', function () {
+    $this->get('/compta/rapports')
+        ->assertRedirect('/rapports/compte-resultat');
+});
+
+it('redirects legacy /compta/rapports/compte-resultat to new URL', function () {
+    $this->get('/compta/rapports/compte-resultat')
+        ->assertRedirect('/rapports/compte-resultat');
 });

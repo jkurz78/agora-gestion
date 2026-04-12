@@ -303,7 +303,7 @@ final class TypeOperationShow extends Component
 
         // After creation, redirect to show page (only for new types)
         if ($type->wasRecentlyCreated) {
-            $this->redirect(route('types-operation.show', $type), navigate: true);
+            $this->redirect(route('operations.types-operation.show', $type), navigate: true);
         }
     }
 
@@ -328,7 +328,7 @@ final class TypeOperationShow extends Component
 
         $type->delete();
 
-        $this->redirect(route('types-operation.index'), navigate: true);
+        $this->redirect(route('operations.types-operation.index'), navigate: true);
     }
 
     // ── Tarifs ───────────────────────────────────────────────────

@@ -29,8 +29,8 @@
                         <i class="bi bi-download"></i> Exporter
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="{{ route('compta.tiers.export', ['format' => 'xlsx']) }}"><i class="bi bi-file-earmark-excel me-1"></i> Excel (.xlsx)</a></li>
-                        <li><a class="dropdown-item" href="{{ route('compta.tiers.export', ['format' => 'csv']) }}"><i class="bi bi-file-earmark-text me-1"></i> CSV</a></li>
+                        <li><a class="dropdown-item" href="{{ route('tiers.export', ['format' => 'xlsx']) }}"><i class="bi bi-file-earmark-excel me-1"></i> Excel (.xlsx)</a></li>
+                        <li><a class="dropdown-item" href="{{ route('tiers.export', ['format' => 'csv']) }}"><i class="bi bi-file-earmark-text me-1"></i> CSV</a></li>
                     </ul>
                 </div>
                 <button class="btn btn-sm btn-primary"
@@ -108,7 +108,7 @@
                             @endif
                         </td>
                         <td class="text-end">
-                            <a href="{{ route('compta.tiers.transactions', $tiers->id) }}"
+                            <a href="{{ route('tiers.transactions', $tiers->id) }}"
                                class="btn btn-sm btn-outline-secondary me-1"
                                title="Transactions">
                                 <i class="bi bi-clock-history"></i>

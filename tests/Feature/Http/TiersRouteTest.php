@@ -5,16 +5,16 @@ declare(strict_types=1);
 
 use App\Models\User;
 
-it('GET /compta/tiers returns 200 for authenticated user', function () {
+it('GET /tiers returns 200 for authenticated user', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
-        ->get('/compta/tiers')
+        ->get('/tiers')
         ->assertOk()
         ->assertSee('Tiers');
 });
 
-it('GET /compta/tiers redirects unauthenticated user', function () {
-    $this->get('/compta/tiers')
+it('GET /tiers redirects unauthenticated user', function () {
+    $this->get('/tiers')
         ->assertRedirect('/login');
 });

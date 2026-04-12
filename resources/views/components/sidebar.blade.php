@@ -75,15 +75,15 @@
 
 @php
 $activeGroup = match(true) {
-    request()->routeIs('compta.transactions.*', 'compta.budget.*') => 'comptabilite',
-    request()->routeIs('compta.banques.rapprochement.*', 'compta.banques.virements.*', 'compta.banques.helloasso-sync',
-        'compta.banques.comptes.*', 'compta.banques.remises*') => 'banques',
-    request()->routeIs('compta.tiers.*', 'gestion.adherents', 'compta.dons.*', 'compta.cotisations.*') => 'tiers',
-    request()->routeIs('gestion.operations*', 'types-operation.*', 'gestion.analyse*') => 'operations',
-    request()->routeIs('compta.factures*', 'gestion.factures*', '*.documents-en-attente*') => 'facturation',
-    request()->routeIs('compta.rapports.*') => 'rapports',
-    request()->routeIs('compta.exercices.*') => 'exercices',
-    request()->routeIs('*.parametres.*') => 'parametres',
+    request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*') => 'comptabilite',
+    request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
+        'banques.comptes.*', 'banques.remises*') => 'banques',
+    request()->routeIs('tiers.*') => 'tiers',
+    request()->routeIs('operations.*') => 'operations',
+    request()->routeIs('facturation.factures*', 'facturation.documents-en-attente*') => 'facturation',
+    request()->routeIs('rapports.*') => 'rapports',
+    request()->routeIs('exercices.*') => 'exercices',
+    request()->routeIs('parametres.*') => 'parametres',
     default => 'comptabilite',
 };
 @endphp
@@ -92,7 +92,7 @@ $activeGroup = match(true) {
 
     {{-- Brand --}}
     <div class="sidebar-brand text-center">
-        <a href="{{ route('compta.dashboard') }}">
+        <a href="{{ route('dashboard') }}">
             <img src="{{ $logoAsset }}" alt="{{ $nomAsso }}" height="100" class="mb-1">
         </a>
         <div class="text-muted" style="font-size:.7rem;">{{ $nomAsso }}</div>
@@ -121,23 +121,23 @@ $activeGroup = match(true) {
                         <ul class="nav flex-column">
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.transactions.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.transactions.index') ? 'active' : '' }}">
+                                <a href="{{ route('comptabilite.transactions') }}"
+                                   class="nav-link {{ request()->routeIs('comptabilite.transactions') ? 'active' : '' }}">
                                     <i class="bi bi-list-ul me-1"></i> Recettes &amp; dépenses
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.transactions.all') }}"
-                                   class="nav-link {{ request()->routeIs('compta.transactions.all') ? 'active' : '' }}">
+                                <a href="{{ route('comptabilite.transactions.all') }}"
+                                   class="nav-link {{ request()->routeIs('comptabilite.transactions.all') ? 'active' : '' }}">
                                     <i class="bi bi-collection me-1"></i> Toutes les transactions
                                 </a>
                             </li>
 
-                            @if (Route::has('compta.budget.index'))
+                            @if (Route::has('comptabilite.budget'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.budget.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.budget.*') ? 'active' : '' }}">
+                                <a href="{{ route('comptabilite.budget') }}"
+                                   class="nav-link {{ request()->routeIs('comptabilite.budget*') ? 'active' : '' }}">
                                     <i class="bi bi-piggy-bank me-1"></i> Budget
                                 </a>
                             </li>
@@ -166,46 +166,46 @@ $activeGroup = match(true) {
                     <div class="accordion-body p-0">
                         <ul class="nav flex-column">
 
-                            @if (Route::has('compta.banques.comptes.index'))
+                            @if (Route::has('banques.comptes.index'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.banques.comptes.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.banques.comptes.*') ? 'active' : '' }}">
+                                <a href="{{ route('banques.comptes.index') }}"
+                                   class="nav-link {{ request()->routeIs('banques.comptes.*') ? 'active' : '' }}">
                                     <i class="bi bi-credit-card me-1"></i> Comptes bancaires
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.banques.rapprochement.index'))
+                            @if (Route::has('banques.rapprochement.index'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.banques.rapprochement.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.banques.rapprochement.*') ? 'active' : '' }}">
+                                <a href="{{ route('banques.rapprochement.index') }}"
+                                   class="nav-link {{ request()->routeIs('banques.rapprochement.*') ? 'active' : '' }}">
                                     <i class="bi bi-bank me-1"></i> Rapprochement
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.banques.virements.index'))
+                            @if (Route::has('banques.virements.index'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.banques.virements.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.banques.virements.*') ? 'active' : '' }}">
+                                <a href="{{ route('banques.virements.index') }}"
+                                   class="nav-link {{ request()->routeIs('banques.virements.*') ? 'active' : '' }}">
                                     <i class="bi bi-arrow-left-right me-1"></i> Virements
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.banques.remises.index'))
+                            @if (Route::has('banques.remises.index'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.banques.remises.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.banques.remises*') ? 'active' : '' }}">
+                                <a href="{{ route('banques.remises.index') }}"
+                                   class="nav-link {{ request()->routeIs('banques.remises*') ? 'active' : '' }}">
                                     <i class="bi bi-cash-coin me-1"></i> Remises en banque
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.banques.helloasso-sync'))
+                            @if (Route::has('banques.helloasso-sync'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.banques.helloasso-sync') }}"
-                                   class="nav-link {{ request()->routeIs('compta.banques.helloasso-sync') ? 'active' : '' }}">
+                                <a href="{{ route('banques.helloasso-sync') }}"
+                                   class="nav-link {{ request()->routeIs('banques.helloasso-sync') ? 'active' : '' }}">
                                     <i class="bi bi-arrow-repeat me-1"></i> Sync HelloAsso
                                 </a>
                             </li>
@@ -235,32 +235,32 @@ $activeGroup = match(true) {
                         <ul class="nav flex-column">
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.tiers.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.tiers.*') ? 'active' : '' }}">
+                                <a href="{{ route('tiers.index') }}"
+                                   class="nav-link {{ request()->routeIs('tiers.index', 'tiers.transactions', 'tiers.export', 'tiers.template.*') ? 'active' : '' }}">
                                     <i class="bi bi-building-add me-1"></i> Liste
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('gestion.adherents') }}"
-                                   class="nav-link {{ request()->routeIs('gestion.adherents') ? 'active' : '' }}">
+                                <a href="{{ route('tiers.adherents') }}"
+                                   class="nav-link {{ request()->routeIs('tiers.adherents') ? 'active' : '' }}">
                                     <i class="bi bi-person-badge me-1"></i> Adhérents
                                 </a>
                             </li>
 
-                            @if (Route::has('compta.dons.index'))
+                            @if (Route::has('tiers.dons'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.dons.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.dons.*') ? 'active' : '' }}">
+                                <a href="{{ route('tiers.dons') }}"
+                                   class="nav-link {{ request()->routeIs('tiers.dons') ? 'active' : '' }}">
                                     <i class="bi bi-heart me-1"></i> Dons
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.cotisations.index'))
+                            @if (Route::has('tiers.cotisations'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.cotisations.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.cotisations.*') ? 'active' : '' }}">
+                                <a href="{{ route('tiers.cotisations') }}"
+                                   class="nav-link {{ request()->routeIs('tiers.cotisations') ? 'active' : '' }}">
                                     <i class="bi bi-person-check me-1"></i> Cotisations
                                 </a>
                             </li>
@@ -290,22 +290,22 @@ $activeGroup = match(true) {
                         <ul class="nav flex-column">
 
                             <li class="nav-item">
-                                <a href="{{ route('gestion.operations') }}"
-                                   class="nav-link {{ request()->routeIs('gestion.operations*') ? 'active' : '' }}">
+                                <a href="{{ route('operations.index') }}"
+                                   class="nav-link {{ request()->routeIs('operations.index', 'operations.show', 'operations.participants.*', 'operations.seances.*') ? 'active' : '' }}">
                                     <i class="bi bi-calendar-event me-1"></i> Liste
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('types-operation.index') }}"
-                                   class="nav-link {{ request()->routeIs('types-operation.*') ? 'active' : '' }}">
+                                <a href="{{ route('operations.types-operation.index') }}"
+                                   class="nav-link {{ request()->routeIs('operations.types-operation.*') ? 'active' : '' }}">
                                     <i class="bi bi-collection me-1"></i> Types d'opération
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('gestion.analyse') }}"
-                                   class="nav-link {{ request()->routeIs('gestion.analyse*') ? 'active' : '' }}">
+                                <a href="{{ route('operations.analyse') }}"
+                                   class="nav-link {{ request()->routeIs('operations.analyse') ? 'active' : '' }}">
                                     <i class="bi bi-graph-up me-1"></i> Analyse pivot
                                 </a>
                             </li>
@@ -334,16 +334,16 @@ $activeGroup = match(true) {
                         <ul class="nav flex-column">
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.factures') }}"
-                                   class="nav-link {{ request()->routeIs('compta.factures*') ? 'active' : '' }}">
+                                <a href="{{ route('facturation.factures') }}"
+                                   class="nav-link {{ request()->routeIs('facturation.factures*') ? 'active' : '' }}">
                                     <i class="bi bi-receipt me-1"></i> Factures
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.documents-en-attente') }}"
+                                <a href="{{ route('facturation.documents-en-attente') }}"
                                    class="nav-link d-flex align-items-center justify-content-between
-                                          {{ request()->routeIs('*.documents-en-attente*') ? 'active' : '' }}">
+                                          {{ request()->routeIs('facturation.documents-en-attente*') ? 'active' : '' }}">
                                     <span><i class="bi bi-inbox me-1"></i> Documents en attente</span>
                                     @if(($incomingDocumentsCount ?? 0) > 0)
                                         <span class="badge bg-warning text-dark ms-1">{{ $incomingDocumentsCount }}</span>
@@ -375,29 +375,29 @@ $activeGroup = match(true) {
                         <ul class="nav flex-column">
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.rapports.compte-resultat') }}"
-                                   class="nav-link {{ request()->routeIs('compta.rapports.compte-resultat') ? 'active' : '' }}">
+                                <a href="{{ route('rapports.compte-resultat') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.compte-resultat') ? 'active' : '' }}">
                                     <i class="bi bi-journal-text me-1"></i> Compte de résultat
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.rapports.operations') }}"
-                                   class="nav-link {{ request()->routeIs('compta.rapports.operations') ? 'active' : '' }}">
+                                <a href="{{ route('rapports.operations') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.operations') ? 'active' : '' }}">
                                     <i class="bi bi-diagram-3 me-1"></i> CR par opérations
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.rapports.flux-tresorerie') }}"
-                                   class="nav-link {{ request()->routeIs('compta.rapports.flux-tresorerie') ? 'active' : '' }}">
+                                <a href="{{ route('rapports.flux-tresorerie') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.flux-tresorerie') ? 'active' : '' }}">
                                     <i class="bi bi-cash-stack me-1"></i> Flux de trésorerie
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.rapports.analyse') }}"
-                                   class="nav-link {{ request()->routeIs('compta.rapports.analyse') ? 'active' : '' }}">
+                                <a href="{{ route('rapports.analyse') }}"
+                                   class="nav-link {{ request()->routeIs('rapports.analyse') ? 'active' : '' }}">
                                     <i class="bi bi-graph-up me-1"></i> Analyse financière
                                 </a>
                             </li>
@@ -427,37 +427,37 @@ $activeGroup = match(true) {
 
                             @if ($exerciceCloture)
                             <li class="nav-item">
-                                <a href="{{ route('compta.exercices.reouvrir') }}"
-                                   class="nav-link text-danger {{ request()->routeIs('compta.exercices.reouvrir') ? 'active' : '' }}">
+                                <a href="{{ route('exercices.reouvrir') }}"
+                                   class="nav-link text-danger {{ request()->routeIs('exercices.reouvrir') ? 'active' : '' }}">
                                     <i class="bi bi-unlock me-1"></i> Réouvrir l'exercice
                                 </a>
                             </li>
                             @else
                             <li class="nav-item">
-                                <a href="{{ route('compta.exercices.cloture') }}"
-                                   class="nav-link {{ request()->routeIs('compta.exercices.cloture') ? 'active' : '' }}">
+                                <a href="{{ route('exercices.cloture') }}"
+                                   class="nav-link {{ request()->routeIs('exercices.cloture') ? 'active' : '' }}">
                                     <i class="bi bi-lock me-1"></i> Clôturer l'exercice
                                 </a>
                             </li>
                             @endif
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.exercices.provisions') }}"
-                                   class="nav-link {{ request()->routeIs('compta.exercices.provisions') ? 'active' : '' }}">
+                                <a href="{{ route('exercices.provisions') }}"
+                                   class="nav-link {{ request()->routeIs('exercices.provisions') ? 'active' : '' }}">
                                     <i class="bi bi-journal-arrow-down me-1"></i> Écritures de provisions
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.exercices.changer') }}"
-                                   class="nav-link {{ request()->routeIs('compta.exercices.changer') ? 'active' : '' }}">
+                                <a href="{{ route('exercices.changer') }}"
+                                   class="nav-link {{ request()->routeIs('exercices.changer') ? 'active' : '' }}">
                                     <i class="bi bi-arrow-left-right me-1"></i> Changer d'exercice
                                 </a>
                             </li>
 
                             <li class="nav-item">
-                                <a href="{{ route('compta.exercices.audit') }}"
-                                   class="nav-link {{ request()->routeIs('compta.exercices.audit') ? 'active' : '' }}">
+                                <a href="{{ route('exercices.audit') }}"
+                                   class="nav-link {{ request()->routeIs('exercices.audit') ? 'active' : '' }}">
                                     <i class="bi bi-clock-history me-1"></i> Piste d'audit
                                 </a>
                             </li>
@@ -490,55 +490,55 @@ $activeGroup = match(true) {
                     <div class="accordion-body p-0">
                         <ul class="nav flex-column">
 
-                            @if (Route::has('compta.parametres.association'))
+                            @if (Route::has('parametres.association'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.parametres.association') }}"
-                                   class="nav-link {{ request()->routeIs('compta.parametres.association') ? 'active' : '' }}">
+                                <a href="{{ route('parametres.association') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.association') ? 'active' : '' }}">
                                     <i class="bi bi-building me-1"></i> Association
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.parametres.reception-documents'))
+                            @if (Route::has('parametres.reception-documents'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.parametres.reception-documents') }}"
-                                   class="nav-link {{ request()->routeIs('compta.parametres.reception-documents') ? 'active' : '' }}">
+                                <a href="{{ route('parametres.reception-documents') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.reception-documents') ? 'active' : '' }}">
                                     <i class="bi bi-envelope-arrow-down me-1"></i> Réception documents
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.parametres.helloasso'))
+                            @if (Route::has('parametres.helloasso'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.parametres.helloasso') }}"
-                                   class="nav-link {{ request()->routeIs('compta.parametres.helloasso') ? 'active' : '' }}">
+                                <a href="{{ route('parametres.helloasso') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.helloasso') ? 'active' : '' }}">
                                     <i class="bi bi-plug me-1"></i> Connexion HelloAsso
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.parametres.categories.index'))
+                            @if (Route::has('parametres.categories.index'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.parametres.categories.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.parametres.categories.*') ? 'active' : '' }}">
+                                <a href="{{ route('parametres.categories.index') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.categories.*') ? 'active' : '' }}">
                                     <i class="bi bi-tags me-1"></i> Catégories
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.parametres.sous-categories.index'))
+                            @if (Route::has('parametres.sous-categories.index'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.parametres.sous-categories.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.parametres.sous-categories.*') ? 'active' : '' }}">
+                                <a href="{{ route('parametres.sous-categories.index') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.sous-categories.*') ? 'active' : '' }}">
                                     <i class="bi bi-tag me-1"></i> Sous-catégories
                                 </a>
                             </li>
                             @endif
 
-                            @if (Route::has('compta.parametres.utilisateurs.index'))
+                            @if (Route::has('parametres.utilisateurs.index'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.parametres.utilisateurs.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.parametres.utilisateurs.*') ? 'active' : '' }}">
+                                <a href="{{ route('parametres.utilisateurs.index') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.utilisateurs.*') ? 'active' : '' }}">
                                     <i class="bi bi-people me-1"></i> Utilisateurs
                                 </a>
                             </li>

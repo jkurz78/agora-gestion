@@ -203,7 +203,7 @@ final class ReglementTable extends Component
         $this->docModalMessage = "{$label} v{$document->version} généré.";
         $this->docModalMessageType = 'success';
 
-        $this->dispatch('open-url', url: route('gestion.documents-previsionnels.pdf', $document));
+        $this->dispatch('open-url', url: route('operations.documents-previsionnels.pdf', $document));
     }
 
     public function render(): View

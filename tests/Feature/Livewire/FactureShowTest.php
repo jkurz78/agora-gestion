@@ -248,5 +248,5 @@ it('redirects to edit if facture is brouillon', function () {
     ]);
 
     Livewire::test(FactureShow::class, ['facture' => $brouillon])
-        ->assertRedirect(route('compta.factures.edit', $brouillon));
+        ->assertRedirect(route('facturation.factures.edit', $brouillon));
 });

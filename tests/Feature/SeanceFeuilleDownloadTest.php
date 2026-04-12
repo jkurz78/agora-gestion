@@ -20,7 +20,7 @@ beforeEach(function () {
 
 it('returns 404 when seance has no feuille attached', function () {
     $this->actingAs($this->user)
-        ->get(route('gestion.operations.seances.feuille-signee.download', [$this->operation, $this->seance]))
+        ->get(route('operations.seances.feuille-signee.download', [$this->operation, $this->seance]))
         ->assertNotFound();
 });
 
@@ -33,7 +33,7 @@ it('downloads the feuille PDF when attached', function () {
     ]);
 
     $response = $this->actingAs($this->user)
-        ->get(route('gestion.operations.seances.feuille-signee.download', [$this->operation, $this->seance]));
+        ->get(route('operations.seances.feuille-signee.download', [$this->operation, $this->seance]));
 
     $response->assertOk();
     expect($response->headers->get('content-disposition'))->toContain('feuille-signee-seance-1.pdf');
@@ -50,7 +50,7 @@ it('returns 404 when seance does not belong to the operation', function () {
 
     // Pass otherOperation in the URL with the seance from the original operation
     $this->actingAs($this->user)
-        ->get(route('gestion.operations.seances.feuille-signee.download', [$otherOperation, $this->seance]))
+        ->get(route('operations.seances.feuille-signee.download', [$otherOperation, $this->seance]))
         ->assertNotFound();
 });
 
@@ -62,6 +62,6 @@ it('redirects guests to login', function () {
         'feuille_signee_source' => 'manual',
     ]);
 
-    $this->get(route('gestion.operations.seances.feuille-signee.download', [$this->operation, $this->seance]))
+    $this->get(route('operations.seances.feuille-signee.download', [$this->operation, $this->seance]))
         ->assertRedirect(route('login'));
 });

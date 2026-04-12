@@ -41,7 +41,7 @@ final class UserController extends Controller
             'role' => Role::tryFrom($validated['role'] ?? '') ?? Role::Admin,
         ]);
 
-        return redirect()->route(request()->attributes->get('espace')->value.'.parametres.utilisateurs.index')
+        return redirect()->route('parametres.utilisateurs.index')
             ->with('success', 'Utilisateur créé.');
     }
 
@@ -75,20 +75,20 @@ final class UserController extends Controller
             ));
         }
 
-        return redirect()->route(request()->attributes->get('espace')->value.'.parametres.utilisateurs.index')
+        return redirect()->route('parametres.utilisateurs.index')
             ->with('success', 'Utilisateur mis à jour.');
     }
 
     public function destroy(User $utilisateur): RedirectResponse
     {
         if ($utilisateur->id === auth()->id()) {
-            return redirect()->route(request()->attributes->get('espace')->value.'.parametres.utilisateurs.index')
+            return redirect()->route('parametres.utilisateurs.index')
                 ->with('error', 'Vous ne pouvez pas supprimer votre propre compte.');
         }
 
         $utilisateur->delete();
 
-        return redirect()->route(request()->attributes->get('espace')->value.'.parametres.utilisateurs.index')
+        return redirect()->route('parametres.utilisateurs.index')
             ->with('success', 'Utilisateur supprimé.');
     }
 }

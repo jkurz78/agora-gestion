@@ -5,7 +5,7 @@ use App\Models\User;
 it('navbar brand shows new app name and logo', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->get(route('compta.dashboard'));
+    $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertSee('Mon Association');
     $response->assertSee('images/agora-gestion.svg', false);
@@ -14,7 +14,7 @@ it('navbar brand shows new app name and logo', function () {
 it('navbar does not contain tableau de bord nav item link', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->get(route('compta.dashboard'));
+    $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertSee('Dépenses');
     $response->assertSee('Recettes');
@@ -26,7 +26,7 @@ it('navbar does not contain tableau de bord nav item link', function () {
 it('page title is updated', function () {
     $user = User::factory()->create();
 
-    $response = $this->actingAs($user)->get(route('compta.dashboard'));
+    $response = $this->actingAs($user)->get(route('dashboard'));
 
     $response->assertSee('Mon Association', false);
 });

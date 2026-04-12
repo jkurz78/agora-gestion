@@ -78,7 +78,7 @@
             <div class="mb-4 small text-muted">
                 <i class="bi bi-calendar-event me-1"></i> Opérations liées :
                 @foreach ($operationsLiees as $op)
-                    <a href="{{ route('gestion.operations.show', $op) }}" class="text-decoration-none me-2">{{ $op->nom }}</a>
+                    <a href="{{ route('operations.show', $op) }}" class="text-decoration-none me-2">{{ $op->nom }}</a>
                 @endforeach
             </div>
             @endif
@@ -203,7 +203,7 @@
                     <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
                 </div>
                 <div class="card-body d-grid gap-2">
-                    <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}" class="btn btn-outline-primary" target="_blank">
+                    <a href="{{ route('facturation.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}" class="btn btn-outline-primary" target="_blank">
                         <i class="bi bi-file-earmark-pdf"></i>
                         {{ $facture->statut === \App\Enums\StatutFacture::Annulee ? 'Télécharger l\'avoir (PDF)' : 'Télécharger PDF' }}
                     </a>
@@ -229,7 +229,7 @@
                             {{ $emailMessage }}
                         </div>
                     @endif
-                    <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures') }}" class="btn btn-outline-secondary">
+                    <a href="{{ route('facturation.factures') }}" class="btn btn-outline-secondary">
                         <i class="bi bi-arrow-left"></i> Retour à la liste
                     </a>
                 </div>

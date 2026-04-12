@@ -56,7 +56,7 @@ final class RemiseBancaireValidation extends Component
 
             session()->forget('remise_selected_ids');
             session()->flash('success', 'Remise comptabilisée avec succès.');
-            $this->redirect(route('compta.banques.remises.index'));
+            $this->redirect(route('banques.remises.index'));
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }

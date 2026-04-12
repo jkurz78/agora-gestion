@@ -45,7 +45,7 @@ it('generates attestation PDF for a seance', function () {
 
     (new Association)->forceFill(['id' => 1, 'nom' => 'Test Asso', 'ville' => 'Paris'])->save();
 
-    $response = $this->get(route('gestion.operations.seances.attestation-pdf', [
+    $response = $this->get(route('operations.seances.attestation-pdf', [
         $operation, $seance, 'participants' => $participant->id,
     ]));
 
@@ -73,7 +73,7 @@ it('generates recap attestation PDF for a participant', function () {
 
     (new Association)->forceFill(['id' => 1, 'nom' => 'Test Asso', 'ville' => 'Paris'])->save();
 
-    $response = $this->get(route('gestion.operations.participants.attestation-recap-pdf', [
+    $response = $this->get(route('operations.participants.attestation-recap-pdf', [
         $operation, $participant,
     ]));
 
@@ -96,7 +96,7 @@ it('rejects attestation PDF for non-present participant', function () {
 
     (new Association)->forceFill(['id' => 1, 'nom' => 'Test Asso'])->save();
 
-    $response = $this->get(route('gestion.operations.seances.attestation-pdf', [
+    $response = $this->get(route('operations.seances.attestation-pdf', [
         $operation, $seance, 'participants' => $participant->id,
     ]));
 

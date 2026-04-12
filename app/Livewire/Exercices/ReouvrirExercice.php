@@ -16,7 +16,7 @@ final class ReouvrirExercice extends Component
     {
         $exercice = app(ExerciceService::class)->exerciceAffiche();
         if ($exercice === null || ! $exercice->isCloture()) {
-            $this->redirect(route('compta.exercices.changer'));
+            $this->redirect(route('exercices.changer'));
         }
     }
 
@@ -39,7 +39,7 @@ final class ReouvrirExercice extends Component
         $exerciceService->reouvrir($exercice, auth()->user(), $this->commentaire);
 
         session()->flash('success', "L'exercice {$exercice->label()} a été réouvert.");
-        $this->redirect(route('compta.exercices.reouvrir'));
+        $this->redirect(route('exercices.reouvrir'));
     }
 
     public function render(): View

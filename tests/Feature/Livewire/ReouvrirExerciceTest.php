@@ -49,5 +49,5 @@ it('redirects if exercice is already open', function () {
     $this->exercice->update(['statut' => StatutExercice::Ouvert, 'date_cloture' => null, 'cloture_par_id' => null]);
 
     Livewire::test(ReouvrirExercice::class)
-        ->assertRedirect(route('compta.exercices.changer'));
+        ->assertRedirect(route('exercices.changer'));
 });

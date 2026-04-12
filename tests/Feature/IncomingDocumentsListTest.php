@@ -30,7 +30,7 @@ it('lists incoming documents for authenticated user in gestion espace', function
     ]);
 
     $this->actingAs($this->user)
-        ->get(route('gestion.documents-en-attente'))
+        ->get(route('facturation.documents-en-attente'))
         ->assertOk()
         ->assertSee('facture.pdf')
         ->assertSee('Non classifié');
@@ -47,7 +47,7 @@ it('lists incoming documents in compta espace', function () {
     ]);
 
     $this->actingAs($this->user)
-        ->get(route('compta.documents-en-attente'))
+        ->get(route('facturation.documents-en-attente'))
         ->assertOk()
         ->assertSee('scan.pdf')
         ->assertSee('Aucun QR');
@@ -55,13 +55,13 @@ it('lists incoming documents in compta espace', function () {
 
 it('shows empty state when no documents', function () {
     $this->actingAs($this->user)
-        ->get(route('gestion.documents-en-attente'))
+        ->get(route('facturation.documents-en-attente'))
         ->assertOk()
         ->assertSee('Aucun document en attente');
 });
 
 it('redirects guest to login', function () {
-    $this->get(route('gestion.documents-en-attente'))
+    $this->get(route('facturation.documents-en-attente'))
         ->assertRedirect(route('login'));
 });
 
@@ -77,7 +77,7 @@ it('downloads a document via the controller', function () {
     ]);
 
     $response = $this->actingAs($this->user)
-        ->get(route('gestion.documents-en-attente.download', $doc));
+        ->get(route('facturation.documents-en-attente.download', $doc));
 
     $response->assertOk();
     expect($response->headers->get('content-disposition'))->toContain('facture.pdf');
@@ -94,6 +94,6 @@ it('returns 404 when downloading a missing file', function () {
     ]);
 
     $this->actingAs($this->user)
-        ->get(route('gestion.documents-en-attente.download', $doc))
+        ->get(route('facturation.documents-en-attente.download', $doc))
         ->assertNotFound();
 });

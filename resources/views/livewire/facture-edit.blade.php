@@ -227,7 +227,7 @@
                     </button>
                     @endif
 
-                    <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
+                    <a href="{{ route('facturation.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
                        target="_blank"
                        class="btn btn-outline-secondary">
                         <i class="bi bi-file-earmark-pdf"></i> Prévisualiser PDF

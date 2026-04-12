@@ -24,7 +24,7 @@
         <div class="col-md-8">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0"><a href="{{ route('compta.banques.comptes.index') }}" class="text-decoration-none text-dark"><i class="bi bi-bank"></i> Comptes bancaires</a></h5>
+                    <h5 class="mb-0"><a href="{{ route('banques.comptes.index') }}" class="text-decoration-none text-dark"><i class="bi bi-bank"></i> Comptes bancaires</a></h5>
                 </div>
                 <div class="card-body d-flex align-items-center">
                     @if ($comptesAvecSolde->isEmpty())
@@ -38,7 +38,7 @@
                                             <div class="small text-muted text-truncate">{{ $item['compte']->nom }}</div>
                                             <div class="fw-bold {{ $item['solde'] >= 0 ? 'text-success' : 'text-danger' }}">
                                                 {{ number_format($item['solde'], 2, ',', ' ') }} &euro;
-                                                <a href="{{ route('compta.banques.comptes.transactions', $item['compte']) }}"
+                                                <a href="{{ route('banques.comptes.transactions', $item['compte']) }}"
                                                    class="ms-1 text-muted" style="font-size:.8rem"
                                                    data-bs-toggle="tooltip" title="Voir les transactions">
                                                     <i class="bi bi-list-ul"></i>
@@ -60,7 +60,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><a href="{{ route('compta.budget.index') }}" class="text-decoration-none text-dark">Résumé budget</a></h5>
+                    <h5 class="mb-0"><a href="{{ route('comptabilite.budget') }}" class="text-decoration-none text-dark">Résumé budget</a></h5>
                 </div>
                 <div class="card-body">
                     <div class="row text-center">
@@ -90,7 +90,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0"><a href="{{ route('compta.transactions.index') }}" class="text-decoration-none text-dark">Dernières dépenses</a></h5>
+                    <h5 class="mb-0"><a href="{{ route('comptabilite.transactions') }}" class="text-decoration-none text-dark">Dernières dépenses</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -123,7 +123,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0"><a href="{{ route('compta.transactions.index') }}" class="text-decoration-none text-dark">Dernières recettes</a></h5>
+                    <h5 class="mb-0"><a href="{{ route('comptabilite.transactions') }}" class="text-decoration-none text-dark">Dernières recettes</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -160,7 +160,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0"><a href="{{ route('compta.dons.index') }}" class="text-decoration-none text-dark">Derniers dons</a></h5>
+                    <h5 class="mb-0"><a href="{{ route('tiers.dons') }}" class="text-decoration-none text-dark">Derniers dons</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -193,7 +193,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0"><a href="{{ route('compta.cotisations.index') }}" class="text-decoration-none text-dark"><i class="bi bi-person-check"></i> Dernières adhésions</a></h5>
+                    <h5 class="mb-0"><a href="{{ route('tiers.cotisations') }}" class="text-decoration-none text-dark"><i class="bi bi-person-check"></i> Dernières adhésions</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -230,7 +230,7 @@
         <div class="col-12">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><a href="{{ route('gestion.operations') }}" class="text-decoration-none text-dark"><i class="bi bi-calendar-event"></i> Opérations en cours</a></h5>
+                    <h5 class="mb-0"><a href="{{ route('operations.index') }}" class="text-decoration-none text-dark"><i class="bi bi-calendar-event"></i> Opérations en cours</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -265,7 +265,7 @@
                                         <td class="small text-muted">{{ $scNom }}</td>
                                         <td class="small">{{ $typeNom }}</td>
                                         <td>
-                                            <a href="{{ route('gestion.operations.show', $op) }}" class="text-decoration-none">
+                                            <a href="{{ route('operations.show', $op) }}" class="text-decoration-none">
                                                 {{ $op->nom }}
                                             </a>
                                             <span class="text-muted small">({{ $op->participants_count }})</span>

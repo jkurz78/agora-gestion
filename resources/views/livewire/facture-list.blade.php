@@ -68,7 +68,7 @@
                         <tr wire:key="facture-{{ $facture->id }}"
                             @if (! $isAnnulee)
                                 style="cursor:pointer"
-                                onclick="window.location='{{ $isBrouillon ? route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures.edit', $facture) : route(($espace ?? \App\Enums\Espace::Compta)->value . '.factures.show', $facture) }}'"
+                                onclick="window.location='{{ $isBrouillon ? route('facturation.factures.edit', $facture) : route('facturation.factures.show', $facture) }}'"
                             @endif
                         >
                             <td class="small">

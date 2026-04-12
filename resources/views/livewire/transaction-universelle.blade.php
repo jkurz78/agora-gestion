@@ -596,7 +596,7 @@
                                                 <td>{{ $ligne['sous_categorie'] ?? '—' }}</td>
                                                 <td class="text-muted">
                                                     @if($ligne['operation_id'] ?? null)
-                                                        <a href="{{ route('gestion.operations.show', $ligne['operation_id']) }}" class="text-decoration-none" @click.stop>{{ $ligne['operation'] }}</a>
+                                                        <a href="{{ route('operations.show', $ligne['operation_id']) }}" class="text-decoration-none" @click.stop>{{ $ligne['operation'] }}</a>
                                                     @else
                                                         {{ $ligne['operation'] ?? '' }}
                                                     @endif
@@ -613,7 +613,7 @@
                                 <div style="margin-left:1.5rem;font-size:.78rem;padding:.3rem 0">
                                     <i class="bi bi-receipt text-muted me-1"></i>
                                     @foreach($detail['factures'] as $fct)
-                                        <a href="{{ route('compta.factures.show', $fct['id']) }}" class="text-decoration-none me-2" @click.stop>
+                                        <a href="{{ route('facturation.factures.show', $fct['id']) }}" class="text-decoration-none me-2" @click.stop>
                                             Facture {{ $fct['numero'] }}
                                         </a>
                                     @endforeach

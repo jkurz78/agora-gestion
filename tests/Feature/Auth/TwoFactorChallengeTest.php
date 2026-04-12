@@ -16,7 +16,7 @@ it('redirects to challenge when 2FA email is active', function () {
     $user = User::factory()->create(['two_factor_method' => TwoFactorMethod::Email, 'two_factor_confirmed_at' => now()]);
 
     $this->actingAs($user)
-        ->get(route('compta.dashboard'))
+        ->get(route('dashboard'))
         ->assertRedirect(route('two-factor.challenge'));
 });
 
@@ -24,7 +24,7 @@ it('allows access when 2FA is not active', function () {
     $user = User::factory()->create(['two_factor_method' => null]);
 
     $this->actingAs($user)
-        ->get(route('compta.dashboard'))
+        ->get(route('dashboard'))
         ->assertOk();
 });
 
@@ -34,7 +34,7 @@ it('allows access after successful 2FA verification', function () {
 
     $this->actingAs($user)
         ->withSession(['two_factor_verified' => true])
-        ->get(route('compta.dashboard'))
+        ->get(route('dashboard'))
         ->assertOk();
 });
 

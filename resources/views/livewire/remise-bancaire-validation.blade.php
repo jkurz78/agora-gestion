@@ -9,7 +9,7 @@
     {{-- En-tête --}}
     <div class="d-flex justify-content-between align-items-start mb-4">
         <h1 class="mb-0">Validation de la remise</h1>
-        <a href="{{ route('compta.banques.remises.selection', $remise) }}" class="btn btn-outline-secondary">
+        <a href="{{ route('banques.remises.selection', $remise) }}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour à la sélection
         </a>
     </div>
