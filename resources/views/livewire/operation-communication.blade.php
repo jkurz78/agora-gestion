@@ -34,6 +34,7 @@
                                 $varGroups = [
                                     'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email_participant}' => 'Email'],
                                     'Opération' => ['{operation}' => 'Nom', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
+                                    'Association' => ['{association}' => 'Nom'],
                                     'Séances' => ['{date_prochaine_seance}' => 'Date prochaine', '{numero_prochaine_seance}' => 'N° prochaine', '{titre_prochaine_seance}' => 'Titre prochaine', '{jours_avant_prochaine_seance}' => 'Jours avant prochaine', '{date_precedente_seance}' => 'Date précédente', '{numero_precedente_seance}' => 'N° précédente', '{titre_precedente_seance}' => 'Titre précédente', '{nb_seances_effectuees}' => 'Nb effectuées', '{nb_seances_restantes}' => 'Nb restantes'],
                                 ];
                             @endphp
@@ -494,6 +495,7 @@
         'Opération': {
             '{operation}': 'Nom',
             '{type_operation}': 'Type',
+            '{logo_operation}': 'Logo opération',
             '{date_debut}': 'Date début',
             '{date_fin}': 'Date fin',
             '{nb_seances}': 'Nb séances',
@@ -509,9 +511,9 @@
             '{nb_seances_effectuees}': 'Nb effectuées',
             '{nb_seances_restantes}': 'Nb restantes',
         },
-        'Logos': {
-            '{logo}': 'Association',
-            '{logo_operation}': 'Opération',
+        'Association': {
+            '{association}': 'Nom',
+            '{logo}': 'Logo',
         },
     };
 

@@ -2,14 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Database\Seeders;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
 
-use App\Models\MessageTemplate;
-use Illuminate\Database\Seeder;
-
-final class MessageTemplateSeeder extends Seeder
+return new class extends Migration
 {
-    public function run(): void
+    public function up(): void
     {
         $templates = [
             [
@@ -44,11 +42,33 @@ final class MessageTemplateSeeder extends Seeder
             ],
         ];
 
+        $now = now();
+
         foreach ($templates as $data) {
-            MessageTemplate::firstOrCreate(
-                ['nom' => $data['nom']],
-                $data
-            );
+            if (DB::table('message_templates')->where('nom', $data['nom'])->exists()) {
+                continue;
+            }
+
+            DB::table('message_templates')->insert(array_merge($data, [
+                'type_operation_id' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]));
         }
     }
-}
+
+    public function down(): void
+    {
+        DB::table('message_templates')
+            ->whereIn('nom', [
+                'Confirmation d\'inscription',
+                'Démarrage imminent',
+                'Rappel prochaine séance',
+                'Instructions prochaine séance',
+                'Remerciements fin de parcours',
+                'Remerciements et questionnaire',
+            ])
+            ->whereNull('type_operation_id')
+            ->delete();
+    }
+};

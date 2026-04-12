@@ -6,6 +6,7 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
+use App\Models\Association;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -128,6 +129,7 @@ final class MessageLibreMail extends Mailable
             '{titre_precedente_seance}' => $this->titrePrecedenteSeance ?? '',
             '{nb_seances_effectuees}' => (string) $this->nbSeancesEffectuees,
             '{nb_seances_restantes}' => (string) $this->nbSeancesRestantes,
+            '{association}' => Association::first()?->nom ?? '',
         ];
     }
 }
