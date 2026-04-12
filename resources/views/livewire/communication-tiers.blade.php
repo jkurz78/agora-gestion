@@ -307,7 +307,7 @@
                                 </div>
                             </div>
                         </div>
-                        <input type="text" class="form-control form-control-sm" wire:model="objet"
+                        <input type="text" class="form-control form-control-sm" wire:model.live.debounce.300ms="objet"
                                placeholder="Objet du message" id="tiers-objet-input">
                     </div>
 
@@ -787,10 +787,17 @@
 
     // --- Helper: find Livewire component ---
     function _tiersMsgGetWire() {
+        // The root div#tiers-communication is the Livewire component root
         const el = document.getElementById('tiers-communication');
         if (!el) return null;
-        const wireId = el.closest('[wire\\:id]')?.getAttribute('wire:id') || el.getAttribute('wire:id');
-        return wireId ? Livewire.find(wireId) : null;
+        // Try wire:id on the element itself, then walk up
+        let wireEl = el;
+        while (wireEl) {
+            const wireId = wireEl.getAttribute('wire:id');
+            if (wireId) return Livewire.find(wireId);
+            wireEl = wireEl.parentElement;
+        }
+        return null;
     }
 
     // --- Sync TinyMCE -> Livewire ---
@@ -828,9 +835,13 @@
         const el = document.querySelector('[x-data="tiersCommunicationTinymce()"]');
         const data = _tiersMsgGetAlpineData(el);
         const wire = _tiersMsgGetWire();
-        if (!wire) return;
+        if (!wire) {
+            console.error('[CommunicationTiers] Livewire component not found');
+            return;
+        }
         if (data && data.getContent) {
-            wire.set('corps', data.getContent());
+            const content = data.getContent();
+            wire.set('corps', content);
         }
         action(wire);
     }
