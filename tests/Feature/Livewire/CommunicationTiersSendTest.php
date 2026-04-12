@@ -30,6 +30,7 @@ beforeEach(function () {
 
 it('loads a message template', function () {
     $tpl = MessageTemplate::create([
+        'categorie' => 'communication',
         'nom' => 'Convocation',
         'objet' => 'Convocation AG',
         'corps' => '<p>Cher {prenom}</p>',
@@ -50,7 +51,9 @@ it('saves a new message template', function () {
         ->set('templateNom', 'Mon modèle')
         ->call('saveAsTemplate');
 
-    expect(MessageTemplate::where('nom', 'Mon modèle')->exists())->toBeTrue();
+    $tpl = MessageTemplate::where('nom', 'Mon modèle')->first();
+    expect($tpl)->not->toBeNull()
+        ->and($tpl->categorie)->toBe('communication');
 });
 
 // --- Send ---

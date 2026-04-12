@@ -305,6 +305,7 @@ final class CommunicationTiers extends Component
         ]);
 
         MessageTemplate::create([
+            'categorie' => 'communication',
             'nom' => $this->templateNom,
             'objet' => $this->objet,
             'corps' => $this->corps,
@@ -591,7 +592,7 @@ final class CommunicationTiers extends Component
             ->orderByDesc('created_at')
             ->get();
 
-        $templates = MessageTemplate::whereNull('type_operation_id')
+        $templates = MessageTemplate::where('categorie', 'communication')
             ->orderBy('nom')
             ->get();
 

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class MessageTemplate extends Model
 {
     protected $fillable = [
+        'categorie',
         'nom',
         'objet',
         'corps',
