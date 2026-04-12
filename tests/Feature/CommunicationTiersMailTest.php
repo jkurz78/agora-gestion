@@ -57,7 +57,7 @@ it('appends tracking pixel when token provided', function () {
     expect($mail->corpsHtml)->toContain('tok123');
 });
 
-it('appends opt-out link automatically', function () {
+it('appends opt-out link automatically when not in body', function () {
     $mail = new CommunicationTiersMail(
         prenom: 'Jean',
         nom: 'DUPONT',
@@ -70,6 +70,35 @@ it('appends opt-out link automatically', function () {
     expect($mail->corpsHtml)
         ->toContain('désinscrire')
         ->toContain('optout-token');
+});
+
+it('does not append opt-out footer when {lien_optout} is in body', function () {
+    $mail = new CommunicationTiersMail(
+        prenom: 'Jean',
+        nom: 'DUPONT',
+        email: 'jean@example.com',
+        objet: 'Test',
+        corps: '<p>Pour vous désabonner : <a href="{lien_optout}">cliquez ici</a></p>',
+        trackingToken: 'custom-token',
+    );
+
+    // Should NOT have the auto-appended footer paragraph
+    expect($mail->corpsHtml)->not->toContain('Se désinscrire des communications');
+    // But should still have the tracking pixel
+    expect($mail->corpsHtml)->toContain('custom-token');
+});
+
+it('does not append opt-out footer when {lien_desinscription} is in body', function () {
+    $mail = new CommunicationTiersMail(
+        prenom: 'Jean',
+        nom: 'DUPONT',
+        email: 'jean@example.com',
+        objet: 'Test',
+        corps: '<p>Infos {lien_desinscription}</p>',
+        trackingToken: 'desinsc-token',
+    );
+
+    expect($mail->corpsHtml)->not->toContain('Se désinscrire des communications');
 });
 
 it('strips disallowed HTML tags', function () {

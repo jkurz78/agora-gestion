@@ -34,12 +34,17 @@ final class CommunicationTiersMail extends Mailable
         );
         $html = ArticleFr::contracter($corps);
 
-        // Opt-out footer (always appended when token present)
         if ($this->trackingToken) {
-            $optoutUrl = route('email.optout', ['token' => $this->trackingToken]);
-            $html .= '<p style="font-size:11px;color:#999;margin-top:20px;text-align:center">'
-                .'<a href="'.htmlspecialchars($optoutUrl).'" style="color:#999">Se désinscrire des communications</a>'
-                .'</p>';
+            // Opt-out footer: only if user didn't already include an opt-out link
+            $hasOptoutInBody = str_contains($this->corps, '{lien_optout}')
+                || str_contains($this->corps, '{lien_desinscription}');
+
+            if (! $hasOptoutInBody) {
+                $optoutUrl = route('email.optout', ['token' => $this->trackingToken]);
+                $html .= '<p style="font-size:11px;color:#999;margin-top:20px;text-align:center">'
+                    .'<a href="'.htmlspecialchars($optoutUrl).'" style="color:#999">Se désinscrire des communications</a>'
+                    .'</p>';
+            }
 
             // Tracking pixel
             $pixelUrl = route('email.tracking', ['token' => $this->trackingToken]);
