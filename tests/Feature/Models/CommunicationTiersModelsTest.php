@@ -35,5 +35,5 @@ it('Association email_from is fillable', function () {
 
 it('CategorieEmail::Communication exists with tiers variables', function () {
     $vars = CategorieEmail::Communication->variables();
-    expect($vars)->toHaveKeys(['{prenom}', '{nom}', '{email}', '{association}', '{lien_desinscription}']);
+    expect($vars)->toHaveKeys(['{prenom}', '{nom}', '{email}', '{association}', '{lien_optout}', '{lien_desinscription}']);
 });

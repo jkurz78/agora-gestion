@@ -92,6 +92,7 @@ final class CommunicationTiersMail extends Mailable
             '{nom}' => $this->nom,
             '{email}' => $this->email,
             '{association}' => Association::first()?->nom ?? '',
+            '{lien_optout}' => $optoutUrl,
             '{lien_desinscription}' => '<a href="'.htmlspecialchars($optoutUrl).'" style="color:#999">Se désinscrire</a>',
         ];
     }

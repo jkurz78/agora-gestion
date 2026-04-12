@@ -84,7 +84,8 @@ enum CategorieEmail: string
                 '{nom}' => 'Nom du tiers',
                 '{email}' => 'Email du tiers',
                 '{association}' => 'Nom de l\'association',
-                '{lien_desinscription}' => 'Lien de désinscription RGPD',
+                '{lien_optout}' => 'URL de désinscription (pour href)',
+                '{lien_desinscription}' => 'Lien de désinscription cliquable',
             ] + $logos,
         };
     }
