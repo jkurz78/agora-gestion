@@ -8,6 +8,13 @@
             :page-title="'Transactions — '.$tiers->displayName()"
             page-title-icon="person-lines-fill" />
 
+        @if($tiers->email_optout)
+            <div class="alert alert-warning mt-3 mb-0">
+                <i class="bi bi-envelope-slash me-1"></i>
+                Ce tiers s'est <strong>désinscrit des communications</strong> (RGPD).
+            </div>
+        @endif
+
         {{-- Historique des emails envoyés à ce tiers --}}
         @php
             $emailLogs = \App\Models\EmailLog::where('tiers_id', $tiers->id)
