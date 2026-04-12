@@ -1,5 +1,5 @@
 {{-- resources/views/livewire/communication-tiers.blade.php --}}
-<div>
+<div id="tiers-communication">
     @if (session('message'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             {{ session('message') }}
@@ -10,6 +10,15 @@
         <div class="alert alert-danger alert-dismissible fade show" role="alert">
             {{ session('error') }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
+    {{-- Email-from warning --}}
+    @if(! $emailFrom)
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Adresse d'expédition non configurée.
+            <a href="{{ route('parametres.association') }}">Configurer dans les paramètres</a>
         </div>
     @endif
 
@@ -134,13 +143,6 @@
                             <i class="bi bi-check-all me-1"></i> Tout sélectionner
                         @endif
                     </button>
-
-                    @if (count($selectedTiersIds) > 0)
-                        <button class="btn btn-sm btn-primary" disabled
-                                title="Disponible dans la prochaine version">
-                            <i class="bi bi-envelope me-1"></i> Envoyer un email
-                        </button>
-                    @endif
                 </div>
             </div>
 
@@ -241,6 +243,190 @@
         </div>
     </div>
 
+    {{-- ── Section composition ── --}}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header py-2" style="background:#3d5473;color:#fff;font-size:.85rem;font-weight:600;">
+                    <i class="bi bi-envelope-paper me-1"></i> Composer un message
+                </div>
+                <div class="card-body">
+
+                    {{-- Template selector --}}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Partir d'un modèle…</label>
+                            <select class="form-select form-select-sm" wire:model="selectedTemplateId" wire:change="loadTemplate">
+                                <option value="">— Composition libre —</option>
+                                @foreach($templates as $groupName => $groupTemplates)
+                                    <optgroup label="{{ $groupName }}">
+                                        @foreach($groupTemplates as $tpl)
+                                            <option value="{{ $tpl->id }}">{{ $tpl->nom }}</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    {{-- Subject --}}
+                    <div class="mb-3">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <label class="form-label small fw-semibold mb-0">Objet</label>
+                            <div x-data="{ openGroup: null }" @click.outside="openGroup = null" class="position-relative">
+                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" style="font-size:11px" @click="openGroup = openGroup ? null : 'root'">
+                                    <i class="bi bi-braces me-1"></i>Variables
+                                </button>
+                                <div class="dropdown-menu" :class="openGroup && 'show'" style="min-width:160px;font-size:12px">
+                                    @php
+                                        $varGroups = [
+                                            'Tiers' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email}' => 'Email'],
+                                            'Association' => ['{association}' => "Nom de l'association", '{lien_desinscription}' => 'Lien de désinscription'],
+                                        ];
+                                    @endphp
+                                    @foreach($varGroups as $groupName => $vars)
+                                        <div class="position-relative" @mouseenter="openGroup = '{{ $groupName }}'" @mouseleave="openGroup = openGroup === '{{ $groupName }}' ? 'root' : openGroup">
+                                            <a class="dropdown-item d-flex justify-content-between" href="#">
+                                                {{ $groupName }} <i class="bi bi-chevron-right"></i>
+                                            </a>
+                                            <div class="dropdown-menu" :class="openGroup === '{{ $groupName }}' && 'show'"
+                                                 style="position:absolute;left:100%;top:0;min-width:260px">
+                                                @foreach($vars as $var => $desc)
+                                                    <a class="dropdown-item" href="#"
+                                                       @click.prevent="
+                                                           const input = document.getElementById('tiers-objet-input');
+                                                           const pos = input.selectionStart || input.value.length;
+                                                           const val = input.value;
+                                                           input.value = val.substring(0, pos) + '{{ $var }}' + val.substring(pos);
+                                                           input.dispatchEvent(new Event('input'));
+                                                           openGroup = null;
+                                                           input.focus();
+                                                       ">
+                                                        <code class="text-primary">{{ $var }}</code> <span class="text-muted">{{ $desc }}</span>
+                                                    </a>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                        <input type="text" class="form-control form-control-sm" wire:model="objet"
+                               placeholder="Objet du message" id="tiers-objet-input">
+                    </div>
+
+                    {{-- Body — TinyMCE --}}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Corps</label>
+                        <div wire:ignore
+                             x-data="tiersCommunicationTinymce()"
+                             x-init="init()">
+                            <textarea x-ref="editor">{!! $corps !!}</textarea>
+                        </div>
+                    </div>
+
+                    {{-- Save as template --}}
+                    <div class="mb-3">
+                        @if($showSaveTemplate)
+                            <div class="border rounded p-2 bg-light">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-7">
+                                        <label class="form-label small">Nom du modèle</label>
+                                        <input type="text" class="form-control form-control-sm @error('templateNom') is-invalid @enderror"
+                                               wire:model="templateNom" placeholder="Ex: Newsletter mensuelle">
+                                        @error('templateNom')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-5 d-flex gap-1">
+                                        <button type="button" class="btn btn-sm btn-primary"
+                                                onclick="window.tiersSyncAndSaveTemplate()">
+                                            <i class="bi bi-check-lg"></i> Enregistrer
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                wire:click="$set('showSaveTemplate', false)">
+                                            Annuler
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        @else
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        wire:click="$set('showSaveTemplate', true)">
+                                    <i class="bi bi-bookmark-plus me-1"></i>Enregistrer comme modèle
+                                </button>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- File attachments --}}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Pièces jointes <span class="text-muted">(max 5 fichiers, 10 Mo au total)</span></label>
+                        <input type="file" class="form-control form-control-sm" wire:model="emailAttachments" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx">
+                        @error('emailAttachments.*') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                        @error('emailAttachments') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+
+                        @if(count($emailAttachments) > 0)
+                            <div class="mt-2">
+                                @foreach($emailAttachments as $index => $attachment)
+                                    <span class="badge bg-light text-dark border me-1 mb-1">
+                                        <i class="bi bi-paperclip"></i> {{ $attachment->getClientOriginalName() }}
+                                        <small class="text-muted">({{ number_format($attachment->getSize() / 1024, 0) }} Ko)</small>
+                                        <button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.5em"
+                                                wire:click="removeAttachment({{ $index }})"></button>
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Progress display during send --}}
+                    @if($envoiEnCours)
+                        <div class="alert alert-info py-2 mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                                <span>Envoi en cours : {{ $envoiProgression }} / {{ $envoiTotal }}</span>
+                            </div>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar" style="width: {{ $envoiTotal > 0 ? ($envoiProgression / $envoiTotal * 100) : 0 }}%"></div>
+                            </div>
+                        </div>
+                    @endif
+
+                    @if($envoiResultat)
+                        <div class="alert alert-success py-2 mb-3 small">
+                            <i class="bi bi-check-circle me-1"></i> {{ $envoiResultat }}
+                        </div>
+                    @endif
+
+                    {{-- Action buttons --}}
+                    @php
+                        $canSend = count($selectedTiersIds) > 0 && $objet !== '' && $corps !== '';
+                    @endphp
+                    <div class="d-flex gap-2 justify-content-end">
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                onclick="window.tiersSyncAndShowPreview()"
+                                {{ $objet === '' && $corps === '' ? 'disabled' : '' }}>
+                            <i class="bi bi-eye me-1"></i>Aperçu
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                onclick="window.tiersSyncAndShowTestModal()"
+                                {{ count($selectedTiersIds) === 0 ? 'disabled' : '' }}>
+                            <i class="bi bi-send me-1"></i>Envoyer un test
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary"
+                                onclick="window.tiersSyncAndShowConfirmSend()"
+                                {{ ! $canSend ? 'disabled' : '' }}>
+                            <i class="bi bi-envelope-paper me-1"></i>Envoyer à {{ count($selectedTiersIds) }} tiers
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- ── Historique des campagnes ── --}}
     @if ($campagnes->isNotEmpty())
     <div class="row mt-4">
@@ -318,4 +504,299 @@
     </div>
     @endif
 
+    {{-- ── Test email modal ── --}}
+    @if($showTestModal)
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+         style="background:rgba(0,0,0,.3);z-index:2100"
+         wire:click.self="$set('showTestModal', false)">
+        <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
+            <h6 class="mb-3"><i class="bi bi-envelope me-1"></i> Envoyer un email de test</h6>
+            <p class="small text-muted mb-2">
+                Variables substituées pour le 1er tiers sélectionné.
+            </p>
+            <div class="mb-3">
+                <label class="form-label small">Adresse destinataire</label>
+                <input type="email" wire:model="testEmail"
+                       class="form-control form-control-sm @error('testEmail') is-invalid @enderror"
+                       placeholder="votre@email.fr">
+                @error('testEmail')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="d-flex gap-2 justify-content-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        wire:click="$set('showTestModal', false)">
+                    Fermer
+                </button>
+                <button type="button" class="btn btn-sm btn-primary" wire:click="envoyerTest">
+                    <span wire:loading.remove wire:target="envoyerTest">Envoyer</span>
+                    <span wire:loading wire:target="envoyerTest">Envoi…</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- ── Confirm send modal ── --}}
+    @if($showConfirmSend)
+    <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+         style="background:rgba(0,0,0,.3);z-index:2100"
+         wire:click.self="$set('showConfirmSend', false)">
+        <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
+            <h6 class="mb-3"><i class="bi bi-envelope-paper me-1"></i> Confirmer l'envoi</h6>
+            <p class="mb-3">
+                Envoyer ce message à <strong>{{ count($selectedTiersIds) }}</strong> tiers ?
+            </p>
+            @if(count($emailAttachments) > 0)
+                <p class="small text-muted mb-3">
+                    {{ count($emailAttachments) }} pièce(s) jointe(s)
+                </p>
+            @endif
+            <div class="d-flex gap-2 justify-content-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        wire:click="$set('showConfirmSend', false)">Annuler</button>
+                <button type="button" class="btn btn-sm btn-primary" wire:click="envoyerMessages">
+                    <span wire:loading.remove wire:target="envoyerMessages">Confirmer l'envoi</span>
+                    <span wire:loading wire:target="envoyerMessages">
+                        <span class="spinner-border spinner-border-sm me-1"></span>Envoi en cours…
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- ── Preview modal ── --}}
+    @if($showPreview)
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+             style="background:rgba(0,0,0,.4);z-index:2100"
+             wire:click.self="$set('showPreview', false)">
+            <div class="bg-white rounded-3 shadow" style="max-width:700px;width:95%;max-height:80vh;display:flex;flex-direction:column">
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-eye me-1"></i> Aperçu du message</h6>
+                    <button type="button" class="btn-close" wire:click="$set('showPreview', false)"></button>
+                </div>
+                <div class="p-3 border-bottom bg-light">
+                    <strong class="small">Objet :</strong> {{ $objet }}
+                </div>
+                <div class="p-3" style="overflow-y:auto;flex:1">
+                    {!! $corps !!}
+                </div>
+            </div>
+        </div>
+    @endif
+
 </div>
+
+@assets
+<script>
+    // --- Alpine component for TinyMCE (registered once, before Alpine init) ---
+    function _tiersMsgStripVarSpans(html) {
+        return html.replace(/<span class="mce-variable[^"]*">(\{[^}]+\})<\/span>/g, '$1');
+    }
+
+    window._tiersMsgVariableGroups = [
+        {
+            title: 'Tiers',
+            items: [
+                { token: '{prenom}', label: 'Prénom' },
+                { token: '{nom}', label: 'Nom' },
+                { token: '{email}', label: 'Email' },
+            ]
+        },
+        {
+            title: 'Association',
+            items: [
+                { token: '{association}', label: "Nom de l'association" },
+                { token: '{lien_desinscription}', label: 'Lien de désinscription' },
+            ]
+        },
+    ];
+
+    // Flat lookup for wrap/strip
+    window._tiersMsgVariables = {};
+    window._tiersMsgVariableGroups.forEach(function(group) {
+        group.items.forEach(function(item) {
+            window._tiersMsgVariables[item.token] = item.label;
+        });
+    });
+
+    function _tiersMsgWrapVars(html) {
+        Object.keys(window._tiersMsgVariables).forEach(function(v) {
+            var escaped = v.replace(/[{}]/g, '\\$&');
+            var regex = new RegExp('(?!<span[^>]*>)' + escaped + '(?!</span>)', 'g');
+            html = html.replace(regex, '<span class="mce-variable mce-noneditable">' + v + '</span>');
+        });
+        return html;
+    }
+
+    if (typeof Alpine !== 'undefined' && !Alpine.components?.tiersCommunicationTinymce) {
+        Alpine.data('tiersCommunicationTinymce', () => ({
+            editor: null,
+
+            init() {
+                this.$nextTick(() => this.setup());
+                this.$cleanup(() => this.destroy());
+            },
+
+            setup() {
+                if (typeof tinymce === 'undefined') {
+                    setTimeout(() => this.setup(), 300);
+                    return;
+                }
+
+                const textarea = this.$refs.editor;
+                if (!textarea) return;
+
+                const self = this;
+
+                // Build nested menu items from variable groups
+                const menuItems = window._tiersMsgVariableGroups.map(function(group) {
+                    return {
+                        type: 'nestedmenuitem',
+                        text: group.title,
+                        getSubmenuItems: function() {
+                            return group.items.map(function(item) {
+                                return {
+                                    type: 'menuitem',
+                                    text: item.token + ' — ' + item.label,
+                                    onAction: function() {
+                                        if (self.editor) {
+                                            self.editor.insertContent('<span class="mce-variable mce-noneditable">' + item.token + '</span>&nbsp;');
+                                        }
+                                    },
+                                };
+                            });
+                        },
+                    };
+                });
+
+                tinymce.init({
+                    target: textarea,
+                    language: 'fr_FR',
+                    language_url: '/vendor/tinymce/langs/fr_FR.js',
+                    height: 400,
+                    menubar: 'edit insert format table',
+                    statusbar: true,
+                    promotion: false,
+                    plugins: 'lists link noneditable table image media code fullscreen',
+                    toolbar: [
+                        'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough forecolor backcolor',
+                        'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link | variablesButton | code fullscreen',
+                    ],
+                    noneditable_class: 'mce-variable',
+                    block_formats: 'Paragraphe=p; Titre 1=h1; Titre 2=h2; Titre 3=h3; Titre 4=h4',
+                    font_family_formats: 'Arial=arial,helvetica,sans-serif; Georgia=georgia,serif; Courier New=courier new,courier,monospace; Trebuchet MS=trebuchet ms,geneva; Verdana=verdana,geneva',
+                    font_size_formats: '10px 12px 14px 16px 18px 20px 24px 28px 32px 36px',
+                    table_toolbar: 'tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol',
+                    table_default_styles: { 'border-collapse': 'collapse', 'width': '100%' },
+                    table_default_attributes: { border: '1', cellpadding: '6', cellspacing: '0' },
+                    image_title: true,
+                    image_caption: true,
+                    image_advtab: true,
+                    automatic_uploads: false,
+                    images_upload_handler: function(blobInfo) {
+                        return new Promise(function(resolve) {
+                            var reader = new FileReader();
+                            reader.onload = function() { resolve(reader.result); };
+                            reader.readAsDataURL(blobInfo.blob());
+                        });
+                    },
+                    file_picker_types: 'image',
+                    file_picker_callback: function(callback, value, meta) {
+                        if (meta.filetype === 'image') {
+                            var input = document.createElement('input');
+                            input.setAttribute('type', 'file');
+                            input.setAttribute('accept', 'image/*');
+                            input.addEventListener('change', function() {
+                                var file = this.files[0];
+                                var reader = new FileReader();
+                                reader.onload = function() {
+                                    callback(reader.result, { alt: file.name, title: file.name });
+                                };
+                                reader.readAsDataURL(file);
+                            });
+                            input.click();
+                        }
+                    },
+                    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .mce-variable { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 3px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; } table { border-collapse: collapse; } td, th { border: 1px solid #ccc; padding: 6px; }',
+                    setup: function(editor) {
+                        self.editor = editor;
+
+                        editor.ui.registry.addMenuButton('variablesButton', {
+                            text: 'Variables',
+                            fetch: function(callback) { callback(menuItems); },
+                        });
+
+                        editor.on('init', function() {
+                            editor.setContent(_tiersMsgWrapVars(editor.getContent()));
+                        });
+                    },
+                });
+            },
+
+            destroy() {
+                if (this.editor) {
+                    try { tinymce.remove(this.editor); } catch (e) {}
+                    this.editor = null;
+                }
+            },
+
+            getContent() {
+                return this.editor ? _tiersMsgStripVarSpans(this.editor.getContent()) : '';
+            },
+
+            setContent(html) {
+                if (this.editor) {
+                    this.editor.setContent(_tiersMsgWrapVars(html));
+                }
+            },
+        }));
+    }
+
+    // --- Helper: get Alpine data from element ---
+    function _tiersMsgGetAlpineData(el) {
+        if (!el) return null;
+        if (el._x_dataStack && el._x_dataStack[0]) return el._x_dataStack[0];
+        if (el.__x && el.__x.$data) return el.__x.$data;
+        return null;
+    }
+
+    // --- Helper: find Livewire component ---
+    function _tiersMsgGetWire() {
+        const el = document.getElementById('tiers-communication');
+        if (!el) return null;
+        const wireId = el.closest('[wire\\:id]')?.getAttribute('wire:id') || el.getAttribute('wire:id');
+        return wireId ? Livewire.find(wireId) : null;
+    }
+
+    // --- Sync TinyMCE -> Livewire ---
+    function _tiersMsgSyncEditor() {
+        const el = document.querySelector('[x-data="tiersCommunicationTinymce()"]');
+        const data = _tiersMsgGetAlpineData(el);
+        const wire = _tiersMsgGetWire();
+        if (data && data.getContent && wire) {
+            wire.set('corps', data.getContent());
+        }
+    }
+
+    window.tiersSyncMessageEditor = _tiersMsgSyncEditor;
+    window.tiersSyncAndSaveTemplate = function() { _tiersMsgSyncEditor(); setTimeout(() => { const w = _tiersMsgGetWire(); if (w) w.saveAsTemplate(); }, 150); };
+    window.tiersSyncAndShowTestModal = function() { _tiersMsgSyncEditor(); setTimeout(() => { const w = _tiersMsgGetWire(); if (w) w.set('showTestModal', true); }, 150); };
+    window.tiersSyncAndShowConfirmSend = function() { _tiersMsgSyncEditor(); setTimeout(() => { const w = _tiersMsgGetWire(); if (w) w.set('showConfirmSend', true); }, 150); };
+    window.tiersSyncAndShowPreview = function() { _tiersMsgSyncEditor(); setTimeout(() => { const w = _tiersMsgGetWire(); if (w) w.set('showPreview', true); }, 150); };
+</script>
+@endassets
+
+@script
+<script>
+    $wire.on('template-loaded', (eventData) => {
+        const el = document.querySelector('[x-data="tiersCommunicationTinymce()"]');
+        const data = _tiersMsgGetAlpineData(el);
+        if (data && data.setContent) {
+            const corps = Array.isArray(eventData) ? eventData[0].corps : eventData.corps;
+            data.setContent(corps || '');
+        }
+    });
+</script>
+@endscript

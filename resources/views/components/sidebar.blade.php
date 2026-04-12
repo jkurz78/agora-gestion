@@ -266,6 +266,15 @@ $activeGroup = match(true) {
                             </li>
                             @endif
 
+                            @if (Route::has('tiers.communication'))
+                            <li class="nav-item">
+                                <a href="{{ route('tiers.communication') }}"
+                                   class="nav-link {{ request()->routeIs('tiers.communication') ? 'active' : '' }}">
+                                    <i class="bi bi-envelope me-1"></i> Communication
+                                </a>
+                            </li>
+                            @endif
+
                         </ul>
                     </div>
                 </div>
