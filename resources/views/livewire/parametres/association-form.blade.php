@@ -26,6 +26,12 @@
                 <i class="bi bi-robot"></i> OCR / IA
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-communication" data-bs-toggle="tab" data-bs-target="#pane-communication"
+                    type="button" role="tab" aria-controls="pane-communication" aria-selected="false">
+                <i class="bi bi-envelope"></i> Communication
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content">
@@ -188,6 +194,35 @@
                         <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
                         <span wire:loading>Enregistrement…</span>
                     </button>
+            </div>
+        </div>
+
+        {{-- Onglet Communication --}}
+        <div class="tab-pane fade" id="pane-communication" role="tabpanel" aria-labelledby="tab-communication">
+            <div style="max-width: 640px;">
+                <p class="text-muted small mb-3">
+                    Adresse d'expédition utilisée pour les communications de masse aux tiers.
+                    Si non renseignée, les envois depuis l'écran Communication seront bloqués.
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label">Email d&#039;expédition</label>
+                    <input type="email" class="form-control @error('email_from') is-invalid @enderror"
+                           wire:model="email_from" placeholder="noreply@monasso.fr">
+                    @error('email_from') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Nom d&#039;expédition</label>
+                    <input type="text" class="form-control @error('email_from_name') is-invalid @enderror"
+                           wire:model="email_from_name" placeholder="Mon Association">
+                    @error('email_from_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                </div>
+
+                <button type="button" class="btn btn-primary" wire:click="save" wire:loading.attr="disabled">
+                    <span wire:loading.remove><i class="bi bi-floppy"></i> Enregistrer</span>
+                    <span wire:loading>Enregistrement…</span>
+                </button>
             </div>
         </div>
     </div>
