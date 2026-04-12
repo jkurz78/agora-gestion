@@ -6,6 +6,7 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
+use App\Models\Association;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
@@ -94,6 +95,7 @@ final class AttestationPresenceMail extends Mailable
             '{numero_seance}' => $this->numeroSeance ?? '',
             '{date_seance}' => $this->dateSeance ?? '',
             '{bloc_seances}' => $this->blocSeances ?? '',
+            '{association}' => Association::first()?->nom ?? '',
         ];
     }
 }
