@@ -572,10 +572,9 @@ final class CommunicationTiers extends Component
             ->orderByDesc('created_at')
             ->get();
 
-        $templates = MessageTemplate::with('typeOperation')
+        $templates = MessageTemplate::whereNull('type_operation_id')
             ->orderBy('nom')
-            ->get()
-            ->groupBy(fn (MessageTemplate $t) => $t->typeOperation?->nom ?? 'Modèles généraux');
+            ->get();
 
         return view('livewire.communication-tiers', compact(
             'tiersList',

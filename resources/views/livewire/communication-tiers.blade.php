@@ -258,12 +258,8 @@
                             <label class="form-label small fw-semibold">Partir d'un modèle…</label>
                             <select class="form-select form-select-sm" wire:model="selectedTemplateId" wire:change="loadTemplate">
                                 <option value="">— Composition libre —</option>
-                                @foreach($templates as $groupName => $groupTemplates)
-                                    <optgroup label="{{ $groupName }}">
-                                        @foreach($groupTemplates as $tpl)
-                                            <option value="{{ $tpl->id }}">{{ $tpl->nom }}</option>
-                                        @endforeach
-                                    </optgroup>
+                                @foreach($templates as $tpl)
+                                    <option value="{{ $tpl->id }}">{{ $tpl->nom }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -608,7 +604,8 @@
             title: 'Association',
             items: [
                 { token: '{association}', label: "Nom de l'association" },
-                { token: '{lien_desinscription}', label: 'Lien de désinscription' },
+                { token: '{lien_optout}', label: 'URL désinscription (pour href)' },
+                { token: '{lien_desinscription}', label: 'Lien désinscription cliquable' },
             ]
         },
     ];
@@ -794,10 +791,23 @@
     }
 
     window.tiersSyncMessageEditor = _tiersMsgSyncEditor;
-    window.tiersSyncAndSaveTemplate = function() { _tiersMsgSyncEditor(); setTimeout(() => { const w = _tiersMsgGetWire(); if (w) w.saveAsTemplate(); }, 150); };
-    window.tiersSyncAndShowTestModal = function() { _tiersMsgSyncEditor(); setTimeout(() => { const w = _tiersMsgGetWire(); if (w) w.set('showTestModal', true); }, 150); };
-    window.tiersSyncAndShowConfirmSend = function() { _tiersMsgSyncEditor(); setTimeout(() => { const w = _tiersMsgGetWire(); if (w) w.set('showConfirmSend', true); }, 150); };
-    window.tiersSyncAndShowPreview = function() { _tiersMsgSyncEditor(); setTimeout(() => { const w = _tiersMsgGetWire(); if (w) w.set('showPreview', true); }, 150); };
+
+    // Sync TinyMCE content into Livewire then trigger action — batched in a single request
+    function _tiersSyncAndDo(action) {
+        const el = document.querySelector('[x-data="tiersCommunicationTinymce()"]');
+        const data = _tiersMsgGetAlpineData(el);
+        const wire = _tiersMsgGetWire();
+        if (!wire) return;
+        if (data && data.getContent) {
+            wire.set('corps', data.getContent());
+        }
+        action(wire);
+    }
+
+    window.tiersSyncAndSaveTemplate = function() { _tiersSyncAndDo(w => w.call('saveAsTemplate')); };
+    window.tiersSyncAndShowTestModal = function() { _tiersSyncAndDo(w => w.set('showTestModal', true)); };
+    window.tiersSyncAndShowConfirmSend = function() { _tiersSyncAndDo(w => w.set('showConfirmSend', true)); };
+    window.tiersSyncAndShowPreview = function() { _tiersSyncAndDo(w => w.set('showPreview', true)); };
 </script>
 @endassets
 
