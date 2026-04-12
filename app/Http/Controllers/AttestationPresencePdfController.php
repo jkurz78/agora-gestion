@@ -82,7 +82,7 @@ final class AttestationPresencePdfController extends Controller
 
     public function recap(Operation $operation, Participant $participant): Response
     {
-        if ($participant->operation_id !== $operation->id) {
+        if ((int) $participant->operation_id !== (int) $operation->id) {
             abort(404);
         }
 
