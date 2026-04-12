@@ -105,6 +105,12 @@
                                    class="form-control @error('email') is-invalid @enderror"
                                    placeholder="contact@exemple.fr">
                             @error('email') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                            <div class="form-check mb-3 mt-2">
+                                <input class="form-check-input" type="checkbox" wire:model="email_optout" id="emailOptout">
+                                <label class="form-check-label small" for="emailOptout">
+                                    Désinscrit des communications <small class="text-muted">(RGPD)</small>
+                                </label>
+                            </div>
                         </div>
 
                         <div class="col-md-6">
