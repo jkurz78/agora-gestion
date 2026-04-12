@@ -240,4 +240,82 @@
 
         </div>
     </div>
+
+    {{-- ── Historique des campagnes ── --}}
+    @if ($campagnes->isNotEmpty())
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header py-2" style="background:#3d5473;color:#fff;font-size:.85rem;font-weight:600;">
+                    <i class="bi bi-clock-history me-1"></i> Historique des campagnes
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                <th>Date</th>
+                                <th>Objet</th>
+                                <th class="text-end">Dest.</th>
+                                <th class="text-end">Erreurs</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($campagnes as $campagne)
+                            <tr>
+                                <td class="text-nowrap">{{ $campagne->created_at->format('d/m/Y H:i') }}</td>
+                                <td>{{ $campagne->objet }}</td>
+                                <td class="text-end">{{ $campagne->nb_destinataires }}</td>
+                                <td class="text-end">
+                                    @if ($campagne->nb_erreurs > 0)
+                                        <span class="badge bg-danger">{{ $campagne->nb_erreurs }}</span>
+                                    @else
+                                        <span class="text-muted">0</span>
+                                    @endif
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary"
+                                            wire:click="reutiliserCampagne({{ $campagne->id }})"
+                                            title="Réutiliser ce modèle">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            wire:click="toggleCampagne({{ $campagne->id }})"
+                                            title="Voir les détails">
+                                        <i class="bi bi-chevron-{{ $expandedCampagneId === $campagne->id ? 'up' : 'down' }}"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            @if ($expandedCampagneId === $campagne->id)
+                            <tr>
+                                <td colspan="5" class="bg-light">
+                                    <div class="p-2">
+                                        <strong>Corps :</strong>
+                                        <div class="border rounded p-2 mt-1 bg-white" style="font-size:.85rem;max-height:200px;overflow:auto;">
+                                            {!! $campagne->corps !!}
+                                        </div>
+                                        @if (is_array($campagne->pieces_jointes) && count($campagne->pieces_jointes))
+                                        <div class="mt-2">
+                                            <strong>Pièces jointes :</strong>
+                                            @foreach ($campagne->pieces_jointes as $idx => $pj)
+                                            <button class="btn btn-sm btn-link p-0 ms-2"
+                                                    wire:click="telechargerPieceJointe({{ $campagne->id }}, {{ $idx }})">
+                                                <i class="bi bi-paperclip"></i> {{ $pj['nom'] }}
+                                            </button>
+                                            @endforeach
+                                        </div>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                            @endif
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
 </div>

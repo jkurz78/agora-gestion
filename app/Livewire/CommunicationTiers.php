@@ -5,19 +5,29 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Mail\CommunicationTiersMail;
 use App\Models\Association;
 use App\Models\CampagneEmail;
+use App\Models\EmailLog;
+use App\Models\MessageTemplate;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 final class CommunicationTiers extends Component
 {
+    use WithFileUploads;
+
     // ── Filters ──────────────────────────────────────────────────────────────
 
     public string $search = '';
@@ -48,11 +58,44 @@ final class CommunicationTiers extends Component
     /** @var array<int> */
     public array $selectedTiersIds = [];
 
-    // ── Composition (stubs — implemented in Task 7) ───────────────────────
+    // ── Composition ──────────────────────────────────────────────────────────
 
     public string $objet = '';
 
     public string $corps = '';
+
+    // Templates
+    public ?int $selectedTemplateId = null;
+
+    public bool $showSaveTemplate = false;
+
+    public string $templateNom = '';
+
+    // Attachments
+    /** @var array<int, TemporaryUploadedFile> */
+    public array $emailAttachments = [];
+
+    // Test email
+    public bool $showTestModal = false;
+
+    public string $testEmail = '';
+
+    // Send
+    public bool $showConfirmSend = false;
+
+    public bool $envoiEnCours = false;
+
+    public int $envoiProgression = 0;
+
+    public int $envoiTotal = 0;
+
+    public string $envoiResultat = '';
+
+    // Preview
+    public bool $showPreview = false;
+
+    // Campaign history
+    public ?int $expandedCampagneId = null;
 
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -218,6 +261,297 @@ final class CommunicationTiers extends Component
         $this->selectedTiersIds = $ids;
     }
 
+    // ── Templates ────────────────────────────────────────────────────────────
+
+    public function loadTemplate(): void
+    {
+        if (! $this->selectedTemplateId) {
+            return;
+        }
+
+        $template = MessageTemplate::find($this->selectedTemplateId);
+        if ($template) {
+            $this->objet = $template->objet;
+            $this->corps = $template->corps;
+            $this->dispatch('template-loaded', corps: $this->corps);
+        }
+    }
+
+    public function saveAsTemplate(): void
+    {
+        $this->validate([
+            'templateNom' => 'required|string|max:100',
+            'objet' => 'required|string|max:255',
+            'corps' => 'required|string',
+        ]);
+
+        MessageTemplate::create([
+            'nom' => $this->templateNom,
+            'objet' => $this->objet,
+            'corps' => $this->corps,
+            'type_operation_id' => null,
+        ]);
+
+        $this->showSaveTemplate = false;
+        $this->templateNom = '';
+
+        session()->flash('message', 'Modèle enregistré.');
+    }
+
+    // ── Attachments ──────────────────────────────────────────────────────────
+
+    public function updatedEmailAttachments(): void
+    {
+        $this->validate([
+            'emailAttachments' => 'array|max:5',
+            'emailAttachments.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx',
+        ]);
+
+        $totalBytes = array_sum(
+            array_map(fn ($f) => $f->getSize(), $this->emailAttachments)
+        );
+
+        if ($totalBytes > 10 * 1024 * 1024) {
+            $this->addError('emailAttachments', 'La taille totale des pièces jointes ne doit pas dépasser 10 Mo.');
+            $this->emailAttachments = [];
+        }
+    }
+
+    public function removeAttachment(int $index): void
+    {
+        unset($this->emailAttachments[$index]);
+        $this->emailAttachments = array_values($this->emailAttachments);
+    }
+
+    // ── Test email ───────────────────────────────────────────────────────────
+
+    public function envoyerTest(): void
+    {
+        $this->validate([
+            'testEmail' => 'required|email',
+            'objet' => 'required|string',
+            'corps' => 'required|string',
+        ]);
+
+        if (empty($this->selectedTiersIds)) {
+            session()->flash('error', 'Aucun tiers sélectionné.');
+
+            return;
+        }
+
+        $assoc = Association::find(1);
+        if (! $assoc?->email_from) {
+            session()->flash('error', "Adresse d'expédition non configurée.");
+
+            return;
+        }
+
+        $tiers = Tiers::find($this->selectedTiersIds[0]);
+        if (! $tiers) {
+            return;
+        }
+
+        $trackingToken = null;
+        $mail = new CommunicationTiersMail(
+            prenom: $tiers->prenom ?? '',
+            nom: $tiers->nom ?? '',
+            email: $tiers->email ?? '',
+            objet: '[Test] '.$this->objet,
+            corps: $this->corps,
+            trackingToken: $trackingToken,
+            attachmentPaths: [],
+        );
+
+        try {
+            Mail::mailer()
+                ->to($this->testEmail)
+                ->send($mail->from($assoc->email_from, $assoc->email_from_name ?? null));
+
+            $this->showTestModal = false;
+            session()->flash('message', "Email de test envoyé à {$this->testEmail}.");
+        } catch (\Throwable $e) {
+            session()->flash('error', "Erreur d'envoi : {$e->getMessage()}");
+        }
+    }
+
+    // ── Send ─────────────────────────────────────────────────────────────────
+
+    public function envoyerMessages(): void
+    {
+        $this->validate([
+            'objet' => 'required|string',
+            'corps' => 'required|string',
+        ]);
+
+        if (empty($this->selectedTiersIds)) {
+            session()->flash('error', 'Aucun tiers sélectionné.');
+
+            return;
+        }
+
+        $assoc = Association::find(1);
+        if (! $assoc?->email_from) {
+            session()->flash('error', "Adresse d'expédition non configurée.");
+
+            return;
+        }
+
+        $tiersList = Tiers::whereIn('id', $this->selectedTiersIds)->get();
+
+        $this->envoiEnCours = true;
+        $this->envoiTotal = $tiersList->count();
+        $this->envoiProgression = 0;
+        $this->envoiResultat = '';
+        $this->showConfirmSend = false;
+
+        // Persist attachments to permanent storage
+        $piecesJointes = [];
+        foreach ($this->emailAttachments as $file) {
+            $nom = $file->getClientOriginalName();
+            $taille = $file->getSize();
+            $uniqueName = time().'_'.$nom;
+            $path = $file->storeAs('campagnes-email', $uniqueName, 'local');
+            $piecesJointes[] = [
+                'nom' => $nom,
+                'path' => $path,
+                'taille' => $taille,
+            ];
+        }
+
+        $campagne = CampagneEmail::create([
+            'operation_id' => null,
+            'objet' => $this->objet,
+            'corps' => $this->corps,
+            'pieces_jointes' => $piecesJointes ?: null,
+            'nb_destinataires' => $this->envoiTotal,
+            'nb_erreurs' => 0,
+            'envoye_par' => Auth::id(),
+        ]);
+
+        $sent = 0;
+        $errors = 0;
+
+        foreach ($tiersList as $tiers) {
+            $email = $tiers->getRawOriginal('email');
+
+            if (! $email) {
+                $this->envoiProgression++;
+
+                continue;
+            }
+
+            try {
+                $trackingToken = Str::random(32);
+                $permanentPaths = array_map(
+                    fn (array $pj) => ['path' => Storage::disk('local')->path($pj['path']), 'nom' => $pj['nom']],
+                    $piecesJointes
+                );
+
+                $mail = new CommunicationTiersMail(
+                    prenom: $tiers->prenom ?? '',
+                    nom: $tiers->nom ?? '',
+                    email: $email,
+                    objet: $this->objet,
+                    corps: $this->corps,
+                    trackingToken: $trackingToken,
+                    attachmentPaths: $permanentPaths,
+                );
+
+                Mail::mailer()
+                    ->to($email)
+                    ->send($mail->from($assoc->email_from, $assoc->email_from_name ?? null));
+
+                EmailLog::create([
+                    'tiers_id' => (int) $tiers->id,
+                    'participant_id' => null,
+                    'operation_id' => null,
+                    'categorie' => 'communication',
+                    'destinataire_email' => $email,
+                    'destinataire_nom' => $tiers->displayName(),
+                    'objet' => $this->objet,
+                    'objet_rendu' => $mail->envelope()->subject,
+                    'corps_html' => $mail->corpsHtml,
+                    'statut' => 'envoye',
+                    'tracking_token' => $trackingToken,
+                    'envoye_par' => Auth::id(),
+                    'campagne_id' => $campagne->id,
+                ]);
+                $sent++;
+            } catch (\Throwable $e) {
+                EmailLog::create([
+                    'tiers_id' => (int) $tiers->id,
+                    'participant_id' => null,
+                    'operation_id' => null,
+                    'categorie' => 'communication',
+                    'destinataire_email' => $email ?? '',
+                    'destinataire_nom' => $tiers->displayName(),
+                    'objet' => $this->objet,
+                    'statut' => 'erreur',
+                    'erreur_message' => $e->getMessage(),
+                    'envoye_par' => Auth::id(),
+                    'campagne_id' => $campagne->id,
+                ]);
+                $errors++;
+            }
+
+            $this->envoiProgression++;
+            usleep(500_000);
+        }
+
+        $campagne->update([
+            'nb_destinataires' => $sent + $errors,
+            'nb_erreurs' => $errors,
+        ]);
+
+        $this->emailAttachments = [];
+        $this->envoiEnCours = false;
+        $this->envoiResultat = "{$sent} email(s) envoyé(s)".($errors > 0 ? ", {$errors} erreur(s)" : '');
+
+        $this->objet = '';
+        $this->corps = '';
+        $this->selectedTemplateId = null;
+        $this->dispatch('template-loaded', corps: '');
+    }
+
+    // ── Campaign history ──────────────────────────────────────────────────────
+
+    public function toggleCampagne(int $id): void
+    {
+        $this->expandedCampagneId = $this->expandedCampagneId === $id ? null : $id;
+    }
+
+    public function reutiliserCampagne(int $id): void
+    {
+        $campagne = CampagneEmail::find($id);
+        if (! $campagne) {
+            return;
+        }
+
+        $this->objet = $campagne->objet;
+        $this->corps = $campagne->corps;
+        $this->selectedTemplateId = null;
+        $this->dispatch('template-loaded', corps: $this->corps);
+    }
+
+    public function telechargerPieceJointe(int $campagneId, int $index): mixed
+    {
+        $campagne = CampagneEmail::find($campagneId);
+        if (! $campagne || ! is_array($campagne->pieces_jointes)) {
+            return null;
+        }
+
+        $pj = $campagne->pieces_jointes[$index] ?? null;
+        if (! $pj || ! Storage::disk('local')->exists($pj['path'])) {
+            session()->flash('error', 'Fichier introuvable.');
+
+            return null;
+        }
+
+        return Storage::disk('local')->download($pj['path'], $pj['nom']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     public function render(): View
     {
         $tiersList = $this->buildQuery()
@@ -238,12 +572,18 @@ final class CommunicationTiers extends Component
             ->orderByDesc('created_at')
             ->get();
 
+        $templates = MessageTemplate::with('typeOperation')
+            ->orderBy('nom')
+            ->get()
+            ->groupBy(fn (MessageTemplate $t) => $t->typeOperation?->nom ?? 'Modèles généraux');
+
         return view('livewire.communication-tiers', compact(
             'tiersList',
             'emailCount',
             'emailFrom',
             'typesOperation',
             'campagnes',
+            'templates',
         ));
     }
 }
