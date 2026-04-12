@@ -413,7 +413,7 @@ final class TypeOperationShow extends Component
     public function loadEmailTemplates(?int $typeOperationId): void
     {
         foreach (CategorieEmail::cases() as $cat) {
-            if ($cat === CategorieEmail::Message) {
+            if ($cat === CategorieEmail::Message || $cat === CategorieEmail::Communication) {
                 continue;
             }
             $custom = $typeOperationId !== null
