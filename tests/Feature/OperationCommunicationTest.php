@@ -475,8 +475,9 @@ it('shows message email logs in participant timeline', function () {
 
 it('seeds default message templates', function () {
     $this->seed(MessageTemplateSeeder::class);
-    expect(MessageTemplate::count())->toBeGreaterThanOrEqual(3);
-    expect(MessageTemplate::where('nom', 'Rappel séance J-2')->exists())->toBeTrue();
+    expect(MessageTemplate::count())->toBeGreaterThanOrEqual(6);
+    expect(MessageTemplate::where('nom', 'Rappel prochaine séance')->exists())->toBeTrue();
+    expect(MessageTemplate::where('nom', 'Confirmation d\'inscription')->exists())->toBeTrue();
 });
 
 it('does not duplicate templates when seeded twice', function () {

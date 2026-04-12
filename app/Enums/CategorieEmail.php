@@ -36,6 +36,7 @@ enum CategorieEmail: string
             '{nom}' => 'Nom du participant',
             '{operation}' => 'Nom de l\'opération',
             '{type_operation}' => 'Nom du type d\'opération',
+            '{association}' => 'Nom de l\'association',
             '{date_debut}' => 'Date début opération',
             '{date_fin}' => 'Date fin opération',
             '{nb_seances}' => 'Nombre de séances',

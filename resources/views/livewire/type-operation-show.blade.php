@@ -401,15 +401,18 @@ x-on:click.window="
                                             'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom'],
                                             'Opération' => ['{operation}' => 'Opération', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
                                             'Formulaire' => ['{url}' => 'URL', '{code}' => 'Code', '{date_expiration}' => 'Date expiration'],
+                                            'Association' => ['{association}' => 'Nom'],
                                         ],
                                         'attestation' => [
                                             'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom'],
                                             'Opération' => ['{operation}' => 'Opération', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
                                             'Séance' => ['{numero_seance}' => 'N° séance', '{date_seance}' => 'Date séance'],
+                                            'Association' => ['{association}' => 'Nom'],
                                         ],
                                         'document' => [
                                             'Destinataire' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom'],
                                             'Document' => ['{type_document}' => 'Type', '{type_document_uc}' => 'Type (maj.)', '{type_document_article}' => 'Avec article', '{numero_document}' => 'Numéro', '{date_document}' => 'Date', '{montant_total}' => 'Montant'],
+                                            'Association' => ['{association}' => 'Nom'],
                                         ],
                                         default => [],
                                     };
@@ -634,17 +637,20 @@ x-on:click.window="
                     const varGroups = {
                         'formulaire': {
                             'Participant': {'{prenom}': 'Prénom', '{nom}': 'Nom'},
-                            'Opération': {'{operation}': 'Opération', '{type_operation}': 'Type', '{date_debut}': 'Date début', '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances'},
+                            'Opération': {'{operation}': 'Opération', '{type_operation}': 'Type', '{logo_operation}': 'Logo opération', '{date_debut}': 'Date début', '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances'},
                             'Formulaire': {'{url}': 'URL', '{code}': 'Code', '{date_expiration}': 'Date expiration'},
+                            'Association': {'{association}': 'Nom', '{logo}': 'Logo'},
                         },
                         'attestation': {
                             'Participant': {'{prenom}': 'Prénom', '{nom}': 'Nom'},
-                            'Opération': {'{operation}': 'Opération', '{type_operation}': 'Type', '{date_debut}': 'Date début', '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances'},
+                            'Opération': {'{operation}': 'Opération', '{type_operation}': 'Type', '{logo_operation}': 'Logo opération', '{date_debut}': 'Date début', '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances'},
                             'Séance': {'{numero_seance}': 'N° séance', '{date_seance}': 'Date séance'},
+                            'Association': {'{association}': 'Nom', '{logo}': 'Logo'},
                         },
                         'document': {
                             'Destinataire': {'{prenom}': 'Prénom', '{nom}': 'Nom'},
                             'Document': {'{type_document}': 'Type', '{type_document_uc}': 'Type (maj.)', '{type_document_article}': 'Avec article', '{numero_document}': 'Numéro', '{date_document}': 'Date', '{montant_total}': 'Montant'},
+                            'Association': {'{association}': 'Nom', '{logo}': 'Logo'},
                         },
                     };
 
