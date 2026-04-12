@@ -29,6 +29,7 @@ final class TiersFactory extends Factory
             'pour_depenses' => fake()->boolean(60),
             'pour_recettes' => fake()->boolean(40),
             'est_helloasso' => false,
+            'email_optout' => false,
         ];
     }
 
