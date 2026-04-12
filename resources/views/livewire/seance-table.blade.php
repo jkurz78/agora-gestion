@@ -153,7 +153,7 @@
                                 <td style="padding:0;vertical-align:middle;border-bottom:none">
                                     <div class="d-flex" style="min-height:28px">
                                         <div style="flex:1;padding:2px 4px">
-                                            @php $statutLocked = ! $this->canEdit || $seance->feuille_signee_path !== null; @endphp
+                                            @php $statutLocked = ! $this->canEdit || ($seance->feuille_signee_path !== null && $statut !== ''); @endphp
                                             <select class="form-select form-select-sm border-0"
                                                     style="font-size:12px;padding:1px 2px;background-color:transparent"
                                                     @if($statutLocked) disabled @endif
