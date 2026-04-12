@@ -79,7 +79,7 @@ $activeGroup = match(true) {
     request()->routeIs('compta.banques.rapprochement.*', 'compta.banques.virements.*', 'compta.banques.helloasso-sync',
         'compta.banques.comptes.*', 'compta.banques.remises*') => 'banques',
     request()->routeIs('compta.tiers.*', 'gestion.adherents', 'compta.dons.*', 'compta.cotisations.*') => 'tiers',
-    request()->routeIs('gestion.operations*', 'compta.parametres.type-operations.*', 'gestion.analyse*') => 'operations',
+    request()->routeIs('gestion.operations*', 'types-operation.*', 'gestion.analyse*') => 'operations',
     request()->routeIs('compta.factures*', 'gestion.factures*', '*.documents-en-attente*') => 'facturation',
     request()->routeIs('compta.rapports.*') => 'rapports',
     request()->routeIs('compta.exercices.*') => 'exercices',
@@ -296,14 +296,12 @@ $activeGroup = match(true) {
                                 </a>
                             </li>
 
-                            @if (Route::has('compta.parametres.type-operations.index'))
                             <li class="nav-item">
-                                <a href="{{ route('compta.parametres.type-operations.index') }}"
-                                   class="nav-link {{ request()->routeIs('compta.parametres.type-operations.*') ? 'active' : '' }}">
+                                <a href="{{ route('types-operation.index') }}"
+                                   class="nav-link {{ request()->routeIs('types-operation.*') ? 'active' : '' }}">
                                     <i class="bi bi-collection me-1"></i> Types d'opération
                                 </a>
                             </li>
-                            @endif
 
                             <li class="nav-item">
                                 <a href="{{ route('gestion.analyse') }}"

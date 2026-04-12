@@ -9,32 +9,23 @@ use App\Mail\TestEmail;
 use App\Models\EmailTemplate;
 use App\Models\SousCategorie;
 use App\Models\TypeOperation;
+use App\Models\TypeOperationSeance;
 use App\Models\TypeOperationTarif;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
-use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
-final class TypeOperationManager extends Component
+final class TypeOperationShow extends Component
 {
     use WithFileUploads;
 
-    // ── Display mode ──────────────────────────────────────────────
-    public bool $modalOnly = false;
+    public ?int $typeOperationId = null;
 
-    // ── Modal state ──────────────────────────────────────────────
-    public bool $showModal = false;
-
-    public ?int $editingId = null;
-
-    // ── Tab state ──────────────────────────────────────────────
-    public int $activeTab = 1;
-
-    public int $maxVisitedTab = 1;
+    public string $activeTab = 'general';
 
     // ── Form fields ──────────────────────────────────────────────
     public string $nom = '';
@@ -73,7 +64,7 @@ final class TypeOperationManager extends Component
 
     public string $existingAttestationPath = '';
 
-    // ── Email fields ──────────────────────────────────────────────
+    // ── Email fields ─────────────────────────────────────────────
     public string $email_from = '';
 
     public string $email_from_name = '';
@@ -98,88 +89,121 @@ final class TypeOperationManager extends Component
 
     public string $newTarifMontant = '';
 
-    // ── Filter ───────────────────────────────────────────────────
-    public string $filter = 'tous';
+    /** @var array<int, int> */
+    public array $tarifsToDelete = [];
+
+    // ── Seance titles ───────────────────────────────────────────
+    /** @var array<int, array{numero: int, titre: string}> */
+    public array $seanceTitres = [];
+
+    // ── Operations count (for delete protection) ──────────────
+    public int $operationsCount = 0;
 
     // ── Flash message ───────────────────────────────────────────
     public string $flashMessage = '';
 
     public string $flashType = '';
 
-    // ── Tarifs flagged for deletion ──────────────────────────────
-    /** @var array<int, int> */
-    public array $tarifsToDelete = [];
-
-    public function render(): View
+    public function mount(?TypeOperation $typeOperation = null): void
     {
-        $query = TypeOperation::with(['sousCategorie', 'tarifs'])
-            ->withCount('operations');
-
-        if ($this->filter === 'actif') {
-            $query->where('actif', true);
-        } elseif ($this->filter === 'inactif') {
-            $query->where('actif', false);
+        if ($typeOperation !== null && $typeOperation->exists) {
+            $this->typeOperationId = $typeOperation->id;
+            $this->loadFromModel($typeOperation);
+        } else {
+            $this->loadEmailTemplates(null);
         }
-
-        $types = $query->orderBy('nom')->get();
-
-        $sousCategories = SousCategorie::where('pour_inscriptions', true)
-            ->with('categorie')
-            ->orderBy('nom')
-            ->get();
-
-        return view('livewire.type-operation-manager', [
-            'types' => $types,
-            'sousCategories' => $sousCategories,
-        ]);
     }
 
-    // ── Modal actions ────────────────────────────────────────────
-
-    #[On('openTypeOperationModal')]
-    public function openCreate(): void
+    private function loadFromModel(TypeOperation $type): void
     {
-        $this->resetForm();
-        $this->showModal = true;
-        $this->loadEmailTemplates(null);
-    }
+        $type->loadMissing(['tarifs', 'seanceDefaults']);
+        $this->operationsCount = $type->operations()->count();
 
-    public function openEdit(int $id): void
-    {
-        $type = TypeOperation::with('tarifs')->findOrFail($id);
-
-        $this->editingId = $type->id;
         $this->nom = $type->nom;
         $this->libelle_article = $type->libelle_article ?? '';
         $this->description = $type->description ?? '';
         $this->sous_categorie_id = (string) $type->sous_categorie_id;
         $this->nombre_seances = $type->nombre_seances !== null ? (string) $type->nombre_seances : '';
-        $this->formulaireActif = $type->formulaire_actif;
-        $this->formulairePrescripteur = $type->formulaire_prescripteur;
-        $this->formulaireParcoursTherapeutique = $type->formulaire_parcours_therapeutique;
-        $this->formulaireDroitImage = $type->formulaire_droit_image;
+        $this->formulaireActif = (bool) $type->formulaire_actif;
+        $this->formulairePrescripteur = (bool) $type->formulaire_prescripteur;
+        $this->formulaireParcoursTherapeutique = (bool) $type->formulaire_parcours_therapeutique;
+        $this->formulaireDroitImage = (bool) $type->formulaire_droit_image;
         $this->formulairePrescripteurTitre = $type->formulaire_prescripteur_titre ?? '';
         $this->formulaireQualificatifAtelier = $type->formulaire_qualificatif_atelier ?? '';
-        $this->reserve_adherents = $type->reserve_adherents;
-        $this->actif = $type->actif;
+        $this->reserve_adherents = (bool) $type->reserve_adherents;
+        $this->actif = (bool) $type->actif;
         $this->logo = null;
         $this->existingLogoPath = $type->logo_path ?? '';
         $this->attestationMedicale = null;
         $this->existingAttestationPath = $type->attestation_medicale_path ?? '';
         $this->email_from = $type->email_from ?? '';
         $this->email_from_name = $type->email_from_name ?? '';
-        $this->loadEmailTemplates($type->id);
-        $this->testEmailTo = '';
         $this->tarifs = $type->tarifs->map(fn (TypeOperationTarif $t) => [
             'id' => $t->id,
             'libelle' => $t->libelle,
             'montant' => (string) $t->montant,
         ])->toArray();
         $this->tarifsToDelete = [];
-
-        $this->showModal = true;
-        $this->maxVisitedTab = 4;
+        $this->loadEmailTemplates($type->id);
+        $this->loadSeanceTitres($type);
     }
+
+    private function loadSeanceTitres(TypeOperation $type): void
+    {
+        $nombreSeances = $type->nombre_seances ?? 0;
+        $defaults = $type->seanceDefaults->keyBy('numero');
+        $this->seanceTitres = [];
+
+        for ($i = 1; $i <= $nombreSeances; $i++) {
+            $this->seanceTitres[] = [
+                'numero' => $i,
+                'titre' => $defaults[$i]->titre ?? '',
+            ];
+        }
+    }
+
+    public function setTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+    }
+
+    public function updatedNombreSeances(): void
+    {
+        $this->syncSeanceTitresCount();
+    }
+
+    public function incrementSeances(): void
+    {
+        $current = $this->nombre_seances !== '' ? (int) $this->nombre_seances : 0;
+        $this->nombre_seances = (string) ($current + 1);
+        $this->syncSeanceTitresCount();
+    }
+
+    public function decrementSeances(): void
+    {
+        $current = $this->nombre_seances !== '' ? (int) $this->nombre_seances : 0;
+        if ($current <= 0) {
+            return;
+        }
+        $this->nombre_seances = $current === 1 ? '' : (string) ($current - 1);
+        $this->syncSeanceTitresCount();
+    }
+
+    private function syncSeanceTitresCount(): void
+    {
+        $count = $this->nombre_seances !== '' ? (int) $this->nombre_seances : 0;
+        $current = count($this->seanceTitres);
+
+        if ($count > $current) {
+            for ($i = $current + 1; $i <= $count; $i++) {
+                $this->seanceTitres[] = ['numero' => $i, 'titre' => ''];
+            }
+        } elseif ($count < $current) {
+            $this->seanceTitres = array_slice($this->seanceTitres, 0, $count);
+        }
+    }
+
+    // ── Save ─────────────────────────────────────────────────────
 
     /**
      * Called from JS — receives TinyMCE content before saving.
@@ -199,7 +223,7 @@ final class TypeOperationManager extends Component
     public function save(): void
     {
         $rules = [
-            'nom' => 'required|string|max:150|unique:type_operations,nom'.($this->editingId ? ','.$this->editingId : ''),
+            'nom' => 'required|string|max:150|unique:type_operations,nom'.($this->typeOperationId ? ','.$this->typeOperationId : ''),
             'description' => 'nullable|string|max:1000',
             'sous_categorie_id' => 'required|exists:sous_categories,id',
             'nombre_seances' => 'nullable|integer|min:1',
@@ -250,15 +274,13 @@ final class TypeOperationManager extends Component
                 $data['attestation_medicale_path'] = $attestationPath;
             }
 
-            if ($this->editingId) {
-                $type = TypeOperation::findOrFail($this->editingId);
+            if ($this->typeOperationId) {
+                $type = TypeOperation::findOrFail($this->typeOperationId);
 
-                // Delete old logo if a new one is uploaded
                 if ($logoPath !== null && $type->logo_path) {
                     Storage::disk('public')->delete($type->logo_path);
                 }
 
-                // Delete old attestation if a new one is uploaded
                 if ($attestationPath !== null && $type->attestation_medicale_path) {
                     Storage::disk('public')->delete($type->attestation_medicale_path);
                 }
@@ -266,26 +288,32 @@ final class TypeOperationManager extends Component
                 $type->update($data);
             } else {
                 $type = TypeOperation::create($data);
+                $this->typeOperationId = $type->id;
             }
 
-            // ── Sync tarifs ──────────────────────────────────────
             $this->syncTarifs($type);
-
-            // ── Sync email templates ────────────────────────────
+            $this->syncSeanceTitres($type);
             $this->syncEmailTemplates($type);
 
             return $type;
         });
 
-        $this->showModal = false;
-        $this->resetForm();
+        $this->flashMessage = 'Type d\'opération enregistré.';
+        $this->flashType = 'success';
 
-        $this->dispatch('typeOperationCreated', id: $type->id);
+        // After creation, redirect to show page (only for new types)
+        if ($type->wasRecentlyCreated) {
+            $this->redirect(route('types-operation.show', $type), navigate: true);
+        }
     }
 
-    public function delete(int $id): void
+    public function delete(): void
     {
-        $type = TypeOperation::withCount('operations')->findOrFail($id);
+        if ($this->typeOperationId === null) {
+            return;
+        }
+
+        $type = TypeOperation::withCount('operations')->findOrFail($this->typeOperationId);
 
         if ($type->operations_count > 0) {
             $this->flashMessage = 'Impossible de supprimer : des opérations utilisent ce type.';
@@ -294,47 +322,13 @@ final class TypeOperationManager extends Component
             return;
         }
 
-        // Delete logo file if exists
         if ($type->logo_path) {
             Storage::disk('public')->delete($type->logo_path);
         }
 
         $type->delete();
-    }
 
-    // ── Tab navigation ───────────────────────────────────────────
-
-    public function goToTab(int $tab): void
-    {
-        if ($tab > $this->maxVisitedTab && $this->editingId === null) {
-            return;
-        }
-        $this->activeTab = $tab;
-    }
-
-    public function nextTab(): void
-    {
-        // Validate current tab before advancing (creation mode only)
-        if ($this->editingId === null && $this->activeTab === 1) {
-            $this->validate([
-                'nom' => 'required|string|max:150|unique:type_operations,nom',
-                'sous_categorie_id' => 'required|exists:sous_categories,id',
-            ]);
-        }
-
-        if ($this->activeTab < 4) {
-            $this->activeTab++;
-            if ($this->activeTab > $this->maxVisitedTab) {
-                $this->maxVisitedTab = $this->activeTab;
-            }
-        }
-    }
-
-    public function previousTab(): void
-    {
-        if ($this->activeTab > 1) {
-            $this->activeTab--;
-        }
+        $this->redirect(route('types-operation.index'), navigate: true);
     }
 
     // ── Tarifs ───────────────────────────────────────────────────
@@ -370,7 +364,6 @@ final class TypeOperationManager extends Component
 
         $tarif = $this->tarifs[$index];
 
-        // Track existing tarifs for deletion on save
         if ($tarif['id'] !== null) {
             $this->tarifsToDelete[] = $tarif['id'];
         }
@@ -496,7 +489,6 @@ final class TypeOperationManager extends Component
         $objet = $this->emailTemplates[$categorie]['objet'];
         $corps = $this->emailTemplates[$categorie]['corps'];
 
-        // Update or create the default template
         if ($default) {
             $default->update(['objet' => $objet, 'corps' => $corps]);
         } else {
@@ -508,12 +500,10 @@ final class TypeOperationManager extends Component
             ]);
         }
 
-        // Delete the custom template (it's now the default)
         if ($this->emailTemplates[$categorie]['id'] !== null) {
             EmailTemplate::where('id', $this->emailTemplates[$categorie]['id'])->delete();
         }
 
-        // Switch view to default mode
         $this->emailTemplates[$categorie] = [
             'id' => $default->id,
             'objet' => $default->objet,
@@ -528,7 +518,6 @@ final class TypeOperationManager extends Component
 
     private function syncTarifs(TypeOperation $type): void
     {
-        // Delete tarifs flagged for removal (only if no participants use them)
         foreach ($this->tarifsToDelete as $tarifId) {
             $tarif = TypeOperationTarif::find($tarifId);
             if ($tarif === null) {
@@ -536,7 +525,6 @@ final class TypeOperationManager extends Component
             }
 
             if ($tarif->participants()->exists()) {
-                // Re-add to the visible tarifs array so the UI stays consistent
                 $this->tarifs[] = [
                     'id' => $tarif->id,
                     'libelle' => $tarif->libelle,
@@ -551,16 +539,13 @@ final class TypeOperationManager extends Component
             $tarif->delete();
         }
 
-        // Update existing tarifs and create new ones
         foreach ($this->tarifs as $tarifData) {
             if ($tarifData['id'] !== null) {
-                // Update existing
                 TypeOperationTarif::where('id', $tarifData['id'])->update([
                     'libelle' => $tarifData['libelle'],
                     'montant' => (float) str_replace(',', '.', $tarifData['montant']),
                 ]);
             } else {
-                // Create new
                 TypeOperationTarif::create([
                     'type_operation_id' => $type->id,
                     'libelle' => $tarifData['libelle'],
@@ -568,6 +553,37 @@ final class TypeOperationManager extends Component
                 ]);
             }
         }
+    }
+
+    private function syncSeanceTitres(TypeOperation $type): void
+    {
+        $existingIds = TypeOperationSeance::where('type_operation_id', $type->id)
+            ->pluck('id', 'numero');
+
+        $seenNumeros = [];
+
+        foreach ($this->seanceTitres as $item) {
+            $numero = $item['numero'];
+            $titre = $item['titre'] !== '' ? $item['titre'] : null;
+            $seenNumeros[] = $numero;
+
+            if ($existingIds->has($numero)) {
+                TypeOperationSeance::where('id', $existingIds[$numero])->update([
+                    'titre' => $titre,
+                ]);
+            } else {
+                TypeOperationSeance::create([
+                    'type_operation_id' => $type->id,
+                    'numero' => $numero,
+                    'titre' => $titre,
+                ]);
+            }
+        }
+
+        // Delete rows no longer needed
+        TypeOperationSeance::where('type_operation_id', $type->id)
+            ->whereNotIn('numero', $seenNumeros)
+            ->delete();
     }
 
     private function syncEmailTemplates(TypeOperation $type): void
@@ -587,38 +603,15 @@ final class TypeOperationManager extends Component
         }
     }
 
-    private function resetForm(): void
+    public function render(): View
     {
-        $this->editingId = null;
-        $this->activeTab = 1;
-        $this->maxVisitedTab = 1;
-        $this->nom = '';
-        $this->libelle_article = '';
-        $this->description = '';
-        $this->sous_categorie_id = '';
-        $this->nombre_seances = '';
-        $this->formulaireActif = false;
-        $this->formulairePrescripteur = false;
-        $this->formulaireParcoursTherapeutique = false;
-        $this->formulaireDroitImage = false;
-        $this->formulairePrescripteurTitre = '';
-        $this->formulaireQualificatifAtelier = '';
-        $this->reserve_adherents = false;
-        $this->actif = true;
-        $this->logo = null;
-        $this->existingLogoPath = '';
-        $this->attestationMedicale = null;
-        $this->existingAttestationPath = '';
-        $this->email_from = '';
-        $this->email_from_name = '';
-        $this->testEmailTo = '';
-        $this->showTestEmailModal = false;
-        $this->emailSubTab = 'formulaire';
-        $this->emailTemplates = [];
-        $this->tarifs = [];
-        $this->newTarifLibelle = '';
-        $this->newTarifMontant = '';
-        $this->tarifsToDelete = [];
-        $this->resetValidation();
+        $sousCategories = SousCategorie::where('pour_inscriptions', true)
+            ->with('categorie')
+            ->orderBy('nom')
+            ->get();
+
+        return view('livewire.type-operation-show', [
+            'sousCategories' => $sousCategories,
+        ]);
     }
 }

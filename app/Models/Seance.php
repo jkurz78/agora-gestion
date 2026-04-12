@@ -31,6 +31,19 @@ final class Seance extends Model
         ];
     }
 
+    /**
+     * Titre affiché : titre propre, sinon fallback depuis TypeOperationSeance, sinon null.
+     */
+    public function getTitreAfficheAttribute(): ?string
+    {
+        if ($this->titre !== null && $this->titre !== '') {
+            return $this->titre;
+        }
+
+        return $this->operation?->typeOperation?->seanceDefaults
+            ?->firstWhere('numero', $this->numero)?->titre;
+    }
+
     public function hasSignedSheet(): bool
     {
         return $this->feuille_signee_path !== null;

@@ -38,6 +38,8 @@ final class SeanceTable extends Component
         $nombreSeances = $this->operation->nombre_seances ?? 0;
 
         if ($existingCount === 0 && $nombreSeances > 0) {
+            $defaults = $this->operation->typeOperation?->seanceDefaults?->keyBy('numero') ?? collect();
+
             for ($i = 1; $i <= $nombreSeances; $i++) {
                 $date = null;
                 if ($i === 1 && $this->operation->date_debut) {
@@ -50,6 +52,7 @@ final class SeanceTable extends Component
                     'operation_id' => $this->operation->id,
                     'numero' => $i,
                     'date' => $date,
+                    'titre' => $defaults[$i]->titre ?? null,
                 ]);
             }
         }

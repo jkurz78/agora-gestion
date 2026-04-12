@@ -433,14 +433,12 @@
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has($espacePrefix . '.parametres.type-operations.index'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs($espacePrefix . '.parametres.type-operations.*') ? 'active' : '' }}"
-                                   href="{{ route($espacePrefix . '.parametres.type-operations.index') }}">
+                                <a class="dropdown-item {{ request()->routeIs('types-operation.*') ? 'active' : '' }}"
+                                   href="{{ route('types-operation.index') }}">
                                     <i class="bi bi-collection"></i> Types d'opération
                                 </a>
                             </li>
-                            @endif
                             @if(($espace ?? null) === \App\Enums\Espace::Compta)
                             @if (Route::has('compta.operations.index'))
                             <li>

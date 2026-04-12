@@ -54,6 +54,6 @@ final class EmailLogo
         $mime = Storage::disk($disk)->mimeType($path) ?: 'image/png';
         $base64 = base64_encode($content);
 
-        return '<img src="data:'.$mime.';base64,'.$base64.'" alt="'.htmlspecialchars($alt).'" style="max-height:80px;max-width:200px;">';
+        return '<img src="data:'.$mime.';base64,'.$base64.'" alt="'.htmlspecialchars($alt).'" style="max-height:80px;max-width:200px;width:auto;height:auto;">';
     }
 }

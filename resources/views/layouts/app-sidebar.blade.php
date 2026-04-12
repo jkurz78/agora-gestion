@@ -115,7 +115,7 @@
                         request()->routeIs('compta.banques.rapprochement.*', 'compta.banques.virements.*', 'compta.banques.helloasso-sync',
                             'compta.banques.comptes.*', 'compta.banques.remises*') => 'Banques',
                         request()->routeIs('compta.tiers.*', 'gestion.adherents', 'compta.dons.*', 'compta.cotisations.*') => 'Tiers',
-                        request()->routeIs('gestion.operations*', 'compta.parametres.type-operations.*', 'gestion.analyse*') => 'Opérations',
+                        request()->routeIs('gestion.operations*', 'types-operation.*', 'gestion.analyse*') => 'Opérations',
                         request()->routeIs('compta.factures*', 'gestion.factures*', '*.documents-en-attente*') => 'Facturation',
                         request()->routeIs('compta.rapports.*') => 'Rapports',
                         request()->routeIs('compta.exercices.*') => 'Exercices',

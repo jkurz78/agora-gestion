@@ -108,7 +108,7 @@
                     <td style="width:40%">
                         <div class="doc-title">{{ $operation->nom }}</div>
                         <div class="doc-subtitle">
-                            Séance {{ $seance->numero }}{{ $seance->titre ? ' — '.$seance->titre : '' }}<br>
+                            Séance {{ $seance->numero }}{{ $seance->titre_affiche ? ' — '.$seance->titre_affiche : '' }}<br>
                             {{ $seance->date?->format('d/m/Y') ?? 'Date non définie' }}
                         </div>
                     </td>
@@ -120,7 +120,7 @@
             <div class="attestation-body">
                 L'association <strong>{{ $association?->nom ?? '' }}</strong> atteste que
                 <strong>{{ $p->tiers->prenom ?? '' }} {{ $p->tiers->nom ?? '' }}</strong>,
-                a participé à la séance n°{{ $seance->numero }}@if($seance->titre), « {{ $seance->titre }} »@endif
+                a participé à la séance n°{{ $seance->numero }}@if($seance->titre_affiche), « {{ $seance->titre_affiche }} »@endif
                 du {{ $seance->date ? $seance->date->translatedFormat('j F Y') : 'date non définie' }}
                 dans le cadre {{ $operation->typeOperation?->libelle_article ? \App\Helpers\ArticleFr::de($operation->typeOperation->libelle_article) : 'de l\'opération' }} « <strong>{{ $operation->nom }}</strong> ».
             </div>

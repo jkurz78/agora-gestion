@@ -38,7 +38,7 @@
                         @foreach ($seances as $seance)
                             <option value="{{ $seance->id }}">
                                 S{{ $seance->numero }}
-                                @if ($seance->titre) — {{ $seance->titre }} @endif
+                                @if ($seance->titre_affiche) — {{ $seance->titre_affiche }} @endif
                             </option>
                         @endforeach
                     </select>

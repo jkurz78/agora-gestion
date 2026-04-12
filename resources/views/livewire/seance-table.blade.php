@@ -69,7 +69,7 @@
                         @foreach($seances as $seance)
                             <td style="background:#f8f9fa;text-align:center">
                                 <input type="text" value="{{ $seance->titre }}"
-                                       placeholder="Titre..."
+                                       placeholder="{{ $seance->titre_affiche ?? 'Titre...' }}"
                                        class="form-control form-control-sm border-0 bg-transparent text-center"
                                        style="font-size:12px;padding:2px 4px"
                                        {{ $this->canEdit ? '' : 'readonly' }}
