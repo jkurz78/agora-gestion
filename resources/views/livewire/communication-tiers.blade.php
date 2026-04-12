@@ -403,7 +403,7 @@
                     <div class="d-flex gap-2 justify-content-end">
                         <button type="button" class="btn btn-sm btn-outline-secondary"
                                 onclick="window.tiersSyncAndShowPreview()"
-                                {{ $objet === '' && $corps === '' ? 'disabled' : '' }}>
+                                {{ $objet === '' ? 'disabled' : '' }}>
                             <i class="bi bi-eye me-1"></i>Aperçu
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-primary"
@@ -680,7 +680,7 @@
                     plugins: 'lists link noneditable table image media code fullscreen',
                     toolbar: [
                         'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough forecolor backcolor',
-                        'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link | variablesButton | code fullscreen',
+                        'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link | variablesButton insertElementButton | code fullscreen',
                     ],
                     noneditable_class: 'mce-variable',
                     block_formats: 'Paragraphe=p; Titre 1=h1; Titre 2=h2; Titre 3=h3; Titre 4=h4',
@@ -724,6 +724,19 @@
                         editor.ui.registry.addMenuButton('variablesButton', {
                             text: 'Variables',
                             fetch: function(callback) { callback(menuItems); },
+                        });
+
+                        // "Insérer" button — logo, lien opt-out
+                        editor.ui.registry.addMenuButton('insertElementButton', {
+                            text: 'Insérer',
+                            icon: 'table-insert-row-after',
+                            fetch: function(callback) {
+                                callback([
+                                    { type: 'menuitem', text: 'Logo association', onAction: function() { _tiersInsertElement(editor, 'logo'); } },
+                                    { type: 'separator' },
+                                    { type: 'menuitem', text: 'Bloc lien de désinscription', onAction: function() { _tiersInsertElement(editor, 'lien_optout'); } },
+                                ]);
+                            },
                         });
 
                         editor.on('init', function() {
@@ -788,6 +801,24 @@
         if (data && data.getContent && wire) {
             wire.set('corps', data.getContent());
         }
+    }
+
+    // --- Insert element: call Livewire, inject HTML into TinyMCE ---
+    let _tiersInsertElementCache = null;
+    function _tiersInsertElement(editor, key) {
+        if (_tiersInsertElementCache) {
+            const html = _tiersInsertElementCache[key];
+            if (html) editor.insertContent(html);
+            return;
+        }
+        const wire = _tiersMsgGetWire();
+        if (!wire) return;
+        wire.call('getInsertableElements').then(function(elements) {
+            _tiersInsertElementCache = elements;
+            setTimeout(function() { _tiersInsertElementCache = null; }, 30000);
+            const html = elements[key];
+            if (html) editor.insertContent(html);
+        });
     }
 
     window.tiersSyncMessageEditor = _tiersMsgSyncEditor;

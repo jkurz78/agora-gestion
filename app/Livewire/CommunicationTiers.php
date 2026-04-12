@@ -171,7 +171,7 @@ final class CommunicationTiers extends Component
             $filters[] = fn (Builder $q) => $q->where('pour_recettes', true);
         }
 
-        if ($this->filtreDonateurs !== null) {
+        if ($this->filtreDonateurs !== null && $this->filtreDonateurs !== '') {
             $donSousCategorieIds = SousCategorie::where('pour_dons', true)->pluck('id');
             $ex = $this->filtreDonateurs === 'exercice' ? $exercice : null;
 
@@ -188,7 +188,7 @@ final class CommunicationTiers extends Component
             };
         }
 
-        if ($this->filtreAdherents !== null) {
+        if ($this->filtreAdherents !== null && $this->filtreAdherents !== '') {
             $cotSousCategorieIds = SousCategorie::where('pour_cotisations', true)->pluck('id');
             $ex = $this->filtreAdherents === 'exercice' ? $exercice : null;
 
@@ -205,7 +205,7 @@ final class CommunicationTiers extends Component
             };
         }
 
-        if ($this->filtreParticipantsScope !== null && ! empty($this->filtreTypeOperationIds)) {
+        if ($this->filtreParticipantsScope !== null && $this->filtreParticipantsScope !== '' && ! empty($this->filtreTypeOperationIds)) {
             $typeOpIds = $this->filtreTypeOperationIds;
             $ex = $this->filtreParticipantsScope === 'exercice' ? $exercice : null;
 
@@ -219,7 +219,7 @@ final class CommunicationTiers extends Component
                     });
                 });
             };
-        } elseif ($this->filtreParticipantsScope !== null) {
+        } elseif ($this->filtreParticipantsScope !== null && $this->filtreParticipantsScope !== '') {
             // Scope set but no type filter: match any participant
             $ex = $this->filtreParticipantsScope === 'exercice' ? $exercice : null;
 
@@ -259,6 +259,25 @@ final class CommunicationTiers extends Component
 
         $this->selectAll = true;
         $this->selectedTiersIds = $ids;
+    }
+
+    // ── Insertable elements ─────────────────────────────────────────────────
+
+    /**
+     * @return array<string, string>
+     */
+    public function getInsertableElements(): array
+    {
+        $logos = \App\Helpers\EmailLogo::variables();
+        $optoutUrl = '{lien_optout}';
+        $optoutBlock = '<p style="font-size:12px;color:#666;margin-top:20px;text-align:center">'
+            .'<a href="'.$optoutUrl.'" style="color:#666">Se désinscrire des communications</a>'
+            .'</p>';
+
+        return [
+            'logo' => $logos['{logo}'] ?: '<em>[Logo non configuré]</em>',
+            'lien_optout' => $optoutBlock,
+        ];
     }
 
     // ── Templates ────────────────────────────────────────────────────────────
