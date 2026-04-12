@@ -17,6 +17,16 @@ final class EmailOptoutController extends Controller
 
         if ($log->tiers_id) {
             Tiers::where('id', $log->tiers_id)->update(['email_optout' => true]);
+
+            // Trace the opt-out action
+            EmailLog::create([
+                'tiers_id' => $log->tiers_id,
+                'categorie' => 'communication',
+                'destinataire_email' => $log->destinataire_email,
+                'destinataire_nom' => $log->destinataire_nom,
+                'objet' => 'Désinscription RGPD',
+                'statut' => 'envoye',
+            ]);
         }
 
         return view('email.optout');
