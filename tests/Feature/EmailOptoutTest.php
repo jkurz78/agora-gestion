@@ -75,3 +75,25 @@ it('does not require authentication', function () {
     $response = $this->get('/email/optout/public-token');
     $response->assertOk();
 });
+
+it('resubscribes a tiers via resubscribe link', function () {
+    $tiers = Tiers::factory()->create(['email' => 'test@example.com', 'email_optout' => true]);
+    $user = User::factory()->create();
+
+    EmailLog::create([
+        'tiers_id' => $tiers->id,
+        'categorie' => 'communication',
+        'destinataire_email' => 'test@example.com',
+        'destinataire_nom' => 'Test',
+        'objet' => 'Test',
+        'statut' => 'envoye',
+        'envoye_par' => $user->id,
+        'tracking_token' => 'resub-token',
+    ]);
+
+    $response = $this->get('/email/resubscribe/resub-token');
+
+    $response->assertOk();
+    $response->assertSee('inscrit');
+    expect($tiers->fresh()->email_optout)->toBeFalse();
+});

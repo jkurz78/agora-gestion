@@ -307,7 +307,8 @@ Route::prefix('formulaire')->middleware('throttle:10,1')->group(function (): voi
 // Email tracking pixel (no auth, no throttle — called by mail clients)
 Route::get('/t/{token}.gif', EmailTrackingController::class)->name('email.tracking');
 
-// Email opt-out (no auth — called from email footer link)
-Route::get('/email/optout/{token}', EmailOptoutController::class)->name('email.optout');
+// Email opt-out / resubscribe (no auth — called from email footer link)
+Route::get('/email/optout/{token}', [EmailOptoutController::class, 'optout'])->name('email.optout');
+Route::get('/email/resubscribe/{token}', [EmailOptoutController::class, 'resubscribe'])->name('email.resubscribe');
 
 require __DIR__.'/auth.php';
