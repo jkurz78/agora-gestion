@@ -8,6 +8,7 @@ use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentPrevisionnelPdfController;
 use App\Http\Controllers\DroitImagePdfController;
+use App\Http\Controllers\EmailOptoutController;
 use App\Http\Controllers\EmailTrackingController;
 use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\FormulaireController;
@@ -307,6 +308,6 @@ Route::prefix('formulaire')->middleware('throttle:10,1')->group(function (): voi
 Route::get('/t/{token}.gif', EmailTrackingController::class)->name('email.tracking');
 
 // Email opt-out (no auth — called from email footer link)
-Route::get('/email/optout/{token}', \App\Http\Controllers\EmailOptoutController::class)->name('email.optout');
+Route::get('/email/optout/{token}', EmailOptoutController::class)->name('email.optout');
 
 require __DIR__.'/auth.php';
