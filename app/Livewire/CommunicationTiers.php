@@ -254,7 +254,7 @@ final class CommunicationTiers extends Component
             ->where('email', '!=', '')
             ->where('email_optout', false)
             ->pluck('id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn ($id) => (string) $id)
             ->toArray();
 
         $this->selectAll = true;
