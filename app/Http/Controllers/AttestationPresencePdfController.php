@@ -20,7 +20,7 @@ final class AttestationPresencePdfController extends Controller
 {
     public function seance(Request $request, Operation $operation, Seance $seance): Response
     {
-        abort_unless((int) $seance->operation_id === $operation->id, 404);
+        abort_unless((int) $seance->operation_id === (int) $operation->id, 404);
 
         $participantIds = array_filter(array_map('intval', explode(',', $request->query('participants', ''))));
 

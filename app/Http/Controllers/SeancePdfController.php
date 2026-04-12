@@ -27,7 +27,7 @@ final class SeancePdfController extends Controller
 
     public function emargement(Request $request, Operation $operation, Seance $seance): Response
     {
-        abort_unless((int) $seance->operation_id === $operation->id, 404);
+        abort_unless((int) $seance->operation_id === (int) $operation->id, 404);
 
         $operation->loadMissing('typeOperation');
         $isConfidentiel = $operation->typeOperation?->formulaire_parcours_therapeutique ?? false;
