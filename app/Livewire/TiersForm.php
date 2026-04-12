@@ -39,6 +39,8 @@ final class TiersForm extends Component
 
     public bool $pour_recettes = false;
 
+    public bool $email_optout = false;
+
     public bool $showForm = false;
 
     public bool $showDetails = false;
@@ -89,6 +91,7 @@ final class TiersForm extends Component
         $this->pays = $tiers->pays ?? 'France';
         $this->pour_depenses = $tiers->pour_depenses;
         $this->pour_recettes = $tiers->pour_recettes;
+        $this->email_optout = (bool) $tiers->email_optout;
 
         $this->est_helloasso = $tiers->est_helloasso;
 
@@ -156,6 +159,7 @@ final class TiersForm extends Component
             'pays' => ['nullable', 'string', 'max:100'],
             'pour_depenses' => ['boolean'],
             'pour_recettes' => ['boolean'],
+            'email_optout' => ['boolean'],
         ];
 
         $validated = $this->validate($rules, [
