@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CategorieEmail;
+use App\Helpers\EmailLogo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -32,6 +33,6 @@ final class EmailTemplate extends Model
 
     public static function sanitizeCorps(string $html): string
     {
-        return strip_tags($html, '<p><br><strong><em><u><ul><ol><li><a><h1><h2><h3><h4><span><div>');
+        return strip_tags($html, EmailLogo::ALLOWED_TAGS);
     }
 }

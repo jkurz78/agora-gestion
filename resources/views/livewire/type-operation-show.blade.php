@@ -674,14 +674,56 @@ x-on:click.window="
 
                     tinymce.init({
                         target: el,
-                        height: 300,
-                        menubar: false,
-                        plugins: 'link lists noneditable',
+                        language: 'fr_FR',
+                        language_url: '/vendor/tinymce/langs/fr_FR.js',
+                        height: 350,
+                        menubar: readonly ? false : 'edit insert format table',
+                        statusbar: !readonly,
+                        promotion: false,
+                        plugins: 'link lists noneditable table image media code',
                         toolbar: readonly
                             ? false
-                            : 'undo redo | bold italic underline | bullist numlist | link | variablesButton',
+                            : [
+                                'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor',
+                                'alignleft aligncenter alignright | bullist numlist | table image media link | variablesButton | code',
+                            ],
                         readonly: readonly,
-                        content_style: 'body { font-family: sans-serif; font-size: 13px; }',
+                        block_formats: 'Paragraphe=p; Titre 1=h1; Titre 2=h2; Titre 3=h3',
+                        font_family_formats: 'Arial=arial,helvetica,sans-serif; Georgia=georgia,serif; Courier New=courier new,courier,monospace; Verdana=verdana,geneva',
+                        font_size_formats: '10px 12px 14px 16px 18px 20px 24px 28px 32px',
+                        table_default_styles: { 'border-collapse': 'collapse', 'width': '100%' },
+                        table_default_attributes: { border: '1', cellpadding: '6', cellspacing: '0' },
+                        image_title: true,
+                        image_caption: true,
+                        image_advtab: true,
+                        image_class_list: [
+                            { title: 'En ligne (défaut)', value: '' },
+                            { title: 'Flottante à gauche', value: 'img-float-left' },
+                            { title: 'Flottante à droite', value: 'img-float-right' },
+                            { title: 'Centrée (bloc)', value: 'img-center' },
+                        ],
+                        automatic_uploads: false,
+                        images_upload_handler: function (blobInfo) {
+                            return new Promise(function (resolve) {
+                                var reader = new FileReader();
+                                reader.onload = function () { resolve(reader.result); };
+                                reader.readAsDataURL(blobInfo.blob());
+                            });
+                        },
+                        file_picker_types: 'image',
+                        file_picker_callback: function (callback, value, meta) {
+                            if (meta.filetype === 'image') {
+                                var input = document.createElement('input');
+                                input.type = 'file'; input.accept = 'image/*';
+                                input.onchange = function () {
+                                    var reader = new FileReader();
+                                    reader.onload = function () { callback(reader.result, { alt: input.files[0].name }); };
+                                    reader.readAsDataURL(input.files[0]);
+                                };
+                                input.click();
+                            }
+                        },
+                        content_style: 'body { font-family: Arial, sans-serif; font-size: 13px; } table { border-collapse: collapse; } td, th { border: 1px solid #ccc; padding: 6px; } .img-float-left { float: left; margin: 0 16px 12px 0; } .img-float-right { float: right; margin: 0 0 12px 16px; } .img-center { display: block; margin: 12px auto; } img { max-width: 100%; height: auto; }',
                         setup: (editor) => {
                             editorRef = editor;
                             editor.ui.registry.addMenuButton('variablesButton', {
@@ -690,6 +732,12 @@ x-on:click.window="
                             });
                             editor.on('init', () => {
                                 editor.getBody().dataset.categorie = categorie;
+                            });
+                            editor.on('ObjectResized', (e) => {
+                                if (e.target.nodeName === 'IMG') {
+                                    e.target.style.height = 'auto';
+                                    e.target.removeAttribute('height');
+                                }
                             });
                             editor.on('input Change', () => {
                                 el.closest('[x-data]')?.dispatchEvent(new Event('input', { bubbles: true }));

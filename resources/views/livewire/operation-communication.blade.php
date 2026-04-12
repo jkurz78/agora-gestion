@@ -510,6 +510,8 @@
             '{titre_precedente_seance}': 'Titre précédente',
             '{nb_seances_effectuees}': 'Nb effectuées',
             '{nb_seances_restantes}': 'Nb restantes',
+            '{table_seances}': 'Tableau toutes séances',
+            '{table_seances_a_venir}': 'Tableau séances à venir',
         },
         'Association': {
             '{association}': 'Nom',
@@ -571,19 +573,88 @@
                     target: textarea,
                     language: 'fr_FR',
                     language_url: '/vendor/tinymce/langs/fr_FR.js',
-                    height: 250,
-                    menubar: false,
-                    statusbar: false,
-                    plugins: 'lists link noneditable',
-                    toolbar: 'bold italic underline | bullist numlist | link | variablesButton',
+                    height: 400,
+                    menubar: 'edit insert format table',
+                    statusbar: true,
+                    promotion: false,
+                    plugins: 'lists link noneditable table image media code fullscreen',
+                    toolbar: [
+                        'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough forecolor backcolor',
+                        'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link | variablesButton insertElementButton | code fullscreen',
+                    ],
                     noneditable_class: 'mce-variable',
-                    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .mce-variable { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 1px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; }',
+                    block_formats: 'Paragraphe=p; Titre 1=h1; Titre 2=h2; Titre 3=h3; Titre 4=h4',
+                    font_family_formats: 'Arial=arial,helvetica,sans-serif; Georgia=georgia,serif; Courier New=courier new,courier,monospace; Trebuchet MS=trebuchet ms,geneva; Verdana=verdana,geneva',
+                    font_size_formats: '10px 12px 14px 16px 18px 20px 24px 28px 32px 36px',
+                    table_toolbar: 'tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol',
+                    table_default_styles: { 'border-collapse': 'collapse', 'width': '100%' },
+                    table_default_attributes: { border: '1', cellpadding: '6', cellspacing: '0' },
+                    image_title: true,
+                    image_caption: true,
+                    image_advtab: true,
+                    image_class_list: [
+                        { title: 'En ligne (défaut)', value: '' },
+                        { title: 'Flottante à gauche', value: 'img-float-left' },
+                        { title: 'Flottante à droite', value: 'img-float-right' },
+                        { title: 'Centrée (bloc)', value: 'img-center' },
+                    ],
+                    automatic_uploads: false,
+                    images_upload_handler: function (blobInfo) {
+                        return new Promise(function (resolve) {
+                            var reader = new FileReader();
+                            reader.onload = function () { resolve(reader.result); };
+                            reader.readAsDataURL(blobInfo.blob());
+                        });
+                    },
+                    file_picker_types: 'image',
+                    file_picker_callback: function (callback, value, meta) {
+                        if (meta.filetype === 'image') {
+                            var input = document.createElement('input');
+                            input.setAttribute('type', 'file');
+                            input.setAttribute('accept', 'image/*');
+                            input.addEventListener('change', function () {
+                                var file = this.files[0];
+                                var reader = new FileReader();
+                                reader.onload = function () {
+                                    callback(reader.result, { alt: file.name, title: file.name });
+                                };
+                                reader.readAsDataURL(file);
+                            });
+                            input.click();
+                        }
+                    },
+                    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; } .mce-variable { background: #f3edff; border: 1px solid #d4c5f9; border-radius: 3px; padding: 1px 3px; font-family: monospace; font-size: 12px; color: #7c3aed; display: inline-block; } table { border-collapse: collapse; } td, th { border: 1px solid #ccc; padding: 6px; } .img-float-left { float: left; margin: 0 16px 12px 0; } .img-float-right { float: right; margin: 0 0 12px 16px; } .img-center { display: block; margin: 12px auto; } img { max-width: 100%; height: auto; }',
                     setup: function (editor) {
                         self.editor = editor;
 
                         editor.ui.registry.addMenuButton('variablesButton', {
                             text: 'Variables',
                             fetch: function (callback) { callback(menuItems); },
+                        });
+
+                        // "Insérer élément" button — fetches real data from Livewire
+                        editor.ui.registry.addMenuButton('insertElementButton', {
+                            text: 'Insérer',
+                            icon: 'table-insert-row-after',
+                            fetch: function (callback) {
+                                callback([
+                                    { type: 'menuitem', text: 'Logo association', onAction: function () { insertElement(editor, 'logo'); } },
+                                    { type: 'menuitem', text: 'Logo opération', onAction: function () { insertElement(editor, 'logo_operation'); } },
+                                    { type: 'separator' },
+                                    { type: 'menuitem', text: 'Tableau — toutes les séances', onAction: function () { insertElement(editor, 'table_seances'); } },
+                                    { type: 'menuitem', text: 'Tableau — séances à venir', onAction: function () { insertElement(editor, 'table_seances_a_venir'); } },
+                                    { type: 'separator' },
+                                    { type: 'menuitem', text: 'Bloc infos opération', onAction: function () { insertElement(editor, 'bloc_infos'); } },
+                                ]);
+                            },
+                        });
+
+                        // Preserve aspect ratio on image resize
+                        editor.on('ObjectResized', function (e) {
+                            if (e.target.nodeName === 'IMG') {
+                                e.target.style.height = 'auto';
+                                e.target.removeAttribute('height');
+                            }
                         });
 
                         editor.on('init', function () {
@@ -626,6 +697,25 @@
         if (!el) return null;
         const wireId = el.closest('[wire\\:id]')?.getAttribute('wire:id') || el.getAttribute('wire:id');
         return wireId ? Livewire.find(wireId) : null;
+    }
+
+    // --- Insert element: call Livewire, inject HTML into TinyMCE ---
+    let _insertElementCache = null;
+    function insertElement(editor, key) {
+        if (_insertElementCache) {
+            const html = _insertElementCache[key];
+            if (html) editor.insertContent(html);
+            return;
+        }
+        const wire = _msgGetWire();
+        if (!wire) return;
+        wire.call('getInsertableElements').then(function (elements) {
+            _insertElementCache = elements;
+            // Invalidate cache after 30s (data may change)
+            setTimeout(function () { _insertElementCache = null; }, 30000);
+            const html = elements[key];
+            if (html) editor.insertContent(html);
+        });
     }
 
     // --- Sync TinyMCE -> Livewire ---
