@@ -58,7 +58,7 @@
                     {{-- Row 2: Titles --}}
                     <tr>
                         @foreach($seances as $seance)
-                            <td style="background:#f8f9fa;text-align:center;font-size:11px;color:#6c757d">{{ $seance->titre ?? '' }}</td>
+                            <td style="background:#f8f9fa;text-align:center;font-size:11px;color:#6c757d">{{ $seance->titre_affiche ?? '' }}</td>
                         @endforeach
                         <td style="background:#f8f9fa"></td>
                     </tr>

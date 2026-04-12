@@ -27,7 +27,7 @@
                         <td style="position:sticky;left:0;z-index:2;background:#f8f9fa;font-size:11px;font-weight:600;color:#495057">Encadrant ↓</td>
                         @foreach($seances as $seance)
                             <td style="background:#f8f9fa;text-align:center;font-size:10px;color:#6c757d">
-                                @if($seance->titre){{ $seance->titre }}@endif
+                                @if($seance->titre_affiche){{ $seance->titre_affiche }}@endif
                                 @if($seance->date){{ $seance->date->format('d/m') }}@endif
                             </td>
                         @endforeach

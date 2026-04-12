@@ -6,8 +6,8 @@
                     <div class="modal-header">
                         <h5 class="modal-title">
                             Feuille signée — Séance {{ $seance->numero }}
-                            @if($seance->titre)
-                                — {{ $seance->titre }}
+                            @if($seance->titre_affiche)
+                                — {{ $seance->titre_affiche }}
                             @endif
                         </h5>
                         <button type="button" class="btn-close" wire:click="fermer"></button>

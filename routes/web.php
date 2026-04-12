@@ -9,6 +9,7 @@ use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentPrevisionnelPdfController;
 use App\Http\Controllers\DroitImagePdfController;
+use App\Http\Controllers\EmailTrackingController;
 use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\FormulaireController;
 use App\Http\Controllers\IncomingDocumentsController;
@@ -37,6 +38,7 @@ use App\Models\Participant;
 use App\Models\RapprochementBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use Illuminate\Support\Facades\Route;
 
 // Root: redirect to user's last espace
@@ -55,7 +57,6 @@ $registerParametres = function (): void {
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
-        Route::view('type-operations', 'parametres.type-operations.index')->name('type-operations.index');
     });
     // Factures (accessibles depuis les deux espaces)
     Route::view('/factures', 'gestion.factures.index')->name('factures');
@@ -214,6 +215,20 @@ Route::middleware('auth')->group(function (): void {
         ->name('transactions.piece-jointe');
 });
 
+// ── Operations (espace-agnostic) ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('operations')
+    ->group(function (): void {
+        Route::view('/types-operation', 'operations.types-operation.index')
+            ->name('types-operation.index');
+        Route::get('/types-operation/create', function () {
+            return view('operations.types-operation.show');
+        })->name('types-operation.create');
+        Route::get('/types-operation/{typeOperation}', function (TypeOperation $typeOperation) {
+            return view('operations.types-operation.show', compact('typeOperation'));
+        })->name('types-operation.show');
+    });
+
 // ── Legacy redirects (301) ──
 Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/dashboard', '/compta/dashboard');
@@ -232,6 +247,8 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/exercices/changer', '/compta/exercices/changer');
     Route::permanentRedirect('/exercices/reouvrir', '/compta/exercices/reouvrir');
     Route::permanentRedirect('/exercices/audit', '/compta/exercices/audit');
+    Route::permanentRedirect('/compta/parametres/type-operations', '/operations/types-operation');
+    Route::permanentRedirect('/gestion/parametres/type-operations', '/operations/types-operation');
 });
 
 // Public formulaire (no auth required)
@@ -243,6 +260,6 @@ Route::prefix('formulaire')->middleware('throttle:10,1')->group(function (): voi
 });
 
 // Email tracking pixel (no auth, no throttle — called by mail clients)
-Route::get('/t/{token}.gif', \App\Http\Controllers\EmailTrackingController::class)->name('email.tracking');
+Route::get('/t/{token}.gif', EmailTrackingController::class)->name('email.tracking');
 
 require __DIR__.'/auth.php';

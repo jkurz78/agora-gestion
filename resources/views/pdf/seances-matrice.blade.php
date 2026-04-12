@@ -84,7 +84,7 @@
             {{-- Titre row --}}
             <tr class="header-row">
                 @foreach($seances as $seance)
-                    <td colspan="{{ $colSpan }}" style="text-align:center">{{ Str::limit($seance->titre, 18) }}</td>
+                    <td colspan="{{ $colSpan }}" style="text-align:center">{{ Str::limit($seance->titre_affiche, 18) }}</td>
                 @endforeach
             </tr>
             {{-- Date row --}}

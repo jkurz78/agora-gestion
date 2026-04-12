@@ -75,4 +75,9 @@ final class TypeOperation extends Model
     {
         return $this->hasMany(EmailTemplate::class);
     }
+
+    public function seanceDefaults(): HasMany
+    {
+        return $this->hasMany(TypeOperationSeance::class)->orderBy('numero');
+    }
 }
