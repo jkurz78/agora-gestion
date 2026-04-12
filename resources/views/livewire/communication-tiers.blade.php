@@ -630,7 +630,8 @@
         return html;
     }
 
-    if (typeof Alpine !== 'undefined' && !Alpine.components?.tiersCommunicationTinymce) {
+    // Register before Alpine scans x-data attributes
+    function _tiersRegisterAlpineComponent() {
         Alpine.data('tiersCommunicationTinymce', () => ({
             editor: null,
 
@@ -753,6 +754,18 @@
             },
         }));
     }
+
+    // Register: try immediately if Alpine is ready, otherwise defer to alpine:init
+    let _tiersAlpineRegistered = false;
+    function _tiersEnsureRegistered() {
+        if (_tiersAlpineRegistered) return;
+        _tiersAlpineRegistered = true;
+        _tiersRegisterAlpineComponent();
+    }
+    if (typeof Alpine !== 'undefined') {
+        _tiersEnsureRegistered();
+    }
+    document.addEventListener('alpine:init', _tiersEnsureRegistered, { once: true });
 
     // --- Helper: get Alpine data from element ---
     function _tiersMsgGetAlpineData(el) {
