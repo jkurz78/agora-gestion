@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
+use App\Helpers\EmailLogo;
 use App\Mail\MessageLibreMail;
 use App\Models\CampagneEmail;
 use App\Models\EmailLog;
@@ -137,6 +138,7 @@ final class OperationCommunication extends Component
 
         if ($this->filtreSeanceId) {
             $presentIds = Presence::where('seance_id', $this->filtreSeanceId)
+                ->where('statut', 'present')
                 ->pluck('participant_id');
             $query->whereIn('id', $presentIds);
         }
@@ -526,7 +528,61 @@ final class OperationCommunication extends Component
             attachmentPaths: $attachmentPaths,
             typeOperationId: $operation->typeOperation?->id,
             trackingToken: $trackingToken,
+            seances: $seances,
         );
+    }
+
+    /**
+     * Returns pre-built HTML elements for insertion into the editor.
+     *
+     * @return array<string, string>
+     */
+    public function getInsertableElements(): array
+    {
+        $operation = $this->operation->loadMissing(['typeOperation', 'seances']);
+        $seances = $operation->seances->sortBy('date');
+        $today = now()->startOfDay();
+        $typeOpId = $operation->typeOperation?->id;
+
+        $logos = EmailLogo::variables($typeOpId);
+
+        $buildTable = function (Collection $items): string {
+            if ($items->isEmpty()) {
+                return '<p><em>Aucune séance.</em></p>';
+            }
+            $rows = '';
+            foreach ($items as $s) {
+                $rows .= '<tr>'
+                    .'<td style="padding:6px 10px;border:1px solid #ddd;text-align:center">'.$s->numero.'</td>'
+                    .'<td style="padding:6px 10px;border:1px solid #ddd">'.($s->date?->format('d/m/Y') ?? '').'</td>'
+                    .'<td style="padding:6px 10px;border:1px solid #ddd">'.e($s->titre_affiche).'</td>'
+                    .'</tr>';
+            }
+
+            return '<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:13px">'
+                .'<tr style="background:#3d5473;color:#fff">'
+                .'<th style="padding:6px 10px;text-align:center;width:50px">N°</th>'
+                .'<th style="padding:6px 10px;width:100px">Date</th>'
+                .'<th style="padding:6px 10px">Titre</th>'
+                .'</tr>'.$rows.'</table>';
+        };
+
+        $aVenir = $seances->filter(fn (Seance $s) => $s->date && $s->date->gte($today));
+
+        $infoBlock = '<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:13px">'
+            .'<tr><td style="padding:4px 8px;font-weight:bold;width:120px">Opération</td><td style="padding:4px 8px">'.e($operation->nom).'</td></tr>'
+            .'<tr><td style="padding:4px 8px;font-weight:bold">Type</td><td style="padding:4px 8px">'.e($operation->typeOperation?->nom ?? '').'</td></tr>'
+            .'<tr><td style="padding:4px 8px;font-weight:bold">Du</td><td style="padding:4px 8px">'.($operation->date_debut?->format('d/m/Y') ?? '').' au '.($operation->date_fin?->format('d/m/Y') ?? '').'</td></tr>'
+            .'<tr><td style="padding:4px 8px;font-weight:bold">Séances</td><td style="padding:4px 8px">'.$operation->nombre_seances.'</td></tr>'
+            .'</table>';
+
+        return [
+            'logo' => $logos['{logo}'],
+            'logo_operation' => $logos['{logo_operation}'],
+            'table_seances' => $buildTable($seances),
+            'table_seances_a_venir' => $buildTable($aVenir),
+            'bloc_infos' => $infoBlock,
+        ];
     }
 
     public function openPreview(): void

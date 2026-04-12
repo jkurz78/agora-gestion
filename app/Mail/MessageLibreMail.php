@@ -7,10 +7,12 @@ namespace App\Mail;
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
 use App\Models\Association;
+use App\Models\Seance;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Support\Collection;
 
 final class MessageLibreMail extends Mailable
 {
@@ -41,6 +43,8 @@ final class MessageLibreMail extends Mailable
         public readonly array $attachmentPaths = [],
         public readonly ?int $typeOperationId = null,
         public readonly ?string $trackingToken = null,
+        /** @var Collection<int, Seance> */
+        public readonly ?Collection $seances = null,
     ) {
         $allVars = $this->variables() + EmailLogo::variables($this->typeOperationId);
         $corps = str_replace(
@@ -130,6 +134,42 @@ final class MessageLibreMail extends Mailable
             '{nb_seances_effectuees}' => (string) $this->nbSeancesEffectuees,
             '{nb_seances_restantes}' => (string) $this->nbSeancesRestantes,
             '{association}' => Association::first()?->nom ?? '',
+            '{table_seances}' => $this->buildTableSeances(false),
+            '{table_seances_a_venir}' => $this->buildTableSeances(true),
         ];
+    }
+
+    private function buildTableSeances(bool $aVenirOnly): string
+    {
+        if (! $this->seances || $this->seances->isEmpty()) {
+            return '';
+        }
+
+        $today = now()->startOfDay();
+        $filtered = $aVenirOnly
+            ? $this->seances->filter(fn (Seance $s) => $s->date && $s->date->gte($today))
+            : $this->seances;
+
+        if ($filtered->isEmpty()) {
+            return '';
+        }
+
+        $rows = '';
+        foreach ($filtered->sortBy('date') as $s) {
+            $rows .= '<tr>'
+                .'<td style="padding:6px 10px;border:1px solid #ddd;text-align:center">'.$s->numero.'</td>'
+                .'<td style="padding:6px 10px;border:1px solid #ddd">'.$s->date?->format('d/m/Y').'</td>'
+                .'<td style="padding:6px 10px;border:1px solid #ddd">'.e($s->titre_affiche).'</td>'
+                .'</tr>';
+        }
+
+        return '<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:13px">'
+            .'<tr style="background:#3d5473;color:#fff">'
+            .'<th style="padding:6px 10px;text-align:center;width:50px">N°</th>'
+            .'<th style="padding:6px 10px;width:100px">Date</th>'
+            .'<th style="padding:6px 10px">Titre</th>'
+            .'</tr>'
+            .$rows
+            .'</table>';
     }
 }
