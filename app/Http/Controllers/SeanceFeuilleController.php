@@ -13,7 +13,7 @@ final class SeanceFeuilleController extends Controller
 {
     public function download(Operation $operation, Seance $seance): StreamedResponse
     {
-        abort_unless((int) $seance->operation_id === $operation->id, 404);
+        abort_unless((int) $seance->operation_id === (int) $operation->id, 404);
         abort_if($seance->feuille_signee_path === null, 404);
 
         return Storage::disk('local')->download(
@@ -24,7 +24,7 @@ final class SeanceFeuilleController extends Controller
 
     public function view(Operation $operation, Seance $seance): StreamedResponse
     {
-        abort_unless((int) $seance->operation_id === $operation->id, 404);
+        abort_unless((int) $seance->operation_id === (int) $operation->id, 404);
         abort_if($seance->feuille_signee_path === null, 404);
 
         return Storage::disk('local')->response(
