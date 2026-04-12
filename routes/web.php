@@ -305,4 +305,7 @@ Route::prefix('formulaire')->middleware('throttle:10,1')->group(function (): voi
 // Email tracking pixel (no auth, no throttle — called by mail clients)
 Route::get('/t/{token}.gif', EmailTrackingController::class)->name('email.tracking');
 
+// Email opt-out (no auth — called from email footer link)
+Route::get('/email/optout/{token}', fn (string $token) => redirect('/')->with('status', 'Vous avez été désinscrit.'))->name('email.optout');
+
 require __DIR__.'/auth.php';
