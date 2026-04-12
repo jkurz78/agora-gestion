@@ -34,12 +34,34 @@ beforeEach(function () {
     ]);
 });
 
-it('rejects statut update when seance has signed sheet', function () {
+it('allows statut update when seance has signed sheet but statut is null', function () {
     Livewire::actingAs($this->user)
         ->test(SeanceTable::class, ['operation' => $this->operation])
         ->call('updatePresence', $this->seance->id, $this->participant->id, 'statut', StatutPresence::Present->value);
 
-    expect(Presence::where('seance_id', $this->seance->id)->count())->toBe(0);
+    $presence = Presence::where('seance_id', $this->seance->id)
+        ->where('participant_id', $this->participant->id)
+        ->first();
+    expect($presence)->not->toBeNull();
+    expect($presence->statut)->toBe(StatutPresence::Present->value);
+});
+
+it('rejects statut update when seance has signed sheet and statut already set', function () {
+    // Pre-fill the presence with a statut
+    Presence::create([
+        'seance_id' => $this->seance->id,
+        'participant_id' => $this->participant->id,
+        'statut' => StatutPresence::Present->value,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(SeanceTable::class, ['operation' => $this->operation])
+        ->call('updatePresence', $this->seance->id, $this->participant->id, 'statut', StatutPresence::Excuse->value);
+
+    $presence = Presence::where('seance_id', $this->seance->id)
+        ->where('participant_id', $this->participant->id)
+        ->first();
+    expect($presence->statut)->toBe(StatutPresence::Present->value);
 });
 
 it('allows kine update even when seance has signed sheet', function () {
