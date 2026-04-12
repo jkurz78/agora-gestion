@@ -34,9 +34,9 @@
                             </p>
                             <hr>
                             <p class="small text-muted mb-0">
-                                Vous avez cliqué par erreur ?
+                                Vous souhaitez continuer à recevoir nos courriels ?<br>
                                 <a href="{{ route('email.resubscribe', ['token' => $token]) }}">
-                                    Cliquez ici pour continuer de recevoir nos courriels
+                                    Se réinscrire
                                 </a>
                             </p>
                         @endif
