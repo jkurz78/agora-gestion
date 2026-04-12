@@ -29,6 +29,7 @@ final class Tiers extends Model
         'est_helloasso',
         'helloasso_nom',
         'helloasso_prenom',
+        'email_optout',
     ];
 
     protected function casts(): array
@@ -37,6 +38,7 @@ final class Tiers extends Model
             'pour_depenses' => 'boolean',
             'pour_recettes' => 'boolean',
             'est_helloasso' => 'boolean',
+            'email_optout' => 'boolean',
         ];
     }
 

@@ -10,6 +10,7 @@ enum CategorieEmail: string
     case Attestation = 'attestation';
     case Document = 'document';
     case Message = 'message';
+    case Communication = 'communication';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum CategorieEmail: string
             self::Attestation => 'Attestation de présence',
             self::Document => 'Document (facture / devis / pro forma)',
             self::Message => 'Message libre',
+            self::Communication => 'Communication tiers',
         };
     }
 
@@ -77,6 +79,13 @@ enum CategorieEmail: string
                 '{nb_seances_effectuees}' => 'Nombre de séances effectuées',
                 '{nb_seances_restantes}' => 'Nombre de séances restantes',
             ],
+            self::Communication => [
+                '{prenom}' => 'Prénom du tiers',
+                '{nom}' => 'Nom du tiers',
+                '{email}' => 'Email du tiers',
+                '{association}' => 'Nom de l\'association',
+                '{lien_desinscription}' => 'Lien de désinscription RGPD',
+            ] + $logos,
         };
     }
 }
