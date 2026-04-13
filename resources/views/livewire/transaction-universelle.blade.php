@@ -545,14 +545,13 @@
                     @endif
                     <td>
                         <div class="d-flex gap-1 align-items-center" @click.stop>
-                            {{-- Badge statut_reglement (recettes/dépenses uniquement) --}}
-                            @if($statutReglement !== null)
+                            {{-- Badge statut_reglement : en_attente et recu seulement (pointe = colonne dédiée) --}}
+                            @if($statutReglement !== null && $statutReglement !== 'pointe')
                                 @php
                                     $isDepense = $tx->source_type === 'depense';
                                     [$sBadge, $sLabel] = match($statutReglement) {
-                                        'en_attente' => ['warning text-dark', $isDepense ? 'À payer'  : 'En attente'],
-                                        'recu'       => ['success',           $isDepense ? 'Payé'     : 'Reçu'],
-                                        'pointe'     => ['secondary',         'Pointé'],
+                                        'en_attente' => ['warning text-dark', $isDepense ? 'À payer' : 'En attente'],
+                                        'recu'       => ['success',           $isDepense ? 'Payé'    : 'Reçu'],
                                         default      => ['light text-muted',  $statutReglement],
                                     };
                                 @endphp
