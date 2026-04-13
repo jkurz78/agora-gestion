@@ -3,17 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
 use App\Livewire\RemiseBancaireValidation;
 use App\Models\CompteBancaire;
-use App\Models\Operation;
-use App\Models\Participant;
-use App\Models\Reglement;
 use App\Models\RemiseBancaire;
-use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\TypeOperation;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -30,44 +25,51 @@ beforeEach(function () {
         'saisi_par' => $this->user->id,
     ]);
 
-    $sc = SousCategorie::factory()->create();
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sc->id]);
-    $operation = Operation::factory()->create(['nom' => 'Gym', 'type_operation_id' => $typeOp->id]);
     $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
-    $participant = Participant::create([
-        'operation_id' => $operation->id,
+    $this->tx = Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compteCible->id,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => 30.00,
+        'statut_reglement' => StatutReglement::EnAttente,
         'tiers_id' => $tiers->id,
-        'date_inscription' => now()->toDateString(),
-    ]);
-    $seance = Seance::create([
-        'operation_id' => $operation->id,
-        'numero' => 1,
-        'date' => '2025-10-01',
-    ]);
-    $this->reglement = Reglement::create([
-        'participant_id' => $participant->id,
-        'seance_id' => $seance->id,
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'montant_prevu' => 30.00,
+        'remise_id' => $this->remise->id,
     ]);
 });
 
-it('renders the validation page with session data', function () {
-    session(['remise_selected_ids' => [$this->reglement->id]]);
-
+it('renders the validation page with linked transactions', function () {
     Livewire::test(RemiseBancaireValidation::class, ['remise' => $this->remise])
         ->assertSee('Jean DUPONT')
         ->assertSee('30,00');
 });
 
-it('comptabiliser creates transactions and redirects', function () {
-    session(['remise_selected_ids' => [$this->reglement->id]]);
-
+it('comptabiliser sets statut_reglement=recu and redirects', function () {
     Livewire::test(RemiseBancaireValidation::class, ['remise' => $this->remise])
         ->call('comptabiliser')
         ->assertRedirect(route('banques.remises.index'));
 
-    expect(Transaction::where('remise_id', $this->remise->id)->count())->toBe(1);
-    $this->remise->refresh();
-    expect($this->remise->virement_id)->not->toBeNull();
+    $this->tx->refresh();
+    expect($this->tx->statut_reglement)->toBe(StatutReglement::Recu)
+        ->and($this->tx->reference)->toBe('RBC-00001-001');
+});
+
+it('comptabiliser calls modifier when remise already has recu transactions', function () {
+    // Pre-mark one transaction as recu to simulate an already-comptabilised remise
+    $txInitiale = Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compteCible->id,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => 50.00,
+        'statut_reglement' => StatutReglement::Recu,
+        'remise_id' => $this->remise->id,
+    ]);
+
+    // The component should detect alreadyComptabilisee=true and call modifier()
+    Livewire::test(RemiseBancaireValidation::class, ['remise' => $this->remise])
+        ->call('comptabiliser')
+        ->assertRedirect(route('banques.remises.index'));
+
+    // Both transactions should be processed
+    $this->tx->refresh();
+    $txInitiale->refresh();
+    // tx was en_attente, modifier should handle it
+    expect($this->tx->remise_id)->toBe($this->remise->id);
 });

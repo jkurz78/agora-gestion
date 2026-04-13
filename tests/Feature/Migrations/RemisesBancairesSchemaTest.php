@@ -29,7 +29,7 @@ it('system intermediary account exists', function () {
 it('remises_bancaires table has all expected columns', function () {
     $columns = [
         'id', 'numero', 'date', 'mode_paiement',
-        'compte_cible_id', 'virement_id', 'libelle',
+        'compte_cible_id', 'libelle',
         'saisi_par', 'created_at', 'updated_at', 'deleted_at',
     ];
 

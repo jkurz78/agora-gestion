@@ -1,8 +1,10 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -10,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         // Soft-delete les VirementInternes liés à des remises (compte source = "Remises en banque")
-        \Illuminate\Support\Facades\DB::statement("
+        DB::statement("
             UPDATE virements_internes vi
             JOIN comptes_bancaires cs ON cs.id = vi.compte_source_id
             SET vi.deleted_at = NOW()

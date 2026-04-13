@@ -96,20 +96,25 @@
                             <td class="small text-nowrap">{{ $remise->date->format('d/m/Y') }}</td>
                             <td class="small">{{ $remise->mode_paiement->label() }}</td>
                             <td class="small">{{ $remise->compteCible->nom }}</td>
-                            <td class="text-end small">{{ $remise->reglements->count() + $remise->transactionsDirectes->count() }}</td>
+                            <td class="text-end small">{{ $remise->transactions->count() }}</td>
                             <td class="text-end small text-nowrap fw-semibold">{{ number_format($remise->montantTotal(), 2, ',', ' ') }} €</td>
                             <td>
-                                @if ($remise->virement_id === null)
-                                    <span class="badge bg-warning text-dark" style="font-size:.7rem">
-                                        <i class="bi bi-pencil"></i> Brouillon
-                                    </span>
-                                @elseif ($remise->isVerrouillee())
+                                @php
+                                    $hasRecu = $remise->transactions->contains(
+                                        fn ($tx) => in_array($tx->statut_reglement?->value, ['recu', 'pointe'], true)
+                                    );
+                                @endphp
+                                @if ($remise->isVerrouillee())
                                     <span class="badge bg-secondary" style="font-size:.7rem">
                                         <i class="bi bi-lock"></i> Verrouillée
                                     </span>
-                                @else
+                                @elseif ($hasRecu)
                                     <span class="badge bg-success" style="font-size:.7rem">
                                         <i class="bi bi-check-circle"></i> Comptabilisée
+                                    </span>
+                                @else
+                                    <span class="badge bg-warning text-dark" style="font-size:.7rem">
+                                        <i class="bi bi-pencil"></i> Brouillon
                                     </span>
                                 @endif
                             </td>
@@ -130,7 +135,7 @@
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     @endif
-                                    @if ($remise->virement_id !== null)
+                                    @if ($hasRecu)
                                         <a href="{{ route('banques.remises.pdf', $remise) }}?mode=inline"
                                            class="btn btn-sm btn-outline-dark" title="PDF" target="_blank">
                                             <i class="bi bi-file-pdf"></i>
