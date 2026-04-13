@@ -24,7 +24,7 @@ beforeEach(function () {
 });
 
 describe('marquerReglementRecu', function () {
-    it('renseigne date_reglement et reference_reglement sur les transactions sélectionnées', function () {
+    it('met statut_reglement=recu sur les transactions sélectionnées', function () {
         $facture = Facture::create([
             'date' => now(),
             'statut' => StatutFacture::Validee,
@@ -43,21 +43,14 @@ describe('marquerReglementRecu', function () {
 
         $facture->transactions()->attach($transaction->id);
 
-        $this->service->marquerReglementRecu(
-            $facture,
-            [$transaction->id],
-            now()->toDateString(),
-            'CHQ-98765',
-        );
+        $this->service->marquerReglementRecu($facture, [$transaction->id]);
 
         $transaction->refresh();
-        expect($transaction->date_reglement)->not->toBeNull();
-        expect($transaction->date_reglement->toDateString())->toBe(now()->toDateString());
-        expect($transaction->reference_reglement)->toBe('CHQ-98765');
+        expect($transaction->statut_reglement->value)->toBe('recu');
         expect($transaction->compte_id)->toBe($this->compteCreances->id);
     });
 
-    it('accepte une reference_reglement null', function () {
+    it('la facture est comptée comme réglée après marquerReglementRecu', function () {
         $facture = Facture::create([
             'date' => now(),
             'statut' => StatutFacture::Validee,
@@ -76,11 +69,11 @@ describe('marquerReglementRecu', function () {
 
         $facture->transactions()->attach($transaction->id);
 
-        $this->service->marquerReglementRecu($facture, [$transaction->id], now()->toDateString());
+        $this->service->marquerReglementRecu($facture, [$transaction->id]);
 
-        $transaction->refresh();
-        expect($transaction->date_reglement)->not->toBeNull();
-        expect($transaction->reference_reglement)->toBeNull();
+        $facture->refresh();
+        expect($facture->montantRegle())->toBe(50.0);
+        expect($facture->isAcquittee())->toBeTrue();
     });
 
     it('refuse sur une facture brouillon', function () {
@@ -111,11 +104,12 @@ describe('marquerReglementRecu', function () {
             'tiers_id' => $this->tiers->id,
             'compte_id' => $compteReel->id,
             'montant_total' => 100.00,
+            'statut_reglement' => 'recu',
         ]);
 
         $facture->transactions()->attach($transaction->id);
 
-        $this->service->marquerReglementRecu($facture, [$transaction->id], now()->toDateString());
+        $this->service->marquerReglementRecu($facture, [$transaction->id]);
     })->throws(RuntimeException::class, 'réglée');
 
     it('refuse une transaction qui n\'est pas sur un compte système', function () {
@@ -137,6 +131,6 @@ describe('marquerReglementRecu', function () {
 
         $facture->transactions()->attach($transaction->id);
 
-        $this->service->marquerReglementRecu($facture, [$transaction->id], now()->toDateString());
+        $this->service->marquerReglementRecu($facture, [$transaction->id]);
     })->throws(RuntimeException::class, 'compte système');
 });

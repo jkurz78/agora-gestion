@@ -22,15 +22,15 @@ it('has a system account named Créances à recevoir', function () {
 
     expect($compte)->not->toBeNull()
         ->and($compte->est_systeme)->toBeTrue()
-        ->and($compte->actif_recettes_depenses)->toBeTrue();
+        ->and($compte->actif_recettes_depenses)->toBeFalse(); // v3: system accounts are deactivated
 });
 
-it('includes Créances à recevoir in comptes list for recettes', function () {
+it('excludes Créances à recevoir from regular comptes list (actif_recettes_depenses)', function () {
     $creances = CompteBancaire::where('nom', 'Créances à recevoir')->first();
     $compteNormal = CompteBancaire::factory()->create(['actif_recettes_depenses' => true]);
 
     $comptes = CompteBancaire::where('actif_recettes_depenses', true)->orderBy('nom')->get();
-    expect($comptes->pluck('id')->toArray())->toContain($creances->id)
+    expect($comptes->pluck('id')->toArray())->not->toContain($creances->id)
         ->and($comptes->pluck('id')->toArray())->toContain($compteNormal->id);
 });
 
@@ -103,7 +103,7 @@ describe('full workflow: créance → facture → encaissement', function () {
         $service = app(FactureService::class);
         $sc = SousCategorie::factory()->create();
 
-        // Transaction already paid (real account)
+        // Transaction already paid (real account, statut_reglement=recu in v3)
         $txPaid = Transaction::create([
             'type' => TypeTransaction::Recette,
             'date' => '2025-06-15',
@@ -113,6 +113,7 @@ describe('full workflow: créance → facture → encaissement', function () {
             'compte_id' => $compteReel->id,
             'tiers_id' => $tiers->id,
             'saisi_par' => $user->id,
+            'statut_reglement' => 'recu',
         ]);
         TransactionLigne::create([
             'transaction_id' => $txPaid->id,

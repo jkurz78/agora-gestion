@@ -33,6 +33,7 @@ beforeEach(function () {
         'statut_reglement' => StatutReglement::EnAttente,
         'tiers_id' => $tiers->id,
         'remise_id' => $this->remise->id,
+        'reference' => null, // not yet comptabilised
     ]);
 });
 

@@ -238,6 +238,7 @@ describe('modifier()', function () {
             'montant_total' => 25.00,
             'statut_reglement' => StatutReglement::EnAttente,
             'remise_id' => null,
+            'reference' => null, // new transaction, no reference yet
         ]);
 
         $this->service->modifier($remise->fresh(), [$tx1->id, $tx2->id]);

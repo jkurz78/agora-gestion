@@ -102,6 +102,7 @@ it('refuse annulation si une transaction est rapprochée', function () {
         'mode_paiement' => 'virement',
         'saisi_par' => $this->user->id,
         'rapprochement_id' => $rapprochement->id,
+        'statut_reglement' => 'pointe', // v3: isLockedByRapprochement() checks statut_reglement
     ]);
 
     $facture->transactions()->attach($tx->id);

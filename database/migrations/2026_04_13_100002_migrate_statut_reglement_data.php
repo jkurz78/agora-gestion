@@ -29,17 +29,19 @@ return new class extends Migration
 
         // 3. Les 3 transactions sur Créances à recevoir → Compte Courant
         DB::statement("
-            UPDATE transactions t
-            JOIN comptes_bancaires c ON c.id = t.compte_id
-            SET t.compte_id = (
+            UPDATE transactions
+            SET compte_id = (
                 SELECT id FROM comptes_bancaires
                 WHERE est_systeme = 0
                   AND nom = 'Compte Courant'
                 LIMIT 1
             )
-            WHERE c.est_systeme = 1
-              AND c.nom = 'Créances à recevoir'
-              AND t.deleted_at IS NULL
+            WHERE compte_id IN (
+                SELECT id FROM comptes_bancaires
+                WHERE est_systeme = 1
+                  AND nom = 'Créances à recevoir'
+            )
+              AND deleted_at IS NULL
         ");
     }
 

@@ -18,16 +18,13 @@ return new class extends Migration
         });
 
         // Drop FK only if it still exists (may have been removed in a partial run)
-        $hasFk = DB::select("
-            SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
-            WHERE TABLE_NAME = 'transactions'
-              AND COLUMN_NAME = 'compte_origine_id'
-              AND REFERENCED_TABLE_NAME IS NOT NULL
-              AND CONSTRAINT_SCHEMA = DATABASE()
-        ");
+        // Use Schema::getForeignKeys() for cross-DB compatibility (MySQL + SQLite)
+        $hasFk = Schema::hasColumn('transactions', 'compte_origine_id')
+            && collect(Schema::getForeignKeys('transactions'))
+                ->contains(fn ($fk) => in_array('compte_origine_id', $fk['columns']));
 
         Schema::table('transactions', function (Blueprint $table) use ($hasFk): void {
-            if (! empty($hasFk)) {
+            if ($hasFk) {
                 $table->dropForeign(['compte_origine_id']);
             }
             $colsToDrop = array_filter(

@@ -26,7 +26,7 @@ test('TransactionService::delete lève une exception si la dépense est pointée
     $depense = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => 'pointe',
     ]);
 
     expect(fn () => app(TransactionService::class)->delete($depense))
@@ -50,7 +50,7 @@ test('TransactionService::delete lève une exception si la recette est pointée'
     $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => 'pointe',
     ]);
 
     expect(fn () => app(TransactionService::class)->delete($recette))

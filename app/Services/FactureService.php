@@ -244,7 +244,10 @@ final class FactureService
                     throw new \RuntimeException('Cette transaction est déjà encaissée.');
                 }
 
-                $transaction->update(['compte_id' => $compteBancaireId]);
+                $transaction->update([
+                    'compte_id' => $compteBancaireId,
+                    'statut_reglement' => \App\Enums\StatutReglement::Recu->value,
+                ]);
             }
         });
     }
@@ -472,16 +475,14 @@ XML;
     }
 
     /**
-     * Mark selected transactions as "payment received" without moving them.
-     * Sets date_reglement (and optional reference) so montantRegle() counts them.
+     * Mark selected transactions as "payment received" (statut_reglement = recu).
+     * Does not move transactions — used for chèques/espèces awaiting deposit.
      *
      * @param  array<int>  $transactionIds
      */
     public function marquerReglementRecu(
         Facture $facture,
         array $transactionIds,
-        string $dateReglement,
-        ?string $referenceReglement = null,
     ): void {
         if ($facture->statut !== StatutFacture::Validee) {
             throw new \RuntimeException('Seule une facture validée peut être encaissée.');
@@ -491,7 +492,7 @@ XML;
             throw new \RuntimeException('Cette facture est déjà intégralement réglée.');
         }
 
-        DB::transaction(function () use ($facture, $transactionIds, $dateReglement, $referenceReglement): void {
+        DB::transaction(function () use ($facture, $transactionIds): void {
             foreach ($transactionIds as $transactionId) {
                 $transaction = $facture->transactions()->findOrFail($transactionId);
 
@@ -500,8 +501,7 @@ XML;
                 }
 
                 $transaction->update([
-                    'date_reglement' => $dateReglement,
-                    'reference_reglement' => $referenceReglement,
+                    'statut_reglement' => \App\Enums\StatutReglement::Recu->value,
                 ]);
             }
         });
