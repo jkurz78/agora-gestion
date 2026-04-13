@@ -336,7 +336,7 @@ final class TransactionForm extends Component
         $this->type = $transaction->type->value;
         $this->date = $transaction->date->format('Y-m-d');
         $this->libelle = $transaction->libelle;
-        $this->mode_paiement = $transaction->mode_paiement->value;
+        $this->mode_paiement = $transaction->mode_paiement?->value ?? '';
         $this->tiers_id = $transaction->tiers_id;
         $this->reference = $transaction->reference;
         $this->compte_id = $transaction->compte_id;
