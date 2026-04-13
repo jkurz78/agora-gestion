@@ -29,7 +29,6 @@ final class Transaction extends Model
         'tiers_id',
         'reference',
         'compte_id',
-        'pointe',
         'notes',
         'saisi_par',
         'rapprochement_id',
