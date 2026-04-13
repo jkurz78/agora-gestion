@@ -143,7 +143,7 @@
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
                 <div class="modal-body text-center py-4">
-                    <p>Supprimer cette remise ?</p>
+                    <p>Supprimer cette remise ?<br><small class="text-muted">Les transactions repasseront en attente.</small></p>
                     <button class="btn btn-secondary me-2" data-bs-dismiss="modal">Annuler</button>
                     <button wire:click="supprimer" data-bs-dismiss="modal" class="btn btn-danger">Supprimer</button>
                 </div>

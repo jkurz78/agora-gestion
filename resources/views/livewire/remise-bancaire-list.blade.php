@@ -130,7 +130,7 @@
                                             <i class="bi bi-pencil"></i>
                                         </a>
                                         <button wire:click="supprimer({{ $remise->id }})"
-                                                wire:confirm="Supprimer cette remise ? Les transactions et le virement associés seront supprimés."
+                                                wire:confirm="Supprimer cette remise ? Les transactions repasseront en attente."
                                                 class="btn btn-sm btn-outline-danger" title="Supprimer">
                                             <i class="bi bi-trash"></i>
                                         </button>
