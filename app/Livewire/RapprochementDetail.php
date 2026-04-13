@@ -160,8 +160,8 @@ final class RapprochementDetail extends Component
         $transactions = collect();
         $verrouille = $this->rapprochement->isVerrouille();
 
-        // Transactions (dépenses + recettes)
-        Transaction::where('compte_id', $compte->id)
+        // Transactions (dépenses + recettes) — grouper les remises en une seule ligne
+        $txRows = Transaction::where('compte_id', $compte->id)
             ->where(function ($q) use ($rid, $dateFin, $verrouille) {
                 if ($verrouille) {
                     $q->where('rapprochement_id', $rid);
@@ -172,20 +172,43 @@ final class RapprochementDetail extends Component
                     })->orWhere('rapprochement_id', $rid);
                 }
             })
-            ->with('tiers')
-            ->get()
-            ->each(function (Transaction $tx) use (&$transactions, $rid) {
-                $transactions->push([
-                    'id' => $tx->id,
-                    'type' => $tx->type->value,
-                    'date' => $tx->date,
-                    'label' => $tx->libelle,
-                    'tiers' => $tx->tiers?->displayName() ?? $tx->libelle,
-                    'reference' => $tx->reference,
-                    'montant_signe' => $tx->montantSigne(),
-                    'pointe' => (int) $tx->rapprochement_id === $rid,
-                ]);
-            });
+            ->with('tiers', 'remise')
+            ->get();
+
+        // Séparer les transactions en remise et les transactions standalone
+        $remiseGroups = $txRows->whereNotNull('remise_id')->groupBy('remise_id');
+        $standalone = $txRows->whereNull('remise_id');
+
+        // Lignes remises — une ligne par remise
+        foreach ($remiseGroups as $remiseId => $remiseTxs) {
+            $remise = $remiseTxs->first()->remise;
+            $allPointed = $remiseTxs->every(fn (Transaction $tx) => (int) $tx->rapprochement_id === $rid);
+            $montantTotal = $remiseTxs->sum(fn (Transaction $tx) => $tx->montantSigne());
+            $transactions->push([
+                'id' => (int) $remiseId,
+                'type' => 'remise',
+                'date' => $remise?->date ?? $remiseTxs->first()->date,
+                'label' => $remise?->libelle ?? "Remise n°{$remiseId}",
+                'tiers' => "Remise {$remiseTxs->first()->mode_paiement?->label()} ({$remiseTxs->count()} transactions)",
+                'reference' => $remise?->numero ? "n°{$remise->numero}" : null,
+                'montant_signe' => $montantTotal,
+                'pointe' => $allPointed,
+            ]);
+        }
+
+        // Lignes standalone
+        $standalone->each(function (Transaction $tx) use (&$transactions, $rid) {
+            $transactions->push([
+                'id' => $tx->id,
+                'type' => $tx->type->value,
+                'date' => $tx->date,
+                'label' => $tx->libelle,
+                'tiers' => $tx->tiers?->displayName() ?? $tx->libelle,
+                'reference' => $tx->reference,
+                'montant_signe' => $tx->montantSigne(),
+                'pointe' => (int) $tx->rapprochement_id === $rid,
+            ]);
+        });
 
         // Virements sortants (source = ce compte)
         VirementInterne::where('compte_source_id', $compte->id)
