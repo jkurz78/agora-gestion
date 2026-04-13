@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\ModePaiement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 final class Reglement extends Model
 {
@@ -40,5 +41,10 @@ final class Reglement extends Model
     public function remise(): BelongsTo
     {
         return $this->belongsTo(RemiseBancaire::class, 'remise_id');
+    }
+
+    public function transaction(): HasOne
+    {
+        return $this->hasOne(Transaction::class, 'reglement_id');
     }
 }
