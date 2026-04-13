@@ -286,6 +286,14 @@ final class ReglementTable extends Component
             return;
         }
 
+        $sansMoyenPaiement = $reglements->filter(fn ($r) => $r->mode_paiement === null);
+        if ($sansMoyenPaiement->isNotEmpty()) {
+            $noms = $sansMoyenPaiement->map(fn ($r) => $r->participant->tiers->displayName())->join(', ');
+            $this->addError('comptabiliserCompteId', "Moyen de paiement manquant pour : {$noms}.");
+
+            return;
+        }
+
         DB::transaction(function () use ($reglements, $seance, $operation, $sousCategorieId): void {
             foreach ($reglements as $reglement) {
                 $tiers = $reglement->participant->tiers;
