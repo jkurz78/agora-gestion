@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -41,9 +42,7 @@ final class Transaction extends Model
         'helloasso_order_id',
         'helloasso_cashout_id',
         'helloasso_payment_id',
-        'date_reglement',
-        'reference_reglement',
-        'compte_origine_id',
+        'statut_reglement',
     ];
 
     protected function casts(): array
@@ -53,7 +52,7 @@ final class Transaction extends Model
             'date' => 'date',
             'montant_total' => 'decimal:2',
             'mode_paiement' => ModePaiement::class,
-            'pointe' => 'boolean',
+            'statut_reglement' => StatutReglement::class,
             'tiers_id' => 'integer',
             'compte_id' => 'integer',
             'saisi_par' => 'integer',
@@ -63,8 +62,6 @@ final class Transaction extends Model
             'helloasso_order_id' => 'integer',
             'helloasso_cashout_id' => 'integer',
             'helloasso_payment_id' => 'integer',
-            'date_reglement' => 'date',
-            'compte_origine_id' => 'integer',
         ];
     }
 
@@ -103,11 +100,6 @@ final class Transaction extends Model
         return $this->belongsTo(Reglement::class, 'reglement_id');
     }
 
-    public function compteOrigine(): BelongsTo
-    {
-        return $this->belongsTo(CompteBancaire::class, 'compte_origine_id');
-    }
-
     public function lignes(): HasMany
     {
         return $this->hasMany(TransactionLigne::class);
@@ -122,8 +114,7 @@ final class Transaction extends Model
 
     public function isLockedByRapprochement(): bool
     {
-        return $this->rapprochement_id !== null
-            && $this->rapprochement?->isVerrouille() === true;
+        return $this->statut_reglement === StatutReglement::Pointe;
     }
 
     public function isLockedByRemise(): bool
