@@ -420,28 +420,37 @@
                         </a>
                     </th>
 
-                    {{-- Pointé --}}
-                    <th class="text-center" style="position:relative">
+                    {{-- Statut --}}
+                    <th style="position:relative">
                         <div class="d-flex align-items-center gap-1">
-                            Pointé
+                            Statut
                             <span x-data="{ open: false }" style="position:relative">
-                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ $filterPointe !== '' ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
+                                <i class="bi bi-search" style="cursor:pointer;font-size:.65rem;{{ $filterStatut !== '' ? 'color:#f87171' : 'opacity:.6' }}" @click="open = !open"></i>
                                 <div x-show="open" @click.outside="open = false"
                                      class="position-absolute bg-white border rounded shadow-sm p-2 text-dark"
-                                     style="z-index:200;min-width:120px;top:1.2rem;left:0">
-                                    <select wire:model.live="filterPointe" class="form-select form-select-sm">
+                                     style="z-index:200;min-width:140px;top:1.2rem;right:0">
+                                    <select wire:model.live="filterStatut" class="form-select form-select-sm">
                                         <option value="">Tous</option>
-                                        <option value="1">Oui</option>
-                                        <option value="0">Non</option>
+                                        <option value="en_attente">En attente / À payer</option>
+                                        <option value="recu">Reçu / Payé</option>
+                                        <option value="pointe">Pointé</option>
                                     </select>
                                 </div>
                             </span>
                         </div>
-                        @if($filterPointe !== '')
+                        @if($filterStatut !== '')
+                            @php
+                                $filterStatutLabel = match($filterStatut) {
+                                    'en_attente' => 'En attente',
+                                    'recu'       => 'Reçu / Payé',
+                                    'pointe'     => 'Pointé',
+                                    default      => $filterStatut,
+                                };
+                            @endphp
                             <div style="margin-top:.1rem">
                                 <span class="badge text-bg-primary" style="font-size:.6rem;font-weight:normal">
-                                    {{ $filterPointe === '1' ? 'Oui' : 'Non' }}
-                                    <a href="#" wire:click.prevent="$set('filterPointe', '')" class="text-white ms-1" style="text-decoration:none">×</a>
+                                    {{ $filterStatutLabel }}
+                                    <a href="#" wire:click.prevent="$set('filterStatut', '')" class="text-white ms-1" style="text-decoration:none">×</a>
                                 </span>
                             </div>
                         @endif
@@ -533,9 +542,21 @@
                     <td class="text-end fw-semibold small text-nowrap {{ (float)$tx->montant >= 0 ? 'text-success' : 'text-danger' }}">
                         {{ number_format(abs((float)$tx->montant), 2, ',', ' ') }} €
                     </td>
-                    <td class="text-center">
-                        @if($tx->pointe)
-                            <i class="bi bi-check-circle-fill text-success" style="font-size:.85rem"></i>
+                    <td>
+                        @if($statutReglement !== null)
+                            @php
+                                $isDepense = $tx->source_type === 'depense';
+                                [$sBadge, $sLabel] = match($statutReglement) {
+                                    'en_attente' => ['warning text-dark', $isDepense ? 'À payer'     : 'En attente'],
+                                    'recu'       => ['success',           $isDepense ? 'Payé'         : 'Reçu'],
+                                    'pointe'     => ['secondary',         'Pointé'],
+                                    default      => ['light text-muted',  $statutReglement],
+                                };
+                            @endphp
+                            <span class="badge text-bg-{{ $sBadge }}" style="font-size:.6rem">{{ $sLabel }}</span>
+                        @elseif($tx->pointe)
+                            {{-- Virements : pas de statut_reglement, afficher ✓ si rapproché --}}
+                            <span class="badge text-bg-secondary" style="font-size:.6rem">Pointé</span>
                         @endif
                     </td>
                     @if($showSolde)
@@ -545,18 +566,6 @@
                     @endif
                     <td>
                         <div class="d-flex gap-1 align-items-center" @click.stop>
-                            {{-- Badge statut_reglement : en_attente et recu seulement (pointe = colonne dédiée) --}}
-                            @if($statutReglement !== null && $statutReglement !== 'pointe')
-                                @php
-                                    $isDepense = $tx->source_type === 'depense';
-                                    [$sBadge, $sLabel] = match($statutReglement) {
-                                        'en_attente' => ['warning text-dark', $isDepense ? 'À payer' : 'En attente'],
-                                        'recu'       => ['success',           $isDepense ? 'Payé'    : 'Reçu'],
-                                        default      => ['light text-muted',  $statutReglement],
-                                    };
-                                @endphp
-                                <span class="badge text-bg-{{ $sBadge }}" style="font-size:.6rem">{{ $sLabel }}</span>
-                            @endif
                             <button type="button"
                                     wire:click="openEdit('{{ e($tx->source_type) }}', {{ $tx->id }})"
                                     class="btn btn-sm btn-outline-primary"

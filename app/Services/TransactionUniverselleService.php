@@ -26,7 +26,7 @@ final class TransactionUniverselleService
         ?string $searchReference,
         ?string $searchNumeroPiece,
         ?string $modePaiement,
-        ?bool $pointe,
+        ?string $statutReglement,
         ?string $sousCategorieFilter = null,
         bool $computeSolde = false,
         string $sortColumn = 'date',
@@ -50,7 +50,7 @@ final class TransactionUniverselleService
             ->when($searchReference, fn ($q) => $q->where('t.reference', 'like', "%{$searchReference}%"))
             ->when($searchNumeroPiece, fn ($q) => $q->where('t.numero_piece', 'like', "%{$searchNumeroPiece}%"))
             ->when($modePaiement, fn ($q) => $q->where('t.mode_paiement', $modePaiement))
-            ->when($pointe !== null, fn ($q) => $q->where('t.pointe', $pointe))
+            ->when($statutReglement, fn ($q) => $q->where('t.statut_reglement', $statutReglement))
             ->orderBy("t.{$sortColumn}", $sortDirection)
             ->orderBy('t.source_type')
             ->orderBy('t.id');

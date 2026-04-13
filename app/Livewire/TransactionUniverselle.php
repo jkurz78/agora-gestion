@@ -65,7 +65,7 @@ final class TransactionUniverselle extends Component
 
     public string $filterModePaiement = '';
 
-    public string $filterPointe = ''; // '' | '1' | '0'
+    public string $filterStatut = ''; // '' | 'en_attente' | 'recu' | 'pointe'
 
     public ?int $filterCompteId = null; // libre seulement si compteId prop est null
 
@@ -190,7 +190,7 @@ final class TransactionUniverselle extends Component
         $this->resetPage();
     }
 
-    public function updatedFilterPointe(): void
+    public function updatedFilterStatut(): void
     {
         $this->resetPage();
     }
@@ -351,7 +351,7 @@ final class TransactionUniverselle extends Component
             && empty($this->filterTypes)
             && $this->filterTiers === '' && $this->filterReference === ''
             && $this->filterLibelle === '' && $this->filterNumeroPiece === ''
-            && $this->filterModePaiement === '' && $this->filterPointe === '';
+            && $this->filterModePaiement === '' && $this->filterStatut === '';
 
         $sortDirection = ($showSolde && $this->sortColumn === 'date')
             ? 'asc'
@@ -368,7 +368,7 @@ final class TransactionUniverselle extends Component
             searchReference: $this->filterReference ?: null,
             searchNumeroPiece: $this->filterNumeroPiece ?: null,
             modePaiement: $this->filterModePaiement ?: null,
-            pointe: $this->filterPointe !== '' ? ($this->filterPointe === '1') : null,
+            statutReglement: $this->filterStatut ?: null,
             sousCategorieFilter: $this->sousCategorieFilter,
             computeSolde: $showSolde,
             sortColumn: $this->sortColumn,
