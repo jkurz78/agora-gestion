@@ -52,7 +52,7 @@
                     @php
                         $visibleIds = $transactions->pluck('id')->map(fn ($id) => (int) $id)->all();
                         $allVisibleSelected = count($visibleIds) > 0
-                            && collect($visibleIds)->every(fn ($id) => in_array($id, $selectedTransactionIds));
+                            && collect($visibleIds)->every(fn ($id) => in_array($id, $selectedTransactionIds, true));
                     @endphp
                     <tr>
                         <th style="width: 40px;">
@@ -75,7 +75,7 @@
                 </thead>
                 <tbody style="color:#555">
                     @foreach ($transactions as $tx)
-                        @php $isSelected = in_array((int) $tx->id, $selectedTransactionIds); @endphp
+                        @php $isSelected = in_array((int) $tx->id, $selectedTransactionIds, true); @endphp
                         <tr wire:key="tx-{{ $tx->id }}"
                             class="{{ $isSelected ? 'table-success' : '' }}"
                             @if ($this->canEdit) style="cursor: pointer;" wire:click="toggleTransaction({{ $tx->id }})" @endif>
@@ -123,7 +123,7 @@
         <div class="container-fluid d-flex justify-content-between align-items-center">
             <div>
                 <strong>{{ $countSelected }}</strong> transaction{{ $countSelected > 1 ? 's' : '' }} sélectionnée{{ $countSelected > 1 ? 's' : '' }}
-                — Total : <strong>{{ number_format((float) $totalSelected, 2, ',', ' ') }} €</strong>
+                — Total : <strong>{{ number_format((float) $totalSelected, 2, ',', "\u{00A0}") }}&nbsp;€</strong>
             </div>
             @if ($this->canEdit)
                 <button wire:click="valider"
