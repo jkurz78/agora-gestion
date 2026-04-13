@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutReglement;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
@@ -22,7 +23,7 @@ it('calculates solde pointage without don/cotisation tables', function () {
         'compte_id' => $compte->id,
         'montant_total' => 200.00,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => StatutReglement::Pointe->value,
     ]);
 
     $service = app(RapprochementBancaireService::class);
@@ -55,13 +56,13 @@ it('supprimer resets only transactions and virements', function () {
     $tx = Transaction::factory()->asRecette()->create([
         'compte_id' => $compte->id,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => StatutReglement::Pointe->value,
     ]);
 
     $service = app(RapprochementBancaireService::class);
     $service->supprimer($rapprochement);
 
     expect(Transaction::find($tx->id)->rapprochement_id)->toBeNull();
-    expect(Transaction::find($tx->id)->pointe)->toBeFalse();
+    expect(Transaction::find($tx->id)->statut_reglement)->toBe(StatutReglement::EnAttente);
     expect(RapprochementBancaire::find($rapprochement->id))->toBeNull();
 });
