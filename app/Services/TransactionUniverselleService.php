@@ -259,7 +259,7 @@ final class TransactionUniverselleService
                 cb_src.nom as compte_nom,
                 NULL as mode_paiement,
                 -(vi.montant) as montant,
-                (vi.rapprochement_source_id IS NOT NULL OR EXISTS (SELECT 1 FROM remises_bancaires rb WHERE rb.virement_id = vi.id AND rb.deleted_at IS NULL)) as pointe,
+                (vi.rapprochement_source_id IS NOT NULL) as pointe,
                 vi.notes,
                 NULL as piece_jointe_path,
                 NULL as piece_jointe_nom,
