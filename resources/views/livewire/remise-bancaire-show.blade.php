@@ -46,7 +46,7 @@
                 </div>
                 <div class="col-md-2">
                     <span class="text-muted small">Statut</span><br>
-                    @if ($remise->virement_id === null)
+                    @if ($isBrouillon)
                         <span class="badge bg-warning text-dark"><i class="bi bi-pencil"></i> Brouillon</span>
                     @elseif ($verrouille)
                         <span class="badge bg-secondary"><i class="bi bi-lock"></i> Verrouillée</span>
@@ -55,134 +55,70 @@
                     @endif
                 </div>
             </div>
-            @if ($remise->virement)
-                <div class="mt-2 small text-muted">
-                    <i class="bi bi-arrow-left-right"></i>
-                    Virement interne : <strong>{{ $remise->virement->reference }}</strong>
-                    — {{ number_format((float) $remise->virement->montant, 2, ',', "\u{00A0}") }}&nbsp;€
-                </div>
-            @endif
         </div>
     </div>
 
-    {{-- Brouillon : tableau des règlements --}}
-    @if ($isBrouillon)
-        @if ($reglements->isEmpty())
-            <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> Aucun règlement sélectionné. Cliquez sur « Modifier » pour ajouter des règlements.
-            </div>
-        @else
-            <h6 class="text-muted mb-2"><i class="bi bi-list-check"></i> Règlements sélectionnés</h6>
-            <div class="table-responsive">
-                <table class="table table-striped align-middle">
-                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                        <tr>
-                            <th>N°</th>
-                            <th>Participant</th>
-                            <th>Opération</th>
-                            <th>Séance</th>
-                            <th class="text-end">Montant</th>
-                        </tr>
-                    </thead>
-                    <tbody style="color:#555">
-                        @foreach ($reglements as $index => $reglement)
-                            <tr>
-                                <td class="small">{{ $index + 1 }}</td>
-                                <td class="small">{{ $reglement->participant->tiers->displayName() }}</td>
-                                <td class="small">{{ $reglement->seance->operation->nom }}</td>
-                                <td class="small">S{{ $reglement->seance->numero }}</td>
-                                <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $reglement->montant_prevu, 2, ',', "\u{00A0}") }}&nbsp;€</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                    <tfoot>
-                        <tr class="fw-bold">
-                            <td colspan="4" class="text-end">Total</td>
-                            <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        @endif
-
-        @if($transactionsDirectes->isNotEmpty())
-        <h6 class="mt-3">Transactions (hors séances)</h6>
-        <table class="table table-sm">
-            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                <tr>
-                    <th>Date</th>
-                    <th>Libellé</th>
-                    <th>Tiers</th>
-                    <th>Compte</th>
-                    <th class="text-end">Montant</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($transactionsDirectes as $tx)
-                <tr>
-                    <td>{{ $tx->date->format('d/m/Y') }}</td>
-                    <td>{{ $tx->libelle }}</td>
-                    <td>{{ $tx->tiers?->displayName() ?? '—' }}</td>
-                    <td>{{ $tx->compte->nom }}</td>
-                    <td class="text-end">{{ number_format($tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
-        @endif
+    {{-- Tableau unifié des transactions --}}
+    @if ($transactions->isEmpty())
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Aucune transaction. Cliquez sur « Modifier » pour ajouter des transactions.
+        </div>
     @else
-        {{-- Comptabilisée : tableau des transactions --}}
-        @if ($transactions->isEmpty())
-            <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> Aucune transaction comptable.
-            </div>
-        @else
-            <div class="table-responsive">
-                <table class="table table-striped align-middle">
-                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                    <tr>
+                        <th>N°</th>
+                        <th>Référence</th>
+                        <th>Tiers</th>
+                        <th>Opération</th>
+                        <th>Séance</th>
+                        <th>Statut</th>
+                        <th class="text-end">Montant</th>
+                    </tr>
+                </thead>
+                <tbody style="color:#555">
+                    @foreach ($transactions as $index => $transaction)
                         <tr>
-                            <th>N°</th>
-                            <th>Référence</th>
-                            <th>N° pièce</th>
-                            <th>Participant</th>
-                            <th>Opération</th>
-                            <th>Séance</th>
-                            <th class="text-end">Montant</th>
+                            <td class="small">{{ $index + 1 }}</td>
+                            <td class="small fw-semibold">{{ $transaction->reference }}</td>
+                            <td class="small">{{ $transaction->tiers?->displayName() ?? '—' }}</td>
+                            <td class="small">{{ $transaction->lignes->first()?->operation?->nom ?? '—' }}</td>
+                            <td class="small">
+                                @if ($transaction->lignes->first()?->seance)
+                                    S{{ $transaction->lignes->first()->seance }}
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td class="small">
+                                @if ($transaction->statut_reglement?->value === 'en_attente')
+                                    <span class="badge bg-warning text-dark">En attente</span>
+                                @elseif ($transaction->statut_reglement?->value === 'recu')
+                                    <span class="badge bg-success">Reçu</span>
+                                @elseif ($transaction->statut_reglement?->value === 'pointe')
+                                    <span class="badge bg-secondary">Pointé</span>
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $transaction->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
                         </tr>
-                    </thead>
-                    <tbody style="color:#555">
-                        @foreach ($transactions as $index => $transaction)
-                            <tr>
-                                <td class="small">{{ $index + 1 }}</td>
-                                <td class="small fw-semibold">{{ $transaction->reference }}</td>
-                                <td class="small">{{ $transaction->numero_piece ?? '—' }}</td>
-                                <td class="small">{{ $transaction->tiers?->displayName() ?? '—' }}</td>
-                                <td class="small">{{ $transaction->lignes->first()?->operation?->nom ?? '—' }}</td>
-                                <td class="small">
-                                    @if ($transaction->lignes->first()?->seance)
-                                        S{{ $transaction->lignes->first()->seance }}
-                                    @else
-                                        —
-                                    @endif
-                                </td>
-                                <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $transaction->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                    <tfoot>
-                        <tr class="fw-bold">
-                            <td colspan="6" class="text-end">Total</td>
-                            <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        @endif
+                    @endforeach
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="6" class="text-end">Total</td>
+                        <td class="text-end text-nowrap">{{ number_format((float) $totalMontant, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
     @endif
 
     {{-- Actions --}}
     <div class="d-flex gap-2 mt-3">
-        @if ($remise->virement_id !== null)
+        @if (! $isBrouillon)
             <a href="{{ route('banques.remises.pdf', $remise) }}?mode=inline"
                class="btn btn-outline-dark" target="_blank">
                 <i class="bi bi-file-pdf"></i> PDF
@@ -193,14 +129,25 @@
                class="btn btn-outline-secondary">
                 <i class="bi bi-pencil"></i> Modifier
             </a>
-            <button wire:click="supprimer"
-                    wire:confirm="Supprimer cette remise ? Les transactions et le virement associés seront supprimés."
-                    class="btn btn-outline-danger">
+            <button data-bs-toggle="modal" data-bs-target="#modalSupprimer" class="btn btn-outline-danger">
                 <i class="bi bi-trash"></i> Supprimer
             </button>
         @endif
         <a href="{{ route('banques.remises.index') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Retour
         </a>
+    </div>
+
+    {{-- Modal confirmation suppression --}}
+    <div class="modal fade" id="modalSupprimer" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <p>Supprimer cette remise ?</p>
+                    <button class="btn btn-secondary me-2" data-bs-dismiss="modal">Annuler</button>
+                    <button wire:click="supprimer" data-bs-dismiss="modal" class="btn btn-danger">Supprimer</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>

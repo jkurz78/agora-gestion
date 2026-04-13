@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
-use App\Models\Reglement;
+use App\Enums\StatutReglement;
 use App\Models\RemiseBancaire;
-use App\Models\Transaction;
 use App\Services\RemiseBancaireService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
@@ -25,6 +24,16 @@ final class RemiseBancaireShow extends Component
     public function getCanEditProperty(): bool
     {
         return Auth::user()->role->canWrite(Espace::Gestion);
+    }
+
+    public function estBrouillon(): bool
+    {
+        return ! $this->remise->transactions()
+            ->whereIn('statut_reglement', [
+                StatutReglement::Recu->value,
+                StatutReglement::Pointe->value,
+            ])
+            ->exists();
     }
 
     public function supprimer(): void
@@ -45,36 +54,9 @@ final class RemiseBancaireShow extends Component
     public function render(): View
     {
         $verrouille = $this->remise->isVerrouillee();
-        $isBrouillon = $this->remise->virement_id === null;
+        $isBrouillon = $this->estBrouillon();
 
-        if ($isBrouillon) {
-            // Brouillon : afficher les règlements persistés
-            $reglements = Reglement::with(['participant.tiers', 'seance.operation'])
-                ->where('remise_id', $this->remise->id)
-                ->get()
-                ->sortBy(fn ($r) => [
-                    $r->seance->operation->nom ?? '',
-                    $r->seance->numero ?? 0,
-                    $r->participant->tiers->nom ?? '',
-                ])->values();
-
-            $transactionsDirectes = $this->remise->transactionsDirectes()
-                ->with(['tiers', 'compte'])
-                ->get();
-
-            $totalMontant = $reglements->sum('montant_prevu') + $transactionsDirectes->sum('montant_total');
-
-            return view('livewire.remise-bancaire-show', [
-                'transactions' => collect(),
-                'reglements' => $reglements,
-                'transactionsDirectes' => $transactionsDirectes,
-                'totalMontant' => $totalMontant,
-                'verrouille' => $verrouille,
-                'isBrouillon' => true,
-            ]);
-        }
-
-        $transactions = Transaction::where('remise_id', $this->remise->id)
+        $transactions = $this->remise->transactions()
             ->with(['tiers', 'lignes.operation'])
             ->orderBy('reference')
             ->get();
@@ -83,10 +65,9 @@ final class RemiseBancaireShow extends Component
 
         return view('livewire.remise-bancaire-show', [
             'transactions' => $transactions,
-            'reglements' => collect(),
             'totalMontant' => $totalMontant,
             'verrouille' => $verrouille,
-            'isBrouillon' => false,
+            'isBrouillon' => $isBrouillon,
         ]);
     }
 }
