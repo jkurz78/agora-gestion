@@ -217,6 +217,25 @@ final class ReglementTable extends Component
         $this->dispatch('open-url', url: route('operations.documents-previsionnels.pdf', $document));
     }
 
+    public function marquerRecu(int $transactionId): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $tx = Transaction::findOrFail($transactionId);
+
+        if ($tx->statut_reglement !== StatutReglement::EnAttente) {
+            return; // Already received or reconciled
+        }
+
+        if ($tx->isLockedByRapprochement() || $tx->isLockedByFacture()) {
+            return;
+        }
+
+        $tx->update(['statut_reglement' => StatutReglement::Recu->value]);
+    }
+
     public function ouvrirComptabiliser(int $seanceId): void
     {
         if (! $this->canEdit) {
@@ -335,7 +354,7 @@ final class ReglementTable extends Component
         // Determine which seances are fully comptabilisées (all their reglements have a transaction)
         $operationReglements = Reglement::whereIn('seance_id', $seanceIds)
             ->where('montant_prevu', '>', 0)
-            ->get(['id', 'seance_id']);
+            ->get(['id', 'seance_id', 'participant_id']);
 
         $reglementIdsWithTx = Transaction::whereIn('reglement_id', $operationReglements->pluck('id'))
             ->whereNotNull('reglement_id')
@@ -356,6 +375,20 @@ final class ReglementTable extends Component
             $seanceComptabiliseeFlags[(int) $seance->id] = $allHaveTx;
         }
 
+        // Build transactionMap: "participantId-seanceId" => Transaction
+        // Only for transactions linked via reglement_id (created by Comptabiliser)
+        $txByReglement = Transaction::whereIn('reglement_id', $operationReglements->pluck('id'))
+            ->get()
+            ->keyBy(fn ($tx) => (int) $tx->reglement_id);
+
+        $transactionMap = [];
+        foreach ($operationReglements as $reglement) {
+            $tx = $txByReglement->get((int) $reglement->id);
+            if ($tx !== null) {
+                $transactionMap[(int) $reglement->participant_id.'-'.(int) $reglement->seance_id] = $tx;
+            }
+        }
+
         // Available accounts for comptabilisation
         $comptesBancaires = CompteBancaire::where('est_systeme', false)
             ->where('actif_recettes_depenses', true)
@@ -369,6 +402,7 @@ final class ReglementTable extends Component
             'docVersions' => $docVersions,
             'seanceComptabiliseeFlags' => $seanceComptabiliseeFlags,
             'comptesBancaires' => $comptesBancaires,
+            'transactionMap' => $transactionMap,
         ]);
     }
 
