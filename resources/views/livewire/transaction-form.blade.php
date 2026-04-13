@@ -110,7 +110,7 @@
                             @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
-                            <label for="reference" class="form-label">Référence <span class="text-danger">*</span></label>
+                            <label for="reference" class="form-label">Référence</label>
                             <input type="text" wire:model="reference" id="reference"
                                    class="form-control @error('reference') is-invalid @enderror"
                                    {{ $exerciceCloture ? 'disabled' : '' }}>
