@@ -36,6 +36,10 @@ final class TransactionService
         return DB::transaction(function () use ($data, $lignes) {
             $data['saisi_par'] = auth()->id();
             $data['numero_piece'] = app(NumeroPieceService::class)->assign(Carbon::parse($data['date']));
+            // Dépenses : payées au moment de la saisie → recu par défaut
+            if (! isset($data['statut_reglement'])) {
+                $data['statut_reglement'] = ($data['type'] ?? '') === 'depense' ? 'recu' : 'en_attente';
+            }
             $transaction = Transaction::create($data);
             foreach ($lignes as $ligne) {
                 $transaction->lignes()->create($ligne);

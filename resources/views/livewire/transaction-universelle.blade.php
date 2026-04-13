@@ -548,11 +548,12 @@
                             {{-- Badge statut_reglement (recettes/dépenses uniquement) --}}
                             @if($statutReglement !== null)
                                 @php
+                                    $isDepense = $tx->source_type === 'depense';
                                     [$sBadge, $sLabel] = match($statutReglement) {
-                                        'en_attente' => ['warning text-dark', 'En attente'],
-                                        'recu'       => ['success',          'Reçu'],
-                                        'pointe'     => ['secondary',        'Pointé'],
-                                        default      => ['light text-muted', $statutReglement],
+                                        'en_attente' => ['warning text-dark', $isDepense ? 'À payer'  : 'En attente'],
+                                        'recu'       => ['success',           $isDepense ? 'Payé'     : 'Reçu'],
+                                        'pointe'     => ['secondary',         'Pointé'],
+                                        default      => ['light text-muted',  $statutReglement],
                                     };
                                 @endphp
                                 <span class="badge text-bg-{{ $sBadge }}" style="font-size:.6rem">{{ $sLabel }}</span>
@@ -564,13 +565,13 @@
                                     title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
                                 <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
                             </button>
-                            {{-- Bouton Marquer reçu (recettes en_attente non verrouillées) --}}
+                            {{-- Bouton Marquer reçu / payé (en_attente non verrouillé) --}}
                             @if(! $exerciceCloture && $statutReglement === 'en_attente' && in_array($tx->source_type, ['recette', 'depense'], true))
                                 <button type="button"
                                         wire:click="marquerRecu({{ $tx->id }})"
                                         class="btn btn-sm btn-outline-success"
                                         style="padding:.15rem .3rem;font-size:.7rem"
-                                        title="Marquer comme reçu">
+                                        title="{{ $tx->source_type === 'depense' ? 'Marquer comme payé' : 'Marquer comme reçu' }}">
                                     <i class="bi bi-check-lg"></i>
                                 </button>
                             @endif
