@@ -179,11 +179,28 @@
                                     $realise = $realiseMap[$key] ?? 0;
                                     $prevu = (float) ($reglementMap[$key]?->montant_prevu ?? 0);
                                     $color = $prevu == 0 && $realise == 0 ? '#6c757d' : ($realise >= $prevu && $prevu > 0 ? '#2E7D32' : '#B5453A');
+                                    $txKey = (int) $participant->id . '-' . (int) $seance->id;
+                                    $tx = $transactionMap[$txKey] ?? null;
                                 @endphp
                                 <td style="padding:2px 6px;background:#f8f9fa;text-align:center">
                                     <span style="font-size:11px;color:{{ $color }}">
                                         {{ $realise > 0 ? number_format($realise, 2, ',', '') : ($prevu > 0 ? '0,00' : '—') }}
                                     </span>
+                                    @if($tx && $tx->statut_reglement === \App\Enums\StatutReglement::EnAttente && $this->canEdit)
+                                        <br>
+                                        <button wire:click="marquerRecu({{ $tx->id }})"
+                                                class="btn py-0 px-1 mt-1"
+                                                style="font-size:9px;line-height:1.4;border:1px solid #198754;color:#198754;border-radius:3px"
+                                                title="Marquer comme reçu">
+                                            &#10003; Reçu
+                                        </button>
+                                    @elseif($tx && $tx->statut_reglement !== \App\Enums\StatutReglement::EnAttente)
+                                        <br>
+                                        <span class="badge mt-1"
+                                              style="font-size:9px;background:{{ $tx->statut_reglement === \App\Enums\StatutReglement::Pointe ? '#6c757d' : '#198754' }}">
+                                            {{ $tx->statut_reglement->label() }}
+                                        </span>
+                                    @endif
                                 </td>
                             @endforeach
                         </tr>
