@@ -206,9 +206,9 @@ it('save conserve l\'IncomingDocument si la validation échoue', function () {
 
     Livewire::test(TransactionForm::class)
         ->dispatch('open-transaction-form-from-incoming', docId: $doc->id)
-        ->set('reference', '') // forcer l'échec de validation
+        ->set('mode_paiement', '') // forcer l'échec de validation (mode_paiement est required)
         ->call('save')
-        ->assertHasErrors('reference');
+        ->assertHasErrors('mode_paiement');
 
     expect(IncomingDocument::find($doc->id))->not->toBeNull()
         ->and(Storage::disk('local')->exists($doc->storage_path))->toBeTrue();
