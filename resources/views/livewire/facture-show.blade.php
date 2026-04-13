@@ -203,10 +203,18 @@
                     <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
                 </div>
                 <div class="card-body d-grid gap-2">
-                    <a href="{{ route('facturation.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}" class="btn btn-outline-primary" target="_blank">
-                        <i class="bi bi-file-earmark-pdf"></i>
-                        {{ $facture->statut === \App\Enums\StatutFacture::Annulee ? 'Télécharger l\'avoir (PDF)' : 'Télécharger PDF' }}
-                    </a>
+                    @if ($facture->statut === \App\Enums\StatutFacture::Annulee)
+                        <a href="{{ route('facturation.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}" class="btn btn-outline-danger" target="_blank">
+                            <i class="bi bi-file-earmark-pdf"></i> Avoir ({{ $facture->numero_avoir }})
+                        </a>
+                        <a href="{{ route('facturation.factures.pdf', ['facture' => $facture, 'mode' => 'inline', 'format' => 'original']) }}" class="btn btn-outline-secondary" target="_blank">
+                            <i class="bi bi-file-earmark-pdf"></i> Facture originale ({{ $facture->numero }})
+                        </a>
+                    @else
+                        <a href="{{ route('facturation.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}" class="btn btn-outline-primary" target="_blank">
+                            <i class="bi bi-file-earmark-pdf"></i> Télécharger PDF
+                        </a>
+                    @endif
                     @if ($facture->statut === \App\Enums\StatutFacture::Validee && $this->canEdit)
                         <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#annulationModal">
                             <i class="bi bi-x-circle"></i> Annuler avec avoir
