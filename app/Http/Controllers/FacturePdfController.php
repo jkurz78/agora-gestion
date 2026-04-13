@@ -15,9 +15,11 @@ final class FacturePdfController extends Controller
     {
         $facture->load('tiers');
 
-        $pdfContent = $service->genererPdf($facture);
+        $forceOriginal = request()->query('format') === 'original';
+        $pdfContent = $service->genererPdf($facture, $forceOriginal);
 
-        if ($facture->statut === StatutFacture::Annulee && $facture->numero_avoir) {
+        $isAvoir = $facture->statut === StatutFacture::Annulee && $facture->numero_avoir && ! $forceOriginal;
+        if ($isAvoir) {
             $label = $facture->numero_avoir;
             $prefix = 'Avoir';
         } else {

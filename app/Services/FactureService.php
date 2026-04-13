@@ -364,7 +364,7 @@ final class FactureService
     /**
      * Generate a Factur-X compliant PDF (PDF/A-3) for the given facture.
      */
-    public function genererPdf(Facture $facture): string
+    public function genererPdf(Facture $facture, bool $forceOriginalFormat = false): string
     {
         $facture->load(['tiers', 'compteBancaire', 'lignes', 'transactions']);
         $association = Association::first();
@@ -389,12 +389,13 @@ final class FactureService
             'montantRegle' => $facture->montantRegle(),
             'isAcquittee' => $facture->isAcquittee(),
             'mentionsPenalites' => $association?->facture_mentions_penalites,
+            'forceOriginalFormat' => $forceOriginalFormat,
         ])->setPaper('a4', 'portrait');
 
         $pdfContent = $pdf->output();
 
-        // Brouillon or annulée: return plain PDF (no Factur-X, not a fiscal document)
-        if ($facture->statut !== StatutFacture::Validee) {
+        // Brouillon, annulée, ou reprint original : plain PDF (pas de Factur-X)
+        if ($facture->statut !== StatutFacture::Validee || $forceOriginalFormat) {
             return $pdfContent;
         }
 
