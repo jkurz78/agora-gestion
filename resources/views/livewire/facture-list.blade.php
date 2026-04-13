@@ -66,10 +66,8 @@
                             $montantRegle = $facture->montantRegle();
                         @endphp
                         <tr wire:key="facture-{{ $facture->id }}"
-                            @if (! $isAnnulee)
-                                style="cursor:pointer"
-                                onclick="window.location='{{ $isBrouillon ? route('facturation.factures.edit', $facture) : route('facturation.factures.show', $facture) }}'"
-                            @endif
+                            style="cursor:pointer"
+                            onclick="window.location='{{ $isBrouillon ? route('facturation.factures.edit', $facture) : route('facturation.factures.show', $facture) }}'"
                         >
                             <td class="small">
                                 @if ($facture->numero)
