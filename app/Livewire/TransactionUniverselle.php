@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
@@ -306,6 +307,18 @@ final class TransactionUniverselle extends Component
             return;
         }
         app(VirementInterneService::class)->delete($v);
+    }
+
+    public function marquerRecu(int $id): void
+    {
+        $tx = Transaction::find($id);
+        if (! $tx || $tx->statut_reglement !== StatutReglement::EnAttente) {
+            return;
+        }
+        if ($tx->isLockedByRapprochement() || $tx->isLockedByFacture()) {
+            return;
+        }
+        $tx->update(['statut_reglement' => StatutReglement::Recu->value]);
     }
 
     // Écouter les événements des modaux pour rafraîchir la liste
