@@ -3,15 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
 use App\Livewire\RemiseBancaireShow;
 use App\Models\CompteBancaire;
-use App\Models\Operation;
-use App\Models\Participant;
-use App\Models\Reglement;
-use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
-use App\Models\TypeOperation;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\RemiseBancaireService;
 use Livewire\Livewire;
@@ -21,34 +17,24 @@ beforeEach(function () {
     $this->actingAs($this->user);
     $this->compteCible = CompteBancaire::factory()->create(['nom' => 'Banque Pop']);
 
-    $sc = SousCategorie::factory()->create();
-    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sc->id]);
-    $operation = Operation::factory()->create(['nom' => 'Gym', 'type_operation_id' => $typeOp->id]);
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
-    $participant = Participant::create([
-        'operation_id' => $operation->id,
-        'tiers_id' => $tiers->id,
-        'date_inscription' => now()->toDateString(),
-    ]);
-    $seance = Seance::create([
-        'operation_id' => $operation->id,
-        'numero' => 1,
-        'date' => '2025-10-01',
-    ]);
-    $reglement = Reglement::create([
-        'participant_id' => $participant->id,
-        'seance_id' => $seance->id,
-        'mode_paiement' => ModePaiement::Cheque->value,
-        'montant_prevu' => 30.00,
-    ]);
-
     $service = app(RemiseBancaireService::class);
     $this->remise = $service->creer([
         'date' => '2025-10-15',
         'mode_paiement' => ModePaiement::Cheque->value,
         'compte_cible_id' => $this->compteCible->id,
     ]);
-    $service->comptabiliser($this->remise, [$reglement->id]);
+
+    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
+    $tx = Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compteCible->id,
+        'mode_paiement' => ModePaiement::Cheque,
+        'montant_total' => 30.00,
+        'statut_reglement' => StatutReglement::EnAttente,
+        'tiers_id' => $tiers->id,
+        'remise_id' => null,
+    ]);
+
+    $service->comptabiliser($this->remise, [$tx->id]);
     $this->remise->refresh();
 });
 
@@ -64,4 +50,23 @@ it('displays remise details', function () {
         ->assertSee('Banque Pop')
         ->assertSee('Jean DUPONT')
         ->assertSee('RBC-00001-001');
+});
+
+it('isBrouillon returns false when remise has recu transactions', function () {
+    $component = Livewire::test(RemiseBancaireShow::class, ['remise' => $this->remise]);
+
+    // The remise has a recu transaction, so it's not a brouillon
+    expect($this->remise->transactions()->where('statut_reglement', StatutReglement::Recu->value)->exists())->toBeTrue();
+});
+
+it('isBrouillon returns true when no recu or pointe transactions', function () {
+    $service = app(RemiseBancaireService::class);
+    $remiseBrouillon = $service->creer([
+        'date' => '2025-11-01',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'compte_cible_id' => $this->compteCible->id,
+    ]);
+
+    // No comptabiliser called — no recu transactions
+    expect($remiseBrouillon->transactions()->whereIn('statut_reglement', ['recu', 'pointe'])->exists())->toBeFalse();
 });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Helpers\EmailLogo;
 use App\Mail\CommunicationTiersMail;
 use App\Models\Association;
 use App\Models\CampagneEmail;
@@ -268,7 +269,7 @@ final class CommunicationTiers extends Component
      */
     public function getInsertableElements(): array
     {
-        $logos = \App\Helpers\EmailLogo::variables();
+        $logos = EmailLogo::variables();
         $optoutUrl = '{lien_optout}';
         $optoutBlock = '<p style="font-size:12px;color:#666;margin-top:20px;text-align:center">'
             .'<a href="'.$optoutUrl.'" style="color:#666">Se désinscrire des communications</a>'

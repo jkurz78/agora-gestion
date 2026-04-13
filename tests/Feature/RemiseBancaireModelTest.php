@@ -12,7 +12,6 @@ use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Models\VirementInterne;
 use Illuminate\Support\Carbon;
 
 test('creating RemiseBancaire with correct casts', function (): void {
@@ -54,22 +53,23 @@ test('remise compteCible relation', function (): void {
     expect($remise->compteCible->id)->toBe($compte->id);
 });
 
-test('remise virement relation', function (): void {
+test('remise transactions relation', function (): void {
     $compte = CompteBancaire::factory()->create();
     $user = User::factory()->create();
-    $virement = VirementInterne::factory()->create();
 
     $remise = RemiseBancaire::create([
         'numero' => 1,
         'date' => now()->toDateString(),
         'mode_paiement' => 'cheque',
         'compte_cible_id' => $compte->id,
-        'virement_id' => $virement->id,
         'libelle' => 'Test',
         'saisi_par' => $user->id,
     ]);
 
-    expect($remise->virement->id)->toBe($virement->id);
+    $tx = Transaction::factory()->create(['remise_id' => $remise->id, 'compte_id' => $compte->id]);
+
+    expect($remise->transactions)->toHaveCount(1)
+        ->and((int) $remise->transactions->first()->id)->toBe((int) $tx->id);
 });
 
 test('remise saisiPar relation', function (): void {
@@ -136,7 +136,7 @@ test('referencePrefix returns RBE for especes', function (): void {
     expect($remise->referencePrefix())->toBe('RBE');
 });
 
-test('montantTotal sums linked reglements montant_prevu', function (): void {
+test('montantTotal sums linked transactions montant_total', function (): void {
     $compte = CompteBancaire::factory()->create();
     $user = User::factory()->create();
 
@@ -149,28 +149,8 @@ test('montantTotal sums linked reglements montant_prevu', function (): void {
         'saisi_par' => $user->id,
     ]);
 
-    $operation = Operation::factory()->create();
-    $tiers1 = Tiers::factory()->create();
-    $tiers2 = Tiers::factory()->create();
-    $p1 = Participant::create(['tiers_id' => $tiers1->id, 'operation_id' => $operation->id, 'date_inscription' => now()->toDateString()]);
-    $p2 = Participant::create(['tiers_id' => $tiers2->id, 'operation_id' => $operation->id, 'date_inscription' => now()->toDateString()]);
-    $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1]);
-
-    Reglement::create([
-        'participant_id' => $p1->id,
-        'seance_id' => $seance->id,
-        'mode_paiement' => 'cheque',
-        'montant_prevu' => 30.00,
-        'remise_id' => $remise->id,
-    ]);
-
-    Reglement::create([
-        'participant_id' => $p2->id,
-        'seance_id' => $seance->id,
-        'mode_paiement' => 'cheque',
-        'montant_prevu' => 20.50,
-        'remise_id' => $remise->id,
-    ]);
+    Transaction::factory()->create(['remise_id' => $remise->id, 'compte_id' => $compte->id, 'montant_total' => 30.00]);
+    Transaction::factory()->create(['remise_id' => $remise->id, 'compte_id' => $compte->id, 'montant_total' => 20.50]);
 
     expect($remise->montantTotal())->toBe(50.50);
 });

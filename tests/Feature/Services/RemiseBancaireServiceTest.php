@@ -3,19 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
-use App\Enums\TypeTransaction;
+use App\Enums\StatutReglement;
 use App\Models\CompteBancaire;
-use App\Models\Operation;
-use App\Models\Participant;
-use App\Models\Reglement;
 use App\Models\RemiseBancaire;
-use App\Models\Seance;
-use App\Models\SousCategorie;
-use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\TypeOperation;
 use App\Models\User;
-use App\Models\VirementInterne;
 use App\Services\RemiseBancaireService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -39,7 +31,6 @@ describe('creer()', function () {
         expect($remise)->toBeInstanceOf(RemiseBancaire::class)
             ->and($remise->numero)->toBe(1)
             ->and($remise->libelle)->toBe('Remise chèques n°1')
-            ->and($remise->virement_id)->toBeNull()
             ->and($remise->saisi_par)->toBe($this->user->id);
     });
 
@@ -61,225 +52,8 @@ describe('creer()', function () {
     });
 });
 
-describe('comptabiliser()', function () {
-    beforeEach(function () {
-        $this->sousCategorie = SousCategorie::factory()->create();
-        $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
-        $this->operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-        $this->tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
-        $this->participant = Participant::create([
-            'operation_id' => $this->operation->id,
-            'tiers_id' => $this->tiers->id,
-            'date_inscription' => now()->toDateString(),
-        ]);
-        $this->seance = Seance::create([
-            'operation_id' => $this->operation->id,
-            'numero' => 1,
-            'date' => '2025-10-01',
-        ]);
-        $this->reglement = Reglement::create([
-            'participant_id' => $this->participant->id,
-            'seance_id' => $this->seance->id,
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'montant_prevu' => 30.00,
-        ]);
-    });
-
-    it('creates transactions and virement for selected reglements', function () {
-        $remise = $this->service->creer([
-            'date' => '2025-10-15',
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $this->service->comptabiliser($remise, [$this->reglement->id]);
-
-        $remise->refresh();
-
-        // Virement created
-        expect($remise->virement_id)->not->toBeNull();
-        $virement = $remise->virement;
-        expect((float) $virement->montant)->toBe(30.0)
-            ->and($virement->reference)->toBe('RBC-00001');
-
-        // Transaction created on intermediary account
-        $transactions = Transaction::where('remise_id', $remise->id)->get();
-        expect($transactions)->toHaveCount(1);
-        $tx = $transactions->first();
-        expect($tx->type)->toBe(TypeTransaction::Recette)
-            ->and((float) $tx->montant_total)->toBe(30.0)
-            ->and($tx->tiers_id)->toBe($this->tiers->id)
-            ->and($tx->reference)->toBe('RBC-00001-001')
-            ->and($tx->numero_piece)->not->toBeNull();
-
-        // Transaction has one ligne with correct operation/seance/sous_categorie
-        $ligne = $tx->lignes->first();
-        expect($ligne->sous_categorie_id)->toBe($this->sousCategorie->id)
-            ->and($ligne->operation_id)->toBe($this->operation->id)
-            ->and($ligne->seance)->toBe(1);
-
-        // Reglement is linked
-        $this->reglement->refresh();
-        expect($this->reglement->remise_id)->toBe($remise->id);
-    });
-
-    it('uses intermediary system account for transactions', function () {
-        $compteIntermediaire = CompteBancaire::where('est_systeme', true)
-            ->where('nom', 'Remises en banque')
-            ->first();
-
-        $remise = $this->service->creer([
-            'date' => '2025-10-15',
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-        $this->service->comptabiliser($remise, [$this->reglement->id]);
-
-        $tx = Transaction::where('remise_id', $remise->id)->first();
-        expect($tx->compte_id)->toBe($compteIntermediaire->id);
-
-        // Virement goes from intermediary to target
-        $virement = $remise->fresh()->virement;
-        expect($virement->compte_source_id)->toBe($compteIntermediaire->id)
-            ->and($virement->compte_destination_id)->toBe($this->compteCible->id);
-    });
-
-    it('refuses to comptabiliser an already-comptabilised remise', function () {
-        $remise = $this->service->creer([
-            'date' => '2025-10-15',
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-        $this->service->comptabiliser($remise, [$this->reglement->id]);
-
-        $this->service->comptabiliser($remise->fresh(), [$this->reglement->id]);
-    })->throws(RuntimeException::class);
-
-    it('refuses reglements with wrong mode_paiement', function () {
-        $this->reglement->update(['mode_paiement' => ModePaiement::Especes->value]);
-
-        $remise = $this->service->creer([
-            'date' => '2025-10-15',
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $this->service->comptabiliser($remise, [$this->reglement->id]);
-    })->throws(RuntimeException::class);
-
-    it('refuses reglements already linked to another remise', function () {
-        // Create another remise to use as a valid FK target
-        $autreRemise = $this->service->creer([
-            'date' => '2025-10-01',
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-        $this->reglement->update(['remise_id' => $autreRemise->id]);
-
-        $remise = $this->service->creer([
-            'date' => '2025-10-15',
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $this->service->comptabiliser($remise, [$this->reglement->id]);
-    })->throws(RuntimeException::class);
-
-    it('throws when operation has no sous_categorie', function () {
-        $this->operation->typeOperation->update(['sous_categorie_id' => null]);
-
-        $remise = $this->service->creer([
-            'date' => '2025-10-15',
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $this->service->comptabiliser($remise, [$this->reglement->id]);
-    })->throws(RuntimeException::class);
-});
-
-describe('modifier()', function () {
-    beforeEach(function () {
-        $this->sousCategorie = SousCategorie::factory()->create();
-        $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
-        $this->operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-        $this->tiers1 = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
-        $this->tiers2 = Tiers::factory()->create(['nom' => 'Martin', 'prenom' => 'Sophie']);
-        $this->participant1 = Participant::create([
-            'operation_id' => $this->operation->id,
-            'tiers_id' => $this->tiers1->id,
-            'date_inscription' => now()->toDateString(),
-        ]);
-        $this->participant2 = Participant::create([
-            'operation_id' => $this->operation->id,
-            'tiers_id' => $this->tiers2->id,
-            'date_inscription' => now()->toDateString(),
-        ]);
-        $this->seance = Seance::create([
-            'operation_id' => $this->operation->id,
-            'numero' => 1,
-            'date' => '2025-10-01',
-        ]);
-        $this->reg1 = Reglement::create([
-            'participant_id' => $this->participant1->id,
-            'seance_id' => $this->seance->id,
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'montant_prevu' => 30.00,
-        ]);
-        $this->reg2 = Reglement::create([
-            'participant_id' => $this->participant2->id,
-            'seance_id' => $this->seance->id,
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'montant_prevu' => 25.00,
-        ]);
-
-        // Create and comptabiliser with reg1 only
-        $this->remise = $this->service->creer([
-            'date' => '2025-10-15',
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-        $this->service->comptabiliser($this->remise, [$this->reg1->id]);
-        $this->remise->refresh();
-    });
-
-    it('adds a reglement and updates virement montant', function () {
-        $this->service->modifier($this->remise, [$this->reg1->id, $this->reg2->id]);
-
-        $this->remise->refresh();
-        expect(Transaction::where('remise_id', $this->remise->id)->count())->toBe(2);
-        expect((float) $this->remise->virement->montant)->toBe(55.0);
-
-        $this->reg2->refresh();
-        expect($this->reg2->remise_id)->toBe($this->remise->id);
-    });
-
-    it('removes a reglement and updates virement montant', function () {
-        // First add reg2
-        $this->service->modifier($this->remise, [$this->reg1->id, $this->reg2->id]);
-        $this->remise->refresh();
-
-        // Now remove reg1
-        $this->service->modifier($this->remise, [$this->reg2->id]);
-
-        $this->remise->refresh();
-        expect(Transaction::where('remise_id', $this->remise->id)->count())->toBe(1);
-        expect((float) $this->remise->virement->montant)->toBe(25.0);
-
-        $this->reg1->refresh();
-        expect($this->reg1->remise_id)->toBeNull();
-    });
-
-    it('deletes remise when empty list', function () {
-        $this->service->modifier($this->remise, []);
-
-        expect(RemiseBancaire::find($this->remise->id))->toBeNull();
-    });
-});
-
-describe('enregistrerBrouillon avec transactions', function () {
+describe('enregistrerBrouillon()', function () {
     it('rattache les transactions sélectionnées à la remise', function () {
-        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
         $remise = $this->service->creer([
             'date' => now()->toDateString(),
             'mode_paiement' => ModePaiement::Cheque->value,
@@ -287,21 +61,19 @@ describe('enregistrerBrouillon avec transactions', function () {
         ]);
 
         $tx = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
+            'compte_id' => $this->compteCible->id,
             'mode_paiement' => ModePaiement::Cheque,
             'montant_total' => 120.00,
             'remise_id' => null,
-            'reglement_id' => null,
         ]);
 
-        $this->service->enregistrerBrouillon($remise, [], [$tx->id]);
+        $this->service->enregistrerBrouillon($remise, [$tx->id]);
 
         $tx->refresh();
         expect($tx->remise_id)->toBe($remise->id);
     });
 
     it('détache les transactions désélectionnées', function () {
-        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
         $remise = $this->service->creer([
             'date' => now()->toDateString(),
             'mode_paiement' => ModePaiement::Cheque->value,
@@ -309,308 +81,256 @@ describe('enregistrerBrouillon avec transactions', function () {
         ]);
 
         $tx = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
+            'compte_id' => $this->compteCible->id,
             'mode_paiement' => ModePaiement::Cheque,
             'montant_total' => 80.00,
             'remise_id' => $remise->id,
-            'reglement_id' => null,
         ]);
 
-        $this->service->enregistrerBrouillon($remise, [], []);
+        $this->service->enregistrerBrouillon($remise, []);
 
         $tx->refresh();
         expect($tx->remise_id)->toBeNull();
     });
 });
 
-describe('comptabiliser avec transactions directes', function () {
-    it('déplace une transaction existante sans en créer une nouvelle', function () {
-        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
-        $compteRemises = CompteBancaire::where('est_systeme', true)->where('nom', 'Remises en banque')->firstOrFail();
-
-        $remise = $this->service->creer([
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'date' => now()->toDateString(),
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $tx = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
-            'mode_paiement' => ModePaiement::Cheque,
-            'montant_total' => 120.00,
-            'remise_id' => $remise->id,
-            'reglement_id' => null,
-        ]);
-
-        $countBefore = Transaction::count();
-
-        $this->service->comptabiliser($remise->fresh(), [], [$tx->id]);
-
-        // The original transaction was MOVED, not duplicated — count unchanged
-        expect(Transaction::count())->toBe($countBefore);
-
-        $tx->refresh();
-        expect($tx->compte_id)->toBe($compteRemises->id);
-        expect($tx->compte_origine_id)->toBe($compteCreances->id);
-        expect($tx->remise_id)->toBe($remise->id);
-        expect($tx->reference)->toStartWith('RBC-');
-
-        // Virement was created
-        $remise->refresh();
-        expect($remise->virement_id)->not->toBeNull();
-    });
-
-    it('préserve date_reglement lors du déplacement', function () {
-        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
-
-        $remise = $this->service->creer([
-            'mode_paiement' => ModePaiement::Especes->value,
-            'date' => now()->toDateString(),
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $tx = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
-            'mode_paiement' => ModePaiement::Especes,
-            'montant_total' => 45.00,
-            'remise_id' => $remise->id,
-            'reglement_id' => null,
-            'date_reglement' => '2026-04-10',
-            'reference_reglement' => 'ESP-001',
-        ]);
-
-        $this->service->comptabiliser($remise->fresh(), [], [$tx->id]);
-
-        $tx->refresh();
-        expect($tx->date_reglement->toDateString())->toBe('2026-04-10');
-        expect($tx->reference_reglement)->toBe('ESP-001');
-    });
-
-    it('refuse une transaction déjà liée à un règlement', function () {
-        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
-
-        $remise = $this->service->creer([
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'date' => now()->toDateString(),
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        // Create a reglement to attach
-        $sousCategorie = SousCategorie::factory()->create();
-        $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sousCategorie->id]);
-        $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-        $tiers = Tiers::factory()->create();
-        $participant = Participant::create([
-            'operation_id' => $operation->id,
-            'tiers_id' => $tiers->id,
-            'date_inscription' => now()->toDateString(),
-        ]);
-        $seance = Seance::create([
-            'operation_id' => $operation->id,
-            'numero' => 1,
-            'date' => now()->toDateString(),
-        ]);
-        $reglement = Reglement::create([
-            'participant_id' => $participant->id,
-            'seance_id' => $seance->id,
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'montant_prevu' => 30.00,
-        ]);
-
-        $tx = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
-            'mode_paiement' => ModePaiement::Cheque,
-            'montant_total' => 30.00,
-            'remise_id' => $remise->id,
-            'reglement_id' => $reglement->id,
-        ]);
-
-        $this->service->comptabiliser($remise->fresh(), [], [$tx->id]);
-    })->throws(RuntimeException::class);
-});
-
-describe('modifier avec transactions directes', function () {
-    it('restaure une transaction retirée à son compte d\'origine', function () {
-        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
-
-        $remise = $this->service->creer([
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'date' => now()->toDateString(),
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $tx = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
-            'mode_paiement' => ModePaiement::Cheque,
-            'montant_total' => 120.00,
-            'remise_id' => $remise->id,
-            'reglement_id' => null,
-        ]);
-
-        $this->service->comptabiliser($remise->fresh(), [], [$tx->id]);
-
-        $tx->refresh();
-        expect($tx->compte_id)->not->toBe($compteCreances->id); // on Remises en banque
-
-        // Now remove it (empty lists → supprimer)
-        $this->service->modifier($remise->fresh(), [], []);
-
-        // Remise should be deleted (empty remise triggers supprimer)
-        expect(RemiseBancaire::find($remise->id))->toBeNull();
-
-        $tx->refresh();
-        expect($tx->compte_id)->toBe($compteCreances->id);
-        expect($tx->remise_id)->toBeNull();
-        expect($tx->compte_origine_id)->toBeNull();
-    });
-
-    it('ajoute une transaction à une remise comptabilisée', function () {
-        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
-        $compteRemises = CompteBancaire::where('nom', 'Remises en banque')->firstOrFail();
-
-        $remise = $this->service->creer([
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'date' => now()->toDateString(),
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $txInitiale = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
-            'mode_paiement' => ModePaiement::Cheque,
-            'montant_total' => 50.00,
-            'remise_id' => $remise->id,
-            'reglement_id' => null,
-        ]);
-
-        $this->service->comptabiliser($remise->fresh(), [], [$txInitiale->id]);
-
-        $txNouvelle = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
-            'mode_paiement' => ModePaiement::Cheque,
-            'montant_total' => 80.00,
-            'reglement_id' => null,
-        ]);
-
-        $this->service->modifier($remise->fresh(), [], [$txInitiale->id, $txNouvelle->id]);
-
-        $txNouvelle->refresh();
-        expect($txNouvelle->compte_id)->toBe($compteRemises->id);
-        expect($txNouvelle->remise_id)->toBe($remise->id);
-    });
-});
-
-describe('supprimer avec transactions directes', function () {
-    it('restaure les transactions déplacées', function () {
-        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
-
-        $remise = $this->service->creer([
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'date' => now()->toDateString(),
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $tx = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
-            'mode_paiement' => ModePaiement::Cheque,
-            'montant_total' => 120.00,
-            'remise_id' => $remise->id,
-            'reglement_id' => null,
-        ]);
-
-        $this->service->comptabiliser($remise->fresh(), [], [$tx->id]);
-
-        $this->service->supprimer($remise->fresh());
-
-        $tx->refresh();
-        expect($tx->compte_id)->toBe($compteCreances->id);
-        expect($tx->remise_id)->toBeNull();
-        expect($tx->compte_origine_id)->toBeNull();
-        expect($tx->trashed())->toBeFalse();
-    });
-
-    it('préserve date_reglement lors de la restauration', function () {
-        $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
-
-        $remise = $this->service->creer([
-            'mode_paiement' => ModePaiement::Especes->value,
-            'date' => now()->toDateString(),
-            'compte_cible_id' => $this->compteCible->id,
-        ]);
-
-        $tx = Transaction::factory()->asRecette()->create([
-            'compte_id' => $compteCreances->id,
-            'mode_paiement' => ModePaiement::Especes,
-            'montant_total' => 45.00,
-            'remise_id' => $remise->id,
-            'reglement_id' => null,
-            'date_reglement' => '2026-04-10',
-            'reference_reglement' => 'ESP-001',
-        ]);
-
-        $this->service->comptabiliser($remise->fresh(), [], [$tx->id]);
-        $this->service->supprimer($remise->fresh());
-
-        $tx->refresh();
-        expect($tx->date_reglement->toDateString())->toBe('2026-04-10');
-        expect($tx->reference_reglement)->toBe('ESP-001');
-    });
-});
-
-describe('supprimer()', function () {
-    beforeEach(function () {
-        $this->sousCategorie = SousCategorie::factory()->create();
-        $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $this->sousCategorie->id]);
-        $this->operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-        $this->tiers = Tiers::factory()->create();
-        $this->participant = Participant::create([
-            'operation_id' => $this->operation->id,
-            'tiers_id' => $this->tiers->id,
-            'date_inscription' => now()->toDateString(),
-        ]);
-        $this->seance = Seance::create([
-            'operation_id' => $this->operation->id,
-            'numero' => 1,
-            'date' => '2025-10-01',
-        ]);
-        $this->reglement = Reglement::create([
-            'participant_id' => $this->participant->id,
-            'seance_id' => $this->seance->id,
-            'mode_paiement' => ModePaiement::Cheque->value,
-            'montant_prevu' => 30.00,
-        ]);
-    });
-
-    it('soft-deletes remise, transactions, virement and frees reglements', function () {
+describe('comptabiliser()', function () {
+    it('sets statut_reglement=recu and reference on transactions', function () {
         $remise = $this->service->creer([
             'date' => '2025-10-15',
             'mode_paiement' => ModePaiement::Cheque->value,
             'compte_cible_id' => $this->compteCible->id,
         ]);
-        $this->service->comptabiliser($remise, [$this->reglement->id]);
-        $remise->refresh();
 
-        $virementId = $remise->virement_id;
-        $transactionIds = Transaction::where('remise_id', $remise->id)->pluck('id')->toArray();
+        $tx = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 30.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
 
-        $this->service->supprimer($remise);
+        $this->service->comptabiliser($remise, [$tx->id]);
 
-        // Remise soft-deleted
+        $tx->refresh();
+        expect($tx->statut_reglement)->toBe(StatutReglement::Recu)
+            ->and($tx->reference)->toBe('RBC-00001-001')
+            ->and($tx->remise_id)->toBe($remise->id);
+    });
+
+    it('assigns sequential references for multiple transactions', function () {
+        $remise = $this->service->creer([
+            'date' => '2025-10-15',
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        $tx1 = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 30.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+        $tx2 = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 20.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+
+        $this->service->comptabiliser($remise, [$tx1->id, $tx2->id]);
+
+        $tx1->refresh();
+        $tx2->refresh();
+        expect($tx1->reference)->toBe('RBC-00001-001')
+            ->and($tx2->reference)->toBe('RBC-00001-002');
+    });
+
+    it('uses RBE prefix for espèces', function () {
+        $remise = $this->service->creer([
+            'date' => '2025-10-15',
+            'mode_paiement' => ModePaiement::Especes->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        $tx = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Especes,
+            'montant_total' => 45.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+
+        $this->service->comptabiliser($remise, [$tx->id]);
+
+        $tx->refresh();
+        expect($tx->reference)->toStartWith('RBE-');
+    });
+
+    it('refuses to comptabiliser a verrouillée remise', function () {
+        $remise = $this->service->creer([
+            'date' => '2025-10-15',
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        // Lock the remise by adding a pointed transaction
+        Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 30.00,
+            'statut_reglement' => StatutReglement::Pointe,
+            'remise_id' => $remise->id,
+        ]);
+
+        $tx = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 20.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+
+        $this->service->comptabiliser($remise->fresh(), [$tx->id]);
+    })->throws(RuntimeException::class);
+
+    it('refuses transaction with wrong mode_paiement', function () {
+        $remise = $this->service->creer([
+            'date' => '2025-10-15',
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        $tx = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Especes,
+            'montant_total' => 30.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+
+        $this->service->comptabiliser($remise, [$tx->id]);
+    })->throws(RuntimeException::class);
+});
+
+describe('modifier()', function () {
+    it('adds a new transaction to a comptabilised remise', function () {
+        $remise = $this->service->creer([
+            'date' => '2025-10-15',
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        $tx1 = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 30.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+        $this->service->comptabiliser($remise, [$tx1->id]);
+
+        $tx2 = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 25.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+
+        $this->service->modifier($remise->fresh(), [$tx1->id, $tx2->id]);
+
+        $tx2->refresh();
+        expect($tx2->remise_id)->toBe($remise->id)
+            ->and($tx2->statut_reglement)->toBe(StatutReglement::Recu);
+    });
+
+    it('removes a transaction from a remise and resets it', function () {
+        $remise = $this->service->creer([
+            'date' => '2025-10-15',
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        $tx1 = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 30.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+        $tx2 = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 25.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+
+        $this->service->comptabiliser($remise, [$tx1->id, $tx2->id]);
+
+        $this->service->modifier($remise->fresh(), [$tx2->id]);
+
+        $tx1->refresh();
+        expect($tx1->remise_id)->toBeNull()
+            ->and($tx1->statut_reglement)->toBe(StatutReglement::EnAttente)
+            ->and($tx1->reference)->toBeNull();
+    });
+
+    it('supprime la remise quand la liste est vide', function () {
+        $remise = $this->service->creer([
+            'date' => '2025-10-15',
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        $tx = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 30.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+        $this->service->comptabiliser($remise, [$tx->id]);
+
+        $this->service->modifier($remise->fresh(), []);
+
+        expect(RemiseBancaire::find($remise->id))->toBeNull();
+
+        $tx->refresh();
+        expect($tx->remise_id)->toBeNull()
+            ->and($tx->statut_reglement)->toBe(StatutReglement::EnAttente);
+    });
+});
+
+describe('supprimer()', function () {
+    it('soft-deletes remise and resets linked transactions', function () {
+        $remise = $this->service->creer([
+            'date' => '2025-10-15',
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        $tx = Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 30.00,
+            'statut_reglement' => StatutReglement::EnAttente,
+            'remise_id' => null,
+        ]);
+        $this->service->comptabiliser($remise, [$tx->id]);
+
+        $this->service->supprimer($remise->fresh());
+
         expect(RemiseBancaire::find($remise->id))->toBeNull();
         expect(RemiseBancaire::withTrashed()->find($remise->id))->not->toBeNull();
 
-        // Transactions soft-deleted
-        foreach ($transactionIds as $txId) {
-            expect(Transaction::find($txId))->toBeNull();
-            expect(Transaction::withTrashed()->find($txId))->not->toBeNull();
-        }
-
-        // Virement soft-deleted
-        expect(VirementInterne::find($virementId))->toBeNull();
-        expect(VirementInterne::withTrashed()->find($virementId))->not->toBeNull();
-
-        // Reglement freed
-        $this->reglement->refresh();
-        expect($this->reglement->remise_id)->toBeNull();
+        $tx->refresh();
+        expect($tx->remise_id)->toBeNull()
+            ->and($tx->statut_reglement)->toBe(StatutReglement::EnAttente)
+            ->and($tx->reference)->toBeNull();
     });
 
     it('can delete a brouillon remise (no transactions)', function () {
@@ -624,4 +344,22 @@ describe('supprimer()', function () {
 
         expect(RemiseBancaire::find($remise->id))->toBeNull();
     });
+
+    it('refuses to supprimer a verrouillée remise', function () {
+        $remise = $this->service->creer([
+            'date' => '2025-10-15',
+            'mode_paiement' => ModePaiement::Cheque->value,
+            'compte_cible_id' => $this->compteCible->id,
+        ]);
+
+        Transaction::factory()->asRecette()->create([
+            'compte_id' => $this->compteCible->id,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => 30.00,
+            'statut_reglement' => StatutReglement::Pointe,
+            'remise_id' => $remise->id,
+        ]);
+
+        $this->service->supprimer($remise->fresh());
+    })->throws(RuntimeException::class);
 });

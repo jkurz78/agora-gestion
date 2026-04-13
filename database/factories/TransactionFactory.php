@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\CompteBancaire;
 use App\Models\Transaction;
@@ -27,7 +28,7 @@ class TransactionFactory extends Factory
             'mode_paiement' => fake()->randomElement(ModePaiement::cases()),
             'reference' => fake()->numerify('REF-####'),
             'compte_id' => CompteBancaire::factory(),
-            'statut_reglement' => \App\Enums\StatutReglement::EnAttente,
+            'statut_reglement' => StatutReglement::EnAttente,
             'notes' => fake()->optional()->sentence(),
             'saisi_par' => User::factory(),
         ];
