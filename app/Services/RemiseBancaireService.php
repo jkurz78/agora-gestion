@@ -37,13 +37,22 @@ final class RemiseBancaireService
     public function enregistrerBrouillon(RemiseBancaire $remise, array $transactionIds): void
     {
         DB::transaction(function () use ($remise, $transactionIds): void {
+            // Retirer les transactions déselectionnées → repasser en attente
             Transaction::where('remise_id', $remise->id)
                 ->whereNotIn('id', $transactionIds)
-                ->update(['remise_id' => null]);
+                ->update([
+                    'remise_id' => null,
+                    'statut_reglement' => StatutReglement::EnAttente->value,
+                    'reference' => null,
+                ]);
 
+            // Ajouter les transactions sélectionnées → reçues (prêtes pour dépôt)
             if (! empty($transactionIds)) {
                 Transaction::whereIn('id', $transactionIds)
-                    ->update(['remise_id' => $remise->id]);
+                    ->update([
+                        'remise_id' => $remise->id,
+                        'statut_reglement' => StatutReglement::Recu->value,
+                    ]);
             }
         });
     }
@@ -126,7 +135,7 @@ final class RemiseBancaireService
             $numeroPadded = str_pad((string) $remise->numero, 5, '0', STR_PAD_LEFT);
             $index = Transaction::where('remise_id', $remise->id)->count();
 
-            foreach (Transaction::whereIn('id', $transactionIds)->whereNull('remise_id')->get() as $tx) {
+            foreach (Transaction::whereIn('id', $transactionIds)->whereNull('reference')->get() as $tx) {
                 $index++;
                 $tx->update([
                     'remise_id' => $remise->id,

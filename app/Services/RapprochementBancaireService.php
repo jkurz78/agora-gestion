@@ -148,7 +148,12 @@ final class RapprochementBancaireService
         );
 
         // Verify account ownership before modifying
-        if (str_starts_with($type, 'virement')) {
+        if ($type === 'remise') {
+            $remiseTx = Transaction::where('remise_id', $id)->where('compte_id', $rapprochement->compte_id)->first();
+            if ($remiseTx === null) {
+                throw new \InvalidArgumentException('Remise introuvable sur ce compte.');
+            }
+        } elseif (str_starts_with($type, 'virement')) {
             $virement = VirementInterne::findOrFail($id);
             $expectedField = $type === 'virement_source' ? 'compte_source_id' : 'compte_destination_id';
             if ((int) $virement->{$expectedField} !== (int) $rapprochement->compte_id) {
@@ -165,6 +170,12 @@ final class RapprochementBancaireService
         }
 
         DB::transaction(function () use ($rapprochement, $type, $id) {
+            if ($type === 'remise') {
+                $this->toggleRemise($rapprochement, $id);
+
+                return;
+            }
+
             if (str_starts_with($type, 'virement')) {
                 $this->toggleVirement($rapprochement, $type, $id);
 
@@ -187,6 +198,23 @@ final class RapprochementBancaireService
             }
             $model->save();
         });
+    }
+
+    private function toggleRemise(RapprochementBancaire $rapprochement, int $remiseId): void
+    {
+        $transactions = Transaction::where('remise_id', $remiseId)->get();
+        $allPointed = $transactions->every(fn (Transaction $tx) => (int) $tx->rapprochement_id === $rapprochement->id);
+
+        foreach ($transactions as $tx) {
+            if ($allPointed) {
+                $tx->rapprochement_id = null;
+                $tx->statut_reglement = StatutReglement::Recu;
+            } else {
+                $tx->rapprochement_id = $rapprochement->id;
+                $tx->statut_reglement = StatutReglement::Pointe;
+            }
+            $tx->save();
+        }
     }
 
     // VirementInterne n'a pas de champ 'pointe' — le pointage est indiqué

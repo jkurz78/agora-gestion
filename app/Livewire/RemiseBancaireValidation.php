@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
-use App\Enums\StatutReglement;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Services\RemiseBancaireService;
@@ -45,7 +44,7 @@ final class RemiseBancaireValidation extends Component
             $service = app(RemiseBancaireService::class);
 
             $alreadyComptabilisee = Transaction::where('remise_id', $this->remise->id)
-                ->where('statut_reglement', StatutReglement::Recu->value)
+                ->whereNotNull('reference')
                 ->exists();
 
             if ($alreadyComptabilisee) {
