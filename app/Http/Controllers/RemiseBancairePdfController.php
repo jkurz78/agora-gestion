@@ -16,7 +16,7 @@ final class RemiseBancairePdfController extends Controller
 {
     public function __invoke(RemiseBancaire $remise): Response
     {
-        $remise->load(['compteCible', 'reglements.participant.tiers', 'reglements.seance.operation', 'transactionsDirectes.tiers']);
+        $remise->load(['compteCible', 'transactions.tiers']);
 
         // Association (may be null)
         $association = Association::find(1);
@@ -42,8 +42,7 @@ final class RemiseBancairePdfController extends Controller
         $data = [
             'remise' => $remise,
             'compteCible' => $remise->compteCible,
-            'reglements' => $remise->reglements,
-            'transactionsDirectes' => $remise->transactionsDirectes,
+            'transactions' => $remise->transactions->sortBy('date')->values(),
             'typeLabel' => $typeLabel,
             'montantTotal' => $montantTotal,
             'association' => $association,
