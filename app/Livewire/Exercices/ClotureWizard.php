@@ -95,7 +95,7 @@ final class ClotureWizard extends Component
     {
         $soldeService = app(SoldeService::class);
         $rapprochementService = app(RapprochementBancaireService::class);
-        $comptes = CompteBancaire::orderBy('nom')->get();
+        $comptes = CompteBancaire::where('est_systeme', false)->orderBy('nom')->get();
         $range = app(ExerciceService::class)->dateRange($this->annee);
         $start = $range['start']->toDateString();
         $end = $range['end']->toDateString();
