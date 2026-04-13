@@ -540,6 +540,7 @@ describe('factures', function (): void {
             'tiers_id' => $this->tiers->id,
             'compte_id' => $compte->id,
             'saisi_par' => $this->user->id,
+            'statut_reglement' => 'recu', // v3: montantRegle() requires statut_reglement in ('recu','pointe')
         ]);
         $facture->transactions()->attach($tx->id);
 

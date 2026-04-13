@@ -197,28 +197,31 @@ test('montantRegle returns sum for transactions on non-système accounts', funct
         'exercice' => 2025,
     ]);
 
-    // Virement sur compte réel → réglé
+    // Virement statut_reglement=recu → réglé
     $txVirement = Transaction::factory()->create([
         'montant_total' => 100.00,
         'mode_paiement' => 'virement',
         'compte_id' => $compteReel->id,
+        'statut_reglement' => 'recu',
     ]);
-    // Chèque sur compte réel → réglé (saisi directement en banque)
+    // Chèque statut_reglement=recu → réglé
     $txCheque = Transaction::factory()->create([
         'montant_total' => 100.00,
         'mode_paiement' => 'cheque',
         'compte_id' => $compteReel->id,
+        'statut_reglement' => 'recu',
     ]);
-    // Chèque sur compte système → non réglé (en attente de remise)
+    // Chèque statut_reglement=en_attente → non réglé
     $txAttente = Transaction::factory()->create([
         'montant_total' => 100.00,
         'mode_paiement' => 'cheque',
         'compte_id' => $compteSysteme->id,
+        'statut_reglement' => 'en_attente',
     ]);
 
     $facture->transactions()->attach([$txVirement->id, $txCheque->id, $txAttente->id]);
 
-    // 100 + 100 (comptes réels) = 200, chèque sur système = non réglé
+    // 100 + 100 (statut recu) = 200, en_attente = non réglé
     expect($facture->montantRegle())->toBe(200.0);
 });
 
@@ -247,18 +250,20 @@ test('montantRegle considers remise transactions on système account as paid', f
         'exercice' => 2025,
     ]);
 
-    // Transaction sur compte système AVEC remise_id → réglée
+    // Transaction statut_reglement=recu (dans une remise) → réglée
     $txRemise = Transaction::factory()->create([
         'montant_total' => 100.00,
         'compte_id' => $compteSysteme->id,
         'remise_id' => $remise->id,
+        'statut_reglement' => 'recu',
     ]);
-    // Transaction sur compte système SANS remise_id → non réglée
+    // Transaction statut_reglement=en_attente → non réglée
     $txAttente = Transaction::factory()->create([
         'montant_total' => 50.00,
         'compte_id' => $compteSysteme->id,
         'mode_paiement' => 'cheque',
         'remise_id' => null,
+        'statut_reglement' => 'en_attente',
     ]);
 
     $facture->transactions()->attach([$txRemise->id, $txAttente->id]);
@@ -304,15 +309,6 @@ test('isAcquittee returns true when fully paid', function (): void {
     $user = User::factory()->create();
     $compte = CompteBancaire::factory()->create();
 
-    $remise = RemiseBancaire::create([
-        'numero' => 1,
-        'date' => now()->toDateString(),
-        'mode_paiement' => 'cheque',
-        'compte_cible_id' => $compte->id,
-        'libelle' => 'Test remise',
-        'saisi_par' => $user->id,
-    ]);
-
     $facture = Facture::create([
         'date' => now()->toDateString(),
         'statut' => 'validee',
@@ -324,7 +320,8 @@ test('isAcquittee returns true when fully paid', function (): void {
 
     $transaction = Transaction::factory()->create([
         'montant_total' => 200.00,
-        'remise_id' => $remise->id,
+        'compte_id' => $compte->id,
+        'statut_reglement' => 'recu',
     ]);
 
     $facture->transactions()->attach($transaction->id);
@@ -503,8 +500,8 @@ test('FactureLigne transactionLigne relation', function (): void {
     expect($ligne->transactionLigne->id)->toBe($transactionLigne->id);
 });
 
-it('compte une transaction avec date_reglement sur un compte système', function (): void {
-    $compteSysteme = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
+it('compte une transaction avec statut_reglement=recu', function (): void {
+    $compte = CompteBancaire::factory()->create();
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
 
@@ -519,10 +516,9 @@ it('compte une transaction avec date_reglement sur un compte système', function
 
     $transaction = Transaction::factory()->asRecette()->create([
         'tiers_id' => $tiers->id,
-        'compte_id' => $compteSysteme->id,
+        'compte_id' => $compte->id,
         'montant_total' => 120.00,
-        'date_reglement' => now(),
-        'reference_reglement' => 'CHQ-12345',
+        'statut_reglement' => 'recu',
     ]);
 
     $facture->transactions()->attach($transaction->id);
@@ -531,8 +527,8 @@ it('compte une transaction avec date_reglement sur un compte système', function
     expect($facture->isAcquittee())->toBeTrue();
 });
 
-it('ne compte pas une transaction sur compte système sans date_reglement ni remise_id', function (): void {
-    $compteSysteme = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
+it('ne compte pas une transaction avec statut_reglement=en_attente', function (): void {
+    $compte = CompteBancaire::factory()->create();
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
 
@@ -547,9 +543,9 @@ it('ne compte pas une transaction sur compte système sans date_reglement ni rem
 
     $transaction = Transaction::factory()->asRecette()->create([
         'tiers_id' => $tiers->id,
-        'compte_id' => $compteSysteme->id,
+        'compte_id' => $compte->id,
         'montant_total' => 120.00,
-        'date_reglement' => null,
+        'statut_reglement' => 'en_attente',
     ]);
 
     $facture->transactions()->attach($transaction->id);

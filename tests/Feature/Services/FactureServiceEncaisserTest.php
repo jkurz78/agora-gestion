@@ -120,10 +120,9 @@ describe('encaisser()', function () {
         $this->service->valider($facture);
         $facture->refresh();
 
-        // The facture is already acquittée (transaction on real account counts as règlement),
-        // so the guard fires before per-transaction checks.
+        // La transaction est déjà sur un compte réel → guard per-transaction
         $this->service->encaisser($facture, [$transaction->id], $this->compteReel->id);
-    })->throws(RuntimeException::class, 'Cette facture est déjà intégralement réglée.');
+    })->throws(RuntimeException::class, 'Cette transaction est déjà encaissée.');
 
     it('supports partial encaissement (only some transactions)', function () {
         $tx1 = Transaction::create([

@@ -124,7 +124,9 @@ final class TransactionUniverselleService
                 "id, 'depense' as source_type, NULL as date, NULL as numero_piece, NULL as reference,
                  NULL as tiers, NULL as tiers_type, NULL as tiers_id, NULL as libelle,
                  NULL as categorie_label, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
-                 NULL as mode_paiement, 0 as montant, NULL as pointe, 0 as is_helloasso"
+                 NULL as mode_paiement, 0 as montant, NULL as pointe,
+                 NULL as statut_reglement, NULL as remise_id, NULL as rapprochement_id,
+                 NULL as notes, NULL as piece_jointe_path, NULL as piece_jointe_nom, 0 as is_helloasso"
             );
         }
 
@@ -266,6 +268,9 @@ final class TransactionUniverselleService
                 NULL as mode_paiement,
                 -(vi.montant) as montant,
                 (vi.rapprochement_source_id IS NOT NULL) as pointe,
+                NULL as statut_reglement,
+                NULL as remise_id,
+                NULL as rapprochement_id,
                 vi.notes,
                 NULL as piece_jointe_path,
                 NULL as piece_jointe_nom,
@@ -304,6 +309,9 @@ final class TransactionUniverselleService
                 NULL as mode_paiement,
                 vi.montant,
                 (vi.rapprochement_destination_id IS NOT NULL) as pointe,
+                NULL as statut_reglement,
+                NULL as remise_id,
+                NULL as rapprochement_id,
                 vi.notes,
                 NULL as piece_jointe_path,
                 NULL as piece_jointe_nom,

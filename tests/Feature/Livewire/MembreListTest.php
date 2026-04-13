@@ -19,7 +19,7 @@ it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée',
     $tiers = Tiers::factory()->create();
     $tx = Transaction::factory()->asRecette()->create([
         'tiers_id' => $tiers->id,
-        'pointe' => true,
+        'statut_reglement' => 'pointe',
     ]);
     $tx->lignes()->forceDelete();
     TransactionLigne::factory()->create([
@@ -37,7 +37,7 @@ it('n\'affiche pas le caractère unicode ✓', function () {
     $tiers = Tiers::factory()->create();
     $tx = Transaction::factory()->asRecette()->create([
         'tiers_id' => $tiers->id,
-        'pointe' => true,
+        'statut_reglement' => 'pointe',
     ]);
     $tx->lignes()->forceDelete();
     TransactionLigne::factory()->create([

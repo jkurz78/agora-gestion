@@ -149,6 +149,7 @@ it('shows badge Acquittee when fully paid', function () {
         'compte_id' => $this->compte->id,
         'date' => now(),
         'remise_id' => $remise->id,
+        'statut_reglement' => 'recu', // v3: montantRegle() checks statut_reglement
     ]);
 
     $this->facture->transactions()->attach($transaction->id);
@@ -184,14 +185,11 @@ it('enregistre un règlement chèque via le bouton unifié', function () {
 
     Livewire::test(FactureShow::class, ['facture' => $facture])
         ->set('selectedTransactionIds', [$transaction->id])
-        ->set('dateReglement', now()->toDateString())
-        ->set('referenceReglement', 'CHQ-12345')
         ->call('enregistrerReglement')
         ->assertHasNoErrors();
 
     $transaction->refresh();
-    expect($transaction->date_reglement)->not->toBeNull();
-    expect($transaction->reference_reglement)->toBe('CHQ-12345');
+    expect($transaction->statut_reglement->value)->toBe('recu');
     // Chèque reste sur le compte système (remise ultérieure)
     expect($transaction->compte_id)->toBe($compteCreances->id);
 });
@@ -223,15 +221,12 @@ it('enregistre un règlement virement et déplace vers compte réel', function (
 
     Livewire::test(FactureShow::class, ['facture' => $facture])
         ->set('selectedTransactionIds', [$transaction->id])
-        ->set('dateReglement', now()->toDateString())
-        ->set('referenceReglement', 'VIR-ABC-123')
         ->set('encaissementCompteId', $compteReel->id)
         ->call('enregistrerReglement')
         ->assertHasNoErrors();
 
     $transaction->refresh();
-    expect($transaction->date_reglement)->not->toBeNull();
-    expect($transaction->reference_reglement)->toBe('VIR-ABC-123');
+    expect($transaction->statut_reglement->value)->toBe('recu');
     // Virement déplacé vers le compte réel
     expect($transaction->compte_id)->toBe($compteReel->id);
 });

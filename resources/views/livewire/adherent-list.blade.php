@@ -74,7 +74,7 @@
                         </td>
                         <td class="small text-muted">{{ $cot?->transaction?->compte?->nom ?? '—' }}</td>
                         <td class="small">
-                            @if($cot && $cot->transaction->pointe)
+                            @if($cot && $cot->transaction->statut_reglement === \App\Enums\StatutReglement::Pointe)
                                 <i class="bi bi-check-lg text-success"></i>
                             @else
                                 <span class="text-muted">—</span>

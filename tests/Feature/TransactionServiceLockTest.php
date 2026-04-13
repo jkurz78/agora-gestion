@@ -35,6 +35,7 @@ function makeLockedTransaction(CompteBancaire $compte, string $type = 'depense')
         'date' => '2025-10-01',
         'montant_total' => 200.00,
         'rapprochement_id' => $rapprochement->id,
+        'statut_reglement' => 'pointe',
     ]);
     $transaction->lignes()->forceDelete();
     TransactionLigne::factory()->create([

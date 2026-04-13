@@ -89,12 +89,6 @@ final class FactureShow extends Component
             return;
         }
 
-        if ($this->dateReglement === null || $this->dateReglement === '') {
-            session()->flash('error', 'Veuillez saisir une date de règlement.');
-
-            return;
-        }
-
         try {
             $factureService = app(FactureService::class);
 
@@ -111,31 +105,21 @@ final class FactureShow extends Component
                 fn ($t) => in_array($t->mode_paiement, $modesDirects, true)
             );
 
-            // 1. Chèque / espèces : marquer comme réglé (reste sur compte système, remise ultérieure)
+            // 1. Chèque / espèces : statut_reglement = recu (reste sur compte système, remise ultérieure)
             if ($txChequeEspeces->isNotEmpty()) {
                 $factureService->marquerReglementRecu(
                     $this->facture,
                     $txChequeEspeces->pluck('id')->all(),
-                    $this->dateReglement,
-                    $this->referenceReglement ?: null,
                 );
             }
 
-            // 2. Virement / CB / prélèvement : déplacer vers le compte réel, puis stocker date + ref
+            // 2. Virement / CB / prélèvement : déplacer vers compte réel + statut_reglement = recu
             if ($txDirectes->isNotEmpty() && $this->encaissementCompteId) {
                 $factureService->encaisser(
                     $this->facture->fresh(),
                     $txDirectes->pluck('id')->all(),
                     $this->encaissementCompteId,
                 );
-                // Appliquer date_reglement et reference_reglement après le déplacement
-                foreach ($txDirectes as $tx) {
-                    $tx->refresh();
-                    $tx->update([
-                        'date_reglement' => $this->dateReglement,
-                        'reference_reglement' => $this->referenceReglement ?: null,
-                    ]);
-                }
             }
 
             $this->selectedTransactionIds = [];
