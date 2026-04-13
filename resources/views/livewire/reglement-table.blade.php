@@ -192,7 +192,7 @@
                                                 class="btn py-0 px-1 mt-1"
                                                 style="font-size:9px;line-height:1.4;border:1px solid #198754;color:#198754;border-radius:3px"
                                                 title="Marquer comme reçu">
-                                            &#10003; Reçu
+                                            Marquer reçu
                                         </button>
                                     @elseif($tx && $tx->statut_reglement !== \App\Enums\StatutReglement::EnAttente)
                                         <br>
