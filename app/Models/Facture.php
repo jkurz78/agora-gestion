@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -75,11 +76,10 @@ final class Facture extends Model
     public function montantRegle(): float
     {
         return (float) $this->transactions()
-            ->where(fn ($q) => $q
-                ->whereHas('compte', fn ($cq) => $cq->where('est_systeme', false))
-                ->orWhereNotNull('remise_id')
-                ->orWhereNotNull('date_reglement')
-            )
+            ->whereIn('statut_reglement', [
+                StatutReglement::Recu->value,
+                StatutReglement::Pointe->value,
+            ])
             ->sum('montant_total');
     }
 

@@ -27,7 +27,7 @@ class TransactionFactory extends Factory
             'mode_paiement' => fake()->randomElement(ModePaiement::cases()),
             'reference' => fake()->numerify('REF-####'),
             'compte_id' => CompteBancaire::factory(),
-            'pointe' => fake()->boolean(20),
+            'statut_reglement' => \App\Enums\StatutReglement::EnAttente,
             'notes' => fake()->optional()->sentence(),
             'saisi_par' => User::factory(),
         ];

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,7 +22,6 @@ final class RemiseBancaire extends Model
         'date',
         'mode_paiement',
         'compte_cible_id',
-        'virement_id',
         'libelle',
         'saisi_par',
     ];
@@ -33,7 +33,6 @@ final class RemiseBancaire extends Model
             'mode_paiement' => ModePaiement::class,
             'numero' => 'integer',
             'compte_cible_id' => 'integer',
-            'virement_id' => 'integer',
             'saisi_par' => 'integer',
         ];
     }
@@ -41,11 +40,6 @@ final class RemiseBancaire extends Model
     public function compteCible(): BelongsTo
     {
         return $this->belongsTo(CompteBancaire::class, 'compte_cible_id');
-    }
-
-    public function virement(): BelongsTo
-    {
-        return $this->belongsTo(VirementInterne::class, 'virement_id');
     }
 
     public function saisiPar(): BelongsTo
@@ -63,21 +57,11 @@ final class RemiseBancaire extends Model
         return $this->hasMany(Transaction::class, 'remise_id');
     }
 
-    /**
-     * Transactions directement sélectionnées (pas issues du flux règlement).
-     */
-    public function transactionsDirectes(): HasMany
-    {
-        return $this->hasMany(Transaction::class, 'remise_id')->whereNull('reglement_id');
-    }
-
     public function isVerrouillee(): bool
     {
-        if ($this->virement_id === null) {
-            return false;
-        }
-
-        return $this->virement->isLockedByRapprochement();
+        return $this->transactions()
+            ->where('statut_reglement', StatutReglement::Pointe->value)
+            ->exists();
     }
 
     public function referencePrefix(): string
@@ -87,7 +71,6 @@ final class RemiseBancaire extends Model
 
     public function montantTotal(): float
     {
-        return (float) $this->reglements()->sum('montant_prevu')
-            + (float) $this->transactionsDirectes()->sum('montant_total');
+        return (float) $this->transactions()->sum('montant_total');
     }
 }
