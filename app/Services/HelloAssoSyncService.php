@@ -25,8 +25,6 @@ final class HelloAssoSyncService
     /** @var array<int, ?int> operation_id => sous_categorie_id */
     private array $operationSousCategorieCache = [];
 
-    private readonly ?int $compteCreancesId;
-
     public function __construct(
         private readonly HelloAssoParametres $parametres,
     ) {
@@ -36,11 +34,6 @@ final class HelloAssoSyncService
                 $this->formMappingCache[$mapping->form_slug] = $mapping->operation_id;
             }
         }
-
-        // Cache le compte "Créances à recevoir" pour le routage chèque/espèces
-        $this->compteCreancesId = CompteBancaire::where('nom', 'Créances à recevoir')
-            ->where('est_systeme', true)
-            ->value('id');
     }
 
     /**
