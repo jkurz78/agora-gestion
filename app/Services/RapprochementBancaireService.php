@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\StatutRapprochement;
+use App\Enums\StatutReglement;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
@@ -94,7 +95,10 @@ final class RapprochementBancaireService
 
             if (! empty($transactionIds)) {
                 Transaction::whereIn('id', $transactionIds)
-                    ->update(['rapprochement_id' => $rapprochement->id, 'pointe' => true]);
+                    ->update([
+                        'rapprochement_id' => $rapprochement->id,
+                        'statut_reglement' => StatutReglement::Pointe->value,
+                    ]);
             }
 
             VirementInterne::where('id', $virementId)
@@ -174,10 +178,12 @@ final class RapprochementBancaireService
 
             if ((int) $model->rapprochement_id === $rapprochement->id) {
                 $model->rapprochement_id = null;
-                $model->pointe = false;
+                $model->statut_reglement = $model->remise_id !== null
+                    ? StatutReglement::Recu
+                    : StatutReglement::EnAttente;
             } else {
                 $model->rapprochement_id = $rapprochement->id;
-                $model->pointe = true;
+                $model->statut_reglement = StatutReglement::Pointe;
             }
             $model->save();
         });
@@ -215,8 +221,14 @@ final class RapprochementBancaireService
         DB::transaction(function () use ($rapprochement) {
             $id = $rapprochement->id;
 
-            Transaction::where('rapprochement_id', $id)
-                ->update(['rapprochement_id' => null, 'pointe' => false]);
+            Transaction::where('rapprochement_id', $id)->each(function (Transaction $tx): void {
+                $tx->update([
+                    'rapprochement_id' => null,
+                    'statut_reglement' => $tx->remise_id !== null
+                        ? StatutReglement::Recu->value
+                        : StatutReglement::EnAttente->value,
+                ]);
+            });
 
             VirementInterne::where('rapprochement_source_id', $id)
                 ->update(['rapprochement_source_id' => null]);

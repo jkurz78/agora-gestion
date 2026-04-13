@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
+use App\Enums\StatutReglement;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
@@ -57,7 +58,7 @@ test('calculerSoldePointage prend en compte les recettes pointées', function ()
         'compte_id' => $this->compte->id,
         'montant_total' => 300.00,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => StatutReglement::Pointe->value,
     ]);
 
     $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
@@ -70,7 +71,7 @@ test('calculerSoldePointage déduit les dépenses pointées', function () {
         'compte_id' => $this->compte->id,
         'montant_total' => 200.00,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => StatutReglement::Pointe->value,
     ]);
 
     $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
@@ -82,13 +83,13 @@ test('toggleTransaction ajoute une dépense au rapprochement', function () {
     $depense = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'montant_total' => 200.00,
-        'pointe' => false,
+        'statut_reglement' => StatutReglement::EnAttente->value,
     ]);
 
     $this->service->toggleTransaction($rapprochement, 'depense', $depense->id);
 
     expect($depense->fresh()->rapprochement_id)->toBe($rapprochement->id)
-        ->and($depense->fresh()->pointe)->toBeTrue();
+        ->and($depense->fresh()->statut_reglement)->toBe(StatutReglement::Pointe);
 });
 
 test('toggleTransaction retire une dépense déjà pointée', function () {
@@ -97,13 +98,13 @@ test('toggleTransaction retire une dépense déjà pointée', function () {
         'compte_id' => $this->compte->id,
         'montant_total' => 200.00,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => StatutReglement::Pointe->value,
     ]);
 
     $this->service->toggleTransaction($rapprochement, 'depense', $depense->id);
 
     expect($depense->fresh()->rapprochement_id)->toBeNull()
-        ->and($depense->fresh()->pointe)->toBeFalse();
+        ->and($depense->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente);
 });
 
 test('verrouiller échoue si écart non nul', function () {
@@ -141,21 +142,21 @@ test('supprimer supprime un rapprochement en cours et dépointe les opérations'
     $depense = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => StatutReglement::Pointe->value,
     ]);
     $recette = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => StatutReglement::Pointe->value,
     ]);
 
     $this->service->supprimer($rapprochement);
 
     expect(RapprochementBancaire::find($rapprochement->id))->toBeNull()
         ->and($depense->fresh()->rapprochement_id)->toBeNull()
-        ->and($depense->fresh()->pointe)->toBeFalse()
+        ->and($depense->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente)
         ->and($recette->fresh()->rapprochement_id)->toBeNull()
-        ->and($recette->fresh()->pointe)->toBeFalse();
+        ->and($recette->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente);
 });
 
 test('supprimer lève une exception si le rapprochement est verrouillé', function () {
@@ -175,20 +176,20 @@ test('supprimer dépointe aussi les recettes (dons/cotisations)', function () {
     $recette1 = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => StatutReglement::Pointe->value,
     ]);
     $recette2 = Transaction::factory()->asRecette()->create([
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $rapprochement->id,
-        'pointe' => true,
+        'statut_reglement' => StatutReglement::Pointe->value,
     ]);
 
     $this->service->supprimer($rapprochement);
 
     expect($recette1->fresh()->rapprochement_id)->toBeNull()
-        ->and($recette1->fresh()->pointe)->toBeFalse()
+        ->and($recette1->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente)
         ->and($recette2->fresh()->rapprochement_id)->toBeNull()
-        ->and($recette2->fresh()->pointe)->toBeFalse();
+        ->and($recette2->fresh()->statut_reglement)->toBe(StatutReglement::EnAttente);
 });
 
 test('deverrouiller déverrouille le dernier rapprochement si aucun en cours', function () {

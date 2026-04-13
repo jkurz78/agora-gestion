@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
@@ -150,6 +151,7 @@ final class HelloAssoSyncService
                         'libelle' => $this->buildLibelle($order),
                         'montant_total' => 0,
                         'mode_paiement' => $modePaiement,
+                        'statut_reglement' => $this->resolveStatutReglement($modePaiement)->value,
                         'tiers_id' => $tiers->id,
                         'reference' => $this->buildReference($order),
                         'compte_id' => $this->resolveCompteId($modePaiement),
@@ -338,15 +340,25 @@ final class HelloAssoSyncService
     /**
      * Route la transaction vers le bon compte selon le mode de paiement.
      * CB/Prélèvement      → compte HelloAsso (cashout réconcilie)
-     * Chèque/Espèces       → Créances à recevoir (dépôt via remise bancaire)
-     * Virement              → compte courant (rapprochement bancaire)
+     * Chèque/Espèces      → compte_versement_id (fallback compte_helloasso_id)
+     * Virement            → compte_versement_id (fallback compte_helloasso_id)
      */
     private function resolveCompteId(ModePaiement $mode): int
     {
         return match ($mode) {
-            ModePaiement::Cheque, ModePaiement::Especes => $this->compteCreancesId ?? $this->parametres->compte_versement_id ?? $this->parametres->compte_helloasso_id,
+            ModePaiement::Cheque,
+            ModePaiement::Especes,
             ModePaiement::Virement => $this->parametres->compte_versement_id ?? $this->parametres->compte_helloasso_id,
             default => $this->parametres->compte_helloasso_id,
+        };
+    }
+
+    private function resolveStatutReglement(ModePaiement $mode): StatutReglement
+    {
+        return match ($mode) {
+            ModePaiement::Cb,
+            ModePaiement::Prelevement => StatutReglement::Recu,
+            default => StatutReglement::EnAttente,
         };
     }
 

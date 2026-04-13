@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
+use App\Enums\StatutReglement;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
@@ -57,7 +58,7 @@ it('creates a locked rapprochement with pointed transactions and virement', func
     expect($rapprochement->date_fin->toDateString())->toBe('2025-10-20');
 
     expect($tx1->fresh()->rapprochement_id)->toBe($rapprochement->id);
-    expect($tx1->fresh()->pointe)->toBeTrue();
+    expect($tx1->fresh()->statut_reglement)->toBe(StatutReglement::Pointe);
     expect($tx2->fresh()->rapprochement_id)->toBe($rapprochement->id);
 
     expect($virement->fresh()->rapprochement_source_id)->toBe($rapprochement->id);
