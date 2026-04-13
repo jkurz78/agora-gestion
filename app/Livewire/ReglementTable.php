@@ -21,6 +21,7 @@ use App\Models\Seance;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\DocumentPrevisionnelService;
+use App\Services\NumeroPieceService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -290,9 +291,11 @@ final class ReglementTable extends Component
                 $tiers = $reglement->participant->tiers;
                 $libelle = "Règlement {$tiers->displayName()} — {$operation->nom} S{$seance->numero}";
 
+                $date = now();
                 $tx = Transaction::create([
                     'type' => TypeTransaction::Recette->value,
-                    'date' => now()->toDateString(),
+                    'date' => $date->toDateString(),
+                    'numero_piece' => app(NumeroPieceService::class)->assign($date),
                     'libelle' => $libelle,
                     'montant_total' => $reglement->montant_prevu,
                     'mode_paiement' => $reglement->mode_paiement?->value,
