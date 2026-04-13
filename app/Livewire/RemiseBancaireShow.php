@@ -23,7 +23,7 @@ final class RemiseBancaireShow extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Gestion);
+        return Auth::user()?->role?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function estBrouillon(): bool

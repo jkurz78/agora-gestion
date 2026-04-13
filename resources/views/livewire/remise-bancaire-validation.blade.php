@@ -71,7 +71,7 @@
                     <td class="small">{{ $tx->libelle }}</td>
                     <td class="small">{{ $tx->tiers?->displayName() ?? '—' }}</td>
                     <td class="small">{{ $tx->compte->nom }}</td>
-                    <td class="text-end small fw-semibold text-nowrap">{{ number_format($tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
+                    <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $tx->montant_total, 2, ',', "\u{00A0}") }}&nbsp;€</td>
                 </tr>
                 @endforeach
             </tbody>

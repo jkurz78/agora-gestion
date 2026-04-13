@@ -26,12 +26,13 @@ final class RemiseBancaireValidation extends Component
 
         $this->selectedTransactionIds = Transaction::where('remise_id', $remise->id)
             ->pluck('id')
+            ->map(fn ($id) => (int) $id)
             ->all();
     }
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Gestion);
+        return Auth::user()?->role?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function comptabiliser(): void
