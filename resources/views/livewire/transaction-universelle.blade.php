@@ -471,6 +471,7 @@
                         default                => ['secondary', '?'],
                     };
                     $isLocked = (bool) $tx->pointe;
+                    $statutReglement = $tx->statut_reglement ?? null; // null for virements
                 @endphp
                 <tr style="cursor:pointer" wire:click="toggleDetail('{{ $tx->source_type }}', {{ $tx->id }})">
                     <td style="width:1rem;padding:.25rem .3rem;text-align:center;color:#adb5bd">
@@ -543,7 +544,19 @@
                         </td>
                     @endif
                     <td>
-                        <div class="d-flex gap-1" @click.stop>
+                        <div class="d-flex gap-1 align-items-center" @click.stop>
+                            {{-- Badge statut_reglement (recettes/dépenses uniquement) --}}
+                            @if($statutReglement !== null)
+                                @php
+                                    [$sBadge, $sLabel] = match($statutReglement) {
+                                        'en_attente' => ['warning text-dark', 'En attente'],
+                                        'recu'       => ['success',          'Reçu'],
+                                        'pointe'     => ['secondary',        'Pointé'],
+                                        default      => ['light text-muted', $statutReglement],
+                                    };
+                                @endphp
+                                <span class="badge text-bg-{{ $sBadge }}" style="font-size:.6rem">{{ $sLabel }}</span>
+                            @endif
                             <button type="button"
                                     wire:click="openEdit('{{ e($tx->source_type) }}', {{ $tx->id }})"
                                     class="btn btn-sm btn-outline-primary"
@@ -551,6 +564,16 @@
                                     title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
                                 <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
                             </button>
+                            {{-- Bouton Marquer reçu (recettes en_attente non verrouillées) --}}
+                            @if(! $exerciceCloture && $statutReglement === 'en_attente' && in_array($tx->source_type, ['recette', 'depense'], true))
+                                <button type="button"
+                                        wire:click="marquerRecu({{ $tx->id }})"
+                                        class="btn btn-sm btn-outline-success"
+                                        style="padding:.15rem .3rem;font-size:.7rem"
+                                        title="Marquer comme reçu">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                            @endif
                             @if (! $exerciceCloture)
                             @if($isLocked)
                                 <span title="Écriture rapprochée bancaire — suppression interdite" style="cursor:not-allowed">
