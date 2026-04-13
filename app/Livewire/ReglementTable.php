@@ -7,14 +7,19 @@ namespace App\Livewire;
 use App\Enums\CategorieEmail;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
+use App\Enums\StatutReglement;
 use App\Enums\TypeDocumentPrevisionnel;
+use App\Enums\TypeTransaction;
 use App\Mail\DocumentMail;
+use App\Models\CompteBancaire;
 use App\Models\DocumentPrevisionnel;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Reglement;
 use App\Models\Seance;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Services\DocumentPrevisionnelService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -35,6 +40,12 @@ final class ReglementTable extends Component
     public string $docModalMessage = '';
 
     public string $docModalMessageType = 'info';
+
+    public ?int $comptabiliserCompteId = null;
+
+    public ?int $comptabiliserSeanceId = null;
+
+    public bool $showComptabiliserModal = false;
 
     public function openDocModal(int $participantId, string $type): void
     {
@@ -206,6 +217,88 @@ final class ReglementTable extends Component
         $this->dispatch('open-url', url: route('operations.documents-previsionnels.pdf', $document));
     }
 
+    public function ouvrirComptabiliser(int $seanceId): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $this->comptabiliserSeanceId = $seanceId;
+        $this->comptabiliserCompteId = CompteBancaire::where('est_systeme', false)
+            ->where('actif_recettes_depenses', true)
+            ->value('id');
+        $this->showComptabiliserModal = true;
+        $this->dispatch('comptabiliser-modal-open');
+    }
+
+    public function comptabiliserSeance(): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $this->validate([
+            'comptabiliserCompteId' => 'required|exists:comptes_bancaires,id',
+            'comptabiliserSeanceId' => 'required|exists:seances,id',
+        ]);
+
+        $seance = Seance::with('operation.typeOperation')->findOrFail((int) $this->comptabiliserSeanceId);
+        $operation = $seance->operation;
+        $sousCategorieId = $operation->typeOperation?->sous_categorie_id;
+
+        if ($sousCategorieId === null) {
+            $this->addError('comptabiliserCompteId', "Le type d'opération n'a pas de sous-catégorie configurée.");
+
+            return;
+        }
+
+        // Only process reglements WITHOUT an existing transaction
+        $reglements = Reglement::with('participant.tiers')
+            ->where('seance_id', (int) $this->comptabiliserSeanceId)
+            ->where('montant_prevu', '>', 0)
+            ->whereDoesntHave('transaction')
+            ->get();
+
+        if ($reglements->isEmpty()) {
+            $this->showComptabiliserModal = false;
+            $this->dispatch('comptabiliser-modal-close');
+
+            return;
+        }
+
+        DB::transaction(function () use ($reglements, $seance, $operation, $sousCategorieId): void {
+            foreach ($reglements as $reglement) {
+                $tiers = $reglement->participant->tiers;
+                $libelle = "Règlement {$tiers->displayName()} — {$operation->nom} S{$seance->numero}";
+
+                $tx = Transaction::create([
+                    'type' => TypeTransaction::Recette->value,
+                    'date' => now()->toDateString(),
+                    'libelle' => $libelle,
+                    'montant_total' => $reglement->montant_prevu,
+                    'mode_paiement' => $reglement->mode_paiement?->value,
+                    'tiers_id' => $tiers->id,
+                    'compte_id' => (int) $this->comptabiliserCompteId,
+                    'statut_reglement' => StatutReglement::EnAttente->value,
+                    'reglement_id' => $reglement->id,
+                    'saisi_par' => auth()->id(),
+                ]);
+
+                TransactionLigne::create([
+                    'transaction_id' => $tx->id,
+                    'sous_categorie_id' => $sousCategorieId,
+                    'operation_id' => $operation->id,
+                    'seance' => $seance->numero,
+                    'montant' => $reglement->montant_prevu,
+                ]);
+            }
+        });
+
+        $this->showComptabiliserModal = false;
+        $this->dispatch('comptabiliser-modal-close');
+        $this->dispatch('$refresh');
+    }
+
     public function render(): View
     {
         $seances = Seance::where('operation_id', $this->operation->id)
@@ -239,12 +332,43 @@ final class ReglementTable extends Component
             ->groupBy('participant_id')
             ->map(fn ($items) => $items->keyBy(fn ($item) => $item->type->value));
 
+        // Determine which seances are fully comptabilisées (all their reglements have a transaction)
+        $operationReglements = Reglement::whereIn('seance_id', $seanceIds)
+            ->where('montant_prevu', '>', 0)
+            ->get(['id', 'seance_id']);
+
+        $reglementIdsWithTx = Transaction::whereIn('reglement_id', $operationReglements->pluck('id'))
+            ->whereNotNull('reglement_id')
+            ->pluck('reglement_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        $seanceComptabiliseeFlags = [];
+        foreach ($seances as $seance) {
+            $seanceReglements = $operationReglements->where('seance_id', $seance->id);
+            if ($seanceReglements->isEmpty()) {
+                $seanceComptabiliseeFlags[(int) $seance->id] = false;
+
+                continue;
+            }
+            $allHaveTx = $seanceReglements->every(fn ($r) => in_array((int) $r->id, $reglementIdsWithTx, true));
+            $seanceComptabiliseeFlags[(int) $seance->id] = $allHaveTx;
+        }
+
+        // Available accounts for comptabilisation
+        $comptesBancaires = CompteBancaire::where('est_systeme', false)
+            ->where('actif_recettes_depenses', true)
+            ->get();
+
         return view('livewire.reglement-table', [
             'seances' => $seances,
             'participants' => $participants,
             'reglementMap' => $reglementMap,
             'realiseMap' => $realiseMap,
             'docVersions' => $docVersions,
+            'seanceComptabiliseeFlags' => $seanceComptabiliseeFlags,
+            'comptesBancaires' => $comptesBancaires,
         ]);
     }
 

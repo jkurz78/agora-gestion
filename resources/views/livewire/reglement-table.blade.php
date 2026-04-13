@@ -220,6 +220,28 @@
                             {{ abs($grandEcart) > 0.01 ? (($grandEcart >= 0 ? '+' : '') . number_format($grandEcart, 2, ',', ' ')) : '0' }}
                         </td>
                     </tr>
+                    {{-- Bouton Comptabiliser par séance --}}
+                    @if($this->canEdit)
+                    <tr style="background:#f0f4ff">
+                        <td colspan="2" style="position:sticky;left:0;z-index:1;background:#f0f4ff;padding:4px 12px;font-size:11px;color:#555;font-weight:500">Comptabiliser</td>
+                        @foreach($seances as $seance)
+                            @php $estComptabilisee = $seanceComptabiliseeFlags[(int) $seance->id] ?? false; @endphp
+                            <td style="text-align:center;padding:4px 6px">
+                                @if(! $estComptabilisee)
+                                    <button wire:click="ouvrirComptabiliser({{ $seance->id }})"
+                                            class="btn btn-sm btn-outline-primary py-0 px-1"
+                                            style="font-size:10px;line-height:1.6"
+                                            title="Créer les transactions pour cette séance">
+                                        Comptabiliser
+                                    </button>
+                                @else
+                                    <span class="badge bg-success" style="font-size:10px">&#10003; Comptabilisé</span>
+                                @endif
+                            </td>
+                        @endforeach
+                        <td></td>
+                    </tr>
+                    @endif
                 </tfoot>
             </table>
         </div>
@@ -274,4 +296,41 @@
             </div>
         </div>
     @endif
+
+    {{-- Modal Comptabiliser --}}
+    <div class="modal fade" id="comptabiliserModal" tabindex="-1"
+         wire:ignore.self
+         x-data
+         x-on:comptabiliser-modal-open.window="bootstrap.Modal.getOrCreateInstance($el).show()"
+         x-on:comptabiliser-modal-close.window="bootstrap.Modal.getOrCreateInstance($el).hide()">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">Comptabiliser la séance</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    @error('comptabiliserCompteId')
+                        <div class="alert alert-danger py-1 px-2 small mb-2">{{ $message }}</div>
+                    @enderror
+                    <div class="mb-3">
+                        <label class="form-label small mb-1">Compte bancaire cible</label>
+                        <select wire:model="comptabiliserCompteId" class="form-select form-select-sm">
+                            @foreach($comptesBancaires as $compte)
+                                <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button wire:click="comptabiliserSeance" class="btn btn-sm btn-primary"
+                            wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="comptabiliserSeance">Créer les transactions</span>
+                        <span wire:loading wire:target="comptabiliserSeance"><i class="bi bi-hourglass-split"></i> Création...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
