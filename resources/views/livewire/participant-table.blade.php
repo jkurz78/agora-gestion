@@ -71,6 +71,7 @@
                 </ul>
             </div>
             @if($this->canEdit)
+            <livewire:import-participants :operation="$operation" :key="'ip-'.$operation->id" />
             <button class="btn btn-sm btn-primary" wire:click="openAddModal">
                 <i class="bi bi-plus-lg"></i> Ajouter un participant
             </button>
