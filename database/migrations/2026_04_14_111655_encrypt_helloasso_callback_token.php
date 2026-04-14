@@ -3,13 +3,20 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        // Élargir la colonne avant de chiffrer (ciphertext ~300 chars)
+        Schema::table('helloasso_parametres', function (Blueprint $table) {
+            $table->text('callback_token')->nullable()->change();
+        });
+
         DB::table('helloasso_parametres')
             ->whereNotNull('callback_token')
             ->get()
@@ -22,7 +29,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Déchiffrement inverse — nécessite APP_KEY inchangée
+        // Déchiffrer d'abord, puis rétrécir la colonne
         DB::table('helloasso_parametres')
             ->whereNotNull('callback_token')
             ->get()
@@ -36,5 +43,9 @@ return new class extends Migration
                     // déjà en clair ou clef changée — on laisse tel quel
                 }
             });
+
+        Schema::table('helloasso_parametres', function (Blueprint $table) {
+            $table->string('callback_token', 64)->nullable()->change();
+        });
     }
 };
