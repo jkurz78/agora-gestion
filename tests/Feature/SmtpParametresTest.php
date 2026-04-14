@@ -2,7 +2,19 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\SmtpParametres;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    if (Association::find(1) === null) {
+        $assoc = new Association;
+        $assoc->id = 1;
+        $assoc->fill(['nom' => 'Test'])->save();
+    }
+});
 
 it('persiste les paramètres smtp avec mot de passe chiffré', function () {
     SmtpParametres::updateOrCreate(['association_id' => 1], [
@@ -18,7 +30,8 @@ it('persiste les paramètres smtp avec mot de passe chiffré', function () {
 
     expect($record->smtp_host)->toBe('mail.example.fr')
         ->and($record->smtp_password)->toBe('secret-password')
-        ->and($record->smtp_port)->toBe(587);
+        ->and($record->smtp_port)->toBe(587)
+        ->and($record->timeout)->toBe(30);
 
     // Le mot de passe est chiffré en base
     $raw = \Illuminate\Support\Facades\DB::table('smtp_parametres')
