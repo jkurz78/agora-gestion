@@ -75,6 +75,12 @@ final class ParticipantTable extends Component
         $this->operation = $operation;
     }
 
+    #[On('participants-saved')]
+    public function refreshList(): void
+    {
+        // Déclenche un re-render pour afficher les nouveaux participants importés
+    }
+
     public function getCanEditProperty(): bool
     {
         return Auth::user()->role->canWrite(Espace::Gestion);

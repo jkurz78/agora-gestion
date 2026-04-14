@@ -16,6 +16,7 @@ use App\Http\Controllers\IncomingDocumentsController;
 use App\Http\Controllers\ParticipantDocumentController;
 use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantFichePdfController;
+use App\Http\Controllers\ParticipantImportTemplateController;
 use App\Http\Controllers\ParticipantPdfController;
 use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
@@ -75,6 +76,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::view('/analyse', 'gestion.analyse.index')->name('analyse');
         Route::get('/{operation}/participants/export', ParticipantExportController::class)
             ->name('participants.export');
+        Route::get('/{operation}/participants/import-template', ParticipantImportTemplateController::class)
+            ->name('participants.import-template');
         Route::get('/{operation}/participants/pdf', ParticipantPdfController::class)
             ->name('participants.pdf');
         Route::get('/{operation}/participants/{participant}/pdf', ParticipantFichePdfController::class)
