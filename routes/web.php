@@ -53,6 +53,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::view('/association', 'parametres.association')->name('association');
         Route::view('/helloasso', 'parametres.helloasso')->name('helloasso');
         Route::view('/reception-documents', 'parametres.reception-documents')->name('reception-documents');
+        Route::view('/smtp', 'parametres.smtp')->name('smtp');
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
