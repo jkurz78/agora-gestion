@@ -81,21 +81,54 @@ final class RapprochementPdfController extends Controller
     {
         $transactions = collect();
 
-        Transaction::where('compte_id', $compteId)
+        // Récupérer toutes les transactions pointées pour ce rapprochement
+        $txRows = Transaction::where('compte_id', $compteId)
             ->where('rapprochement_id', $rid)
-            ->with('tiers')
-            ->get()
-            ->each(function (Transaction $tx) use (&$transactions) {
-                $transactions->push([
-                    'id' => $tx->id,
-                    'date' => $tx->date,
-                    'type' => $tx->type->label(),
-                    'label' => $tx->libelle,
-                    'tiers' => $tx->tiers?->displayName() ?? $tx->libelle,
-                    'reference' => $tx->reference ?? null,
+            ->with('tiers', 'remise')
+            ->get();
+
+        // Grouper les transactions appartenant à une remise
+        $remiseGroups = $txRows->whereNotNull('remise_id')->groupBy('remise_id');
+        $standalone   = $txRows->whereNull('remise_id');
+
+        // Lignes remises — une ligne par remise avec sous-transactions
+        foreach ($remiseGroups as $remiseId => $remiseTxs) {
+            $remise      = $remiseTxs->first()->remise;
+            $montantTotal = $remiseTxs->sum(fn (Transaction $tx) => $tx->montantSigne());
+            $transactions->push([
+                'id'               => (int) $remiseId,
+                'type'             => 'Remise',
+                'date'             => $remise?->date ?? $remiseTxs->first()->date,
+                'label'            => $remise?->libelle ?? "Remise n°{$remiseId}",
+                'tiers'            => "Remise {$remiseTxs->first()->mode_paiement?->label()} ({$remiseTxs->count()} transactions)",
+                'reference'        => $remise?->numero ? "n°{$remise->numero}" : null,
+                'mode_paiement'    => $remiseTxs->first()->mode_paiement?->trigramme(),
+                'montant_signe'    => $montantTotal,
+                'sub_transactions' => $remiseTxs->map(fn (Transaction $tx) => [
+                    'id'            => $tx->id,
+                    'date'          => $tx->date,
+                    'label'         => $tx->libelle,
+                    'tiers'         => $tx->tiers?->displayName() ?? $tx->libelle,
+                    'reference'     => $tx->reference,
                     'montant_signe' => $tx->montantSigne(),
-                ]);
-            });
+                ])->values()->all(),
+            ]);
+        }
+
+        // Transactions standalone
+        $standalone->each(function (Transaction $tx) use (&$transactions) {
+            $transactions->push([
+                'id'               => $tx->id,
+                'type'             => $tx->type->label(),
+                'date'             => $tx->date,
+                'label'            => $tx->libelle,
+                'tiers'            => $tx->tiers?->displayName() ?? $tx->libelle,
+                'reference'        => $tx->reference ?? null,
+                'mode_paiement'    => $tx->mode_paiement?->trigramme(),
+                'montant_signe'    => $tx->montantSigne(),
+                'sub_transactions' => [],
+            ]);
+        });
 
         VirementInterne::where('compte_source_id', $compteId)
             ->where('rapprochement_source_id', $rid)
@@ -103,13 +136,15 @@ final class RapprochementPdfController extends Controller
             ->get()
             ->each(function (VirementInterne $v) use (&$transactions) {
                 $transactions->push([
-                    'id' => $v->id,
-                    'date' => $v->date,
-                    'type' => 'Virement sortant',
-                    'label' => 'Virement vers '.$v->compteDestination->nom,
-                    'tiers' => $v->compteDestination->nom,
-                    'reference' => $v->reference ?? null,
-                    'montant_signe' => -(float) $v->montant,
+                    'id'               => $v->id,
+                    'type'             => 'Virement sortant',
+                    'date'             => $v->date,
+                    'label'            => 'Virement vers '.$v->compteDestination->nom,
+                    'tiers'            => $v->compteDestination->nom,
+                    'reference'        => $v->reference ?? null,
+                    'mode_paiement'    => 'VMT',
+                    'montant_signe'    => -(float) $v->montant,
+                    'sub_transactions' => [],
                 ]);
             });
 
@@ -119,13 +154,15 @@ final class RapprochementPdfController extends Controller
             ->get()
             ->each(function (VirementInterne $v) use (&$transactions) {
                 $transactions->push([
-                    'id' => $v->id,
-                    'date' => $v->date,
-                    'type' => 'Virement entrant',
-                    'label' => 'Virement depuis '.$v->compteSource->nom,
-                    'tiers' => $v->compteSource->nom,
-                    'reference' => $v->reference ?? null,
-                    'montant_signe' => (float) $v->montant,
+                    'id'               => $v->id,
+                    'type'             => 'Virement entrant',
+                    'date'             => $v->date,
+                    'label'            => 'Virement depuis '.$v->compteSource->nom,
+                    'tiers'            => $v->compteSource->nom,
+                    'reference'        => $v->reference ?? null,
+                    'mode_paiement'    => 'VMT',
+                    'montant_signe'    => (float) $v->montant,
+                    'sub_transactions' => [],
                 ]);
             });
 

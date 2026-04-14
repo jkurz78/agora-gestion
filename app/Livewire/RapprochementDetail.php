@@ -24,6 +24,9 @@ final class RapprochementDetail extends Component
 
     public bool $masquerPointees = false;
 
+    /** @var array<int, bool> */
+    public array $expandedRemises = [];
+
     public function mount(RapprochementBancaire $rapprochement): void
     {
         $this->rapprochement = $rapprochement;
@@ -32,6 +35,15 @@ final class RapprochementDetail extends Component
     public function getCanEditProperty(): bool
     {
         return Auth::user()->role->canWrite(Espace::Compta);
+    }
+
+    public function toggleRemiseExpand(int $remiseId): void
+    {
+        if (isset($this->expandedRemises[$remiseId])) {
+            unset($this->expandedRemises[$remiseId]);
+        } else {
+            $this->expandedRemises[$remiseId] = true;
+        }
     }
 
     public function toggle(string $type, int $id): void
@@ -185,28 +197,39 @@ final class RapprochementDetail extends Component
             $allPointed = $remiseTxs->every(fn (Transaction $tx) => (int) $tx->rapprochement_id === $rid);
             $montantTotal = $remiseTxs->sum(fn (Transaction $tx) => $tx->montantSigne());
             $transactions->push([
-                'id' => (int) $remiseId,
-                'type' => 'remise',
-                'date' => $remise?->date ?? $remiseTxs->first()->date,
-                'label' => $remise?->libelle ?? "Remise n°{$remiseId}",
-                'tiers' => "Remise {$remiseTxs->first()->mode_paiement?->label()} ({$remiseTxs->count()} transactions)",
-                'reference' => $remise?->numero ? "n°{$remise->numero}" : null,
-                'montant_signe' => $montantTotal,
-                'pointe' => $allPointed,
+                'id'               => (int) $remiseId,
+                'type'             => 'remise',
+                'date'             => $remise?->date ?? $remiseTxs->first()->date,
+                'label'            => $remise?->libelle ?? "Remise n°{$remiseId}",
+                'tiers'            => "Remise {$remiseTxs->first()->mode_paiement?->label()} ({$remiseTxs->count()} transactions)",
+                'reference'        => $remise?->numero ? "n°{$remise->numero}" : null,
+                'mode_paiement'    => $remiseTxs->first()->mode_paiement?->trigramme(),
+                'montant_signe'    => $montantTotal,
+                'pointe'           => $allPointed,
+                'sub_transactions' => $remiseTxs->map(fn (Transaction $tx) => [
+                    'id'            => $tx->id,
+                    'date'          => $tx->date,
+                    'label'         => $tx->libelle,
+                    'tiers'         => $tx->tiers?->displayName() ?? $tx->libelle,
+                    'reference'     => $tx->reference,
+                    'montant_signe' => $tx->montantSigne(),
+                ])->values()->all(),
             ]);
         }
 
         // Lignes standalone
         $standalone->each(function (Transaction $tx) use (&$transactions, $rid) {
             $transactions->push([
-                'id' => $tx->id,
-                'type' => $tx->type->value,
-                'date' => $tx->date,
-                'label' => $tx->libelle,
-                'tiers' => $tx->tiers?->displayName() ?? $tx->libelle,
-                'reference' => $tx->reference,
-                'montant_signe' => $tx->montantSigne(),
-                'pointe' => (int) $tx->rapprochement_id === $rid,
+                'id'               => $tx->id,
+                'type'             => $tx->type->value,
+                'date'             => $tx->date,
+                'label'            => $tx->libelle,
+                'tiers'            => $tx->tiers?->displayName() ?? $tx->libelle,
+                'reference'        => $tx->reference,
+                'mode_paiement'    => $tx->mode_paiement?->trigramme(),
+                'montant_signe'    => $tx->montantSigne(),
+                'pointe'           => (int) $tx->rapprochement_id === $rid,
+                'sub_transactions' => [],
             ]);
         });
 
@@ -226,14 +249,16 @@ final class RapprochementDetail extends Component
             ->get()
             ->each(function (VirementInterne $v) use (&$transactions, $rid) {
                 $transactions->push([
-                    'id' => $v->id,
-                    'type' => 'virement_source',
-                    'date' => $v->date,
-                    'label' => 'Virement vers '.$v->compteDestination->nom,
-                    'tiers' => $v->compteDestination->nom,
-                    'reference' => $v->reference,
-                    'montant_signe' => -(float) $v->montant,
-                    'pointe' => (int) $v->rapprochement_source_id === $rid,
+                    'id'               => $v->id,
+                    'type'             => 'virement_source',
+                    'date'             => $v->date,
+                    'label'            => 'Virement vers '.$v->compteDestination->nom,
+                    'tiers'            => $v->compteDestination->nom,
+                    'reference'        => $v->reference,
+                    'mode_paiement'    => 'VMT',
+                    'montant_signe'    => -(float) $v->montant,
+                    'pointe'           => (int) $v->rapprochement_source_id === $rid,
+                    'sub_transactions' => [],
                 ]);
             });
 
@@ -253,14 +278,16 @@ final class RapprochementDetail extends Component
             ->get()
             ->each(function (VirementInterne $v) use (&$transactions, $rid) {
                 $transactions->push([
-                    'id' => $v->id,
-                    'type' => 'virement_destination',
-                    'date' => $v->date,
-                    'label' => 'Virement depuis '.$v->compteSource->nom,
-                    'tiers' => $v->compteSource->nom,
-                    'reference' => $v->reference,
-                    'montant_signe' => (float) $v->montant,
-                    'pointe' => (int) $v->rapprochement_destination_id === $rid,
+                    'id'               => $v->id,
+                    'type'             => 'virement_destination',
+                    'date'             => $v->date,
+                    'label'            => 'Virement depuis '.$v->compteSource->nom,
+                    'tiers'            => $v->compteSource->nom,
+                    'reference'        => $v->reference,
+                    'mode_paiement'    => 'VMT',
+                    'montant_signe'    => (float) $v->montant,
+                    'pointe'           => (int) $v->rapprochement_destination_id === $rid,
+                    'sub_transactions' => [],
                 ]);
             });
 

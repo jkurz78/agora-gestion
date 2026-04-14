@@ -145,6 +145,12 @@
             </label>
         </div>
     @endif
+    <style>
+        .remise-toggle-btn { line-height: 1; vertical-align: middle; }
+        .remise-chevron { display: inline-block; transition: transform 0.15s ease; font-size: .65rem; }
+        .remise-chevron.expanded { transform: rotate(90deg); }
+        .remise-sub-row td { border-top: none; }
+    </style>
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
@@ -155,59 +161,127 @@
                     <th>Libellé</th>
                     <th>Tiers</th>
                     <th>Réf.</th>
+                    <th>Mode</th>
                     <th class="text-end">Débit</th>
                     <th class="text-end">Crédit</th>
                     <th class="text-center">Pointé</th>
                 </tr>
             </thead>
-            <tbody style="color:#555">
-                @forelse ($transactions as $tx)
-                    <tr wire:key="{{ $tx['type'] }}-{{ $tx['id'] }}" class="{{ $tx['pointe'] ? 'table-success' : '' }}">
-                        <td class="text-muted small">{{ $tx['id'] }}</td>
-                        <td class="text-nowrap small">{{ $tx['date']->format('d/m/Y') }}</td>
-                        <td>
-                            @switch($tx['type'])
-                                @case('depense') <span class="badge bg-danger" style="font-size:.7rem">Dépense</span> @break
-                                @case('recette') <span class="badge bg-success" style="font-size:.7rem">Recette</span> @break
-                                @case('virement_source') <span class="badge bg-secondary" style="font-size:.7rem">Virement ↑</span> @break
-                                @case('virement_destination') <span class="badge bg-secondary" style="font-size:.7rem">Virement ↓</span> @break
-                            @endswitch
-                        </td>
-                        <td class="small">{{ $tx['label'] }}</td>
-                        <td class="small text-muted">{{ $tx['tiers'] ?? '—' }}</td>
-                        <td class="text-muted small">{{ $tx['reference'] ?? '—' }}</td>
-                        <td class="text-end text-danger fw-semibold small text-nowrap">
-                            @if ($tx['montant_signe'] < 0)
-                                {{ number_format(abs($tx['montant_signe']), 2, ',', ' ') }} €
-                            @endif
-                        </td>
-                        <td class="text-end text-success fw-semibold small text-nowrap">
-                            @if ($tx['montant_signe'] > 0)
-                                {{ number_format($tx['montant_signe'], 2, ',', ' ') }} €
-                            @endif
-                        </td>
-                        <td class="text-center">
-                            @if ($rapprochement->isEnCours() && ! $exerciceCloture && $this->canEdit)
-                                <input type="checkbox"
-                                       wire:click="toggle('{{ $tx['type'] }}', {{ $tx['id'] }})"
-                                       {{ $tx['pointe'] ? 'checked' : '' }}
-                                       class="form-check-input">
-                            @else
-                                <input type="checkbox"
-                                       {{ $tx['pointe'] ? 'checked' : '' }}
-                                       disabled
-                                       class="form-check-input">
-                            @endif
-                        </td>
-                    </tr>
-                @empty
+
+            @if ($transactions->isEmpty())
+                <tbody style="color:#555">
                     <tr>
-                        <td colspan="9" class="text-center text-muted">
+                        <td colspan="10" class="text-center text-muted">
                             Aucune transaction disponible pour ce compte.
                         </td>
                     </tr>
-                @endforelse
-            </tbody>
+                </tbody>
+            @else
+                @foreach ($transactions as $tx)
+                    @php
+                        $hasSubRows = !empty($tx['sub_transactions']);
+                        $isExpanded = $hasSubRows && isset($expandedRemises[$tx['id']]);
+                        $modeBadge = match($tx['mode_paiement'] ?? null) {
+                            'CHQ' => ['class' => 'bg-info text-dark',      'title' => 'Chèque'],
+                            'VMT' => ['class' => 'bg-secondary',           'title' => 'Virement'],
+                            'ESP' => ['class' => 'bg-success',             'title' => 'Espèces'],
+                            'CB'  => ['class' => 'bg-primary',             'title' => 'Carte bancaire'],
+                            'PRL' => ['class' => 'bg-warning text-dark',   'title' => 'Prélèvement'],
+                            default => null,
+                        };
+                    @endphp
+
+                    {{-- Ligne principale --}}
+                    <tbody wire:key="{{ $tx['type'] }}-{{ $tx['id'] }}" style="color:#555">
+                        <tr class="{{ $tx['pointe'] ? 'table-success' : '' }}">
+                            <td class="text-muted small text-nowrap">
+                                @if ($hasSubRows)
+                                    <button wire:click="toggleRemiseExpand({{ $tx['id'] }})"
+                                            class="btn btn-link p-0 remise-toggle-btn"
+                                            style="color:#888;text-decoration:none"
+                                            title="{{ $isExpanded ? 'Replier' : 'Déplier' }}">
+                                        <i class="bi bi-chevron-right remise-chevron {{ $isExpanded ? 'expanded' : '' }}"></i>
+                                    </button>
+                                @endif
+                                {{ $tx['id'] }}
+                            </td>
+                            <td class="text-nowrap small">{{ $tx['date']->format('d/m/Y') }}</td>
+                            <td>
+                                @switch($tx['type'])
+                                    @case('depense')              <span class="badge bg-danger"    style="font-size:.7rem">Dépense</span>    @break
+                                    @case('recette')              <span class="badge bg-success"   style="font-size:.7rem">Recette</span>    @break
+                                    @case('virement_source')      <span class="badge bg-secondary" style="font-size:.7rem">Virement ↑</span> @break
+                                    @case('virement_destination') <span class="badge bg-secondary" style="font-size:.7rem">Virement ↓</span> @break
+                                    @case('remise')               <span class="badge"              style="background:#5a6e87;font-size:.7rem">Remise</span> @break
+                                @endswitch
+                            </td>
+                            <td class="small">{{ $tx['label'] }}</td>
+                            <td class="small text-muted">{{ $tx['tiers'] ?? '—' }}</td>
+                            <td class="text-muted small">{{ $tx['reference'] ?? '—' }}</td>
+                            <td class="small">
+                                @if ($modeBadge)
+                                    <span class="badge {{ $modeBadge['class'] }}"
+                                          style="font-size:.65rem"
+                                          title="{{ $modeBadge['title'] }}">{{ $tx['mode_paiement'] }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td class="text-end text-danger fw-semibold small text-nowrap">
+                                @if ($tx['montant_signe'] < 0)
+                                    {{ number_format(abs($tx['montant_signe']), 2, ',', ' ') }} €
+                                @endif
+                            </td>
+                            <td class="text-end text-success fw-semibold small text-nowrap">
+                                @if ($tx['montant_signe'] > 0)
+                                    {{ number_format($tx['montant_signe'], 2, ',', ' ') }} €
+                                @endif
+                            </td>
+                            <td class="text-center">
+                                @if ($rapprochement->isEnCours() && ! $exerciceCloture && $this->canEdit)
+                                    <input type="checkbox"
+                                           wire:click="toggle('{{ $tx['type'] }}', {{ $tx['id'] }})"
+                                           {{ $tx['pointe'] ? 'checked' : '' }}
+                                           class="form-check-input">
+                                @else
+                                    <input type="checkbox"
+                                           {{ $tx['pointe'] ? 'checked' : '' }}
+                                           disabled
+                                           class="form-check-input">
+                                @endif
+                            </td>
+                        </tr>
+                    </tbody>
+
+                    {{-- Sous-lignes remise (dépliables) --}}
+                    @if ($hasSubRows)
+                        <tbody class="{{ $isExpanded ? '' : 'd-none' }}" style="color:#666">
+                            @foreach ($tx['sub_transactions'] as $sub)
+                                <tr class="remise-sub-row" style="background:{{ $tx['pointe'] ? '#d1e7dd' : '#f2f5f8' }}">
+                                    <td class="text-muted small ps-3">↳ {{ $sub['id'] }}</td>
+                                    <td class="text-nowrap small">{{ $sub['date']->format('d/m/Y') }}</td>
+                                    <td></td>
+                                    <td class="small">{{ $sub['label'] }}</td>
+                                    <td class="small text-muted">{{ $sub['tiers'] ?? '—' }}</td>
+                                    <td class="text-muted small">{{ $sub['reference'] ?? '—' }}</td>
+                                    <td></td>
+                                    <td class="text-end text-danger fw-semibold small text-nowrap">
+                                        @if ($sub['montant_signe'] < 0)
+                                            {{ number_format(abs($sub['montant_signe']), 2, ',', ' ') }} €
+                                        @endif
+                                    </td>
+                                    <td class="text-end text-success fw-semibold small text-nowrap">
+                                        @if ($sub['montant_signe'] > 0)
+                                            {{ number_format($sub['montant_signe'], 2, ',', ' ') }} €
+                                        @endif
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    @endif
+                @endforeach
+            @endif
         </table>
     </div>
 </div>

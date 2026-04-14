@@ -149,6 +149,7 @@
         }
         .tx-table thead th.text-end {
             text-align: right;
+            white-space: nowrap;
         }
         .even { background-color: #f9f9f9; }
         .tx-table tbody td {
@@ -158,6 +159,7 @@
         }
         .tx-table tbody td.text-end {
             text-align: right;
+            white-space: nowrap;
         }
         .tx-table tfoot tr {
             background-color: #e9ecef;
@@ -175,6 +177,19 @@
         }
         .text-success {
             color: #2E7D32;
+        }
+        /* Remises bancaires */
+        .tx-remise-header td {
+            background-color: #dde8f8;
+            font-weight: bold;
+        }
+        .tx-remise-sub td {
+            background-color: #f0f4fb;
+            font-size: 9px;
+            color: #555;
+        }
+        .tx-remise-sub td:first-child {
+            padding-left: 18px;
         }
 
     </style>
@@ -279,31 +294,37 @@
         <table class="tx-table">
             <thead>
                 <tr>
-                    <th style="width: 5%;">#</th>
+                    <th style="width: 4%;">#</th>
                     <th style="width: 7%;">Date</th>
                     <th style="width: 5%;">Type</th>
-                    <th style="width: 22%;">Libellé</th>
-                    <th style="width: 22%;">Tiers</th>
+                    <th style="width: 19%;">Libellé</th>
+                    <th style="width: 19%;">Tiers</th>
                     <th style="white-space: nowrap;">Réf.</th>
-                    <th class="text-end" style="width: 10%;">Débit</th>
-                    <th class="text-end" style="width: 10%;">Crédit</th>
+                    <th style="width: 5%;">Mode</th>
+                    <th class="text-end" style="width: 11%; white-space: nowrap;">Débit</th>
+                    <th class="text-end" style="width: 11%; white-space: nowrap;">Crédit</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($transactions as $i => $tx)
-                    <tr class="{{ $i % 2 === 1 ? 'even' : '' }}">
+                    @php $hasSubRows = !empty($tx['sub_transactions'] ?? []); @endphp
+
+                    {{-- Ligne principale --}}
+                    <tr class="{{ $hasSubRows ? 'tx-remise-header' : ($i % 2 === 1 ? 'even' : '') }}">
                         <td>{{ $tx['id'] }}</td>
                         <td>{{ \Carbon\Carbon::parse($tx['date'])->format('d/m') }}</td>
                         <td>@switch($tx['type'])
-                            @case('Dépense') Dép @break
-                            @case('Recette') Rec @break
-                            @case('Virement sortant') Vir @break
-                            @case('Virement entrant') Vir @break
+                            @case('Dépense')        Dép  @break
+                            @case('Recette')        Rec  @break
+                            @case('Virement sortant') Vir↑ @break
+                            @case('Virement entrant') Vir↓ @break
+                            @case('Remise')         Rem  @break
                             @default {{ $tx['type'] }}
                         @endswitch</td>
                         <td>{{ $tx['label'] }}</td>
                         <td>{{ $tx['tiers'] ?? '—' }}</td>
-                        <td style="white-space: nowrap;">{{ $tx['reference'] }}</td>
+                        <td style="white-space: nowrap;">{{ $tx['reference'] ?? '—' }}</td>
+                        <td>{{ $tx['mode_paiement'] ?? '—' }}</td>
                         <td class="text-end text-danger">
                             @if ($tx['montant_signe'] < 0)
                                 {{ number_format(abs($tx['montant_signe']), 2, ',', ' ') }}
@@ -315,12 +336,53 @@
                             @endif
                         </td>
                     </tr>
+
+                    {{-- Sous-lignes remise --}}
+                    @if ($hasSubRows)
+                        @php
+                            $subs  = $tx['sub_transactions'];
+                            $count = count($subs);
+                            $truncate = $count > 5;
+                            $shown = $truncate
+                                ? array_merge(array_slice($subs, 0, 2), array_slice($subs, -2))
+                                : $subs;
+                        @endphp
+                        @foreach ($shown as $idx => $sub)
+                            {{-- Ligne "..." entre les 2 premiers et les 2 derniers --}}
+                            @if ($truncate && $idx === 2)
+                                <tr class="tx-remise-sub">
+                                    <td colspan="9" style="text-align:center; color:#888; font-style:italic; letter-spacing:.5px;">
+                                        … {{ $count - 4 }} autres chèques …
+                                    </td>
+                                </tr>
+                            @endif
+                            <tr class="tx-remise-sub">
+                                <td>↳ {{ $sub['id'] }}</td>
+                                <td>{{ \Carbon\Carbon::parse($sub['date'])->format('d/m') }}</td>
+                                <td></td>
+                                <td>{{ $sub['label'] }}</td>
+                                <td>{{ $sub['tiers'] ?? '—' }}</td>
+                                <td style="white-space: nowrap;">{{ $sub['reference'] ?? '—' }}</td>
+                                <td></td>
+                                <td class="text-end text-danger">
+                                    @if ($sub['montant_signe'] < 0)
+                                        {{ number_format(abs($sub['montant_signe']), 2, ',', ' ') }}
+                                    @endif
+                                </td>
+                                <td class="text-end text-success">
+                                    @if ($sub['montant_signe'] > 0)
+                                        {{ number_format($sub['montant_signe'], 2, ',', ' ') }}
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    @endif
                 @empty
                 @endforelse
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="6">Total</td>
+                    <td colspan="7">Total</td>
                     <td class="text-end text-danger">{{ number_format($totalDebit, 2, ',', ' ') }}</td>
                     <td class="text-end text-success">{{ number_format($totalCredit, 2, ',', ' ') }}</td>
                 </tr>
