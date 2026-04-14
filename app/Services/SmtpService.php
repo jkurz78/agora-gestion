@@ -16,8 +16,8 @@ final class SmtpService
         string $host,
         int $port,
         string $encryption,
-        string $username,
-        string $password,
+        string $username, // Non utilisés — test TCP uniquement (pas d'auth, évite verrouillage)
+        string $password, // Non utilisés — test TCP uniquement (pas d'auth, évite verrouillage)
         int $timeout = 10,
     ): stdClass {
         $wrapper = ($encryption === 'ssl') ? 'ssl' : 'tcp';
@@ -31,23 +31,29 @@ final class SmtpService
         ]);
 
         set_error_handler(static fn () => true);
-        $socket = stream_socket_client(
-            $address,
-            $errno,
-            $errstr,
-            $timeout,
-            STREAM_CLIENT_CONNECT,
-            $context,
-        );
-        restore_error_handler();
+        try {
+            $socket = stream_socket_client(
+                $address,
+                $errno,
+                $errstr,
+                $timeout,
+                STREAM_CLIENT_CONNECT,
+                $context,
+            );
+        } finally {
+            restore_error_handler();
+        }
 
         if ($socket === false) {
             return $this->failure($errstr !== '' ? $errstr : "Connexion refusée (errno {$errno})");
         }
 
-        stream_set_timeout($socket, $timeout);
-        $banner = fgets($socket, 512);
-        fclose($socket);
+        try {
+            stream_set_timeout($socket, $timeout);
+            $banner = fgets($socket, 512);
+        } finally {
+            fclose($socket);
+        }
 
         if ($banner === false || $banner === '') {
             return $this->failure('Connexion établie mais aucune réponse du serveur SMTP.');
