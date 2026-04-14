@@ -89,3 +89,38 @@ it('ne touche pas la config mail si smtp_parametres est désactivé', function (
 
     expect(config('mail.mailers.smtp.host'))->toBe($originalHost);
 });
+
+it('SmtpForm charge les paramètres existants au mount', function () {
+    \App\Models\SmtpParametres::updateOrCreate(['association_id' => 1], [
+        'enabled'         => true,
+        'smtp_host'       => 'mail.charge.fr',
+        'smtp_port'       => 587,
+        'smtp_encryption' => 'tls',
+        'smtp_username'   => 'user@charge.fr',
+        'smtp_password'   => 'secret',
+    ]);
+
+    Livewire\Livewire::test(\App\Livewire\Parametres\SmtpForm::class)
+        ->assertSet('smtpHost', 'mail.charge.fr')
+        ->assertSet('smtpPort', 587)
+        ->assertSet('smtpEncryption', 'tls')
+        ->assertSet('smtpUsername', 'user@charge.fr')
+        ->assertSet('passwordDejaEnregistre', true)
+        ->assertSet('smtpPassword', '');
+});
+
+it('SmtpForm sauvegarde les paramètres', function () {
+    Livewire\Livewire::test(\App\Livewire\Parametres\SmtpForm::class)
+        ->set('smtpHost', 'smtp.nouveau.fr')
+        ->set('smtpPort', 465)
+        ->set('smtpEncryption', 'ssl')
+        ->set('smtpUsername', 'envoi@nouveau.fr')
+        ->set('smtpPassword', 'nouveausecret')
+        ->set('enabled', true)
+        ->call('sauvegarder');
+
+    $record = \App\Models\SmtpParametres::where('association_id', 1)->first();
+    expect($record->smtp_host)->toBe('smtp.nouveau.fr')
+        ->and($record->smtp_password)->toBe('nouveausecret')
+        ->and($record->enabled)->toBeTrue();
+});
