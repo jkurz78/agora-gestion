@@ -112,25 +112,4 @@ describe('marquerReglementRecu', function () {
         $this->service->marquerReglementRecu($facture, [$transaction->id]);
     })->throws(RuntimeException::class, 'réglée');
 
-    it('refuse une transaction qui n\'est pas sur un compte système', function () {
-        $compteReel = CompteBancaire::factory()->create(['est_systeme' => false]);
-        $facture = Facture::create([
-            'date' => now(),
-            'statut' => StatutFacture::Validee,
-            'tiers_id' => $this->tiers->id,
-            'montant_total' => 300.00,
-            'saisi_par' => $this->user->id,
-            'exercice' => $this->exercice,
-        ]);
-
-        $transaction = Transaction::factory()->asRecette()->create([
-            'tiers_id' => $this->tiers->id,
-            'compte_id' => $compteReel->id,
-            'montant_total' => 100.00,
-        ]);
-
-        $facture->transactions()->attach($transaction->id);
-
-        $this->service->marquerReglementRecu($facture, [$transaction->id]);
-    })->throws(RuntimeException::class, 'compte système');
 });

@@ -324,7 +324,7 @@ final class OperationCommunication extends Component
         $typeOp = $operation->typeOperation;
 
         if (! $typeOp?->effectiveEmailFrom()) {
-            session()->flash('error', "Aucune adresse d'expédition configurée (ni sur le type d'opération, ni dans Paramètres > Association > Communication).");
+            session()->flash('error', "Adresse d'expédition non configurée (ni sur le type d'opération, ni dans Paramètres > Association > Communication).");
 
             return;
         }
@@ -365,7 +365,7 @@ final class OperationCommunication extends Component
         $typeOp = $operation->typeOperation;
 
         if (! $typeOp?->effectiveEmailFrom()) {
-            session()->flash('error', "Aucune adresse d'expédition configurée (ni sur le type d'opération, ni dans Paramètres > Association > Communication).");
+            session()->flash('error', "Adresse d'expédition non configurée (ni sur le type d'opération, ni dans Paramètres > Association > Communication).");
 
             return;
         }
