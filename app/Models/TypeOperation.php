@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Association;
 
 final class TypeOperation extends Model
 {
@@ -79,5 +80,24 @@ final class TypeOperation extends Model
     public function seanceDefaults(): HasMany
     {
         return $this->hasMany(TypeOperationSeance::class)->orderBy('numero');
+    }
+
+    /**
+     * Adresse d'expédition effective : celle du type d'opération si définie,
+     * sinon repli sur l'adresse de l'association (Paramètres > Communication).
+     */
+    public function effectiveEmailFrom(): ?string
+    {
+        return $this->email_from ?: Association::find(1)?->email_from;
+    }
+
+    /**
+     * Nom d'expédition effectif, cohérent avec effectiveEmailFrom().
+     */
+    public function effectiveEmailFromName(): ?string
+    {
+        return $this->email_from
+            ? ($this->email_from_name ?: null)
+            : Association::find(1)?->email_from_name;
     }
 }

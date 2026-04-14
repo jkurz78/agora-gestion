@@ -55,6 +55,7 @@ final class HelloassoSyncConfig extends Component
             'sous_categorie_inscription_id' => $this->sousCategorieInscriptionId ?: null,
         ]);
 
+        $this->dispatch('form-saved');
         $this->message = 'Configuration enregistrée.';
     }
 

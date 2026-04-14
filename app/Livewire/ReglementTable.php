@@ -495,8 +495,8 @@ final class ReglementTable extends Component
         }
 
         $typeOp = $this->operation->typeOperation;
-        if (! $typeOp?->email_from) {
-            $this->docModalMessage = "L'adresse d'expédition n'est pas configurée pour le type d'opération.";
+        if (! $typeOp?->effectiveEmailFrom()) {
+            $this->docModalMessage = "Aucune adresse d'expédition configurée (ni sur le type d'opération, ni dans Paramètres > Association > Communication).";
             $this->docModalMessageType = 'danger';
 
             return;
@@ -536,7 +536,7 @@ final class ReglementTable extends Component
 
             Mail::mailer()
                 ->to($tiers->email)
-                ->send($mail->from($typeOp->email_from, $typeOp->email_from_name));
+                ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
             EmailLog::create([
                 'tiers_id' => $tiers->id,

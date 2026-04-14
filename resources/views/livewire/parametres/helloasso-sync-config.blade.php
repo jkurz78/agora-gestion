@@ -1,4 +1,23 @@
-<div>
+<div
+    x-data="{ isDirty: false, ready: false, showUnsavedModal: false, pendingUrl: '' }"
+    x-on:focusin.once="$nextTick(() => ready = true)"
+    x-on:input="if (ready) isDirty = true"
+    x-on:change="if (ready) isDirty = true"
+    x-on:form-saved.window="isDirty = false"
+    x-on:click.window="
+        if (isDirty) {
+            const link = $event.target.closest('a[href]');
+            if (link && link.getAttribute('href') !== '#'
+                && !link.classList.contains('btn-primary')
+                && !link.getAttribute('target')
+                && !link.closest('.dropdown-menu')) {
+                $event.preventDefault();
+                pendingUrl = link.href;
+                showUnsavedModal = true;
+            }
+        }
+    "
+>
     <div class="card mb-4">
         <div class="card-header">
             <h5 class="mb-0"><i class="bi bi-gear me-1"></i> Configuration de la synchronisation</h5>
@@ -71,4 +90,30 @@
         </div>
     </div>
 
+    {{-- Modale modifications non enregistrées --}}
+    <template x-if="showUnsavedModal">
+        <div class="modal-backdrop fade show" style="z-index: 1050;"></div>
+    </template>
+    <template x-if="showUnsavedModal">
+        <div class="modal fade show" tabindex="-1" style="display: block; z-index: 1055;">
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h6 class="modal-title">Modifications non enregistrées</h6>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0">Vous avez des modifications non enregistrées. Que souhaitez-vous faire ?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-sm btn-outline-secondary" @click="showUnsavedModal = false; window.location = pendingUrl;">
+                            Abandonner
+                        </button>
+                        <button class="btn btn-sm btn-primary" @click="$wire.sauvegarder().then(() => { isDirty = false; showUnsavedModal = false; window.location = pendingUrl; })">
+                            Enregistrer et quitter
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>

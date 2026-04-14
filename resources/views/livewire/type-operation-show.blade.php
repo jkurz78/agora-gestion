@@ -326,6 +326,9 @@ x-on:click.window="
                     </button>
                 </div>
             </div>
+            <div class="form-text mt-2" style="font-size:11px">
+                Si non renseignée, l'<a href="{{ route('parametres.association') }}" target="_blank">adresse de l'association</a> sera utilisée en repli.
+            </div>
         </div>
 
         <ul class="nav nav-pills nav-fill mb-3">

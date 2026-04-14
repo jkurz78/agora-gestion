@@ -751,8 +751,8 @@ final class ParticipantShow extends Component
         }
 
         $typeOp = $doc->operation->typeOperation;
-        if (! $typeOp?->email_from) {
-            session()->flash('error', "L'adresse d'expédition n'est pas configurée pour le type d'opération.");
+        if (! $typeOp?->effectiveEmailFrom()) {
+            session()->flash('error', "Aucune adresse d'expédition configurée (ni sur le type d'opération, ni dans Paramètres > Association > Communication).");
 
             return;
         }
@@ -793,7 +793,7 @@ final class ParticipantShow extends Component
 
             Mail::mailer()
                 ->to($tiers->email)
-                ->send($mail->from($typeOp->email_from, $typeOp->email_from_name));
+                ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
             EmailLog::create([
                 'tiers_id' => $tiers->id,

@@ -80,6 +80,7 @@ final class HelloassoForm extends Component
         }
 
         $this->testResult = null;
+        $this->dispatch('form-saved');
         session()->flash('success', 'Paramètres HelloAsso enregistrés.');
     }
 

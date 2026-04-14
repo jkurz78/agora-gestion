@@ -95,6 +95,7 @@ final class IncomingMailForm extends Component
         IncomingMailParametres::updateOrCreate(['association_id' => 1], $payload);
 
         $this->testResult = null;
+        $this->dispatch('form-saved');
         session()->flash('success', 'Paramètres de réception enregistrés.');
     }
 
@@ -148,7 +149,7 @@ final class IncomingMailForm extends Component
                 $errors[] = 'mot de passe';
             }
             if (IncomingMailAllowedSender::where('association_id', 1)->count() === 0) {
-                $errors[] = 'liste blanche expéditeurs vide';
+                $errors[] = 'aucun expéditeur autorisé configuré';
             }
 
             if (! empty($errors)) {

@@ -74,6 +74,7 @@ final class SmtpForm extends Component
 
         SmtpParametres::updateOrCreate(['association_id' => 1], $payload);
         $this->testResult = null;
+        $this->dispatch('form-saved');
         session()->flash('success', 'Paramètres SMTP enregistrés.');
     }
 
