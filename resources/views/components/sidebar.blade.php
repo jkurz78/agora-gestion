@@ -517,6 +517,15 @@ $activeGroup = match(true) {
                             </li>
                             @endif
 
+                            @if (Route::has('parametres.smtp'))
+                            <li class="nav-item">
+                                <a href="{{ route('parametres.smtp') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.smtp') ? 'active' : '' }}">
+                                    <i class="bi bi-send me-1"></i> Serveur d'envoi
+                                </a>
+                            </li>
+                            @endif
+
                             @if (Route::has('parametres.helloasso'))
                             <li class="nav-item">
                                 <a href="{{ route('parametres.helloasso') }}"
