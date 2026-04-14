@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Association;
 use App\Models\SmtpParametres;
+use App\Services\SmtpService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -38,4 +39,19 @@ it('persiste les paramètres smtp avec mot de passe chiffré', function () {
         ->where('association_id', 1)
         ->value('smtp_password');
     expect($raw)->not->toBe('secret-password');
+});
+
+it('retourne une erreur si le serveur smtp est injoignable', function () {
+    $service = new SmtpService();
+    $result = $service->testerConnexion(
+        host: '127.0.0.1',
+        port: 59999,         // port délibérément invalide
+        encryption: 'none',
+        username: 'u',
+        password: 'p',
+        timeout: 2,
+    );
+
+    expect($result->success)->toBeFalse()
+        ->and($result->error)->not->toBeNull();
 });
