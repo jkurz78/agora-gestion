@@ -55,3 +55,37 @@ it('retourne une erreur si le serveur smtp est injoignable', function () {
     expect($result->success)->toBeFalse()
         ->and($result->error)->not->toBeNull();
 });
+
+it('surcharge la config mail quand smtp_parametres est activé', function () {
+    \App\Models\SmtpParametres::updateOrCreate(['association_id' => 1], [
+        'enabled'         => true,
+        'smtp_host'       => 'smtp.monasso.fr',
+        'smtp_port'       => 465,
+        'smtp_encryption' => 'ssl',
+        'smtp_username'   => 'envoi@monasso.fr',
+        'smtp_password'   => 'motdepasse',
+    ]);
+
+    $provider = new \App\Providers\AppServiceProvider(app());
+    $provider->boot();
+
+    expect(config('mail.mailers.smtp.host'))->toBe('smtp.monasso.fr')
+        ->and(config('mail.mailers.smtp.port'))->toBe(465)
+        ->and(config('mail.mailers.smtp.username'))->toBe('envoi@monasso.fr')
+        ->and(config('mail.mailers.smtp.scheme'))->toBe('smtps')
+        ->and(config('mail.default'))->toBe('smtp');
+});
+
+it('ne touche pas la config mail si smtp_parametres est désactivé', function () {
+    \App\Models\SmtpParametres::updateOrCreate(['association_id' => 1], [
+        'enabled'    => false,
+        'smtp_host'  => 'autre.host.fr',
+    ]);
+
+    $originalHost = config('mail.mailers.smtp.host');
+
+    $provider = new \App\Providers\AppServiceProvider(app());
+    $provider->boot();
+
+    expect(config('mail.mailers.smtp.host'))->toBe($originalHost);
+});
