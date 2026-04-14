@@ -59,8 +59,8 @@ final class AttestationModal extends Component
     public function mount(Operation $operation): void
     {
         $this->operation = $operation;
-        $this->hasEmailFrom = (bool) ($operation->typeOperation?->effectiveEmailFrom() ?: $association?->email_from);
         $association = Association::find(1);
+        $this->hasEmailFrom = (bool) ($operation->typeOperation?->effectiveEmailFrom() ?: $association?->email_from);
         $this->hasCachet = (bool) $association?->cachet_signature_path;
     }
 

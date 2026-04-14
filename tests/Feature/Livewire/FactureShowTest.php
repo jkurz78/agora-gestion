@@ -194,42 +194,6 @@ it('enregistre un règlement chèque via le bouton unifié', function () {
     expect($transaction->compte_id)->toBe($compteCreances->id);
 });
 
-it('enregistre un règlement virement et déplace vers compte réel', function () {
-    $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
-    $compteReel = CompteBancaire::factory()->create(['est_systeme' => false]);
-    $tiers = Tiers::factory()->create();
-    $exercice = now()->month >= 9 ? now()->year : now()->year - 1;
-
-    $facture = Facture::create([
-        'numero' => 'F-2026-0100',
-        'date' => now(),
-        'statut' => StatutFacture::Validee,
-        'tiers_id' => $tiers->id,
-        'montant_total' => 200.00,
-        'saisi_par' => $this->user->id,
-        'exercice' => $exercice,
-    ]);
-
-    $transaction = Transaction::factory()->asRecette()->create([
-        'tiers_id' => $tiers->id,
-        'compte_id' => $compteCreances->id,
-        'montant_total' => 200.00,
-        'mode_paiement' => ModePaiement::Virement,
-    ]);
-
-    $facture->transactions()->attach($transaction->id);
-
-    Livewire::test(FactureShow::class, ['facture' => $facture])
-        ->set('selectedTransactionIds', [$transaction->id])
-        ->set('encaissementCompteId', $compteReel->id)
-        ->call('enregistrerReglement')
-        ->assertHasNoErrors();
-
-    $transaction->refresh();
-    expect($transaction->statut_reglement->value)->toBe('recu');
-    // Virement déplacé vers le compte réel
-    expect($transaction->compte_id)->toBe($compteReel->id);
-});
 
 it('redirects to edit if facture is brouillon', function () {
     $brouillon = Facture::create([

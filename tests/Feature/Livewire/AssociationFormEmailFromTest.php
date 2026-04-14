@@ -16,8 +16,9 @@ beforeEach(function () {
 
 it('displays email_from fields', function () {
     Livewire::test(AssociationForm::class)
-        ->assertSee('Email d\'expédition')
-        ->assertSee('Nom d\'expédition');
+        ->assertSee('Adresse d\'expédition')
+        ->assertSeeHtml('placeholder="Nom expéditeur"')
+        ->assertSeeHtml('placeholder="noreply@monasso.fr"');
 });
 
 it('saves email_from and email_from_name', function () {
