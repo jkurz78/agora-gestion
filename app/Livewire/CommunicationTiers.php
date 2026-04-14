@@ -10,6 +10,7 @@ use App\Mail\CommunicationTiersMail;
 use App\Models\Association;
 use App\Models\CampagneEmail;
 use App\Models\EmailLog;
+use App\Models\EmailTemplate;
 use App\Models\MessageTemplate;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
@@ -309,7 +310,7 @@ final class CommunicationTiers extends Component
             'categorie' => 'communication',
             'nom' => $this->templateNom,
             'objet' => $this->objet,
-            'corps' => $this->corps,
+            'corps' => EmailTemplate::sanitizeCorps($this->corps),
             'type_operation_id' => null,
         ]);
 
@@ -442,7 +443,7 @@ final class CommunicationTiers extends Component
         $campagne = CampagneEmail::create([
             'operation_id' => null,
             'objet' => $this->objet,
-            'corps' => $this->corps,
+            'corps' => EmailTemplate::sanitizeCorps($this->corps),
             'pieces_jointes' => $piecesJointes ?: null,
             'nb_destinataires' => $this->envoiTotal,
             'nb_erreurs' => 0,
@@ -491,7 +492,7 @@ final class CommunicationTiers extends Component
                     'destinataire_nom' => $tiers->displayName(),
                     'objet' => $this->objet,
                     'objet_rendu' => $mail->envelope()->subject,
-                    'corps_html' => $mail->corpsHtml,
+                    'corps_html' => EmailTemplate::sanitizeCorps($mail->corpsHtml),
                     'statut' => 'envoye',
                     'tracking_token' => $trackingToken,
                     'envoye_par' => Auth::id(),

@@ -20,14 +20,30 @@
 
                 <div class="card shadow-sm">
                     <div class="card-body text-center py-5">
-                        @if($resubscribed)
+                        @if(! $confirmed)
+                            {{-- Étape 1 : demande de confirmation --}}
+                            <i class="bi bi-envelope-slash text-warning" style="font-size:3rem"></i>
+                            <h5 class="mt-3">Se désinscrire des communications</h5>
+                            <p class="text-muted">
+                                Confirmez-vous vouloir ne plus recevoir<br>
+                                les communications de <strong>{{ $nomAsso }}</strong> ?
+                            </p>
+                            <form method="POST" action="{{ route('email.optout.confirm', ['token' => $token]) }}">
+                                @csrf
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="bi bi-check-lg me-1"></i>Confirmer la désinscription
+                                </button>
+                            </form>
+                        @elseif($resubscribed)
+                            {{-- Réinscription confirmée --}}
                             <i class="bi bi-envelope-check text-success" style="font-size:3rem"></i>
                             <h5 class="mt-3">Vous avez été réinscrit(e)</h5>
                             <p class="text-muted mb-0">
                                 Vous recevrez de nouveau nos communications.
                             </p>
                         @else
-                            <i class="bi bi-envelope-slash text-warning" style="font-size:3rem"></i>
+                            {{-- Désinscription confirmée --}}
+                            <i class="bi bi-envelope-slash text-secondary" style="font-size:3rem"></i>
                             <h5 class="mt-3">Vous avez été désinscrit(e)</h5>
                             <p class="text-muted">
                                 Vous ne recevrez plus de communications de notre part.

@@ -36,6 +36,7 @@ final class HelloAssoParametres extends Model
     {
         return [
             'client_secret' => 'encrypted',
+            'callback_token' => 'encrypted',
             'association_id' => 'integer',
             'environnement' => HelloAssoEnvironnement::class,
             'compte_helloasso_id' => 'integer',

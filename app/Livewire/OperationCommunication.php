@@ -9,6 +9,7 @@ use App\Helpers\EmailLogo;
 use App\Mail\MessageLibreMail;
 use App\Models\CampagneEmail;
 use App\Models\EmailLog;
+use App\Models\EmailTemplate;
 use App\Models\MessageTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -235,7 +236,7 @@ final class OperationCommunication extends Component
             'categorie' => 'operation',
             'nom' => $this->templateNom,
             'objet' => $this->objet,
-            'corps' => $this->corps,
+            'corps' => EmailTemplate::sanitizeCorps($this->corps),
             'type_operation_id' => $this->templateTypeOperationId,
         ]);
 
@@ -256,7 +257,7 @@ final class OperationCommunication extends Component
         if ($template) {
             $template->update([
                 'objet' => $this->objet,
-                'corps' => $this->corps,
+                'corps' => EmailTemplate::sanitizeCorps($this->corps),
             ]);
             session()->flash('message', 'Modèle mis à jour.');
         }
@@ -396,7 +397,7 @@ final class OperationCommunication extends Component
         $campagne = CampagneEmail::create([
             'operation_id' => $operation->id,
             'objet' => $this->objet,
-            'corps' => $this->corps,
+            'corps' => EmailTemplate::sanitizeCorps($this->corps),
             'pieces_jointes' => $piecesJointes ?: null,
             'nb_destinataires' => $this->envoiTotal,
             'nb_erreurs' => 0,
@@ -437,7 +438,7 @@ final class OperationCommunication extends Component
                     'destinataire_nom' => $tiers->displayName(),
                     'objet' => $mail->envelope()->subject,
                     'objet_rendu' => $mail->envelope()->subject,
-                    'corps_html' => $mail->corpsHtml,
+                    'corps_html' => EmailTemplate::sanitizeCorps($mail->corpsHtml),
                     'statut' => 'envoye',
                     'tracking_token' => $trackingToken,
                     'envoye_par' => Auth::id(),

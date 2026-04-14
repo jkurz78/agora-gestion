@@ -21,12 +21,14 @@ Route::middleware('guest')->group(function () {
         ->name('password.request');
 
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:5,1')
         ->name('password.email');
 
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
         ->name('password.reset');
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('throttle:5,1')
         ->name('password.store');
 });
 
@@ -56,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::get('two-factor/challenge', [TwoFactorChallengeController::class, 'create'])
         ->name('two-factor.challenge');
     Route::post('two-factor/challenge', [TwoFactorChallengeController::class, 'store'])
+        ->middleware('throttle:5,1')
         ->name('two-factor.challenge.verify');
     Route::post('two-factor/challenge/resend', [TwoFactorChallengeController::class, 'resend'])
         ->middleware('throttle:3,1')

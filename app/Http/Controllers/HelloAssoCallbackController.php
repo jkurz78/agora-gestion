@@ -13,7 +13,8 @@ final class HelloAssoCallbackController extends Controller
 {
     public function __invoke(Request $request, string $token): JsonResponse
     {
-        $parametres = HelloAssoParametres::where('callback_token', $token)->first();
+        $parametres = HelloAssoParametres::all()
+            ->first(fn ($p) => hash_equals((string) ($p->callback_token ?? ''), $token));
 
         if ($parametres === null) {
             return response()->json(['error' => 'Invalid token'], 403);
