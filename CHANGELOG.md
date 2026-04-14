@@ -5,6 +5,17 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [v3.0.3] — 2026-04-14
+### Améliorations
+- **Facturation — Enregistrer règlement** — bouton fonctionnel sur la fiche facture : coche les transactions sélectionnées comme « reçues » (statut_reglement = recu). Filtre corrigé pour utiliser statut_reglement plutôt que les colonnes supprimées date_reglement/reference_reglement. Suppression du garde-fou est_systeme devenu obsolète en v3.
+- **Paramètres Association — Informations** — mise en page en deux colonnes avec cartes (Identité, Coordonnées, Logo, Cachet), style harmonisé avec l'écran type-opération
+- **Paramètres — Dirty state** — protection « modifications non enregistrées » sur les 5 écrans Paramètres (Association, HelloAsso, HelloAsso Sync, Réception mail, SMTP) : modale Bootstrap « Enregistrer et quitter / Abandonner » identique à l'écran type-opération
+- **Paramètres — Aide contextuelle** — cachet : mention attestations ; onglet Facturation : mention factures ; Réception mail : « Ingestion active » renommé « Relève activée », aide crontab avec commande complète calculée dynamiquement, aide expéditeurs autorisés (rôle sécurité + libellé)
+- **Paramètres — Onglets élargis** — suppression des contraintes max-width sur les onglets Facturation, OCR/IA et Communication
+- **Expéditeur email — repli association** — si un type d'opération n'a pas d'adresse d'expédition configurée, l'adresse paramétrée dans Paramètres > Association > Communication est utilisée automatiquement (AttestationModal, ParticipantShow, ParticipantTable, ReglementTable, OperationCommunication, FactureShow). Méthodes `effectiveEmailFrom()` / `effectiveEmailFromName()` sur le modèle TypeOperation.
+- **Paramètres Association — Communication** — harmonisation avec l'écran type-opération : layout 3 colonnes (nom / email / bouton Tester), mini-modale de test identique. La description mentionne le repli pour les types d'opération.
+- **Type-opération — onglet Emails** — note sous l'adresse d'expédition : lien vers Paramètres > Association si le champ est vide.
+
 ## [v2.7.5] — 2026-04-08
 ### Améliorations
 - **PDFs — footer unifié** — tous les PDFs (rapprochement bancaire, remise bancaire, émargement, matrice présences, participants liste/annuaire, fiche participant, droit image, attestation présence, rapports compte-résultat/opérations/flux trésorerie) partagent le même pied de page : logo association à gauche (selon contexte), pagination centrée « Page X / Y » correcte sur toutes les pages, « AgoraGestion · date » + logo à droite

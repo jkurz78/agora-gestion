@@ -372,8 +372,8 @@ final class ParticipantTable extends Component
         }
 
         $typeOp = $participant->operation?->typeOperation;
-        if (! $typeOp?->email_from) {
-            $this->tokenEmailMessage = 'L\'adresse d\'expédition n\'est pas configurée sur le type d\'opération.';
+        if (! $typeOp?->effectiveEmailFrom()) {
+            $this->tokenEmailMessage = "Aucune adresse d'expédition configurée (ni sur le type d'opération, ni dans Paramètres > Association > Communication).";
             $this->tokenEmailType = 'danger';
 
             return;
@@ -410,7 +410,7 @@ final class ParticipantTable extends Component
 
             Mail::mailer()
                 ->to($email)
-                ->send($mail->from($typeOp->email_from, $typeOp->email_from_name ?? null));
+                ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
             EmailLog::create([
                 'tiers_id' => $participant->tiers_id,

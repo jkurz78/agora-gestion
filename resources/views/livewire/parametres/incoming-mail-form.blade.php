@@ -1,4 +1,23 @@
-<div>
+<div
+    x-data="{ isDirty: false, ready: false, showUnsavedModal: false, pendingUrl: '' }"
+    x-on:focusin.once="$nextTick(() => ready = true)"
+    x-on:input="if (ready) isDirty = true"
+    x-on:change="if (ready) isDirty = true"
+    x-on:form-saved.window="isDirty = false"
+    x-on:click.window="
+        if (isDirty) {
+            const link = $event.target.closest('a[href]');
+            if (link && link.getAttribute('href') !== '#'
+                && !link.classList.contains('btn-primary')
+                && !link.getAttribute('target')
+                && !link.closest('.dropdown-menu')) {
+                $event.preventDefault();
+                pendingUrl = link.href;
+                showUnsavedModal = true;
+            }
+        }
+    "
+>
     @if (session('success'))
         <div class="alert alert-success alert-dismissible mb-4">
             {{ session('success') }}
@@ -31,18 +50,23 @@
 
     @if ($tab === 'configuration')
         <div class="pt-2">
-                <div class="form-check form-switch mb-4">
+                <div class="form-check form-switch mb-2">
                     <input class="form-check-input" type="checkbox"
                            id="enabled" wire:click="toggleEnabled"
                            @checked($enabled)>
                     <label class="form-check-label" for="enabled">
-                        Ingestion active
+                        Relève activée
                         @if ($enabled)
                             <span class="badge bg-success ms-1">ACTIVE</span>
                         @else
                             <span class="badge bg-secondary ms-1">DÉSACTIVÉE</span>
                         @endif
                     </label>
+                </div>
+                <div class="alert alert-info small mb-4">
+                    <p class="mb-2">La relève s'appuie sur le <strong>scheduler Laravel</strong> déclenché par un cron système toutes les minutes. La commande <code>incoming-mail:fetch</code> s'exécute alors toutes les 5 minutes. Si le cron n'est pas configuré sur le serveur, activer cette option n'aura aucun effet.</p>
+                    <p class="mb-1">Ligne à ajouter dans le crontab du serveur (<code>crontab -e</code>) :</p>
+                    <code>* * * * * cd {{ base_path() }} && php artisan schedule:run >> /dev/null 2>&1</code>
                 </div>
 
                 <div class="row g-3">
@@ -155,6 +179,10 @@
 
     @if ($tab === 'expediteurs')
         <div class="pt-2">
+                <div class="alert alert-info small py-2 mb-3">
+                    <p class="mb-1"><i class="bi bi-shield-lock me-1"></i><strong>Filtrage de sécurité</strong> — seuls les emails provenant d'une adresse autorisée sont traités. Tout autre expéditeur est ignoré, ce qui protège le système contre les envois non sollicités ou malveillants.</p>
+                    <p class="mb-0"><i class="bi bi-tag me-1"></i><strong>Libellé</strong> — affiché dans la boîte de réception à la place de l'adresse brute. Permet d'identifier rapidement la source (ex : « Copieur salle de réunion », « Scanner RH »).</p>
+                </div>
                 <table class="table">
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
@@ -201,5 +229,32 @@
                 </div>
         </div>
     @endif
+
+    {{-- Modale modifications non enregistrées --}}
+    <template x-if="showUnsavedModal">
+        <div class="modal-backdrop fade show" style="z-index: 1050;"></div>
+    </template>
+    <template x-if="showUnsavedModal">
+        <div class="modal fade show" tabindex="-1" style="display: block; z-index: 1055;">
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h6 class="modal-title">Modifications non enregistrées</h6>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0">Vous avez des modifications non enregistrées. Que souhaitez-vous faire ?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-sm btn-outline-secondary" @click="showUnsavedModal = false; window.location = pendingUrl;">
+                            Abandonner
+                        </button>
+                        <button class="btn btn-sm btn-primary" @click="$wire.save().then(() => { isDirty = false; showUnsavedModal = false; window.location = pendingUrl; })">
+                            Enregistrer et quitter
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>
 

@@ -496,10 +496,6 @@ XML;
             foreach ($transactionIds as $transactionId) {
                 $transaction = $facture->transactions()->findOrFail($transactionId);
 
-                if (! $transaction->compte->est_systeme) {
-                    throw new \RuntimeException('Seules les transactions sur un compte système peuvent être marquées comme réglées.');
-                }
-
                 $transaction->update([
                     'statut_reglement' => \App\Enums\StatutReglement::Recu->value,
                 ]);

@@ -59,7 +59,7 @@ final class AttestationModal extends Component
     public function mount(Operation $operation): void
     {
         $this->operation = $operation;
-        $this->hasEmailFrom = (bool) $operation->typeOperation?->email_from;
+        $this->hasEmailFrom = (bool) ($operation->typeOperation?->effectiveEmailFrom() ?: $association?->email_from);
         $association = Association::find(1);
         $this->hasCachet = (bool) $association?->cachet_signature_path;
     }
@@ -208,7 +208,7 @@ final class AttestationModal extends Component
 
                 Mail::mailer()
                     ->to($pData['email'])
-                    ->send($mail->from($typeOp->email_from, $typeOp->email_from_name ?? null));
+                    ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
                 EmailLog::create([
                     'tiers_id' => $participant->tiers_id,
@@ -300,7 +300,7 @@ final class AttestationModal extends Component
 
             Mail::mailer()
                 ->to($this->participantEmail)
-                ->send($mail->from($typeOp->email_from, $typeOp->email_from_name ?? null));
+                ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
             EmailLog::create([
                 'tiers_id' => $participant->tiers_id,

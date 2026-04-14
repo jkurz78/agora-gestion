@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Parametres;
 
+use App\Mail\TestEmail;
 use App\Models\Association;
 use App\Models\CompteBancaire;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -52,6 +54,14 @@ final class AssociationForm extends Component
     public ?string $email_from = null;
 
     public ?string $email_from_name = null;
+
+    public string $testEmailTo = '';
+
+    public bool $showTestEmailModal = false;
+
+    public string $testFlashMessage = '';
+
+    public string $testFlashType = '';
 
     public function mount(): void
     {
@@ -161,7 +171,40 @@ final class AssociationForm extends Component
         $association->id = 1;
         $association->fill($data)->save();
 
+        $this->dispatch('form-saved');
         session()->flash('success', 'Informations de l\'association mises à jour.');
+    }
+
+    public function openTestEmailModal(): void
+    {
+        $this->testEmailTo = '';
+        $this->testFlashMessage = '';
+        $this->testFlashType = '';
+        $this->showTestEmailModal = true;
+    }
+
+    public function sendTestEmail(): void
+    {
+        $this->validate([
+            'email_from'  => 'required|email',
+            'testEmailTo' => 'required|email',
+        ], [
+            'email_from.required'  => "L'adresse d'expédition est requise.",
+            'testEmailTo.required' => 'Veuillez saisir une adresse destinataire.',
+            'testEmailTo.email'    => "L'adresse destinataire n'est pas valide.",
+        ]);
+
+        try {
+            Mail::mailer()
+                ->to($this->testEmailTo)
+                ->send((new TestEmail($this->nom ?: 'Association'))->from($this->email_from, $this->email_from_name ?: null));
+
+            $this->testFlashMessage = "Email de test envoyé à {$this->testEmailTo}.";
+            $this->testFlashType = 'success';
+        } catch (\Throwable $e) {
+            $this->testFlashMessage = 'Erreur lors de l\'envoi : '.$e->getMessage();
+            $this->testFlashType = 'danger';
+        }
     }
 
     public function render(): View

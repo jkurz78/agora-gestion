@@ -323,8 +323,8 @@ final class OperationCommunication extends Component
         $operation = $this->operation->loadMissing(['typeOperation', 'seances']);
         $typeOp = $operation->typeOperation;
 
-        if (! $typeOp?->email_from) {
-            session()->flash('error', "Adresse d'expédition non configurée sur le type d'opération.");
+        if (! $typeOp?->effectiveEmailFrom()) {
+            session()->flash('error', "Aucune adresse d'expédition configurée (ni sur le type d'opération, ni dans Paramètres > Association > Communication).");
 
             return;
         }
@@ -339,7 +339,7 @@ final class OperationCommunication extends Component
         try {
             Mail::mailer()
                 ->to($this->testEmail)
-                ->send($mail->from($typeOp->email_from, $typeOp->email_from_name ?? null));
+                ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
             $this->showTestModal = false;
             session()->flash('message', "Email de test envoyé à {$this->testEmail}.");
@@ -364,8 +364,8 @@ final class OperationCommunication extends Component
         $operation = $this->operation->loadMissing(['typeOperation', 'seances']);
         $typeOp = $operation->typeOperation;
 
-        if (! $typeOp?->email_from) {
-            session()->flash('error', "Adresse d'expédition non configurée sur le type d'opération.");
+        if (! $typeOp?->effectiveEmailFrom()) {
+            session()->flash('error', "Aucune adresse d'expédition configurée (ni sur le type d'opération, ni dans Paramètres > Association > Communication).");
 
             return;
         }
@@ -427,7 +427,7 @@ final class OperationCommunication extends Component
 
                 Mail::mailer()
                     ->to($email)
-                    ->send($mail->from($typeOp->email_from, $typeOp->email_from_name ?? null));
+                    ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
                 EmailLog::create([
                     'tiers_id' => $participant->tiers_id,

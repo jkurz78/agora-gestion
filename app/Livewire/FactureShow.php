@@ -6,10 +6,9 @@ namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
 use App\Enums\Espace;
-use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
 use App\Mail\DocumentMail;
-use App\Models\CompteBancaire;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Facture;
@@ -30,12 +29,6 @@ final class FactureShow extends Component
 
     /** @var array<int> */
     public array $selectedTransactionIds = [];
-
-    public ?int $encaissementCompteId = null;
-
-    public ?string $dateReglement = null;
-
-    public ?string $referenceReglement = null;
 
     // ── Email state ──
     public string $emailMessage = '';
@@ -90,42 +83,12 @@ final class FactureShow extends Component
         }
 
         try {
-            $factureService = app(FactureService::class);
-
-            $modesDirects = [ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement];
-
-            $transactions = $this->facture->transactions()
-                ->whereIn('transactions.id', $this->selectedTransactionIds)
-                ->get();
-
-            $txChequeEspeces = $transactions->filter(
-                fn ($t) => ! in_array($t->mode_paiement, $modesDirects, true)
+            app(FactureService::class)->marquerReglementRecu(
+                $this->facture,
+                $this->selectedTransactionIds,
             );
-            $txDirectes = $transactions->filter(
-                fn ($t) => in_array($t->mode_paiement, $modesDirects, true)
-            );
-
-            // 1. Chèque / espèces : statut_reglement = recu (reste sur compte système, remise ultérieure)
-            if ($txChequeEspeces->isNotEmpty()) {
-                $factureService->marquerReglementRecu(
-                    $this->facture,
-                    $txChequeEspeces->pluck('id')->all(),
-                );
-            }
-
-            // 2. Virement / CB / prélèvement : déplacer vers compte réel + statut_reglement = recu
-            if ($txDirectes->isNotEmpty() && $this->encaissementCompteId) {
-                $factureService->encaisser(
-                    $this->facture->fresh(),
-                    $txDirectes->pluck('id')->all(),
-                    $this->encaissementCompteId,
-                );
-            }
 
             $this->selectedTransactionIds = [];
-            $this->dateReglement = null;
-            $this->referenceReglement = null;
-            $this->encaissementCompteId = null;
             $this->facture->load(['transactions.compte']);
 
             session()->flash('success', 'Règlement enregistré.');
@@ -209,23 +172,8 @@ final class FactureShow extends Component
         $montantRegle = $this->facture->montantRegle();
         $isAcquittee = $this->facture->isAcquittee();
 
-        $modesDirects = [ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement];
-
         $transactionsAEncaisser = $this->facture->transactions
-            ->filter(fn ($t) => $t->compte->est_systeme && $t->remise_id === null && $t->date_reglement === null);
-
-        $hasTransactionsDirectes = $transactionsAEncaisser->contains(
-            fn ($t) => in_array($t->mode_paiement, $modesDirects, true)
-        );
-
-        $comptesDestination = CompteBancaire::where('est_systeme', false)
-            ->where('actif_recettes_depenses', true)
-            ->orderBy('nom')
-            ->get();
-
-        if ($this->encaissementCompteId === null && $comptesDestination->count() === 1) {
-            $this->encaissementCompteId = $comptesDestination->first()->id;
-        }
+            ->filter(fn ($t) => $t->statut_reglement === StatutReglement::EnAttente);
 
         // Opérations liées via transactions
         $operationIds = TransactionLigne::whereIn(
@@ -243,8 +191,6 @@ final class FactureShow extends Component
             'montantRegle' => $montantRegle,
             'isAcquittee' => $isAcquittee,
             'transactionsAEncaisser' => $transactionsAEncaisser,
-            'hasTransactionsDirectes' => $hasTransactionsDirectes,
-            'comptesDestination' => $comptesDestination,
             'operationsLiees' => $operationsLiees,
         ]);
     }
@@ -357,6 +303,18 @@ final class FactureShow extends Component
                 'label' => $to->nom.' ('.$to->email_from.')',
             ])
             ->unique('email');
+
+        // Repli sur l'adresse de l'association si aucun type d'opération n'en a une
+        if ($senders->isEmpty()) {
+            $assoc = \App\Models\Association::find(1);
+            if ($assoc?->email_from) {
+                $senders = collect([[
+                    'email' => $assoc->email_from,
+                    'name'  => $assoc->email_from_name,
+                    'label' => ($assoc->nom ?? 'Association').' ('.$assoc->email_from.')',
+                ]]);
+            }
+        }
 
         return $senders;
     }

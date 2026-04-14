@@ -108,23 +108,6 @@
                         </div>
                     </div>
 
-                    @php
-                        $txReglees = $facture->transactions->filter(fn ($t) => $t->date_reglement !== null);
-                    @endphp
-                    @if ($txReglees->isNotEmpty())
-                        <div class="mt-3 small text-muted text-center">
-                            @foreach ($txReglees as $tx)
-                                <i class="bi bi-check2"></i>
-                                Réglé le {{ $tx->date_reglement->format('d/m/Y') }}
-                                @if ($tx->reference_reglement)
-                                    (réf. {{ $tx->reference_reglement }})
-                                @endif
-                                — {{ number_format((float) $tx->montant_total, 2, ',', "\u{202f}") }}&nbsp;&euro;
-                                @if (!$loop->last)<br>@endif
-                            @endforeach
-                        </div>
-                    @endif
-
                     @if ($isAcquittee)
                         <div class="text-center mt-3">
                             <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Acquittée</span>
@@ -283,8 +266,11 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">Créances en attente</label>
+                    <p class="text-muted small mb-3">
+                        Les transactions sélectionnées seront marquées comme <strong>reçues</strong>.
+                        Elles resteront disponibles pour le rapprochement bancaire.
+                    </p>
+                    <div class="mb-2">
                         @foreach ($transactionsAEncaisser as $tx)
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="tx-{{ $tx->id }}"
@@ -297,42 +283,6 @@
                                 </label>
                             </div>
                         @endforeach
-                    </div>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col">
-                            <label class="form-label fw-semibold">Date de règlement</label>
-                            <x-date-input name="dateReglement" wire:model="dateReglement" :value="$dateReglement" />
-                        </div>
-                        <div class="col">
-                            <label class="form-label fw-semibold">
-                                Référence
-                                <span class="text-muted fw-normal" title="ex: n° de chèque, réf. virement">&#9432;</span>
-                            </label>
-                            <input type="text" class="form-control" wire:model="referenceReglement"
-                                placeholder="ex: n° de chèque">
-                        </div>
-                    </div>
-
-                    @if ($hasTransactionsDirectes)
-                    <div class="mb-3">
-                        <label for="encaissement-compte" class="form-label fw-semibold">Compte bancaire de destination</label>
-                        <p class="text-muted small mb-2">Pour les règlements par virement ou CB uniquement.</p>
-                        <select wire:model="encaissementCompteId" id="encaissement-compte" class="form-select">
-                            <option value="">-- Choisir --</option>
-                            @foreach ($comptesDestination as $compte)
-                                <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    @endif
-
-                    <div class="alert alert-info small mb-0 py-2">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Les chèques et espèces restent disponibles pour une remise en banque ultérieurement.
-                        @if ($hasTransactionsDirectes)
-                            Les virements et CB seront enregistrés directement sur le compte sélectionné.
-                        @endif
                     </div>
                 </div>
                 <div class="modal-footer">
