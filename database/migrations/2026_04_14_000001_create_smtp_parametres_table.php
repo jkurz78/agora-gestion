@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('smtp_parametres', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('association_id')->unique();
+            $table->foreignId('association_id')->unique()->constrained('association')->cascadeOnDelete();
             $table->boolean('enabled')->default(false);
             $table->string('smtp_host')->nullable();
             $table->unsignedSmallInteger('smtp_port')->default(587);

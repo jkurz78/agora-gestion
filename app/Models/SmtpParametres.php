@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class SmtpParametres extends Model
 {
@@ -30,5 +31,10 @@ final class SmtpParametres extends Model
             'smtp_password'  => 'encrypted',
             'timeout'        => 'integer',
         ];
+    }
+
+    public function association(): BelongsTo
+    {
+        return $this->belongsTo(Association::class);
     }
 }
