@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\IncomingDocuments;
 
 use App\Enums\Espace;
+use App\Enums\Role;
 use App\Models\IncomingDocument;
 use App\Models\IncomingMailAllowedSender;
 use App\Models\Operation;
@@ -103,6 +104,8 @@ final class IncomingDocumentsList extends Component
 
     public function assignerASeance(): void
     {
+        abort_unless(Auth::user()->role->canWrite(Espace::Gestion), 403);
+
         $this->validate([
             'selectedSeanceId' => ['required', 'integer', 'exists:seances,id'],
         ]);
@@ -155,6 +158,8 @@ final class IncomingDocumentsList extends Component
 
     public function assignerAParticipant(): void
     {
+        abort_unless(Auth::user()->role->canWrite(Espace::Gestion), 403);
+
         $this->validate([
             'selectedParticipantId' => ['required', 'integer', 'exists:participants,id'],
             'assignParticipantLabel' => ['required', 'string', 'max:255'],
@@ -190,6 +195,8 @@ final class IncomingDocumentsList extends Component
 
     public function supprimer(int $docId): void
     {
+        abort_unless(Auth::user()->role === Role::Admin, 403);
+
         $doc = IncomingDocument::findOrFail($docId);
         Storage::disk('local')->delete($doc->storage_path);
         $doc->delete();

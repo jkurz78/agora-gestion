@@ -13,7 +13,18 @@ use Illuminate\View\View;
 
 final class EmailOptoutController extends Controller
 {
-    public function optout(Request $request, string $token): View
+    public function showOptout(string $token): View
+    {
+        EmailLog::where('tracking_token', $token)->firstOrFail();
+
+        return view('email.optout', [
+            'token' => $token,
+            'confirmed' => false,
+            'resubscribed' => false,
+        ] + $this->associationData());
+    }
+
+    public function optout(string $token): View
     {
         $log = EmailLog::where('tracking_token', $token)->firstOrFail();
 
@@ -32,6 +43,7 @@ final class EmailOptoutController extends Controller
 
         return view('email.optout', [
             'token' => $token,
+            'confirmed' => true,
             'resubscribed' => false,
         ] + $this->associationData());
     }
@@ -55,6 +67,7 @@ final class EmailOptoutController extends Controller
 
         return view('email.optout', [
             'token' => $token,
+            'confirmed' => true,
             'resubscribed' => true,
         ] + $this->associationData());
     }

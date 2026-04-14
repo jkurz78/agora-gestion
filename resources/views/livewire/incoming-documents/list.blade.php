@@ -68,10 +68,12 @@
                                        class="btn btn-sm btn-outline-secondary" target="_blank" title="Aperçu">
                                         👁
                                     </a>
-                                    <button class="btn btn-sm btn-outline-primary"
-                                            wire:click="ouvrirAssignation({{ $doc->id }})">
-                                        Attacher à une séance
-                                    </button>
+                                    @if(Auth::user()->role->canWrite(\App\Enums\Espace::Gestion))
+                                        <button class="btn btn-sm btn-outline-primary"
+                                                wire:click="ouvrirAssignation({{ $doc->id }})">
+                                            Attacher à une séance
+                                        </button>
+                                    @endif
                                     @if(\App\Services\InvoiceOcrService::isConfigured() && Auth::user()->role->canWrite(\App\Enums\Espace::Compta))
                                         <button class="btn btn-sm btn-outline-success"
                                                 wire:click="creerDepense({{ $doc->id }})"
@@ -79,15 +81,19 @@
                                             <i class="bi bi-receipt"></i> Créer dépense
                                         </button>
                                     @endif
-                                    <button wire:click="ouvrirAssignationParticipant({{ $doc->id }})" class="btn btn-sm btn-outline-success" title="Assigner à un participant">
-                                        <i class="bi bi-person-check"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger"
-                                            wire:click="supprimer({{ $doc->id }})"
-                                            wire:confirm="Supprimer ce document ?"
-                                            title="Supprimer">
-                                        🗑
-                                    </button>
+                                    @if(Auth::user()->role->canWrite(\App\Enums\Espace::Gestion))
+                                        <button wire:click="ouvrirAssignationParticipant({{ $doc->id }})" class="btn btn-sm btn-outline-success" title="Assigner à un participant">
+                                            <i class="bi bi-person-check"></i>
+                                        </button>
+                                    @endif
+                                    @if(Auth::user()->role === \App\Enums\Role::Admin)
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                wire:click="supprimer({{ $doc->id }})"
+                                                wire:confirm="Supprimer ce document ?"
+                                                title="Supprimer">
+                                            🗑
+                                        </button>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

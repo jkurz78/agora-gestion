@@ -33,6 +33,24 @@ final class EmailTemplate extends Model
 
     public static function sanitizeCorps(string $html): string
     {
-        return strip_tags($html, EmailLogo::ALLOWED_TAGS);
+        $cacheDir = storage_path('app/htmlpurifier');
+        if (! is_dir($cacheDir)) {
+            mkdir($cacheDir, 0755, true);
+        }
+
+        $config = \HTMLPurifier_Config::createDefault();
+        $config->set(
+            'HTML.Allowed',
+            'p,br,strong,em,u,ul,ol,li,a[href|title|target],h1,h2,h3,h4,span[style],div[style],table,tr,td[style],th[style],img[src|alt|width|height|style]'
+        );
+        $config->set(
+            'CSS.AllowedProperties',
+            'color,background-color,font-size,font-weight,font-style,text-decoration,text-align,margin,padding,border,width,height'
+        );
+        $config->set('URI.AllowedSchemes', ['http' => true, 'https' => true, 'mailto' => true]);
+        $config->set('Attr.AllowedFrameTargets', ['_blank', '_self']);
+        $config->set('Cache.SerializerPath', $cacheDir);
+
+        return (new \HTMLPurifier($config))->purify($html);
     }
 }
