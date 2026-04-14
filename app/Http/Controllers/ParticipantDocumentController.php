@@ -17,6 +17,10 @@ final class ParticipantDocumentController extends Controller
             abort(403);
         }
 
+        if (! preg_match('/^[A-Za-z0-9._-]+$/', $filename)) {
+            abort(400);
+        }
+
         $path = "participants/{$participant->id}/{$filename}";
 
         if (! Storage::disk('local')->exists($path)) {

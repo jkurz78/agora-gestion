@@ -38,7 +38,7 @@ final class UserController extends Controller
             'email' => $validated['email'],
             'password' => $validated['password'],
             'peut_voir_donnees_sensibles' => $request->boolean('peut_voir_donnees_sensibles'),
-            'role' => Role::tryFrom($validated['role'] ?? '') ?? Role::Admin,
+            'role' => Role::tryFrom($validated['role'] ?? '') ?? Role::Consultation,
         ]);
 
         return redirect()->route('parametres.utilisateurs.index')

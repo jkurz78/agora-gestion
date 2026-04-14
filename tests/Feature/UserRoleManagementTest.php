@@ -35,7 +35,7 @@ it('can update a user role', function () {
     expect($target->fresh()->role)->toBe(Role::Gestionnaire);
 });
 
-it('defaults to admin role if not specified', function () {
+it('defaults to consultation role if not specified', function () {
     $admin = User::factory()->create(['role' => Role::Admin]);
 
     $this->actingAs($admin)->post(route('parametres.utilisateurs.store'), [
@@ -45,7 +45,7 @@ it('defaults to admin role if not specified', function () {
         'password_confirmation' => 'password123',
     ])->assertRedirect();
 
-    expect(User::where('email', 'default@example.com')->first()->role)->toBe(Role::Admin);
+    expect(User::where('email', 'default@example.com')->first()->role)->toBe(Role::Consultation);
 });
 
 it('validates role must be a valid enum value', function () {
