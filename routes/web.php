@@ -102,6 +102,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         })->name('participants.show');
         // Participant documents
         Route::get('/participants/{participant}/documents/{filename}', ParticipantDocumentController::class)
+            ->where('filename', '[A-Za-z0-9._-]+')
             ->name('participants.documents.download');
         // Documents prévisionnels (devis / pro forma)
         Route::get('/documents-previsionnels/{document}/pdf', DocumentPrevisionnelPdfController::class)

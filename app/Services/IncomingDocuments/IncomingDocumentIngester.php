@@ -70,10 +70,13 @@ final class IncomingDocumentIngester
         ?string $detail,
     ): IncomingDocument {
         if ($file->sourceMessageId !== null) {
-            $existing = IncomingDocument::where('source_message_id', $file->sourceMessageId)->first();
+            $existing = IncomingDocument::where('source_message_id', $file->sourceMessageId)
+                ->where('original_filename', $file->originalFilename)
+                ->first();
             if ($existing !== null) {
-                Log::info('Document déjà en inbox (dédup par Message-ID)', [
+                Log::info('Document déjà en inbox (dédup par Message-ID + nom fichier)', [
                     'message_id' => $file->sourceMessageId,
+                    'filename' => $file->originalFilename,
                     'existing_id' => $existing->id,
                 ]);
 
