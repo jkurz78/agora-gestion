@@ -23,7 +23,7 @@ return new class extends Migration
     {
         foreach ($this->tables as $table) {
             Schema::table($table, function (Blueprint $t) {
-                $t->unsignedBigInteger('association_id')->nullable(false)->change();
+                $t->foreignId('association_id')->nullable(false)->change();
             });
         }
     }
@@ -32,7 +32,7 @@ return new class extends Migration
     {
         foreach ($this->tables as $table) {
             Schema::table($table, function (Blueprint $t) {
-                $t->unsignedBigInteger('association_id')->nullable()->change();
+                $t->foreignId('association_id')->nullable()->change();
             });
         }
     }

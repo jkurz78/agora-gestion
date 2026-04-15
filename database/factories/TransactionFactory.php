@@ -13,7 +13,10 @@ use App\Models\TransactionLigne;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/** @extends Factory<Transaction> */
+/**
+ * @extends Factory<Transaction>
+ * @todo S1-Task22: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
+ */
 class TransactionFactory extends Factory
 {
     protected $model = Transaction::class;

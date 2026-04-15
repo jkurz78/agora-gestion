@@ -8,6 +8,9 @@ namespace Database\Factories;
 use App\Models\Tiers;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/**
+ * @todo S1-Task22: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
+ */
 final class TiersFactory extends Factory
 {
     protected $model = Tiers::class;
