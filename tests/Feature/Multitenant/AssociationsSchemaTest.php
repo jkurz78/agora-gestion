@@ -27,3 +27,16 @@ it('association_slug_aliases table exists with expected columns', function (): v
     $slugAncienUnique = $indexes->first(fn ($i) => in_array('slug_ancien', $i['columns']) && $i['unique']);
     expect($slugAncienUnique)->not->toBeNull();
 });
+
+it('association_user pivot table has expected structure', function (): void {
+    expect(Schema::hasTable('association_user'))->toBeTrue()
+        ->and(Schema::hasColumn('association_user', 'user_id'))->toBeTrue()
+        ->and(Schema::hasColumn('association_user', 'association_id'))->toBeTrue()
+        ->and(Schema::hasColumn('association_user', 'role'))->toBeTrue()
+        ->and(Schema::hasColumn('association_user', 'joined_at'))->toBeTrue()
+        ->and(Schema::hasColumn('association_user', 'revoked_at'))->toBeTrue();
+
+    $indexes = collect(Schema::getIndexes('association_user'));
+    $unique = $indexes->first(fn ($i) => $i['columns'] === ['user_id', 'association_id'] && $i['unique']);
+    expect($unique)->not->toBeNull();
+});
