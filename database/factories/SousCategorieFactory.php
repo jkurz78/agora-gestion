@@ -18,6 +18,7 @@ class SousCategorieFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => 1,
             'categorie_id' => Categorie::factory(),
             'nom' => fake()->words(2, true),
             'code_cerfa' => fake()->optional(0.3)->numerify('####'),

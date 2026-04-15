@@ -15,6 +15,7 @@ final class CompteBancaire extends Model
     protected $table = 'comptes_bancaires';
 
     protected $fillable = [
+        'association_id',
         'nom',
         'iban',
         'bic',

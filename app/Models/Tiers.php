@@ -14,6 +14,7 @@ final class Tiers extends Model
     use HasFactory;
 
     protected $fillable = [
+        'association_id',
         'type',
         'nom',
         'prenom',

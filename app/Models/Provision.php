@@ -16,6 +16,7 @@ final class Provision extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'association_id',
         'exercice',
         'type',
         'sous_categorie_id',

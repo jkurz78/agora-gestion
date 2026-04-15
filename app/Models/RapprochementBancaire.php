@@ -17,6 +17,7 @@ final class RapprochementBancaire extends Model
     protected $table = 'rapprochements_bancaires';
 
     protected $fillable = [
+        'association_id',
         'compte_id',
         'date_fin',
         'solde_ouverture',

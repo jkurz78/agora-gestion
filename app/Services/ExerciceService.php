@@ -151,6 +151,7 @@ final class ExerciceService
     {
         return DB::transaction(function () use ($annee, $user): Exercice {
             $exercice = Exercice::create([
+                'association_id' => 1,
                 'annee' => $annee,
                 'statut' => StatutExercice::Ouvert,
             ]);

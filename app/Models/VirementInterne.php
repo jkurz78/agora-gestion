@@ -17,6 +17,7 @@ final class VirementInterne extends Model
     protected $table = 'virements_internes';
 
     protected $fillable = [
+        'association_id',
         'date',
         'montant',
         'compte_source_id',

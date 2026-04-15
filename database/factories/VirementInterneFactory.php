@@ -19,6 +19,7 @@ class VirementInterneFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => 1,
             'date' => fake()->dateTimeBetween('-1 year', 'now'),
             'montant' => fake()->randomFloat(2, 10, 5000),
             'compte_source_id' => CompteBancaire::factory(),

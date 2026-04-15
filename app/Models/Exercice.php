@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 final class Exercice extends Model
 {
     protected $fillable = [
+        'association_id',
         'annee',
         'statut',
         'date_cloture',

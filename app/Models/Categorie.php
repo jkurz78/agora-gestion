@@ -14,6 +14,7 @@ final class Categorie extends Model
     use HasFactory;
 
     protected $fillable = [
+        'association_id',
         'nom',
         'type',
     ];

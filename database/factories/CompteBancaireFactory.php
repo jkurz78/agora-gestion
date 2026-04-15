@@ -17,6 +17,7 @@ class CompteBancaireFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => 1,
             'nom' => fake()->company().' - '.fake()->randomElement(['Courant', 'Livret A', 'Épargne']),
             'iban' => fake()->iban('FR'),
             'solde_initial' => fake()->randomFloat(2, 0, 10000),

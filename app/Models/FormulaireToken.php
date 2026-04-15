@@ -15,6 +15,7 @@ final class FormulaireToken extends Model
     protected $table = 'formulaire_tokens';
 
     protected $fillable = [
+        'association_id',
         'participant_id',
         'token',
         'expire_at',

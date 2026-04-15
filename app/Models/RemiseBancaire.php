@@ -18,6 +18,7 @@ final class RemiseBancaire extends Model
     protected $table = 'remises_bancaires';
 
     protected $fillable = [
+        'association_id',
         'numero',
         'date',
         'mode_paiement',

@@ -112,12 +112,13 @@ class CategoriesSeeder extends Seeder
 
         foreach ($data as $item) {
             $categorie = Categorie::create([
+                'association_id' => 1,
                 'nom' => $item['nom'],
                 'type' => $item['type'],
             ]);
 
             foreach ($item['sous'] as $sous) {
-                $categorie->sousCategories()->create($sous);
+                $categorie->sousCategories()->create(array_merge(['association_id' => 1], $sous));
             }
         }
     }
