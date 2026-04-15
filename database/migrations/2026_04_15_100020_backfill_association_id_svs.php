@@ -20,26 +20,28 @@ return new class extends Migration
 
     public function up(): void
     {
-        // If no association exists, create a default one (fresh install case)
-        $first = DB::table('association')->first();
-        if (! $first) {
-            DB::table('association')->insert([
-                'nom' => 'Association par défaut',
-                'slug' => 'defaut',
-                'exercice_mois_debut' => 9,
-                'statut' => 'actif',
-                'wizard_completed_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        DB::transaction(function (): void {
+            // If no association exists, create a default one (fresh install case)
             $first = DB::table('association')->first();
-        }
+            if (! $first) {
+                DB::table('association')->insert([
+                    'nom' => 'Association par défaut',
+                    'slug' => 'defaut',
+                    'exercice_mois_debut' => 9,
+                    'statut' => 'actif',
+                    'wizard_completed_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+                $first = DB::table('association')->first();
+            }
 
-        $firstId = $first->id;
+            $firstId = $first->id;
 
-        foreach ($this->tables as $table) {
-            DB::table($table)->whereNull('association_id')->update(['association_id' => $firstId]);
-        }
+            foreach ($this->tables as $table) {
+                DB::table($table)->whereNull('association_id')->update(['association_id' => $firstId]);
+            }
+        });
     }
 
     public function down(): void
