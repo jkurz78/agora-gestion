@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<Categorie>
+ * @todo S1-Task22: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 class CategorieFactory extends Factory
 {
