@@ -54,3 +54,15 @@ it('group D tables have association_id column (nullable, indexed)', function (st
     $hasIndex = $indexes->first(fn ($i) => in_array('association_id', $i['columns']));
     expect($hasIndex)->not->toBeNull();
 })->with(['factures', 'documents_previsionnels', 'budget_lines', 'exercices', 'provisions']);
+
+it('group E tables have association_id column (nullable, indexed)', function (string $table): void {
+    expect(Schema::hasColumn($table, 'association_id'))->toBeTrue();
+
+    $column = collect(Schema::getColumns($table))->firstWhere('name', 'association_id');
+    expect($column)->not->toBeNull()
+        ->and($column['nullable'])->toBeTrue();
+
+    $indexes = collect(Schema::getIndexes($table));
+    $hasIndex = $indexes->first(fn ($i) => in_array('association_id', $i['columns']));
+    expect($hasIndex)->not->toBeNull();
+})->with(['email_templates', 'message_templates', 'campagnes_email', 'formulaire_tokens']);
