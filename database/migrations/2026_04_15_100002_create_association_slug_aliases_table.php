@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->string('slug_ancien', 80)->unique();
             $table->foreignId('association_id')->constrained('association')->cascadeOnDelete();
-            $table->timestamp('deprecated_at');
+            $table->timestamp('deprecated_at')->nullable();
             $table->timestamps();
             $table->index('association_id');
         });

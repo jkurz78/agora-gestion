@@ -22,4 +22,8 @@ it('association_slug_aliases table exists with expected columns', function (): v
         ->and(Schema::hasColumn('association_slug_aliases', 'slug_ancien'))->toBeTrue()
         ->and(Schema::hasColumn('association_slug_aliases', 'association_id'))->toBeTrue()
         ->and(Schema::hasColumn('association_slug_aliases', 'deprecated_at'))->toBeTrue();
+
+    $indexes = collect(Schema::getIndexes('association_slug_aliases'));
+    $slugAncienUnique = $indexes->first(fn ($i) => in_array('slug_ancien', $i['columns']) && $i['unique']);
+    expect($slugAncienUnique)->not->toBeNull();
 });
