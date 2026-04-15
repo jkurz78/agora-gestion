@@ -18,6 +18,7 @@ class BudgetLineFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => 1,
             'sous_categorie_id' => SousCategorie::factory(),
             'exercice' => (int) date('Y'),
             'montant_prevu' => fake()->randomFloat(2, 100, 10000),

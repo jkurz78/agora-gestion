@@ -18,6 +18,7 @@ class CategorieFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => 1,
             'nom' => fake()->word(),
             'type' => fake()->randomElement(TypeCategorie::cases()),
         ];

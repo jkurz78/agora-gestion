@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 final class Participant extends Model
 {
     protected $fillable = [
+        'association_id',
         'tiers_id',
         'operation_id',
         'type_operation_tarif_id',

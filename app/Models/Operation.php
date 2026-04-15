@@ -17,6 +17,7 @@ final class Operation extends Model
     use HasFactory;
 
     protected $fillable = [
+        'association_id',
         'nom',
         'description',
         'date_debut',

@@ -21,6 +21,7 @@ final class Transaction extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'association_id',
         'type',
         'date',
         'libelle',

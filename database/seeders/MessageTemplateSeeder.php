@@ -47,7 +47,7 @@ final class MessageTemplateSeeder extends Seeder
         foreach ($templates as $data) {
             MessageTemplate::firstOrCreate(
                 ['nom' => $data['nom']],
-                $data
+                array_merge(['association_id' => 1], $data)
             );
         }
     }

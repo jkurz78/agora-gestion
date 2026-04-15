@@ -17,6 +17,7 @@ final class TiersFactory extends Factory
         $type = 'particulier';
 
         return [
+            'association_id' => 1,
             'type' => $type,
             'nom' => fake()->lastName(),
             'prenom' => fake()->firstName(),

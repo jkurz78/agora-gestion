@@ -13,6 +13,7 @@ final class DocumentPrevisionnel extends Model
     protected $table = 'documents_previsionnels';
 
     protected $fillable = [
+        'association_id',
         'operation_id',
         'participant_id',
         'type',

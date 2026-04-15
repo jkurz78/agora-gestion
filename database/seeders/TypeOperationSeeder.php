@@ -19,6 +19,7 @@ class TypeOperationSeeder extends Seeder
         $psa = TypeOperation::firstOrCreate(
             ['nom' => 'Parcours de soins A'],
             [
+                'association_id' => 1,
                 'nom' => 'Parcours de soins A',
                 'libelle_article' => 'le parcours de soins thérapeutique',
                 'description' => 'Parcours thérapeutique de 30 séances avec médiation animale.',
@@ -44,6 +45,7 @@ class TypeOperationSeeder extends Seeder
         $form = TypeOperation::firstOrCreate(
             ['nom' => 'Formation'],
             [
+                'association_id' => 1,
                 'nom' => 'Formation',
                 'libelle_article' => 'la formation',
                 'description' => 'Formation ouverte à tous, 12 séances.',

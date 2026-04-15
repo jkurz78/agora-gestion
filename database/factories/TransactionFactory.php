@@ -21,6 +21,7 @@ class TransactionFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => 1,
             'type' => fake()->randomElement(TypeTransaction::cases()),
             'date' => fake()->dateTimeBetween('-1 year', 'now'),
             'libelle' => fake()->sentence(4),

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 final class Seance extends Model
 {
     protected $fillable = [
+        'association_id',
         'operation_id',
         'numero',
         'date',

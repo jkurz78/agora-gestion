@@ -16,6 +16,7 @@ final class SousCategorie extends Model
     protected $table = 'sous_categories';
 
     protected $fillable = [
+        'association_id',
         'categorie_id',
         'nom',
         'code_cerfa',

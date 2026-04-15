@@ -13,6 +13,7 @@ final class CampagneEmail extends Model
     protected $table = 'campagnes_email';
 
     protected $fillable = [
+        'association_id',
         'operation_id',
         'objet',
         'corps',

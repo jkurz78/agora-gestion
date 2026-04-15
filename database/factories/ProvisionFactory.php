@@ -18,6 +18,7 @@ final class ProvisionFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => 1,
             'exercice' => 2025,
             'type' => fake()->randomElement(TypeTransaction::cases()),
             'sous_categorie_id' => SousCategorie::factory(),

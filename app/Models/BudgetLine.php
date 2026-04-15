@@ -16,6 +16,7 @@ final class BudgetLine extends Model
     protected $table = 'budget_lines';
 
     protected $fillable = [
+        'association_id',
         'sous_categorie_id',
         'exercice',
         'montant_prevu',

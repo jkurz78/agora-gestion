@@ -18,6 +18,7 @@ final class FormulaireTokenFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => 1,
             'participant_id' => null, // must be provided when creating
             'token' => strtoupper(Str::random(8)),
             'expire_at' => now()->addDays(30),
