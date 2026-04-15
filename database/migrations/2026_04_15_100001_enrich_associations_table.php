@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -18,15 +19,19 @@ return new class extends Migration
             $table->timestamp('wizard_completed_at')->nullable()->after('statut');
         });
 
-        // Backfill slug pour l'asso existante SVS : "svs" ou slug depuis nom
+        // Backfill slug pour les associations existantes
         $existing = DB::table('association')->get();
         foreach ($existing as $row) {
-            DB::table('association')
-                ->where('id', $row->id)
-                ->update([
-                    'slug' => Str::slug($row->nom ?: "asso-{$row->id}"),
-                    'wizard_completed_at' => now(), // assos existantes déjà opérationnelles
-                ]);
+            $base = Str::slug($row->nom ?: "asso-{$row->id}");
+            $slug = $base;
+            $n = 1;
+            while (DB::table('association')->where('slug', $slug)->where('id', '!=', $row->id)->exists()) {
+                $slug = $base.'-'.$n++;
+            }
+            DB::table('association')->where('id', $row->id)->update([
+                'slug' => $slug,
+                'wizard_completed_at' => now(),
+            ]);
         }
 
         Schema::table('association', function (Blueprint $table) {
