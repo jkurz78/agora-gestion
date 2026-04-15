@@ -9,6 +9,7 @@ use App\Models\Exercice;
 use App\Models\User;
 use App\Services\ExerciceService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
@@ -48,18 +49,22 @@ class DatabaseSeeder extends Seeder
             'date_solde_initial' => '2025-09-01',
         ]);
 
-        \DB::table('association')->insert([
-            'id' => 1,
-            'nom' => 'Mon Association',
-            'slug' => 'mon-association',
-            'forme_juridique' => 'Association loi 1901',
-            'facture_conditions_reglement' => 'Payable à réception',
-            'facture_mentions_legales' => "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé",
-            'facture_mentions_penalites' => "En cas de retard de paiement, pénalités au taux de 3× le taux d'intérêt légal. Indemnité forfaitaire de recouvrement : 40 € (art. D441-5 C.Com).",
-            'wizard_completed_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // updateOrInsert: idempotent — works whether backfill migration already created
+        // the default association (migrate:fresh --seed) or not (fresh production deploy).
+        DB::table('association')->updateOrInsert(
+            ['id' => 1],
+            [
+                'nom' => 'Mon Association',
+                'slug' => 'mon-association',
+                'forme_juridique' => 'Association loi 1901',
+                'facture_conditions_reglement' => 'Payable à réception',
+                'facture_mentions_legales' => "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé",
+                'facture_mentions_penalites' => "En cas de retard de paiement, pénalités au taux de 3× le taux d'intérêt légal. Indemnité forfaitaire de recouvrement : 40 € (art. D441-5 C.Com).",
+                'wizard_completed_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
 
         $this->call(CategoriesSeeder::class);
         $this->call(TypeOperationSeeder::class);
