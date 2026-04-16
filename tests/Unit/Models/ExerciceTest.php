@@ -4,13 +4,21 @@ declare(strict_types=1);
 
 use App\Enums\StatutExercice;
 use App\Enums\TypeActionExercice;
+use App\Models\Association;
 use App\Models\Exercice;
 use App\Models\ExerciceAction;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
 
-uses(RefreshDatabase::class);
+beforeEach(function () {
+    $association = Association::factory()->create();
+    TenantContext::boot($association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 describe('Exercice model', function () {
     it('casts statut to StatutExercice enum', function () {
