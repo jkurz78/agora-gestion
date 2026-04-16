@@ -18,7 +18,7 @@ it('every user has at least one association_user row with role copied', function
     foreach (['admin', 'gestionnaire'] as $role) {
         $userIds[] = DB::table('users')->insertGetId([
             'nom' => 'Test User',
-            'email' => $role . '@test.fr',
+            'email' => $role.'@test.fr',
             'password' => Hash::make('password'),
             'role' => $role,
             'created_at' => now(),

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\User;
@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('local');
-    $this->user = User::factory()->create(['role' => Role::Gestionnaire]);
+    $this->user = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
     $this->operation = Operation::factory()->create();
     $this->seance = Seance::create([
         'operation_id' => $this->operation->id,

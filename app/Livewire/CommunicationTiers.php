@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Helpers\EmailLogo;
 use App\Mail\CommunicationTiersMail;
 use App\Models\CampagneEmail;
@@ -104,7 +105,7 @@ final class CommunicationTiers extends Component
     public function mount(): void
     {
         $user = Auth::user();
-        if (! $user || ! $user->role->canWrite(Espace::Gestion)) {
+        if (! $user || ! (RoleAssociation::tryFrom($user->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false)) {
             abort(403);
         }
     }

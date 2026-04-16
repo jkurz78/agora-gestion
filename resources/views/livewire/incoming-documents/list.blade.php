@@ -86,7 +86,7 @@
                                             <i class="bi bi-person-check"></i>
                                         </button>
                                     @endif
-                                    @if(Auth::user()->role === \App\Enums\Role::Admin)
+                                    @if(Auth::user()->currentRole() === \App\Enums\RoleAssociation::Admin->value)
                                         <button class="btn btn-sm btn-outline-danger"
                                                 wire:click="supprimer({{ $doc->id }})"
                                                 wire:confirm="Supprimer ce document ?"

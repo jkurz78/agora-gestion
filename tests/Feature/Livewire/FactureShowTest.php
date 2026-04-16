@@ -194,7 +194,6 @@ it('enregistre un règlement chèque via le bouton unifié', function () {
     expect($transaction->compte_id)->toBe($compteCreances->id);
 });
 
-
 it('redirects to edit if facture is brouillon', function () {
     $brouillon = Facture::create([
         'numero' => null,

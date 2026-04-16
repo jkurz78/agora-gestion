@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Mail\PasswordChangedByAdmin;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -13,7 +13,7 @@ uses(RefreshDatabase::class);
 it('sends email when admin changes another user password', function () {
     Mail::fake();
 
-    $admin = User::factory()->create(['role' => Role::Admin]);
+    $admin = User::factory()->create(['role' => RoleAssociation::Admin]);
     $target = User::factory()->create();
 
     $this->actingAs($admin)->put(route('parametres.utilisateurs.update', $target), [
@@ -31,7 +31,7 @@ it('sends email when admin changes another user password', function () {
 it('does not send email when password is not changed', function () {
     Mail::fake();
 
-    $admin = User::factory()->create(['role' => Role::Admin]);
+    $admin = User::factory()->create(['role' => RoleAssociation::Admin]);
     $target = User::factory()->create();
 
     $this->actingAs($admin)->put(route('parametres.utilisateurs.update', $target), [

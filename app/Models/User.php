@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\Espace;
-use App\Enums\Role;
 use App\Enums\RoleSysteme;
 use App\Enums\TwoFactorMethod;
 use App\Tenant\TenantContext;
@@ -32,7 +31,6 @@ final class User extends Authenticatable implements MustVerifyEmail
         'password',
         'dernier_espace',
         'peut_voir_donnees_sensibles',
-        'role',
         'two_factor_method',
         'two_factor_secret',
         'two_factor_confirmed_at',
@@ -60,7 +58,6 @@ final class User extends Authenticatable implements MustVerifyEmail
             'password' => 'hashed',
             'dernier_espace' => Espace::class,
             'peut_voir_donnees_sensibles' => 'boolean',
-            'role' => Role::class,
             'role_systeme' => RoleSysteme::class,
             'two_factor_method' => TwoFactorMethod::class,
             'two_factor_secret' => 'encrypted',

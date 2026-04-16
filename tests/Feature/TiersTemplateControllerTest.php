@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Models\User;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 beforeEach(function (): void {
-    $this->admin = User::factory()->create(['role' => Role::Admin]);
-    $this->consultation = User::factory()->create(['role' => Role::Consultation]);
+    $this->admin = User::factory()->create(['role' => RoleAssociation::Admin]);
+    $this->consultation = User::factory()->create(['role' => RoleAssociation::Consultation]);
 });
 
 // ── CSV template ──

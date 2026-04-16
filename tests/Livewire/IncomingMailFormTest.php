@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Livewire\Parametres\IncomingMailForm;
 use App\Models\Association;
 use App\Models\IncomingMailAllowedSender;
@@ -16,7 +16,7 @@ beforeEach(function () {
         $assoc->id = 1;
         $assoc->fill(['nom' => 'Test'])->save();
     }
-    $this->admin = User::factory()->create(['role' => Role::Admin]);
+    $this->admin = User::factory()->create(['role' => RoleAssociation::Admin]);
 });
 
 it('loads existing parametres on mount', function () {

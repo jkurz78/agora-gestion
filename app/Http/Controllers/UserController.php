@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Mail\PasswordChangedByAdmin;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -30,7 +30,7 @@ final class UserController extends Controller
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'peut_voir_donnees_sensibles' => ['boolean'],
-            'role' => ['nullable', Rule::enum(Role::class)],
+            'role' => ['nullable', Rule::enum(RoleAssociation::class)],
         ]);
 
         User::create([
@@ -38,7 +38,6 @@ final class UserController extends Controller
             'email' => $validated['email'],
             'password' => $validated['password'],
             'peut_voir_donnees_sensibles' => $request->boolean('peut_voir_donnees_sensibles'),
-            'role' => Role::tryFrom($validated['role'] ?? '') ?? Role::Consultation,
         ]);
 
         return redirect()->route('parametres.utilisateurs.index')
@@ -51,7 +50,7 @@ final class UserController extends Controller
             'nom' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email', 'max:150', "unique:users,email,{$utilisateur->id}"],
             'password' => ['nullable', 'confirmed', Password::defaults()],
-            'role' => ['nullable', Rule::enum(Role::class)],
+            'role' => ['nullable', Rule::enum(RoleAssociation::class)],
         ]);
 
         $utilisateur->nom = $validated['nom'];
@@ -64,7 +63,6 @@ final class UserController extends Controller
         }
 
         $utilisateur->peut_voir_donnees_sensibles = $request->boolean('peut_voir_donnees_sensibles');
-        $utilisateur->role = Role::tryFrom($validated['role'] ?? '') ?? $utilisateur->role;
 
         $utilisateur->save();
 

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Espace;
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Livewire\TransactionForm;
 use App\Models\Association;
 use App\Models\Categorie;
@@ -215,7 +215,7 @@ it('save conserve l\'IncomingDocument si la validation échoue', function () {
 });
 
 it('openFormFromIncoming flash une erreur pour un utilisateur Gestionnaire (sans droit canEdit)', function () {
-    $gestionnaire = User::factory()->create(['role' => Role::Gestionnaire]);
+    $gestionnaire = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
     $doc = createInboxDocument();
 
     // Cf. test « file missing » plus haut : Livewire::test désactive StartSession dans son

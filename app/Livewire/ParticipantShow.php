@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Mail\DocumentMail;
 use App\Models\DocumentPrevisionnel;
@@ -486,7 +487,7 @@ final class ParticipantShow extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Gestion);
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function render(): View

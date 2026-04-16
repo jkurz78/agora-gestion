@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 
 /**
  * @extends Factory<FormulaireToken>
+ *
  * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 final class FormulaireTokenFactory extends Factory

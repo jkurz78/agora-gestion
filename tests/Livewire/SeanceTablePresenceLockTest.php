@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Enums\StatutPresence;
 use App\Livewire\SeanceTable;
 use App\Models\Operation;
@@ -15,7 +15,7 @@ use Livewire\Livewire;
 
 beforeEach(function () {
     $this->user = User::factory()->create([
-        'role' => Role::Admin,
+        'role' => RoleAssociation::Admin,
         'peut_voir_donnees_sensibles' => true,
     ]);
     $this->operation = Operation::factory()->create();
