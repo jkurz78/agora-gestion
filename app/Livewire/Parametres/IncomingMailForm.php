@@ -7,6 +7,7 @@ namespace App\Livewire\Parametres;
 use App\Models\IncomingMailAllowedSender;
 use App\Models\IncomingMailParametres;
 use App\Services\IncomingDocuments\IncomingMailService;
+use App\Support\CurrentAssociation;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -43,7 +44,7 @@ final class IncomingMailForm extends Component
 
     public function mount(): void
     {
-        $params = IncomingMailParametres::where('association_id', 1)->first();
+        $params = IncomingMailParametres::where('association_id', CurrentAssociation::id())->first();
         if ($params !== null) {
             $this->enabled = $params->enabled;
             $this->imapHost = $params->imap_host ?? '';
@@ -92,7 +93,7 @@ final class IncomingMailForm extends Component
             $this->imapPassword = '';
         }
 
-        IncomingMailParametres::updateOrCreate(['association_id' => 1], $payload);
+        IncomingMailParametres::updateOrCreate(['association_id' => CurrentAssociation::id()], $payload);
 
         $this->testResult = null;
         $this->dispatch('form-saved');
@@ -111,7 +112,7 @@ final class IncomingMailForm extends Component
 
         $password = $this->imapPassword;
         if ($password === '' && $this->passwordDejaEnregistre) {
-            $existing = IncomingMailParametres::where('association_id', 1)->first();
+            $existing = IncomingMailParametres::where('association_id', CurrentAssociation::id())->first();
             $password = $existing?->imap_password ?? '';
         }
 
@@ -148,7 +149,7 @@ final class IncomingMailForm extends Component
             if (! $this->passwordDejaEnregistre && $this->imapPassword === '') {
                 $errors[] = 'mot de passe';
             }
-            if (IncomingMailAllowedSender::where('association_id', 1)->count() === 0) {
+            if (IncomingMailAllowedSender::where('association_id', CurrentAssociation::id())->count() === 0) {
                 $errors[] = 'aucun expéditeur autorisé configuré';
             }
 
@@ -172,14 +173,14 @@ final class IncomingMailForm extends Component
 
         $email = strtolower(trim($this->nouveauEmail));
 
-        if (IncomingMailAllowedSender::where('association_id', 1)->where('email', $email)->exists()) {
+        if (IncomingMailAllowedSender::where('association_id', CurrentAssociation::id())->where('email', $email)->exists()) {
             $this->addError('nouveauEmail', 'Cette adresse est déjà dans la liste.');
 
             return;
         }
 
         IncomingMailAllowedSender::create([
-            'association_id' => 1,
+            'association_id' => CurrentAssociation::id(),
             'email' => $email,
             'label' => $this->nouveauLabel ?: null,
         ]);
@@ -190,13 +191,13 @@ final class IncomingMailForm extends Component
 
     public function supprimerExpediteur(int $id): void
     {
-        IncomingMailAllowedSender::where('association_id', 1)->where('id', $id)->delete();
+        IncomingMailAllowedSender::where('association_id', CurrentAssociation::id())->where('id', $id)->delete();
     }
 
     public function render(): View
     {
         return view('livewire.parametres.incoming-mail-form', [
-            'expediteurs' => IncomingMailAllowedSender::where('association_id', 1)
+            'expediteurs' => IncomingMailAllowedSender::where('association_id', CurrentAssociation::id())
                 ->orderBy('email')
                 ->get(),
         ]);

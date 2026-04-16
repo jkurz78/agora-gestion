@@ -3,14 +3,24 @@
 declare(strict_types=1);
 
 use App\Livewire\TiersTransactions;
+use App\Models\Association;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
-    $this->tiers = Tiers::factory()->create(['nom' => 'Dupont']);
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont']);
+});
+
+afterEach(function (): void {
+    TenantContext::clear();
 });
 
 it('renders the component', function (): void {
@@ -27,7 +37,7 @@ it('affiche un message quand aucune transaction', function (): void {
 });
 
 it('affiche les dépenses du tiers', function (): void {
-    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Achat test', 'date' => '2025-10-01']);
+    Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'tiers_id' => $this->tiers->id, 'libelle' => 'Achat test', 'date' => '2025-10-01']);
 
     Livewire::actingAs($this->user)
         ->test(TiersTransactions::class, ['tiersId' => $this->tiers->id])
@@ -35,8 +45,8 @@ it('affiche les dépenses du tiers', function (): void {
 });
 
 it('filtre par type', function (): void {
-    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma dépense', 'date' => '2025-10-01']);
-    Transaction::factory()->asRecette()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Ma recette', 'date' => '2025-10-01']);
+    Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'tiers_id' => $this->tiers->id, 'libelle' => 'Ma dépense', 'date' => '2025-10-01']);
+    Transaction::factory()->asRecette()->create(['association_id' => $this->association->id, 'tiers_id' => $this->tiers->id, 'libelle' => 'Ma recette', 'date' => '2025-10-01']);
 
     Livewire::actingAs($this->user)
         ->test(TiersTransactions::class, ['tiersId' => $this->tiers->id])
@@ -46,8 +56,8 @@ it('filtre par type', function (): void {
 });
 
 it('filtre par recherche texte', function (): void {
-    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Frais transport', 'date' => '2025-10-01']);
-    Transaction::factory()->asDepense()->create(['tiers_id' => $this->tiers->id, 'libelle' => 'Loyer bureau', 'date' => '2025-10-01']);
+    Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'tiers_id' => $this->tiers->id, 'libelle' => 'Frais transport', 'date' => '2025-10-01']);
+    Transaction::factory()->asDepense()->create(['association_id' => $this->association->id, 'tiers_id' => $this->tiers->id, 'libelle' => 'Loyer bureau', 'date' => '2025-10-01']);
 
     Livewire::actingAs($this->user)
         ->test(TiersTransactions::class, ['tiersId' => $this->tiers->id])
