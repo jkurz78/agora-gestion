@@ -5,17 +5,27 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Livewire\RemiseBancaireShow;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\RemiseBancaireService;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->compteCible = CompteBancaire::factory()->create(['nom' => 'Banque Pop']);
+
+    $this->compteCible = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Banque Pop',
+    ]);
 
     $service = app(RemiseBancaireService::class);
     $this->remise = $service->creer([
@@ -24,8 +34,9 @@ beforeEach(function () {
         'compte_cible_id' => $this->compteCible->id,
     ]);
 
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Jean']);
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 30.00,
@@ -36,6 +47,10 @@ beforeEach(function () {
 
     $service->comptabiliser($this->remise, [$tx->id]);
     $this->remise->refresh();
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('renders the show page', function () {

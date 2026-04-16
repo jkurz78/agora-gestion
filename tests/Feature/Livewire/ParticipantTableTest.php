@@ -3,18 +3,29 @@
 declare(strict_types=1);
 
 use App\Livewire\ParticipantTable;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->operation = Operation::factory()->create();
+
+    $this->operation = Operation::factory()->create(['association_id' => $this->association->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('renders participant table', function () {
@@ -24,8 +35,9 @@ it('renders participant table', function () {
 });
 
 it('shows participants in table', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Marie']);
     Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => '2026-01-15',
@@ -37,7 +49,7 @@ it('shows participants in table', function () {
 });
 
 it('can add participant via tiers selection then confirm', function () {
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
         ->call('openAddModal')
@@ -50,8 +62,9 @@ it('can add participant via tiers selection then confirm', function () {
 });
 
 it('prevents duplicate participant', function () {
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => now(),
@@ -65,8 +78,9 @@ it('prevents duplicate participant', function () {
 });
 
 it('can update tiers field inline', function () {
-    $tiers = Tiers::factory()->create(['telephone' => '0100000000']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'telephone' => '0100000000']);
     $participant = Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => now(),
@@ -80,8 +94,9 @@ it('can update tiers field inline', function () {
 });
 
 it('rejects disallowed tiers fields', function () {
-    $tiers = Tiers::factory()->create(['type' => 'particulier']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'type' => 'particulier']);
     $participant = Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => now(),
@@ -96,7 +111,8 @@ it('rejects disallowed tiers fields', function () {
 
 it('can remove participant', function () {
     $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
+        'association_id' => $this->association->id,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => now(),
     ]);
@@ -116,8 +132,11 @@ it('hides medical columns when user lacks permission', function () {
 it('shows medical columns when user has permission', function () {
     $this->user->update(['peut_voir_donnees_sensibles' => true]);
 
-    $type = TypeOperation::factory()->confidentiel()->create();
-    $operation = Operation::factory()->create(['type_operation_id' => $type->id]);
+    $type = TypeOperation::factory()->confidentiel()->create(['association_id' => $this->association->id]);
+    $operation = Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'type_operation_id' => $type->id,
+    ]);
 
     Livewire::test(ParticipantTable::class, ['operation' => $operation])
         ->assertSee('Date naissance')
@@ -127,8 +146,9 @@ it('shows medical columns when user has permission', function () {
 it('can update medical field inline when permitted', function () {
     $this->user->update(['peut_voir_donnees_sensibles' => true]);
 
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $participant = Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => now(),
@@ -143,8 +163,9 @@ it('can update medical field inline when permitted', function () {
 });
 
 it('blocks medical field update when not permitted', function () {
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $participant = Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => now(),
@@ -158,7 +179,7 @@ it('blocks medical field update when not permitted', function () {
 });
 
 it('auto-inscribes with today date when participant is added', function () {
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::test(ParticipantTable::class, ['operation' => $this->operation])
         ->call('openAddModal')
