@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Models\Reglement;
 use App\Models\TransactionLigne;
 use App\Services\ExerciceService;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -117,8 +118,8 @@ final class AnalysePivot extends Component
                 // Temporal dimensions
                 if ($date) {
                     $data['Mois'] = ucfirst($date->translatedFormat('F Y'));
-                    $data['Trimestre'] = $this->trimestre($date, $exercice);
-                    $data['Semestre'] = $this->semestre($date, $exercice);
+                    $data['Trimestre'] = $this->trimestreFor($date->month).' '.$exercice.'-'.($exercice + 1);
+                    $data['Semestre'] = $this->semestreFor($date->month).' '.$exercice.'-'.($exercice + 1);
                 } else {
                     $data['Mois'] = null;
                     $data['Trimestre'] = null;
@@ -154,31 +155,28 @@ final class AnalysePivot extends Component
     }
 
     /**
-     * Map a date to its trimestre within the exercice (Sept-Aug).
-     * T1: Sept-Nov, T2: Dec-Feb, T3: Mar-May, T4: Jun-Aug
+     * Map a month number to its trimestre label within the exercice.
+     * The trimestre boundaries are relative to exercice_mois_debut from TenantContext.
+     * Offset 1–3 → T1, 4–6 → T2, 7–9 → T3, 10–12 → T4.
      */
-    private function trimestre(Carbon $date, int $exercice): string
+    private function trimestreFor(int $month): string
     {
-        $month = $date->month;
-        $t = match (true) {
-            in_array($month, [9, 10, 11]) => 'T1',
-            in_array($month, [12, 1, 2]) => 'T2',
-            in_array($month, [3, 4, 5]) => 'T3',
-            default => 'T4',
-        };
+        $moisDebut = TenantContext::current()?->exercice_mois_debut ?? 9;
+        $offset = (($month - $moisDebut + 12) % 12) + 1;
 
-        return $t.' '.$exercice.'-'.($exercice + 1);
+        return 'T'.(int) ceil($offset / 3);
     }
 
     /**
-     * Map a date to its semestre within the exercice (Sept-Aug).
-     * S1: Sept-Feb, S2: Mar-Aug
+     * Map a month number to its semestre label within the exercice.
+     * The semestre boundaries are relative to exercice_mois_debut from TenantContext.
+     * Offset 1–6 → S1, 7–12 → S2.
      */
-    private function semestre(Carbon $date, int $exercice): string
+    private function semestreFor(int $month): string
     {
-        $month = $date->month;
-        $s = ($month >= 9 || $month <= 2) ? 'S1' : 'S2';
+        $moisDebut = TenantContext::current()?->exercice_mois_debut ?? 9;
+        $offset = (($month - $moisDebut + 12) % 12) + 1;
 
-        return $s.' '.$exercice.'-'.($exercice + 1);
+        return $offset <= 6 ? 'S1' : 'S2';
     }
 }

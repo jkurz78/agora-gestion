@@ -10,7 +10,9 @@ use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Reglement;
 use App\Models\Seance;
+use App\Services\ExerciceService;
 use App\Services\FormulaireTokenService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -244,7 +246,7 @@ final class FormulaireController extends Controller
         $typeOperation = $participant->operation->typeOperation;
         if ($typeOperation?->reserve_adherents) {
             $now = now();
-            $annee = $now->month >= 9 ? $now->year : $now->year - 1;
+            $annee = app(ExerciceService::class)->anneeForDate(CarbonImmutable::instance($now));
             $exercice = Exercice::where('annee', $annee)->first();
             $helloassoUrl = $exercice?->helloasso_url;
         }
