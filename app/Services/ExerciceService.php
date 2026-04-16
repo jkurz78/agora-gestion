@@ -151,7 +151,7 @@ final class ExerciceService
     {
         return DB::transaction(function () use ($annee, $user): Exercice {
             $exercice = Exercice::create([
-                'association_id' => 1, // TODO(S1-Task22): remove — TenantModel will auto-fill from TenantContext
+                'association_id' => 1, // TODO(S1-Task39): remove — TenantModel will auto-fill from TenantContext
                 'annee' => $annee,
                 'statut' => StatutExercice::Ouvert,
             ]);
