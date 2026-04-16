@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Livewire\ParticipantTable;
+use App\Models\Association;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Operation;
@@ -10,6 +11,7 @@ use App\Models\Participant;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
@@ -17,15 +19,24 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     $this->actingAs($this->user);
-    $this->tiers = Tiers::factory()->create();
-    $this->operation = Operation::factory()->create();
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $typeOp = TypeOperation::factory()->create(['association_id' => $this->association->id]);
+    $this->operation = Operation::factory()->create(['association_id' => $this->association->id, 'type_operation_id' => $typeOp->id]);
     $this->participant = Participant::create([
         'tiers_id' => $this->tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => '2025-10-01',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('creates an email log with all fields', function () {
@@ -152,11 +163,12 @@ it('logs email when formulaire invitation is sent successfully', function () {
     Mail::fake();
 
     $typeOp = TypeOperation::factory()->create([
+        'association_id' => $this->association->id,
         'email_from' => 'asso@example.com',
         'formulaire_actif' => true,
     ]);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-    $tiers = Tiers::factory()->create(['email' => 'participant@example.com', 'nom' => 'Dupont', 'prenom' => 'Marie']);
+    $operation = Operation::factory()->create(['association_id' => $this->association->id, 'type_operation_id' => $typeOp->id]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'participant@example.com', 'nom' => 'Dupont', 'prenom' => 'Marie']);
     $participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
@@ -199,11 +211,12 @@ it('logs email with error status when sending fails', function () {
         });
 
     $typeOp = TypeOperation::factory()->create([
+        'association_id' => $this->association->id,
         'email_from' => 'asso@example.com',
         'formulaire_actif' => true,
     ]);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-    $tiers = Tiers::factory()->create(['email' => 'fail@example.com', 'nom' => 'Martin', 'prenom' => 'Luc']);
+    $operation = Operation::factory()->create(['association_id' => $this->association->id, 'type_operation_id' => $typeOp->id]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'fail@example.com', 'nom' => 'Martin', 'prenom' => 'Luc']);
     $participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,

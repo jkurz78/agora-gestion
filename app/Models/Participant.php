@@ -122,6 +122,8 @@ final class Participant extends TenantModel
 
     protected static function booted(): void
     {
+        parent::booted();
+
         self::deleting(function (Participant $participant) {
             $dir = "participants/{$participant->id}";
             if (Storage::disk('local')->exists($dir)) {
