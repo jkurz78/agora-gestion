@@ -40,7 +40,34 @@ class AuthenticatedSessionController extends Controller
             }
         }
 
-        return redirect()->intended(route('home', absolute: false));
+        $assos = $user->associations()->whereNull('association_user.revoked_at')->get();
+
+        if ($assos->count() === 0) {
+            auth()->logout();
+
+            return redirect()->route('login')
+                ->withErrors(['email' => 'Compte non rattaché à une association.']);
+        }
+
+        // Tenter d'auto-sélectionner derniere_association_id si encore valide
+        if ($user->derniere_association_id !== null) {
+            $stillValid = $assos->firstWhere('id', $user->derniere_association_id);
+            if ($stillValid !== null) {
+                $request->session()->put('current_association_id', $stillValid->id);
+
+                return redirect()->intended(route('dashboard'));
+            }
+        }
+
+        if ($assos->count() === 1) {
+            $only = $assos->first();
+            $request->session()->put('current_association_id', $only->id);
+            $user->update(['derniere_association_id' => $only->id]);
+
+            return redirect()->intended(route('dashboard'));
+        }
+
+        return redirect()->route('association-selector');
     }
 
     /**
