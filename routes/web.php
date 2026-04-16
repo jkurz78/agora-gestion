@@ -31,6 +31,7 @@ use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\EnsureTwoFactor;
+use App\Livewire\Auth\AssociationSelector;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
@@ -60,10 +61,9 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
-// @todo S1-Task27 — remplacer par la route Livewire AssociationSelector
-Route::get('/association-selector', fn () => 'placeholder')
-    ->middleware('auth')
-    ->name('association-selector');
+Route::middleware(['auth'])->group(function (): void {
+    Route::get('/association-selector', AssociationSelector::class)->name('association-selector');
+});
 
 // ── Profile (espace-agnostic) ──
 Route::middleware('auth')->group(function (): void {
