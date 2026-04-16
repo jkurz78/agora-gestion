@@ -60,6 +60,11 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
+// @todo S1-Task27 — remplacer par la route Livewire AssociationSelector
+Route::get('/association-selector', fn () => 'placeholder')
+    ->middleware('auth')
+    ->name('association-selector');
+
 // ── Profile (espace-agnostic) ──
 Route::middleware('auth')->group(function (): void {
     Route::view('/profil', 'profil.index')->name('profil.index');
