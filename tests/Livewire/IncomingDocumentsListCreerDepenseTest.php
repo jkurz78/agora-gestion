@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Livewire\IncomingDocuments\IncomingDocumentsList;
 use App\Models\Association;
 use App\Models\IncomingDocument;
@@ -57,7 +57,7 @@ it('le bouton Créer dépense est visible pour un utilisateur Comptable avec OCR
         'reason' => 'unclassified',
     ]);
 
-    $comptable = User::factory()->create(['role' => Role::Comptable]);
+    $comptable = User::factory()->create(['role' => RoleAssociation::Comptable]);
 
     Livewire::actingAs($comptable)
         ->test(IncomingDocumentsList::class)
@@ -78,7 +78,7 @@ it('le bouton Créer dépense est invisible pour un utilisateur Gestionnaire', f
         'reason' => 'unclassified',
     ]);
 
-    $gestionnaire = User::factory()->create(['role' => Role::Gestionnaire]);
+    $gestionnaire = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
 
     Livewire::actingAs($gestionnaire)
         ->test(IncomingDocumentsList::class)
@@ -119,7 +119,7 @@ it('creerDepense abort 403 pour un utilisateur Gestionnaire', function () {
         'reason' => 'unclassified',
     ]);
 
-    $gestionnaire = User::factory()->create(['role' => Role::Gestionnaire]);
+    $gestionnaire = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
 
     Livewire::actingAs($gestionnaire)
         ->test(IncomingDocumentsList::class)

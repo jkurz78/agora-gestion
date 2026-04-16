@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Models\Participant;
 use App\Models\ParticipantDocument;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +27,7 @@ final class ParticipantEngagementUpload extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()?->role->canWrite(Espace::Gestion) ?? false;
+        return RoleAssociation::tryFrom(Auth::user()?->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function updatedScanFormulaire(): void

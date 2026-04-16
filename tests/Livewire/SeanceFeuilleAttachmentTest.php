@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Livewire\SeanceFeuilleAttachment;
 use App\Models\Operation;
 use App\Models\Seance;
@@ -16,8 +16,8 @@ use Livewire\Livewire;
 beforeEach(function () {
     Storage::fake('local');
 
-    $this->gestionnaire = User::factory()->create(['role' => Role::Gestionnaire]);
-    $this->consultation = User::factory()->create(['role' => Role::Consultation]);
+    $this->gestionnaire = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
+    $this->consultation = User::factory()->create(['role' => RoleAssociation::Consultation]);
 
     $this->operation = Operation::factory()->create();
     $this->seance = Seance::create([

@@ -70,7 +70,8 @@ return new class extends Migration
         Schema::table('sequences', function (Blueprint $t): void {
             try {
                 $t->dropUnique(['association_id', 'exercice']);
-            } catch (Throwable) {}
+            } catch (Throwable) {
+            }
             $t->unique(['exercice']);
             $t->dropConstrainedForeignId('association_id');
         });

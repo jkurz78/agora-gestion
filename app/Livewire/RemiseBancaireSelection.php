@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\RemiseBancaire;
@@ -38,7 +39,7 @@ final class RemiseBancaireSelection extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()?->role?->canWrite(Espace::Gestion) ?? false;
+        return RoleAssociation::tryFrom(Auth::user()?->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function toggleAll(): void

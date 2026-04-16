@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\DTOs\InvoiceOcrResult;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
+use App\Enums\RoleAssociation;
 use App\Enums\StatutOperation;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
@@ -102,7 +103,7 @@ final class TransactionForm extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Compta);
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
     }
 
     public function getMontantTotalProperty(): float

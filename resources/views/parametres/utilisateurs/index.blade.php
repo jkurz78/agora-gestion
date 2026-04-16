@@ -49,7 +49,7 @@
                 <div class="col-md-2">
                     <label class="form-label">Rôle</label>
                     <select name="role" class="form-select">
-                        @foreach(\App\Enums\Role::cases() as $r)
+                        @foreach(\App\Enums\RoleAssociation::cases() as $r)
                             <option value="{{ $r->value }}" {{ old('role', 'admin') === $r->value ? 'selected' : '' }}>
                                 {{ $r->label() }}
                             </option>
@@ -126,7 +126,7 @@
                             <div class="col-md-2">
                                 <label class="form-label">Rôle</label>
                                 <select name="role" class="form-select">
-                                    @foreach(\App\Enums\Role::cases() as $r)
+                                    @foreach(\App\Enums\RoleAssociation::cases() as $r)
                                         <option value="{{ $r->value }}" {{ $utilisateur->role === $r ? 'selected' : '' }}>
                                             {{ $r->label() }}
                                         </option>

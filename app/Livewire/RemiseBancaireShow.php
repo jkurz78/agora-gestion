@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Enums\StatutReglement;
 use App\Models\RemiseBancaire;
 use App\Services\RemiseBancaireService;
@@ -23,7 +24,7 @@ final class RemiseBancaireShow extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()?->role?->canWrite(Espace::Gestion) ?? false;
+        return RoleAssociation::tryFrom(Auth::user()?->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function estBrouillon(): bool

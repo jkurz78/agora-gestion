@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Mail\FormulaireInvitation;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
@@ -83,7 +84,7 @@ final class ParticipantTable extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Gestion);
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function render(): View

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Models\Seance;
 use App\Services\Emargement\SeanceFeuilleAttacher;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +28,7 @@ final class SeanceFeuilleAttachment extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()?->role->canWrite(Espace::Gestion) ?? false;
+        return RoleAssociation::tryFrom(Auth::user()?->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     #[On('open-feuille-modal')]
@@ -96,7 +97,7 @@ final class SeanceFeuilleAttachment extends Component
             Log::info('Feuille signée détachée (unlock)', [
                 'seance_id' => $seance->id,
                 'user_id' => Auth::id(),
-                'user_role' => Auth::user()?->role?->value,
+                'user_role' => Auth::user()?->currentRole(),
             ]);
         }
 

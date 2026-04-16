@@ -127,10 +127,10 @@ final class ImportParticipants extends Component
 
             $this->reportData = [
                 'created' => $report->created,
-                'linked'  => $report->linked,
+                'linked' => $report->linked,
                 'skipped' => $report->skipped,
-                'total'   => $report->total(),
-                'lines'   => $report->lines,
+                'total' => $report->total(),
+                'lines' => $report->lines,
             ];
 
             $this->phase = 'done';

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Enums\RoleAssociation;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,8 +19,10 @@ final class CheckEspaceAccess
             abort(403);
         }
 
+        $role = RoleAssociation::tryFrom($user->currentRole() ?? '');
+
         if ($level === 'parametres') {
-            if (! $user->role->canAccessParametres()) {
+            if (! ($role?->canAccessParametres() ?? false)) {
                 abort(403, 'Accès réservé aux administrateurs.');
             }
 
@@ -28,7 +31,7 @@ final class CheckEspaceAccess
 
         $espace = $request->attributes->get('espace');
 
-        if ($espace && ! $user->role->canRead($espace)) {
+        if ($espace && ! ($role?->canRead($espace) ?? false)) {
             abort(403, 'Vous n\'avez pas accès à cet espace.');
         }
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Livewire\CommunicationTiers;
 use App\Models\Association;
 use App\Models\Categorie;
@@ -17,7 +17,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->admin = User::factory()->create(['role' => Role::Admin]);
+    $this->admin = User::factory()->create(['role' => RoleAssociation::Admin]);
     $this->actingAs($this->admin);
 
     $assoc = Association::find(1) ?? new Association;
@@ -32,17 +32,17 @@ it('renders for admin', function () {
 });
 
 it('renders for gestionnaire', function () {
-    $this->actingAs(User::factory()->create(['role' => Role::Gestionnaire]));
+    $this->actingAs(User::factory()->create(['role' => RoleAssociation::Gestionnaire]));
     Livewire::test(CommunicationTiers::class)->assertOk();
 });
 
 it('aborts for comptable', function () {
-    $this->actingAs(User::factory()->create(['role' => Role::Comptable]));
+    $this->actingAs(User::factory()->create(['role' => RoleAssociation::Comptable]));
     Livewire::test(CommunicationTiers::class)->assertForbidden();
 });
 
 it('aborts for consultation', function () {
-    $this->actingAs(User::factory()->create(['role' => Role::Consultation]));
+    $this->actingAs(User::factory()->create(['role' => RoleAssociation::Consultation]));
     Livewire::test(CommunicationTiers::class)->assertForbidden();
 });
 

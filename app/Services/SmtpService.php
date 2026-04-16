@@ -25,7 +25,7 @@ final class SmtpService
 
         $context = stream_context_create([
             'ssl' => [
-                'verify_peer'      => true,
+                'verify_peer' => true,
                 'verify_peer_name' => true,
             ],
         ]);
@@ -61,23 +61,23 @@ final class SmtpService
 
         $code = (int) substr(trim($banner), 0, 3);
         if ($code !== 220) {
-            return $this->failure("Réponse inattendue du serveur : " . trim($banner));
+            return $this->failure('Réponse inattendue du serveur : '.trim($banner));
         }
 
-        $result          = new stdClass();
+        $result = new stdClass;
         $result->success = true;
-        $result->error   = null;
-        $result->banner  = trim($banner);
+        $result->error = null;
+        $result->banner = trim($banner);
 
         return $result;
     }
 
     private function failure(string $error): stdClass
     {
-        $result          = new stdClass();
+        $result = new stdClass;
         $result->success = false;
-        $result->error   = $error;
-        $result->banner  = null;
+        $result->error = $error;
+        $result->banner = null;
 
         return $result;
     }

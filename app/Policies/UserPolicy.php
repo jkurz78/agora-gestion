@@ -4,32 +4,34 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\RoleAssociation;
 use App\Models\User;
 
 final class UserPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->role->canAccessParametres();
+        return RoleAssociation::tryFrom($user->currentRole() ?? '')?->canAccessParametres() ?? false;
     }
 
     public function view(User $user, User $model): bool
     {
-        return $user->role->canAccessParametres();
+        return RoleAssociation::tryFrom($user->currentRole() ?? '')?->canAccessParametres() ?? false;
     }
 
     public function create(User $user): bool
     {
-        return $user->role->canAccessParametres();
+        return RoleAssociation::tryFrom($user->currentRole() ?? '')?->canAccessParametres() ?? false;
     }
 
     public function update(User $user, User $model): bool
     {
-        return $user->role->canAccessParametres();
+        return RoleAssociation::tryFrom($user->currentRole() ?? '')?->canAccessParametres() ?? false;
     }
 
     public function delete(User $user, User $model): bool
     {
-        return $user->role->canAccessParametres() && $user->id !== $model->id;
+        return (RoleAssociation::tryFrom($user->currentRole() ?? '')?->canAccessParametres() ?? false)
+            && $user->id !== $model->id;
     }
 }

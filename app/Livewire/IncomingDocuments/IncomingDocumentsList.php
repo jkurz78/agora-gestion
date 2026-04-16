@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\IncomingDocuments;
 
 use App\Enums\Espace;
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Models\IncomingDocument;
 use App\Models\IncomingMailAllowedSender;
 use App\Models\Operation;
@@ -104,7 +104,7 @@ final class IncomingDocumentsList extends Component
 
     public function assignerASeance(): void
     {
-        abort_unless(Auth::user()->role->canWrite(Espace::Gestion), 403);
+        abort_unless(RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false, 403);
 
         $this->validate([
             'selectedSeanceId' => ['required', 'integer', 'exists:seances,id'],
@@ -158,7 +158,7 @@ final class IncomingDocumentsList extends Component
 
     public function assignerAParticipant(): void
     {
-        abort_unless(Auth::user()->role->canWrite(Espace::Gestion), 403);
+        abort_unless(RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false, 403);
 
         $this->validate([
             'selectedParticipantId' => ['required', 'integer', 'exists:participants,id'],
@@ -195,7 +195,7 @@ final class IncomingDocumentsList extends Component
 
     public function supprimer(int $docId): void
     {
-        abort_unless(Auth::user()->role === Role::Admin, 403);
+        abort_unless(Auth::user()->currentRole() === RoleAssociation::Admin->value, 403);
 
         $doc = IncomingDocument::findOrFail($docId);
         Storage::disk('local')->delete($doc->storage_path);
@@ -208,7 +208,7 @@ final class IncomingDocumentsList extends Component
     {
         abort_unless(
             InvoiceOcrService::isConfigured()
-                && Auth::user()?->role->canWrite(Espace::Compta),
+                && (RoleAssociation::tryFrom(Auth::user()?->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false),
             403
         );
 

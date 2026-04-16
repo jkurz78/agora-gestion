@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Mail\DocumentMail;
@@ -47,7 +48,7 @@ final class FactureShow extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Compta);
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
     }
 
     public function mount(Facture $facture): void

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Enums\StatutRapprochement;
 use App\Livewire\BudgetTable;
 use App\Livewire\ParticipantTable;
@@ -21,7 +21,7 @@ uses(RefreshDatabase::class);
 // ─── TransactionForm (Compta) ────────────────────────────────────────────────
 
 it('consultation gets canEdit false on TransactionForm', function () {
-    $user = User::factory()->create(['role' => Role::Consultation]);
+    $user = User::factory()->create(['role' => RoleAssociation::Consultation]);
 
     Livewire::actingAs($user)
         ->test(TransactionForm::class)
@@ -29,7 +29,7 @@ it('consultation gets canEdit false on TransactionForm', function () {
 });
 
 it('comptable gets canEdit true on TransactionForm', function () {
-    $user = User::factory()->create(['role' => Role::Comptable]);
+    $user = User::factory()->create(['role' => RoleAssociation::Comptable]);
 
     Livewire::actingAs($user)
         ->test(TransactionForm::class)
@@ -39,7 +39,7 @@ it('comptable gets canEdit true on TransactionForm', function () {
 // ─── BudgetTable (Compta) ────────────────────────────────────────────────────
 
 it('consultation gets canEdit false on BudgetTable', function () {
-    $user = User::factory()->create(['role' => Role::Consultation]);
+    $user = User::factory()->create(['role' => RoleAssociation::Consultation]);
 
     Livewire::actingAs($user)
         ->test(BudgetTable::class)
@@ -47,7 +47,7 @@ it('consultation gets canEdit false on BudgetTable', function () {
 });
 
 it('comptable gets canEdit true on BudgetTable', function () {
-    $user = User::factory()->create(['role' => Role::Comptable]);
+    $user = User::factory()->create(['role' => RoleAssociation::Comptable]);
 
     Livewire::actingAs($user)
         ->test(BudgetTable::class)
@@ -57,7 +57,7 @@ it('comptable gets canEdit true on BudgetTable', function () {
 // ─── RapprochementDetail (Compta) ────────────────────────────────────────────
 
 it('consultation gets canEdit false on RapprochementDetail', function () {
-    $user = User::factory()->create(['role' => Role::Consultation]);
+    $user = User::factory()->create(['role' => RoleAssociation::Consultation]);
     $compte = CompteBancaire::factory()->create();
     $rapprochement = RapprochementBancaire::factory()->create([
         'compte_id' => $compte->id,
@@ -74,7 +74,7 @@ it('consultation gets canEdit false on RapprochementDetail', function () {
 });
 
 it('comptable gets canEdit true on RapprochementDetail', function () {
-    $user = User::factory()->create(['role' => Role::Comptable]);
+    $user = User::factory()->create(['role' => RoleAssociation::Comptable]);
     $compte = CompteBancaire::factory()->create();
     $rapprochement = RapprochementBancaire::factory()->create([
         'compte_id' => $compte->id,
@@ -93,7 +93,7 @@ it('comptable gets canEdit true on RapprochementDetail', function () {
 // ─── ParticipantTable (Gestion) ──────────────────────────────────────────────
 
 it('consultation gets canEdit false on ParticipantTable', function () {
-    $user = User::factory()->create(['role' => Role::Consultation]);
+    $user = User::factory()->create(['role' => RoleAssociation::Consultation]);
     $operation = Operation::factory()->create();
 
     Livewire::actingAs($user)
@@ -102,7 +102,7 @@ it('consultation gets canEdit false on ParticipantTable', function () {
 });
 
 it('gestionnaire gets canEdit true on ParticipantTable', function () {
-    $user = User::factory()->create(['role' => Role::Gestionnaire]);
+    $user = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
     $operation = Operation::factory()->create();
 
     Livewire::actingAs($user)
@@ -111,7 +111,7 @@ it('gestionnaire gets canEdit true on ParticipantTable', function () {
 });
 
 it('comptable gets canEdit false on ParticipantTable', function () {
-    $user = User::factory()->create(['role' => Role::Comptable]);
+    $user = User::factory()->create(['role' => RoleAssociation::Comptable]);
     $operation = Operation::factory()->create();
 
     Livewire::actingAs($user)
@@ -120,7 +120,7 @@ it('comptable gets canEdit false on ParticipantTable', function () {
 });
 
 it('admin gets canEdit true on ParticipantTable', function () {
-    $user = User::factory()->create(['role' => Role::Admin]);
+    $user = User::factory()->create(['role' => RoleAssociation::Admin]);
     $operation = Operation::factory()->create();
 
     Livewire::actingAs($user)
@@ -131,7 +131,7 @@ it('admin gets canEdit true on ParticipantTable', function () {
 // ─── ReglementTable (Gestion) ────────────────────────────────────────────────
 
 it('consultation gets canEdit false on ReglementTable', function () {
-    $user = User::factory()->create(['role' => Role::Consultation]);
+    $user = User::factory()->create(['role' => RoleAssociation::Consultation]);
     $operation = Operation::factory()->create();
 
     Livewire::actingAs($user)
@@ -140,7 +140,7 @@ it('consultation gets canEdit false on ReglementTable', function () {
 });
 
 it('gestionnaire gets canEdit true on ReglementTable', function () {
-    $user = User::factory()->create(['role' => Role::Gestionnaire]);
+    $user = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
     $operation = Operation::factory()->create();
 
     Livewire::actingAs($user)
