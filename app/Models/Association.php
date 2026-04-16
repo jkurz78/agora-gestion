@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 final class Association extends Model
 {
+    use HasFactory;
+
     protected $table = 'association';
 
     protected $fillable = [
         'nom',
+        'slug',
         'adresse',
         'code_postal',
         'ville',
@@ -28,6 +32,9 @@ final class Association extends Model
         'anthropic_api_key',
         'email_from',
         'email_from_name',
+        'exercice_mois_debut',
+        'statut',
+        'wizard_completed_at',
     ];
 
     protected function casts(): array
@@ -35,6 +42,7 @@ final class Association extends Model
         return [
             'id' => 'integer',
             'nom' => 'string',
+            'slug' => 'string',
             'adresse' => 'string',
             'code_postal' => 'string',
             'ville' => 'string',
@@ -46,6 +54,9 @@ final class Association extends Model
             'anthropic_api_key' => 'encrypted',
             'email_from' => 'string',
             'email_from_name' => 'string',
+            'exercice_mois_debut' => 'integer',
+            'statut' => 'string',
+            'wizard_completed_at' => 'datetime',
         ];
     }
 }
