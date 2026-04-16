@@ -6,7 +6,7 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
-use App\Models\Association;
+use App\Support\CurrentAssociation;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -96,7 +96,7 @@ final class CommunicationTiersMail extends Mailable
             '{prenom}' => $this->prenom,
             '{nom}' => $this->nom,
             '{email}' => $this->email,
-            '{association}' => Association::first()?->nom ?? '',
+            '{association}' => CurrentAssociation::tryGet()?->nom ?? '',
             '{lien_optout}' => $optoutUrl,
             '{lien_desinscription}' => '<a href="'.htmlspecialchars($optoutUrl).'" style="color:#999">Se désinscrire</a>',
         ];
