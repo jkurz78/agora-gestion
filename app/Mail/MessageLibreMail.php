@@ -6,8 +6,8 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
-use App\Models\Association;
 use App\Models\Seance;
+use App\Support\CurrentAssociation;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -133,7 +133,7 @@ final class MessageLibreMail extends Mailable
             '{titre_precedente_seance}' => $this->titrePrecedenteSeance ?? '',
             '{nb_seances_effectuees}' => (string) $this->nbSeancesEffectuees,
             '{nb_seances_restantes}' => (string) $this->nbSeancesRestantes,
-            '{association}' => Association::first()?->nom ?? '',
+            '{association}' => CurrentAssociation::tryGet()?->nom ?? '',
             '{table_seances}' => $this->buildTableSeances(false),
             '{table_seances_a_venir}' => $this->buildTableSeances(true),
         ];
