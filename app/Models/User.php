@@ -10,6 +10,7 @@ use App\Enums\TwoFactorMethod;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -34,6 +35,7 @@ final class User extends Authenticatable implements MustVerifyEmail
         'two_factor_confirmed_at',
         'two_factor_recovery_codes',
         'two_factor_trusted_token',
+        'derniere_association_id', // @todo S1-Task25
     ];
 
     /**
@@ -60,6 +62,16 @@ final class User extends Authenticatable implements MustVerifyEmail
             'two_factor_confirmed_at' => 'datetime',
             'two_factor_recovery_codes' => 'encrypted:array',
         ];
+    }
+
+    /** @todo S1-Task25 — full refactor (enum role, scopes) scheduled in Task 25 */
+    public function associations(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Association::class,
+            'association_user',
+        )->withPivot(['role', 'invited_at', 'joined_at', 'revoked_at'])
+            ->withTimestamps();
     }
 
     public function transactions(): HasMany
