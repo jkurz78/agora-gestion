@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
+use App\Support\CurrentAssociation;
 use App\Support\EmargementQrCode;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -132,7 +132,7 @@ final class SeancePdfController extends Controller
      */
     private function getAssociationData(Operation $operation): array
     {
-        $association = Association::find(1);
+        $association = CurrentAssociation::get();
         $assoBase64 = null;
         $assoMime = 'image/png';
 

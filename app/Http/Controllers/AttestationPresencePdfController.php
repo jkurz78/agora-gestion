@@ -10,6 +10,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
+use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -147,7 +148,7 @@ final class AttestationPresencePdfController extends Controller
      */
     private function getAssociationData(Operation $operation): array
     {
-        $association = Association::find(1);
+        $association = CurrentAssociation::get();
         $assoBase64 = null;
         $assoMime = 'image/png';
 
