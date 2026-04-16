@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Enums\RoleAssociation;
 use App\Mail\PasswordChangedByAdmin;
 use App\Models\User;
+use App\Support\CurrentAssociation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -33,12 +34,19 @@ final class UserController extends Controller
             'role' => ['nullable', Rule::enum(RoleAssociation::class)],
         ]);
 
-        User::create([
+        $user = User::create([
             'nom' => $validated['nom'],
             'email' => $validated['email'],
             'password' => $validated['password'],
             'peut_voir_donnees_sensibles' => $request->boolean('peut_voir_donnees_sensibles'),
         ]);
+
+        if (! empty($validated['role'])) {
+            $user->associations()->attach(CurrentAssociation::id(), [
+                'role' => $validated['role'],
+                'joined_at' => now(),
+            ]);
+        }
 
         return redirect()->route('parametres.utilisateurs.index')
             ->with('success', 'Utilisateur créé.');
@@ -65,6 +73,17 @@ final class UserController extends Controller
         $utilisateur->peut_voir_donnees_sensibles = $request->boolean('peut_voir_donnees_sensibles');
 
         $utilisateur->save();
+
+        if (! empty($validated['role'])) {
+            $utilisateur->associations()->syncWithoutDetaching([
+                CurrentAssociation::id() => [
+                    'role' => $validated['role'],
+                    'joined_at' => $utilisateur->associations()
+                        ->where('association_id', CurrentAssociation::id())
+                        ->first()?->pivot?->joined_at ?? now(),
+                ],
+            ]);
+        }
 
         if ($passwordChanged) {
             Mail::to($utilisateur)->send(new PasswordChangedByAdmin(

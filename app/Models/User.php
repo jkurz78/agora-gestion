@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Enums\RoleSysteme;
 use App\Enums\TwoFactorMethod;
 use App\Tenant\TenantContext;
@@ -93,6 +94,11 @@ final class User extends Authenticatable implements MustVerifyEmail
         $pivot = $this->associations()->where('association_id', $assoId)->first();
 
         return $pivot?->pivot?->role;
+    }
+
+    public function currentRoleEnum(): ?RoleAssociation
+    {
+        return RoleAssociation::tryFrom($this->currentRole() ?? '');
     }
 
     public function isSuperAdmin(): bool
