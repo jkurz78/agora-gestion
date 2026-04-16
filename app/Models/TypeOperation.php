@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\CurrentAssociation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -87,7 +88,7 @@ final class TypeOperation extends TenantModel
      */
     public function effectiveEmailFrom(): ?string
     {
-        return $this->email_from ?: Association::find(1)?->email_from;
+        return $this->email_from ?: CurrentAssociation::tryGet()?->email_from;
     }
 
     /**
@@ -97,6 +98,6 @@ final class TypeOperation extends TenantModel
     {
         return $this->email_from
             ? ($this->email_from_name ?: null)
-            : Association::find(1)?->email_from_name;
+            : CurrentAssociation::tryGet()?->email_from_name;
     }
 }

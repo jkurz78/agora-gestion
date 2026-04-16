@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Helpers;
 
-use App\Models\Association;
 use App\Models\TypeOperation;
+use App\Support\CurrentAssociation;
 use Illuminate\Support\Facades\Storage;
 
 final class EmailLogo
@@ -19,7 +19,7 @@ final class EmailLogo
     public static function variables(?int $typeOperationId = null): array
     {
         $logoAsso = self::buildImgTag(
-            Association::first()?->logo_path,
+            CurrentAssociation::tryGet()?->logo_path,
             'public',
             'Logo',
         );

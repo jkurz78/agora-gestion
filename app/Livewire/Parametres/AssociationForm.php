@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Mail\TestEmail;
-use App\Models\Association;
 use App\Models\CompteBancaire;
+use App\Support\CurrentAssociation;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -65,7 +65,7 @@ final class AssociationForm extends Component
 
     public function mount(): void
     {
-        $association = Association::find(1);
+        $association = CurrentAssociation::tryGet();
         if ($association) {
             $this->nom = $association->nom ?? '';
             $this->adresse = $association->adresse ?? '';
@@ -166,9 +166,8 @@ final class AssociationForm extends Component
             $this->cachet = null;
         }
 
-        // Direct assignment pattern (id not in fillable)
-        $association = Association::find(1) ?? new Association;
-        $association->id = 1;
+        // Update the current tenant association
+        $association = CurrentAssociation::get();
         $association->fill($data)->save();
 
         $this->dispatch('form-saved');
@@ -186,12 +185,12 @@ final class AssociationForm extends Component
     public function sendTestEmail(): void
     {
         $this->validate([
-            'email_from'  => 'required|email',
+            'email_from' => 'required|email',
             'testEmailTo' => 'required|email',
         ], [
-            'email_from.required'  => "L'adresse d'expédition est requise.",
+            'email_from.required' => "L'adresse d'expédition est requise.",
             'testEmailTo.required' => 'Veuillez saisir une adresse destinataire.',
-            'testEmailTo.email'    => "L'adresse destinataire n'est pas valide.",
+            'testEmailTo.email' => "L'adresse destinataire n'est pas valide.",
         ]);
 
         try {

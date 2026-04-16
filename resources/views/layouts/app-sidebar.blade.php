@@ -1,5 +1,5 @@
 @php
-    $association   = \App\Models\Association::find(1);
+    // $association injected by LayoutAssociationComposerProvider (CurrentAssociation::tryGet())
     $nomAsso       = $association?->nom ?? 'Mon Association';
     $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
         ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
