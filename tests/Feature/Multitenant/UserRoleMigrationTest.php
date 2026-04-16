@@ -2,77 +2,50 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+
+uses(RefreshDatabase::class);
+
+// These tests verify the end-state expected after the role-to-pivot migration:
+// every user is linked to an association via association_user with a non-null role,
+// and has derniere_association_id set.
+// NOTE: the users.role column has been dropped (Wave 1). Tests now insert via
+// the Eloquent pivot API instead of raw DB inserts that referenced that column.
 
 it('every user has at least one association_user row with role copied', function (): void {
-    // Seed one association and two users, then simulate what the migration does.
-    $assoId = DB::table('association')->insertGetId([
-        'nom' => 'Test Asso',
-        'slug' => 'test-asso',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $association = Association::factory()->create();
 
-    $userIds = [];
-    foreach (['admin', 'gestionnaire'] as $role) {
-        $userIds[] = DB::table('users')->insertGetId([
-            'nom' => 'Test User',
-            'email' => $role.'@test.fr',
-            'password' => Hash::make('password'),
+    $roles = ['admin', 'gestionnaire'];
+    $users = collect($roles)->map(function (string $role) use ($association): User {
+        $user = User::factory()->create();
+        $user->associations()->attach($association->id, [
             'role' => $role,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'joined_at' => now(),
         ]);
-    }
+        $user->update(['derniere_association_id' => $association->id]);
 
-    // Insert pivots as the migration would have done.
-    foreach ($userIds as $userId) {
-        $user = DB::table('users')->where('id', $userId)->first();
-        DB::table('association_user')->insert([
-            'user_id' => $userId,
-            'association_id' => $assoId,
-            'role' => $user->role ?? 'consultation',
-            'joined_at' => $user->created_at,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('users')
-            ->where('id', $userId)
-            ->whereNull('derniere_association_id')
-            ->update(['derniere_association_id' => $assoId]);
-    }
+        return $user;
+    });
 
-    $users = DB::table('users')->get();
-    foreach ($users as $user) {
+    $users->each(function (User $user): void {
         $pivot = DB::table('association_user')->where('user_id', $user->id)->first();
         expect($pivot)->not->toBeNull()
             ->and($pivot->role)->not->toBeNull();
-    }
+    });
 });
 
 it('every user has derniere_association_id populated', function (): void {
-    $assoId = DB::table('association')->insertGetId([
-        'nom' => 'Test Asso 2',
-        'slug' => 'test-asso-2',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    $association = Association::factory()->create();
 
-    $userId = DB::table('users')->insertGetId([
-        'nom' => 'Test Admin',
-        'email' => 'admin2@test.fr',
-        'password' => Hash::make('password'),
+    $user = User::factory()->create();
+    $user->associations()->attach($association->id, [
         'role' => 'admin',
-        'created_at' => now(),
-        'updated_at' => now(),
+        'joined_at' => now(),
     ]);
-
-    // Migration sets derniere_association_id when NULL.
-    DB::table('users')
-        ->where('id', $userId)
-        ->whereNull('derniere_association_id')
-        ->update(['derniere_association_id' => $assoId]);
+    $user->update(['derniere_association_id' => $association->id]);
 
     $nullCount = DB::table('users')->whereNull('derniere_association_id')->count();
     expect($nullCount)->toBe(0);
