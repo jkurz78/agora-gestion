@@ -68,20 +68,20 @@
                                        class="btn btn-sm btn-outline-secondary" target="_blank" title="Aperçu">
                                         👁
                                     </a>
-                                    @if(Auth::user()->role->canWrite(\App\Enums\Espace::Gestion))
+                                    @if(Auth::user()->currentRoleEnum()?->canWrite(\App\Enums\Espace::Gestion))
                                         <button class="btn btn-sm btn-outline-primary"
                                                 wire:click="ouvrirAssignation({{ $doc->id }})">
                                             Attacher à une séance
                                         </button>
                                     @endif
-                                    @if(\App\Services\InvoiceOcrService::isConfigured() && Auth::user()->role->canWrite(\App\Enums\Espace::Compta))
+                                    @if(\App\Services\InvoiceOcrService::isConfigured() && Auth::user()->currentRoleEnum()?->canWrite(\App\Enums\Espace::Compta))
                                         <button class="btn btn-sm btn-outline-success"
                                                 wire:click="creerDepense({{ $doc->id }})"
                                                 title="Créer une dépense depuis ce PDF">
                                             <i class="bi bi-receipt"></i> Créer dépense
                                         </button>
                                     @endif
-                                    @if(Auth::user()->role->canWrite(\App\Enums\Espace::Gestion))
+                                    @if(Auth::user()->currentRoleEnum()?->canWrite(\App\Enums\Espace::Gestion))
                                         <button wire:click="ouvrirAssignationParticipant({{ $doc->id }})" class="btn btn-sm btn-outline-success" title="Assigner à un participant">
                                             <i class="bi bi-person-check"></i>
                                         </button>
