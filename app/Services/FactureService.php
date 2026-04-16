@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
@@ -14,6 +15,7 @@ use App\Models\FactureLigne;
 use App\Models\Seance;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Support\CurrentAssociation;
 use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -35,7 +37,7 @@ final class FactureService
         $this->exerciceService->assertOuvert($exercice);
 
         return DB::transaction(function () use ($tiersId, $exercice): Facture {
-            $association = Association::first();
+            $association = CurrentAssociation::get();
 
             $mentionsLegales = $association?->facture_mentions_legales
                 ?? "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé";
@@ -246,7 +248,7 @@ final class FactureService
 
                 $transaction->update([
                     'compte_id' => $compteBancaireId,
-                    'statut_reglement' => \App\Enums\StatutReglement::Recu->value,
+                    'statut_reglement' => StatutReglement::Recu->value,
                 ]);
             }
         });
@@ -370,7 +372,7 @@ final class FactureService
     public function genererPdf(Facture $facture, bool $forceOriginalFormat = false): string
     {
         $facture->load(['tiers', 'compteBancaire', 'lignes', 'transactions']);
-        $association = Association::first();
+        $association = CurrentAssociation::get();
 
         // Step 1: generate visual PDF via dompdf
         $headerLogoBase64 = null;
@@ -497,7 +499,7 @@ XML;
                 $transaction = $facture->transactions()->findOrFail($transactionId);
 
                 $transaction->update([
-                    'statut_reglement' => \App\Enums\StatutReglement::Recu->value,
+                    'statut_reglement' => StatutReglement::Recu->value,
                 ]);
             }
         });

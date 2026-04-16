@@ -12,6 +12,7 @@ use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Tiers;
+use App\Support\CurrentAssociation;
 use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
@@ -167,7 +168,7 @@ final class DocumentPrevisionnelService
     {
         $document->load('participant.tiers', 'operation');
 
-        $association = Association::first();
+        $association = CurrentAssociation::get();
         $tiers = $document->participant->tiers;
 
         $headerLogoBase64 = null;

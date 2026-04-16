@@ -8,10 +8,10 @@ use App\DTOs\InvoiceOcrLigne;
 use App\DTOs\InvoiceOcrResult;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
-use App\Models\Association;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Support\CurrentAssociation;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 
@@ -21,7 +21,12 @@ final class InvoiceOcrService
 
     public static function isConfigured(): bool
     {
-        return Association::first()?->anthropic_api_key !== null;
+        return CurrentAssociation::tryGet()?->anthropic_api_key !== null;
+    }
+
+    private function apiKey(): ?string
+    {
+        return CurrentAssociation::tryGet()?->anthropic_api_key;
     }
 
     /**
@@ -29,7 +34,7 @@ final class InvoiceOcrService
      */
     public function analyze(UploadedFile $file, ?array $context = null): InvoiceOcrResult
     {
-        $apiKey = Association::first()?->anthropic_api_key;
+        $apiKey = $this->apiKey();
         if ($apiKey === null) {
             throw new OcrNotConfiguredException;
         }
@@ -47,7 +52,7 @@ final class InvoiceOcrService
      */
     public function analyzeFromPath(string $path, string $mime, ?array $context = null): InvoiceOcrResult
     {
-        $apiKey = Association::first()?->anthropic_api_key;
+        $apiKey = $this->apiKey();
         if ($apiKey === null) {
             throw new OcrNotConfiguredException;
         }
