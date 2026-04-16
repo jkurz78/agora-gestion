@@ -2,15 +2,26 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\CampagneEmail;
 use App\Models\EmailLog;
 use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('campagnes_email table exists', function () {
     expect(Schema::hasTable('campagnes_email'))->toBeTrue();
@@ -22,7 +33,7 @@ it('campagnes_email table exists', function () {
 
 it('can create a CampagneEmail and relates to Operation', function () {
     $user = User::factory()->create();
-    $operation = Operation::factory()->create();
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
 
     $campagne = CampagneEmail::create([
         'operation_id' => $operation->id,
@@ -45,8 +56,8 @@ it('can create a CampagneEmail and relates to Operation', function () {
 
 it('CampagneEmail has emailLogs relation', function () {
     $user = User::factory()->create();
-    $tiers = Tiers::factory()->create();
-    $operation = Operation::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
 
     $campagne = CampagneEmail::create([
         'operation_id' => $operation->id,
@@ -77,8 +88,8 @@ it('email_logs.campagne_id exists and is nullable', function () {
     expect(Schema::hasColumn('email_logs', 'campagne_id'))->toBeTrue();
 
     $user = User::factory()->create();
-    $tiers = Tiers::factory()->create();
-    $operation = Operation::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
 
     $log = EmailLog::create([
         'tiers_id' => $tiers->id,

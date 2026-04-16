@@ -12,21 +12,47 @@ use App\Models\FactureLigne;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\FactureService;
+use App\Tenant\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 
+uses(RefreshDatabase::class);
+
 beforeEach(function () {
+    $this->association = Association::factory()->create([
+        'siret' => '12345678901234',
+        'forme_juridique' => 'Association loi 1901',
+        'adresse' => '1 rue du Test',
+        'code_postal' => '69001',
+        'ville' => 'Lyon',
+        'email' => 'test@monasso.fr',
+        'telephone' => '04 00 00 00 00',
+        'facture_conditions_reglement' => 'Payable à réception',
+        'facture_mentions_legales' => 'TVA non applicable, art. 261-7-1° du CGI',
+        'facture_mentions_penalites' => 'Pénalités de retard : 3 fois le taux légal',
+    ]);
+    TenantContext::boot($this->association);
+
     // Register a temporary route for the controller (routes not yet added in Task 13)
     Route::middleware('web')
         ->get('/test/factures/{facture}/pdf', FacturePdfController::class)
         ->name('test.facture.pdf');
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 /**
  * Create a validated facture with one montant line, ready for PDF generation.
+ * Requires TenantContext to be booted (done in beforeEach).
  */
 function createValidatedFacture(): Facture
 {
+    $assocId = TenantContext::currentId();
+
     $tiers = Tiers::factory()->pourRecettes()->create([
+        'association_id' => $assocId,
         'type' => 'entreprise',
         'entreprise' => 'Acme Corp',
         'adresse_ligne1' => '12 rue de la Paix',
@@ -35,25 +61,14 @@ function createValidatedFacture(): Facture
     ]);
 
     $compteBancaire = CompteBancaire::factory()->create([
+        'association_id' => $assocId,
         'iban' => 'FR76 1234 5678 9012 3456 7890 123',
         'bic' => 'BNPAFRPP',
         'domiciliation' => 'BNP Paribas Paris',
     ]);
 
-    Association::create([
-        'nom' => 'Asso Test',
-        'forme_juridique' => 'Association loi 1901',
-        'adresse' => '1 rue du Test',
-        'code_postal' => '69001',
-        'ville' => 'Lyon',
-        'email' => 'test@monasso.fr',
-        'telephone' => '04 00 00 00 00',
-        'siret' => '12345678901234',
-        'facture_conditions_reglement' => 'Payable à réception',
-        'facture_mentions_legales' => 'TVA non applicable, art. 261-7-1° du CGI',
-        'facture_mentions_penalites' => 'Pénalités de retard : 3 fois le taux légal',
-        'facture_compte_bancaire_id' => $compteBancaire->id,
-    ]);
+    // Update the association created in beforeEach with invoice-specific fields
+    Association::query()->update(['facture_compte_bancaire_id' => $compteBancaire->id]);
 
     $facture = Facture::create([
         'numero' => 'F-2025-0001',

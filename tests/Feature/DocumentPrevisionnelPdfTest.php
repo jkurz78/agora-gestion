@@ -13,17 +13,20 @@ use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Services\DocumentPrevisionnelService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+
     $this->user = User::factory()->create();
     $this->actingAs($this->user);
     $this->service = app(DocumentPrevisionnelService::class);
 
-    Association::create(['nom' => 'Test Asso', 'siret' => '123 456 789 00012']);
     Exercice::create([
         'annee' => 2025,
         'date_debut' => '2025-09-01',
@@ -32,16 +35,23 @@ beforeEach(function () {
     ]);
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 function createDocPrevSetup(int $nbSeances = 2, float $montant = 50.00): array
 {
-    $typeOp = TypeOperation::factory()->create();
+    $assocId = TenantContext::currentId();
+
+    $typeOp = TypeOperation::factory()->create(['association_id' => $assocId]);
     $operation = Operation::factory()->create([
+        'association_id' => $assocId,
         'type_operation_id' => $typeOp->id,
         'date_debut' => '2025-10-01',
         'date_fin' => '2025-12-15',
     ]);
 
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $assocId]);
     $participant = Participant::create([
         'operation_id' => $operation->id,
         'tiers_id' => $tiers->id,
