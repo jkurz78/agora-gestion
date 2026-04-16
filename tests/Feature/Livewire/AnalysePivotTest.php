@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Espace;
 use App\Livewire\AnalysePivot;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -15,12 +16,21 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
     view()->share('espace', Espace::Gestion);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('renders in participants mode without toggle buttons', function () {
@@ -43,16 +53,19 @@ it('defaults to participants mode', function () {
 });
 
 it('returns participants data with correct fields', function () {
-    $typeOp = TypeOperation::factory()->create();
+    $typeOp = TypeOperation::factory()->create(['association_id' => $this->association->id]);
     $operation = Operation::factory()->create([
+        'association_id' => $this->association->id,
         'type_operation_id' => $typeOp->id,
     ]);
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Dupont',
         'prenom' => 'Marie',
         'ville' => 'Paris',
     ]);
     $participant = Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
         'date_inscription' => '2026-01-15',
@@ -83,10 +96,11 @@ it('returns participants data with correct fields', function () {
 });
 
 it('returns financier data with correct fields including temporal dimensions', function () {
-    $compte = CompteBancaire::factory()->create();
-    $tiers = Tiers::factory()->create(['nom' => 'Fournisseur', 'pour_depenses' => true]);
-    $sousCategorie = SousCategorie::factory()->create();
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Fournisseur', 'pour_depenses' => true]);
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
     $transaction = Transaction::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'compte_id' => $compte->id,
         'type' => 'depense',

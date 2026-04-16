@@ -3,13 +3,24 @@
 declare(strict_types=1);
 
 use App\Livewire\ImportCsvTiers;
+use App\Models\Association;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 // ---------------------------------------------------------------------------
@@ -30,6 +41,7 @@ function makeCsvUploadForImport(array $headers, array $rows, string $filename = 
 // ---------------------------------------------------------------------------
 it('uploade un CSV valide et passe en phase preview avec les bons statuts', function () {
     Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Jean',
@@ -103,6 +115,7 @@ it('rejette un fichier .xls avec erreur de validation', function () {
 // ---------------------------------------------------------------------------
 it('dispatche open-tiers-merge pour un conflit avec un seul candidat', function () {
     $existing = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Jean',
@@ -133,6 +146,7 @@ it('dispatche open-tiers-merge pour un conflit avec un seul candidat', function 
 // ---------------------------------------------------------------------------
 it('met a jour la ligne en conflict_resolved_merge apres tiers-merge-confirmed', function () {
     $existing = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Jean',
@@ -170,6 +184,7 @@ it('met a jour la ligne en conflict_resolved_merge apres tiers-merge-confirmed',
 // ---------------------------------------------------------------------------
 it('met a jour la ligne en conflict_resolved_new apres tiers-merge-create-new', function () {
     $existing = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Jean',
@@ -202,6 +217,7 @@ it('met a jour la ligne en conflict_resolved_new apres tiers-merge-create-new', 
 // ---------------------------------------------------------------------------
 it('conserve le statut conflict apres tiers-merge-cancelled', function () {
     $existing = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Jean',
@@ -230,6 +246,7 @@ it('conserve le statut conflict apres tiers-merge-cancelled', function () {
 // ---------------------------------------------------------------------------
 it('empeche confirmImport quand il y a des conflits non resolus', function () {
     Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Jean',
@@ -287,6 +304,7 @@ it('confirme l\'import et cree les tiers atomiquement', function () {
 // ---------------------------------------------------------------------------
 it('affiche le rapport avec les bons compteurs apres import', function () {
     Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Martin',
         'prenom' => 'Marie',
@@ -343,6 +361,7 @@ it('remet tout a zero apres annulation', function () {
 // ---------------------------------------------------------------------------
 it('ignore tiers-merge-confirmed d\'un autre contexte', function () {
     $existing = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Jean',
@@ -375,12 +394,14 @@ it('ignore tiers-merge-confirmed d\'un autre contexte', function () {
 // ---------------------------------------------------------------------------
 it('dispatche open-tiers-merge apres selection d\'un candidat homonyme', function () {
     $tiers1 = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Jean',
         'email' => 'jean1@example.com',
     ]);
     Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Jean',

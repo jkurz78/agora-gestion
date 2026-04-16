@@ -3,17 +3,32 @@
 declare(strict_types=1);
 
 use App\Livewire\Parametres\HelloassoForm;
+use App\Models\Association;
 use App\Models\HelloAssoParametres;
 use App\Models\User;
 use App\Services\HelloAssoService;
 use App\Services\HelloAssoTestResult;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
-    // Créer l'association id=1 via DB car 'id' n'est pas dans $fillable du modèle Association
-    DB::table('association')->insert(['id' => 1, 'nom' => 'Mon Asso', 'created_at' => now(), 'updated_at' => now()]);
+    // HelloassoForm est hardcodé sur association_id=1 (bug connu, non corrigé ici).
+    // On utilise firstOrCreate pour éviter les conflits de clé unique entre tests.
+    $this->association = Association::firstOrCreate(
+        ['id' => 1],
+        ['nom' => 'Mon Asso', 'slug' => 'mon-asso']
+    );
+
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('monte sans configuration existante', function () {

@@ -4,23 +4,32 @@ declare(strict_types=1);
 
 use App\Enums\StatutExercice;
 use App\Livewire\Exercices\ReouvrirExercice;
+use App\Models\Association;
 use App\Models\Exercice;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+
     $this->exercice = Exercice::create([
+        'association_id' => $this->association->id,
         'annee' => 2025,
         'statut' => StatutExercice::Cloture,
         'date_cloture' => now(),
         'cloture_par_id' => $this->user->id,
     ]);
     session(['exercice_actif' => 2025]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('renders with exercice info', function () {

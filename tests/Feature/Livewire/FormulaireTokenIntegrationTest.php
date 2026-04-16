@@ -3,25 +3,44 @@
 declare(strict_types=1);
 
 use App\Livewire\ParticipantTable;
+use App\Models\Association;
 use App\Models\FormulaireToken;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $typeOp = TypeOperation::factory()->confidentiel()->create();
-    $this->operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-    $this->tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
+
+    $typeOp = TypeOperation::factory()->confidentiel()->create(['association_id' => $this->association->id]);
+    $this->operation = Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'type_operation_id' => $typeOp->id,
+    ]);
+    $this->tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Dupont',
+        'prenom' => 'Jean',
+    ]);
     $this->participant = Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => '2026-01-15',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('shows link icon when participant has no token', function () {
@@ -42,6 +61,7 @@ it('generates a token and opens modal', function () {
 
 it('shows pending badge after token is generated', function () {
     FormulaireToken::create([
+        'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'token' => 'ABCD-EFGH',
         'expire_at' => now()->addDays(7)->toDateString(),
@@ -53,6 +73,7 @@ it('shows pending badge after token is generated', function () {
 
 it('shows filled badge when token is used', function () {
     FormulaireToken::create([
+        'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'token' => 'ABCD-EFGH',
         'expire_at' => now()->addDays(7)->toDateString(),
@@ -66,6 +87,7 @@ it('shows filled badge when token is used', function () {
 
 it('shows expired badge when token is expired', function () {
     FormulaireToken::create([
+        'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'token' => 'ABCD-EFGH',
         'expire_at' => now()->subDay()->toDateString(),
@@ -77,6 +99,7 @@ it('shows expired badge when token is expired', function () {
 
 it('can open existing token modal', function () {
     $token = FormulaireToken::create([
+        'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'token' => 'ABCD-EFGH',
         'expire_at' => now()->addDays(7)->toDateString(),

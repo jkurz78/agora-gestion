@@ -6,6 +6,7 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Livewire\FactureShow;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
@@ -14,11 +15,16 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ExerciceService;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
     $this->exercice = app(ExerciceService::class)->current();
 
@@ -31,6 +37,7 @@ beforeEach(function () {
     });
 
     $this->tiers = Tiers::factory()->pourRecettes()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Dupont',
         'prenom' => 'Marie',
         'adresse_ligne1' => '12 rue des Lilas',
@@ -38,9 +45,10 @@ beforeEach(function () {
         'ville' => 'Paris',
     ]);
 
-    $this->compte = CompteBancaire::factory()->create();
+    $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 
     $this->facture = Facture::create([
+        'association_id' => $this->association->id,
         'numero' => 'F-'.$this->exercice.'-0001',
         'date' => now()->toDateString(),
         'statut' => StatutFacture::Validee,
@@ -78,6 +86,10 @@ beforeEach(function () {
     ]);
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('renders with all facture data', function () {
     Livewire::test(FactureShow::class, ['facture' => $this->facture])
         ->assertStatus(200)
@@ -94,6 +106,7 @@ it('renders with all facture data', function () {
 
 it('shows montant regle = 0 when no remise', function () {
     $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'montant_total' => 150.00,
         'compte_id' => $this->compte->id,
@@ -110,6 +123,7 @@ it('shows montant regle = 0 when no remise', function () {
 
 it('shows montant regle correctly when transactions have remise_id', function () {
     $remise = RemiseBancaire::create([
+        'association_id' => $this->association->id,
         'numero' => 1,
         'date' => now()->toDateString(),
         'mode_paiement' => 'cheque',
@@ -119,6 +133,7 @@ it('shows montant regle correctly when transactions have remise_id', function ()
     ]);
 
     $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'montant_total' => 150.00,
         'compte_id' => $this->compte->id,
@@ -135,6 +150,7 @@ it('shows montant regle correctly when transactions have remise_id', function ()
 
 it('shows badge Acquittee when fully paid', function () {
     $remise = RemiseBancaire::create([
+        'association_id' => $this->association->id,
         'numero' => 1,
         'date' => now()->toDateString(),
         'mode_paiement' => 'cheque',
@@ -144,6 +160,7 @@ it('shows badge Acquittee when fully paid', function () {
     ]);
 
     $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'montant_total' => 150.00,
         'compte_id' => $this->compte->id,
@@ -160,11 +177,15 @@ it('shows badge Acquittee when fully paid', function () {
 });
 
 it('enregistre un règlement chèque via le bouton unifié', function () {
-    $compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
-    $tiers = Tiers::factory()->create();
+    $compteCreances = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Créances à recevoir',
+    ]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $exercice = now()->month >= 9 ? now()->year : now()->year - 1;
 
     $facture = Facture::create([
+        'association_id' => $this->association->id,
         'numero' => 'F-2026-0099',
         'date' => now(),
         'statut' => StatutFacture::Validee,
@@ -175,6 +196,7 @@ it('enregistre un règlement chèque via le bouton unifié', function () {
     ]);
 
     $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'compte_id' => $compteCreances->id,
         'montant_total' => 120.00,
@@ -196,6 +218,7 @@ it('enregistre un règlement chèque via le bouton unifié', function () {
 
 it('redirects to edit if facture is brouillon', function () {
     $brouillon = Facture::create([
+        'association_id' => $this->association->id,
         'numero' => null,
         'date' => now()->toDateString(),
         'statut' => StatutFacture::Brouillon,

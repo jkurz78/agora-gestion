@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 use App\Enums\StatutFacture;
 use App\Livewire\FactureList;
+use App\Models\Association;
 use App\Models\Facture;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\ExerciceService;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
     $this->exercice = app(ExerciceService::class)->current();
 
@@ -23,6 +29,10 @@ beforeEach(function () {
     });
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('renders the facture list component', function () {
     Livewire::test(FactureList::class)
         ->assertStatus(200)
@@ -31,11 +41,13 @@ it('renders the facture list component', function () {
 
 it('displays existing factures with correct data', function () {
     $tiers = Tiers::factory()->pourRecettes()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Dupont',
         'prenom' => 'Jean',
     ]);
 
     Facture::create([
+        'association_id' => $this->association->id,
         'numero' => 'F-'.$this->exercice.'-0001',
         'date' => now()->toDateString(),
         'statut' => StatutFacture::Validee,
@@ -52,10 +64,11 @@ it('displays existing factures with correct data', function () {
 });
 
 it('shows correct badges for each statut', function () {
-    $tiers = Tiers::factory()->pourRecettes()->create();
+    $tiers = Tiers::factory()->pourRecettes()->create(['association_id' => $this->association->id]);
 
     // Brouillon
     Facture::create([
+        'association_id' => $this->association->id,
         'numero' => null,
         'date' => now()->toDateString(),
         'statut' => StatutFacture::Brouillon,
@@ -67,6 +80,7 @@ it('shows correct badges for each statut', function () {
 
     // Validee
     Facture::create([
+        'association_id' => $this->association->id,
         'numero' => 'F-'.$this->exercice.'-0001',
         'date' => now()->toDateString(),
         'statut' => StatutFacture::Validee,
@@ -78,6 +92,7 @@ it('shows correct badges for each statut', function () {
 
     // Annulee
     Facture::create([
+        'association_id' => $this->association->id,
         'numero' => 'F-'.$this->exercice.'-0002',
         'date' => now()->toDateString(),
         'statut' => StatutFacture::Annulee,
@@ -94,7 +109,7 @@ it('shows correct badges for each statut', function () {
 });
 
 it('creates a new brouillon and redirects to edit', function () {
-    $tiers = Tiers::factory()->pourRecettes()->create();
+    $tiers = Tiers::factory()->pourRecettes()->create(['association_id' => $this->association->id]);
 
     Livewire::test(FactureList::class)
         ->set('newFactureTiersId', $tiers->id)
@@ -110,9 +125,10 @@ it('creates a new brouillon and redirects to edit', function () {
 });
 
 it('deletes a brouillon facture', function () {
-    $tiers = Tiers::factory()->pourRecettes()->create();
+    $tiers = Tiers::factory()->pourRecettes()->create(['association_id' => $this->association->id]);
 
     $facture = Facture::create([
+        'association_id' => $this->association->id,
         'numero' => null,
         'date' => now()->toDateString(),
         'statut' => StatutFacture::Brouillon,

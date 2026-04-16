@@ -2,26 +2,28 @@
 
 declare(strict_types=1);
 
-use App\Enums\RoleAssociation;
 use App\Livewire\IncomingDocuments\IncomingDocumentsList;
 use App\Models\Association;
 use App\Models\IncomingDocument;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
-    $assoc = Association::find(1) ?? new Association;
-    $assoc->id = 1;
-    $assoc->fill(['nom' => 'Test Asso'])->save();
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 // ── assignerASeance ───────────────────────────────────────────────────────────
 
 it('consultation ne peut pas assigner à une séance', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Consultation]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'consultation', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(IncomingDocumentsList::class)
@@ -30,7 +32,8 @@ it('consultation ne peut pas assigner à une séance', function () {
 });
 
 it('comptable ne peut pas assigner à une séance', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Comptable]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'comptable', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(IncomingDocumentsList::class)
@@ -39,7 +42,8 @@ it('comptable ne peut pas assigner à une séance', function () {
 });
 
 it('gestionnaire dépasse le guard sur assignerASeance', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'gestionnaire', 'joined_at' => now()]);
 
     // Le guard passe ; la validation échoue faute de données — mais pas 403
     Livewire::actingAs($user)
@@ -51,7 +55,8 @@ it('gestionnaire dépasse le guard sur assignerASeance', function () {
 // ── assignerAParticipant ──────────────────────────────────────────────────────
 
 it('consultation ne peut pas assigner à un participant', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Consultation]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'consultation', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(IncomingDocumentsList::class)
@@ -60,7 +65,8 @@ it('consultation ne peut pas assigner à un participant', function () {
 });
 
 it('comptable ne peut pas assigner à un participant', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Comptable]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'comptable', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(IncomingDocumentsList::class)
@@ -69,7 +75,8 @@ it('comptable ne peut pas assigner à un participant', function () {
 });
 
 it('gestionnaire dépasse le guard sur assignerAParticipant', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'gestionnaire', 'joined_at' => now()]);
 
     // Le guard passe ; la validation échoue faute de données — mais pas 403
     Livewire::actingAs($user)
@@ -81,7 +88,8 @@ it('gestionnaire dépasse le guard sur assignerAParticipant', function () {
 // ── supprimer ─────────────────────────────────────────────────────────────────
 
 it('consultation ne peut pas supprimer un document', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Consultation]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'consultation', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(IncomingDocumentsList::class)
@@ -90,7 +98,8 @@ it('consultation ne peut pas supprimer un document', function () {
 });
 
 it('gestionnaire ne peut pas supprimer un document', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'gestionnaire', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(IncomingDocumentsList::class)
@@ -99,7 +108,8 @@ it('gestionnaire ne peut pas supprimer un document', function () {
 });
 
 it('comptable ne peut pas supprimer un document', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Comptable]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'comptable', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(IncomingDocumentsList::class)
@@ -108,10 +118,11 @@ it('comptable ne peut pas supprimer un document', function () {
 });
 
 it('admin peut supprimer un document', function () {
-    $user = User::factory()->create(['role' => RoleAssociation::Admin]);
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
 
     $doc = IncomingDocument::create([
-        'association_id' => 1,
+        'association_id' => $this->association->id,
         'storage_path' => 'incoming-documents/test.pdf',
         'original_filename' => 'test.pdf',
         'sender_email' => 'test@example.com',

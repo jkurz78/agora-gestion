@@ -5,26 +5,35 @@ declare(strict_types=1);
 use App\Enums\StatutExercice;
 use App\Enums\TypeTransaction;
 use App\Livewire\Provisions\ProvisionIndex;
+use App\Models\Association;
 use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\SousCategorie;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->exercice = Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+
+    $this->exercice = Exercice::create(['association_id' => $this->association->id, 'annee' => 2025, 'statut' => StatutExercice::Ouvert]);
     session(['exercice_actif' => 2025]);
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('renders the provision list', function () {
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
 
     Provision::factory()->create([
+        'association_id' => $this->association->id,
         'exercice' => 2025,
         'libelle' => 'Provision congés payés',
         'type' => TypeTransaction::Depense,
@@ -41,7 +50,7 @@ it('renders the provision list', function () {
 });
 
 it('creates a provision via modal', function () {
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::test(ProvisionIndex::class)
         ->call('openCreate')
@@ -65,9 +74,10 @@ it('creates a provision via modal', function () {
 });
 
 it('edits a provision via modal', function () {
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
 
     $provision = Provision::factory()->create([
+        'association_id' => $this->association->id,
         'exercice' => 2025,
         'libelle' => 'Provision initiale',
         'type' => TypeTransaction::Depense,
@@ -92,9 +102,10 @@ it('edits a provision via modal', function () {
 });
 
 it('deletes a provision', function () {
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
 
     $provision = Provision::factory()->create([
+        'association_id' => $this->association->id,
         'exercice' => 2025,
         'libelle' => 'À supprimer',
         'sous_categorie_id' => $sousCategorie->id,
@@ -110,7 +121,7 @@ it('deletes a provision', function () {
 it('blocks editing when exercice is closed', function () {
     $this->exercice->update(['statut' => StatutExercice::Cloture]);
 
-    $sousCategorie = SousCategorie::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::test(ProvisionIndex::class)
         ->assertSee('clôturé')
