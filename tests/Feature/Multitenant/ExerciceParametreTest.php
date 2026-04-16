@@ -62,3 +62,13 @@ it('label is year-range when exercice starts mid-year', function () {
 
     expect($this->service->label(2025))->toBe('2025-2026');
 });
+
+it('Exercice::dateDebut reads exercice_mois_debut from associated tenant', function () {
+    $asso = Association::factory()->create(['exercice_mois_debut' => 1]);
+    TenantContext::boot($asso);
+
+    $ex = \App\Models\Exercice::create(['annee' => 2026, 'statut' => \App\Enums\StatutExercice::Ouvert]);
+    expect($ex->dateDebut()->toDateString())->toBe('2026-01-01')
+        ->and($ex->dateFin()->toDateString())->toBe('2026-12-31')
+        ->and($ex->label())->toBe('2026');
+});
