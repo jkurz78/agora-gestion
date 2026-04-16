@@ -13,6 +13,9 @@ final class Association extends Model
 
     protected $table = 'association';
 
+    /** Flag to allow a one-shot slug change; not persisted to DB. */
+    public ?bool $allowSlugChange = null;
+
     protected $fillable = [
         'nom',
         'slug',
