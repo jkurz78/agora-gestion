@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -37,7 +37,7 @@ final class ParticipantPdfController extends Controller
             ->orderBy('id')
             ->get();
 
-        $association = Association::find(1);
+        $association = CurrentAssociation::get();
 
         [$headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime] = $this->resolveLogos($association, $operation);
 

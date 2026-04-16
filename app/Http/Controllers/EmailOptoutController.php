@@ -75,6 +75,8 @@ final class EmailOptoutController extends Controller
     /** @return array{nomAsso: string, logoUrl: string|null} */
     private function associationData(): array
     {
+        // TODO(S7): public route — no TenantContext booted here.
+        // Replace with CurrentAssociation::get() once public routes resolve tenant from URL/subdomain.
         $association = Association::find(1);
         $logoUrl = ($association?->logo_path && Storage::disk('public')->exists($association->logo_path))
             ? Storage::disk('public')->url($association->logo_path)

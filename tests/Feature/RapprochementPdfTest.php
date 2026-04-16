@@ -9,16 +9,22 @@ use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 beforeEach(function () {
     $this->user = User::factory()->create();
 
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+
     $this->compte = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Compte Test',
     ]);
 
     $this->rapprochement = RapprochementBancaire::factory()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'date_fin' => now()->format('Y-m-d'),
         'solde_ouverture' => 1000.00,
@@ -26,6 +32,10 @@ beforeEach(function () {
         'saisi_par' => $this->user->id,
         'statut' => StatutRapprochement::Verrouille,
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('requires authentication to download PDF', function () {
@@ -46,8 +56,8 @@ it('returns a PDF for authenticated user', function () {
         ->assertHeader('Content-Type', 'application/pdf');
 });
 
-it('generates PDF even when association is not configured', function () {
-    expect(Association::find(1))->toBeNull();
+it('generates PDF when TenantContext is booted', function () {
+    expect(TenantContext::hasBooted())->toBeTrue();
 
     $this->actingAs($this->user)
         ->get(route('banques.rapprochement.pdf', $this->rapprochement))
@@ -56,9 +66,7 @@ it('generates PDF even when association is not configured', function () {
 });
 
 it('generates PDF even when logo file is missing', function () {
-    $assoc = Association::find(1) ?? new Association;
-    $assoc->id = 1;
-    $assoc->fill(['nom' => 'Test', 'logo_path' => 'association/logo-inexistant.png'])->save();
+    $this->association->update(['nom' => 'Test', 'logo_path' => 'association/logo-inexistant.png']);
 
     $this->actingAs($this->user)
         ->get(route('banques.rapprochement.pdf', $this->rapprochement))
@@ -68,6 +76,7 @@ it('generates PDF even when logo file is missing', function () {
 
 it('passes only pointed transactions to PDF view', function () {
     Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'libelle' => 'Dépense pointée',
@@ -76,6 +85,7 @@ it('passes only pointed transactions to PDF view', function () {
     ]);
 
     Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => null,
         'libelle' => 'Dépense non pointée',
@@ -103,9 +113,7 @@ it('passes only pointed transactions to PDF view', function () {
 });
 
 it('télécharge le PDF avec un nom de fichier structuré', function () {
-    $assoc = Association::find(1) ?? new Association;
-    $assoc->id = 1;
-    $assoc->fill(['nom' => 'Mon Association'])->save();
+    $this->association->update(['nom' => 'Mon Association']);
 
     $response = $this->actingAs($this->user)
         ->get(route('banques.rapprochement.pdf', $this->rapprochement));
@@ -130,6 +138,7 @@ it('ouvre le PDF inline avec ?mode=inline', function () {
 it('inclut l\'id et le tiers dans les données PDF', function () {
     $tiers = Tiers::factory()->create(['nom' => 'Test Tiers']);
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'tiers_id' => $tiers->id,

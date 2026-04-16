@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Association;
 use App\Models\RemiseBancaire;
+use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
@@ -18,8 +18,8 @@ final class RemiseBancairePdfController extends Controller
     {
         $remise->load(['compteCible', 'transactions.tiers']);
 
-        // Association (may be null)
-        $association = Association::find(1);
+        // Association resolved from TenantContext (booted by ResolveTenant middleware)
+        $association = CurrentAssociation::get();
 
         // Logo base64 (null-safe)
         $logoBase64 = null;

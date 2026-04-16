@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ final class ParticipantFichePdfController extends Controller
             $participant->load('donneesMedicales');
         }
 
-        $association = Association::find(1);
+        $association = CurrentAssociation::get();
 
         [$headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime] = $this->resolveLogos($association, $operation);
 
