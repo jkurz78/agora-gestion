@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Middleware\EnsureTenantAccess;
+use App\Http\Middleware\ResolveTenant;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,7 +17,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->append(SecurityHeaders::class);
+
+        $middleware->appendToGroup('web', [
+            ResolveTenant::class,
+        ]);
+
+        $middleware->alias([
+            'tenant.access' => EnsureTenantAccess::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (TokenMismatchException $e, Request $request) {
