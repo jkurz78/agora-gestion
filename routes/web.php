@@ -29,6 +29,7 @@ use App\Http\Controllers\TiersExportController;
 use App\Http\Controllers\TiersTemplateController;
 use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\SwitchAssociationController;
 use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\EnsureTwoFactor;
 use App\Livewire\Auth\AssociationSelector;
@@ -63,6 +64,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
 
 Route::middleware(['auth'])->group(function (): void {
     Route::get('/association-selector', AssociationSelector::class)->name('association-selector');
+    Route::post('/switch-association', SwitchAssociationController::class)->name('switch-association');
 });
 
 // ── Profile (espace-agnostic) ──
