@@ -17,6 +17,7 @@ use App\Models\Participant;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Services\FactureService;
+use App\Support\CurrentAssociation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -306,11 +307,11 @@ final class FactureShow extends Component
 
         // Repli sur l'adresse de l'association si aucun type d'opération n'en a une
         if ($senders->isEmpty()) {
-            $assoc = \App\Models\Association::find(1);
+            $assoc = CurrentAssociation::tryGet();
             if ($assoc?->email_from) {
                 $senders = collect([[
                     'email' => $assoc->email_from,
-                    'name'  => $assoc->email_from_name,
+                    'name' => $assoc->email_from_name,
                     'label' => ($assoc->nom ?? 'Association').' ('.$assoc->email_from.')',
                 ]]);
             }

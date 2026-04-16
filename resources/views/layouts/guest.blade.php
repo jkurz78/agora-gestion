@@ -1,5 +1,6 @@
 @php
-    $association   = \App\Models\Association::find(1);
+    // $association injected by LayoutAssociationComposerProvider (Association::first() fallback — public route, no tenant boot)
+    // TODO(S7): replace with CurrentAssociation::tryGet() once public routes resolve tenant from URL/subdomain.
     $nomAsso       = $association?->nom ?? 'Mon Association';
     $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
         ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
