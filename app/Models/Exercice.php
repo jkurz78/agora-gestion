@@ -7,11 +7,10 @@ namespace App\Models;
 use App\Enums\StatutExercice;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-final class Exercice extends Model
+final class Exercice extends TenantModel
 {
     protected $fillable = [
         'association_id',

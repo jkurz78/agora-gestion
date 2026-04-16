@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\TypeDocumentPrevisionnel;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-final class DocumentPrevisionnel extends Model
+final class DocumentPrevisionnel extends TenantModel
 {
     protected $table = 'documents_previsionnels';
 

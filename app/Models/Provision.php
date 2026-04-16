@@ -7,11 +7,10 @@ namespace App\Models;
 use App\Enums\TypeTransaction;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-final class Provision extends Model
+final class Provision extends TenantModel
 {
     use HasFactory, SoftDeletes;
 

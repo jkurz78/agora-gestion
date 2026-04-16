@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<Operation>
- * @todo S1-Task22: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
+ * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 class OperationFactory extends Factory
 {

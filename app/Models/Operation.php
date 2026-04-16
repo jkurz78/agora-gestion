@@ -8,11 +8,10 @@ use App\Enums\StatutOperation;
 use App\Services\ExerciceService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-final class Operation extends Model
+final class Operation extends TenantModel
 {
     use HasFactory;
 

@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\DroitImage;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
-final class Participant extends Model
+final class Participant extends TenantModel
 {
     protected $fillable = [
         'association_id',

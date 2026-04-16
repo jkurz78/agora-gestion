@@ -6,10 +6,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-final class BudgetLine extends Model
+final class BudgetLine extends TenantModel
 {
     use HasFactory;
 
