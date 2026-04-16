@@ -374,6 +374,40 @@
 
                 </ul>
 
+                {{-- Dropdown Changer d'association --}}
+                @auth
+                @php
+                    $currentAsso = \App\Tenant\TenantContext::current();
+                    $userAssos = auth()->user()?->associations()->whereNull('association_user.revoked_at')->get() ?? collect();
+                @endphp
+                @if ($currentAsso && $userAssos->count() > 1)
+                <ul class="navbar-nav me-2 align-items-end">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" data-bs-toggle="dropdown" role="button">
+                            @if ($currentAsso->logo_path)
+                                <img src="{{ Storage::url($currentAsso->logo_path) }}" style="height:24px;width:24px;object-fit:contain" alt="">
+                            @endif
+                            <span class="small">{{ $currentAsso->nom }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Changer d'association</h6></li>
+                            @foreach ($userAssos as $asso)
+                                @if ($asso->id !== $currentAsso->id)
+                                    <li>
+                                        <form method="POST" action="{{ route('switch-association') }}">
+                                            @csrf
+                                            <input type="hidden" name="association_id" value="{{ $asso->id }}">
+                                            <button type="submit" class="dropdown-item">{{ $asso->nom }}</button>
+                                        </form>
+                                    </li>
+                                @endif
+                            @endforeach
+                        </ul>
+                    </li>
+                </ul>
+                @endif
+                @endauth
+
                 {{-- Dropdown Paramètres (poussé à droite) --}}
                 <ul class="navbar-nav ms-auto me-3 align-items-end">
                     <li class="nav-item">

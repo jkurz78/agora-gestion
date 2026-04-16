@@ -170,6 +170,40 @@
                         @endif
                     </span>
 
+                    {{-- Dropdown Changer d'association --}}
+                    @php
+                        $currentAsso = \App\Tenant\TenantContext::current();
+                        $userAssos = auth()->user()?->associations()->whereNull('association_user.revoked_at')->get() ?? collect();
+                    @endphp
+                    @if ($currentAsso && $userAssos->count() > 1)
+                    <div class="dropdown">
+                        <a href="#" class="text-decoration-none dropdown-toggle d-flex align-items-center gap-1"
+                           role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                           style="color: rgba(255,255,255,.9);">
+                            @if ($currentAsso->logo_path)
+                                <img src="{{ Storage::url($currentAsso->logo_path) }}" style="height:20px;width:20px;object-fit:contain" alt="">
+                            @else
+                                <i class="bi bi-building"></i>
+                            @endif
+                            <span class="d-none d-md-inline small">{{ $currentAsso->nom }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Changer d'association</h6></li>
+                            @foreach ($userAssos as $asso)
+                                @if ($asso->id !== $currentAsso->id)
+                                    <li>
+                                        <form method="POST" action="{{ route('switch-association') }}">
+                                            @csrf
+                                            <input type="hidden" name="association_id" value="{{ $asso->id }}">
+                                            <button type="submit" class="dropdown-item">{{ $asso->nom }}</button>
+                                        </form>
+                                    </li>
+                                @endif
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endif
+
                     {{-- Separateur --}}
                     <span style="border-left: 1px solid rgba(255,255,255,.25); height: 20px;"></span>
 
