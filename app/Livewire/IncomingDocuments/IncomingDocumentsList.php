@@ -15,6 +15,7 @@ use App\Models\Seance;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
 use App\Services\InvoiceOcrService;
+use App\Support\CurrentAssociation;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -219,10 +220,10 @@ final class IncomingDocumentsList extends Component
     public function render(): View
     {
         return view('livewire.incoming-documents.list', [
-            'documents' => IncomingDocument::where('association_id', 1)
+            'documents' => IncomingDocument::where('association_id', CurrentAssociation::id())
                 ->orderBy('received_at', 'desc')
                 ->paginate(20),
-            'senderLabels' => IncomingMailAllowedSender::where('association_id', 1)
+            'senderLabels' => IncomingMailAllowedSender::where('association_id', CurrentAssociation::id())
                 ->whereNotNull('label')
                 ->pluck('label', 'email'),
             'operations' => $this->showAssignModal

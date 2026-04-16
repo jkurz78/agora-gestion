@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-use App\Enums\RoleAssociation;
 use App\Livewire\SeanceFeuilleAttachment;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\User;
 use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Services\Emargement\QrExtractionResult;
+use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -16,14 +17,25 @@ use Livewire\Livewire;
 beforeEach(function () {
     Storage::fake('local');
 
-    $this->gestionnaire = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
-    $this->consultation = User::factory()->create(['role' => RoleAssociation::Consultation]);
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
 
-    $this->operation = Operation::factory()->create();
+    $this->gestionnaire = User::factory()->create();
+    $this->gestionnaire->associations()->attach($this->association->id, ['role' => 'gestionnaire', 'joined_at' => now()]);
+
+    $this->consultation = User::factory()->create();
+    $this->consultation->associations()->attach($this->association->id, ['role' => 'consultation', 'joined_at' => now()]);
+
+    $this->operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $this->seance = Seance::create([
         'operation_id' => $this->operation->id,
         'numero' => 1,
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('opens the modal when receiving open-feuille-modal event', function () {

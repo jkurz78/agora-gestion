@@ -2,23 +2,27 @@
 
 declare(strict_types=1);
 
-use App\Enums\RoleAssociation;
 use App\Enums\StatutPresence;
 use App\Livewire\SeanceTable;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->user = User::factory()->create([
-        'role' => RoleAssociation::Admin,
-        'peut_voir_donnees_sensibles' => true,
-    ]);
-    $this->operation = Operation::factory()->create();
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+
+    $this->user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+
+    $this->operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $this->seance = Seance::create([
         'operation_id' => $this->operation->id,
         'numero' => 1,
@@ -26,12 +30,16 @@ beforeEach(function () {
         'feuille_signee_at' => now(),
         'feuille_signee_source' => 'email',
     ]);
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $this->participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => '2026-01-15',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('allows statut update when seance has signed sheet but statut is null', function () {

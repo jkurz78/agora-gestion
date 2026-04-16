@@ -3,12 +3,23 @@
 declare(strict_types=1);
 
 use App\Livewire\TiersAutocomplete;
+use App\Models\Association;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('renders the component', function () {
@@ -16,8 +27,8 @@ it('renders the component', function () {
 });
 
 it('can search tiers by name', function () {
-    Tiers::factory()->create(['nom' => 'Dupont', 'pour_depenses' => true]);
-    Tiers::factory()->create(['nom' => 'Martin', 'pour_depenses' => true]);
+    Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'pour_depenses' => true]);
+    Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Martin', 'pour_depenses' => true]);
 
     Livewire::test(TiersAutocomplete::class, ['filtre' => 'depenses'])
         ->set('search', 'Dup')
@@ -29,6 +40,7 @@ it('can search tiers by name', function () {
 
 it('can search tiers by entreprise name', function () {
     Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'entreprise',
         'entreprise' => 'ACME Corp',
         'nom' => 'Dupont',
@@ -43,6 +55,7 @@ it('can search tiers by entreprise name', function () {
 
 it('can select a tiers', function () {
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'entreprise',
         'entreprise' => 'ACME Corp',
         'nom' => 'Dupont',
@@ -56,7 +69,7 @@ it('can select a tiers', function () {
 });
 
 it('can clear the selection', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'pour_recettes' => true]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'pour_recettes' => true]);
 
     Livewire::test(TiersAutocomplete::class)
         ->call('selectTiers', $tiers->id)
@@ -86,7 +99,7 @@ it('dispatches open-tiers-form with depenses flag for depenses filter', function
 });
 
 it('selects tiers on tiers-saved event', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Nouveau', 'pour_recettes' => true]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Nouveau', 'pour_recettes' => true]);
 
     Livewire::test(TiersAutocomplete::class)
         ->dispatch('tiers-saved', id: $tiers->id)
@@ -95,6 +108,7 @@ it('selects tiers on tiers-saved event', function () {
 
 it('shows activate modal for tiers excluded by filter', function () {
     Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Dupont',
         'pour_depenses' => false,
         'pour_recettes' => true,

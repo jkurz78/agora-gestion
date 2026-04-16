@@ -2,26 +2,32 @@
 
 declare(strict_types=1);
 
-use App\Enums\RoleAssociation;
 use App\Livewire\Parametres\IncomingMailForm;
 use App\Models\Association;
 use App\Models\IncomingMailAllowedSender;
 use App\Models\IncomingMailParametres;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    if (Association::find(1) === null) {
-        $assoc = new Association;
-        $assoc->id = 1;
-        $assoc->fill(['nom' => 'Test'])->save();
-    }
-    $this->admin = User::factory()->create(['role' => RoleAssociation::Admin]);
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+    session()->forget('current_association_id');
+    session(['current_association_id' => $this->association->id]);
+    $this->admin = User::factory()->create();
+    $this->admin->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->admin->update(['derniere_association_id' => $this->association->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+    session()->forget('current_association_id');
 });
 
 it('loads existing parametres on mount', function () {
     IncomingMailParametres::create([
-        'association_id' => 1,
+        'association_id' => $this->association->id,
         'enabled' => true,
         'imap_host' => 'mail.test.fr',
         'imap_port' => 993,
@@ -53,7 +59,7 @@ it('saves parametres', function () {
         ->call('sauvegarder')
         ->assertHasNoErrors();
 
-    $row = IncomingMailParametres::where('association_id', 1)->first();
+    $row = IncomingMailParametres::where('association_id', $this->association->id)->first();
     expect($row)->not->toBeNull();
     expect($row->imap_host)->toBe('mail.test.fr');
     expect($row->imap_password)->toBe('newsecret');
@@ -72,12 +78,12 @@ it('rejects activation when whitelist is empty', function () {
         ->assertSet('enabled', false);
 
     // Aucune ligne de paramètres ne doit avoir été créée avec enabled=true
-    expect(IncomingMailParametres::where('association_id', 1)->where('enabled', true)->count())->toBe(0);
+    expect(IncomingMailParametres::where('association_id', $this->association->id)->where('enabled', true)->count())->toBe(0);
 });
 
 it('allows activation when whitelist has at least one sender', function () {
     IncomingMailAllowedSender::create([
-        'association_id' => 1,
+        'association_id' => $this->association->id,
         'email' => 'copieur@test.fr',
     ]);
 
@@ -103,7 +109,7 @@ it('adds and removes allowed senders', function () {
         ->assertSet('nouveauEmail', '')
         ->assertSet('nouveauLabel', '');
 
-    $row = IncomingMailAllowedSender::where('association_id', 1)->first();
+    $row = IncomingMailAllowedSender::where('association_id', $this->association->id)->first();
     expect($row->email)->toBe('copieur@test.fr');
     expect($row->label)->toBe('Copieur RdC');
 
@@ -116,7 +122,7 @@ it('adds and removes allowed senders', function () {
 
 it('rejects duplicate sender email', function () {
     IncomingMailAllowedSender::create([
-        'association_id' => 1,
+        'association_id' => $this->association->id,
         'email' => 'copieur@test.fr',
     ]);
 
