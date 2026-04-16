@@ -10,15 +10,22 @@ use App\Exceptions\ExerciceCloturedException;
 use App\Models\Exercice;
 use App\Models\ExerciceAction;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 final class ExerciceService
 {
+    private function moisDebut(): int
+    {
+        return TenantContext::current()?->exercice_mois_debut ?? 9;
+    }
+
     /**
      * Return the current exercice year.
-     * Financial year runs September 1 to August 31, identified by start year.
+     * Financial year start month is read from the current tenant's exercice_mois_debut.
+     * Falls back to month 9 (September) when no tenant context is booted.
      */
     public function current(): int
     {
@@ -27,29 +34,43 @@ final class ExerciceService
         }
 
         $now = CarbonImmutable::now();
+        $moisDebut = $this->moisDebut();
 
-        return $now->month >= 9 ? $now->year : $now->year - 1;
+        return $now->month >= $moisDebut ? $now->year : $now->year - 1;
     }
 
     /**
      * Return the start and end dates for a given exercice.
+     * Dates are computed from the current tenant's exercice_mois_debut.
      *
      * @return array{start: CarbonImmutable, end: CarbonImmutable}
      */
     public function dateRange(int $exercice): array
     {
-        return [
-            'start' => CarbonImmutable::create($exercice, 9, 1)->startOfDay(),
-            'end' => CarbonImmutable::create($exercice + 1, 8, 31)->startOfDay(),
-        ];
+        $moisDebut = $this->moisDebut();
+        $start = CarbonImmutable::create($exercice, $moisDebut, 1)->startOfDay();
+
+        if ($moisDebut === 1) {
+            // Calendrier : exercice jan–déc de la même année
+            $end = CarbonImmutable::create($exercice, 12, 31)->startOfDay();
+        } else {
+            // Décalé : fin le dernier jour du mois précédant moisDebut, année suivante
+            $endMonth = $moisDebut - 1;
+            $end = CarbonImmutable::create($exercice + 1, $endMonth, 1)->endOfMonth()->startOfDay();
+        }
+
+        return compact('start', 'end');
     }
 
     /**
-     * Return a display label for the given exercice, e.g. "2025-2026".
+     * Return a display label for the given exercice.
+     * Returns e.g. "2026" for a calendar exercice, "2025-2026" for a shifted one.
      */
     public function label(int $exercice): string
     {
-        return $exercice.'-'.($exercice + 1);
+        return $this->moisDebut() === 1
+            ? (string) $exercice
+            : $exercice.'-'.($exercice + 1);
     }
 
     /**
@@ -82,11 +103,13 @@ final class ExerciceService
 
     /**
      * Calculate which exercice a given date belongs to.
-     * Month >= 9 → that year, otherwise → previous year.
+     * Month >= moisDebut → that year, otherwise → previous year.
      */
     public function anneeForDate(CarbonImmutable|Carbon $date): int
     {
-        return $date->month >= 9 ? $date->year : $date->year - 1;
+        $moisDebut = $this->moisDebut();
+
+        return $date->month >= $moisDebut ? $date->year : $date->year - 1;
     }
 
     /**
@@ -146,12 +169,12 @@ final class ExerciceService
 
     /**
      * Create a new exercice year.
+     * association_id is auto-filled by TenantModel's creating observer from TenantContext.
      */
     public function creerExercice(int $annee, User $user): Exercice
     {
         return DB::transaction(function () use ($annee, $user): Exercice {
             $exercice = Exercice::create([
-                'association_id' => 1, // TODO(S1-Task39): remove — TenantModel will auto-fill from TenantContext
                 'annee' => $annee,
                 'statut' => StatutExercice::Ouvert,
             ]);
