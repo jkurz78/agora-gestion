@@ -6,10 +6,13 @@ namespace App\Models;
 
 use App\Enums\Espace;
 use App\Enums\Role;
+use App\Enums\RoleSysteme;
 use App\Enums\TwoFactorMethod;
+use App\Tenant\TenantContext;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -35,7 +38,8 @@ final class User extends Authenticatable implements MustVerifyEmail
         'two_factor_confirmed_at',
         'two_factor_recovery_codes',
         'two_factor_trusted_token',
-        'derniere_association_id', // @todo S1-Task25
+        'derniere_association_id',
+        'role_systeme',
     ];
 
     /**
@@ -57,6 +61,7 @@ final class User extends Authenticatable implements MustVerifyEmail
             'dernier_espace' => Espace::class,
             'peut_voir_donnees_sensibles' => 'boolean',
             'role' => Role::class,
+            'role_systeme' => RoleSysteme::class,
             'two_factor_method' => TwoFactorMethod::class,
             'two_factor_secret' => 'encrypted',
             'two_factor_confirmed_at' => 'datetime',
@@ -64,14 +69,38 @@ final class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
-    /** @todo S1-Task25 — full refactor (enum role, scopes) scheduled in Task 25 */
     public function associations(): BelongsToMany
     {
-        return $this->belongsToMany(
-            Association::class,
-            'association_user',
-        )->withPivot(['role', 'invited_at', 'joined_at', 'revoked_at'])
+        return $this->belongsToMany(Association::class, 'association_user')
+            ->withPivot('role', 'invited_at', 'joined_at', 'revoked_at')
             ->withTimestamps();
+    }
+
+    public function derniereAssociation(): BelongsTo
+    {
+        return $this->belongsTo(Association::class, 'derniere_association_id');
+    }
+
+    public function currentAssociation(): ?Association
+    {
+        return TenantContext::current();
+    }
+
+    public function currentRole(): ?string
+    {
+        $assoId = TenantContext::currentId();
+        if ($assoId === null) {
+            return null;
+        }
+
+        $pivot = $this->associations()->where('association_id', $assoId)->first();
+
+        return $pivot?->pivot?->role;
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role_systeme === RoleSysteme::SuperAdmin;
     }
 
     public function transactions(): HasMany
