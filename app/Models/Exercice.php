@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\StatutExercice;
+use App\Services\ExerciceService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -58,16 +59,20 @@ final class Exercice extends TenantModel
 
     public function label(): string
     {
-        return $this->annee.'-'.($this->annee + 1);
+        return app(ExerciceService::class)->label($this->annee);
     }
 
     public function dateDebut(): Carbon
     {
-        return Carbon::create($this->annee, 9, 1)->startOfDay();
+        $range = app(ExerciceService::class)->dateRange($this->annee);
+
+        return Carbon::instance($range['start']);
     }
 
     public function dateFin(): Carbon
     {
-        return Carbon::create($this->annee + 1, 8, 31)->startOfDay();
+        $range = app(ExerciceService::class)->dateRange($this->annee);
+
+        return Carbon::instance($range['end']);
     }
 }
