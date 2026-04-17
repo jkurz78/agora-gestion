@@ -28,7 +28,7 @@ it('applies where association_id = current tenant when booted', function () {
         ->and($wheres[0]['value'])->toBe($asso->id);
 });
 
-it('does not apply scope when TenantContext not booted', function () {
+it('blocks all rows (fail-closed) when TenantContext not booted', function () {
     $fake = new class extends Model
     {
         protected $table = 'tiers';
@@ -37,5 +37,10 @@ it('does not apply scope when TenantContext not booted', function () {
     $builder = $fake->newQuery();
     (new TenantScope)->apply($builder, $fake);
 
-    expect($builder->getQuery()->wheres)->toBeEmpty();
+    // Fail-closed: a whereRaw('1 = 0') clause must be present so that
+    // unbooted queries return no rows instead of leaking all tenant data.
+    $wheres = $builder->getQuery()->wheres;
+    expect($wheres)->toHaveCount(1)
+        ->and($wheres[0]['type'])->toBe('raw')
+        ->and((string) $wheres[0]['sql'])->toBe('1 = 0');
 });
