@@ -6,12 +6,12 @@ namespace App\Livewire;
 
 use App\Enums\StatutPresence;
 use App\Mail\AttestationPresenceMail;
-use App\Models\Association;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Seance;
+use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
@@ -59,7 +59,7 @@ final class AttestationModal extends Component
     public function mount(Operation $operation): void
     {
         $this->operation = $operation;
-        $association = Association::find(1);
+        $association = CurrentAssociation::tryGet();
         $this->hasEmailFrom = (bool) ($operation->typeOperation?->effectiveEmailFrom() ?: $association?->email_from);
         $this->hasCachet = (bool) $association?->cachet_signature_path;
     }
@@ -438,7 +438,7 @@ final class AttestationModal extends Component
     /** Same logo resolution as AttestationPresencePdfController::getAssociationData() */
     private function resolveAssociationData(): array
     {
-        $association = Association::find(1);
+        $association = CurrentAssociation::tryGet();
         $assoBase64 = null;
         $assoMime = 'image/png';
 
