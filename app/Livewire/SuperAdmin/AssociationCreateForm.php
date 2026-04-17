@@ -49,6 +49,7 @@ final class AssociationCreateForm extends Component
                 'password' => Hash::make(Str::random(40)),
                 'role_systeme' => RoleSysteme::User,
             ]);
+            $admin->markEmailAsVerified();
 
             $admin->associations()->attach($association->id, [
                 'role' => 'admin',
