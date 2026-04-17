@@ -6,6 +6,8 @@ use App\Livewire\Onboarding\Wizard;
 use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -143,4 +145,42 @@ it('rejects step 2 with mois hors plage 1..12', function () {
         ->set('exerciceMoisDebut', 13)
         ->call('saveStep2')
         ->assertHasErrors(['exerciceMoisDebut']);
+});
+
+it('stores uploaded logo at associations/{id}/branding/ with short filename', function () {
+    Storage::fake('local');
+    $id = $this->association->id;
+    $file = UploadedFile::fake()->image('original.png', 200, 200);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('identiteAdresse', '1 rue X')
+        ->set('identiteCodePostal', '75001')
+        ->set('identiteVille', 'Paris')
+        ->set('identiteEmail', 'a@b.c')
+        ->set('logoUpload', $file)
+        ->call('saveStep1')
+        ->assertHasNoErrors();
+
+    Storage::disk('local')->assertExists("associations/{$id}/branding/logo.png");
+    expect($this->association->fresh()->logo_path)->toBe('logo.png');
+});
+
+it('stores uploaded cachet at associations/{id}/branding/ with short filename', function () {
+    Storage::fake('local');
+    $id = $this->association->id;
+    $file = UploadedFile::fake()->image('signature.png', 200, 200);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('identiteAdresse', '1 rue X')
+        ->set('identiteCodePostal', '75001')
+        ->set('identiteVille', 'Paris')
+        ->set('identiteEmail', 'a@b.c')
+        ->set('cachetUpload', $file)
+        ->call('saveStep1')
+        ->assertHasNoErrors();
+
+    Storage::disk('local')->assertExists("associations/{$id}/branding/cachet.png");
+    expect($this->association->fresh()->cachet_signature_path)->toBe('cachet.png');
 });

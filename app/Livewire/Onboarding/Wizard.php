@@ -7,6 +7,7 @@ namespace App\Livewire\Onboarding;
 use App\Models\Association;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -107,10 +108,37 @@ final class Wizard extends Component
         ];
 
         if ($this->logoUpload !== null) {
-            $data['logo_path'] = $this->logoUpload->store("associations/{$association->id}/logos", 'local');
+            $shortName = 'logo.'.$this->logoUpload->extension();
+            $fullPath  = $association->storagePath('branding/'.$shortName);
+            $dir       = dirname($fullPath);
+            Storage::disk('local')->makeDirectory($dir);
+            Storage::disk('local')->putFileAs($dir, $this->logoUpload, $shortName);
+
+            if ($association->logo_path !== null) {
+                $oldFull = $association->storagePath('branding/'.basename($association->logo_path));
+                if ($oldFull !== $fullPath && Storage::disk('local')->exists($oldFull)) {
+                    Storage::disk('local')->delete($oldFull);
+                }
+            }
+
+            $data['logo_path'] = $shortName;
         }
+
         if ($this->cachetUpload !== null) {
-            $data['cachet_signature_path'] = $this->cachetUpload->store("associations/{$association->id}/cachets", 'local');
+            $shortName = 'cachet.'.$this->cachetUpload->extension();
+            $fullPath  = $association->storagePath('branding/'.$shortName);
+            $dir       = dirname($fullPath);
+            Storage::disk('local')->makeDirectory($dir);
+            Storage::disk('local')->putFileAs($dir, $this->cachetUpload, $shortName);
+
+            if ($association->cachet_signature_path !== null) {
+                $oldFull = $association->storagePath('branding/'.basename($association->cachet_signature_path));
+                if ($oldFull !== $fullPath && Storage::disk('local')->exists($oldFull)) {
+                    Storage::disk('local')->delete($oldFull);
+                }
+            }
+
+            $data['cachet_signature_path'] = $shortName;
         }
 
         $association->update($data);
