@@ -15,11 +15,13 @@
     <div class="row">
         <div class="col-md-6 mb-3">
             <label class="form-label">BIC (optionnel)</label>
-            <input type="text" wire:model="banqueBic" class="form-control">
+            <input type="text" wire:model="banqueBic" class="form-control @error('banqueBic') is-invalid @enderror">
+            @error('banqueBic') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
         <div class="col-md-6 mb-3">
             <label class="form-label">Domiciliation (optionnel)</label>
-            <input type="text" wire:model="banqueDomiciliation" class="form-control" placeholder="Crédit Agricole Paris 8">
+            <input type="text" wire:model="banqueDomiciliation" class="form-control @error('banqueDomiciliation') is-invalid @enderror" placeholder="Crédit Agricole Paris 8">
+            @error('banqueDomiciliation') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
     </div>
     <div class="row">

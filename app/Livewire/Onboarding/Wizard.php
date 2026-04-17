@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Onboarding;
 
 use App\Models\Association;
+use App\Models\CompteBancaire;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Storage;
@@ -86,6 +87,19 @@ final class Wizard extends Component
         $this->identiteFormeJuridique = $association->forme_juridique;
         $this->exerciceMoisDebut = (int) ($association->exercice_mois_debut ?? 1);
         $this->banqueDateSoldeInitial = now()->format('Y-m-d');
+
+        $compteId = $this->state['compte_principal_id'] ?? null;
+        if ($compteId !== null) {
+            $compte = CompteBancaire::find($compteId);
+            if ($compte !== null) {
+                $this->banqueNom = (string) $compte->nom;
+                $this->banqueIban = (string) $compte->iban;
+                $this->banqueBic = $compte->bic;
+                $this->banqueDomiciliation = $compte->domiciliation;
+                $this->banqueSoldeInitial = (float) $compte->solde_initial;
+                $this->banqueDateSoldeInitial = $compte->date_solde_initial?->format('Y-m-d') ?? now()->format('Y-m-d');
+            }
+        }
     }
 
     public function goToStep(int $step): void
@@ -191,8 +205,7 @@ final class Wizard extends Component
 
         $association = $this->currentAssociation();
 
-        \App\Models\CompteBancaire::create([
-            'association_id'          => $association->id,
+        $attributes = [
             'nom'                     => $this->banqueNom,
             'iban'                    => $this->banqueIban,
             'bic'                     => $this->banqueBic,
@@ -201,15 +214,31 @@ final class Wizard extends Component
             'date_solde_initial'      => $this->banqueDateSoldeInitial,
             'actif_recettes_depenses' => true,
             'est_systeme'             => false,
-        ]);
+        ];
+
+        $existingId = $this->state['compte_principal_id'] ?? null;
+        $compte = $existingId !== null
+            ? CompteBancaire::find($existingId)
+            : null;
+
+        if ($compte !== null) {
+            $compte->update($attributes);
+        } else {
+            $compte = CompteBancaire::create($attributes + ['association_id' => $association->id]);
+            $this->state['compte_principal_id'] = $compte->id;
+            $association->update(['wizard_state' => $this->state]);
+        }
 
         $this->advanceTo(4);
     }
 
     protected function advanceTo(int $step): void
     {
+        $association = $this->currentAssociation();
         $this->currentStep = $step;
-        $this->currentAssociation()->update(['wizard_current_step' => $step]);
+        $association->update([
+            'wizard_current_step' => max($step, (int) $association->wizard_current_step),
+        ]);
     }
 
     protected function currentAssociation(): Association

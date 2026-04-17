@@ -220,3 +220,46 @@ it('rejects step 3 with missing IBAN', function () {
         ->call('saveStep3')
         ->assertHasErrors(['banqueIban']);
 });
+
+it('reuses existing compte principal on step 3 re-submit (no duplicate row)', function () {
+    $this->association->update(['wizard_current_step' => 3]);
+
+    // First submission
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('banqueNom', 'Compte A')
+        ->set('banqueIban', 'FR7630001007941234567890185')
+        ->set('banqueSoldeInitial', 100.00)
+        ->set('banqueDateSoldeInitial', '2026-01-01')
+        ->call('saveStep3')
+        ->assertSet('currentStep', 4);
+
+    expect(\App\Models\CompteBancaire::where('association_id', $this->association->id)->count())->toBe(1);
+    $firstId = \App\Models\CompteBancaire::where('association_id', $this->association->id)->value('id');
+
+    // Second submission with updated values (wizard_state now has compte_principal_id)
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('banqueNom', 'Compte A renommé')
+        ->set('banqueIban', 'FR7630001007941234567890185')
+        ->set('banqueSoldeInitial', 250.00)
+        ->set('banqueDateSoldeInitial', '2026-02-01')
+        ->call('saveStep3');
+
+    expect(\App\Models\CompteBancaire::where('association_id', $this->association->id)->count())->toBe(1);
+    $compte = \App\Models\CompteBancaire::find($firstId);
+    expect($compte->nom)->toBe('Compte A renommé');
+    expect((float) $compte->solde_initial)->toBe(250.00);
+});
+
+it('advanceTo does not downgrade wizard_current_step', function () {
+    $this->association->update(['wizard_current_step' => 5]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('currentStep', 2)
+        ->set('exerciceMoisDebut', 9)
+        ->call('saveStep2');  // advanceTo(3) but persisted was 5
+
+    expect($this->association->fresh()->wizard_current_step)->toBe(5);
+});
