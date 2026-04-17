@@ -337,8 +337,13 @@ Route::middleware(['auth', 'super-admin'])
     ->name('super-admin.')
     ->group(function (): void {
         Route::get('/', fn () => view('super-admin.dashboard'))->name('dashboard');
-        // Stub — remplacé dans Task 2 par le composant Livewire AssociationsList
-        Route::get('/associations', fn () => redirect()->route('super-admin.dashboard'))->name('associations.index');
+        Route::prefix('associations')->name('associations.')->group(function (): void {
+            Route::view('/', 'super-admin.associations.index')->name('index');
+            // Stubs — remplacés dans Tasks 3/4/5
+            Route::get('/create', fn () => abort(501))->name('create');
+            Route::get('/{slug}', fn () => abort(501))->name('show');
+            Route::post('/{slug}/support/enter', fn () => abort(501))->name('support.enter');
+        });
     });
 
 require __DIR__.'/auth.php';
