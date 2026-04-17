@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->appendToGroup('web', [
             ResolveTenant::class,
+            BootTenantConfig::class,
         ]);
 
         $middleware->alias([
