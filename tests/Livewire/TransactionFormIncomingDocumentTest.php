@@ -147,7 +147,7 @@ it('open-transaction-form-from-incoming flash une erreur si le fichier disque ma
     expect(session('error'))->toBe('Fichier introuvable sur le disque.');
 });
 
-it('save transfère le fichier inbox vers pieces-jointes et supprime l\'IncomingDocument', function () {
+it('save transfère le fichier inbox vers transactions/{tid} et supprime l\'IncomingDocument', function () {
     $scId = $this->sousCategorie->id;
     Http::fake([
         'api.anthropic.com/*' => Http::response([
@@ -182,11 +182,12 @@ it('save transfère le fichier inbox vers pieces-jointes et supprime l\'Incoming
 
     // Transaction créée avec le justificatif
     $tx = Transaction::where('reference', 'FAC-42')->first();
+    $aid = $this->association->id;
     expect($tx)->not->toBeNull()
         ->and($tx->piece_jointe_nom)->toBe('facture-fournisseur.pdf')
         ->and($tx->piece_jointe_mime)->toBe('application/pdf')
-        ->and($tx->piece_jointe_path)->toBe("pieces-jointes/{$tx->id}/justificatif.pdf")
-        ->and(Storage::disk('local')->get($tx->piece_jointe_path))->toBe('FAKE PDF BYTES');
+        ->and($tx->piece_jointe_path)->toBe('justificatif.pdf')
+        ->and(Storage::disk('local')->get($tx->pieceJointeFullPath()))->toBe('FAKE PDF BYTES');
 
     // IncomingDocument supprimé (row + fichier disque)
     expect(IncomingDocument::find($doc->id))->toBeNull()
