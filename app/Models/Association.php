@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use InvalidArgumentException;
 
 final class Association extends Model
@@ -64,6 +65,13 @@ final class Association extends Model
             'statut' => 'string',
             'wizard_completed_at' => 'datetime',
         ];
+    }
+
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'association_user')
+            ->withPivot(['role', 'joined_at', 'revoked_at'])
+            ->withTimestamps();
     }
 
     /**
