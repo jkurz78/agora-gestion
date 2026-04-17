@@ -8,6 +8,7 @@ use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class Transaction extends TenantModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TenantStorage;
 
     protected $fillable = [
         'association_id',
@@ -136,6 +137,13 @@ final class Transaction extends TenantModel
     public function hasPieceJointe(): bool
     {
         return $this->piece_jointe_path !== null;
+    }
+
+    public function pieceJointeFullPath(): ?string
+    {
+        return $this->piece_jointe_path
+            ? $this->storagePath('transactions/'.$this->id.'/'.basename($this->piece_jointe_path))
+            : null;
     }
 
     public function pieceJointeUrl(): ?string
