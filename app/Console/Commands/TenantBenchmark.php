@@ -9,6 +9,7 @@ use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -16,7 +17,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Benchmark artisan : seed N tenants × M transactions puis mesure 5 requêtes lourdes.
+ * Benchmark artisan : seed N tenants × M transactions puis mesure 6 requêtes lourdes.
  *
  * Approche choisie : C — Minimal (requêtes DB directes)
  * Rationale : le dispatch HTTP via `$this->laravel['router']` ne dispose pas de session ni
@@ -34,7 +35,7 @@ final class TenantBenchmark extends Command
 {
     protected $signature = 'tenant:benchmark {--tenants=10} {--transactions=1000}';
 
-    protected $description = 'Seed N tenants × M transactions puis mesure 5 requêtes lourdes par tenant cible.';
+    protected $description = 'Seed N tenants × M transactions puis mesure 6 requêtes lourdes par tenant cible.';
 
     public function handle(): int
     {
@@ -88,6 +89,13 @@ final class TenantBenchmark extends Command
             'Tiers 360' => fn () => Tiers::where('association_id', $targetId)->orderBy('nom')->paginate(50)->total(),
             'Factures' => fn () => DB::table('factures')->where('association_id', $targetId)->where('statut', 'brouillon')->count(),
             'Rapports CERFA' => fn () => Transaction::where('association_id', $targetId)->whereYear('date', date('Y'))->sum('montant_total'),
+            'Analyse pivot' => fn () => TransactionLigne::query()
+                ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+                ->where('transactions.association_id', $targetId)
+                ->whereNull('transaction_lignes.deleted_at')
+                ->select('transaction_lignes.sous_categorie_id', DB::raw('SUM(transaction_lignes.montant) as total'), DB::raw('COUNT(*) as nb'))
+                ->groupBy('transaction_lignes.sous_categorie_id')
+                ->get(),
         ];
 
         $rows = [];
