@@ -29,4 +29,9 @@ final class AssociationFactory extends Factory
             'wizard_completed_at' => now(),
         ];
     }
+
+    public function unonboarded(): static
+    {
+        return $this->state(fn (array $attributes) => ['wizard_completed_at' => null]);
+    }
 }

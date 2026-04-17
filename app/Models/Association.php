@@ -42,6 +42,8 @@ final class Association extends Model
         'exercice_mois_debut',
         'statut',
         'wizard_completed_at',
+        'wizard_state',
+        'wizard_current_step',
     ];
 
     protected function casts(): array
@@ -64,6 +66,8 @@ final class Association extends Model
             'exercice_mois_debut' => 'integer',
             'statut' => 'string',
             'wizard_completed_at' => 'datetime',
+            'wizard_state' => 'array',
+            'wizard_current_step' => 'integer',
         ];
     }
 

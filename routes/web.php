@@ -82,6 +82,11 @@ Route::middleware(['auth'])->group(function (): void {
         ->name('transactions.piece-jointe');
 });
 
+// ── Onboarding ──
+Route::middleware(['auth'])->prefix('onboarding')->name('onboarding.')->group(function (): void {
+    Route::get('/', [\App\Http\Controllers\OnboardingController::class, 'index'])->name('index');
+});
+
 // ── Operations ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->prefix('operations')

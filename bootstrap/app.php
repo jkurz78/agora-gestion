@@ -4,6 +4,7 @@ use App\Http\Middleware\BlockWritesInSupport;
 use App\Http\Middleware\BootTenantConfig;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureTenantAccess;
+use App\Http\Middleware\ForceWizardIfNotCompleted;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', [
             ResolveTenant::class,
             BootTenantConfig::class,
+            ForceWizardIfNotCompleted::class,
             BlockWritesInSupport::class,
         ]);
 
