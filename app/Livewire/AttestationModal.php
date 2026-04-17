@@ -454,10 +454,10 @@ final class AttestationModal extends Component
         $footerBase64 = null;
         $footerMime = 'image/png';
 
-        $typeLogo = $this->operation->typeOperation?->logo_path;
-        if ($typeLogo && Storage::disk('public')->exists($typeLogo)) {
-            $headerBase64 = base64_encode(Storage::disk('public')->get($typeLogo));
-            $ext = strtolower(pathinfo($typeLogo, PATHINFO_EXTENSION));
+        $typeFullPath = $this->operation->typeOperation?->typeOpLogoFullPath();
+        if ($typeFullPath && Storage::disk('local')->exists($typeFullPath)) {
+            $headerBase64 = base64_encode(Storage::disk('local')->get($typeFullPath));
+            $ext = strtolower(pathinfo($typeFullPath, PATHINFO_EXTENSION));
             $headerMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
             $footerBase64 = $assoBase64;
             $footerMime = $assoMime;

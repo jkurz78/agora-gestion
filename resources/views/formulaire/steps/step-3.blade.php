@@ -6,9 +6,12 @@
             <i class="bi bi-download me-2"></i>
             <span>
                 Téléchargez l'attestation médicale à faire remplir par votre médecin :
-                <a href="{{ asset('storage/' . $typeOperation->attestation_medicale_path) }}" target="_blank" class="alert-link">
+                @php($attestationUrl = $typeOperation->typeOpAttestationFullPath() ? \App\Support\TenantAsset::url($typeOperation->typeOpAttestationFullPath()) : null)
+                @if($attestationUrl)
+                <a href="{{ $attestationUrl }}" target="_blank" class="alert-link">
                     Télécharger le document <i class="bi bi-box-arrow-up-right"></i>
                 </a>
+                @endif
             </span>
         </div>
     @endif

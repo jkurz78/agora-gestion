@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Support\CurrentAssociation;
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 final class TypeOperation extends TenantModel
 {
     use HasFactory;
+    use TenantStorage;
 
     protected $fillable = [
         'association_id',
@@ -80,6 +82,26 @@ final class TypeOperation extends TenantModel
     public function seanceDefaults(): HasMany
     {
         return $this->hasMany(TypeOperationSeance::class)->orderBy('numero');
+    }
+
+    /**
+     * Full local-disk path for the type-operation logo, or null if not set.
+     */
+    public function typeOpLogoFullPath(): ?string
+    {
+        return $this->logo_path
+            ? $this->storagePath('type-operations/'.$this->id.'/'.basename($this->logo_path))
+            : null;
+    }
+
+    /**
+     * Full local-disk path for the attestation médicale, or null if not set.
+     */
+    public function typeOpAttestationFullPath(): ?string
+    {
+        return $this->attestation_medicale_path
+            ? $this->storagePath('type-operations/'.$this->id.'/'.basename($this->attestation_medicale_path))
+            : null;
     }
 
     /**
