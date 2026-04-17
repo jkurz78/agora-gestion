@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\BootTenantConfig;
 use App\Http\Middleware\EnsureTenantAccess;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SecurityHeaders;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'tenant.access' => EnsureTenantAccess::class,
+            'boot-tenant' => BootTenantConfig::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

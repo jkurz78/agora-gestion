@@ -25,13 +25,15 @@ use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeanceFeuilleController;
 use App\Http\Controllers\SeancePdfController;
 use App\Http\Controllers\SousCategorieController;
+use App\Http\Controllers\SwitchAssociationController;
+use App\Http\Controllers\TenantAssetController;
 use App\Http\Controllers\TiersExportController;
 use App\Http\Controllers\TiersTemplateController;
 use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\SwitchAssociationController;
 use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\EnsureTwoFactor;
+use App\Http\Middleware\VerifyTenantAsset;
 use App\Livewire\Auth\AssociationSelector;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -49,7 +51,7 @@ Route::middleware('auth')->get('/', function () {
 })->name('home');
 
 // ── Paramètres ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess::class.':parametres'])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, 'boot-tenant', CheckEspaceAccess::class.':parametres'])
     ->prefix('parametres')
     ->name('parametres.')
     ->group(function (): void {
@@ -68,20 +70,20 @@ Route::middleware(['auth'])->group(function (): void {
 });
 
 // ── Tenant Assets (signed URLs) ──
-Route::get('/tenant-assets/{path}', App\Http\Controllers\TenantAssetController::class)
+Route::get('/tenant-assets/{path}', TenantAssetController::class)
     ->where('path', '.*')
-    ->middleware(['auth', 'signed', App\Http\Middleware\VerifyTenantAsset::class])
+    ->middleware(['auth', 'signed', VerifyTenantAsset::class])
     ->name('tenant-assets');
 
 // ── Profile (espace-agnostic) ──
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth', 'boot-tenant'])->group(function (): void {
     Route::view('/profil', 'profil.index')->name('profil.index');
     Route::get('/transactions/{transaction}/piece-jointe', TransactionPieceJointeController::class)
         ->name('transactions.piece-jointe');
 });
 
 // ── Operations ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, 'boot-tenant'])
     ->prefix('operations')
     ->name('operations.')
     ->group(function (): void {
@@ -139,12 +141,12 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     });
 
 // ── Dashboard ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, 'boot-tenant'])
     ->get('/dashboard', [DashboardController::class, 'index'])
     ->name('dashboard');
 
 // ── Comptabilité ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, 'boot-tenant'])
     ->prefix('comptabilite')
     ->name('comptabilite.')
     ->group(function (): void {
@@ -158,7 +160,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     });
 
 // ── Banques ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, 'boot-tenant'])
     ->prefix('banques')
     ->name('banques.')
     ->group(function (): void {
@@ -193,7 +195,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     });
 
 // ── Tiers ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, 'boot-tenant'])
     ->prefix('tiers')
     ->name('tiers.')
     ->group(function (): void {
@@ -211,7 +213,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     });
 
 // ── Facturation ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, 'boot-tenant'])
     ->prefix('facturation')
     ->name('facturation.')
     ->group(function (): void {
@@ -232,7 +234,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     });
 
 // ── Rapports ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, 'boot-tenant'])
     ->prefix('rapports')
     ->name('rapports.')
     ->group(function (): void {
@@ -245,7 +247,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     });
 
 // ── Exercices ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, 'boot-tenant'])
     ->prefix('exercices')
     ->name('exercices.')
     ->group(function (): void {
