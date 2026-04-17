@@ -51,6 +51,25 @@ final class Wizard extends Component
     #[Validate('required|integer|between:1,12')]
     public int $exerciceMoisDebut = 1;
 
+    // Step 3 — Compte bancaire principal
+    #[Validate('required|string|max:100')]
+    public string $banqueNom = '';
+
+    #[Validate('required|string|max:34')]
+    public string $banqueIban = '';
+
+    #[Validate('nullable|string|max:11')]
+    public ?string $banqueBic = null;
+
+    #[Validate('nullable|string|max:255')]
+    public ?string $banqueDomiciliation = null;
+
+    #[Validate('required|numeric')]
+    public float $banqueSoldeInitial = 0.0;
+
+    #[Validate('required|date')]
+    public string $banqueDateSoldeInitial = '';
+
     public function mount(): void
     {
         $association = $this->currentAssociation();
@@ -66,6 +85,7 @@ final class Wizard extends Component
         $this->identiteSiret = $association->siret;
         $this->identiteFormeJuridique = $association->forme_juridique;
         $this->exerciceMoisDebut = (int) ($association->exercice_mois_debut ?? 1);
+        $this->banqueDateSoldeInitial = now()->format('Y-m-d');
     }
 
     public function goToStep(int $step): void
@@ -156,6 +176,34 @@ final class Wizard extends Component
         ]);
 
         $this->advanceTo(3);
+    }
+
+    public function saveStep3(): void
+    {
+        $this->validate([
+            'banqueNom'              => 'required|string|max:100',
+            'banqueIban'             => 'required|string|max:34',
+            'banqueBic'              => 'nullable|string|max:11',
+            'banqueDomiciliation'    => 'nullable|string|max:255',
+            'banqueSoldeInitial'     => 'required|numeric',
+            'banqueDateSoldeInitial' => 'required|date',
+        ]);
+
+        $association = $this->currentAssociation();
+
+        \App\Models\CompteBancaire::create([
+            'association_id'          => $association->id,
+            'nom'                     => $this->banqueNom,
+            'iban'                    => $this->banqueIban,
+            'bic'                     => $this->banqueBic,
+            'domiciliation'           => $this->banqueDomiciliation,
+            'solde_initial'           => $this->banqueSoldeInitial,
+            'date_solde_initial'      => $this->banqueDateSoldeInitial,
+            'actif_recettes_depenses' => true,
+            'est_systeme'             => false,
+        ]);
+
+        $this->advanceTo(4);
     }
 
     protected function advanceTo(int $step): void

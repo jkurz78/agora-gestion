@@ -184,3 +184,39 @@ it('stores uploaded cachet at associations/{id}/branding/ with short filename', 
     Storage::disk('local')->assertExists("associations/{$id}/branding/cachet.png");
     expect($this->association->fresh()->cachet_signature_path)->toBe('cachet.png');
 });
+
+it('saves step 3 compte bancaire and advances to step 4', function () {
+    $this->association->update(['wizard_current_step' => 3]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('banqueNom', 'Compte courant principal')
+        ->set('banqueIban', 'FR7630001007941234567890185')
+        ->set('banqueBic', 'BDFEFRPPCCT')
+        ->set('banqueDomiciliation', 'Banque de France Paris')
+        ->set('banqueSoldeInitial', 1500.50)
+        ->set('banqueDateSoldeInitial', '2026-01-01')
+        ->call('saveStep3')
+        ->assertSet('currentStep', 4);
+
+    $compte = \App\Models\CompteBancaire::where('association_id', $this->association->id)->first();
+    expect($compte)->not->toBeNull();
+    expect($compte->nom)->toBe('Compte courant principal');
+    expect($compte->iban)->toBe('FR7630001007941234567890185');
+    expect($compte->bic)->toBe('BDFEFRPPCCT');
+    expect((float) $compte->solde_initial)->toBe(1500.50);
+    expect($compte->actif_recettes_depenses)->toBeTrue();
+    expect($compte->est_systeme)->toBeFalse();
+    expect($this->association->fresh()->wizard_current_step)->toBe(4);
+});
+
+it('rejects step 3 with missing IBAN', function () {
+    $this->association->update(['wizard_current_step' => 3]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('banqueNom', 'Test')
+        ->set('banqueIban', '')
+        ->call('saveStep3')
+        ->assertHasErrors(['banqueIban']);
+});
