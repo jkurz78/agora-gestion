@@ -38,6 +38,8 @@ Vérification :
 ```php
 User::where('email', 'admin@monasso.fr')->value('role_systeme');
 // Attendu : "super_admin"
+
+exit;
 ```
 
 ### 1.3 Créer une association via wizard
@@ -62,6 +64,8 @@ User::where('email', 'admin@monasso.fr')->value('role_systeme');
 // Vérifier que les entrées récentes ont bien un association_id
 \DB::table('operations')->latest()->limit(3)->get(['id', 'association_id']);
 \DB::table('tiers')->latest()->limit(3)->get(['id', 'association_id']);
+
+exit;
 ```
 
 Contrôler l'absence d'erreur dans les logs :
@@ -136,6 +140,14 @@ Comparer avec les mêmes chiffres relevés sur prod avant le dump. Ouvrir `/dash
 
 ### 3.1 Pull de la branche
 
+> **Prérequis :** le dépôt doit être cloné dans `/volume1/agora-staging`. Si ce n'est pas encore le cas :
+> ```bash
+> git clone git@github.com:jurgenkurz/agora-gestion.git /volume1/agora-staging
+> cd /volume1/agora-staging
+> cp .env.example .env  # puis configurer DB_* pour pointer sur la base staging importée en 2.3
+> php artisan key:generate
+> ```
+
 ```bash
 cd /volume1/agora-staging
 git fetch origin feat/multi-tenancy-s1
@@ -178,6 +190,12 @@ SELECT COUNT(*) FROM tiers WHERE association_id IS NULL;
 
 SELECT COUNT(*) FROM factures WHERE association_id IS NULL;
 -- Attendu : 0
+
+SELECT COUNT(*) FROM transactions WHERE association_id IS NULL;
+-- Attendu : 0
+
+SELECT COUNT(*) FROM comptes_bancaires WHERE association_id IS NULL;
+-- Attendu : 0
 ```
 
 ### 3.3 Configurer le super-admin sur staging
@@ -187,13 +205,25 @@ php artisan tinker
 ```
 
 ```php
-// Remplacer par l'email de l'admin SVS réel en prod
-User::where('email', 'admin@monasso.fr')
+// 1) Lister les users existants pour identifier l'email de l'admin SVS réel en prod
+//    (admin@monasso.fr est l'email de dev/seed, il n'existera probablement pas en prod)
+User::orderBy('id')->get(['id', 'email', 'role_systeme']);
+
+// 2) Promouvoir — adapter l'email ci-dessous au résultat de l'étape 1
+$updated = User::where('email', '{email-admin-svs-prod}')
     ->update(['role_systeme' => \App\Enums\RoleSysteme::SuperAdmin->value]);
 
-// Vérification
-User::where('email', 'admin@monasso.fr')->value('role_systeme');
+// 3) Vérifier que la mise à jour a bien touché exactement 1 ligne
+//    (0 = email inexistant, > 1 = doublon de compte — stopper et investiguer)
+if ($updated !== 1) {
+    throw new RuntimeException("Promotion super-admin échouée : {$updated} rows");
+}
+
+// 4) Confirmer la valeur
+User::where('email', '{email-admin-svs-prod}')->value('role_systeme');
 // Attendu : "super_admin"
+
+exit;
 ```
 
 ### 3.4 Checklist non-régression SVS en tant que tenant #1
@@ -235,12 +265,22 @@ Tous verts attendus (suite à 0 failed).
 - **✅ GO** — Si la checklist 3.4 est entièrement cochée ET les tests 3.5 sont tous verts : feu vert pour merge `main` + déploiement prod. Cette étape est **hors S6** et fait l'objet d'un runbook séparé.
 - **❌ ROLLBACK** — Si une régression est détectée :
   1. Sur staging : `git checkout main` (ou la version prod en cours).
-  2. Restaurer la base staging depuis le dump prod importé en Phase 2 :
+  2. **Recréer la base staging vide** avant de ré-importer le dump (sinon l'import échoue sur les tables déjà altérées par `migrate --force`) :
+     ```bash
+     mysql -u {user} -p -e "DROP DATABASE {db_staging}; \
+       CREATE DATABASE {db_staging} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+     ```
+  3. Restaurer la base staging depuis le dump prod importé en Phase 2 :
      ```bash
      mysql -u {user} -p {db_staging} < /volume1/agora-staging/prod-dump-*.sql
      ```
-  3. Créer un ticket détaillant la régression, avec reproduction minimale.
-  4. Retour en développement sur `feat/multi-tenancy-s1`.
+  4. Restaurer aussi le storage depuis le tar d'origine si des fichiers ont été déplacés par les migrations S6 :
+     ```bash
+     rm -rf /volume1/agora-staging/storage/app
+     tar xzf /volume1/agora-staging/prod-storage-*.tar.gz -C /volume1/agora-staging/
+     ```
+  5. Créer un ticket détaillant la régression, avec reproduction minimale.
+  6. Retour en développement sur `feat/multi-tenancy-s1`.
 
 ---
 
