@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 return new class extends Migration
 {
@@ -15,9 +16,8 @@ return new class extends Migration
             ->each(function (object $row): void {
                 $old = $row->feuille_signee_path;
 
-                // Déjà migré : valeur courte sans slash
                 if (! str_contains($old, '/')) {
-                    return;
+                    return; // déjà migré
                 }
 
                 $associationId = $row->association_id;
@@ -26,19 +26,26 @@ return new class extends Migration
                 $fullOld = storage_path('app/private/'.$old);
                 $fullNew = storage_path('app/private/associations/'.$associationId.'/seances/'.$seanceId.'/feuille-signee.pdf');
 
-                if (is_file($fullOld)) {
+                if (is_file($fullOld) && ! is_file($fullNew)) {
                     @mkdir(dirname($fullNew), 0775, true);
-                    rename($fullOld, $fullNew);
+                    @rename($fullOld, $fullNew);
                 }
 
-                DB::table('seances')
-                    ->where('id', $seanceId)
-                    ->update(['feuille_signee_path' => 'feuille-signee.pdf']);
+                if (is_file($fullNew)) {
+                    DB::table('seances')
+                        ->where('id', $seanceId)
+                        ->update(['feuille_signee_path' => 'feuille-signee.pdf']);
+                } else {
+                    Log::warning('S2 backfill: expected file missing, DB not updated', [
+                        'table' => 'seances', 'id' => $seanceId,
+                        'old_value' => $old, 'expected_new_path' => $fullNew,
+                    ]);
+                }
             });
     }
 
     public function down(): void
     {
-        // Retour arrière non implémenté : restaurer manuellement depuis sauvegarde si nécessaire.
+        // Non réversible sans backup — restaurer depuis sauvegarde si nécessaire.
     }
 };

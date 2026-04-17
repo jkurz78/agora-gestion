@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 return new class extends Migration
 {
@@ -11,17 +12,12 @@ return new class extends Migration
     {
         DB::table('participant_documents')->get()->each(function (stdClass $row): void {
             $old = $row->storage_path;
-
-            // Si storage_path contient déjà juste le nom court (sans '/'), pas de migration fichier nécessaire
-            // mais on vérifie quand même s'il faut déplacer un fichier depuis l'ancien emplacement
             $shortName = basename($old);
 
             if ($old === $shortName) {
-                // Déjà au format court — pas de changement DB nécessaire
-                return;
+                return; // déjà au format court
             }
 
-            // Chemin sous l'ancien format : "participants/{pid}/{filename}"
             $associationId = $row->association_id ?? DB::table('participants')
                 ->where('id', $row->participant_id)
                 ->value('association_id');
@@ -37,17 +33,24 @@ return new class extends Migration
                 if (! is_dir(dirname($fullNew))) {
                     @mkdir(dirname($fullNew), 0775, true);
                 }
-                rename($fullOld, $fullNew);
+                @rename($fullOld, $fullNew);
             }
 
-            DB::table('participant_documents')
-                ->where('id', $row->id)
-                ->update(['storage_path' => $shortName]);
+            if (is_file($fullNew)) {
+                DB::table('participant_documents')
+                    ->where('id', $row->id)
+                    ->update(['storage_path' => $shortName]);
+            } else {
+                Log::warning('S2 backfill: expected file missing, DB not updated', [
+                    'table' => 'participant_documents', 'id' => $row->id,
+                    'old_value' => $old, 'expected_new_path' => $fullNew,
+                ]);
+            }
         });
     }
 
     public function down(): void
     {
-        // Non réversible sans backup — restore depuis sauvegarde si nécessaire.
+        // Non réversible sans backup — restaurer depuis sauvegarde si nécessaire.
     }
 };
