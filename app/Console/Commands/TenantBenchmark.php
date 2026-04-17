@@ -30,15 +30,28 @@ use Illuminate\Support\Facades\DB;
  * Usage :
  *   php artisan tenant:benchmark --tenants=10 --transactions=1000
  *   php artisan tenant:benchmark --tenants=3 --transactions=50
+ *
+ * Avertissement : les données seedées (associations, transactions, tiers…) persistent dans la base
+ * après exécution — le nettoyage est à la charge de l'appelant en dehors du contexte de test.
+ * La commande est bloquée hors environnement local/testing ; utiliser --force pour bypasser.
  */
 final class TenantBenchmark extends Command
 {
-    protected $signature = 'tenant:benchmark {--tenants=10} {--transactions=1000}';
+    protected $signature = 'tenant:benchmark {--tenants=10} {--transactions=1000} {--force : Ignorer le garde-fou environnement}';
 
     protected $description = 'Seed N tenants × M transactions puis mesure 6 requêtes lourdes par tenant cible.';
 
     public function handle(): int
     {
+        if (! $this->laravel->environment(['local', 'testing'])) {
+            $this->error('Refus de s\'exécuter hors environnement local/testing. Cette commande laisse des données résiduelles.');
+            $this->line('Utilise --force pour bypasser (à vos risques).');
+
+            if (! $this->option('force')) {
+                return self::FAILURE;
+            }
+        }
+
         $tenantsCount = (int) $this->option('tenants');
         $transactionsCount = (int) $this->option('transactions');
 
