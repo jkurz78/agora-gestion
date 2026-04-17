@@ -23,7 +23,7 @@ Comptes dev : `admin@monasso.fr / password` (Admin), `jean@monasso.fr / password
 ## Conventions de code
 
 - `declare(strict_types=1)` + `final class` + type hints sur toutes les méthodes.
-- PSR-12 via `./vendor/bin/sail artisan pint`.
+- PSR-12 via `./vendor/bin/pint`.
 - Locale `fr` partout (labels, validation, Faker).
 - SoftDeletes sur modèles financiers (`Depense`, `Recette`, `Don`).
 - En-têtes de tableaux : `table-dark` + `style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880"`.
