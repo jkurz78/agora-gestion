@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Livewire\Onboarding\Wizard;
 use App\Models\Association;
 use App\Models\CompteBancaire;
+use App\Models\HelloAssoParametres;
+use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
 use App\Models\User;
 use App\Services\SmtpService;
@@ -392,4 +394,97 @@ it('testSmtp surfaces failure error from service', function () {
         ->call('testSmtp')
         ->assertSet('smtpTestMessage', null)
         ->assertSeeHtml('Connexion refusée (errno 111)');
+});
+
+it('saves step 5 HelloAsso and advances to step 6', function () {
+    $this->association->update(['wizard_current_step' => 5]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('helloClientId', 'abc123')
+        ->set('helloClientSecret', 'supersecret')
+        ->set('helloOrganisationSlug', 'mon-asso')
+        ->set('helloEnvironnement', 'sandbox')
+        ->call('saveStep5')
+        ->assertSet('currentStep', 6);
+
+    $ha = HelloAssoParametres::where('association_id', $this->association->id)->first();
+    expect($ha)->not->toBeNull();
+    expect($ha->client_id)->toBe('abc123');
+    expect($ha->organisation_slug)->toBe('mon-asso');
+    expect($ha->client_secret)->toBe('supersecret');
+    expect($ha->callback_token)->not->toBeNull();
+    $env = $ha->environnement;
+    expect($env instanceof BackedEnum ? $env->value : $env)->toBe('sandbox');
+});
+
+it('skips step 5 HelloAsso without creating parameter row', function () {
+    $this->association->update(['wizard_current_step' => 5]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('skipStep5')
+        ->assertSet('currentStep', 6);
+
+    $ha = HelloAssoParametres::where('association_id', $this->association->id)->first();
+    expect($ha)->toBeNull();
+});
+
+it('preserves HelloAsso client secret on re-submit with blank field', function () {
+    HelloAssoParametres::create([
+        'association_id' => $this->association->id,
+        'client_id' => 'old',
+        'client_secret' => 'oldsecret',
+        'organisation_slug' => 'old-slug',
+        'environnement' => 'production',
+        'callback_token' => 'tokoko',
+    ]);
+    $this->association->update(['wizard_current_step' => 5]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('helloClientId', 'newid')
+        ->set('helloClientSecret', '')
+        ->set('helloOrganisationSlug', 'new-slug')
+        ->set('helloEnvironnement', 'sandbox')
+        ->call('saveStep5')
+        ->assertSet('currentStep', 6);
+
+    $ha = HelloAssoParametres::where('association_id', $this->association->id)->first();
+    expect($ha->client_id)->toBe('newid');
+    expect($ha->client_secret)->toBe('oldsecret');
+});
+
+it('saves step 6 IMAP and advances to step 7', function () {
+    $this->association->update(['wizard_current_step' => 6]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('imapHost', 'imap.example.com')
+        ->set('imapPort', 993)
+        ->set('imapEncryption', 'ssl')
+        ->set('imapUsername', 'inbox@example.com')
+        ->set('imapPassword', 'secret')
+        ->call('saveStep6')
+        ->assertSet('currentStep', 7);
+
+    $imap = IncomingMailParametres::where('association_id', $this->association->id)->first();
+    expect($imap)->not->toBeNull();
+    expect($imap->imap_host)->toBe('imap.example.com');
+    expect($imap->imap_port)->toBe(993);
+    expect($imap->imap_username)->toBe('inbox@example.com');
+    expect($imap->imap_password)->toBe('secret');
+    expect($imap->enabled)->toBeTrue();
+});
+
+it('skips step 6 IMAP without creating parameter row', function () {
+    $this->association->update(['wizard_current_step' => 6]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('skipStep6')
+        ->assertSet('currentStep', 7);
+
+    $imap = IncomingMailParametres::where('association_id', $this->association->id)->first();
+    expect($imap)->toBeNull();
 });

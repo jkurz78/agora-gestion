@@ -6,11 +6,14 @@ namespace App\Livewire\Onboarding;
 
 use App\Models\Association;
 use App\Models\CompteBancaire;
+use App\Models\HelloAssoParametres;
+use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -98,6 +101,43 @@ final class Wizard extends Component
 
     public ?string $smtpTestError = null;
 
+    // Step 5 — HelloAsso
+    #[Validate('required|string|max:255')]
+    public string $helloClientId = '';
+
+    #[Validate('required|string|max:255')]
+    public string $helloClientSecret = '';
+
+    #[Validate('required|string|max:100')]
+    public string $helloOrganisationSlug = '';
+
+    #[Validate('required|in:sandbox,production')]
+    public string $helloEnvironnement = 'production';
+
+    public bool $helloSecretDejaEnregistre = false;
+
+    // Step 6 — IMAP
+    #[Validate('required|string|max:255')]
+    public string $imapHost = '';
+
+    #[Validate('required|integer|between:1,65535')]
+    public int $imapPort = 993;
+
+    #[Validate('nullable|in:tls,ssl')]
+    public ?string $imapEncryption = 'ssl';
+
+    #[Validate('required|string|max:255')]
+    public string $imapUsername = '';
+
+    #[Validate('nullable|string|max:255')]
+    public string $imapPassword = '';
+
+    public bool $imapPasswordDejaEnregistre = false;
+
+    public string $imapProcessedFolder = 'Processed';
+
+    public string $imapErrorsFolder = 'Errors';
+
     public function mount(): void
     {
         $association = $this->currentAssociation();
@@ -137,6 +177,26 @@ final class Wizard extends Component
             $this->passwordDejaEnregistre = $smtp->smtp_password !== null;
             // Do not decrypt password into view — leave smtpPassword as ''
             $this->smtpEnabled = (bool) $smtp->enabled;
+        }
+
+        $hello = HelloAssoParametres::where('association_id', $association->id)->first();
+        if ($hello !== null) {
+            $this->helloClientId = (string) ($hello->client_id ?? '');
+            $this->helloOrganisationSlug = (string) ($hello->organisation_slug ?? '');
+            $env = $hello->environnement;
+            $this->helloEnvironnement = $env instanceof \BackedEnum ? (string) $env->value : (string) $env;
+            $this->helloSecretDejaEnregistre = $hello->client_secret !== null;
+        }
+
+        $imap = IncomingMailParametres::where('association_id', $association->id)->first();
+        if ($imap !== null) {
+            $this->imapHost = (string) ($imap->imap_host ?? '');
+            $this->imapPort = (int) ($imap->imap_port ?? 993);
+            $this->imapEncryption = $imap->imap_encryption;
+            $this->imapUsername = (string) ($imap->imap_username ?? '');
+            $this->imapProcessedFolder = (string) ($imap->processed_folder ?? 'Processed');
+            $this->imapErrorsFolder = (string) ($imap->errors_folder ?? 'Errors');
+            $this->imapPasswordDejaEnregistre = $imap->imap_password !== null;
         }
     }
 
@@ -351,6 +411,100 @@ final class Wizard extends Component
         } else {
             $this->smtpTestError = 'Échec : '.$result->error;
         }
+    }
+
+    public function saveStep5(): void
+    {
+        $this->validate([
+            'helloClientId' => 'required|string|max:255',
+            'helloClientSecret' => ($this->helloSecretDejaEnregistre ? 'nullable' : 'required').'|string|max:255',
+            'helloOrganisationSlug' => 'required|string|max:100',
+            'helloEnvironnement' => 'required|in:sandbox,production',
+        ]);
+
+        if (! $this->helloSecretDejaEnregistre && $this->helloClientSecret === '') {
+            $this->addError('helloClientSecret', 'Le client secret est obligatoire.');
+
+            return;
+        }
+
+        $asso = $this->currentAssociation();
+
+        $existing = HelloAssoParametres::where('association_id', $asso->id)->first();
+
+        $payload = [
+            'client_id' => $this->helloClientId,
+            'organisation_slug' => $this->helloOrganisationSlug,
+            'environnement' => $this->helloEnvironnement,
+        ];
+
+        if ($this->helloClientSecret !== '') {
+            $payload['client_secret'] = $this->helloClientSecret;
+        }
+
+        if ($existing === null) {
+            $payload['callback_token'] = Str::random(40);
+            HelloAssoParametres::create($payload + ['association_id' => $asso->id]);
+        } else {
+            $existing->update($payload);
+        }
+
+        $this->helloSecretDejaEnregistre = true;
+        $this->helloClientSecret = '';
+
+        $this->advanceTo(6);
+    }
+
+    public function skipStep5(): void
+    {
+        $this->advanceTo(6);
+    }
+
+    public function saveStep6(): void
+    {
+        $this->validate([
+            'imapHost' => 'required|string|max:255',
+            'imapPort' => 'required|integer|between:1,65535',
+            'imapEncryption' => 'nullable|in:tls,ssl',
+            'imapUsername' => 'required|string|max:255',
+            'imapPassword' => ($this->imapPasswordDejaEnregistre ? 'nullable' : 'required').'|string|max:255',
+            'imapProcessedFolder' => 'required|string|max:100',
+            'imapErrorsFolder' => 'required|string|max:100',
+        ]);
+
+        $asso = $this->currentAssociation();
+        $existing = IncomingMailParametres::where('association_id', $asso->id)->first();
+
+        $payload = [
+            'enabled' => true,
+            'imap_host' => $this->imapHost,
+            'imap_port' => $this->imapPort,
+            'imap_encryption' => $this->imapEncryption,
+            'imap_username' => $this->imapUsername,
+            'processed_folder' => $this->imapProcessedFolder,
+            'errors_folder' => $this->imapErrorsFolder,
+            'max_per_run' => 50,
+        ];
+
+        if ($this->imapPassword !== '') {
+            $payload['imap_password'] = $this->imapPassword;
+        }
+
+        if ($existing === null) {
+            IncomingMailParametres::create($payload + ['association_id' => $asso->id]);
+        } else {
+            $existing->update($payload);
+        }
+
+        $this->imapPasswordDejaEnregistre = true;
+        $this->imapPassword = '';
+
+        $this->advanceTo(7);
+    }
+
+    public function skipStep6(): void
+    {
+        $this->advanceTo(7);
     }
 
     protected function advanceTo(int $step): void
