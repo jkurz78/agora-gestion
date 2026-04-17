@@ -34,6 +34,7 @@ it('creates association + admin user + pivot + logs + sends invitation mail', fu
 
     $admin = User::where('email', 'admin@nouvelle.example')->first();
     expect($admin)->not->toBeNull();
+    expect($admin->role_systeme)->toBe(RoleSysteme::User);
     expect($admin->associations()->wherePivot('association_id', $asso->id)->wherePivot('role', 'admin')->exists())->toBeTrue();
 
     expect(SuperAdminAccessLog::where('action', 'create_association')->where('association_id', $asso->id)->exists())->toBeTrue();
@@ -63,4 +64,17 @@ it('rejects an invalid slug format', function () {
         ->set('nom_admin', 'X Y')
         ->call('submit')
         ->assertHasErrors('slug');
+});
+
+it('rejects an already-taken admin email', function () {
+    User::factory()->create(['email' => 'deja@pris.example']);
+
+    Livewire::actingAs($this->superAdmin)
+        ->test(AssociationCreateForm::class)
+        ->set('nom', 'Test')
+        ->set('slug', 'valide-slug')
+        ->set('email_admin', 'deja@pris.example')
+        ->set('nom_admin', 'X Y')
+        ->call('submit')
+        ->assertHasErrors('email_admin');
 });
