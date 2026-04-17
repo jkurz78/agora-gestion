@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Enums\RoleAssociation;
 use App\Tenant\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
@@ -58,7 +59,8 @@ final class ForceWizardIfNotCompleted
 
         $isAdmin = $user->associations()
             ->wherePivot('association_id', $association->id)
-            ->wherePivot('role', 'admin')
+            ->wherePivot('role', RoleAssociation::Admin->value)
+            ->whereNull('association_user.revoked_at')
             ->exists();
 
         if (! $isAdmin) {
