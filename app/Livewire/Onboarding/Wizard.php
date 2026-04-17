@@ -7,6 +7,7 @@ namespace App\Livewire\Onboarding;
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\SmtpParametres;
+use App\Services\SmtpService;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Storage;
@@ -47,6 +48,7 @@ final class Wizard extends Component
     public ?string $identiteFormeJuridique = null;
 
     public $logoUpload = null;
+
     public $cachetUpload = null;
 
     // Step 2 — Exercice
@@ -79,18 +81,21 @@ final class Wizard extends Component
     #[Validate('required|integer|between:1,65535')]
     public int $smtpPort = 587;
 
-    #[Validate('nullable|in:tls,ssl')]
-    public ?string $smtpEncryption = 'tls';
+    #[Validate('required|in:ssl,tls,starttls,none')]
+    public string $smtpEncryption = 'tls';
 
-    #[Validate('required|string|max:255')]
+    #[Validate('nullable|string|max:255')]
     public string $smtpUsername = '';
 
-    #[Validate('required|string|max:255')]
+    #[Validate('nullable|string|max:255')]
     public string $smtpPassword = '';
+
+    public bool $passwordDejaEnregistre = false;
 
     public bool $smtpEnabled = true;
 
     public ?string $smtpTestMessage = null;
+
     public ?string $smtpTestError = null;
 
     public function mount(): void
@@ -127,9 +132,10 @@ final class Wizard extends Component
         if ($smtp !== null) {
             $this->smtpHost = (string) ($smtp->smtp_host ?? '');
             $this->smtpPort = (int) ($smtp->smtp_port ?? 587);
-            $this->smtpEncryption = $smtp->smtp_encryption;
+            $this->smtpEncryption = $smtp->smtp_encryption ?? 'tls';
             $this->smtpUsername = (string) ($smtp->smtp_username ?? '');
-            $this->smtpPassword = (string) ($smtp->smtp_password ?? '');
+            $this->passwordDejaEnregistre = $smtp->smtp_password !== null;
+            // Do not decrypt password into view — leave smtpPassword as ''
             $this->smtpEnabled = (bool) $smtp->enabled;
         }
     }
@@ -150,33 +156,33 @@ final class Wizard extends Component
     public function saveStep1(): void
     {
         $this->validate([
-            'identiteAdresse'        => 'required|string|max:255',
-            'identiteCodePostal'     => 'required|string|max:10',
-            'identiteVille'          => 'required|string|max:100',
-            'identiteEmail'          => 'required|email|max:255',
-            'identiteTelephone'      => 'nullable|string|max:20',
-            'identiteSiret'          => 'nullable|string|size:14|regex:/^\d{14}$/',
+            'identiteAdresse' => 'required|string|max:255',
+            'identiteCodePostal' => 'required|string|max:10',
+            'identiteVille' => 'required|string|max:100',
+            'identiteEmail' => 'required|email|max:255',
+            'identiteTelephone' => 'nullable|string|max:20',
+            'identiteSiret' => 'nullable|string|size:14|regex:/^\d{14}$/',
             'identiteFormeJuridique' => 'nullable|string|max:100',
-            'logoUpload'             => 'nullable|image|max:2048',
-            'cachetUpload'           => 'nullable|image|max:2048',
+            'logoUpload' => 'nullable|image|max:2048',
+            'cachetUpload' => 'nullable|image|max:2048',
         ]);
 
         $association = $this->currentAssociation();
 
         $data = [
-            'adresse'         => $this->identiteAdresse,
-            'code_postal'     => $this->identiteCodePostal,
-            'ville'           => $this->identiteVille,
-            'email'           => $this->identiteEmail,
-            'telephone'       => $this->identiteTelephone,
-            'siret'           => $this->identiteSiret,
+            'adresse' => $this->identiteAdresse,
+            'code_postal' => $this->identiteCodePostal,
+            'ville' => $this->identiteVille,
+            'email' => $this->identiteEmail,
+            'telephone' => $this->identiteTelephone,
+            'siret' => $this->identiteSiret,
             'forme_juridique' => $this->identiteFormeJuridique,
         ];
 
         if ($this->logoUpload !== null) {
             $shortName = 'logo.'.$this->logoUpload->extension();
-            $fullPath  = $association->storagePath('branding/'.$shortName);
-            $dir       = dirname($fullPath);
+            $fullPath = $association->storagePath('branding/'.$shortName);
+            $dir = dirname($fullPath);
             Storage::disk('local')->makeDirectory($dir);
             Storage::disk('local')->putFileAs($dir, $this->logoUpload, $shortName);
 
@@ -192,8 +198,8 @@ final class Wizard extends Component
 
         if ($this->cachetUpload !== null) {
             $shortName = 'cachet.'.$this->cachetUpload->extension();
-            $fullPath  = $association->storagePath('branding/'.$shortName);
-            $dir       = dirname($fullPath);
+            $fullPath = $association->storagePath('branding/'.$shortName);
+            $dir = dirname($fullPath);
             Storage::disk('local')->makeDirectory($dir);
             Storage::disk('local')->putFileAs($dir, $this->cachetUpload, $shortName);
 
@@ -227,25 +233,25 @@ final class Wizard extends Component
     public function saveStep3(): void
     {
         $this->validate([
-            'banqueNom'              => 'required|string|max:100',
-            'banqueIban'             => 'required|string|max:34',
-            'banqueBic'              => 'nullable|string|max:11',
-            'banqueDomiciliation'    => 'nullable|string|max:255',
-            'banqueSoldeInitial'     => 'required|numeric',
+            'banqueNom' => 'required|string|max:100',
+            'banqueIban' => 'required|string|max:34',
+            'banqueBic' => 'nullable|string|max:11',
+            'banqueDomiciliation' => 'nullable|string|max:255',
+            'banqueSoldeInitial' => 'required|numeric',
             'banqueDateSoldeInitial' => 'required|date',
         ]);
 
         $association = $this->currentAssociation();
 
         $attributes = [
-            'nom'                     => $this->banqueNom,
-            'iban'                    => $this->banqueIban,
-            'bic'                     => $this->banqueBic,
-            'domiciliation'           => $this->banqueDomiciliation,
-            'solde_initial'           => $this->banqueSoldeInitial,
-            'date_solde_initial'      => $this->banqueDateSoldeInitial,
+            'nom' => $this->banqueNom,
+            'iban' => $this->banqueIban,
+            'bic' => $this->banqueBic,
+            'domiciliation' => $this->banqueDomiciliation,
+            'solde_initial' => $this->banqueSoldeInitial,
+            'date_solde_initial' => $this->banqueDateSoldeInitial,
             'actif_recettes_depenses' => true,
-            'est_systeme'             => false,
+            'est_systeme' => false,
         ];
 
         $existingId = $this->state['compte_principal_id'] ?? null;
@@ -267,26 +273,40 @@ final class Wizard extends Component
     public function saveStep4(): void
     {
         $this->validate([
-            'smtpHost'       => 'required|string|max:255',
-            'smtpPort'       => 'required|integer|between:1,65535',
-            'smtpEncryption' => 'nullable|in:tls,ssl',
-            'smtpUsername'   => 'required|string|max:255',
-            'smtpPassword'   => 'required|string|max:255',
+            'smtpHost' => 'required|string|max:255',
+            'smtpPort' => 'required|integer|between:1,65535',
+            'smtpEncryption' => 'required|in:ssl,tls,starttls,none',
+            'smtpUsername' => 'nullable|string|max:255',
+            'smtpPassword' => 'nullable|string|max:255',
         ]);
+
+        if (! $this->passwordDejaEnregistre && $this->smtpPassword === '') {
+            $this->addError('smtpPassword', 'Le mot de passe est obligatoire.');
+
+            return;
+        }
 
         $association = $this->currentAssociation();
 
+        $payload = [
+            'enabled' => $this->smtpEnabled,
+            'smtp_host' => $this->smtpHost,
+            'smtp_port' => $this->smtpPort,
+            'smtp_encryption' => $this->smtpEncryption,
+            'smtp_username' => $this->smtpUsername ?: null,
+            // Runtime mail timeout (connexion test uses 10s, see SmtpService).
+            'timeout' => 30,
+        ];
+
+        if ($this->smtpPassword !== '') {
+            $payload['smtp_password'] = $this->smtpPassword;
+            $this->passwordDejaEnregistre = true;
+            $this->smtpPassword = '';
+        }
+
         SmtpParametres::updateOrCreate(
             ['association_id' => $association->id],
-            [
-                'enabled'         => $this->smtpEnabled,
-                'smtp_host'       => $this->smtpHost,
-                'smtp_port'       => $this->smtpPort,
-                'smtp_encryption' => $this->smtpEncryption,
-                'smtp_username'   => $this->smtpUsername,
-                'smtp_password'   => $this->smtpPassword,
-                'timeout'         => 30,
-            ],
+            $payload,
         );
 
         $this->advanceTo(5);
@@ -295,6 +315,7 @@ final class Wizard extends Component
     public function skipStep4(): void
     {
         $association = $this->currentAssociation();
+        // Keep existing host/credentials intact — user may resume configuration later.
         SmtpParametres::updateOrCreate(
             ['association_id' => $association->id],
             ['enabled' => false],
@@ -305,32 +326,30 @@ final class Wizard extends Component
     public function testSmtp(): void
     {
         $this->validate([
-            'smtpHost'       => 'required|string',
-            'smtpPort'       => 'required|integer',
-            'smtpEncryption' => 'nullable|in:tls,ssl',
-            'smtpUsername'   => 'required|string',
-            'smtpPassword'   => 'required|string',
+            'smtpHost' => 'required|string',
+            'smtpPort' => 'required|integer',
+            'smtpEncryption' => 'required|in:ssl,tls,starttls,none',
         ]);
 
         $this->smtpTestMessage = null;
         $this->smtpTestError = null;
 
-        try {
-            $scheme = $this->smtpEncryption === 'ssl' ? 'smtps' : 'smtp';
-            $transport = (new \Symfony\Component\Mailer\Transport\EsmtpTransportFactory())
-                ->create(new \Symfony\Component\Mailer\Transport\Dsn(
-                    $scheme,
-                    $this->smtpHost,
-                    $this->smtpUsername,
-                    $this->smtpPassword,
-                    $this->smtpPort,
-                    ['encryption' => $this->smtpEncryption],
-                ));
-            $transport->start();
-            $transport->stop();
-            $this->smtpTestMessage = 'Connexion SMTP réussie.';
-        } catch (\Throwable $e) {
-            $this->smtpTestError = 'Échec : '.$e->getMessage();
+        /** @var SmtpService $service */
+        $service = app(SmtpService::class);
+
+        $result = $service->testerConnexion(
+            host: $this->smtpHost,
+            port: $this->smtpPort,
+            encryption: $this->smtpEncryption,
+            username: $this->smtpUsername,
+            password: $this->smtpPassword,
+            timeout: 10,
+        );
+
+        if ($result->success === true) {
+            $this->smtpTestMessage = 'Connexion SMTP réussie. '.$result->banner;
+        } else {
+            $this->smtpTestError = 'Échec : '.$result->error;
         }
     }
 
