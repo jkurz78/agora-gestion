@@ -341,7 +341,7 @@ Route::middleware(['auth', 'super-admin'])
             Route::view('/', 'super-admin.associations.index')->name('index');
             // Stubs — remplacés dans Tasks 3/4/5
             Route::get('/create', fn () => abort(501))->name('create');
-            Route::get('/{slug}', fn () => abort(501))->name('show');
+            Route::get('/{association:slug}', fn (\App\Models\Association $association) => view('super-admin.associations.show', compact('association')))->name('show');
             Route::post('/{slug}/support/enter', fn () => abort(501))->name('support.enter');
         });
     });
