@@ -28,6 +28,9 @@
                     @case(2)
                         @include('livewire.onboarding.steps.step-2-exercice')
                         @break
+                    @case(3)
+                        @include('livewire.onboarding.steps.step-3-banque')
+                        @break
                     @default
                         <h3>Étape {{ $currentStep }} sur {{ \App\Livewire\Onboarding\Wizard::TOTAL_STEPS }}</h3>
                         <p class="text-muted">Contenu de l'étape à compléter par les tasks suivantes.</p>
