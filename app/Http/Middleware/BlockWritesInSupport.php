@@ -20,7 +20,7 @@ final class BlockWritesInSupport
             return $next($request);
         }
 
-        if ($request->is('super-admin/support/exit')) {
+        if ($request->routeIs('super-admin.support.exit')) {
             return $next($request);
         }
 
