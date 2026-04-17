@@ -488,3 +488,22 @@ it('skips step 6 IMAP without creating parameter row', function () {
     $imap = IncomingMailParametres::where('association_id', $this->association->id)->first();
     expect($imap)->toBeNull();
 });
+
+it('accepts step 6 IMAP with encryption none', function () {
+    $this->association->update(['wizard_current_step' => 6]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('imapHost', 'imap.example.com')
+        ->set('imapPort', 143)
+        ->set('imapEncryption', 'none')
+        ->set('imapUsername', 'inbox@example.com')
+        ->set('imapPassword', 'secret')
+        ->call('saveStep6')
+        ->assertSet('currentStep', 7);
+
+    $imap = IncomingMailParametres::where('association_id', $this->association->id)->first();
+    expect($imap->imap_encryption)->toBe('none');
+    expect($imap->processed_folder)->toBe('INBOX.Processed');
+    expect($imap->errors_folder)->toBe('INBOX.Errors');
+});

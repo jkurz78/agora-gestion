@@ -16,11 +16,13 @@
     </div>
     <div class="mb-3">
         <label class="form-label">Chiffrement</label>
-        <select wire:model="imapEncryption" class="form-select">
+        <select wire:model="imapEncryption" class="form-select @error('imapEncryption') is-invalid @enderror">
             <option value="ssl">SSL</option>
             <option value="tls">TLS</option>
-            <option value="">Aucun</option>
+            <option value="starttls">STARTTLS</option>
+            <option value="none">Aucun</option>
         </select>
+        @error('imapEncryption') <div class="invalid-feedback">{{ $message }}</div> @enderror
     </div>
     <div class="row">
         <div class="col-md-6 mb-3">
@@ -40,11 +42,13 @@
     <div class="row">
         <div class="col-md-6 mb-3">
             <label class="form-label">Dossier "traités"</label>
-            <input type="text" wire:model="imapProcessedFolder" class="form-control">
+            <input type="text" wire:model="imapProcessedFolder" class="form-control @error('imapProcessedFolder') is-invalid @enderror">
+            @error('imapProcessedFolder') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
         <div class="col-md-6 mb-3">
             <label class="form-label">Dossier "erreurs"</label>
-            <input type="text" wire:model="imapErrorsFolder" class="form-control">
+            <input type="text" wire:model="imapErrorsFolder" class="form-control @error('imapErrorsFolder') is-invalid @enderror">
+            @error('imapErrorsFolder') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
     </div>
 
