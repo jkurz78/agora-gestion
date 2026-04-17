@@ -123,7 +123,7 @@ final class Wizard extends Component
     #[Validate('required|integer|between:1,65535')]
     public int $imapPort = 993;
 
-    #[Validate('nullable|in:tls,ssl')]
+    #[Validate('required|in:ssl,tls,starttls,none')]
     public ?string $imapEncryption = 'ssl';
 
     #[Validate('required|string|max:255')]
@@ -134,9 +134,9 @@ final class Wizard extends Component
 
     public bool $imapPasswordDejaEnregistre = false;
 
-    public string $imapProcessedFolder = 'Processed';
+    public string $imapProcessedFolder = 'INBOX.Processed';
 
-    public string $imapErrorsFolder = 'Errors';
+    public string $imapErrorsFolder = 'INBOX.Errors';
 
     public function mount(): void
     {
@@ -194,8 +194,8 @@ final class Wizard extends Component
             $this->imapPort = (int) ($imap->imap_port ?? 993);
             $this->imapEncryption = $imap->imap_encryption;
             $this->imapUsername = (string) ($imap->imap_username ?? '');
-            $this->imapProcessedFolder = (string) ($imap->processed_folder ?? 'Processed');
-            $this->imapErrorsFolder = (string) ($imap->errors_folder ?? 'Errors');
+            $this->imapProcessedFolder = (string) ($imap->processed_folder ?? 'INBOX.Processed');
+            $this->imapErrorsFolder = (string) ($imap->errors_folder ?? 'INBOX.Errors');
             $this->imapPasswordDejaEnregistre = $imap->imap_password !== null;
         }
     }
@@ -422,12 +422,6 @@ final class Wizard extends Component
             'helloEnvironnement' => 'required|in:sandbox,production',
         ]);
 
-        if (! $this->helloSecretDejaEnregistre && $this->helloClientSecret === '') {
-            $this->addError('helloClientSecret', 'Le client secret est obligatoire.');
-
-            return;
-        }
-
         $asso = $this->currentAssociation();
 
         $existing = HelloAssoParametres::where('association_id', $asso->id)->first();
@@ -465,7 +459,7 @@ final class Wizard extends Component
         $this->validate([
             'imapHost' => 'required|string|max:255',
             'imapPort' => 'required|integer|between:1,65535',
-            'imapEncryption' => 'nullable|in:tls,ssl',
+            'imapEncryption' => 'required|in:ssl,tls,starttls,none',
             'imapUsername' => 'required|string|max:255',
             'imapPassword' => ($this->imapPasswordDejaEnregistre ? 'nullable' : 'required').'|string|max:255',
             'imapProcessedFolder' => 'required|string|max:100',
