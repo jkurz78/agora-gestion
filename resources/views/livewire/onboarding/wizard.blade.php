@@ -21,8 +21,17 @@
     <div class="col-md-9">
         <div class="card">
             <div class="card-body">
-                <h3>Étape {{ $currentStep }} sur {{ \App\Livewire\Onboarding\Wizard::TOTAL_STEPS }}</h3>
-                <p class="text-muted">Contenu de l'étape à compléter par les tasks suivantes.</p>
+                @switch($currentStep)
+                    @case(1)
+                        @include('livewire.onboarding.steps.step-1-identite')
+                        @break
+                    @case(2)
+                        @include('livewire.onboarding.steps.step-2-exercice')
+                        @break
+                    @default
+                        <h3>Étape {{ $currentStep }} sur {{ \App\Livewire\Onboarding\Wizard::TOTAL_STEPS }}</h3>
+                        <p class="text-muted">Contenu de l'étape à compléter par les tasks suivantes.</p>
+                @endswitch
             </div>
         </div>
     </div>
