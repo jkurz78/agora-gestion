@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 return new class extends Migration
 {
@@ -12,44 +13,39 @@ return new class extends Migration
         DB::table('association')->get()->each(function (stdClass $row): void {
             $updates = [];
 
-            if ($row->logo_path !== null) {
-                $old = $row->logo_path;
+            foreach (['logo_path', 'cachet_signature_path'] as $col) {
+                if ($row->{$col} === null) {
+                    continue;
+                }
+
+                $old = $row->{$col};
                 $shortName = basename($old);
                 $fullNew = storage_path('app/private/associations/'.$row->id.'/branding/'.$shortName);
 
-                // Move the physical file if it still lives under the old public path
+                // If the old value still carries a path prefix, try to move the physical file.
                 if (str_contains($old, '/') || str_contains($old, 'association')) {
                     $fullOld = storage_path('app/public/'.$old);
-                    if (file_exists($fullOld) && ! file_exists($fullNew)) {
+                    if (is_file($fullOld) && ! is_file($fullNew)) {
                         if (! is_dir(dirname($fullNew))) {
-                            mkdir(dirname($fullNew), 0775, true);
+                            @mkdir(dirname($fullNew), 0775, true);
                         }
-                        rename($fullOld, $fullNew);
+                        @rename($fullOld, $fullNew);
                     }
                 }
 
-                $updates['logo_path'] = $shortName;
-            }
-
-            if ($row->cachet_signature_path !== null) {
-                $old = $row->cachet_signature_path;
-                $shortName = basename($old);
-                $fullNew = storage_path('app/private/associations/'.$row->id.'/branding/'.$shortName);
-
-                if (str_contains($old, '/') || str_contains($old, 'association')) {
-                    $fullOld = storage_path('app/public/'.$old);
-                    if (file_exists($fullOld) && ! file_exists($fullNew)) {
-                        if (! is_dir(dirname($fullNew))) {
-                            mkdir(dirname($fullNew), 0775, true);
-                        }
-                        rename($fullOld, $fullNew);
-                    }
+                // Only update DB if the file is actually present at the target location —
+                // otherwise we'd end up with a DB pointer to a non-existing file.
+                if (is_file($fullNew)) {
+                    $updates[$col] = $shortName;
+                } else {
+                    Log::warning('S2 backfill: expected file missing, DB not updated', [
+                        'table' => 'association', 'id' => $row->id, 'column' => $col,
+                        'old_value' => $old, 'expected_new_path' => $fullNew,
+                    ]);
                 }
-
-                $updates['cachet_signature_path'] = $shortName;
             }
 
-            if (! empty($updates)) {
+            if ($updates !== []) {
                 DB::table('association')->where('id', $row->id)->update($updates);
             }
         });
@@ -57,7 +53,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Reversing this migration would require knowing the original path prefix per row.
-        // Not implemented — restore from backup if needed.
+        // Non réversible sans backup — restaurer depuis sauvegarde si nécessaire.
     }
 };

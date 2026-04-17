@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 return new class extends Migration
 {
@@ -12,44 +13,36 @@ return new class extends Migration
         DB::table('type_operations')->get()->each(function (stdClass $row): void {
             $updates = [];
 
-            if ($row->logo_path !== null) {
-                $old = $row->logo_path;
-                $shortName = basename($old);
-                $fullNew = storage_path('app/private/associations/'.$row->association_id.'/type-operations/'.$row->id.'/'.$shortName);
-
-                // Move the physical file if it still lives under the old public path
-                if (str_contains($old, '/') || str_contains($old, 'type-operation')) {
-                    $fullOld = storage_path('app/public/'.$old);
-                    if (file_exists($fullOld) && ! file_exists($fullNew)) {
-                        if (! is_dir(dirname($fullNew))) {
-                            mkdir(dirname($fullNew), 0775, true);
-                        }
-                        rename($fullOld, $fullNew);
-                    }
+            foreach (['logo_path', 'attestation_medicale_path'] as $col) {
+                if ($row->{$col} === null) {
+                    continue;
                 }
 
-                $updates['logo_path'] = $shortName;
-            }
-
-            if ($row->attestation_medicale_path !== null) {
-                $old = $row->attestation_medicale_path;
+                $old = $row->{$col};
                 $shortName = basename($old);
                 $fullNew = storage_path('app/private/associations/'.$row->association_id.'/type-operations/'.$row->id.'/'.$shortName);
 
                 if (str_contains($old, '/') || str_contains($old, 'type-operation')) {
                     $fullOld = storage_path('app/public/'.$old);
-                    if (file_exists($fullOld) && ! file_exists($fullNew)) {
+                    if (is_file($fullOld) && ! is_file($fullNew)) {
                         if (! is_dir(dirname($fullNew))) {
-                            mkdir(dirname($fullNew), 0775, true);
+                            @mkdir(dirname($fullNew), 0775, true);
                         }
-                        rename($fullOld, $fullNew);
+                        @rename($fullOld, $fullNew);
                     }
                 }
 
-                $updates['attestation_medicale_path'] = $shortName;
+                if (is_file($fullNew)) {
+                    $updates[$col] = $shortName;
+                } else {
+                    Log::warning('S2 backfill: expected file missing, DB not updated', [
+                        'table' => 'type_operations', 'id' => $row->id, 'column' => $col,
+                        'old_value' => $old, 'expected_new_path' => $fullNew,
+                    ]);
+                }
             }
 
-            if (! empty($updates)) {
+            if ($updates !== []) {
                 DB::table('type_operations')->where('id', $row->id)->update($updates);
             }
         });
@@ -57,7 +50,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        // Reversing this migration would require knowing the original path prefix per row.
-        // Not implemented — restore from backup if needed.
+        // Non réversible sans backup — restaurer depuis sauvegarde si nécessaire.
     }
 };
