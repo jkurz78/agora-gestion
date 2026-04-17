@@ -342,8 +342,11 @@ Route::middleware(['auth', 'super-admin'])
             // Stubs — remplacés dans Tasks 3/4/5
             Route::get('/create', fn () => abort(501))->name('create');
             Route::get('/{association:slug}', fn (\App\Models\Association $association) => view('super-admin.associations.show', compact('association')))->name('show');
-            Route::post('/{slug}/support/enter', fn () => abort(501))->name('support.enter');
+            Route::post('/{association:slug}/support/enter', [\App\Http\Controllers\SuperAdmin\SupportModeController::class, 'enter'])
+                ->name('support.enter');
         });
+        Route::post('/support/exit', [\App\Http\Controllers\SuperAdmin\SupportModeController::class, 'exit'])
+            ->name('support.exit');
     });
 
 require __DIR__.'/auth.php';

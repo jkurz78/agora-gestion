@@ -110,6 +110,7 @@
     </style>
 </head>
 <body>
+    @include('partials.support-mode-banner')
     @auth
     <nav class="navbar navbar-expand-lg navbar-app mb-4">
         <div class="container-fluid">

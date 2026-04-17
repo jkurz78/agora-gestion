@@ -77,6 +77,7 @@
     </style>
 </head>
 <body>
+    @include('partials.support-mode-banner')
     @auth
     <div class="d-flex">
         {{-- Sidebar : composant separe, offcanvas-lg pour responsive --}}

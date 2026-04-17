@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\BlockWritesInSupport;
 use App\Http\Middleware\BootTenantConfig;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureTenantAccess;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', [
             ResolveTenant::class,
             BootTenantConfig::class,
+            BlockWritesInSupport::class,
         ]);
 
         $middleware->alias([
