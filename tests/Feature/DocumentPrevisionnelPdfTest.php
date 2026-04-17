@@ -105,5 +105,7 @@ it('stores the PDF on disk and updates pdf_path', function () {
 
     $doc->refresh();
     expect($doc->pdf_path)->not->toBeNull();
-    expect(Storage::disk('local')->exists($doc->pdf_path))->toBeTrue();
+    // pdf_path contient uniquement le nom court (ex: "42.pdf"), le chemin complet est via pdfFullPath()
+    expect($doc->pdf_path)->not->toContain('/');
+    expect(Storage::disk('local')->exists($doc->pdfFullPath()))->toBeTrue();
 });
