@@ -33,8 +33,6 @@ final class SeanceFeuilleAttacher
             );
         }
 
-        $finalPath = "emargement/seance-{$seance->id}.pdf";
-
         if ($seance->feuille_signee_path !== null) {
             Log::info('Feuille signée écrasée (flux direct)', [
                 'seance_id' => $seance->id,
@@ -43,10 +41,11 @@ final class SeanceFeuilleAttacher
             ]);
         }
 
-        Storage::disk('local')->put($finalPath, file_get_contents($tempPath));
+        $fullPath = $seance->storagePath('seances/'.$seance->id.'/feuille-signee.pdf');
+        Storage::disk('local')->put($fullPath, file_get_contents($tempPath));
 
         $seance->update([
-            'feuille_signee_path' => $finalPath,
+            'feuille_signee_path' => 'feuille-signee.pdf',
             'feuille_signee_at' => now(),
             'feuille_signee_source' => 'manual',
             'feuille_signee_sender_email' => null,

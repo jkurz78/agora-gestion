@@ -34,9 +34,11 @@ it('returns 404 when seance has no feuille attached', function () {
 });
 
 it('downloads the feuille PDF when attached', function () {
-    Storage::disk('local')->put('emargement/seance-'.$this->seance->id.'.pdf', 'PDF CONTENT');
+    $aid = $this->association->id;
+    $sid = $this->seance->id;
+    Storage::disk('local')->put("associations/{$aid}/seances/{$sid}/feuille-signee.pdf", 'PDF CONTENT');
     $this->seance->update([
-        'feuille_signee_path' => 'emargement/seance-'.$this->seance->id.'.pdf',
+        'feuille_signee_path' => 'feuille-signee.pdf',
         'feuille_signee_at' => now(),
         'feuille_signee_source' => 'manual',
     ]);
@@ -50,9 +52,11 @@ it('downloads the feuille PDF when attached', function () {
 
 it('returns 404 when seance does not belong to the operation', function () {
     $otherOperation = Operation::factory()->create();
-    Storage::disk('local')->put('emargement/seance-'.$this->seance->id.'.pdf', 'PDF CONTENT');
+    $aid = $this->association->id;
+    $sid = $this->seance->id;
+    Storage::disk('local')->put("associations/{$aid}/seances/{$sid}/feuille-signee.pdf", 'PDF CONTENT');
     $this->seance->update([
-        'feuille_signee_path' => 'emargement/seance-'.$this->seance->id.'.pdf',
+        'feuille_signee_path' => 'feuille-signee.pdf',
         'feuille_signee_at' => now(),
         'feuille_signee_source' => 'manual',
     ]);
@@ -64,9 +68,11 @@ it('returns 404 when seance does not belong to the operation', function () {
 });
 
 it('redirects guests to login', function () {
-    Storage::disk('local')->put('emargement/seance-'.$this->seance->id.'.pdf', 'PDF CONTENT');
+    $aid = $this->association->id;
+    $sid = $this->seance->id;
+    Storage::disk('local')->put("associations/{$aid}/seances/{$sid}/feuille-signee.pdf", 'PDF CONTENT');
     $this->seance->update([
-        'feuille_signee_path' => 'emargement/seance-'.$this->seance->id.'.pdf',
+        'feuille_signee_path' => 'feuille-signee.pdf',
         'feuille_signee_at' => now(),
         'feuille_signee_source' => 'manual',
     ]);
