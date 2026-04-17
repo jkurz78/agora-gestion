@@ -7,6 +7,7 @@ namespace App\Livewire\SuperAdmin;
 use App\Models\Association;
 use App\Models\SuperAdminAccessLog;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 final class AssociationDetail extends Component
@@ -27,8 +28,11 @@ final class AssociationDetail extends Component
             $this->addError('statut', "Transition impossible depuis '{$this->association->statut}'.");
             return;
         }
-        $this->association->update(['statut' => 'suspendu']);
-        $this->logTransition('suspend');
+
+        DB::transaction(function () {
+            $this->association->update(['statut' => 'suspendu']);
+            $this->logTransition('suspend');
+        });
     }
 
     public function reactivate(): void
@@ -38,8 +42,11 @@ final class AssociationDetail extends Component
             $this->addError('statut', "Transition impossible depuis '{$this->association->statut}'.");
             return;
         }
-        $this->association->update(['statut' => 'actif']);
-        $this->logTransition('reactivate');
+
+        DB::transaction(function () {
+            $this->association->update(['statut' => 'actif']);
+            $this->logTransition('reactivate');
+        });
     }
 
     public function archive(): void
@@ -49,8 +56,11 @@ final class AssociationDetail extends Component
             $this->addError('statut', "Seule une asso suspendue peut être archivée.");
             return;
         }
-        $this->association->update(['statut' => 'archive']);
-        $this->logTransition('archive');
+
+        DB::transaction(function () {
+            $this->association->update(['statut' => 'archive']);
+            $this->logTransition('archive');
+        });
     }
 
     private function logTransition(string $action): void
