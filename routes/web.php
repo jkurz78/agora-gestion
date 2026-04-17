@@ -332,4 +332,13 @@ Route::get('/email/optout/{token}', [EmailOptoutController::class, 'showOptout']
 Route::post('/email/optout/{token}', [EmailOptoutController::class, 'optout'])->name('email.optout.confirm');
 Route::get('/email/resubscribe/{token}', [EmailOptoutController::class, 'resubscribe'])->name('email.resubscribe');
 
+Route::middleware(['auth', 'super-admin'])
+    ->prefix('super-admin')
+    ->name('super-admin.')
+    ->group(function (): void {
+        Route::get('/', fn () => view('super-admin.dashboard'))->name('dashboard');
+        // Stub — remplacé dans Task 2 par le composant Livewire AssociationsList
+        Route::get('/associations', fn () => redirect()->route('super-admin.dashboard'))->name('associations.index');
+    });
+
 require __DIR__.'/auth.php';
