@@ -28,10 +28,9 @@ final class EmailLogo
         $logoOp = '';
         if ($typeOperationId) {
             $typeOp = TypeOperation::find($typeOperationId);
-            // TypeOperation logo still uses public disk (Task 5 will migrate it)
             $logoOp = self::buildImgTagLocal(
-                $typeOp?->logo_path,
-                'public',
+                $typeOp?->typeOpLogoFullPath(),
+                'local',
                 'Logo '.($typeOp?->nom ?? ''),
             );
         }

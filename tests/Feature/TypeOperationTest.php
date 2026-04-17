@@ -160,7 +160,7 @@ it('prevents deletion of tarif used by participants', function () {
 });
 
 it('uploads a logo', function () {
-    Storage::fake('public');
+    Storage::fake('local');
 
     $file = UploadedFile::fake()->image('logo.png', 100, 100);
 
@@ -172,7 +172,8 @@ it('uploads a logo', function () {
 
     $type = TypeOperation::where('nom', 'Test logo')->first();
     expect($type->logo_path)->not->toBeNull();
-    Storage::disk('public')->assertExists($type->logo_path);
+    $fullPath = $type->typeOpLogoFullPath();
+    Storage::disk('local')->assertExists($fullPath);
 });
 
 it('filters by active status', function () {

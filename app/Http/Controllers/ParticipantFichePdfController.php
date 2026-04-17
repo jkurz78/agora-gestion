@@ -93,10 +93,10 @@ final class ParticipantFichePdfController extends Controller
             $assoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
-        $typeLogo = $operation->typeOperation?->logo_path;
-        if ($typeLogo && Storage::disk('public')->exists($typeLogo)) {
-            $typeBase64 = base64_encode(Storage::disk('public')->get($typeLogo));
-            $ext = strtolower(pathinfo($typeLogo, PATHINFO_EXTENSION));
+        $typeFullPath = $operation->typeOperation?->typeOpLogoFullPath();
+        if ($typeFullPath && Storage::disk('local')->exists($typeFullPath)) {
+            $typeBase64 = base64_encode(Storage::disk('local')->get($typeFullPath));
+            $ext = strtolower(pathinfo($typeFullPath, PATHINFO_EXTENSION));
             $typeMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
 
             return [$typeBase64, $typeMime, $assoBase64, $assoMime];

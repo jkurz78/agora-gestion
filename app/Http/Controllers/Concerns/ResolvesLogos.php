@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Models\Association;
 use App\Models\Operation;
-use Illuminate\Support\Facades\Storage; // kept for TypeOperation logo (public disk, Task 5)
+use Illuminate\Support\Facades\Storage;
 
 trait ResolvesLogos
 {
@@ -28,10 +28,10 @@ trait ResolvesLogos
             $assoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
-        $typeLogo = $operation->typeOperation?->logo_path;
-        if ($typeLogo && Storage::disk('public')->exists($typeLogo)) {
-            $typeBase64 = base64_encode(Storage::disk('public')->get($typeLogo));
-            $ext = strtolower(pathinfo($typeLogo, PATHINFO_EXTENSION));
+        $typeFullPath = $operation->typeOperation?->typeOpLogoFullPath();
+        if ($typeFullPath && Storage::disk('local')->exists($typeFullPath)) {
+            $typeBase64 = base64_encode(Storage::disk('local')->get($typeFullPath));
+            $ext = strtolower(pathinfo($typeFullPath, PATHINFO_EXTENSION));
             $typeMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
 
             return [$typeBase64, $typeMime, $assoBase64, $assoMime];
