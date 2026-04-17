@@ -7,7 +7,7 @@
     $imap = $recap['imap'];
 @endphp
 
-<h3>9. Récapitulatif</h3>
+<h3>8. Récapitulatif</h3>
 <p class="text-muted">Vérifiez ci-dessous votre configuration avant de terminer l'onboarding.</p>
 
 <dl class="row">
@@ -51,17 +51,42 @@
 
     <dt class="col-sm-4">Plan comptable</dt>
     <dd class="col-sm-8">{{ $recap['nb_categories'] }} catégorie(s) créée(s)</dd>
-
-    <dt class="col-sm-4">Types d'opérations</dt>
-    <dd class="col-sm-8">{{ $recap['nb_type_operations'] }} créé(s)</dd>
 </dl>
 
-<div class="alert alert-info small">
+<div class="alert alert-info small mb-3">
     Vous pourrez modifier ces paramètres à tout moment depuis le menu Paramètres.
 </div>
 
+<div class="card border-primary mb-4">
+    <div class="card-header bg-primary text-white">
+        <strong>Prochaines étapes</strong>
+    </div>
+    <div class="card-body">
+        <p class="mb-2">Une fois l'onboarding terminé, voici les chantiers naturels pour démarrer avec AgoraGestion&nbsp;:</p>
+        <ol class="mb-0">
+            <li class="mb-2">
+                <strong>Importer vos contacts</strong> — rendez-vous sur l'écran
+                <a href="{{ url('/tiers') }}" target="_blank" rel="noopener">Tiers</a>
+                pour importer vos adhérents, donateurs et fournisseurs (CSV/XLSX) ou les créer un par un.
+            </li>
+            <li class="mb-2">
+                <strong>Reprise comptable</strong> — si vous démarrez en cours d'exercice, saisissez
+                ou importez vos transactions passées sur l'écran universel
+                <a href="{{ url('/comptabilite/transactions') }}" target="_blank" rel="noopener">Recettes &amp; Dépenses</a>.
+            </li>
+            <li class="mb-0">
+                <strong>Créer vos opérations</strong> — définissez d'abord un ou plusieurs
+                <a href="{{ url('/operations/types-operation') }}" target="_blank" rel="noopener">types d'opération</a>
+                (formations, adhésions, événements…), puis déclinez-les en
+                <a href="{{ url('/operations') }}" target="_blank" rel="noopener">opérations</a>
+                concrètes avec leurs séances et participants.
+            </li>
+        </ol>
+    </div>
+</div>
+
 <div class="d-flex gap-2 justify-content-between mt-4">
-    <button type="button" wire:click="goToStep(8)" class="btn btn-link">← Retour</button>
+    <button type="button" wire:click="goToStep(7)" class="btn btn-link">← Retour</button>
     <button type="button" wire:click="finalize" class="btn btn-success btn-lg"
             wire:confirm="Terminer l'onboarding et accéder au tableau de bord ?">
         Terminer l'onboarding

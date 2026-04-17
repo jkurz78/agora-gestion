@@ -40,11 +40,11 @@ Si le mail n'arrive pas :
 >>> \Password::sendResetLink(['email' => $user->email]);
 ```
 
-### 3. Wizard d'onboarding (9 étapes)
+### 3. Wizard d'onboarding (8 étapes)
 
 Au premier login, le middleware `ForceWizardIfNotCompleted` redirige automatiquement l'admin vers `/onboarding` tant que `associations.wizard_completed_at` est NULL.
 
-Le wizard `App\Livewire\Onboarding\Wizard` comporte exactement 9 étapes. La progression est persistée dans `associations.wizard_current_step` et `associations.wizard_state` — l'admin peut interrompre et reprendre.
+Le wizard `App\Livewire\Onboarding\Wizard` comporte exactement 8 étapes. La progression est persistée dans `associations.wizard_current_step` et `associations.wizard_state` — l'admin peut interrompre et reprendre.
 
 | Étape | Contenu | Obligatoire |
 |---|---|---|
@@ -55,10 +55,9 @@ Le wizard `App\Livewire\Onboarding\Wizard` comporte exactement 9 étapes. La pro
 | **5 — HelloAsso** | Client ID, Client Secret, slug organisation, environnement (sandbox/production) | Skippable |
 | **6 — IMAP** | Hôte, port, chiffrement, identifiants, dossiers "traités" et "erreurs" (défauts : `INBOX.Processed` / `INBOX.Errors`) | Skippable |
 | **7 — Plan comptable** | Choix : "Plan comptable par défaut" (catégories et sous-catégories pré-remplies) ou "Vide" | Oui |
-| **8 — Premier type d'opération** | Nom, description, sous-catégorie liée — crée le premier `TypeOperation` du tenant | Skippable |
-| **9 — Récapitulatif** | Synthèse de tous les paramètres saisis. Bouton "Terminer" → `wizard_completed_at` horodaté → redirection `/dashboard`. | Finalisation |
+| **8 — Récapitulatif** | Synthèse de tous les paramètres saisis + pistes "Prochaines étapes" (contacts, reprise comptable, types d'opération). Bouton "Terminer" → `wizard_completed_at` horodaté → redirection `/dashboard`. | Finalisation |
 
-Après l'étape 9, `ForceWizardIfNotCompleted` laisse passer l'admin normalement.
+Après l'étape 8, `ForceWizardIfNotCompleted` laisse passer l'admin normalement.
 
 ### 4. Vérifications post-onboarding
 
