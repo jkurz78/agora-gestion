@@ -652,3 +652,73 @@ it('saves step 7 with empty plan leaves zero sous-categories', function () {
     $scCount = SousCategorie::where('association_id', $this->association->id)->count();
     expect($scCount)->toBe(0);
 });
+
+it('finalizes wizard and redirects to dashboard', function () {
+    $this->association->update(['wizard_current_step' => 9]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('finalize')
+        ->assertRedirect('/dashboard');
+
+    $fresh = $this->association->fresh();
+    expect($fresh->wizard_completed_at)->not->toBeNull();
+});
+
+it('cannot finalize from a step earlier than 9', function () {
+    $this->association->update(['wizard_current_step' => 5]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('finalize')
+        ->assertNoRedirect();
+
+    expect($this->association->fresh()->wizard_completed_at)->toBeNull();
+});
+
+it('allows access to dashboard after finalize', function () {
+    $this->association->update(['wizard_current_step' => 9]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('finalize');
+
+    $this->actingAs($this->admin)
+        ->get('/dashboard')
+        ->assertOk();
+});
+
+it('completes the full 9-step wizard end to end', function () {
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('identiteAdresse', '1 rue de la Paix')
+        ->set('identiteCodePostal', '75001')
+        ->set('identiteVille', 'Paris')
+        ->set('identiteEmail', 'contact@asso.example')
+        ->call('saveStep1')
+        ->assertSet('currentStep', 2)
+        ->set('exerciceMoisDebut', 1)
+        ->call('saveStep2')
+        ->assertSet('currentStep', 3)
+        ->set('banqueNom', 'Compte principal')
+        ->set('banqueIban', 'FR7630001007941234567890185')
+        ->set('banqueSoldeInitial', 0)
+        ->set('banqueDateSoldeInitial', now()->format('Y-m-d'))
+        ->call('saveStep3')
+        ->assertSet('currentStep', 4)
+        ->call('skipStep4')
+        ->assertSet('currentStep', 5)
+        ->call('skipStep5')
+        ->assertSet('currentStep', 6)
+        ->call('skipStep6')
+        ->assertSet('currentStep', 7)
+        ->set('planComptableChoix', 'default')
+        ->call('saveStep7')
+        ->assertSet('currentStep', 8)
+        ->call('skipStep8')
+        ->assertSet('currentStep', 9)
+        ->call('finalize')
+        ->assertRedirect('/dashboard');
+
+    expect($this->association->fresh()->wizard_completed_at)->not->toBeNull();
+});

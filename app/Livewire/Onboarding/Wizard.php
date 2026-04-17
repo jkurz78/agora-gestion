@@ -588,6 +588,19 @@ final class Wizard extends Component
         $this->advanceTo(9);
     }
 
+    public function finalize(): void
+    {
+        if ($this->currentStep < 9) {
+            return;
+        }
+
+        $this->currentAssociation()->update([
+            'wizard_completed_at' => now(),
+        ]);
+
+        $this->redirect('/dashboard');
+    }
+
     public function getSousCategoriesProperty(): Collection
     {
         return SousCategorie::orderBy('nom')->get();
