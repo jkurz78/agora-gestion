@@ -218,6 +218,20 @@ final class Wizard extends Component
             $this->imapErrorsFolder = (string) ($imap->errors_folder ?? 'INBOX.Errors');
             $this->imapPasswordDejaEnregistre = $imap->imap_password !== null;
         }
+
+        if (isset($this->state['plan_comptable_categories_count'])) {
+            $this->planComptableCategoriesCount = (int) $this->state['plan_comptable_categories_count'];
+        }
+
+        $typeOpId = $this->state['type_operation_id'] ?? null;
+        if ($typeOpId !== null) {
+            $typeOp = TypeOperation::find($typeOpId);
+            if ($typeOp !== null) {
+                $this->typeOpNom = (string) $typeOp->nom;
+                $this->typeOpDescription = $typeOp->description;
+                $this->typeOpSousCategorieId = (int) $typeOp->sous_categorie_id;
+            }
+        }
     }
 
     public function goToStep(int $step): void
@@ -525,10 +539,14 @@ final class Wizard extends Component
     {
         $this->validate(['planComptableChoix' => 'required|in:default,empty']);
 
-        if ($this->planComptableChoix === 'default') {
-            $result = app(DefaultChartOfAccountsService::class)
-                ->applyTo($this->currentAssociation());
+        $asso = $this->currentAssociation();
+
+        if ($this->planComptableChoix === 'default' && ! ($this->state['plan_comptable_applied'] ?? false)) {
+            $result = app(DefaultChartOfAccountsService::class)->applyTo($asso);
             $this->planComptableCategoriesCount = $result['categories'];
+            $this->state['plan_comptable_applied'] = true;
+            $this->state['plan_comptable_categories_count'] = $result['categories'];
+            $asso->update(['wizard_state' => $this->state]);
         }
 
         $this->advanceTo(8);
@@ -543,13 +561,24 @@ final class Wizard extends Component
         ]);
 
         $asso = $this->currentAssociation();
-        TypeOperation::create([
-            'association_id' => $asso->id,
+
+        $attributes = [
             'nom' => $this->typeOpNom,
             'description' => $this->typeOpDescription,
             'sous_categorie_id' => $this->typeOpSousCategorieId,
             'actif' => true,
-        ]);
+        ];
+
+        $existingId = $this->state['type_operation_id'] ?? null;
+        $type = $existingId !== null ? TypeOperation::find($existingId) : null;
+
+        if ($type !== null) {
+            $type->update($attributes);
+        } else {
+            $type = TypeOperation::create($attributes + ['association_id' => $asso->id]);
+            $this->state['type_operation_id'] = $type->id;
+            $asso->update(['wizard_state' => $this->state]);
+        }
 
         $this->advanceTo(9);
     }
@@ -561,9 +590,7 @@ final class Wizard extends Component
 
     public function getSousCategoriesProperty(): Collection
     {
-        return SousCategorie::where('association_id', $this->currentAssociation()->id)
-            ->orderBy('nom')
-            ->get();
+        return SousCategorie::orderBy('nom')->get();
     }
 
     protected function advanceTo(int $step): void

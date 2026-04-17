@@ -582,3 +582,73 @@ it('skips step 8 TypeOperation', function () {
     $count = TypeOperation::where('association_id', $this->association->id)->count();
     expect($count)->toBe(0);
 });
+
+it('does not re-apply default plan on step 7 re-submit', function () {
+    $this->association->update(['wizard_current_step' => 7]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('planComptableChoix', 'default')
+        ->call('saveStep7')
+        ->assertSet('currentStep', 8);
+
+    $firstCount = Categorie::where('association_id', $this->association->id)->count();
+    expect($firstCount)->toBeGreaterThan(0);
+
+    // Simulate back + re-submit
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('planComptableChoix', 'default')
+        ->call('saveStep7');
+
+    $secondCount = Categorie::where('association_id', $this->association->id)->count();
+    expect($secondCount)->toBe($firstCount);
+});
+
+it('reuses existing TypeOperation on step 8 re-submit (no duplicate)', function () {
+    $this->association->update(['wizard_current_step' => 8]);
+    $categorie = Categorie::create([
+        'association_id' => $this->association->id,
+        'nom' => 'Cat test',
+        'type' => TypeCategorie::Recette,
+    ]);
+    $sc = SousCategorie::create([
+        'association_id' => $this->association->id,
+        'categorie_id' => $categorie->id,
+        'nom' => 'Sous-cat test',
+        'pour_dons' => false,
+        'pour_cotisations' => false,
+        'pour_inscriptions' => false,
+    ]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('typeOpNom', 'Initial')
+        ->set('typeOpSousCategorieId', $sc->id)
+        ->call('saveStep8')
+        ->assertSet('currentStep', 9);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('typeOpNom', 'Renommé')
+        ->set('typeOpSousCategorieId', $sc->id)
+        ->call('saveStep8');
+
+    $count = TypeOperation::where('association_id', $this->association->id)->count();
+    expect($count)->toBe(1);
+    $type = TypeOperation::where('association_id', $this->association->id)->first();
+    expect($type->nom)->toBe('Renommé');
+});
+
+it('saves step 7 with empty plan leaves zero sous-categories', function () {
+    $this->association->update(['wizard_current_step' => 7]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('planComptableChoix', 'empty')
+        ->call('saveStep7')
+        ->assertSet('currentStep', 8);
+
+    $scCount = SousCategorie::where('association_id', $this->association->id)->count();
+    expect($scCount)->toBe(0);
+});
