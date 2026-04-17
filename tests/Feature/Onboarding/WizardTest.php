@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\TypeCategorie;
 use App\Livewire\Onboarding\Wizard;
 use App\Models\Association;
+use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
+use App\Models\SousCategorie;
+use App\Models\TypeOperation;
 use App\Models\User;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
@@ -506,4 +510,75 @@ it('accepts step 6 IMAP with encryption none', function () {
     expect($imap->imap_encryption)->toBe('none');
     expect($imap->processed_folder)->toBe('INBOX.Processed');
     expect($imap->errors_folder)->toBe('INBOX.Errors');
+});
+
+it('saves step 7 with default plan comptable and advances to step 8', function () {
+    $this->association->update(['wizard_current_step' => 7]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('planComptableChoix', 'default')
+        ->call('saveStep7')
+        ->assertSet('currentStep', 8);
+
+    $catCount = Categorie::where('association_id', $this->association->id)->count();
+    $scCount = SousCategorie::where('association_id', $this->association->id)->count();
+    expect($catCount)->toBeGreaterThan(0);
+    expect($scCount)->toBeGreaterThan(0);
+});
+
+it('saves step 7 with empty plan and advances to step 8', function () {
+    $this->association->update(['wizard_current_step' => 7]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('planComptableChoix', 'empty')
+        ->call('saveStep7')
+        ->assertSet('currentStep', 8);
+
+    $catCount = Categorie::where('association_id', $this->association->id)->count();
+    expect($catCount)->toBe(0);
+});
+
+it('saves step 8 TypeOperation and advances to step 9', function () {
+    $this->association->update(['wizard_current_step' => 8]);
+    $categorie = Categorie::create([
+        'association_id' => $this->association->id,
+        'nom' => 'Cat test',
+        'type' => TypeCategorie::Recette,
+    ]);
+    $sc = SousCategorie::create([
+        'association_id' => $this->association->id,
+        'categorie_id' => $categorie->id,
+        'nom' => 'Sous-cat test',
+        'pour_dons' => false,
+        'pour_cotisations' => false,
+        'pour_inscriptions' => false,
+    ]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('typeOpNom', 'Adhésion annuelle')
+        ->set('typeOpDescription', 'Cotisation annuelle membre')
+        ->set('typeOpSousCategorieId', $sc->id)
+        ->call('saveStep8')
+        ->assertSet('currentStep', 9);
+
+    $type = TypeOperation::where('association_id', $this->association->id)->first();
+    expect($type)->not->toBeNull();
+    expect($type->nom)->toBe('Adhésion annuelle');
+    expect((int) $type->sous_categorie_id)->toBe((int) $sc->id);
+    expect($type->actif)->toBeTrue();
+});
+
+it('skips step 8 TypeOperation', function () {
+    $this->association->update(['wizard_current_step' => 8]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('skipStep8')
+        ->assertSet('currentStep', 9);
+
+    $count = TypeOperation::where('association_id', $this->association->id)->count();
+    expect($count)->toBe(0);
 });

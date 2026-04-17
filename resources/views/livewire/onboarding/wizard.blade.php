@@ -40,6 +40,12 @@
                     @case(6)
                         @include('livewire.onboarding.steps.step-6-imap')
                         @break
+                    @case(7)
+                        @include('livewire.onboarding.steps.step-7-categories')
+                        @break
+                    @case(8)
+                        @include('livewire.onboarding.steps.step-8-type-operation')
+                        @break
                     @default
                         <h3>Étape {{ $currentStep }} sur {{ \App\Livewire\Onboarding\Wizard::TOTAL_STEPS }}</h3>
                         <p class="text-muted">Contenu de l'étape à compléter par les tasks suivantes.</p>
