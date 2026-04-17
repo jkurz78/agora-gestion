@@ -14,6 +14,11 @@ final class ResolveTenant
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Super-admin zone : on ne boote jamais de tenant ici.
+        if ($request->is('super-admin', 'super-admin/*')) {
+            return $next($request);
+        }
+
         $user = auth()->user();
 
         if ($user === null) {
