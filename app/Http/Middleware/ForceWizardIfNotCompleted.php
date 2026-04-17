@@ -21,6 +21,7 @@ final class ForceWizardIfNotCompleted
         'super-admin',
         'super-admin/*',
         'livewire/*',
+        'livewire-*',
         'logout',
         'login',
         'password/*',

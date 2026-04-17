@@ -57,3 +57,19 @@ it('does not redirect on /logout POST', function () {
         ->post('/logout')
         ->assertRedirect('/');
 });
+
+it('does not redirect Livewire hashed upload endpoint during onboarding', function () {
+    // Livewire 4 utilise un préfixe hashé (livewire-xxxxx/...) par défaut.
+    // Sans exemption, le wizard admin serait redirigé vers /onboarding
+    // et toutes les actions Livewire (upload de logo/cachet, submit de step)
+    // retourneraient 302 → la JS Livewire échoue silencieusement.
+    $updateUri = \Livewire\Livewire::getUpdateUri();
+    expect($updateUri)->toMatch('#^/livewire-[a-f0-9]+/update$#');
+
+    $response = $this->actingAs($this->admin)
+        ->post($updateUri);
+
+    // On accepte n'importe quel status sauf une redirection vers /onboarding
+    // (signe que ForceWizardIfNotCompleted a intercepté la requête Livewire).
+    expect($response->isRedirect(url('/onboarding')))->toBeFalse();
+});
