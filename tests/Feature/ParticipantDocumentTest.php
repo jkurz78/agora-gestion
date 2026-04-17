@@ -32,46 +32,51 @@ afterEach(function () {
 });
 
 it('downloads document when user has permission', function () {
-    // Create a fake file
+    Storage::fake('local');
+
+    $aid = $this->association->id;
+    $pid = $this->participant->id;
+
     Storage::disk('local')->put(
-        "participants/{$this->participant->id}/certificat.pdf",
+        "associations/{$aid}/participants/{$pid}/certificat.pdf",
         'fake-pdf-content'
     );
 
     $response = $this->get(route('operations.participants.documents.download', [
-        'participant' => $this->participant->id,
+        'participant' => $pid,
         'filename' => 'certificat.pdf',
     ]));
 
     $response->assertOk();
     $response->assertDownload('certificat.pdf');
-
-    // Clean up
-    Storage::disk('local')->deleteDirectory("participants/{$this->participant->id}");
 });
 
 it('returns 403 when user lacks permission', function () {
+    Storage::fake('local');
+
     $userLimited = User::factory()->create(['peut_voir_donnees_sensibles' => false]);
     $userLimited->associations()->attach($this->association->id, ['role' => 'gestionnaire', 'joined_at' => now()]);
 
+    $aid = $this->association->id;
+    $pid = $this->participant->id;
+
     Storage::disk('local')->put(
-        "participants/{$this->participant->id}/certificat.pdf",
+        "associations/{$aid}/participants/{$pid}/certificat.pdf",
         'fake-pdf-content'
     );
 
     $response = $this->actingAs($userLimited)
         ->get(route('operations.participants.documents.download', [
-            'participant' => $this->participant->id,
+            'participant' => $pid,
             'filename' => 'certificat.pdf',
         ]));
 
     $response->assertForbidden();
-
-    // Clean up
-    Storage::disk('local')->deleteDirectory("participants/{$this->participant->id}");
 });
 
 it('returns 404 for missing file', function () {
+    Storage::fake('local');
+
     $response = $this->get(route('operations.participants.documents.download', [
         'participant' => $this->participant->id,
         'filename' => 'nonexistent.pdf',

@@ -49,17 +49,18 @@ final class ParticipantEngagementUpload extends Component
         ]);
 
         $participant = Participant::findOrFail($this->participantId);
-        $dir = "participants/{$participant->id}";
         $originalName = $this->scanFormulaire->getClientOriginalName();
         $extension = $this->scanFormulaire->getClientOriginalExtension();
         $filename = 'doc-'.now()->format('Y-m-d-His').'.'.$extension;
 
-        $this->scanFormulaire->storeAs($dir, $filename, 'local');
+        $tenantDir = 'associations/'.$participant->association_id.'/participants/'.$participant->id;
+        $this->scanFormulaire->storeAs($tenantDir, $filename, 'local');
 
         ParticipantDocument::create([
+            'association_id' => $participant->association_id,
             'participant_id' => $participant->id,
             'label' => $this->label,
-            'storage_path' => "{$dir}/{$filename}",
+            'storage_path' => $filename,
             'original_filename' => $originalName,
             'source' => 'manual-upload',
         ]);

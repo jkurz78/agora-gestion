@@ -38,7 +38,7 @@ final class ParticipantFichePdfController extends Controller
 
         $documents = [];
         if ($showParcours) {
-            $dir = "participants/{$participant->id}";
+            $dir = $participant->storagePath('participants/'.$participant->id);
             if (Storage::disk('local')->exists($dir)) {
                 $documents = collect(Storage::disk('local')->files($dir))
                     ->map(fn (string $path) => basename($path))

@@ -139,7 +139,9 @@ it('uploade un document avec label', function () {
     $doc = ParticipantDocument::where('participant_id', $this->participant->id)->first();
     expect($doc->label)->toBe('Attestation signée');
     expect($doc->source)->toBe('manual-upload');
-    expect(Storage::disk('local')->exists($doc->storage_path))->toBeTrue();
+    // storage_path contient désormais le nom court seulement ; le fichier est sous le chemin tenant-scoped
+    expect($doc->storage_path)->not->toContain('/');
+    expect(Storage::disk('local')->exists($doc->documentFullPath()))->toBeTrue();
 });
 
 it('refuse l\'upload sans label', function () {
@@ -161,7 +163,7 @@ it('affiche le document dans la timeline', function () {
         'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'label' => 'Formulaire papier',
-        'storage_path' => 'participants/'.$this->participant->id.'/test.pdf',
+        'storage_path' => 'test.pdf',
         'original_filename' => 'test.pdf',
         'source' => 'manual-upload',
     ]);

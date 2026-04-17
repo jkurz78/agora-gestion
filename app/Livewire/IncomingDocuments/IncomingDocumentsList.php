@@ -170,18 +170,19 @@ final class IncomingDocumentsList extends Component
         $participant = Participant::findOrFail($this->selectedParticipantId);
 
         DB::transaction(function () use ($doc, $participant): void {
-            $dir = "participants/{$participant->id}";
             $extension = pathinfo($doc->original_filename, PATHINFO_EXTENSION) ?: 'pdf';
             $filename = 'doc-'.now()->format('Y-m-d-His').'.'.$extension;
-            $finalPath = "{$dir}/{$filename}";
+            $tenantDir = 'associations/'.$participant->association_id.'/participants/'.$participant->id;
+            $finalPath = $tenantDir.'/'.$filename;
 
-            Storage::disk('local')->makeDirectory($dir);
+            Storage::disk('local')->makeDirectory($tenantDir);
             Storage::disk('local')->move($doc->storage_path, $finalPath);
 
             ParticipantDocument::create([
+                'association_id' => $participant->association_id,
                 'participant_id' => $participant->id,
                 'label' => $this->assignParticipantLabel,
-                'storage_path' => $finalPath,
+                'storage_path' => $filename,
                 'original_filename' => $doc->original_filename,
                 'source' => 'inbox',
             ]);
