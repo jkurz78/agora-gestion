@@ -11,6 +11,7 @@ use App\Models\SuperAdminAccessLog;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -25,13 +26,13 @@ final class AssociationCreateForm extends Component
     #[Validate('required|string|regex:/^[a-z0-9-]+$/|max:64|unique:association,slug')]
     public string $slug = '';
 
-    #[Validate('required|email')]
+    #[Validate('required|email|unique:users,email')]
     public string $email_admin = '';
 
     #[Validate('required|string|min:2|max:255')]
     public string $nom_admin = '';
 
-    public function submit(): mixed
+    public function submit(): void
     {
         $this->validate();
 
@@ -45,7 +46,7 @@ final class AssociationCreateForm extends Component
             $admin = User::create([
                 'nom' => $this->nom_admin,
                 'email' => $this->email_admin,
-                'password' => bcrypt(Str::random(40)),
+                'password' => Hash::make(Str::random(40)),
                 'role_systeme' => RoleSysteme::User,
             ]);
 
@@ -76,7 +77,7 @@ final class AssociationCreateForm extends Component
 
         session()->flash('success', "Association '{$association->nom}' créée et invitation envoyée à {$this->email_admin}.");
 
-        return redirect()->route('super-admin.associations.index');
+        $this->redirect(route('super-admin.associations.index'));
     }
 
     public function render(): View
