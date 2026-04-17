@@ -73,7 +73,7 @@ final class CommunicationTiersMail extends Mailable
     /** @return array<int, Attachment> */
     public function attachments(): array
     {
-        return array_map(
+        $attachments = array_map(
             static function (array|string $item): Attachment {
                 if (is_array($item)) {
                     return Attachment::fromPath($item['path'])->as($item['nom']);
@@ -83,6 +83,15 @@ final class CommunicationTiersMail extends Mailable
             },
             $this->attachmentPaths
         );
+
+        $logo = EmailLogo::resolve();
+        if ($logo) {
+            $attachments[] = Attachment::fromPath($logo['path'])
+                ->as(EmailLogo::CID_ASSO)
+                ->withMime($logo['mime']);
+        }
+
+        return $attachments;
     }
 
     /** @return array<string, string> */

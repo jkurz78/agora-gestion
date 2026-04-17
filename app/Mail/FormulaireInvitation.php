@@ -7,6 +7,7 @@ namespace App\Mail;
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
 use Illuminate\Bus\Queueable;
+use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
@@ -99,5 +100,20 @@ final class FormulaireInvitation extends Mailable
         return new Content(
             view: 'emails.formulaire-invitation',
         );
+    }
+
+    /** @return array<int, Attachment> */
+    public function attachments(): array
+    {
+        $logo = EmailLogo::resolve();
+        if (! $logo) {
+            return [];
+        }
+
+        return [
+            Attachment::fromPath($logo['path'])
+                ->as(EmailLogo::CID_ASSO)
+                ->withMime($logo['mime']),
+        ];
     }
 }
