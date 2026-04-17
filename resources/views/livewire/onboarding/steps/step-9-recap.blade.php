@@ -1,11 +1,10 @@
 @php
-    $asso = \App\Tenant\TenantContext::current();
-    $smtp = \App\Models\SmtpParametres::where('association_id', $asso->id)->first();
-    $helloasso = \App\Models\HelloAssoParametres::where('association_id', $asso->id)->first();
-    $imap = \App\Models\IncomingMailParametres::where('association_id', $asso->id)->first();
-    $compte = \App\Models\CompteBancaire::where('association_id', $asso->id)->first();
-    $nbCategories = \App\Models\Categorie::where('association_id', $asso->id)->count();
-    $nbTypeOp = \App\Models\TypeOperation::where('association_id', $asso->id)->count();
+    $recap = $this->recap;
+    $asso = $recap['association'];
+    $compte = $recap['compte'];
+    $smtp = $recap['smtp'];
+    $helloasso = $recap['helloasso'];
+    $imap = $recap['imap'];
 @endphp
 
 <h3>9. Récapitulatif</h3>
@@ -51,10 +50,10 @@
     <dd class="col-sm-8">{{ $imap?->imap_host ?: 'non configurée' }}</dd>
 
     <dt class="col-sm-4">Plan comptable</dt>
-    <dd class="col-sm-8">{{ $nbCategories }} catégorie(s) créée(s)</dd>
+    <dd class="col-sm-8">{{ $recap['nb_categories'] }} catégorie(s) créée(s)</dd>
 
     <dt class="col-sm-4">Types d'opérations</dt>
-    <dd class="col-sm-8">{{ $nbTypeOp }} créé(s)</dd>
+    <dd class="col-sm-8">{{ $recap['nb_type_operations'] }} créé(s)</dd>
 </dl>
 
 <div class="alert alert-info small">
