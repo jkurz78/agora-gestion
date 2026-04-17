@@ -28,7 +28,7 @@
                                 Confirmez-vous vouloir ne plus recevoir<br>
                                 les communications de <strong>{{ $nomAsso }}</strong> ?
                             </p>
-                            <form method="POST" action="{{ route('email.optout.confirm', ['token' => $token]) }}">
+                            <form method="POST" action="{{ \App\Support\TenantUrl::route('email.optout.confirm', ['token' => $token]) }}">
                                 @csrf
                                 <button type="submit" class="btn btn-warning">
                                     <i class="bi bi-check-lg me-1"></i>Confirmer la désinscription
@@ -51,7 +51,7 @@
                             <hr>
                             <p class="small text-muted mb-0">
                                 Vous souhaitez continuer à recevoir nos courriels ?<br>
-                                <a href="{{ route('email.resubscribe', ['token' => $token]) }}">
+                                <a href="{{ \App\Support\TenantUrl::route('email.resubscribe', ['token' => $token]) }}">
                                     Se réinscrire
                                 </a>
                             </p>

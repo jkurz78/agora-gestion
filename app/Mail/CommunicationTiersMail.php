@@ -7,6 +7,7 @@ namespace App\Mail;
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
 use App\Support\CurrentAssociation;
+use App\Support\TenantUrl;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -40,14 +41,14 @@ final class CommunicationTiersMail extends Mailable
                 || str_contains($this->corps, '{lien_desinscription}');
 
             if (! $hasOptoutInBody) {
-                $optoutUrl = route('email.optout', ['token' => $this->trackingToken]);
+                $optoutUrl = TenantUrl::route('email.optout', ['token' => $this->trackingToken]);
                 $html .= '<p style="font-size:11px;color:#999;margin-top:20px;text-align:center">'
                     .'<a href="'.htmlspecialchars($optoutUrl).'" style="color:#999">Se désinscrire des communications</a>'
                     .'</p>';
             }
 
             // Tracking pixel
-            $pixelUrl = route('email.tracking', ['token' => $this->trackingToken]);
+            $pixelUrl = TenantUrl::route('email.tracking', ['token' => $this->trackingToken]);
             $html .= '<img src="'.htmlspecialchars($pixelUrl).'" width="1" height="1" alt="" style="display:none">';
         }
 
@@ -98,7 +99,7 @@ final class CommunicationTiersMail extends Mailable
     private function variables(): array
     {
         $optoutUrl = $this->trackingToken
-            ? route('email.optout', ['token' => $this->trackingToken])
+            ? TenantUrl::route('email.optout', ['token' => $this->trackingToken])
             : '#';
 
         return [
