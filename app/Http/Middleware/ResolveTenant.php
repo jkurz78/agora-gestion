@@ -25,6 +25,19 @@ final class ResolveTenant
             return $next($request);
         }
 
+        // Support mode : boote le tenant sans vérification de pivot (le super-admin n'est pas dans association_user).
+        if ($request->session()->get('support_mode', false) && $user->isSuperAdmin()) {
+            $supportAssoId = (int) $request->session()->get('support_association_id', 0);
+            if ($supportAssoId > 0) {
+                $association = Association::find($supportAssoId);
+                if ($association !== null) {
+                    TenantContext::boot($association);
+
+                    return $next($request);
+                }
+            }
+        }
+
         $assoId = $request->session()->get('current_association_id')
             ?? $user->derniere_association_id;
 
