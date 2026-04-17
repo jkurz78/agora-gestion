@@ -83,7 +83,7 @@ Route::middleware(['auth'])->group(function (): void {
 });
 
 // ── Onboarding ──
-Route::middleware(['auth'])->prefix('onboarding')->name('onboarding.')->group(function (): void {
+Route::middleware(['auth', EnsureTwoFactor::class])->prefix('onboarding')->name('onboarding.')->group(function (): void {
     Route::get('/', [\App\Http\Controllers\OnboardingController::class, 'index'])->name('index');
 });
 

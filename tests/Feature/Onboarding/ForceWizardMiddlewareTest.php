@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\RoleAssociation;
 use App\Enums\RoleSysteme;
 use App\Models\Association;
 use App\Models\User;
@@ -29,7 +30,7 @@ it('does not redirect when wizard_completed_at is set', function () {
 
 it('does not redirect a non-admin user of the same asso', function () {
     $user = User::factory()->create(['role_systeme' => RoleSysteme::User]);
-    $user->associations()->attach($this->association->id, ['role' => 'utilisateur', 'joined_at' => now()]);
+    $user->associations()->attach($this->association->id, ['role' => RoleAssociation::Comptable->value, 'joined_at' => now()]);
     session(['current_association_id' => $this->association->id]);
 
     $this->actingAs($user)

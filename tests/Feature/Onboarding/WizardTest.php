@@ -50,3 +50,38 @@ it('rejects jumping forward beyond current step', function () {
         ->call('goToStep', 5)
         ->assertSet('currentStep', 2);
 });
+
+it('hydrates state from wizard_state on mount', function () {
+    $this->association->update(['wizard_state' => ['identite' => ['nom' => 'Foo']]]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->assertSet('state.identite.nom', 'Foo');
+});
+
+it('rejects goToStep 0 (out of lower bound)', function () {
+    $this->association->update(['wizard_current_step' => 3]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('goToStep', 0)
+        ->assertSet('currentStep', 3);
+});
+
+it('rejects goToStep -1 (negative)', function () {
+    $this->association->update(['wizard_current_step' => 3]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('goToStep', -1)
+        ->assertSet('currentStep', 3);
+});
+
+it('rejects goToStep beyond TOTAL_STEPS', function () {
+    $this->association->update(['wizard_current_step' => 5]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('goToStep', 10)
+        ->assertSet('currentStep', 5);
+});
