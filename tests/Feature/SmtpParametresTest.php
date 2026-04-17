@@ -2,13 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\BootTenantConfig;
 use App\Livewire\Parametres\SmtpForm;
 use App\Models\Association;
 use App\Models\SmtpParametres;
 use App\Models\User;
-use App\Providers\AppServiceProvider;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
@@ -63,7 +65,7 @@ it('retourne une erreur si le serveur smtp est injoignable', function () {
         ->and($result->error)->not->toBeNull();
 });
 
-it('surcharge la config mail quand smtp_parametres est activé', function () {
+it('surcharge la config mail quand smtp_parametres est activé via le middleware BootTenantConfig', function () {
     SmtpParametres::updateOrCreate(['association_id' => $this->association->id], [
         'enabled' => true,
         'smtp_host' => 'smtp.monasso.fr',
@@ -73,17 +75,24 @@ it('surcharge la config mail quand smtp_parametres est activé', function () {
         'smtp_password' => 'motdepasse',
     ]);
 
-    $provider = new AppServiceProvider(app());
-    $provider->boot();
+    $middleware = new BootTenantConfig;
+    $request = Request::create('/test');
+    $called = false;
+    $middleware->handle($request, function () use (&$called) {
+        $called = true;
 
-    expect(config('mail.mailers.smtp.host'))->toBe('smtp.monasso.fr')
+        return new Response;
+    });
+
+    expect($called)->toBeTrue()
+        ->and(config('mail.mailers.smtp.host'))->toBe('smtp.monasso.fr')
         ->and(config('mail.mailers.smtp.port'))->toBe(465)
         ->and(config('mail.mailers.smtp.username'))->toBe('envoi@monasso.fr')
         ->and(config('mail.mailers.smtp.scheme'))->toBe('smtps')
         ->and(config('mail.default'))->toBe('smtp');
 });
 
-it('ne touche pas la config mail si smtp_parametres est désactivé', function () {
+it('ne touche pas la config mail si smtp_parametres est désactivé via le middleware BootTenantConfig', function () {
     SmtpParametres::updateOrCreate(['association_id' => $this->association->id], [
         'enabled' => false,
         'smtp_host' => 'autre.host.fr',
@@ -91,8 +100,9 @@ it('ne touche pas la config mail si smtp_parametres est désactivé', function (
 
     $originalHost = config('mail.mailers.smtp.host');
 
-    $provider = new AppServiceProvider(app());
-    $provider->boot();
+    $middleware = new BootTenantConfig;
+    $request = Request::create('/test');
+    $middleware->handle($request, fn () => new Response);
 
     expect(config('mail.mailers.smtp.host'))->toBe($originalHost);
 });
