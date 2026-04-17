@@ -14,23 +14,30 @@ use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use App\Services\DocumentPrevisionnelService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create(['siret' => '123 456 789 00012']);
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->service = app(DocumentPrevisionnelService::class);
 
-    Association::create(['nom' => 'Test Asso', 'siret' => '123 456 789 00012']);
     Exercice::create([
         'annee' => 2025,
         'date_debut' => '2025-09-01',
         'date_fin' => '2026-08-31',
         'statut' => 'ouvert',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 function createOperationWithReglements(int $nbSeances = 3, float $montant = 50.00): array

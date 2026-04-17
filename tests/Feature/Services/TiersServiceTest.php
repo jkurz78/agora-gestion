@@ -3,8 +3,23 @@
 // tests/Feature/Services/TiersServiceTest.php
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\Tiers;
+use App\Models\User;
 use App\Services\TiersService;
+use App\Tenant\TenantContext;
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    $this->actingAs($user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('crée un tiers', function () {
     $tiers = app(TiersService::class)->create([

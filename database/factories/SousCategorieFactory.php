@@ -6,12 +6,11 @@ namespace Database\Factories;
 
 use App\Models\Categorie;
 use App\Models\SousCategorie;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<SousCategorie>
- *
- * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 class SousCategorieFactory extends Factory
 {
@@ -20,7 +19,7 @@ class SousCategorieFactory extends Factory
     public function definition(): array
     {
         return [
-            'association_id' => 1,
+            'association_id' => TenantContext::currentId() ?? 1,
             'categorie_id' => Categorie::factory(),
             'nom' => fake()->words(2, true),
             'code_cerfa' => fake()->optional(0.3)->numerify('####'),

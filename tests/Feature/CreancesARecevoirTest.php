@@ -12,10 +12,25 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\FactureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    // Use the default association from migration so system accounts are in scope.
+    $this->association = Association::firstOrFail();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('has a system account named Créances à recevoir', function () {
     $compte = CompteBancaire::where('nom', 'Créances à recevoir')->first();

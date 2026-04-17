@@ -7,12 +7,11 @@ namespace Database\Factories;
 use App\Enums\StatutOperation;
 use App\Models\Operation;
 use App\Models\TypeOperation;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<Operation>
- *
- * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 class OperationFactory extends Factory
 {
@@ -24,7 +23,7 @@ class OperationFactory extends Factory
         $end = fake()->dateTimeBetween($start, '+6 months');
 
         return [
-            'association_id' => 1,
+            'association_id' => TenantContext::currentId() ?? 1,
             'nom' => fake()->sentence(3),
             'description' => fake()->optional()->paragraph(),
             'date_debut' => $start,

@@ -7,6 +7,9 @@ use App\Models\Seance;
 use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Services\Emargement\EmargementDocumentHandler;
 use App\Services\Emargement\QrExtractionResult;
+use App\Models\Association;
+use App\Models\User;
+use App\Tenant\TenantContext;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -30,6 +33,14 @@ function makeEmargementIncomingFile(string $originalName = 'scan.pdf', string $s
 
 beforeEach(function () {
     Storage::fake('local');
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('passes non-PDF files to the next handler', function () {

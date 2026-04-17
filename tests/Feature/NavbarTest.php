@@ -1,20 +1,35 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Models\Association;
 use App\Models\User;
+use App\Tenant\TenantContext;
+
+beforeEach(function () {
+    // Re-use the default association created by migration; rename it so login-page assertions hold.
+    $this->association = Association::firstOrFail();
+    $this->association->update(['nom' => 'Mon Association']);
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('navbar brand shows new app name and logo', function () {
-    $user = User::factory()->create();
-
-    $response = $this->actingAs($user)->get(route('dashboard'));
+    $response = $this->get(route('dashboard'));
 
     $response->assertSee('Mon Association');
     $response->assertSee('images/agora-gestion.svg', false);
 });
 
 it('navbar does not contain tableau de bord nav item link', function () {
-    $user = User::factory()->create();
-
-    $response = $this->actingAs($user)->get(route('dashboard'));
+    $response = $this->get(route('dashboard'));
 
     $response->assertSee('Dépenses');
     $response->assertSee('Recettes');
@@ -24,14 +39,14 @@ it('navbar does not contain tableau de bord nav item link', function () {
 });
 
 it('page title is updated', function () {
-    $user = User::factory()->create();
-
-    $response = $this->actingAs($user)->get(route('dashboard'));
+    $response = $this->get(route('dashboard'));
 
     $response->assertSee('Mon Association', false);
 });
 
 it('login page shows logo and new app name', function () {
+    TenantContext::clear();
+    auth()->logout();
     $response = $this->get('/login');
 
     $response->assertSee('Mon Association');
@@ -40,6 +55,8 @@ it('login page shows logo and new app name', function () {
 });
 
 it('login page title is updated', function () {
+    TenantContext::clear();
+    auth()->logout();
     $response = $this->get('/login');
 
     $response->assertSee('Mon Association Gestion et comptabilité - Connexion', false);

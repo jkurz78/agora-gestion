@@ -8,19 +8,18 @@ use App\Enums\TypeTransaction;
 use App\Models\Provision;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<Provision>
- *
- * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 final class ProvisionFactory extends Factory
 {
     public function definition(): array
     {
         return [
-            'association_id' => 1,
+            'association_id' => TenantContext::currentId() ?? 1,
             'exercice' => 2025,
             'type' => fake()->randomElement(TypeTransaction::cases()),
             'sous_categorie_id' => SousCategorie::factory(),

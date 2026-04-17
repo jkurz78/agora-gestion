@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\FormulaireToken;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
 /**
  * @extends Factory<FormulaireToken>
- *
- * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 final class FormulaireTokenFactory extends Factory
 {
@@ -20,7 +19,7 @@ final class FormulaireTokenFactory extends Factory
     public function definition(): array
     {
         return [
-            'association_id' => 1,
+            'association_id' => TenantContext::currentId() ?? 1,
             'participant_id' => null, // must be provided when creating
             'token' => strtoupper(Str::random(8)),
             'expire_at' => now()->addDays(30),

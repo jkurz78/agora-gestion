@@ -6,11 +6,19 @@ use App\Models\Operation;
 use App\Models\Seance;
 use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Services\Emargement\QrExtractionResult;
+use App\Models\Association;
+use App\Models\User;
+use App\Tenant\TenantContext;
 use App\Services\Emargement\SeanceFeuilleAttacher;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('local');
+
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
 
     $this->operation = Operation::factory()->create();
     $this->seance = Seance::create([
@@ -27,6 +35,7 @@ afterEach(function () {
     if (file_exists($this->tempPath)) {
         unlink($this->tempPath);
     }
+    TenantContext::clear();
 });
 
 it('attaches when QR matches the target seance', function () {

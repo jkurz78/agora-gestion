@@ -11,12 +11,11 @@ use App\Models\CompteBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<Transaction>
- *
- * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 class TransactionFactory extends Factory
 {
@@ -25,7 +24,7 @@ class TransactionFactory extends Factory
     public function definition(): array
     {
         return [
-            'association_id' => 1,
+            'association_id' => TenantContext::currentId() ?? 1,
             'type' => fake()->randomElement(TypeTransaction::cases()),
             'date' => fake()->dateTimeBetween('-1 year', 'now'),
             'libelle' => fake()->sentence(4),

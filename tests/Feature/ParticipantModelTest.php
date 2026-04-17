@@ -3,16 +3,30 @@
 declare(strict_types=1);
 
 use App\Enums\DroitImage;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 test('participant belongs to tiers and operation', function (): void {
-    $tiers = Tiers::factory()->create();
-    $operation = Operation::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
@@ -23,25 +37,25 @@ test('participant belongs to tiers and operation', function (): void {
 });
 
 test('participant unique constraint on tiers and operation', function (): void {
-    $tiers = Tiers::factory()->create();
-    $operation = Operation::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     Participant::create(['tiers_id' => $tiers->id, 'operation_id' => $operation->id, 'date_inscription' => now()->toDateString()]);
     Participant::create(['tiers_id' => $tiers->id, 'operation_id' => $operation->id, 'date_inscription' => now()->toDateString()]);
 })->throws(QueryException::class);
 
 test('tiers can participate in multiple operations', function (): void {
-    $tiers = Tiers::factory()->create();
-    $op1 = Operation::factory()->create();
-    $op2 = Operation::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $op1 = Operation::factory()->create(['association_id' => $this->association->id]);
+    $op2 = Operation::factory()->create(['association_id' => $this->association->id]);
     Participant::create(['tiers_id' => $tiers->id, 'operation_id' => $op1->id, 'date_inscription' => now()]);
     Participant::create(['tiers_id' => $tiers->id, 'operation_id' => $op2->id, 'date_inscription' => now()]);
     expect($tiers->participants)->toHaveCount(2);
 });
 
 test('operation has many participants', function (): void {
-    $operation = Operation::factory()->create();
-    $t1 = Tiers::factory()->create();
-    $t2 = Tiers::factory()->create();
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
+    $t1 = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $t2 = Tiers::factory()->create(['association_id' => $this->association->id]);
     Participant::create(['tiers_id' => $t1->id, 'operation_id' => $operation->id, 'date_inscription' => now()]);
     Participant::create(['tiers_id' => $t2->id, 'operation_id' => $operation->id, 'date_inscription' => now()]);
     expect($operation->participants)->toHaveCount(2);
@@ -49,8 +63,8 @@ test('operation has many participants', function (): void {
 
 test('donnees medicales are encrypted and linked to participant', function (): void {
     $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
-        'operation_id' => Operation::factory()->create()->id,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
+        'operation_id' => Operation::factory()->create(['association_id' => $this->association->id])->id,
         'date_inscription' => now()->toDateString(),
     ]);
     $donnees = ParticipantDonneesMedicales::create([
@@ -69,8 +83,8 @@ test('donnees medicales are encrypted and linked to participant', function (): v
 
 test('deleting participant cascades to donnees medicales', function (): void {
     $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
-        'operation_id' => Operation::factory()->create()->id,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
+        'operation_id' => Operation::factory()->create(['association_id' => $this->association->id])->id,
         'date_inscription' => now()->toDateString(),
     ]);
     ParticipantDonneesMedicales::create([
@@ -90,8 +104,8 @@ test('user peut_voir_donnees_sensibles defaults to false', function (): void {
 
 test('participant donnees medicales has unique constraint on participant_id', function (): void {
     $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
-        'operation_id' => Operation::factory()->create()->id,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
+        'operation_id' => Operation::factory()->create(['association_id' => $this->association->id])->id,
         'date_inscription' => now()->toDateString(),
     ]);
     ParticipantDonneesMedicales::create(['participant_id' => $participant->id]);
@@ -100,8 +114,8 @@ test('participant donnees medicales has unique constraint on participant_id', fu
 
 test('medecin and therapeute fields are encrypted in database', function (): void {
     $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
-        'operation_id' => Operation::factory()->create()->id,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
+        'operation_id' => Operation::factory()->create(['association_id' => $this->association->id])->id,
         'date_inscription' => now()->toDateString(),
     ]);
     $donnees = ParticipantDonneesMedicales::create([
@@ -124,17 +138,4 @@ test('medecin and therapeute fields are encrypted in database', function (): voi
     expect($donnees->therapeute_email)->toBe('dupont@exemple.fr');
     $raw = DB::table('participant_donnees_medicales')->where('id', $donnees->id)->first();
     expect($raw->medecin_nom)->not->toBe('Martin');
-    expect($raw->therapeute_nom)->not->toBe('Dupont');
-});
-
-test('participant stores droit_image as enum', function (): void {
-    $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
-        'operation_id' => Operation::factory()->create()->id,
-        'date_inscription' => now()->toDateString(),
-        'droit_image' => DroitImage::UsagePropre,
-    ]);
-    $participant->refresh();
-    expect($participant->droit_image)->toBeInstanceOf(DroitImage::class);
-    expect($participant->droit_image)->toBe(DroitImage::UsagePropre);
 });

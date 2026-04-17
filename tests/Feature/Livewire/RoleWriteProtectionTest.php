@@ -27,7 +27,7 @@ afterEach(function () {
 });
 
 // Helper: create a user with the given pivot role
-function makeUserWithRole(Association $association, string $role): User
+function makeUserWithPivotRole(Association $association, string $role): User
 {
     $user = User::factory()->create();
     $user->associations()->attach($association->id, ['role' => $role, 'joined_at' => now()]);
@@ -37,7 +37,7 @@ function makeUserWithRole(Association $association, string $role): User
 // ─── TransactionForm (Compta) ────────────────────────────────────────────────
 
 it('consultation gets canEdit false on TransactionForm', function () {
-    $user = makeUserWithRole($this->association, 'consultation');
+    $user = makeUserWithPivotRole($this->association, 'consultation');
 
     Livewire::actingAs($user)
         ->test(TransactionForm::class)
@@ -45,7 +45,7 @@ it('consultation gets canEdit false on TransactionForm', function () {
 });
 
 it('comptable gets canEdit true on TransactionForm', function () {
-    $user = makeUserWithRole($this->association, 'comptable');
+    $user = makeUserWithPivotRole($this->association, 'comptable');
 
     Livewire::actingAs($user)
         ->test(TransactionForm::class)
@@ -55,7 +55,7 @@ it('comptable gets canEdit true on TransactionForm', function () {
 // ─── BudgetTable (Compta) ────────────────────────────────────────────────────
 
 it('consultation gets canEdit false on BudgetTable', function () {
-    $user = makeUserWithRole($this->association, 'consultation');
+    $user = makeUserWithPivotRole($this->association, 'consultation');
 
     Livewire::actingAs($user)
         ->test(BudgetTable::class)
@@ -63,7 +63,7 @@ it('consultation gets canEdit false on BudgetTable', function () {
 });
 
 it('comptable gets canEdit true on BudgetTable', function () {
-    $user = makeUserWithRole($this->association, 'comptable');
+    $user = makeUserWithPivotRole($this->association, 'comptable');
 
     Livewire::actingAs($user)
         ->test(BudgetTable::class)
@@ -73,7 +73,7 @@ it('comptable gets canEdit true on BudgetTable', function () {
 // ─── RapprochementDetail (Compta) ────────────────────────────────────────────
 
 it('consultation gets canEdit false on RapprochementDetail', function () {
-    $user = makeUserWithRole($this->association, 'consultation');
+    $user = makeUserWithPivotRole($this->association, 'consultation');
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $rapprochement = RapprochementBancaire::factory()->create([
         'association_id' => $this->association->id,
@@ -91,7 +91,7 @@ it('consultation gets canEdit false on RapprochementDetail', function () {
 });
 
 it('comptable gets canEdit true on RapprochementDetail', function () {
-    $user = makeUserWithRole($this->association, 'comptable');
+    $user = makeUserWithPivotRole($this->association, 'comptable');
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $rapprochement = RapprochementBancaire::factory()->create([
         'association_id' => $this->association->id,
@@ -111,7 +111,7 @@ it('comptable gets canEdit true on RapprochementDetail', function () {
 // ─── ParticipantTable (Gestion) ──────────────────────────────────────────────
 
 it('consultation gets canEdit false on ParticipantTable', function () {
-    $user = makeUserWithRole($this->association, 'consultation');
+    $user = makeUserWithPivotRole($this->association, 'consultation');
     $operation = Operation::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::actingAs($user)
@@ -120,7 +120,7 @@ it('consultation gets canEdit false on ParticipantTable', function () {
 });
 
 it('gestionnaire gets canEdit true on ParticipantTable', function () {
-    $user = makeUserWithRole($this->association, 'gestionnaire');
+    $user = makeUserWithPivotRole($this->association, 'gestionnaire');
     $operation = Operation::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::actingAs($user)
@@ -129,7 +129,7 @@ it('gestionnaire gets canEdit true on ParticipantTable', function () {
 });
 
 it('comptable gets canEdit false on ParticipantTable', function () {
-    $user = makeUserWithRole($this->association, 'comptable');
+    $user = makeUserWithPivotRole($this->association, 'comptable');
     $operation = Operation::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::actingAs($user)
@@ -138,7 +138,7 @@ it('comptable gets canEdit false on ParticipantTable', function () {
 });
 
 it('admin gets canEdit true on ParticipantTable', function () {
-    $user = makeUserWithRole($this->association, 'admin');
+    $user = makeUserWithPivotRole($this->association, 'admin');
     $operation = Operation::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::actingAs($user)
@@ -149,7 +149,7 @@ it('admin gets canEdit true on ParticipantTable', function () {
 // ─── ReglementTable (Gestion) ────────────────────────────────────────────────
 
 it('consultation gets canEdit false on ReglementTable', function () {
-    $user = makeUserWithRole($this->association, 'consultation');
+    $user = makeUserWithPivotRole($this->association, 'consultation');
     $operation = Operation::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::actingAs($user)
@@ -158,7 +158,7 @@ it('consultation gets canEdit false on ReglementTable', function () {
 });
 
 it('gestionnaire gets canEdit true on ReglementTable', function () {
-    $user = makeUserWithRole($this->association, 'gestionnaire');
+    $user = makeUserWithPivotRole($this->association, 'gestionnaire');
     $operation = Operation::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::actingAs($user)

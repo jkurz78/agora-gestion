@@ -9,6 +9,7 @@ use App\Exceptions\OcrNotConfiguredException;
 use App\Models\Association;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use App\Services\InvoiceOcrService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -17,31 +18,34 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('isConfigured retourne false sans clé API', function () {
-    Association::create(['id' => 1, 'nom' => 'Test']);
     expect(InvoiceOcrService::isConfigured())->toBeFalse();
 });
 
 it('isConfigured retourne true avec clé API', function () {
-    $asso = Association::create(['id' => 1, 'nom' => 'Test']);
-    $asso->update(['anthropic_api_key' => 'sk-test-key']);
+    $this->association->update(['anthropic_api_key' => 'sk-test-key']);
     expect(InvoiceOcrService::isConfigured())->toBeTrue();
 });
 
 it('analyze lance OcrNotConfiguredException sans clé', function () {
-    Association::create(['id' => 1, 'nom' => 'Test']);
     $file = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
 
     app(InvoiceOcrService::class)->analyze($file);
 })->throws(OcrNotConfiguredException::class);
 
 it('analyze parse correctement la réponse API', function () {
-    $asso = Association::create(['id' => 1, 'nom' => 'Test']);
-    $asso->update(['anthropic_api_key' => 'sk-test-key']);
+    $this->association->update(['anthropic_api_key' => 'sk-test-key']);
     SousCategorie::factory()->create();
 
     Http::fake([
@@ -79,8 +83,7 @@ it('analyze parse correctement la réponse API', function () {
 });
 
 it('analyze gère les warnings de cohérence', function () {
-    $asso = Association::create(['id' => 1, 'nom' => 'Test']);
-    $asso->update(['anthropic_api_key' => 'sk-test-key']);
+    $this->association->update(['anthropic_api_key' => 'sk-test-key']);
     SousCategorie::factory()->create();
 
     Http::fake([
@@ -110,8 +113,7 @@ it('analyze gère les warnings de cohérence', function () {
 });
 
 it('analyze lance OcrAnalysisException si API échoue', function () {
-    $asso = Association::create(['id' => 1, 'nom' => 'Test']);
-    $asso->update(['anthropic_api_key' => 'sk-test-key']);
+    $this->association->update(['anthropic_api_key' => 'sk-test-key']);
     SousCategorie::factory()->create();
 
     Http::fake([
@@ -123,8 +125,7 @@ it('analyze lance OcrAnalysisException si API échoue', function () {
 })->throws(OcrAnalysisException::class);
 
 it('analyze lance OcrAnalysisException si JSON invalide', function () {
-    $asso = Association::create(['id' => 1, 'nom' => 'Test']);
-    $asso->update(['anthropic_api_key' => 'sk-test-key']);
+    $this->association->update(['anthropic_api_key' => 'sk-test-key']);
     SousCategorie::factory()->create();
 
     Http::fake([
@@ -138,8 +139,7 @@ it('analyze lance OcrAnalysisException si JSON invalide', function () {
 })->throws(OcrAnalysisException::class);
 
 it('analyzeFromPath parse correctement la réponse API depuis un fichier sur disque', function () {
-    $asso = Association::create(['id' => 1, 'nom' => 'Test']);
-    $asso->update(['anthropic_api_key' => 'sk-test-key']);
+    $this->association->update(['anthropic_api_key' => 'sk-test-key']);
     SousCategorie::factory()->create();
 
     Http::fake([
@@ -177,8 +177,6 @@ it('analyzeFromPath parse correctement la réponse API depuis un fichier sur dis
 });
 
 it('analyzeFromPath lance OcrNotConfiguredException sans clé API', function () {
-    Association::create(['id' => 1, 'nom' => 'Test']);
-
     $tempPath = tempnam(sys_get_temp_dir(), 'invoice-ocr-').'.pdf';
     file_put_contents($tempPath, '%PDF-1.4 fake');
 

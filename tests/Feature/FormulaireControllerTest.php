@@ -14,6 +14,8 @@ use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
 use App\Models\User;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\FormulaireTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -22,7 +24,10 @@ use Illuminate\Support\Facades\Storage;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->service = app(FormulaireTokenService::class);
     $this->operation = Operation::factory()
@@ -47,6 +52,10 @@ beforeEach(function () {
         'operation_id' => $this->operation->id,
         'date_inscription' => '2025-10-01',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 describe('index', function () {

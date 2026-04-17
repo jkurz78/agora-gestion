@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\SousCategorie;
@@ -10,23 +11,24 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\HelloAssoSyncService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
-
-    // Ensure user ID 1 exists so saisi_par FK is valid (auth()->id() ?? 1)
-    User::factory()->create();
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    $this->actingAs($this->user);
 
     $this->compteHA = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
     $this->compteCourant = CompteBancaire::factory()->create(['nom' => 'Compte courant']);
-    $this->scDon = SousCategorie::where('pour_dons', true)->first()
-        ?? SousCategorie::factory()->create(['pour_dons' => true, 'nom' => 'Don']);
+    $this->scDon = SousCategorie::factory()->create(['pour_dons' => true, 'nom' => 'Don']);
 
     $this->parametres = HelloAssoParametres::create([
-        'association_id' => 1,
+        'association_id' => $this->association->id,
         'client_id' => 'test',
         'client_secret' => 'secret',
         'organisation_slug' => 'test',
@@ -39,6 +41,10 @@ beforeEach(function () {
     $this->tiers = Tiers::factory()->avecHelloasso()->create([
         'nom' => 'Dupont', 'prenom' => 'Jean',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('creates a virement interne from a cashout', function () {

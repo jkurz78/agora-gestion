@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\CompteBancaire;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<CompteBancaire>
- *
- * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 class CompteBancaireFactory extends Factory
 {
@@ -19,7 +18,7 @@ class CompteBancaireFactory extends Factory
     public function definition(): array
     {
         return [
-            'association_id' => 1,
+            'association_id' => TenantContext::currentId() ?? 1,
             'nom' => fake()->company().' - '.fake()->randomElement(['Courant', 'Livret A', 'Épargne']),
             'iban' => fake()->iban('FR'),
             'solde_initial' => fake()->randomFloat(2, 0, 10000),

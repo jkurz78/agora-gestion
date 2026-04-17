@@ -2,9 +2,24 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\Tiers;
+use App\Models\User;
 use App\Services\TiersCsvImportReport;
 use App\Services\TiersCsvImportService;
+use App\Tenant\TenantContext;
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    $this->actingAs($user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 // ---------------------------------------------------------------------------
 // 1. Import rows with status=new → tiers created in DB, counter correct

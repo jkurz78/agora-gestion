@@ -2,14 +2,27 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\User;
 use App\Models\VirementInterne;
+use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('has helloasso_cashout_id column on virements_internes table', function (): void {
     expect(Schema::hasColumn('virements_internes', 'helloasso_cashout_id'))->toBeTrue();

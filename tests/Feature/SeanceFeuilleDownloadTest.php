@@ -2,20 +2,29 @@
 
 declare(strict_types=1);
 
-use App\Enums\RoleAssociation;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     Storage::fake('local');
-    $this->user = User::factory()->create(['role' => RoleAssociation::Gestionnaire]);
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'gestionnaire', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->operation = Operation::factory()->create();
     $this->seance = Seance::create([
         'operation_id' => $this->operation->id,
         'numero' => 1,
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('returns 404 when seance has no feuille attached', function () {

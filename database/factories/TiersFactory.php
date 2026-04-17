@@ -6,11 +6,9 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Tiers;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/**
- * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
- */
 final class TiersFactory extends Factory
 {
     protected $model = Tiers::class;
@@ -20,7 +18,7 @@ final class TiersFactory extends Factory
         $type = 'particulier';
 
         return [
-            'association_id' => 1,
+            'association_id' => TenantContext::currentId() ?? 1,
             'type' => $type,
             'nom' => fake()->lastName(),
             'prenom' => fake()->firstName(),

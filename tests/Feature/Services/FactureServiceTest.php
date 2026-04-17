@@ -21,16 +21,24 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\FactureService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = \App\Models\Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
     $this->compteBancaire = CompteBancaire::factory()->create();
     $this->service = app(FactureService::class);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 /**
@@ -60,8 +68,7 @@ function createRecetteTransaction(
 describe('creer()', function () {
     it('creates a brouillon facture with correct defaults from association', function () {
         $compte = CompteBancaire::factory()->create();
-        Association::create([
-            'nom' => 'Mon Asso',
+        $this->association->update([
             'facture_conditions_reglement' => 'Net 30 jours',
             'facture_mentions_legales' => 'Mentions personnalisées',
             'facture_compte_bancaire_id' => $compte->id,

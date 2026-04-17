@@ -6,12 +6,11 @@ namespace Database\Factories;
 
 use App\Enums\TypeCategorie;
 use App\Models\Categorie;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<Categorie>
- *
- * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 class CategorieFactory extends Factory
 {
@@ -20,7 +19,7 @@ class CategorieFactory extends Factory
     public function definition(): array
     {
         return [
-            'association_id' => 1,
+            'association_id' => TenantContext::currentId() ?? 1,
             'nom' => fake()->word(),
             'type' => fake()->randomElement(TypeCategorie::cases()),
         ];

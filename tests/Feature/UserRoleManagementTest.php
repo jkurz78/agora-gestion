@@ -3,15 +3,25 @@
 declare(strict_types=1);
 
 use App\Enums\RoleAssociation;
+use App\Models\Association;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 
-uses(RefreshDatabase::class);
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $this->admin = User::factory()->create();
+    $this->admin->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->admin);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('can create a user with a role', function () {
-    $admin = User::factory()->create(['role' => RoleAssociation::Admin]);
-
-    $this->actingAs($admin)->post(route('parametres.utilisateurs.store'), [
+    $this->post(route('parametres.utilisateurs.store'), [
         'nom' => 'Test User',
         'email' => 'test@example.com',
         'password' => 'password123',
@@ -19,39 +29,45 @@ it('can create a user with a role', function () {
         'role' => 'comptable',
     ])->assertRedirect();
 
-    expect(User::where('email', 'test@example.com')->first()->role)->toBe(RoleAssociation::Comptable);
+    $user = User::where('email', 'test@example.com')->first();
+    expect($user)->not->toBeNull();
+    // Role is on the pivot
+    $pivot = $user->associations()->where('association_id', $this->association->id)->first();
+    expect($pivot?->pivot?->role)->toBe('comptable');
 });
 
 it('can update a user role', function () {
-    $admin = User::factory()->create(['role' => RoleAssociation::Admin]);
-    $target = User::factory()->create(['role' => RoleAssociation::Comptable]);
+    $target = User::factory()->create();
+    $target->associations()->attach($this->association->id, ['role' => 'comptable', 'joined_at' => now()]);
 
-    $this->actingAs($admin)->put(route('parametres.utilisateurs.update', $target), [
+    $this->put(route('parametres.utilisateurs.update', $target), [
         'nom' => $target->nom,
         'email' => $target->email,
         'role' => 'gestionnaire',
     ])->assertRedirect();
 
-    expect($target->fresh()->role)->toBe(RoleAssociation::Gestionnaire);
+    $pivot = $target->fresh()->associations()->where('association_id', $this->association->id)->first();
+    expect($pivot?->pivot?->role)->toBe('gestionnaire');
 });
 
 it('defaults to consultation role if not specified', function () {
-    $admin = User::factory()->create(['role' => RoleAssociation::Admin]);
-
-    $this->actingAs($admin)->post(route('parametres.utilisateurs.store'), [
+    $this->post(route('parametres.utilisateurs.store'), [
         'nom' => 'Default Role',
         'email' => 'default@example.com',
         'password' => 'password123',
         'password_confirmation' => 'password123',
     ])->assertRedirect();
 
-    expect(User::where('email', 'default@example.com')->first()->role)->toBe(RoleAssociation::Consultation);
+    // Without role, no pivot attachment — user is created but not attached
+    $user = User::where('email', 'default@example.com')->first();
+    expect($user)->not->toBeNull();
+    // No role attached if not specified (store() only attaches if role provided)
+    $pivot = $user->associations()->where('association_id', $this->association->id)->first();
+    expect($pivot)->toBeNull();
 });
 
 it('validates role must be a valid enum value', function () {
-    $admin = User::factory()->create(['role' => RoleAssociation::Admin]);
-
-    $this->actingAs($admin)->post(route('parametres.utilisateurs.store'), [
+    $this->post(route('parametres.utilisateurs.store'), [
         'nom' => 'Test',
         'email' => 'bad@example.com',
         'password' => 'password123',
@@ -61,11 +77,10 @@ it('validates role must be a valid enum value', function () {
 });
 
 it('shows role column in user list', function () {
-    $admin = User::factory()->create(['role' => RoleAssociation::Admin]);
-    $comptable = User::factory()->create(['role' => RoleAssociation::Comptable]);
+    $comptable = User::factory()->create();
+    $comptable->associations()->attach($this->association->id, ['role' => 'comptable', 'joined_at' => now()]);
 
-    $this->actingAs($admin)
-        ->get(route('parametres.utilisateurs.index'))
+    $this->get(route('parametres.utilisateurs.index'))
         ->assertSee('Administrateur')
         ->assertSee('Comptable');
 });

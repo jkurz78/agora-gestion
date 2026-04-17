@@ -6,13 +6,18 @@ use App\Models\FormulaireToken;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Tiers;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->operation = Operation::factory()->create();
     $this->tiers = Tiers::factory()->create();
@@ -21,6 +26,10 @@ beforeEach(function () {
         'operation_id' => $this->operation->id,
         'date_inscription' => '2025-10-01',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('creates a FormulaireToken with correct casts', function () {
