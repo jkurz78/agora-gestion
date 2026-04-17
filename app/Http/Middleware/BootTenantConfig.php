@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\SmtpParametres;
+use App\Support\LogContext;
 use App\Tenant\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
@@ -20,6 +21,8 @@ final class BootTenantConfig
         if ($associationId === null) {
             return $next($request);
         }
+
+        LogContext::boot($associationId, $request->user()?->id);
 
         try {
             $smtp = SmtpParametres::where('association_id', $associationId)->first();

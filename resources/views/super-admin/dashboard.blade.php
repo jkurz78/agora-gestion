@@ -3,7 +3,10 @@
 @section('content')
     <h1>Super-administration</h1>
     <p class="text-muted">Gestion des tenants, accès support, audit.</p>
-    <div class="row g-3">
+
+    <livewire:super-admin.dashboard />
+
+    <div class="row g-3 mt-3">
         <div class="col-md-4">
             <a href="{{ route('super-admin.associations.index') }}" class="card h-100 text-decoration-none">
                 <div class="card-body">
