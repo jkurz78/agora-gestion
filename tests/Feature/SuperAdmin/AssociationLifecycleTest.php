@@ -31,6 +31,7 @@ it('reactivates a suspended association', function () {
         ->call('reactivate');
 
     expect($this->asso->fresh()->statut)->toBe('actif');
+    expect(SuperAdminAccessLog::where('action', 'reactivate')->where('association_id', $this->asso->id)->exists())->toBeTrue();
 });
 
 it('archives a suspended association', function () {
@@ -61,4 +62,15 @@ it('prevents a regular user from accessing a suspended association', function ()
     session(['current_association_id' => $this->asso->id]);
 
     $this->actingAs($user)->get('/dashboard')->assertForbidden();
+});
+
+it('aborts 403 when a non-super-admin tries to suspend', function () {
+    $regularUser = User::factory()->create(['role_systeme' => RoleSysteme::User]);
+
+    Livewire::actingAs($regularUser)
+        ->test(AssociationDetail::class, ['association' => $this->asso])
+        ->call('suspend')
+        ->assertStatus(403);
+
+    expect($this->asso->fresh()->statut)->toBe('actif');
 });
