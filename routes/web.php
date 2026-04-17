@@ -67,6 +67,12 @@ Route::middleware(['auth'])->group(function (): void {
     Route::post('/switch-association', SwitchAssociationController::class)->name('switch-association');
 });
 
+// ── Tenant Assets (signed URLs) ──
+Route::get('/tenant-assets/{path}', App\Http\Controllers\TenantAssetController::class)
+    ->where('path', '.*')
+    ->middleware(['auth', 'signed', App\Http\Middleware\VerifyTenantAsset::class])
+    ->name('tenant-assets');
+
 // ── Profile (espace-agnostic) ──
 Route::middleware('auth')->group(function (): void {
     Route::view('/profil', 'profil.index')->name('profil.index');
