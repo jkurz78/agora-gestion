@@ -16,13 +16,7 @@ final class SupportModeController extends Controller
     {
         $user = $request->user();
 
-        SuperAdminAccessLog::create([
-            'user_id' => $user->id,
-            'association_id' => $association->id,
-            'action' => 'enter_support_mode',
-            'payload' => ['ip' => $request->ip()],
-            'created_at' => now(),
-        ]);
+        $this->logAccess($user->id, $association->id, 'enter_support_mode', $request);
 
         $request->session()->put([
             'support_mode' => true,
@@ -39,17 +33,22 @@ final class SupportModeController extends Controller
         $associationId = $request->session()->get('support_association_id');
 
         if ($associationId !== null) {
-            SuperAdminAccessLog::create([
-                'user_id' => $user->id,
-                'association_id' => $associationId,
-                'action' => 'exit_support_mode',
-                'payload' => ['ip' => $request->ip()],
-                'created_at' => now(),
-            ]);
+            $this->logAccess($user->id, (int) $associationId, 'exit_support_mode', $request);
         }
 
         $request->session()->forget(['support_mode', 'support_association_id', 'current_association_id']);
 
         return redirect()->route('super-admin.associations.index');
+    }
+
+    private function logAccess(int $userId, int $associationId, string $action, Request $request): void
+    {
+        SuperAdminAccessLog::create([
+            'user_id' => $userId,
+            'association_id' => $associationId,
+            'action' => $action,
+            'payload' => ['ip' => $request->ip()],
+            'created_at' => now(),
+        ]);
     }
 }
