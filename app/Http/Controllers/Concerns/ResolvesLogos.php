@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Models\Association;
 use App\Models\Operation;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Storage; // kept for TypeOperation logo (public disk, Task 5)
 
 trait ResolvesLogos
 {
@@ -21,9 +21,10 @@ trait ResolvesLogos
     {
         $assoBase64 = null;
         $assoMime = 'image/png';
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $assoBase64 = base64_encode(Storage::disk('public')->get($association->logo_path));
-            $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+        $fullPath = $association?->brandingLogoFullPath();
+        if ($fullPath && Storage::disk('local')->exists($fullPath)) {
+            $assoBase64 = base64_encode(Storage::disk('local')->get($fullPath));
+            $ext = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
             $assoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
@@ -46,9 +47,10 @@ trait ResolvesLogos
      */
     private function resolveAssociationLogo(?Association $association): array
     {
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $base64 = base64_encode(Storage::disk('public')->get($association->logo_path));
-            $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+        $fullPath = $association?->brandingLogoFullPath();
+        if ($fullPath && Storage::disk('local')->exists($fullPath)) {
+            $base64 = base64_encode(Storage::disk('local')->get($fullPath));
+            $ext = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
             $mime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
 
             return [$base64, $mime];

@@ -80,9 +80,10 @@ final class DroitImagePdfController extends Controller
     {
         $assoBase64 = null;
         $assoMime = 'image/png';
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $assoBase64 = base64_encode(Storage::disk('public')->get($association->logo_path));
-            $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $assoBase64 = base64_encode(Storage::disk('local')->get($logoFullPath));
+            $ext = strtolower(pathinfo($logoFullPath, PATHINFO_EXTENSION));
             $assoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 

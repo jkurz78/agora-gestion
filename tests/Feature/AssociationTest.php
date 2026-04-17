@@ -87,7 +87,7 @@ it('validates email format', function () {
 });
 
 it('rejects logo exceeding 2MB', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     $file = UploadedFile::fake()->create('logo.png', 3000, 'image/png'); // 3 Mo
 
     Livewire::test(AssociationForm::class)
@@ -98,7 +98,7 @@ it('rejects logo exceeding 2MB', function () {
 });
 
 it('rejects logo with invalid mime type', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     $file = UploadedFile::fake()->create('logo.pdf', 100, 'application/pdf');
 
     Livewire::test(AssociationForm::class)
@@ -109,7 +109,7 @@ it('rejects logo with invalid mime type', function () {
 });
 
 it('saves valid logo and persists logo_path', function () {
-    Storage::fake('public');
+    Storage::fake('local');
     $file = UploadedFile::fake()->image('logo.png', 200, 200);
 
     Livewire::test(AssociationForm::class)
@@ -118,17 +118,19 @@ it('saves valid logo and persists logo_path', function () {
         ->call('save')
         ->assertHasNoErrors();
 
+    $id = $this->association->id;
     $association = $this->association->fresh();
-    expect($association->logo_path)->not->toBeNull();
-    Storage::disk('public')->assertExists($association->logo_path);
+    expect($association->logo_path)->toBe('logo.png');
+    Storage::disk('local')->assertExists("associations/{$id}/branding/logo.png");
 });
 
 it('deletes old logo file before saving new one', function () {
-    Storage::fake('public');
+    Storage::fake('local');
+    $id = $this->association->id;
 
-    // Premier upload
-    Storage::disk('public')->put('association/logo.png', 'old');
-    $this->association->fill(['nom' => 'Mon Asso', 'logo_path' => 'association/logo.png'])->save();
+    // Premier upload — seed old file under new path format
+    Storage::disk('local')->put("associations/{$id}/branding/logo.png", 'old');
+    $this->association->fill(['nom' => 'Mon Asso', 'logo_path' => 'logo.png'])->save();
 
     $newFile = UploadedFile::fake()->image('logo.jpg', 200, 200);
 
@@ -138,5 +140,6 @@ it('deletes old logo file before saving new one', function () {
         ->call('save')
         ->assertHasNoErrors();
 
-    Storage::disk('public')->assertMissing('association/logo.png');
+    Storage::disk('local')->assertMissing("associations/{$id}/branding/logo.png");
+    Storage::disk('local')->assertExists("associations/{$id}/branding/logo.jpg");
 });

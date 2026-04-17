@@ -7,8 +7,8 @@
             <div class="col-md-6 col-lg-4">
                 <button wire:click="select({{ $asso->id }})" class="card w-100 h-100 text-start border-0 shadow-sm">
                     <div class="card-body d-flex align-items-center gap-3">
-                        @if ($asso->logo_path)
-                            <img src="{{ Storage::url($asso->logo_path) }}" alt="Logo {{ $asso->nom }}" style="width:48px;height:48px;object-fit:contain">
+                        @if ($asso->brandingLogoFullPath() && \Illuminate\Support\Facades\Storage::disk('local')->exists($asso->brandingLogoFullPath()))
+                            <img src="{{ \App\Support\TenantAsset::url($asso->brandingLogoFullPath()) }}" alt="Logo {{ $asso->nom }}" style="width:48px;height:48px;object-fit:contain">
                         @else
                             <div style="width:48px;height:48px;background:#dee2e6;border-radius:4px"></div>
                         @endif

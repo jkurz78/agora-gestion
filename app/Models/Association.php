@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 
 final class Association extends Model
 {
     use HasFactory;
+    use TenantStorage;
 
     protected $table = 'association';
 
@@ -61,5 +64,38 @@ final class Association extends Model
             'statut' => 'string',
             'wizard_completed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Override TenantStorage::storagePath() because Association IS the tenant
+     * (uses its own id instead of association_id).
+     */
+    public function storagePath(string $suffix): string
+    {
+        if (str_contains($suffix, '..')) {
+            throw new InvalidArgumentException('Path traversal interdit.');
+        }
+
+        return 'associations/'.$this->id.'/'.ltrim($suffix, '/');
+    }
+
+    /**
+     * Full local-disk path for the association logo, or null if not set.
+     */
+    public function brandingLogoFullPath(): ?string
+    {
+        return $this->logo_path
+            ? $this->storagePath('branding/'.basename($this->logo_path))
+            : null;
+    }
+
+    /**
+     * Full local-disk path for the cachet/signature, or null if not set.
+     */
+    public function brandingCachetFullPath(): ?string
+    {
+        return $this->cachet_signature_path
+            ? $this->storagePath('branding/'.basename($this->cachet_signature_path))
+            : null;
     }
 }

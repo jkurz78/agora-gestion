@@ -18,16 +18,18 @@ final class EmailLogo
      */
     public static function variables(?int $typeOperationId = null): array
     {
-        $logoAsso = self::buildImgTag(
-            CurrentAssociation::tryGet()?->logo_path,
-            'public',
+        $association = CurrentAssociation::tryGet();
+        $logoAsso = self::buildImgTagLocal(
+            $association?->brandingLogoFullPath(),
+            'local',
             'Logo',
         );
 
         $logoOp = '';
         if ($typeOperationId) {
             $typeOp = TypeOperation::find($typeOperationId);
-            $logoOp = self::buildImgTag(
+            // TypeOperation logo still uses public disk (Task 5 will migrate it)
+            $logoOp = self::buildImgTagLocal(
                 $typeOp?->logo_path,
                 'public',
                 'Logo '.($typeOp?->nom ?? ''),
@@ -40,7 +42,7 @@ final class EmailLogo
         ];
     }
 
-    private static function buildImgTag(?string $path, string $disk, string $alt): string
+    private static function buildImgTagLocal(?string $path, string $disk, string $alt): string
     {
         if (! $path) {
             return '';

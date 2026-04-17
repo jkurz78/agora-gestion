@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Association;
 use App\Models\EmailLog;
 use App\Models\Tiers;
+use App\Support\TenantAsset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -78,9 +79,11 @@ final class EmailOptoutController extends Controller
         // TODO(S7): public route — no TenantContext booted here.
         // Replace with CurrentAssociation::get() once public routes resolve tenant from URL/subdomain.
         $association = Association::find(1);
-        $logoUrl = ($association?->logo_path && Storage::disk('public')->exists($association->logo_path))
-            ? Storage::disk('public')->url($association->logo_path)
-            : null;
+        $logoUrl = null;
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $logoUrl = TenantAsset::url($logoFullPath);
+        }
 
         return [
             'nomAsso' => $association?->nom ?? 'Notre association',

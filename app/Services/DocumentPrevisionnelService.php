@@ -173,10 +173,11 @@ final class DocumentPrevisionnelService
 
         $headerLogoBase64 = null;
         $headerLogoMime = null;
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $logoContent = Storage::disk('public')->get($association->logo_path);
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $logoContent = Storage::disk('local')->get($logoFullPath);
             if ($logoContent) {
-                $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+                $ext = strtolower(pathinfo($logoFullPath, PATHINFO_EXTENSION));
                 $headerLogoMime = in_array($ext, ['jpg', 'jpeg']) ? 'image/jpeg' : 'image/png';
                 $headerLogoBase64 = base64_encode($logoContent);
             }

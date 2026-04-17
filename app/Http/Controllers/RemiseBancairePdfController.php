@@ -24,13 +24,11 @@ final class RemiseBancairePdfController extends Controller
         // Logo base64 (null-safe)
         $logoBase64 = null;
         $logoMime = 'image/png';
-        if ($association !== null && $association->logo_path !== null) {
-            $path = $association->logo_path;
-            if (Storage::disk('public')->exists($path)) {
-                $logoBase64 = base64_encode(Storage::disk('public')->get($path));
-                $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-                $logoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
-            }
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $logoBase64 = base64_encode(Storage::disk('local')->get($logoFullPath));
+            $ext = strtolower(pathinfo($logoFullPath, PATHINFO_EXTENSION));
+            $logoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
         $typeLabel = $remise->mode_paiement->value === 'cheque' ? 'chèques' : 'espèces';

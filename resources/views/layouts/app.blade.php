@@ -1,8 +1,9 @@
 @php
     // $association injected by LayoutAssociationComposerProvider (CurrentAssociation::tryGet())
     $nomAsso       = $association?->nom ?? 'Mon Association';
-    $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
-        ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
+    $logoFullPath  = $association?->brandingLogoFullPath();
+    $logoAsset     = ($logoFullPath && \Illuminate\Support\Facades\Storage::disk('local')->exists($logoFullPath))
+        ? \App\Support\TenantAsset::url($logoFullPath)
         : asset('images/agora-gestion.svg');
     $exerciceService = app(\App\Services\ExerciceService::class);
     $exerciceActif   = $exerciceService->current();
@@ -384,8 +385,8 @@
                 <ul class="navbar-nav me-2 align-items-end">
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" data-bs-toggle="dropdown" role="button">
-                            @if ($currentAsso->logo_path)
-                                <img src="{{ Storage::url($currentAsso->logo_path) }}" style="height:24px;width:24px;object-fit:contain" alt="">
+                            @if ($currentAsso->brandingLogoFullPath() && \Illuminate\Support\Facades\Storage::disk('local')->exists($currentAsso->brandingLogoFullPath()))
+                                <img src="{{ \App\Support\TenantAsset::url($currentAsso->brandingLogoFullPath()) }}" style="height:24px;width:24px;object-fit:contain" alt="">
                             @endif
                             <span class="small">{{ $currentAsso->nom }}</span>
                         </a>
