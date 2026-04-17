@@ -66,7 +66,7 @@ it('generates PDF when TenantContext is booted', function () {
 });
 
 it('generates PDF even when logo file is missing', function () {
-    $this->association->update(['nom' => 'Test', 'logo_path' => 'association/logo-inexistant.png']);
+    $this->association->update(['nom' => 'Test', 'logo_path' => 'logo-inexistant.png']);
 
     $this->actingAs($this->user)
         ->get(route('banques.rapprochement.pdf', $this->rapprochement))

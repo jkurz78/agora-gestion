@@ -152,9 +152,10 @@ final class AttestationPresencePdfController extends Controller
         $assoBase64 = null;
         $assoMime = 'image/png';
 
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $assoBase64 = base64_encode(Storage::disk('public')->get($association->logo_path));
-            $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $assoBase64 = base64_encode(Storage::disk('local')->get($logoFullPath));
+            $ext = strtolower(pathinfo($logoFullPath, PATHINFO_EXTENSION));
             $assoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
@@ -176,9 +177,10 @@ final class AttestationPresencePdfController extends Controller
         // Cachet/signature
         $cachetBase64 = null;
         $cachetMime = 'image/png';
-        if ($association?->cachet_signature_path && Storage::disk('public')->exists($association->cachet_signature_path)) {
-            $cachetBase64 = base64_encode(Storage::disk('public')->get($association->cachet_signature_path));
-            $ext = strtolower(pathinfo($association->cachet_signature_path, PATHINFO_EXTENSION));
+        $cachetFullPath = $association?->brandingCachetFullPath();
+        if ($cachetFullPath && Storage::disk('local')->exists($cachetFullPath)) {
+            $cachetBase64 = base64_encode(Storage::disk('local')->get($cachetFullPath));
+            $ext = strtolower(pathinfo($cachetFullPath, PATHINFO_EXTENSION));
             $cachetMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
