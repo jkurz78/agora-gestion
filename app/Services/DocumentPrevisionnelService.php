@@ -198,10 +198,10 @@ final class DocumentPrevisionnelService
         $writer = new FacturXWriter;
         $pdfA3Content = $writer->generate($pdfContent, $xml, 'minimum', false);
 
-        // Store on disk
-        $path = "documents-previsionnels/{$document->numero}.pdf";
-        Storage::disk('local')->put($path, $pdfA3Content);
-        $document->update(['pdf_path' => $path]);
+        // Store on disk — nom court uniquement, chemin tenant-scoped via pdfFullPath()
+        $shortName = "{$document->id}.pdf";
+        Storage::disk('local')->put($document->storagePath("documents-previsionnels/{$shortName}"), $pdfA3Content);
+        $document->update(['pdf_path' => $shortName]);
 
         return $pdfA3Content;
     }

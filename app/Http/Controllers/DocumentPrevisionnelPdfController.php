@@ -16,8 +16,9 @@ final class DocumentPrevisionnelPdfController extends Controller
         DocumentPrevisionnelService $service,
     ): Response {
         // Serve stored PDF if available, otherwise generate
-        if ($document->pdf_path && Storage::disk('local')->exists($document->pdf_path)) {
-            $pdfContent = Storage::disk('local')->get($document->pdf_path);
+        $fullPath = $document->pdfFullPath();
+        if ($fullPath && Storage::disk('local')->exists($fullPath)) {
+            $pdfContent = Storage::disk('local')->get($fullPath);
         } else {
             $pdfContent = $service->genererPdf($document);
         }

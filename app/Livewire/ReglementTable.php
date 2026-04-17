@@ -508,8 +508,9 @@ final class ReglementTable extends Component
             TypeDocumentPrevisionnel::Proforma => ['pro forma', 'la pro forma', 'de la pro forma'],
         };
 
-        $pdfContent = $doc->pdf_path && Storage::disk('local')->exists($doc->pdf_path)
-            ? Storage::disk('local')->get($doc->pdf_path)
+        $docFullPath = $doc->pdfFullPath();
+        $pdfContent = $docFullPath && Storage::disk('local')->exists($docFullPath)
+            ? Storage::disk('local')->get($docFullPath)
             : app(DocumentPrevisionnelService::class)->genererPdf($doc);
 
         $pdfFilename = ucfirst($typeLabel)." {$doc->numero} - {$tiers->displayName()}.pdf";
