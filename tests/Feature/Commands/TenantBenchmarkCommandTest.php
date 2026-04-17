@@ -18,3 +18,16 @@ it('runs tenant:benchmark and exercises all 6 screens', function () {
         expect($output)->toContain($screen);
     }
 });
+
+it('refuses to run in production-like environment without --force', function () {
+    // Override environment and restore it after regardless of outcome.
+    app()->detectEnvironment(fn () => 'production');
+
+    try {
+        $code = Artisan::call('tenant:benchmark', ['--tenants' => 1, '--transactions' => 1]);
+        expect($code)->toBe(Symfony\Component\Console\Command\Command::FAILURE);
+        expect(Artisan::output())->toContain('Refus de');
+    } finally {
+        app()->detectEnvironment(fn () => 'testing');
+    }
+});
