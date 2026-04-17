@@ -11,16 +11,25 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
 use App\Models\User;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\RapportService;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->service = app(RapportService::class);
     $this->compte = CompteBancaire::factory()->create();
     $this->op1 = Operation::factory()->create();
     $this->categorie = Categorie::factory()->create(['type' => TypeCategorie::Recette]);
     $this->sousCategorie = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('le rapport onglet 2 prend en compte les affectations au lieu de operation_id ligne', function () {

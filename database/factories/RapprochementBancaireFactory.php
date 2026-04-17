@@ -8,12 +8,11 @@ use App\Enums\StatutRapprochement;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<RapprochementBancaire>
- *
- * @todo S1-Task39: remove the hardcoded association_id once TenantModel auto-fills from TenantContext.
  */
 class RapprochementBancaireFactory extends Factory
 {
@@ -22,7 +21,7 @@ class RapprochementBancaireFactory extends Factory
     public function definition(): array
     {
         return [
-            'association_id' => 1,
+            'association_id' => TenantContext::currentId() ?? 1,
             'compte_id' => CompteBancaire::factory(),
             'date_fin' => fake()->dateTimeBetween('-6 months', 'now')->format('Y-m-d'),
             'solde_ouverture' => fake()->randomFloat(2, 0, 10000),

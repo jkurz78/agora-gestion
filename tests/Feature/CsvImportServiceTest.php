@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Enums\TypeCategorie;
+use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use App\Services\CsvImportService;
 use Illuminate\Http\UploadedFile;
 
@@ -19,7 +23,10 @@ function makeCsvFile(string $content): UploadedFile
 }
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($user);
 
     $this->compte = CompteBancaire::factory()->create([
@@ -29,6 +36,10 @@ beforeEach(function () {
 
     $cat = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
     $this->sc = SousCategorie::factory()->create(['categorie_id' => $cat->id, 'nom' => 'Fournitures']);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('importe un CSV valide avec une transaction simple', function () {

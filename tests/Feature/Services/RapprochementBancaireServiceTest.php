@@ -8,16 +8,25 @@ use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\RapprochementBancaireService;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->compte = CompteBancaire::factory()->create([
         'solde_initial' => 1000.00,
         'date_solde_initial' => '2025-09-01',
     ]);
     $this->service = app(RapprochementBancaireService::class);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 test('calculerSoldeOuverture retourne solde_initial si aucun rapprochement verrouillé', function () {

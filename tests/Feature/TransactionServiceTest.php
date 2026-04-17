@@ -1,26 +1,34 @@
 <?php
 
 declare(strict_types=1);
+
 use App\Enums\TypeTransaction;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\TransactionService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
     $this->service = app(TransactionService::class);
-    $this->compte = CompteBancaire::factory()->create();
+    $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('crée une dépense avec ses lignes', function () {
-    $sc = SousCategorie::factory()->create();
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
     $data = [
         'type' => TypeTransaction::Depense->value,
         'date' => '2025-10-01',
@@ -39,7 +47,7 @@ it('crée une dépense avec ses lignes', function () {
 });
 
 it('crée une recette avec ses lignes', function () {
-    $sc = SousCategorie::factory()->create();
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
     $data = [
         'type' => TypeTransaction::Recette->value,
         'date' => '2025-10-01',
@@ -58,17 +66,25 @@ it('crée une recette avec ses lignes', function () {
 });
 
 it('montantSigne est négatif pour une dépense', function () {
-    $transaction = Transaction::factory()->asDepense()->create(['montant_total' => '150.00', 'compte_id' => $this->compte->id]);
+    $transaction = Transaction::factory()->asDepense()->create([
+        'montant_total' => '150.00',
+        'compte_id' => $this->compte->id,
+        'association_id' => $this->association->id,
+    ]);
     expect($transaction->montantSigne())->toBe(-150.0);
 });
 
 it('montantSigne est positif pour une recette', function () {
-    $transaction = Transaction::factory()->asRecette()->create(['montant_total' => '150.00', 'compte_id' => $this->compte->id]);
+    $transaction = Transaction::factory()->asRecette()->create([
+        'montant_total' => '150.00',
+        'compte_id' => $this->compte->id,
+        'association_id' => $this->association->id,
+    ]);
     expect($transaction->montantSigne())->toBe(150.0);
 });
 
 it('create assigne un numero_piece non null', function () {
-    $sc = SousCategorie::factory()->create();
+    $sc = SousCategorie::factory()->create(['association_id' => $this->association->id]);
     $transaction = $this->service->create([
         'type' => TypeTransaction::Depense->value,
         'date' => '2025-10-01',
@@ -84,15 +100,22 @@ it('create assigne un numero_piece non null', function () {
 });
 
 it('supprime une transaction non rapprochée', function () {
-    $transaction = Transaction::factory()->asDepense()->create(['compte_id' => $this->compte->id]);
+    $transaction = Transaction::factory()->asDepense()->create([
+        'compte_id' => $this->compte->id,
+        'association_id' => $this->association->id,
+    ]);
     $this->service->delete($transaction);
     expect(Transaction::find($transaction->id))->toBeNull();
 });
 
 it('rejette la suppression d\'une transaction rapprochée', function () {
-    $rapprochement = RapprochementBancaire::factory()->create(['compte_id' => $this->compte->id]);
+    $rapprochement = RapprochementBancaire::factory()->create([
+        'compte_id' => $this->compte->id,
+        'association_id' => $this->association->id,
+    ]);
     $transaction = Transaction::factory()->asDepense()->create([
         'compte_id' => $this->compte->id,
+        'association_id' => $this->association->id,
         'rapprochement_id' => $rapprochement->id,
     ]);
     expect(fn () => $this->service->delete($transaction))

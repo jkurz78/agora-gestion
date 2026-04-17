@@ -15,18 +15,27 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\FactureService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create();
     $this->compteBancaire = CompteBancaire::factory()->create();
     $this->sousCategorie = SousCategorie::factory()->create(['nom' => 'Inscription']);
     $this->service = app(FactureService::class);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 /**

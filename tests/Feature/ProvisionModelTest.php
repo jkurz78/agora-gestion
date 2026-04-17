@@ -3,13 +3,22 @@
 declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
+use App\Models\Association;
 use App\Models\Provision;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->sc = SousCategorie::factory()->create();
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('computes montantSigne for depense (FNP)', function () {

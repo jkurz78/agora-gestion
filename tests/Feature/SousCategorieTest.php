@@ -3,17 +3,27 @@
 declare(strict_types=1);
 
 use App\Livewire\SousCategorieList;
+use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->categorie = Categorie::factory()->create();
+    $this->categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('renders the sous-categorie list component', function () {
@@ -94,7 +104,10 @@ it('can create without code_cerfa', function () {
 });
 
 it('can update a sous-categorie via modal', function () {
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+    $sc = SousCategorie::factory()->create([
+        'categorie_id' => $this->categorie->id,
+        'association_id' => $this->association->id,
+    ]);
 
     Livewire::test(SousCategorieList::class)
         ->call('openEdit', $sc->id)
@@ -116,6 +129,7 @@ it('can update a sous-categorie via modal', function () {
 it('can toggle a flag', function () {
     $sc = SousCategorie::factory()->create([
         'categorie_id' => $this->categorie->id,
+        'association_id' => $this->association->id,
         'pour_dons' => false,
     ]);
 
@@ -128,6 +142,7 @@ it('can toggle a flag', function () {
 it('rejects invalid flag names', function () {
     $sc = SousCategorie::factory()->create([
         'categorie_id' => $this->categorie->id,
+        'association_id' => $this->association->id,
         'pour_dons' => false,
     ]);
 
@@ -140,6 +155,7 @@ it('rejects invalid flag names', function () {
 it('can update a field inline', function () {
     $sc = SousCategorie::factory()->create([
         'categorie_id' => $this->categorie->id,
+        'association_id' => $this->association->id,
         'nom' => 'Ancien nom',
     ]);
 
@@ -152,6 +168,7 @@ it('can update a field inline', function () {
 it('validates inline field update', function () {
     $sc = SousCategorie::factory()->create([
         'categorie_id' => $this->categorie->id,
+        'association_id' => $this->association->id,
         'nom' => 'Ancien nom',
     ]);
 
@@ -163,7 +180,10 @@ it('validates inline field update', function () {
 });
 
 it('can delete a sous-categorie', function () {
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+    $sc = SousCategorie::factory()->create([
+        'categorie_id' => $this->categorie->id,
+        'association_id' => $this->association->id,
+    ]);
 
     Livewire::test(SousCategorieList::class)
         ->call('delete', $sc->id);
@@ -172,11 +192,15 @@ it('can delete a sous-categorie', function () {
 });
 
 it('shows error when deleting a sous-categorie with linked lignes', function () {
-    $sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+    $sc = SousCategorie::factory()->create([
+        'categorie_id' => $this->categorie->id,
+        'association_id' => $this->association->id,
+    ]);
 
     $depense = Transaction::factory()->asDepense()->create([
         'saisi_par' => $this->user->id,
         'date' => '2025-10-15',
+        'association_id' => $this->association->id,
     ]);
     TransactionLigne::factory()->create([
         'transaction_id' => $depense->id,

@@ -11,16 +11,25 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\TransactionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->service = app(TransactionService::class);
     $this->compte = CompteBancaire::factory()->create();
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 function makeFactureLockedTransaction(CompteBancaire $compte): Transaction

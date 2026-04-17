@@ -11,8 +11,22 @@ use App\Models\RemiseBancaire;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\Association;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    $this->actingAs($user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 test('creating RemiseBancaire with correct casts', function (): void {
     $compte = CompteBancaire::factory()->create();

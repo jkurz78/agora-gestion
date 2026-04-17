@@ -15,7 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 // Helper: create a user with a given role in the current association context.
-function makeUserWithRole(RoleAssociation $role, Association $association): User
+function makePolicyUser(RoleAssociation $role, Association $association): User
 {
     $user = User::factory()->create();
     $user->associations()->attach($association->id, ['role' => $role->value, 'joined_at' => now()]);
@@ -36,28 +36,28 @@ afterEach(function (): void {
 // ── Operation (Gestion espace) ──
 
 it('admin can create operations', function () {
-    $user = makeUserWithRole(RoleAssociation::Admin, $this->association);
+    $user = makePolicyUser(RoleAssociation::Admin, $this->association);
     expect($user->can('create', Operation::class))->toBeTrue();
 });
 
 it('gestionnaire can create operations', function () {
-    $user = makeUserWithRole(RoleAssociation::Gestionnaire, $this->association);
+    $user = makePolicyUser(RoleAssociation::Gestionnaire, $this->association);
     expect($user->can('create', Operation::class))->toBeTrue();
 });
 
 it('comptable cannot create operations', function () {
-    $user = makeUserWithRole(RoleAssociation::Comptable, $this->association);
+    $user = makePolicyUser(RoleAssociation::Comptable, $this->association);
     expect($user->can('create', Operation::class))->toBeFalse();
 });
 
 it('consultation cannot create operations', function () {
-    $user = makeUserWithRole(RoleAssociation::Consultation, $this->association);
+    $user = makePolicyUser(RoleAssociation::Consultation, $this->association);
     expect($user->can('create', Operation::class))->toBeFalse();
 });
 
 it('all roles can view operations', function () {
     foreach (RoleAssociation::cases() as $role) {
-        $user = makeUserWithRole($role, $this->association);
+        $user = makePolicyUser($role, $this->association);
         expect($user->can('viewAny', Operation::class))->toBeTrue(
             "Role {$role->value} should be able to view operations"
         );
@@ -67,75 +67,75 @@ it('all roles can view operations', function () {
 // ── Transaction (Compta espace) ──
 
 it('admin can create transactions', function () {
-    $user = makeUserWithRole(RoleAssociation::Admin, $this->association);
+    $user = makePolicyUser(RoleAssociation::Admin, $this->association);
     expect($user->can('create', Transaction::class))->toBeTrue();
 });
 
 it('comptable can create transactions', function () {
-    $user = makeUserWithRole(RoleAssociation::Comptable, $this->association);
+    $user = makePolicyUser(RoleAssociation::Comptable, $this->association);
     expect($user->can('create', Transaction::class))->toBeTrue();
 });
 
 it('gestionnaire cannot create transactions', function () {
-    $user = makeUserWithRole(RoleAssociation::Gestionnaire, $this->association);
+    $user = makePolicyUser(RoleAssociation::Gestionnaire, $this->association);
     expect($user->can('create', Transaction::class))->toBeFalse();
 });
 
 it('consultation cannot create transactions', function () {
-    $user = makeUserWithRole(RoleAssociation::Consultation, $this->association);
+    $user = makePolicyUser(RoleAssociation::Consultation, $this->association);
     expect($user->can('create', Transaction::class))->toBeFalse();
 });
 
 // ── Facture (Compta espace) ──
 
 it('admin can create factures', function () {
-    $user = makeUserWithRole(RoleAssociation::Admin, $this->association);
+    $user = makePolicyUser(RoleAssociation::Admin, $this->association);
     expect($user->can('create', Facture::class))->toBeTrue();
 });
 
 it('comptable can create factures', function () {
-    $user = makeUserWithRole(RoleAssociation::Comptable, $this->association);
+    $user = makePolicyUser(RoleAssociation::Comptable, $this->association);
     expect($user->can('create', Facture::class))->toBeTrue();
 });
 
 it('gestionnaire cannot create factures', function () {
-    $user = makeUserWithRole(RoleAssociation::Gestionnaire, $this->association);
+    $user = makePolicyUser(RoleAssociation::Gestionnaire, $this->association);
     expect($user->can('create', Facture::class))->toBeFalse();
 });
 
 // ── Tiers (both espaces) ──
 
 it('admin can create tiers', function () {
-    $user = makeUserWithRole(RoleAssociation::Admin, $this->association);
+    $user = makePolicyUser(RoleAssociation::Admin, $this->association);
     expect($user->can('create', Tiers::class))->toBeTrue();
 });
 
 it('comptable can create tiers', function () {
-    $user = makeUserWithRole(RoleAssociation::Comptable, $this->association);
+    $user = makePolicyUser(RoleAssociation::Comptable, $this->association);
     expect($user->can('create', Tiers::class))->toBeTrue();
 });
 
 it('gestionnaire can create tiers', function () {
-    $user = makeUserWithRole(RoleAssociation::Gestionnaire, $this->association);
+    $user = makePolicyUser(RoleAssociation::Gestionnaire, $this->association);
     expect($user->can('create', Tiers::class))->toBeTrue();
 });
 
 it('consultation cannot create tiers', function () {
-    $user = makeUserWithRole(RoleAssociation::Consultation, $this->association);
+    $user = makePolicyUser(RoleAssociation::Consultation, $this->association);
     expect($user->can('create', Tiers::class))->toBeFalse();
 });
 
 // ── User (Parametres / Admin only) ──
 
 it('admin can manage users', function () {
-    $user = makeUserWithRole(RoleAssociation::Admin, $this->association);
+    $user = makePolicyUser(RoleAssociation::Admin, $this->association);
     expect($user->can('create', User::class))->toBeTrue();
     expect($user->can('viewAny', User::class))->toBeTrue();
 });
 
 it('non-admin cannot manage users', function () {
     foreach ([RoleAssociation::Comptable, RoleAssociation::Gestionnaire, RoleAssociation::Consultation] as $role) {
-        $user = makeUserWithRole($role, $this->association);
+        $user = makePolicyUser($role, $this->association);
         expect($user->can('create', User::class))->toBeFalse(
             "Role {$role->value} should not create users"
         );
@@ -145,12 +145,12 @@ it('non-admin cannot manage users', function () {
 // ── User self-delete protection ──
 
 it('admin cannot delete themselves', function () {
-    $admin = makeUserWithRole(RoleAssociation::Admin, $this->association);
+    $admin = makePolicyUser(RoleAssociation::Admin, $this->association);
     expect($admin->can('delete', $admin))->toBeFalse();
 });
 
 it('admin can delete other users', function () {
-    $admin = makeUserWithRole(RoleAssociation::Admin, $this->association);
-    $other = makeUserWithRole(RoleAssociation::Comptable, $this->association);
+    $admin = makePolicyUser(RoleAssociation::Admin, $this->association);
+    $other = makePolicyUser(RoleAssociation::Comptable, $this->association);
     expect($admin->can('delete', $other))->toBeTrue();
 });

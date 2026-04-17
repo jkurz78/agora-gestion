@@ -4,21 +4,29 @@ declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
-    User::factory()->create();
-    $this->actingAs(User::first());
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    $this->actingAs($this->user);
     $this->compte = CompteBancaire::factory()->create(['nom' => 'HelloAsso', 'solde_initial' => 0]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('creates a locked rapprochement with pointed transactions and virement', function () {

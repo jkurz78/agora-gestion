@@ -2,13 +2,23 @@
 
 declare(strict_types=1);
 
-use App\Enums\RoleAssociation;
+use App\Models\Association;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 beforeEach(function (): void {
-    $this->admin = User::factory()->create(['role' => RoleAssociation::Admin]);
-    $this->consultation = User::factory()->create(['role' => RoleAssociation::Consultation]);
+    $this->association = Association::factory()->create();
+    $this->admin = User::factory()->create();
+    $this->admin->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $this->consultation = User::factory()->create();
+    $this->consultation->associations()->attach($this->association->id, ['role' => 'consultation', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 // ── CSV template ──

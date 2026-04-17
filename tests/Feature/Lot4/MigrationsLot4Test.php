@@ -2,11 +2,27 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
+use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
+use App\Models\SousCategorie;
+use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('has sync config columns on helloasso_parametres', function () {
     expect(Schema::hasColumn('helloasso_parametres', 'compte_helloasso_id'))->toBeTrue();
@@ -24,21 +40,19 @@ it('has helloasso_form_mappings table', function () {
 });
 
 it('can save sync config on helloasso_parametres', function () {
-    DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
-    DB::table('comptes_bancaires')->insertOrIgnore(['id' => 1, 'nom' => 'HelloAsso', 'solde_initial' => 0, 'date_solde_initial' => now()->toDateString(), 'created_at' => now(), 'updated_at' => now()]);
-    DB::table('categories')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'type' => 'recette', 'created_at' => now(), 'updated_at' => now()]);
-    DB::table('sous_categories')->insertOrIgnore(['id' => 2, 'categorie_id' => 1, 'nom' => 'Don', 'created_at' => now(), 'updated_at' => now()]);
+    $compte = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
+    $scDon = SousCategorie::factory()->create(['nom' => 'Don']);
 
     $p = HelloAssoParametres::create([
-        'association_id' => 1,
+        'association_id' => $this->association->id,
         'client_id' => 'test',
         'client_secret' => 'secret',
         'organisation_slug' => 'test',
         'environnement' => 'sandbox',
-        'compte_helloasso_id' => 1,
-        'sous_categorie_don_id' => 2,
+        'compte_helloasso_id' => $compte->id,
+        'sous_categorie_don_id' => $scDon->id,
     ]);
 
-    expect($p->compte_helloasso_id)->toBe(1);
-    expect($p->sous_categorie_don_id)->toBe(2);
+    expect($p->compte_helloasso_id)->toBe($compte->id);
+    expect($p->sous_categorie_don_id)->toBe($scDon->id);
 });

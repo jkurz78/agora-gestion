@@ -1,14 +1,23 @@
 <?php
 
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\SoldeService;
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
-    $this->service = new SoldeService;
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    $this->service = new SoldeService;
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('returns solde_initial when no movements', function () {

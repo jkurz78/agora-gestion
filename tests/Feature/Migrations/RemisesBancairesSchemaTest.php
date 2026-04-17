@@ -9,9 +9,23 @@ use App\Models\Reglement;
 use App\Models\RemiseBancaire;
 use App\Models\Seance;
 use App\Models\Tiers;
+use App\Models\Association;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
+
+beforeEach(function () {
+    // Use the default association from migration so system accounts are in scope.
+    $this->association = Association::firstOrFail();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('comptes_bancaires table has est_systeme column', function () {
     expect(Schema::hasColumn('comptes_bancaires', 'est_systeme'))->toBeTrue();

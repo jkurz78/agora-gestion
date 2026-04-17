@@ -3,8 +3,22 @@
 // tests/Unit/Models/TiersTest.php
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\Tiers;
+use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Schema;
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('displayName returns nom as fallback when entreprise field is null', function () {
     $tiers = new Tiers(['type' => 'entreprise', 'entreprise' => null, 'nom' => 'Mairie de Lyon', 'prenom' => null]);

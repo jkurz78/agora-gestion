@@ -15,23 +15,41 @@ use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 
+beforeEach(function () {
+    $this->association = Association::factory()->create(['nom' => 'Test Asso', 'ville' => 'Paris']);
+    $this->user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('association has cachet_signature_path field', function () {
-    (new Association)->forceFill(['id' => 1, 'nom' => 'Test', 'cachet_signature_path' => 'association/cachet.png'])->save();
-    $asso = Association::find(1);
+    $this->association->fill(['cachet_signature_path' => 'association/cachet.png'])->save();
+    $asso = $this->association->fresh();
     expect($asso->cachet_signature_path)->toBe('association/cachet.png');
 });
 
 it('generates attestation PDF for a seance', function () {
-    $user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
-    $this->actingAs($user);
-
-    $typeOp = TypeOperation::factory()->create();
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create(['association_id' => $this->association->id]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
     $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1, 'date' => '2026-03-15']);
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+    $tiers = Tiers::factory()->create([
+        'nom' => 'Dupont',
+        'prenom' => 'Marie',
+        'association_id' => $this->association->id,
+    ]);
     $participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
@@ -42,8 +60,6 @@ it('generates attestation PDF for a seance', function () {
         'participant_id' => $participant->id,
         'statut' => StatutPresence::Present->value,
     ]);
-
-    (new Association)->forceFill(['id' => 1, 'nom' => 'Test Asso', 'ville' => 'Paris'])->save();
 
     $response = $this->get(route('operations.seances.attestation-pdf', [
         $operation, $seance, 'participants' => $participant->id,
@@ -53,13 +69,17 @@ it('generates attestation PDF for a seance', function () {
 });
 
 it('generates recap attestation PDF for a participant', function () {
-    $user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
-    $this->actingAs($user);
-
-    $typeOp = TypeOperation::factory()->create();
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create(['association_id' => $this->association->id]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
     $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1, 'date' => '2026-03-15']);
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+    $tiers = Tiers::factory()->create([
+        'nom' => 'Dupont',
+        'prenom' => 'Marie',
+        'association_id' => $this->association->id,
+    ]);
     $participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
@@ -71,8 +91,6 @@ it('generates recap attestation PDF for a participant', function () {
         'statut' => StatutPresence::Present->value,
     ]);
 
-    (new Association)->forceFill(['id' => 1, 'nom' => 'Test Asso', 'ville' => 'Paris'])->save();
-
     $response = $this->get(route('operations.participants.attestation-recap-pdf', [
         $operation, $participant,
     ]));
@@ -81,20 +99,15 @@ it('generates recap attestation PDF for a participant', function () {
 });
 
 it('rejects attestation PDF for non-present participant', function () {
-    $user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
-    $this->actingAs($user);
-
-    $operation = Operation::factory()->create();
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1, 'date' => '2026-03-15']);
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
         'date_inscription' => '2026-01-15',
     ]);
     // No Presence record
-
-    (new Association)->forceFill(['id' => 1, 'nom' => 'Test Asso'])->save();
 
     $response = $this->get(route('operations.seances.attestation-pdf', [
         $operation, $seance, 'participants' => $participant->id,
@@ -129,17 +142,23 @@ it('creates attestation mail with PDF attachment and substituted variables', fun
 // ── Livewire AttestationModal tests ─────────────────────────────
 
 it('opens seance attestation modal with present participants', function () {
-    $user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
-    $this->actingAs($user);
-
-    $typeOp = TypeOperation::factory()->create(['email_from' => 'asso@test.com']);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => 'asso@test.com',
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
     $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1, 'date' => '2026-03-15']);
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie', 'email' => 'marie@test.com']);
+    $tiers = Tiers::factory()->create([
+        'nom' => 'Dupont',
+        'prenom' => 'Marie',
+        'email' => 'marie@test.com',
+        'association_id' => $this->association->id,
+    ]);
     $participant = Participant::create(['tiers_id' => $tiers->id, 'operation_id' => $operation->id, 'date_inscription' => now()]);
     Presence::create(['seance_id' => $seance->id, 'participant_id' => $participant->id, 'statut' => StatutPresence::Present->value]);
-
-    (new Association)->forceFill(['id' => 1, 'nom' => 'Test Asso', 'ville' => 'Paris'])->save();
 
     Livewire::test(AttestationModal::class, ['operation' => $operation])
         ->call('openSeanceModal', $seance->id)
@@ -149,18 +168,31 @@ it('opens seance attestation modal with present participants', function () {
 
 it('sends attestation emails and logs them', function () {
     Mail::fake();
-    $user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
-    $this->actingAs($user);
 
-    $typeOp = TypeOperation::factory()->create(['email_from' => 'asso@test.com']);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => 'asso@test.com',
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
     $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1, 'date' => '2026-03-15']);
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie', 'email' => 'marie@test.com']);
+    $tiers = Tiers::factory()->create([
+        'nom' => 'Dupont',
+        'prenom' => 'Marie',
+        'email' => 'marie@test.com',
+        'association_id' => $this->association->id,
+    ]);
     $participant = Participant::create(['tiers_id' => $tiers->id, 'operation_id' => $operation->id, 'date_inscription' => now()]);
     Presence::create(['seance_id' => $seance->id, 'participant_id' => $participant->id, 'statut' => StatutPresence::Present->value]);
 
-    (new Association)->forceFill(['id' => 1, 'nom' => 'Test Asso', 'ville' => 'Paris'])->save();
-    EmailTemplate::create(['categorie' => 'attestation', 'objet' => 'Attestation — {operation}', 'corps' => '<p>Bonjour {prenom}</p>']);
+    EmailTemplate::create([
+        'association_id' => $this->association->id,
+        'categorie' => 'attestation',
+        'objet' => 'Attestation — {operation}',
+        'corps' => '<p>Bonjour {prenom}</p>',
+    ]);
 
     Livewire::test(AttestationModal::class, ['operation' => $operation])
         ->call('openSeanceModal', $seance->id)
@@ -173,17 +205,19 @@ it('sends attestation emails and logs them', function () {
 });
 
 it('opens recap modal with seances list', function () {
-    $user = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
-    $this->actingAs($user);
-
-    $typeOp = TypeOperation::factory()->create();
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create(['association_id' => $this->association->id]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
     $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1, 'date' => '2026-03-15', 'titre' => 'Introduction']);
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+    $tiers = Tiers::factory()->create([
+        'nom' => 'Dupont',
+        'prenom' => 'Marie',
+        'association_id' => $this->association->id,
+    ]);
     $participant = Participant::create(['tiers_id' => $tiers->id, 'operation_id' => $operation->id, 'date_inscription' => now()]);
     Presence::create(['seance_id' => $seance->id, 'participant_id' => $participant->id, 'statut' => StatutPresence::Present->value]);
-
-    (new Association)->forceFill(['id' => 1, 'nom' => 'Test Asso'])->save();
 
     Livewire::test(AttestationModal::class, ['operation' => $operation])
         ->call('openRecapModal', $participant->id)

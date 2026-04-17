@@ -6,6 +6,7 @@ namespace App\Livewire\Parametres;
 
 use App\Models\SmtpParametres;
 use App\Services\SmtpService;
+use App\Tenant\TenantContext;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -32,7 +33,7 @@ final class SmtpForm extends Component
 
     public function mount(): void
     {
-        $params = SmtpParametres::where('association_id', 1)->first();
+        $params = SmtpParametres::where('association_id', TenantContext::currentId())->first();
         if ($params === null) {
             return;
         }
@@ -72,7 +73,7 @@ final class SmtpForm extends Component
             $this->smtpPassword = '';
         }
 
-        SmtpParametres::updateOrCreate(['association_id' => 1], $payload);
+        SmtpParametres::updateOrCreate(['association_id' => TenantContext::currentId()], $payload);
         $this->testResult = null;
         $this->dispatch('form-saved');
         session()->flash('success', 'Paramètres SMTP enregistrés.');
@@ -88,7 +89,7 @@ final class SmtpForm extends Component
 
         $password = $this->smtpPassword;
         if ($password === '' && $this->passwordDejaEnregistre) {
-            $existing = SmtpParametres::where('association_id', 1)->first();
+            $existing = SmtpParametres::where('association_id', TenantContext::currentId())->first();
             $password = $existing?->smtp_password ?? '';
         }
 

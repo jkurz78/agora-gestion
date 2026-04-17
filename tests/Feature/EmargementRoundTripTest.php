@@ -2,10 +2,23 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use App\Services\Emargement\Contracts\QrCodeExtractor;
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('generates an emargement PDF that the QR extractor can read back', function () {
     $user = User::factory()->create();

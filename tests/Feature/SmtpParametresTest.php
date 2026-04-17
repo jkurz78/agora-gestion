@@ -5,23 +5,27 @@ declare(strict_types=1);
 use App\Livewire\Parametres\SmtpForm;
 use App\Models\Association;
 use App\Models\SmtpParametres;
+use App\Models\User;
 use App\Providers\AppServiceProvider;
 use App\Services\SmtpService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
-    if (Association::find(1) === null) {
-        $assoc = new Association;
-        $assoc->id = 1;
-        $assoc->fill(['nom' => 'Test'])->save();
-    }
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('persiste les paramètres smtp avec mot de passe chiffré', function () {
-    SmtpParametres::updateOrCreate(['association_id' => 1], [
+    SmtpParametres::updateOrCreate(['association_id' => $this->association->id], [
         'enabled' => true,
         'smtp_host' => 'mail.example.fr',
         'smtp_port' => 587,
@@ -30,7 +34,7 @@ it('persiste les paramètres smtp avec mot de passe chiffré', function () {
         'smtp_password' => 'secret-password',
     ]);
 
-    $record = SmtpParametres::where('association_id', 1)->first();
+    $record = SmtpParametres::where('association_id', $this->association->id)->first();
 
     expect($record->smtp_host)->toBe('mail.example.fr')
         ->and($record->smtp_password)->toBe('secret-password')
@@ -39,7 +43,7 @@ it('persiste les paramètres smtp avec mot de passe chiffré', function () {
 
     // Le mot de passe est chiffré en base
     $raw = DB::table('smtp_parametres')
-        ->where('association_id', 1)
+        ->where('association_id', $this->association->id)
         ->value('smtp_password');
     expect($raw)->not->toBe('secret-password');
 });
@@ -60,7 +64,7 @@ it('retourne une erreur si le serveur smtp est injoignable', function () {
 });
 
 it('surcharge la config mail quand smtp_parametres est activé', function () {
-    SmtpParametres::updateOrCreate(['association_id' => 1], [
+    SmtpParametres::updateOrCreate(['association_id' => $this->association->id], [
         'enabled' => true,
         'smtp_host' => 'smtp.monasso.fr',
         'smtp_port' => 465,
@@ -80,7 +84,7 @@ it('surcharge la config mail quand smtp_parametres est activé', function () {
 });
 
 it('ne touche pas la config mail si smtp_parametres est désactivé', function () {
-    SmtpParametres::updateOrCreate(['association_id' => 1], [
+    SmtpParametres::updateOrCreate(['association_id' => $this->association->id], [
         'enabled' => false,
         'smtp_host' => 'autre.host.fr',
     ]);
@@ -94,7 +98,7 @@ it('ne touche pas la config mail si smtp_parametres est désactivé', function (
 });
 
 it('SmtpForm charge les paramètres existants au mount', function () {
-    SmtpParametres::updateOrCreate(['association_id' => 1], [
+    SmtpParametres::updateOrCreate(['association_id' => $this->association->id], [
         'enabled' => true,
         'smtp_host' => 'mail.charge.fr',
         'smtp_port' => 587,
@@ -122,7 +126,7 @@ it('SmtpForm sauvegarde les paramètres', function () {
         ->set('enabled', true)
         ->call('sauvegarder');
 
-    $record = SmtpParametres::where('association_id', 1)->first();
+    $record = SmtpParametres::where('association_id', $this->association->id)->first();
     expect($record->smtp_host)->toBe('smtp.nouveau.fr')
         ->and($record->smtp_password)->toBe('nouveausecret')
         ->and($record->enabled)->toBeTrue();
