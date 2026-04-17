@@ -340,7 +340,7 @@ Route::middleware(['auth', 'super-admin'])
         Route::prefix('associations')->name('associations.')->group(function (): void {
             Route::view('/', 'super-admin.associations.index')->name('index');
             // Stubs — remplacés dans Tasks 3/4/5
-            Route::get('/create', fn () => abort(501))->name('create');
+            Route::view('/create', 'super-admin.associations.create')->name('create');
             Route::get('/{association:slug}', fn (\App\Models\Association $association) => view('super-admin.associations.show', compact('association')))->name('show');
             Route::post('/{association:slug}/support/enter', [\App\Http\Controllers\SuperAdmin\SupportModeController::class, 'enter'])
                 ->name('support.enter');
