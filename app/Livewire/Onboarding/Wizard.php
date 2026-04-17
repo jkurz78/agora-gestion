@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Onboarding;
 
 use App\Models\Association;
+use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
@@ -590,7 +591,7 @@ final class Wizard extends Component
 
     public function finalize(): void
     {
-        if ($this->currentStep < 9) {
+        if ($this->currentStep !== 9) {
             return;
         }
 
@@ -604,6 +605,24 @@ final class Wizard extends Component
     public function getSousCategoriesProperty(): Collection
     {
         return SousCategorie::orderBy('nom')->get();
+    }
+
+    /**
+     * @return array{association: Association, compte: ?CompteBancaire, smtp: ?SmtpParametres, helloasso: ?HelloAssoParametres, imap: ?IncomingMailParametres, nb_categories: int, nb_type_operations: int}
+     */
+    public function getRecapProperty(): array
+    {
+        $asso = $this->currentAssociation();
+
+        return [
+            'association' => $asso,
+            'compte' => CompteBancaire::orderBy('id')->first(),
+            'smtp' => SmtpParametres::first(),
+            'helloasso' => HelloAssoParametres::first(),
+            'imap' => IncomingMailParametres::first(),
+            'nb_categories' => Categorie::count(),
+            'nb_type_operations' => TypeOperation::count(),
+        ];
     }
 
     protected function advanceTo(int $step): void
