@@ -80,7 +80,7 @@ ls storage/app/associations/{id}/
 
 ```bash
 # Vérifier que les actions du tenant sont bien taggées
-grep '"association_id":"{id}"' storage/logs/laravel.log | tail -20
+grep '"association_id":{id}' storage/logs/laravel.log | tail -20
 ```
 
 **Base de données (si accès direct) :**
@@ -88,7 +88,7 @@ grep '"association_id":"{id}"' storage/logs/laravel.log | tail -20
 ```sql
 SELECT id, nom, slug, statut, wizard_completed_at FROM association WHERE id = {id};
 SELECT COUNT(*) FROM compte_bancaire WHERE association_id = {id};
-SELECT COUNT(*) FROM categories WHERE association_id = {id};  -- si plan comptable par défaut
+SELECT COUNT(*) FROM categories WHERE association_id = {id};  -- 0 si l'admin a choisi "Vide" à l'étape 7
 ```
 
 ---
