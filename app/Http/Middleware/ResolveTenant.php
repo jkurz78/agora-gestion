@@ -54,22 +54,7 @@ final class ResolveTenant
         if (! $hasAccess) {
             $request->session()->forget('current_association_id');
 
-            // Fallback : try derniere_association_id if it's different and the user has access.
-            $fallbackId = $user->derniere_association_id;
-            if ($fallbackId !== null && $fallbackId !== $assoId) {
-                $fallbackHasAccess = $user->associations()
-                    ->wherePivot('association_id', $fallbackId)
-                    ->whereNull('association_user.revoked_at')
-                    ->exists();
-
-                if ($fallbackHasAccess) {
-                    $assoId = $fallbackId;
-                } else {
-                    return $next($request);
-                }
-            } else {
-                return $next($request);
-            }
+            return $next($request);
         }
 
         $association = Association::find($assoId);
