@@ -54,7 +54,22 @@ final class ResolveTenant
         if (! $hasAccess) {
             $request->session()->forget('current_association_id');
 
-            return $next($request);
+            // Fallback : try derniere_association_id if it's different and the user has access.
+            $fallbackId = $user->derniere_association_id;
+            if ($fallbackId !== null && $fallbackId !== $assoId) {
+                $fallbackHasAccess = $user->associations()
+                    ->wherePivot('association_id', $fallbackId)
+                    ->whereNull('association_user.revoked_at')
+                    ->exists();
+
+                if ($fallbackHasAccess) {
+                    $assoId = $fallbackId;
+                } else {
+                    return $next($request);
+                }
+            } else {
+                return $next($request);
+            }
         }
 
         $association = Association::find($assoId);
@@ -62,8 +77,8 @@ final class ResolveTenant
             if (in_array($association->statut, ['suspendu', 'archive'], true) && ! $user->isSuperAdmin()) {
                 $libelle = match ($association->statut) {
                     'suspendu' => 'suspendue',
-                    'archive'  => 'archivée',
-                    default    => $association->statut,
+                    'archive' => 'archivée',
+                    default => $association->statut,
                 };
                 abort(403, "Cette association est {$libelle}.");
             }
