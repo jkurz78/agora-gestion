@@ -10,13 +10,10 @@ use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
-use App\Models\SousCategorie;
-use App\Models\TypeOperation;
 use App\Services\Onboarding\DefaultChartOfAccountsService;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
@@ -27,7 +24,7 @@ final class Wizard extends Component
 {
     use WithFileUploads;
 
-    public const TOTAL_STEPS = 9;
+    public const TOTAL_STEPS = 8;
 
     public int $currentStep = 1;
 
@@ -149,16 +146,6 @@ final class Wizard extends Component
 
     public ?int $planComptableCategoriesCount = null;
 
-    // Step 8 — TypeOperation
-    #[Validate('required|string|max:100')]
-    public string $typeOpNom = '';
-
-    #[Validate('nullable|string|max:255')]
-    public ?string $typeOpDescription = null;
-
-    #[Validate('required|integer|exists:sous_categories,id')]
-    public ?int $typeOpSousCategorieId = null;
-
     public function mount(): void
     {
         $association = $this->currentAssociation();
@@ -222,16 +209,6 @@ final class Wizard extends Component
 
         if (isset($this->state['plan_comptable_categories_count'])) {
             $this->planComptableCategoriesCount = (int) $this->state['plan_comptable_categories_count'];
-        }
-
-        $typeOpId = $this->state['type_operation_id'] ?? null;
-        if ($typeOpId !== null) {
-            $typeOp = TypeOperation::find($typeOpId);
-            if ($typeOp !== null) {
-                $this->typeOpNom = (string) $typeOp->nom;
-                $this->typeOpDescription = $typeOp->description;
-                $this->typeOpSousCategorieId = (int) $typeOp->sous_categorie_id;
-            }
         }
     }
 
@@ -553,45 +530,9 @@ final class Wizard extends Component
         $this->advanceTo(8);
     }
 
-    public function saveStep8(): void
-    {
-        $this->validate([
-            'typeOpNom' => 'required|string|max:100',
-            'typeOpDescription' => 'nullable|string|max:255',
-            'typeOpSousCategorieId' => 'required|integer|exists:sous_categories,id',
-        ]);
-
-        $asso = $this->currentAssociation();
-
-        $attributes = [
-            'nom' => $this->typeOpNom,
-            'description' => $this->typeOpDescription,
-            'sous_categorie_id' => $this->typeOpSousCategorieId,
-            'actif' => true,
-        ];
-
-        $existingId = $this->state['type_operation_id'] ?? null;
-        $type = $existingId !== null ? TypeOperation::find($existingId) : null;
-
-        if ($type !== null) {
-            $type->update($attributes);
-        } else {
-            $type = TypeOperation::create($attributes + ['association_id' => $asso->id]);
-            $this->state['type_operation_id'] = $type->id;
-            $asso->update(['wizard_state' => $this->state]);
-        }
-
-        $this->advanceTo(9);
-    }
-
-    public function skipStep8(): void
-    {
-        $this->advanceTo(9);
-    }
-
     public function finalize(): void
     {
-        if ($this->currentStep !== 9) {
+        if ($this->currentStep !== 8) {
             return;
         }
 
@@ -602,13 +543,8 @@ final class Wizard extends Component
         $this->redirect('/dashboard');
     }
 
-    public function getSousCategoriesProperty(): Collection
-    {
-        return SousCategorie::orderBy('nom')->get();
-    }
-
     /**
-     * @return array{association: Association, compte: ?CompteBancaire, smtp: ?SmtpParametres, helloasso: ?HelloAssoParametres, imap: ?IncomingMailParametres, nb_categories: int, nb_type_operations: int}
+     * @return array{association: Association, compte: ?CompteBancaire, smtp: ?SmtpParametres, helloasso: ?HelloAssoParametres, imap: ?IncomingMailParametres, nb_categories: int}
      */
     public function getRecapProperty(): array
     {
@@ -621,7 +557,6 @@ final class Wizard extends Component
             'helloasso' => HelloAssoParametres::first(),
             'imap' => IncomingMailParametres::first(),
             'nb_categories' => Categorie::count(),
-            'nb_type_operations' => TypeOperation::count(),
         ];
     }
 

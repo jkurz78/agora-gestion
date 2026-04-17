@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\TypeCategorie;
 use App\Livewire\Onboarding\Wizard;
 use App\Models\Association;
 use App\Models\Categorie;
@@ -11,7 +10,6 @@ use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
 use App\Models\SousCategorie;
-use App\Models\TypeOperation;
 use App\Models\User;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
@@ -540,49 +538,6 @@ it('saves step 7 with empty plan and advances to step 8', function () {
     expect($catCount)->toBe(0);
 });
 
-it('saves step 8 TypeOperation and advances to step 9', function () {
-    $this->association->update(['wizard_current_step' => 8]);
-    $categorie = Categorie::create([
-        'association_id' => $this->association->id,
-        'nom' => 'Cat test',
-        'type' => TypeCategorie::Recette,
-    ]);
-    $sc = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorie->id,
-        'nom' => 'Sous-cat test',
-        'pour_dons' => false,
-        'pour_cotisations' => false,
-        'pour_inscriptions' => false,
-    ]);
-
-    Livewire::actingAs($this->admin)
-        ->test(Wizard::class)
-        ->set('typeOpNom', 'Adhésion annuelle')
-        ->set('typeOpDescription', 'Cotisation annuelle membre')
-        ->set('typeOpSousCategorieId', $sc->id)
-        ->call('saveStep8')
-        ->assertSet('currentStep', 9);
-
-    $type = TypeOperation::where('association_id', $this->association->id)->first();
-    expect($type)->not->toBeNull();
-    expect($type->nom)->toBe('Adhésion annuelle');
-    expect((int) $type->sous_categorie_id)->toBe((int) $sc->id);
-    expect($type->actif)->toBeTrue();
-});
-
-it('skips step 8 TypeOperation', function () {
-    $this->association->update(['wizard_current_step' => 8]);
-
-    Livewire::actingAs($this->admin)
-        ->test(Wizard::class)
-        ->call('skipStep8')
-        ->assertSet('currentStep', 9);
-
-    $count = TypeOperation::where('association_id', $this->association->id)->count();
-    expect($count)->toBe(0);
-});
-
 it('does not re-apply default plan on step 7 re-submit', function () {
     $this->association->update(['wizard_current_step' => 7]);
 
@@ -605,41 +560,6 @@ it('does not re-apply default plan on step 7 re-submit', function () {
     expect($secondCount)->toBe($firstCount);
 });
 
-it('reuses existing TypeOperation on step 8 re-submit (no duplicate)', function () {
-    $this->association->update(['wizard_current_step' => 8]);
-    $categorie = Categorie::create([
-        'association_id' => $this->association->id,
-        'nom' => 'Cat test',
-        'type' => TypeCategorie::Recette,
-    ]);
-    $sc = SousCategorie::create([
-        'association_id' => $this->association->id,
-        'categorie_id' => $categorie->id,
-        'nom' => 'Sous-cat test',
-        'pour_dons' => false,
-        'pour_cotisations' => false,
-        'pour_inscriptions' => false,
-    ]);
-
-    Livewire::actingAs($this->admin)
-        ->test(Wizard::class)
-        ->set('typeOpNom', 'Initial')
-        ->set('typeOpSousCategorieId', $sc->id)
-        ->call('saveStep8')
-        ->assertSet('currentStep', 9);
-
-    Livewire::actingAs($this->admin)
-        ->test(Wizard::class)
-        ->set('typeOpNom', 'Renommé')
-        ->set('typeOpSousCategorieId', $sc->id)
-        ->call('saveStep8');
-
-    $count = TypeOperation::where('association_id', $this->association->id)->count();
-    expect($count)->toBe(1);
-    $type = TypeOperation::where('association_id', $this->association->id)->first();
-    expect($type->nom)->toBe('Renommé');
-});
-
 it('saves step 7 with empty plan leaves zero sous-categories', function () {
     $this->association->update(['wizard_current_step' => 7]);
 
@@ -654,7 +574,7 @@ it('saves step 7 with empty plan leaves zero sous-categories', function () {
 });
 
 it('finalizes wizard and redirects to dashboard', function () {
-    $this->association->update(['wizard_current_step' => 9]);
+    $this->association->update(['wizard_current_step' => 8]);
 
     Livewire::actingAs($this->admin)
         ->test(Wizard::class)
@@ -665,7 +585,7 @@ it('finalizes wizard and redirects to dashboard', function () {
     expect($fresh->wizard_completed_at)->not->toBeNull();
 });
 
-it('cannot finalize from a step earlier than 9', function () {
+it('cannot finalize from a step earlier than 8', function () {
     $this->association->update(['wizard_current_step' => 5]);
 
     Livewire::actingAs($this->admin)
@@ -677,7 +597,7 @@ it('cannot finalize from a step earlier than 9', function () {
 });
 
 it('allows access to dashboard after finalize', function () {
-    $this->association->update(['wizard_current_step' => 9]);
+    $this->association->update(['wizard_current_step' => 8]);
 
     Livewire::actingAs($this->admin)
         ->test(Wizard::class)
@@ -688,7 +608,7 @@ it('allows access to dashboard after finalize', function () {
         ->assertOk();
 });
 
-it('completes the full 9-step wizard end to end', function () {
+it('completes the full 8-step wizard end to end', function () {
     Livewire::actingAs($this->admin)
         ->test(Wizard::class)
         ->set('identiteAdresse', '1 rue de la Paix')
@@ -715,8 +635,6 @@ it('completes the full 9-step wizard end to end', function () {
         ->set('planComptableChoix', 'default')
         ->call('saveStep7')
         ->assertSet('currentStep', 8)
-        ->call('skipStep8')
-        ->assertSet('currentStep', 9)
         ->call('finalize')
         ->assertRedirect('/dashboard');
 
