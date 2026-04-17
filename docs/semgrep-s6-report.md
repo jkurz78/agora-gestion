@@ -16,7 +16,7 @@
 | # | Fichier:ligne | Règle | Gravité | Résolution |
 |---|---------------|-------|---------|------------|
 | 1 | `app/Services/TransactionUniverselleService.php` (toutes branches) | Manuel — `DB::table()` sans `association_id` | CRITIQUE | Ajout de `->when(TenantContext::hasBooted(), fn($q) => $q->where('tx.association_id', TenantContext::currentId()))` dans les 4 méthodes `brancheDepense`, `brancheRecette`, `brancheVirementSortant`, `brancheVirementEntrant` |
-| 2 | `app/Services/Rapports/CompteResultatBuilder.php` (10 requêtes) | Manuel — `DB::table()` sans `association_id` | CRITIQUE | Ajout du filtre `->when(TenantContext::hasBooted(), ...)` sur toutes les requêtes `DB::table` (transactions aliasées `d`, `r`, `tx`) + `fetchBudgetMap` (table `budget_lines`) |
+| 2 | `app/Services/Rapports/CompteResultatBuilder.php` (11 scopes) | Manuel — `DB::table()` sans `association_id` | CRITIQUE | Ajout du filtre `->when(TenantContext::hasBooted(), ...)` sur toutes les requêtes `DB::table` : 10 requêtes `transactions` (aliasées `d`, `r`, `tx`) + 1 requête `budget_lines` via `fetchBudgetMap` = 11 scopes ajoutés |
 
 ### Détail finding #1 — TransactionUniverselleService
 
@@ -67,3 +67,18 @@ De plus, `fetchBudgetMap` utilisait `DB::table('budget_lines')->where('exercice'
 - Après fix : 0 échec
 - Suite complète : **1824 tests, 0 failed** (1823 deprecated PDO::MYSQL_ATTR_SSL_CA — avertissement PHP/driver non lié aux changements)
 - Baseline pré-T2 : 1819 tests → +4 nouveaux tests = 1823 attendus (+ 1 `true is true` existant)
+
+---
+
+## Follow-ups (hors périmètre T2)
+
+### Defense-in-depth sur services tiers non corrigés
+Le code-review T2 a relevé 4 services qui utilisent `DB::table('transactions'...)` mais qui sont indirectement tenant-scopés via l'ID du modèle passé en argument (`Tiers`, `CompteBancaire`) — eux-mêmes tenant-scopés par `TenantScope` global. Risque actuel : faible. Suggestion defense-in-depth : ajouter le même `->when(TenantContext::hasBooted(), …)` pour couvrir le cas où un caller passerait un ID externe.
+
+- `app/Services/TiersTransactionService.php`
+- `app/Services/TransactionCompteService.php`
+- `app/Services/TiersQuickViewService.php`
+- `app/Livewire/ReglementTable.php:433`
+
+### Fail-closed vs fail-open sur `when(hasBooted())`
+Le pattern `->when(TenantContext::hasBooted(), fn ($q) => $q->where(...))` silently no-ope si `TenantContext` n'est pas booté. C'est OK sous HTTP (middleware `ResolveTenant` boote toujours pour un user auth), mais en contexte job/console, un caller distrait exposerait à nouveau toutes les données tenants. Décision à cadrer (hors T2) : migrer vers un `->where('...', TenantContext::requireCurrentId())` qui lève si non-booté, ou accepter le pattern actuel documenté comme contrat HTTP-only.

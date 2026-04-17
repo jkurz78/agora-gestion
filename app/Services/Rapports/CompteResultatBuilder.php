@@ -714,7 +714,7 @@ final class CompteResultatBuilder
     {
         return DB::table('budget_lines')
             ->where('exercice', $exercice)
-            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('association_id', TenantContext::currentId()))
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('budget_lines.association_id', TenantContext::currentId()))
             ->select('sous_categorie_id', DB::raw('SUM(montant_prevu) as budget'))
             ->groupBy('sous_categorie_id')
             ->get()
