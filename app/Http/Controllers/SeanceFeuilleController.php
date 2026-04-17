@@ -17,7 +17,7 @@ final class SeanceFeuilleController extends Controller
         abort_if($seance->feuille_signee_path === null, 404);
 
         return Storage::disk('local')->download(
-            $seance->feuille_signee_path,
+            $seance->feuilleSigneeFullPath(),
             'feuille-signee-seance-'.$seance->numero.'.pdf',
         );
     }
@@ -28,7 +28,7 @@ final class SeanceFeuilleController extends Controller
         abort_if($seance->feuille_signee_path === null, 404);
 
         return Storage::disk('local')->response(
-            $seance->feuille_signee_path,
+            $seance->feuilleSigneeFullPath(),
             'feuille-signee-seance-'.$seance->numero.'.pdf',
             ['Content-Type' => 'application/pdf'],
         );

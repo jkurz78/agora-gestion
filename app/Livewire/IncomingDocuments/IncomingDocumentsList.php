@@ -115,20 +115,19 @@ final class IncomingDocumentsList extends Component
         $seance = Seance::findOrFail($this->selectedSeanceId);
 
         DB::transaction(function () use ($doc, $seance): void {
-            $finalPath = "emargement/seance-{$seance->id}.pdf";
-
             if ($seance->feuille_signee_path !== null) {
                 Log::info('Feuille signée écrasée via assignation depuis inbox', [
                     'seance_id' => $seance->id,
                     'doc_id' => $doc->id,
                 ]);
-                Storage::disk('local')->delete($seance->feuille_signee_path);
+                Storage::disk('local')->delete($seance->feuilleSigneeFullPath());
             }
 
-            Storage::disk('local')->move($doc->incomingFullPath(), $finalPath);
+            $finalFullPath = $seance->storagePath('seances/'.$seance->id.'/feuille-signee.pdf');
+            Storage::disk('local')->move($doc->incomingFullPath(), $finalFullPath);
 
             $seance->update([
-                'feuille_signee_path' => $finalPath,
+                'feuille_signee_path' => 'feuille-signee.pdf',
                 'feuille_signee_at' => now(),
                 'feuille_signee_source' => $doc->sender_email === 'upload-manuel' ? 'manual' : 'email',
                 'feuille_signee_sender_email' => $doc->sender_email === 'upload-manuel' ? null : $doc->sender_email,

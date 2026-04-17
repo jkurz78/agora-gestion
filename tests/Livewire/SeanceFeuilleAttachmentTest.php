@@ -88,9 +88,12 @@ it('shows a French error when the QR mismatches', function () {
 });
 
 it('allows gestionnaire to retire a feuille', function () {
-    Storage::disk('local')->put('emargement/seance-'.$this->seance->id.'.pdf', 'old');
+    $aid = $this->association->id;
+    $sid = $this->seance->id;
+    $fullPath = "associations/{$aid}/seances/{$sid}/feuille-signee.pdf";
+    Storage::disk('local')->put($fullPath, 'old');
     $this->seance->update([
-        'feuille_signee_path' => 'emargement/seance-'.$this->seance->id.'.pdf',
+        'feuille_signee_path' => 'feuille-signee.pdf',
         'feuille_signee_at' => now(),
         'feuille_signee_source' => 'manual',
     ]);
@@ -104,7 +107,7 @@ it('allows gestionnaire to retire a feuille', function () {
 
     $this->seance->refresh();
     expect($this->seance->feuille_signee_path)->toBeNull();
-    Storage::disk('local')->assertMissing('emargement/seance-'.$this->seance->id.'.pdf');
+    Storage::disk('local')->assertMissing($fullPath);
 });
 
 it('forbids consultation user from uploading', function () {
@@ -126,9 +129,11 @@ it('forbids consultation user from uploading', function () {
 });
 
 it('forbids consultation user from retiring', function () {
-    Storage::disk('local')->put('emargement/seance-'.$this->seance->id.'.pdf', 'old');
+    $aid = $this->association->id;
+    $sid = $this->seance->id;
+    Storage::disk('local')->put("associations/{$aid}/seances/{$sid}/feuille-signee.pdf", 'old');
     $this->seance->update([
-        'feuille_signee_path' => 'emargement/seance-'.$this->seance->id.'.pdf',
+        'feuille_signee_path' => 'feuille-signee.pdf',
         'feuille_signee_at' => now(),
         'feuille_signee_source' => 'manual',
     ]);

@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class Seance extends TenantModel
 {
+    use TenantStorage;
+
     protected $fillable = [
         'association_id',
         'operation_id',
@@ -47,6 +50,13 @@ final class Seance extends TenantModel
     public function hasSignedSheet(): bool
     {
         return $this->feuille_signee_path !== null;
+    }
+
+    public function feuilleSigneeFullPath(): ?string
+    {
+        return $this->feuille_signee_path !== null
+            ? $this->storagePath('seances/'.$this->id.'/feuille-signee.pdf')
+            : null;
     }
 
     public function presencesLocked(): bool

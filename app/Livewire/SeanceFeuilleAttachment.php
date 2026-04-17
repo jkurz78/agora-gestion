@@ -86,7 +86,7 @@ final class SeanceFeuilleAttachment extends Component
         $seance = Seance::findOrFail($this->seanceId);
 
         if ($seance->feuille_signee_path !== null) {
-            Storage::disk('local')->delete($seance->feuille_signee_path);
+            Storage::disk('local')->delete($seance->feuilleSigneeFullPath());
             $seance->update([
                 'feuille_signee_path' => null,
                 'feuille_signee_at' => null,

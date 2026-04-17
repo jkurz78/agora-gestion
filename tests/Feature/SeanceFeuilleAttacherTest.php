@@ -51,10 +51,10 @@ it('attaches when QR matches the target seance', function () {
     expect($result->reason)->toBeNull();
 
     $this->seance->refresh();
-    expect($this->seance->feuille_signee_path)->toBe("emargement/seance-{$this->seance->id}.pdf");
+    expect($this->seance->feuille_signee_path)->toBe('feuille-signee.pdf');
     expect($this->seance->feuille_signee_source)->toBe('manual');
     expect($this->seance->feuille_signee_sender_email)->toBeNull();
-    Storage::disk('local')->assertExists($this->seance->feuille_signee_path);
+    Storage::disk('local')->assertExists($this->seance->feuilleSigneeFullPath());
 });
 
 it('rejects with qr_mismatch when QR points to another seance', function () {
@@ -114,11 +114,11 @@ it('rejects with pdf_unreadable when the PDF cannot be rasterized', function () 
 
 it('overwrites a previously attached feuille', function () {
     $this->seance->update([
-        'feuille_signee_path' => 'emargement/seance-old.pdf',
+        'feuille_signee_path' => 'feuille-signee.pdf',
         'feuille_signee_at' => now()->subDay(),
         'feuille_signee_source' => 'email',
     ]);
-    Storage::disk('local')->put('emargement/seance-old.pdf', 'old');
+    Storage::disk('local')->put($this->seance->feuilleSigneeFullPath(), 'old');
 
     $extractor = Mockery::mock(QrCodeExtractor::class);
     $extractor->shouldReceive('extractSeanceIdFromPdf')
@@ -131,5 +131,5 @@ it('overwrites a previously attached feuille', function () {
     expect($result->success)->toBeTrue();
     $this->seance->refresh();
     expect($this->seance->feuille_signee_source)->toBe('manual');
-    expect($this->seance->feuille_signee_path)->toBe("emargement/seance-{$this->seance->id}.pdf");
+    expect($this->seance->feuille_signee_path)->toBe('feuille-signee.pdf');
 });
