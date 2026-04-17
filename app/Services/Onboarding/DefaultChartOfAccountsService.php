@@ -53,6 +53,47 @@ final class DefaultChartOfAccountsService
     {
         return [
             [
+                'nom' => '60 - Achats',
+                'type' => TypeCategorie::Depense,
+                'sous' => [
+                    ['nom' => 'Fournitures',        'code_cerfa' => '606'],
+                    ['nom' => 'Petits équipements', 'code_cerfa' => '606B'],
+                    ['nom' => 'Achats divers',      'code_cerfa' => '609'],
+                ],
+            ],
+            [
+                'nom' => '61 - Charges de fonctionnement',
+                'type' => TypeCategorie::Depense,
+                'sous' => [
+                    ['nom' => 'Location salle',                     'code_cerfa' => '613A'],
+                    ['nom' => 'Location lieu (centre équestre)',    'code_cerfa' => '613B'],
+                    ['nom' => "Location lieu (salle d'armes)",      'code_cerfa' => '613C'],
+                ],
+            ],
+            [
+                'nom' => '62 - Autres services extérieurs',
+                'type' => TypeCategorie::Depense,
+                'sous' => [
+                    ['nom' => 'Bilan pré-thérapeutique',  'code_cerfa' => '611A'],
+                    ['nom' => 'Animation / Encadrement',  'code_cerfa' => '611B'],
+                    ['nom' => 'Supervision',              'code_cerfa' => '611C'],
+                    ['nom' => 'Sessions inter-ateliers',  'code_cerfa' => '611D'],
+                    ['nom' => 'Honoraires juridiques',    'code_cerfa' => '622'],
+                    ['nom' => 'Frais de déplacements',    'code_cerfa' => '625A'],
+                    ['nom' => 'Repas / Restauration',     'code_cerfa' => '625B'],
+                    ['nom' => 'Locations de logiciels',   'code_cerfa' => '628A'],
+                    ['nom' => 'Hébergement internet',     'code_cerfa' => '628B'],
+                    ['nom' => 'Développement logiciel',   'code_cerfa' => '628C'],
+                ],
+            ],
+            [
+                'nom' => '66 - Charges financières',
+                'type' => TypeCategorie::Depense,
+                'sous' => [
+                    ['nom' => 'Frais bancaires', 'code_cerfa' => '627'],
+                ],
+            ],
+            [
                 'nom' => '70 - Ventes et prestations',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
@@ -65,45 +106,30 @@ final class DefaultChartOfAccountsService
                 'nom' => '74 - Subventions',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Subventions publiques', 'code_cerfa' => '740'],
+                    ['nom' => 'Subvention État Ministère des Sports', 'code_cerfa' => '741'],
                 ],
             ],
             [
-                'nom' => '75 - Cotisations',
+                'nom' => '75 - Cotisations et dons',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Cotisations adhérents', 'code_cerfa' => '754', 'pour_cotisations' => true],
+                    ['nom' => 'Cotisations', 'code_cerfa' => '751', 'pour_cotisations' => true],
+                    ['nom' => 'Dons manuels', 'code_cerfa' => '754', 'pour_dons' => true],
+                    ['nom' => 'Mécénat',     'code_cerfa' => '756'],
                 ],
             ],
             [
-                'nom' => '75 - Dons',
+                'nom' => '76 - Produits financiers',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Dons éligibles au mécénat', 'code_cerfa' => '754', 'pour_dons' => true],
+                    ['nom' => 'Intérêts', 'code_cerfa' => '761'],
                 ],
             ],
             [
-                'nom' => '60 - Achats',
-                'type' => TypeCategorie::Depense,
+                'nom' => '77 - Produits exceptionnels',
+                'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Matières premières', 'code_cerfa' => '601'],
-                    ['nom' => 'Fournitures',        'code_cerfa' => '606'],
-                ],
-            ],
-            [
-                'nom' => '62 - Services extérieurs',
-                'type' => TypeCategorie::Depense,
-                'sous' => [
-                    ['nom' => 'Honoraires',   'code_cerfa' => '622'],
-                    ['nom' => 'Publicité',    'code_cerfa' => '623'],
-                    ['nom' => 'Déplacements', 'code_cerfa' => '625'],
-                ],
-            ],
-            [
-                'nom' => '64 - Charges de personnel',
-                'type' => TypeCategorie::Depense,
-                'sous' => [
-                    ['nom' => 'Salaires et traitements', 'code_cerfa' => '641'],
+                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771'],
                 ],
             ],
         ];

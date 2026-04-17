@@ -6,7 +6,7 @@
         <input class="form-check-input" type="radio" wire:model="planComptableChoix" id="planDefault" value="default">
         <label class="form-check-label" for="planDefault">
             <strong>Importer le plan comptable associatif par défaut</strong>
-            <br><small class="text-muted">~7 catégories, ~13 sous-catégories correspondant aux codes CERFA usuels (dons, cotisations, subventions, services extérieurs, charges de personnel…). Recommandé.</small>
+            <br><small class="text-muted">~9 catégories, ~26 sous-catégories correspondant aux codes CERFA usuels (achats, charges de fonctionnement, services extérieurs, ventes, subventions, cotisations, dons…). Recommandé.</small>
         </label>
     </div>
     <div class="form-check mb-3">
