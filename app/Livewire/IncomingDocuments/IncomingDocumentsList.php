@@ -125,7 +125,7 @@ final class IncomingDocumentsList extends Component
                 Storage::disk('local')->delete($seance->feuille_signee_path);
             }
 
-            Storage::disk('local')->move($doc->storage_path, $finalPath);
+            Storage::disk('local')->move($doc->incomingFullPath(), $finalPath);
 
             $seance->update([
                 'feuille_signee_path' => $finalPath,
@@ -176,7 +176,7 @@ final class IncomingDocumentsList extends Component
             $finalPath = $tenantDir.'/'.$filename;
 
             Storage::disk('local')->makeDirectory($tenantDir);
-            Storage::disk('local')->move($doc->storage_path, $finalPath);
+            Storage::disk('local')->move($doc->incomingFullPath(), $finalPath);
 
             ParticipantDocument::create([
                 'association_id' => $participant->association_id,
@@ -200,7 +200,7 @@ final class IncomingDocumentsList extends Component
         abort_unless(Auth::user()->currentRole() === RoleAssociation::Admin->value, 403);
 
         $doc = IncomingDocument::findOrFail($docId);
-        Storage::disk('local')->delete($doc->storage_path);
+        Storage::disk('local')->delete($doc->incomingFullPath());
         $doc->delete();
         session()->flash('success', 'Document supprimé.');
         $this->redirect($this->pageUrl, navigate: false);

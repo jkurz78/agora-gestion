@@ -8,6 +8,7 @@ use App\Services\IncomingDocuments\Contracts\DocumentHandler;
 use App\Services\IncomingDocuments\HandlerAttempt;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Storage;
 
 function makeIncomingFile(string $content = '%PDF-1.4 fake', ?string $messageId = null): IncomingDocumentFile
@@ -31,12 +32,12 @@ function makeIncomingFile(string $content = '%PDF-1.4 fake', ?string $messageId 
 beforeEach(function () {
     Storage::fake('local');
 
-    // The association singleton must exist for the FK.
-    if (Association::find(1) === null) {
-        $assoc = new Association;
-        $assoc->id = 1;
-        $assoc->fill(['nom' => 'Test Association'])->save();
-    }
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('calls the first handler that returns handled and stops the chain', function () {

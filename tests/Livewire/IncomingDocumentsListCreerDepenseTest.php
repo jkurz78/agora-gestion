@@ -25,18 +25,25 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-it('creerDepense dispatche open-transaction-form-from-incoming avec le docId', function () {
-    $this->association->update(['anthropic_api_key' => 'sk-test']);
+function makeInboxDoc(Association $association): IncomingDocument
+{
+    $aid = $association->id;
+    Storage::disk('local')->put("associations/{$aid}/incoming-documents/abc.pdf", 'PDF');
 
-    Storage::disk('local')->put('incoming-documents/abc.pdf', 'PDF');
-    $doc = IncomingDocument::create([
-        'association_id' => $this->association->id,
-        'storage_path' => 'incoming-documents/abc.pdf',
+    return IncomingDocument::create([
+        'association_id' => $aid,
+        'storage_path' => 'abc.pdf',
         'original_filename' => 'facture.pdf',
         'sender_email' => 'f@test.fr',
         'received_at' => now(),
         'reason' => 'unclassified',
     ]);
+}
+
+it('creerDepense dispatche open-transaction-form-from-incoming avec le docId', function () {
+    $this->association->update(['anthropic_api_key' => 'sk-test']);
+
+    $doc = makeInboxDoc($this->association);
 
     Livewire::test(IncomingDocumentsList::class)
         ->call('creerDepense', $doc->id)
@@ -53,15 +60,7 @@ it('creerDepense échoue sur un docId inexistant', function () {
 it('le bouton Créer dépense est visible pour un utilisateur Comptable avec OCR configuré', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test']);
 
-    Storage::disk('local')->put('incoming-documents/abc.pdf', 'PDF');
-    IncomingDocument::create([
-        'association_id' => $this->association->id,
-        'storage_path' => 'incoming-documents/abc.pdf',
-        'original_filename' => 'facture.pdf',
-        'sender_email' => 'f@test.fr',
-        'received_at' => now(),
-        'reason' => 'unclassified',
-    ]);
+    makeInboxDoc($this->association);
 
     $comptable = User::factory()->create();
     $comptable->associations()->attach($this->association->id, ['role' => 'comptable', 'joined_at' => now()]);
@@ -74,15 +73,7 @@ it('le bouton Créer dépense est visible pour un utilisateur Comptable avec OCR
 it('le bouton Créer dépense est invisible pour un utilisateur Gestionnaire', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test']);
 
-    Storage::disk('local')->put('incoming-documents/abc.pdf', 'PDF');
-    IncomingDocument::create([
-        'association_id' => $this->association->id,
-        'storage_path' => 'incoming-documents/abc.pdf',
-        'original_filename' => 'facture.pdf',
-        'sender_email' => 'f@test.fr',
-        'received_at' => now(),
-        'reason' => 'unclassified',
-    ]);
+    makeInboxDoc($this->association);
 
     $gestionnaire = User::factory()->create();
     $gestionnaire->associations()->attach($this->association->id, ['role' => 'gestionnaire', 'joined_at' => now()]);
@@ -94,16 +85,7 @@ it('le bouton Créer dépense est invisible pour un utilisateur Gestionnaire', f
 
 it('le bouton Créer dépense est invisible si OCR non configuré', function () {
     // association has no API key
-
-    Storage::disk('local')->put('incoming-documents/abc.pdf', 'PDF');
-    IncomingDocument::create([
-        'association_id' => $this->association->id,
-        'storage_path' => 'incoming-documents/abc.pdf',
-        'original_filename' => 'facture.pdf',
-        'sender_email' => 'f@test.fr',
-        'received_at' => now(),
-        'reason' => 'unclassified',
-    ]);
+    makeInboxDoc($this->association);
 
     Livewire::actingAs($this->user)
         ->test(IncomingDocumentsList::class)
@@ -113,15 +95,7 @@ it('le bouton Créer dépense est invisible si OCR non configuré', function () 
 it('creerDepense abort 403 pour un utilisateur Gestionnaire', function () {
     $this->association->update(['anthropic_api_key' => 'sk-test']);
 
-    Storage::disk('local')->put('incoming-documents/abc.pdf', 'PDF');
-    $doc = IncomingDocument::create([
-        'association_id' => $this->association->id,
-        'storage_path' => 'incoming-documents/abc.pdf',
-        'original_filename' => 'facture.pdf',
-        'sender_email' => 'f@test.fr',
-        'received_at' => now(),
-        'reason' => 'unclassified',
-    ]);
+    $doc = makeInboxDoc($this->association);
 
     $gestionnaire = User::factory()->create();
     $gestionnaire->associations()->attach($this->association->id, ['role' => 'gestionnaire', 'joined_at' => now()]);
@@ -135,16 +109,7 @@ it('creerDepense abort 403 pour un utilisateur Gestionnaire', function () {
 
 it('creerDepense abort 403 si OCR non configuré', function () {
     // association has no API key
-
-    Storage::disk('local')->put('incoming-documents/abc.pdf', 'PDF');
-    $doc = IncomingDocument::create([
-        'association_id' => $this->association->id,
-        'storage_path' => 'incoming-documents/abc.pdf',
-        'original_filename' => 'facture.pdf',
-        'sender_email' => 'f@test.fr',
-        'received_at' => now(),
-        'reason' => 'unclassified',
-    ]);
+    $doc = makeInboxDoc($this->association);
 
     Livewire::actingAs($this->user)
         ->test(IncomingDocumentsList::class)

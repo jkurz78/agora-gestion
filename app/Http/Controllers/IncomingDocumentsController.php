@@ -12,10 +12,10 @@ final class IncomingDocumentsController extends Controller
 {
     public function download(IncomingDocument $document): StreamedResponse
     {
-        abort_if(! Storage::disk('local')->exists($document->storage_path), 404);
+        abort_if(! Storage::disk('local')->exists($document->incomingFullPath()), 404);
 
         return Storage::disk('local')->response(
-            $document->storage_path,
+            $document->incomingFullPath(),
             $document->original_filename,
             ['Content-Type' => 'application/pdf'],
         );

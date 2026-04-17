@@ -167,7 +167,7 @@ final class TransactionForm extends Component
             return;
         }
 
-        $diskPath = Storage::disk('local')->path($doc->storage_path);
+        $diskPath = Storage::disk('local')->path($doc->incomingFullPath());
         if (! file_exists($diskPath)) {
             session()->flash('error', 'Fichier introuvable sur le disque.');
 
@@ -534,7 +534,7 @@ final class TransactionForm extends Component
 
                 return;
             }
-            $diskPath = Storage::disk('local')->path($doc->storage_path);
+            $diskPath = Storage::disk('local')->path($doc->incomingFullPath());
             if (! file_exists($diskPath)) {
                 $this->ocrError = 'Fichier introuvable sur le disque.';
 
@@ -568,7 +568,7 @@ final class TransactionForm extends Component
             return;
         }
 
-        $diskPath = Storage::disk('local')->path($doc->storage_path);
+        $diskPath = Storage::disk('local')->path($doc->incomingFullPath());
         if (! file_exists($diskPath)) {
             session()->flash('warning', 'Le fichier inbox a disparu pendant la sauvegarde ; la dépense a été créée sans justificatif.');
 
@@ -582,7 +582,7 @@ final class TransactionForm extends Component
             'application/pdf',
         );
 
-        $storagePath = $doc->storage_path;
+        $fullPath = $doc->incomingFullPath();
 
         // Ordre : on supprime la row d'abord (source de vérité). Si la row-delete
         // échoue (exception DB), la méthode propage et les fichiers disque restent
@@ -591,7 +591,7 @@ final class TransactionForm extends Component
         // sans row — le backfill artisan les détectera.
         $doc->delete();
 
-        Storage::disk('local')->delete($storagePath);
+        Storage::disk('local')->delete($fullPath);
     }
 
     /**
