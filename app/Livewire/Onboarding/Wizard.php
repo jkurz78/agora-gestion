@@ -9,9 +9,13 @@ use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\IncomingMailParametres;
 use App\Models\SmtpParametres;
+use App\Models\SousCategorie;
+use App\Models\TypeOperation;
+use App\Services\Onboarding\DefaultChartOfAccountsService;
 use App\Services\SmtpService;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Validate;
@@ -137,6 +141,22 @@ final class Wizard extends Component
     public string $imapProcessedFolder = 'INBOX.Processed';
 
     public string $imapErrorsFolder = 'INBOX.Errors';
+
+    // Step 7 — Plan comptable
+    #[Validate('required|in:default,empty')]
+    public string $planComptableChoix = 'default';
+
+    public ?int $planComptableCategoriesCount = null;
+
+    // Step 8 — TypeOperation
+    #[Validate('required|string|max:100')]
+    public string $typeOpNom = '';
+
+    #[Validate('nullable|string|max:255')]
+    public ?string $typeOpDescription = null;
+
+    #[Validate('required|integer|exists:sous_categories,id')]
+    public ?int $typeOpSousCategorieId = null;
 
     public function mount(): void
     {
@@ -499,6 +519,51 @@ final class Wizard extends Component
     public function skipStep6(): void
     {
         $this->advanceTo(7);
+    }
+
+    public function saveStep7(): void
+    {
+        $this->validate(['planComptableChoix' => 'required|in:default,empty']);
+
+        if ($this->planComptableChoix === 'default') {
+            $result = app(DefaultChartOfAccountsService::class)
+                ->applyTo($this->currentAssociation());
+            $this->planComptableCategoriesCount = $result['categories'];
+        }
+
+        $this->advanceTo(8);
+    }
+
+    public function saveStep8(): void
+    {
+        $this->validate([
+            'typeOpNom' => 'required|string|max:100',
+            'typeOpDescription' => 'nullable|string|max:255',
+            'typeOpSousCategorieId' => 'required|integer|exists:sous_categories,id',
+        ]);
+
+        $asso = $this->currentAssociation();
+        TypeOperation::create([
+            'association_id' => $asso->id,
+            'nom' => $this->typeOpNom,
+            'description' => $this->typeOpDescription,
+            'sous_categorie_id' => $this->typeOpSousCategorieId,
+            'actif' => true,
+        ]);
+
+        $this->advanceTo(9);
+    }
+
+    public function skipStep8(): void
+    {
+        $this->advanceTo(9);
+    }
+
+    public function getSousCategoriesProperty(): Collection
+    {
+        return SousCategorie::where('association_id', $this->currentAssociation()->id)
+            ->orderBy('nom')
+            ->get();
     }
 
     protected function advanceTo(int $step): void
