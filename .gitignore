@@ -52,8 +52,6 @@ public/proto-*.html
 # Docs internes (specs, plans, design) — exclus du repo
 /docs/superpowers/
 /docs/adr/
-/docs/runbooks/
-/docs/semgrep-s6-report.md
 
 # Fichiers locaux
 /tmp/
