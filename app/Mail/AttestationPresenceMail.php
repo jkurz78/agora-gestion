@@ -73,10 +73,19 @@ final class AttestationPresenceMail extends Mailable
      */
     public function attachments(): array
     {
-        return [
+        $attachments = [
             Attachment::fromData(fn () => $this->pdfContent, $this->pdfFilename)
                 ->withMime('application/pdf'),
         ];
+
+        $logo = EmailLogo::resolve();
+        if ($logo) {
+            $attachments[] = Attachment::fromPath($logo['path'])
+                ->as(EmailLogo::CID_ASSO)
+                ->withMime($logo['mime']);
+        }
+
+        return $attachments;
     }
 
     /**
