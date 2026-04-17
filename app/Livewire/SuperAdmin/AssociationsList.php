@@ -13,6 +13,8 @@ final class AssociationsList extends Component
 {
     use WithPagination;
 
+    protected string $paginationTheme = 'bootstrap';
+
     public string $search = '';
 
     public function updatingSearch(): void
