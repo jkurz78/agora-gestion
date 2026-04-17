@@ -20,6 +20,50 @@ final class AssociationDetail extends Component
         $this->association = $association;
     }
 
+    public function suspend(): void
+    {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        if ($this->association->statut !== 'actif') {
+            $this->addError('statut', "Transition impossible depuis '{$this->association->statut}'.");
+            return;
+        }
+        $this->association->update(['statut' => 'suspendu']);
+        $this->logTransition('suspend');
+    }
+
+    public function reactivate(): void
+    {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        if ($this->association->statut !== 'suspendu') {
+            $this->addError('statut', "Transition impossible depuis '{$this->association->statut}'.");
+            return;
+        }
+        $this->association->update(['statut' => 'actif']);
+        $this->logTransition('reactivate');
+    }
+
+    public function archive(): void
+    {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+        if ($this->association->statut !== 'suspendu') {
+            $this->addError('statut', "Seule une asso suspendue peut être archivée.");
+            return;
+        }
+        $this->association->update(['statut' => 'archive']);
+        $this->logTransition('archive');
+    }
+
+    private function logTransition(string $action): void
+    {
+        SuperAdminAccessLog::create([
+            'user_id' => auth()->id(),
+            'association_id' => $this->association->id,
+            'action' => $action,
+            'payload' => ['new_statut' => $this->association->statut],
+            'created_at' => now(),
+        ]);
+    }
+
     public function render(): View
     {
         $users = $this->association->users()

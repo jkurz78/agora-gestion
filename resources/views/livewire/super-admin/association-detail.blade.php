@@ -20,6 +20,19 @@
             <dt class="col-sm-3">Onboarding</dt><dd class="col-sm-9">{{ $association->wizard_completed_at?->format('d/m/Y H:i') ?? 'En cours' }}</dd>
             <dt class="col-sm-3">Créée</dt><dd class="col-sm-9">{{ $association->created_at?->format('d/m/Y H:i') }}</dd>
         </dl>
+
+        <hr>
+        <h5>Actions</h5>
+        @if ($association->statut === 'actif')
+            <button wire:click="suspend" wire:confirm="Suspendre {{ $association->nom }} ? Les users ne pourront plus y accéder." class="btn btn-warning">Suspendre</button>
+        @elseif ($association->statut === 'suspendu')
+            <button wire:click="reactivate" wire:confirm="Réactiver {{ $association->nom }} ?" class="btn btn-success">Réactiver</button>
+            <button wire:click="archive" wire:confirm="ARCHIVAGE IRRÉVERSIBLE. Continuer ?" class="btn btn-outline-danger ms-2">Archiver</button>
+        @else
+            <p class="text-muted small">Association archivée, aucune action disponible.</p>
+        @endif
+
+        @error('statut')<div class="alert alert-danger mt-2">{{ $message }}</div>@enderror
     @elseif ($tab === 'users')
         <table class="table">
             <thead><tr><th>Email</th><th>Rôle</th><th>Invité/rejoint</th><th>Révoqué</th></tr></thead>
