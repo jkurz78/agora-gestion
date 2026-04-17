@@ -6,6 +6,7 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
+use App\Support\TenantUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
@@ -70,7 +71,7 @@ final class FormulaireInvitation extends Mailable
      */
     private function variables(): array
     {
-        $formulaireIndex = route('formulaire.index');
+        $formulaireIndex = TenantUrl::route('formulaire.index');
 
         $blocLiens = '<p style="text-align: center; margin: 25px 0;">'
             .'<a href="'.$this->formulaireUrl.'" style="display:inline-block;padding:10px 24px;background:#3d5473;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;">Accéder au formulaire</a>'

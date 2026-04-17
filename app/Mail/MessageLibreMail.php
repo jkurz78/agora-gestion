@@ -8,6 +8,7 @@ use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
 use App\Models\Seance;
 use App\Support\CurrentAssociation;
+use App\Support\TenantUrl;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -56,7 +57,7 @@ final class MessageLibreMail extends Mailable
 
         // Append tracking pixel if token provided
         if ($this->trackingToken) {
-            $pixelUrl = route('email.tracking', ['token' => $this->trackingToken]);
+            $pixelUrl = TenantUrl::route('email.tracking', ['token' => $this->trackingToken]);
             $html .= '<img src="'.htmlspecialchars($pixelUrl).'" width="1" height="1" alt="" style="display:none">';
         }
 
