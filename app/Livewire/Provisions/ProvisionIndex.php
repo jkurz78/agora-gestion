@@ -160,17 +160,29 @@ final class ProvisionIndex extends Component
             'saisi_par' => auth()->id(),
         ];
 
-        if ($this->piece_jointe !== null) {
-            $path = $this->piece_jointe->store('provisions', 'local');
-            $data['piece_jointe_path'] = $path;
-            $data['piece_jointe_nom'] = $this->piece_jointe->getClientOriginalName();
-            $data['piece_jointe_mime'] = $this->piece_jointe->getMimeType();
+        if ($this->editingId !== null) {
+            $provision = Provision::findOrFail($this->editingId);
+            $provision->update($data);
+        } else {
+            $provision = Provision::create($data);
         }
 
-        if ($this->editingId !== null) {
-            Provision::findOrFail($this->editingId)->update($data);
-        } else {
-            Provision::create($data);
+        // Écriture physique de la pièce jointe après que l'id soit connu
+        if ($this->piece_jointe !== null) {
+            $extension = $this->piece_jointe->getClientOriginalExtension() ?: 'pdf';
+            $shortName = 'piece-jointe.'.$extension;
+            $fullPath  = $provision->storagePath('provisions/'.$provision->id.'/'.$shortName);
+
+            \Illuminate\Support\Facades\Storage::disk('local')->put(
+                $fullPath,
+                $this->piece_jointe->get(),
+            );
+
+            $provision->update([
+                'piece_jointe_path' => $shortName,
+                'piece_jointe_nom'  => $this->piece_jointe->getClientOriginalName(),
+                'piece_jointe_mime' => $this->piece_jointe->getMimeType(),
+            ]);
         }
 
         $this->showModal = false;
