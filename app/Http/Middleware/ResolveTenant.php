@@ -59,6 +59,9 @@ final class ResolveTenant
 
         $association = Association::find($assoId);
         if ($association !== null) {
+            if (in_array($association->statut, ['suspendu', 'archive'], true) && ! $user->isSuperAdmin()) {
+                abort(403, 'Cette association est '.$association->statut.'.');
+            }
             TenantContext::boot($association);
             $request->session()->put('current_association_id', $association->id);
         }
