@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Association;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -17,7 +18,14 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
-    ->beforeEach(fn () => TenantContext::clear())
+    ->beforeEach(function () {
+        // Boot a default tenant context so that tenant-scoped models work out of the box.
+        // Tests that manage their own context (e.g. isolation tests, explicit boot/clear)
+        // override this by calling TenantContext::clear() or TenantContext::boot() in
+        // their own beforeEach — which runs AFTER this global hook.
+        $association = Association::factory()->create();
+        TenantContext::boot($association);
+    })
     ->afterEach(fn () => TenantContext::clear())
     ->in('Feature', 'Livewire', 'Unit');
 
