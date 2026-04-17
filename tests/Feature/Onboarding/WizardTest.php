@@ -263,3 +263,47 @@ it('advanceTo does not downgrade wizard_current_step', function () {
 
     expect($this->association->fresh()->wizard_current_step)->toBe(5);
 });
+
+it('saves step 4 SMTP and advances to step 5', function () {
+    $this->association->update(['wizard_current_step' => 4]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('smtpHost', 'smtp.example.com')
+        ->set('smtpPort', 587)
+        ->set('smtpEncryption', 'tls')
+        ->set('smtpUsername', 'user@example.com')
+        ->set('smtpPassword', 'secret')
+        ->set('smtpEnabled', true)
+        ->call('saveStep4')
+        ->assertSet('currentStep', 5);
+
+    $smtp = \App\Models\SmtpParametres::where('association_id', $this->association->id)->first();
+    expect($smtp)->not->toBeNull();
+    expect($smtp->smtp_host)->toBe('smtp.example.com');
+    expect($smtp->smtp_port)->toBe(587);
+    expect($smtp->enabled)->toBeTrue();
+    expect($this->association->fresh()->wizard_current_step)->toBe(5);
+});
+
+it('rejects step 4 with missing host', function () {
+    $this->association->update(['wizard_current_step' => 4]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('smtpHost', '')
+        ->call('saveStep4')
+        ->assertHasErrors(['smtpHost']);
+});
+
+it('allows step 4 to be skipped (SMTP disabled)', function () {
+    $this->association->update(['wizard_current_step' => 4]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('skipStep4')
+        ->assertSet('currentStep', 5);
+
+    $smtp = \App\Models\SmtpParametres::where('association_id', $this->association->id)->first();
+    expect($smtp?->enabled ?? false)->toBeFalse();
+});

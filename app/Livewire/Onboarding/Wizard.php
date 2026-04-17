@@ -6,6 +6,7 @@ namespace App\Livewire\Onboarding;
 
 use App\Models\Association;
 use App\Models\CompteBancaire;
+use App\Models\SmtpParametres;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Storage;
@@ -71,6 +72,27 @@ final class Wizard extends Component
     #[Validate('required|date')]
     public string $banqueDateSoldeInitial = '';
 
+    // Step 4 — SMTP
+    #[Validate('required|string|max:255')]
+    public string $smtpHost = '';
+
+    #[Validate('required|integer|between:1,65535')]
+    public int $smtpPort = 587;
+
+    #[Validate('nullable|in:tls,ssl')]
+    public ?string $smtpEncryption = 'tls';
+
+    #[Validate('required|string|max:255')]
+    public string $smtpUsername = '';
+
+    #[Validate('required|string|max:255')]
+    public string $smtpPassword = '';
+
+    public bool $smtpEnabled = true;
+
+    public ?string $smtpTestMessage = null;
+    public ?string $smtpTestError = null;
+
     public function mount(): void
     {
         $association = $this->currentAssociation();
@@ -99,6 +121,16 @@ final class Wizard extends Component
                 $this->banqueSoldeInitial = (float) $compte->solde_initial;
                 $this->banqueDateSoldeInitial = $compte->date_solde_initial?->format('Y-m-d') ?? now()->format('Y-m-d');
             }
+        }
+
+        $smtp = SmtpParametres::where('association_id', $association->id)->first();
+        if ($smtp !== null) {
+            $this->smtpHost = (string) ($smtp->smtp_host ?? '');
+            $this->smtpPort = (int) ($smtp->smtp_port ?? 587);
+            $this->smtpEncryption = $smtp->smtp_encryption;
+            $this->smtpUsername = (string) ($smtp->smtp_username ?? '');
+            $this->smtpPassword = (string) ($smtp->smtp_password ?? '');
+            $this->smtpEnabled = (bool) $smtp->enabled;
         }
     }
 
@@ -230,6 +262,76 @@ final class Wizard extends Component
         }
 
         $this->advanceTo(4);
+    }
+
+    public function saveStep4(): void
+    {
+        $this->validate([
+            'smtpHost'       => 'required|string|max:255',
+            'smtpPort'       => 'required|integer|between:1,65535',
+            'smtpEncryption' => 'nullable|in:tls,ssl',
+            'smtpUsername'   => 'required|string|max:255',
+            'smtpPassword'   => 'required|string|max:255',
+        ]);
+
+        $association = $this->currentAssociation();
+
+        SmtpParametres::updateOrCreate(
+            ['association_id' => $association->id],
+            [
+                'enabled'         => $this->smtpEnabled,
+                'smtp_host'       => $this->smtpHost,
+                'smtp_port'       => $this->smtpPort,
+                'smtp_encryption' => $this->smtpEncryption,
+                'smtp_username'   => $this->smtpUsername,
+                'smtp_password'   => $this->smtpPassword,
+                'timeout'         => 30,
+            ],
+        );
+
+        $this->advanceTo(5);
+    }
+
+    public function skipStep4(): void
+    {
+        $association = $this->currentAssociation();
+        SmtpParametres::updateOrCreate(
+            ['association_id' => $association->id],
+            ['enabled' => false],
+        );
+        $this->advanceTo(5);
+    }
+
+    public function testSmtp(): void
+    {
+        $this->validate([
+            'smtpHost'       => 'required|string',
+            'smtpPort'       => 'required|integer',
+            'smtpEncryption' => 'nullable|in:tls,ssl',
+            'smtpUsername'   => 'required|string',
+            'smtpPassword'   => 'required|string',
+        ]);
+
+        $this->smtpTestMessage = null;
+        $this->smtpTestError = null;
+
+        try {
+            $scheme = $this->smtpEncryption === 'ssl' ? 'smtps' : 'smtp';
+            $transport = (new \Symfony\Component\Mailer\Transport\EsmtpTransportFactory())
+                ->create(new \Symfony\Component\Mailer\Transport\Dsn(
+                    $scheme,
+                    $this->smtpHost,
+                    $this->smtpUsername,
+                    $this->smtpPassword,
+                    $this->smtpPort,
+                    ['encryption' => $this->smtpEncryption],
+                ));
+            $transport->start();
+            $transport->stop();
+            $this->smtpTestMessage = 'Connexion SMTP réussie.';
+        } catch (\Throwable $e) {
+            $this->smtpTestError = 'Échec : '.$e->getMessage();
+        }
     }
 
     protected function advanceTo(int $step): void
