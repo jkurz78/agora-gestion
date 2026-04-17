@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use App\Livewire\Onboarding\Wizard;
 use App\Models\Association;
+use App\Models\CompteBancaire;
+use App\Models\SmtpParametres;
 use App\Models\User;
+use App\Services\SmtpService;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -199,7 +202,7 @@ it('saves step 3 compte bancaire and advances to step 4', function () {
         ->call('saveStep3')
         ->assertSet('currentStep', 4);
 
-    $compte = \App\Models\CompteBancaire::where('association_id', $this->association->id)->first();
+    $compte = CompteBancaire::where('association_id', $this->association->id)->first();
     expect($compte)->not->toBeNull();
     expect($compte->nom)->toBe('Compte courant principal');
     expect($compte->iban)->toBe('FR7630001007941234567890185');
@@ -234,8 +237,8 @@ it('reuses existing compte principal on step 3 re-submit (no duplicate row)', fu
         ->call('saveStep3')
         ->assertSet('currentStep', 4);
 
-    expect(\App\Models\CompteBancaire::where('association_id', $this->association->id)->count())->toBe(1);
-    $firstId = \App\Models\CompteBancaire::where('association_id', $this->association->id)->value('id');
+    expect(CompteBancaire::where('association_id', $this->association->id)->count())->toBe(1);
+    $firstId = CompteBancaire::where('association_id', $this->association->id)->value('id');
 
     // Second submission with updated values (wizard_state now has compte_principal_id)
     Livewire::actingAs($this->admin)
@@ -246,8 +249,8 @@ it('reuses existing compte principal on step 3 re-submit (no duplicate row)', fu
         ->set('banqueDateSoldeInitial', '2026-02-01')
         ->call('saveStep3');
 
-    expect(\App\Models\CompteBancaire::where('association_id', $this->association->id)->count())->toBe(1);
-    $compte = \App\Models\CompteBancaire::find($firstId);
+    expect(CompteBancaire::where('association_id', $this->association->id)->count())->toBe(1);
+    $compte = CompteBancaire::find($firstId);
     expect($compte->nom)->toBe('Compte A renommé');
     expect((float) $compte->solde_initial)->toBe(250.00);
 });
@@ -278,7 +281,7 @@ it('saves step 4 SMTP and advances to step 5', function () {
         ->call('saveStep4')
         ->assertSet('currentStep', 5);
 
-    $smtp = \App\Models\SmtpParametres::where('association_id', $this->association->id)->first();
+    $smtp = SmtpParametres::where('association_id', $this->association->id)->first();
     expect($smtp)->not->toBeNull();
     expect($smtp->smtp_host)->toBe('smtp.example.com');
     expect($smtp->smtp_port)->toBe(587);
@@ -304,6 +307,89 @@ it('allows step 4 to be skipped (SMTP disabled)', function () {
         ->call('skipStep4')
         ->assertSet('currentStep', 5);
 
-    $smtp = \App\Models\SmtpParametres::where('association_id', $this->association->id)->first();
+    $smtp = SmtpParametres::where('association_id', $this->association->id)->first();
     expect($smtp?->enabled ?? false)->toBeFalse();
+});
+
+it('preserves prior SMTP credentials when skipping step 4', function () {
+    $this->association->update(['wizard_current_step' => 4]);
+
+    SmtpParametres::create([
+        'association_id' => $this->association->id,
+        'enabled' => true,
+        'smtp_host' => 'smtp.ex.com',
+        'smtp_port' => 587,
+        'smtp_encryption' => 'tls',
+        'smtp_username' => 'foo@ex.com',
+        'smtp_password' => 'secret',
+        'timeout' => 30,
+    ]);
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->call('skipStep4')
+        ->assertSet('currentStep', 5);
+
+    $smtp = SmtpParametres::where('association_id', $this->association->id)->first();
+    expect($smtp)->not->toBeNull();
+    expect($smtp->smtp_host)->toBe('smtp.ex.com');
+    expect($smtp->smtp_username)->toBe('foo@ex.com');
+    expect($smtp->smtp_password)->toBe('secret');
+    expect($smtp->enabled)->toBeFalse();
+});
+
+it('testSmtp surfaces success banner from service', function () {
+    $this->association->update(['wizard_current_step' => 4]);
+
+    $r = new stdClass;
+    $r->success = true;
+    $r->error = null;
+    $r->banner = '220 smtp.ex.com ESMTP';
+
+    app()->bind(SmtpService::class, fn () => new class($r)
+    {
+        public function __construct(private readonly stdClass $result) {}
+
+        public function testerConnexion(string $host, int $port, string $encryption, string $username, string $password, int $timeout = 10): stdClass
+        {
+            return $this->result;
+        }
+    });
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('smtpHost', 'smtp.ex.com')
+        ->set('smtpPort', 587)
+        ->set('smtpEncryption', 'tls')
+        ->call('testSmtp')
+        ->assertSet('smtpTestError', null)
+        ->assertSeeHtml('Connexion SMTP réussie');
+});
+
+it('testSmtp surfaces failure error from service', function () {
+    $this->association->update(['wizard_current_step' => 4]);
+
+    $r = new stdClass;
+    $r->success = false;
+    $r->error = 'Connexion refusée (errno 111)';
+    $r->banner = null;
+
+    app()->bind(SmtpService::class, fn () => new class($r)
+    {
+        public function __construct(private readonly stdClass $result) {}
+
+        public function testerConnexion(string $host, int $port, string $encryption, string $username, string $password, int $timeout = 10): stdClass
+        {
+            return $this->result;
+        }
+    });
+
+    Livewire::actingAs($this->admin)
+        ->test(Wizard::class)
+        ->set('smtpHost', 'smtp.ex.com')
+        ->set('smtpPort', 587)
+        ->set('smtpEncryption', 'tls')
+        ->call('testSmtp')
+        ->assertSet('smtpTestMessage', null)
+        ->assertSeeHtml('Connexion refusée (errno 111)');
 });

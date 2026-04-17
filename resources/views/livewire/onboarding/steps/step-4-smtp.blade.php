@@ -16,11 +16,13 @@
     </div>
     <div class="mb-3">
         <label class="form-label">Chiffrement</label>
-        <select wire:model="smtpEncryption" class="form-select">
+        <select wire:model="smtpEncryption" class="form-select @error('smtpEncryption') is-invalid @enderror">
             <option value="tls">TLS</option>
             <option value="ssl">SSL</option>
-            <option value="">Aucun</option>
+            <option value="starttls">STARTTLS</option>
+            <option value="none">Aucun</option>
         </select>
+        @error('smtpEncryption') <div class="invalid-feedback">{{ $message }}</div> @enderror
     </div>
     <div class="row">
         <div class="col-md-6 mb-3">
@@ -29,8 +31,12 @@
             @error('smtpUsername') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
         <div class="col-md-6 mb-3">
-            <label class="form-label">Mot de passe</label>
-            <input type="password" wire:model="smtpPassword" class="form-control @error('smtpPassword') is-invalid @enderror">
+            <label class="form-label">
+                Mot de passe
+                @if($passwordDejaEnregistre)<small class="text-muted">(laisser vide pour conserver)</small>@endif
+            </label>
+            <input type="password" wire:model="smtpPassword" class="form-control @error('smtpPassword') is-invalid @enderror"
+                placeholder="{{ $passwordDejaEnregistre ? '••••••••' : 'Mot de passe SMTP' }}">
             @error('smtpPassword') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
     </div>
@@ -49,9 +55,11 @@
         <div class="alert alert-danger">{{ $smtpTestError }}</div>
     @endif
 
-    <button type="button" wire:click="goToStep(3)" class="btn btn-link">← Retour</button>
-    <button type="button" wire:click="skipStep4" class="btn btn-outline-warning" wire:confirm="Vous pourrez configurer SMTP plus tard depuis les paramètres. Les envois d'emails seront désactivés.">
-        Passer sans configurer
-    </button>
-    <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">Valider et continuer</button>
+    <div class="d-flex gap-2 justify-content-between mt-4">
+        <button type="button" wire:click="goToStep(3)" class="btn btn-link">← Retour</button>
+        <button type="button" wire:click="skipStep4" class="btn btn-outline-warning" wire:confirm="Vous pourrez configurer SMTP plus tard depuis les paramètres. Les envois d'emails seront désactivés.">
+            Passer sans configurer
+        </button>
+        <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">Valider et continuer</button>
+    </div>
 </form>
