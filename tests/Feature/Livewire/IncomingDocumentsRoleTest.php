@@ -123,7 +123,7 @@ it('admin peut supprimer un document', function () {
 
     $doc = IncomingDocument::create([
         'association_id' => $this->association->id,
-        'storage_path' => 'incoming-documents/test.pdf',
+        'storage_path' => 'test.pdf',
         'original_filename' => 'test.pdf',
         'sender_email' => 'test@example.com',
         'received_at' => now(),

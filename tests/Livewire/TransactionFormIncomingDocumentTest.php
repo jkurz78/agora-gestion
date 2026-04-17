@@ -38,13 +38,14 @@ afterEach(function () {
 
 function createInboxDocument(string $content = '%PDF-1.4 fake'): IncomingDocument
 {
-    $path = 'incoming-documents/doc-'.uniqid().'.pdf';
-    Storage::disk('local')->put($path, $content);
+    $associationId = TenantContext::currentId();
+    $shortName = 'doc-'.uniqid().'.pdf';
+    $fullPath = 'associations/'.$associationId.'/incoming-documents/'.$shortName;
+    Storage::disk('local')->put($fullPath, $content);
 
-    // Use the booted TenantContext to get the current association id
     return IncomingDocument::create([
-        'association_id' => TenantContext::currentId(),
-        'storage_path' => $path,
+        'association_id' => $associationId,
+        'storage_path' => $shortName,
         'original_filename' => 'facture-fournisseur.pdf',
         'sender_email' => 'fournisseur@test.fr',
         'received_at' => now(),
@@ -128,7 +129,7 @@ it('open-transaction-form-from-incoming ignore un docId inexistant sans planter'
 it('open-transaction-form-from-incoming flash une erreur si le fichier disque manque', function () {
     $doc = IncomingDocument::create([
         'association_id' => $this->association->id,
-        'storage_path' => 'incoming-documents/ghost.pdf', // n'existe pas sur disque
+        'storage_path' => 'ghost.pdf', // n'existe pas sur disque
         'original_filename' => 'ghost.pdf',
         'sender_email' => 'test@test.fr',
         'received_at' => now(),
@@ -169,7 +170,7 @@ it('save transfère le fichier inbox vers pieces-jointes et supprime l\'Incoming
 
     $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $doc = createInboxDocument('FAKE PDF BYTES');
-    $storagePath = $doc->storage_path;
+    $incomingFullPath = $doc->incomingFullPath();
 
     Livewire::test(TransactionForm::class)
         ->dispatch('open-transaction-form-from-incoming', docId: $doc->id)
@@ -189,7 +190,7 @@ it('save transfère le fichier inbox vers pieces-jointes et supprime l\'Incoming
 
     // IncomingDocument supprimé (row + fichier disque)
     expect(IncomingDocument::find($doc->id))->toBeNull()
-        ->and(Storage::disk('local')->exists($storagePath))->toBeFalse();
+        ->and(Storage::disk('local')->exists($incomingFullPath))->toBeFalse();
 });
 
 it('save conserve l\'IncomingDocument si la validation échoue', function () {
@@ -222,7 +223,7 @@ it('save conserve l\'IncomingDocument si la validation échoue', function () {
         ->assertHasErrors('mode_paiement');
 
     expect(IncomingDocument::find($doc->id))->not->toBeNull()
-        ->and(Storage::disk('local')->exists($doc->storage_path))->toBeTrue();
+        ->and(Storage::disk('local')->exists($doc->incomingFullPath()))->toBeTrue();
 });
 
 it('openFormFromIncoming flash une erreur pour un utilisateur Gestionnaire (sans droit canEdit)', function () {
@@ -270,7 +271,7 @@ it('save flash un warning et crée la dépense sans justificatif si le fichier i
     $component = Livewire::test(TransactionForm::class)
         ->dispatch('open-transaction-form-from-incoming', docId: $doc->id);
 
-    Storage::disk('local')->delete($doc->storage_path);
+    Storage::disk('local')->delete($doc->incomingFullPath());
 
     $component
         ->set('date', '2025-11-22')
