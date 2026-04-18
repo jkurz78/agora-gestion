@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\Enums\CategorieEmail;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
+use App\Enums\RoleAssociation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Enums\TypeTransaction;
@@ -57,7 +58,7 @@ final class ReglementTable extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Gestion);
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function mount(Operation $operation): void
@@ -507,8 +508,9 @@ final class ReglementTable extends Component
             TypeDocumentPrevisionnel::Proforma => ['pro forma', 'la pro forma', 'de la pro forma'],
         };
 
-        $pdfContent = $doc->pdf_path && Storage::disk('local')->exists($doc->pdf_path)
-            ? Storage::disk('local')->get($doc->pdf_path)
+        $docFullPath = $doc->pdfFullPath();
+        $pdfContent = $docFullPath && Storage::disk('local')->exists($docFullPath)
+            ? Storage::disk('local')->get($docFullPath)
             : app(DocumentPrevisionnelService::class)->genererPdf($doc);
 
         $pdfFilename = ucfirst($typeLabel)." {$doc->numero} - {$tiers->displayName()}.pdf";

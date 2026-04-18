@@ -5,18 +5,26 @@ declare(strict_types=1);
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Livewire\RemiseBancaireSelection;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->compteCible = CompteBancaire::factory()->create();
+
+    $this->compteCible = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $this->remise = RemiseBancaire::create([
+        'association_id' => $this->association->id,
         'numero' => 1,
         'date' => '2025-10-15',
         'mode_paiement' => ModePaiement::Cheque->value,
@@ -26,6 +34,10 @@ beforeEach(function () {
     ]);
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('renders the selection page', function () {
     $this->get(route('banques.remises.selection', $this->remise))
         ->assertStatus(200)
@@ -33,8 +45,9 @@ it('renders the selection page', function () {
 });
 
 it('shows transactions matching mode_paiement and statut_reglement', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Jean']);
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 30.00,
@@ -49,8 +62,9 @@ it('shows transactions matching mode_paiement and statut_reglement', function ()
 });
 
 it('does not show transactions with different mode_paiement', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Jean']);
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Especes,
         'montant_total' => 30.00,
@@ -64,8 +78,9 @@ it('does not show transactions with different mode_paiement', function () {
 });
 
 it('does not show transactions with statut_reglement=pointe', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Jean']);
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 30.00,
@@ -80,6 +95,7 @@ it('does not show transactions with statut_reglement=pointe', function () {
 
 it('toggleTransaction sélectionne et désélectionne une transaction', function () {
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 45.00,
@@ -96,6 +112,7 @@ it('toggleTransaction sélectionne et désélectionne une transaction', function
 
 it('pre-popule selectedTransactionIds avec les transactions déjà dans la remise', function () {
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 55.00,
@@ -109,6 +126,7 @@ it('pre-popule selectedTransactionIds avec les transactions déjà dans la remis
 
 it('valider enregistre le brouillon et redirige vers show', function () {
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 45.00,
@@ -133,6 +151,7 @@ it('valider sans sélection affiche une erreur', function () {
 
 it('exclut les transactions déjà dans une autre remise', function () {
     $autreRemise = RemiseBancaire::create([
+        'association_id' => $this->association->id,
         'numero' => 99,
         'date' => '2025-11-01',
         'mode_paiement' => ModePaiement::Cheque->value,
@@ -141,8 +160,9 @@ it('exclut les transactions déjà dans une autre remise', function () {
         'saisi_par' => $this->user->id,
     ]);
 
-    $tiers = Tiers::factory()->create(['nom' => 'Martin', 'prenom' => 'Sophie']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Martin', 'prenom' => 'Sophie']);
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
         'montant_total' => 60.00,

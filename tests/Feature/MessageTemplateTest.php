@@ -2,12 +2,25 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\MessageTemplate;
 use App\Models\TypeOperation;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Schema;
 
-uses(RefreshDatabase::class);
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('message_templates table exists with expected columns', function () {
     expect(Schema::hasTable('message_templates'))->toBeTrue();
@@ -18,9 +31,10 @@ it('message_templates table exists with expected columns', function () {
 });
 
 it('can create a MessageTemplate with all fields', function () {
-    $typeOperation = TypeOperation::factory()->create();
+    $typeOperation = TypeOperation::factory()->create(['association_id' => $this->association->id]);
 
     $template = MessageTemplate::create([
+        'association_id' => $this->association->id,
         'nom' => 'Rappel séance',
         'objet' => 'Rappel : votre séance de demain',
         'corps' => 'Bonjour {prenom}, votre prochaine séance est le {date_prochaine_seance}.',
@@ -35,9 +49,10 @@ it('can create a MessageTemplate with all fields', function () {
 });
 
 it('MessageTemplate belongs to TypeOperation', function () {
-    $typeOperation = TypeOperation::factory()->create();
+    $typeOperation = TypeOperation::factory()->create(['association_id' => $this->association->id]);
 
     $template = MessageTemplate::create([
+        'association_id' => $this->association->id,
         'nom' => 'Gabarit atelier',
         'objet' => 'Info atelier',
         'corps' => 'Corps du message',
@@ -50,6 +65,7 @@ it('MessageTemplate belongs to TypeOperation', function () {
 
 it('MessageTemplate type_operation_id is nullable for global templates', function () {
     $template = MessageTemplate::create([
+        'association_id' => $this->association->id,
         'nom' => 'Gabarit global',
         'objet' => 'Info générale',
         'corps' => 'Corps du message global',

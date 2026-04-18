@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\TypeCategorie;
 use App\Enums\TypeTransaction;
+use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
@@ -11,9 +12,14 @@ use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
 
     $cat = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
     $this->sc = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $cat->id]);
@@ -31,6 +37,10 @@ beforeEach(function () {
         'sous_categorie_id' => $this->sc->id,
         'montant' => 1200.00,
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('télécharge un CSV budget', function () {

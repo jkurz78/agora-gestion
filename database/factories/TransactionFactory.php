@@ -11,9 +11,12 @@ use App\Models\CompteBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/** @extends Factory<Transaction> */
+/**
+ * @extends Factory<Transaction>
+ */
 class TransactionFactory extends Factory
 {
     protected $model = Transaction::class;
@@ -21,6 +24,7 @@ class TransactionFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => TenantContext::currentId() ?? 1,
             'type' => fake()->randomElement(TypeTransaction::cases()),
             'date' => fake()->dateTimeBetween('-1 year', 'now'),
             'libelle' => fake()->sentence(4),

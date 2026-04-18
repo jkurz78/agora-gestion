@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\TypeDocumentPrevisionnel;
-use Illuminate\Database\Eloquent\Model;
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-final class DocumentPrevisionnel extends Model
+final class DocumentPrevisionnel extends TenantModel
 {
+    use TenantStorage;
+
     protected $table = 'documents_previsionnels';
 
     protected $fillable = [
+        'association_id',
         'operation_id',
         'participant_id',
         'type',
@@ -39,6 +42,13 @@ final class DocumentPrevisionnel extends Model
             'participant_id' => 'integer',
             'saisi_par' => 'integer',
         ];
+    }
+
+    public function pdfFullPath(): ?string
+    {
+        return $this->pdf_path
+            ? $this->storagePath('documents-previsionnels/'.basename($this->pdf_path))
+            : null;
     }
 
     public function operation(): BelongsTo

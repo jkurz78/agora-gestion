@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\StatutFacture;
+use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
@@ -14,6 +15,7 @@ use App\Models\FactureLigne;
 use App\Models\Seance;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Support\CurrentAssociation;
 use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -35,7 +37,7 @@ final class FactureService
         $this->exerciceService->assertOuvert($exercice);
 
         return DB::transaction(function () use ($tiersId, $exercice): Facture {
-            $association = Association::first();
+            $association = CurrentAssociation::get();
 
             $mentionsLegales = $association?->facture_mentions_legales
                 ?? "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé";
@@ -246,7 +248,7 @@ final class FactureService
 
                 $transaction->update([
                     'compte_id' => $compteBancaireId,
-                    'statut_reglement' => \App\Enums\StatutReglement::Recu->value,
+                    'statut_reglement' => StatutReglement::Recu->value,
                 ]);
             }
         });
@@ -370,15 +372,16 @@ final class FactureService
     public function genererPdf(Facture $facture, bool $forceOriginalFormat = false): string
     {
         $facture->load(['tiers', 'compteBancaire', 'lignes', 'transactions']);
-        $association = Association::first();
+        $association = CurrentAssociation::get();
 
         // Step 1: generate visual PDF via dompdf
         $headerLogoBase64 = null;
         $headerLogoMime = null;
-        if ($association?->logo_path) {
-            $logoContent = Storage::disk('public')->get($association->logo_path);
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $logoContent = Storage::disk('local')->get($logoFullPath);
             if ($logoContent) {
-                $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+                $ext = strtolower(pathinfo($logoFullPath, PATHINFO_EXTENSION));
                 $headerLogoMime = in_array($ext, ['jpg', 'jpeg']) ? 'image/jpeg' : 'image/png';
                 $headerLogoBase64 = base64_encode($logoContent);
             }
@@ -497,7 +500,7 @@ XML;
                 $transaction = $facture->transactions()->findOrFail($transactionId);
 
                 $transaction->update([
-                    'statut_reglement' => \App\Enums\StatutReglement::Recu->value,
+                    'statut_reglement' => StatutReglement::Recu->value,
                 ]);
             }
         });

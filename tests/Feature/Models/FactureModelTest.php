@@ -10,11 +10,24 @@ use App\Models\FactureLigne;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\Association;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 test('facture creation with all fields and correct casts', function (): void {
     $tiers = Tiers::factory()->create();

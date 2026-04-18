@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Models\BudgetLine;
 use App\Models\SousCategorie;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,6 +19,7 @@ class BudgetLineFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => TenantContext::currentId() ?? 1,
             'sous_categorie_id' => SousCategorie::factory(),
             'exercice' => (int) date('Y'),
             'montant_prevu' => fake()->randomFloat(2, 100, 10000),

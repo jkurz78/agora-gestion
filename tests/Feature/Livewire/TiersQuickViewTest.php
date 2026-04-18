@@ -3,19 +3,30 @@
 declare(strict_types=1);
 
 use App\Livewire\TiersQuickView;
+use App\Models\Association;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Services\ExerciceService;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
     $this->exercice = app(ExerciceService::class)->current();
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('loads tiers data on open-tiers-quick-view event and becomes visible', function () {
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Dupont',
         'prenom' => 'Marie',
         'email' => 'marie@example.com',
@@ -37,7 +48,7 @@ it('starts hidden and shows nothing before event', function () {
 });
 
 it('can change exercice and reloads summary', function () {
-    $tiers = Tiers::factory()->create(['email' => 'change@example.com']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'change@example.com']);
 
     $otherYear = $this->exercice - 1;
 
@@ -49,7 +60,7 @@ it('can change exercice and reloads summary', function () {
 });
 
 it('displays depenses section when summary has depenses', function () {
-    $tiers = Tiers::factory()->pourDepenses()->create(['email' => 'depense@example.com']);
+    $tiers = Tiers::factory()->pourDepenses()->create(['association_id' => $this->association->id, 'email' => 'depense@example.com']);
 
     $mockSummary = [
         'contact' => ['email' => 'depense@example.com', 'telephone' => null],
@@ -66,7 +77,7 @@ it('displays depenses section when summary has depenses', function () {
 });
 
 it('hides and resets when close() is called', function () {
-    $tiers = Tiers::factory()->create(['email' => 'close@example.com']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'close@example.com']);
 
     Livewire::test(TiersQuickView::class)
         ->dispatch('open-tiers-quick-view', tiersId: $tiers->id)
@@ -79,6 +90,7 @@ it('hides and resets when close() is called', function () {
 
 it('shows tiers name and type badge when visible', function () {
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Martin',
         'prenom' => 'Jean',
@@ -92,7 +104,7 @@ it('shows tiers name and type badge when visible', function () {
 });
 
 it('shows no activity message when summary has no sections', function () {
-    $tiers = Tiers::factory()->create(['email' => 'empty@example.com']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'empty@example.com']);
 
     Livewire::test(TiersQuickView::class)
         ->dispatch('open-tiers-quick-view', tiersId: $tiers->id)

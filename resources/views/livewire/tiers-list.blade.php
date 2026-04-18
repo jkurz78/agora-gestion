@@ -21,7 +21,7 @@
         </div>
         @if($showActions)
             <div class="d-flex gap-2 ms-auto align-items-center">
-                @if(auth()->user()->role->canWrite(\App\Enums\Espace::Compta) || auth()->user()->role->canWrite(\App\Enums\Espace::Gestion))
+                @if(auth()->user()->currentRoleEnum()?->canWrite(\App\Enums\Espace::Compta) || auth()->user()->currentRoleEnum()?->canWrite(\App\Enums\Espace::Gestion))
                     @livewire('import-csv-tiers')
                 @endif
                 <div class="dropdown">

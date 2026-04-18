@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Models\SousCategorie;
 use App\Models\TypeOperation;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,6 +19,7 @@ class TypeOperationFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => TenantContext::currentId() ?? 1,
             'nom' => fake()->unique()->sentence(3),
             'description' => fake()->optional()->paragraph(),
             'sous_categorie_id' => SousCategorie::factory(),

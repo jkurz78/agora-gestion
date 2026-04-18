@@ -3,23 +3,35 @@
 declare(strict_types=1);
 
 use App\Livewire\AdherentList;
+use App\Models\Association;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     session(['exercice_actif' => 2025]);
-    $this->cotSc = SousCategorie::factory()->create(['pour_cotisations' => true]);
+    $this->cotSc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'pour_cotisations' => true]);
+});
+
+afterEach(function (): void {
+    TenantContext::clear();
+    session()->forget('exercice_actif');
 });
 
 /** Helper: create a cotisation transaction for a tiers */
 function createCotisation(Tiers $tiers, int $exercice, int $cotScId): Transaction
 {
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => TenantContext::currentId(),
         'tiers_id' => $tiers->id,
         'date' => "{$exercice}-10-01",
     ]);
@@ -40,8 +52,8 @@ it('renders without error', function (): void {
 });
 
 it('filtre a_jour retourne les tiers avec cotisation exercice courant', function (): void {
-    $aJour = Tiers::factory()->create(['nom' => 'AJour']);
-    $retard = Tiers::factory()->create(['nom' => 'EnRetard']);
+    $aJour = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'AJour']);
+    $retard = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'EnRetard']);
 
     createCotisation($aJour, 2025, $this->cotSc->id);
     createCotisation($retard, 2024, $this->cotSc->id);
@@ -54,8 +66,8 @@ it('filtre a_jour retourne les tiers avec cotisation exercice courant', function
 });
 
 it('filtre en_retard retourne les tiers avec cotisation N-1 sans cotisation N', function (): void {
-    $aJour = Tiers::factory()->create(['nom' => 'AJour']);
-    $retard = Tiers::factory()->create(['nom' => 'EnRetard']);
+    $aJour = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'AJour']);
+    $retard = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'EnRetard']);
 
     createCotisation($aJour, 2024, $this->cotSc->id);
     createCotisation($aJour, 2025, $this->cotSc->id);
@@ -69,8 +81,8 @@ it('filtre en_retard retourne les tiers avec cotisation N-1 sans cotisation N', 
 });
 
 it('filtre tous retourne tous les tiers avec au moins une cotisation', function (): void {
-    $avecCot = Tiers::factory()->create(['nom' => 'AvecCot']);
-    $sansCot = Tiers::factory()->create(['nom' => 'SansCot']);
+    $avecCot = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'AvecCot']);
+    $sansCot = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'SansCot']);
 
     createCotisation($avecCot, 2024, $this->cotSc->id);
 
@@ -82,8 +94,8 @@ it('filtre tous retourne tous les tiers avec au moins une cotisation', function 
 });
 
 it('filtre par recherche texte sur le nom', function (): void {
-    $martin = Tiers::factory()->create(['nom' => 'Martin']);
-    $dupont = Tiers::factory()->create(['nom' => 'Dupont']);
+    $martin = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Martin']);
+    $dupont = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont']);
 
     createCotisation($martin, 2025, $this->cotSc->id);
     createCotisation($dupont, 2025, $this->cotSc->id);

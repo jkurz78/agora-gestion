@@ -10,6 +10,7 @@ use App\Models\Association;
 use App\Services\ExerciceService;
 use App\Services\ProvisionService;
 use App\Services\RapportService;
+use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -63,7 +64,7 @@ final class RapportExportController extends Controller
         $exercice = $request->integer('exercice', $exerciceService->current());
         $label = $exerciceService->label($exercice);
 
-        $association = Association::find(1);
+        $association = CurrentAssociation::get();
         $filename = $this->buildFilename($association, $rapport, $label, $format);
 
         return match ($format) {

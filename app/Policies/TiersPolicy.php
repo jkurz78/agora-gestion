@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Policies;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Models\Tiers;
 use App\Models\User;
 
@@ -22,16 +23,22 @@ final class TiersPolicy
 
     public function create(User $user): bool
     {
-        return $user->role->canWrite(Espace::Compta) || $user->role->canWrite(Espace::Gestion);
+        $role = RoleAssociation::tryFrom($user->currentRole() ?? '');
+
+        return ($role?->canWrite(Espace::Compta) ?? false) || ($role?->canWrite(Espace::Gestion) ?? false);
     }
 
     public function update(User $user, Tiers $tiers): bool
     {
-        return $user->role->canWrite(Espace::Compta) || $user->role->canWrite(Espace::Gestion);
+        $role = RoleAssociation::tryFrom($user->currentRole() ?? '');
+
+        return ($role?->canWrite(Espace::Compta) ?? false) || ($role?->canWrite(Espace::Gestion) ?? false);
     }
 
     public function delete(User $user, Tiers $tiers): bool
     {
-        return $user->role->canWrite(Espace::Compta) || $user->role->canWrite(Espace::Gestion);
+        $role = RoleAssociation::tryFrom($user->currentRole() ?? '');
+
+        return ($role?->canWrite(Espace::Compta) ?? false) || ($role?->canWrite(Espace::Gestion) ?? false);
     }
 }

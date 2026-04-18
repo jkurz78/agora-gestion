@@ -25,12 +25,16 @@ use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeanceFeuilleController;
 use App\Http\Controllers\SeancePdfController;
 use App\Http\Controllers\SousCategorieController;
+use App\Http\Controllers\SwitchAssociationController;
+use App\Http\Controllers\TenantAssetController;
 use App\Http\Controllers\TiersExportController;
 use App\Http\Controllers\TiersTemplateController;
 use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\EnsureTwoFactor;
+use App\Http\Middleware\VerifyTenantAsset;
+use App\Livewire\Auth\AssociationSelector;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
@@ -60,11 +64,27 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
+Route::middleware(['auth'])->group(function (): void {
+    Route::get('/association-selector', AssociationSelector::class)->name('association-selector');
+    Route::post('/switch-association', SwitchAssociationController::class)->name('switch-association');
+});
+
+// ── Tenant Assets (signed URLs) ──
+Route::get('/tenant-assets/{path}', TenantAssetController::class)
+    ->where('path', '.*')
+    ->middleware(['auth', 'signed', VerifyTenantAsset::class])
+    ->name('tenant-assets');
+
 // ── Profile (espace-agnostic) ──
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth'])->group(function (): void {
     Route::view('/profil', 'profil.index')->name('profil.index');
     Route::get('/transactions/{transaction}/piece-jointe', TransactionPieceJointeController::class)
         ->name('transactions.piece-jointe');
+});
+
+// ── Onboarding ──
+Route::middleware(['auth', EnsureTwoFactor::class])->prefix('onboarding')->name('onboarding.')->group(function (): void {
+    Route::get('/', [\App\Http\Controllers\OnboardingController::class, 'index'])->name('index');
 });
 
 // ── Operations ──
@@ -316,5 +336,22 @@ Route::get('/t/{token}.gif', EmailTrackingController::class)->name('email.tracki
 Route::get('/email/optout/{token}', [EmailOptoutController::class, 'showOptout'])->name('email.optout');
 Route::post('/email/optout/{token}', [EmailOptoutController::class, 'optout'])->name('email.optout.confirm');
 Route::get('/email/resubscribe/{token}', [EmailOptoutController::class, 'resubscribe'])->name('email.resubscribe');
+
+Route::middleware(['auth', 'super-admin'])
+    ->prefix('super-admin')
+    ->name('super-admin.')
+    ->group(function (): void {
+        Route::get('/', fn () => view('super-admin.dashboard'))->name('dashboard');
+        Route::prefix('associations')->name('associations.')->group(function (): void {
+            Route::view('/', 'super-admin.associations.index')->name('index');
+            // Stubs — remplacés dans Tasks 3/4/5
+            Route::view('/create', 'super-admin.associations.create')->name('create');
+            Route::get('/{association:slug}', fn (\App\Models\Association $association) => view('super-admin.associations.show', compact('association')))->name('show');
+            Route::post('/{association:slug}/support/enter', [\App\Http\Controllers\SuperAdmin\SupportModeController::class, 'enter'])
+                ->name('support.enter');
+        });
+        Route::post('/support/exit', [\App\Http\Controllers\SuperAdmin\SupportModeController::class, 'exit'])
+            ->name('support.exit');
+    });
 
 require __DIR__.'/auth.php';

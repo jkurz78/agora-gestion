@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
 use App\Livewire\SeanceFeuilleAttachment;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\User;
 use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Services\Emargement\QrExtractionResult;
+use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -16,14 +17,25 @@ use Livewire\Livewire;
 beforeEach(function () {
     Storage::fake('local');
 
-    $this->gestionnaire = User::factory()->create(['role' => Role::Gestionnaire]);
-    $this->consultation = User::factory()->create(['role' => Role::Consultation]);
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
 
-    $this->operation = Operation::factory()->create();
+    $this->gestionnaire = User::factory()->create();
+    $this->gestionnaire->associations()->attach($this->association->id, ['role' => 'gestionnaire', 'joined_at' => now()]);
+
+    $this->consultation = User::factory()->create();
+    $this->consultation->associations()->attach($this->association->id, ['role' => 'consultation', 'joined_at' => now()]);
+
+    $this->operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $this->seance = Seance::create([
         'operation_id' => $this->operation->id,
         'numero' => 1,
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('opens the modal when receiving open-feuille-modal event', function () {
@@ -76,9 +88,12 @@ it('shows a French error when the QR mismatches', function () {
 });
 
 it('allows gestionnaire to retire a feuille', function () {
-    Storage::disk('local')->put('emargement/seance-'.$this->seance->id.'.pdf', 'old');
+    $aid = $this->association->id;
+    $sid = $this->seance->id;
+    $fullPath = "associations/{$aid}/seances/{$sid}/feuille-signee.pdf";
+    Storage::disk('local')->put($fullPath, 'old');
     $this->seance->update([
-        'feuille_signee_path' => 'emargement/seance-'.$this->seance->id.'.pdf',
+        'feuille_signee_path' => 'feuille-signee.pdf',
         'feuille_signee_at' => now(),
         'feuille_signee_source' => 'manual',
     ]);
@@ -92,7 +107,7 @@ it('allows gestionnaire to retire a feuille', function () {
 
     $this->seance->refresh();
     expect($this->seance->feuille_signee_path)->toBeNull();
-    Storage::disk('local')->assertMissing('emargement/seance-'.$this->seance->id.'.pdf');
+    Storage::disk('local')->assertMissing($fullPath);
 });
 
 it('forbids consultation user from uploading', function () {
@@ -114,9 +129,11 @@ it('forbids consultation user from uploading', function () {
 });
 
 it('forbids consultation user from retiring', function () {
-    Storage::disk('local')->put('emargement/seance-'.$this->seance->id.'.pdf', 'old');
+    $aid = $this->association->id;
+    $sid = $this->seance->id;
+    Storage::disk('local')->put("associations/{$aid}/seances/{$sid}/feuille-signee.pdf", 'old');
     $this->seance->update([
-        'feuille_signee_path' => 'emargement/seance-'.$this->seance->id.'.pdf',
+        'feuille_signee_path' => 'feuille-signee.pdf',
         'feuille_signee_at' => now(),
         'feuille_signee_source' => 'manual',
     ]);

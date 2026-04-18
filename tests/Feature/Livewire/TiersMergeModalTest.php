@@ -6,21 +6,32 @@ use App\Enums\Espace;
 use App\Livewire\Banques\HelloassoSyncWizard;
 use App\Livewire\ParticipantShow;
 use App\Livewire\TiersMergeModal;
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('opens modal and loads tiers data on open-tiers-merge event', function () {
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Marie',
@@ -63,6 +74,7 @@ it('opens modal and loads tiers data on open-tiers-merge event', function () {
 
 it('pre-fills result with source values when target fields are empty', function () {
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Marie',
@@ -101,7 +113,7 @@ it('pre-fills result with source values when target fields are empty', function 
 });
 
 it('always keeps target type over source type', function () {
-    $tiers = Tiers::factory()->create(['type' => 'entreprise', 'nom' => 'ACME']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'type' => 'entreprise', 'nom' => 'ACME']);
 
     $sourceData = ['type' => 'particulier', 'nom' => 'Dupont'];
 
@@ -119,6 +131,7 @@ it('always keeps target type over source type', function () {
 
 it('updates tiers with result data on confirmMerge', function () {
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Marie',
@@ -164,7 +177,11 @@ it('updates tiers with result data on confirmMerge', function () {
 });
 
 it('dispatches tiers-merge-cancelled on cancel without DB changes', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'email' => 'old@test.com']);
+    $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Dupont',
+        'email' => 'old@test.com',
+    ]);
 
     Livewire::test(TiersMergeModal::class)
         ->dispatch('open-tiers-merge',
@@ -187,6 +204,7 @@ it('dispatches tiers-merge-cancelled on cancel without DB changes', function () 
 
 it('blocks confirmMerge when HelloAsso identities conflict', function () {
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Dupont',
         'est_helloasso' => true,
         'helloasso_nom' => 'Dupont',
@@ -218,7 +236,11 @@ it('blocks confirmMerge when HelloAsso identities conflict', function () {
 });
 
 it('renders modal with field labels and column headers', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+    $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Dupont',
+        'prenom' => 'Marie',
+    ]);
 
     Livewire::test(TiersMergeModal::class)
         ->dispatch('open-tiers-merge',
@@ -240,7 +262,7 @@ it('renders modal with field labels and column headers', function () {
 it('HelloassoSyncWizard associerTiers dispatches open-tiers-merge', function () {
     view()->share('espace', Espace::Gestion);
 
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'pour_recettes' => true]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'pour_recettes' => true]);
 
     $component = Livewire::test(HelloassoSyncWizard::class);
 
@@ -262,13 +284,18 @@ it('HelloassoSyncWizard associerTiers dispatches open-tiers-merge', function () 
 
 it('ParticipantShow mapMedecinTiers dispatches open-tiers-merge', function () {
     $typeOp = TypeOperation::factory()->create([
+        'association_id' => $this->association->id,
         'formulaire_parcours_therapeutique' => true,
         'formulaire_prescripteur' => true,
     ]);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-    $tiers = Tiers::factory()->create(['nom' => 'Participant']);
-    $medecinTiers = Tiers::factory()->create(['nom' => 'DrMedecin', 'prenom' => 'Paul']);
+    $operation = Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'type_operation_id' => $typeOp->id,
+    ]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Participant']);
+    $medecinTiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'DrMedecin', 'prenom' => 'Paul']);
     $participant = Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
         'date_inscription' => '2026-01-15',
@@ -295,7 +322,7 @@ it('ParticipantShow mapMedecinTiers dispatches open-tiers-merge', function () {
 });
 
 it('dispatches tiers-merge-create-new with correct data on createNewTiers', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Marie']);
 
     Livewire::test(TiersMergeModal::class)
         ->dispatch('open-tiers-merge',
@@ -315,7 +342,7 @@ it('dispatches tiers-merge-create-new with correct data on createNewTiers', func
 });
 
 it('closes modal after createNewTiers is called', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Marie']);
 
     Livewire::test(TiersMergeModal::class)
         ->dispatch('open-tiers-merge',
@@ -337,6 +364,7 @@ it('closes modal after createNewTiers is called', function () {
 
 it('confirmMerge still works correctly after adding createNewTiers', function () {
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'type' => 'particulier',
         'nom' => 'Dupont',
         'prenom' => 'Marie',
@@ -359,7 +387,7 @@ it('confirmMerge still works correctly after adding createNewTiers', function ()
 });
 
 it('cancelMerge still works correctly after adding createNewTiers', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont']);
 
     Livewire::test(TiersMergeModal::class)
         ->dispatch('open-tiers-merge',

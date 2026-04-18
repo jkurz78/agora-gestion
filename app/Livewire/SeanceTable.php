@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Enums\StatutPresence;
 use App\Models\Operation;
 use App\Models\Presence;
@@ -60,7 +61,7 @@ final class SeanceTable extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Gestion);
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function addSeance(): void

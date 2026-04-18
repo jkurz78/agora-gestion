@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Helpers\EmailLogo;
 use App\Mail\CommunicationTiersMail;
-use App\Models\Association;
 use App\Models\CampagneEmail;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
@@ -16,6 +16,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Services\ExerciceService;
+use App\Support\CurrentAssociation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -104,7 +105,7 @@ final class CommunicationTiers extends Component
     public function mount(): void
     {
         $user = Auth::user();
-        if (! $user || ! $user->role->canWrite(Espace::Gestion)) {
+        if (! $user || ! (RoleAssociation::tryFrom($user->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false)) {
             abort(403);
         }
     }
@@ -361,7 +362,7 @@ final class CommunicationTiers extends Component
             return;
         }
 
-        $assoc = Association::find(1);
+        $assoc = CurrentAssociation::tryGet();
         if (! $assoc?->email_from) {
             session()->flash('error', "Adresse d'expédition non configurée.");
 
@@ -411,7 +412,7 @@ final class CommunicationTiers extends Component
             return;
         }
 
-        $assoc = Association::find(1);
+        $assoc = CurrentAssociation::tryGet();
         if (! $assoc?->email_from) {
             session()->flash('error', "Adresse d'expédition non configurée.");
 
@@ -585,7 +586,7 @@ final class CommunicationTiers extends Component
             ->filter(fn (Tiers $t) => ! empty($t->getRawOriginal('email')) && ! $t->email_optout)
             ->count();
 
-        $emailFrom = Association::find(1)?->email_from ?? '';
+        $emailFrom = CurrentAssociation::tryGet()?->email_from ?? '';
 
         $typesOperation = TypeOperation::actif()->orderBy('nom')->get();
 

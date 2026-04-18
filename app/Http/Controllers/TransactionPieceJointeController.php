@@ -17,7 +17,9 @@ final class TransactionPieceJointeController extends Controller
             abort(404);
         }
 
-        if (! Storage::disk('local')->exists($transaction->piece_jointe_path)) {
+        $fullPath = $transaction->pieceJointeFullPath();
+
+        if ($fullPath === null || ! Storage::disk('local')->exists($fullPath)) {
             abort(404);
         }
 
@@ -27,7 +29,7 @@ final class TransactionPieceJointeController extends Controller
         }
 
         return Storage::disk('local')->response(
-            $transaction->piece_jointe_path,
+            $fullPath,
             $downloadName,
             ['Content-Type' => $transaction->piece_jointe_mime],
             'inline'

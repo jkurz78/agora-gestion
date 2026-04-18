@@ -4,18 +4,26 @@ declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
 use App\Livewire\RapprochementDetail;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->compte = CompteBancaire::factory()->create();
+
+    $this->compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $this->rapprochement = RapprochementBancaire::factory()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'statut' => StatutRapprochement::EnCours,
         'solde_ouverture' => 1000.00,
@@ -25,8 +33,13 @@ beforeEach(function () {
     ]);
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('affiche la colonne # avec l\'id de la transaction', function () {
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'date' => '2026-03-15',
@@ -38,8 +51,9 @@ it('affiche la colonne # avec l\'id de la transaction', function () {
 });
 
 it('affiche la colonne Tiers pour une recette', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Jean', 'type' => 'particulier']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont', 'prenom' => 'Jean', 'type' => 'particulier']);
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'tiers_id' => $tiers->id,
@@ -52,8 +66,9 @@ it('affiche la colonne Tiers pour une recette', function () {
 });
 
 it('affiche la colonne Tiers pour une autre recette (don/cotisation)', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Martin', 'prenom' => 'Marie', 'type' => 'particulier']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Martin', 'prenom' => 'Marie', 'type' => 'particulier']);
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'tiers_id' => $tiers->id,
@@ -67,12 +82,14 @@ it('affiche la colonne Tiers pour une autre recette (don/cotisation)', function 
 
 it('affiche les totaux débits et crédits pointés', function () {
     Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'date' => '2026-03-10',
         'montant_total' => 150.00,
     ]);
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'date' => '2026-03-15',
@@ -86,6 +103,7 @@ it('affiche les totaux débits et crédits pointés', function () {
 
 it('masque les écritures pointées quand la case est cochée', function () {
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'date' => '2026-03-10',
@@ -93,6 +111,7 @@ it('masque les écritures pointées quand la case est cochée', function () {
         'libelle' => 'Recette pointée',
     ]);
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => null,
         'date' => '2026-03-15',
@@ -108,6 +127,7 @@ it('masque les écritures pointées quand la case est cochée', function () {
 
 it('affiche toutes les écritures quand la case est décochée', function () {
     Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'rapprochement_id' => $this->rapprochement->id,
         'date' => '2026-03-10',
@@ -144,6 +164,7 @@ it('peut modifier la date de fin', function () {
 
 it('refuse une date de fin antérieure au dernier rapprochement verrouillé', function () {
     RapprochementBancaire::factory()->create([
+        'association_id' => $this->association->id,
         'compte_id' => $this->compte->id,
         'statut' => StatutRapprochement::Verrouille,
         'verrouille_at' => now(),

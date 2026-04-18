@@ -1,8 +1,9 @@
 @php
-    $association   = \App\Models\Association::find(1);
+    // $association injected by LayoutAssociationComposerProvider (CurrentAssociation::tryGet())
     $nomAsso       = $association?->nom ?? 'Mon Association';
-    $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
-        ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
+    $logoFullPath  = $association?->brandingLogoFullPath();
+    $logoAsset     = ($logoFullPath && \Illuminate\Support\Facades\Storage::disk('local')->exists($logoFullPath))
+        ? \App\Support\TenantAsset::url($logoFullPath)
         : asset('images/agora-gestion.svg');
     $exerciceService = app(\App\Services\ExerciceService::class);
     $exerciceActif   = $exerciceService->current();
@@ -109,6 +110,7 @@
     </style>
 </head>
 <body>
+    @include('partials.support-mode-banner')
     @auth
     <nav class="navbar navbar-expand-lg navbar-app mb-4">
         <div class="container-fluid">
@@ -373,6 +375,40 @@
                     @endif
 
                 </ul>
+
+                {{-- Dropdown Changer d'association --}}
+                @auth
+                @php
+                    $currentAsso = \App\Tenant\TenantContext::current();
+                    $userAssos = auth()->user()?->associations()->whereNull('association_user.revoked_at')->get() ?? collect();
+                @endphp
+                @if ($currentAsso && $userAssos->count() > 1)
+                <ul class="navbar-nav me-2 align-items-end">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" data-bs-toggle="dropdown" role="button">
+                            @if ($currentAsso->brandingLogoFullPath() && \Illuminate\Support\Facades\Storage::disk('local')->exists($currentAsso->brandingLogoFullPath()))
+                                <img src="{{ \App\Support\TenantAsset::url($currentAsso->brandingLogoFullPath()) }}" style="height:24px;width:24px;object-fit:contain" alt="">
+                            @endif
+                            <span class="small">{{ $currentAsso->nom }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Changer d'association</h6></li>
+                            @foreach ($userAssos as $asso)
+                                @if ($asso->id !== $currentAsso->id)
+                                    <li>
+                                        <form method="POST" action="{{ route('switch-association') }}">
+                                            @csrf
+                                            <input type="hidden" name="association_id" value="{{ $asso->id }}">
+                                            <button type="submit" class="dropdown-item">{{ $asso->nom }}</button>
+                                        </form>
+                                    </li>
+                                @endif
+                            @endforeach
+                        </ul>
+                    </li>
+                </ul>
+                @endif
+                @endauth
 
                 {{-- Dropdown Paramètres (poussé à droite) --}}
                 <ul class="navbar-nav ms-auto me-3 align-items-end">

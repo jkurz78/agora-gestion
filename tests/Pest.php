@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,8 +16,31 @@ use Tests\TestCase;
 |
 */
 
+/*
+ * Global test bootstrap — S6/T3
+ *
+ * TenantScope is fail-closed : unbooted queries return zero rows (see
+ * App\Tenant\TenantScope::apply). Most tests in this suite exercise
+ * tenant-scoped models and therefore need a booted TenantContext to
+ * return any data at all. This beforeEach creates a default Association
+ * and boots it so those tests keep working.
+ *
+ * Security-sensitive tests that verify the fail-closed behavior itself
+ * (e.g. tests/Unit/Tenant/TenantScopeTest.php, CrossTenantAccessTest
+ * scenario 9) MUST start their own beforeEach with TenantContext::clear()
+ * to undo this bootstrap. See AccessControlTest for the pattern.
+ */
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(function () {
+        // Boot a default tenant context so that tenant-scoped models work out of the box.
+        // Tests that manage their own context (e.g. isolation tests, explicit boot/clear)
+        // override this by calling TenantContext::clear() or TenantContext::boot() in
+        // their own beforeEach — which runs AFTER this global hook.
+        $association = Association::factory()->create();
+        TenantContext::boot($association);
+    })
+    ->afterEach(fn () => TenantContext::clear())
     ->in('Feature', 'Livewire', 'Unit');
 
 /*

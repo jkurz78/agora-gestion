@@ -3,14 +3,25 @@
 declare(strict_types=1);
 
 use App\Livewire\TransactionUniverselle;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('se rend sans erreur', function () {
@@ -19,13 +30,16 @@ it('se rend sans erreur', function () {
 });
 
 it('accepte les props verrouillées en mount', function () {
-    $compte = CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     Livewire::test(TransactionUniverselle::class, ['compteId' => $compte->id])
         ->assertSet('compteId', $compte->id);
 });
 
 it('supprime une recette via deleteRow', function () {
-    $recette = Transaction::factory()->asRecette()->create(['date' => '2025-10-01']);
+    $recette = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'date' => '2025-10-01',
+    ]);
     Livewire::test(TransactionUniverselle::class)
         ->call('deleteRow', 'recette', $recette->id);
     $this->assertSoftDeleted('transactions', ['id' => $recette->id]);
@@ -33,6 +47,7 @@ it('supprime une recette via deleteRow', function () {
 
 it('ne supprime pas une transaction pointée', function () {
     $tx = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
         'date' => '2025-10-01',
         'statut_reglement' => 'pointe',
     ]);
@@ -51,7 +66,7 @@ it('la page /transactions rend TransactionUniverselle avec lockedTypes depense+r
 });
 
 it('la page /comptes-bancaires/{id}/transactions rend TransactionUniverselle avec compteId', function () {
-    $compte = CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $this->get("/banques/comptes/{$compte->id}/transactions")
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
@@ -61,7 +76,7 @@ it('la page /comptes-bancaires/{id}/transactions rend TransactionUniverselle ave
 });
 
 it('la page /tiers/{id}/transactions rend TransactionUniverselle avec tiersId', function () {
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $this->get("/tiers/{$tiers->id}/transactions")
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);

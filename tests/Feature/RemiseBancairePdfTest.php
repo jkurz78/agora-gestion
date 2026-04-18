@@ -3,22 +3,34 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\RemiseBancaireService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('generates a PDF for a comptabilised remise', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    $compteCible = CompteBancaire::factory()->create();
+    $compteCible = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $tiers = Tiers::factory()->create();
 
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'compte_id' => $compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,
@@ -43,10 +55,11 @@ it('generates a PDF for a comptabilised remise', function () {
 it('streams PDF inline when mode=inline', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
-    $compteCible = CompteBancaire::factory()->create();
+    $compteCible = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     $tiers = Tiers::factory()->create();
 
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'compte_id' => $compteCible->id,
         'mode_paiement' => ModePaiement::Cheque,

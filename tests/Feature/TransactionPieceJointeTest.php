@@ -7,6 +7,8 @@ use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\TransactionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -15,8 +17,16 @@ use Illuminate\Support\Facades\Storage;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
+    $this->aid = $this->association->id;
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 // Model tests
@@ -27,7 +37,7 @@ it('hasPieceJointe retourne false quand pas de pièce jointe', function () {
 
 it('hasPieceJointe retourne true quand pièce jointe présente', function () {
     $transaction = Transaction::factory()->create([
-        'piece_jointe_path' => 'pieces-jointes/1/justificatif.pdf',
+        'piece_jointe_path' => 'justificatif.pdf',
         'piece_jointe_nom' => 'facture.pdf',
         'piece_jointe_mime' => 'application/pdf',
     ]);
@@ -41,7 +51,7 @@ it('pieceJointeUrl retourne null sans pièce jointe', function () {
 
 it('pieceJointeUrl retourne une URL quand pièce jointe présente', function () {
     $transaction = Transaction::factory()->create([
-        'piece_jointe_path' => 'pieces-jointes/1/justificatif.pdf',
+        'piece_jointe_path' => 'justificatif.pdf',
         'piece_jointe_nom' => 'facture.pdf',
         'piece_jointe_mime' => 'application/pdf',
     ]);
@@ -57,14 +67,14 @@ it('retourne 404 si la transaction n\'a pas de pièce jointe', function () {
 
 it('retourne le fichier avec le bon Content-Disposition', function () {
     Storage::fake('local');
-    $path = 'pieces-jointes/1/justificatif.pdf';
-    Storage::disk('local')->put($path, 'fake-pdf-content');
-
     $transaction = Transaction::factory()->create([
-        'piece_jointe_path' => $path,
+        'piece_jointe_path' => 'justificatif.pdf',
         'piece_jointe_nom' => 'ma-facture.pdf',
         'piece_jointe_mime' => 'application/pdf',
     ]);
+
+    $fullPath = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
+    Storage::disk('local')->put($fullPath, 'fake-pdf-content');
 
     $response = $this->get(route('transactions.piece-jointe', $transaction));
     $response->assertOk();
@@ -76,7 +86,7 @@ it('retourne le fichier avec le bon Content-Disposition', function () {
 it('refuse l\'accès aux utilisateurs non authentifiés', function () {
     auth()->logout();
     $transaction = Transaction::factory()->create([
-        'piece_jointe_path' => 'pieces-jointes/1/justificatif.pdf',
+        'piece_jointe_path' => 'justificatif.pdf',
         'piece_jointe_nom' => 'facture.pdf',
         'piece_jointe_mime' => 'application/pdf',
     ]);
@@ -94,10 +104,13 @@ it('storePieceJointe stocke le fichier et met à jour la transaction', function 
     app(TransactionService::class)->storePieceJointe($transaction, $file);
 
     $transaction->refresh();
-    expect($transaction->piece_jointe_path)->toBe("pieces-jointes/{$transaction->id}/justificatif.pdf")
+    $expectedShort = 'justificatif.pdf';
+    $expectedFull  = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
+
+    expect($transaction->piece_jointe_path)->toBe($expectedShort)
         ->and($transaction->piece_jointe_nom)->toBe('facture.pdf')
         ->and($transaction->piece_jointe_mime)->toBe('application/pdf')
-        ->and(Storage::disk('local')->exists($transaction->piece_jointe_path))->toBeTrue();
+        ->and(Storage::disk('local')->exists($expectedFull))->toBeTrue();
 });
 
 it('storePieceJointe remplace le fichier existant', function () {
@@ -111,10 +124,13 @@ it('storePieceJointe remplace le fichier existant', function () {
     app(TransactionService::class)->storePieceJointe($transaction, $file2);
 
     $transaction->refresh();
+    $oldPath = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
+    $newPath = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.jpg";
+
     expect($transaction->piece_jointe_nom)->toBe('nouvelle.jpg')
         ->and($transaction->piece_jointe_mime)->toBe('image/jpeg')
-        ->and(Storage::disk('local')->exists("pieces-jointes/{$transaction->id}/justificatif.pdf"))->toBeFalse()
-        ->and(Storage::disk('local')->exists("pieces-jointes/{$transaction->id}/justificatif.jpg"))->toBeTrue();
+        ->and(Storage::disk('local')->exists($oldPath))->toBeFalse()
+        ->and(Storage::disk('local')->exists($newPath))->toBeTrue();
 });
 
 it('storePieceJointe rejette un fichier au MIME non autorisé', function () {
@@ -132,13 +148,16 @@ it('deletePieceJointe supprime le fichier et remet les colonnes à null', functi
 
     $service = app(TransactionService::class);
     $service->storePieceJointe($transaction, $file);
+
+    $fullPath = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
+
     $service->deletePieceJointe($transaction);
 
     $transaction->refresh();
     expect($transaction->piece_jointe_path)->toBeNull()
         ->and($transaction->piece_jointe_nom)->toBeNull()
         ->and($transaction->piece_jointe_mime)->toBeNull()
-        ->and(Storage::disk('local')->exists("pieces-jointes/{$transaction->id}/justificatif.pdf"))->toBeFalse();
+        ->and(Storage::disk('local')->exists($fullPath))->toBeFalse();
 });
 
 it('la suppression d\'une transaction supprime aussi la pièce jointe du disque', function () {
@@ -159,7 +178,8 @@ it('la suppression d\'une transaction supprime aussi la pièce jointe du disque'
 
     $file = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
     $service->storePieceJointe($transaction, $file);
-    $path = $transaction->fresh()->piece_jointe_path;
+    $transaction->refresh();
+    $path = $transaction->pieceJointeFullPath();
 
     expect(Storage::disk('local')->exists($path))->toBeTrue();
 
@@ -172,7 +192,7 @@ it('storePieceJointeFromPath copie le fichier depuis un chemin et met à jour la
     Storage::fake('local');
     $transaction = Transaction::factory()->create();
 
-    // Créer un fichier source sur disque (hors du dossier pieces-jointes)
+    // Créer un fichier source sur disque (hors du dossier transactions)
     Storage::disk('local')->put('incoming-documents/source-abc.pdf', 'FAKE PDF BYTES');
     $sourcePath = Storage::disk('local')->path('incoming-documents/source-abc.pdf');
 
@@ -184,11 +204,14 @@ it('storePieceJointeFromPath copie le fichier depuis un chemin et met à jour la
     );
 
     $transaction->refresh();
-    expect($transaction->piece_jointe_path)->toBe("pieces-jointes/{$transaction->id}/justificatif.pdf")
+    $expectedShort = 'justificatif.pdf';
+    $expectedFull  = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
+
+    expect($transaction->piece_jointe_path)->toBe($expectedShort)
         ->and($transaction->piece_jointe_nom)->toBe('facture-edf.pdf')
         ->and($transaction->piece_jointe_mime)->toBe('application/pdf')
-        ->and(Storage::disk('local')->exists($transaction->piece_jointe_path))->toBeTrue()
-        ->and(Storage::disk('local')->get($transaction->piece_jointe_path))->toBe('FAKE PDF BYTES');
+        ->and(Storage::disk('local')->exists($expectedFull))->toBeTrue()
+        ->and(Storage::disk('local')->get($expectedFull))->toBe('FAKE PDF BYTES');
 });
 
 it('storePieceJointeFromPath rejette un MIME non autorisé', function () {
@@ -222,6 +245,8 @@ it('storePieceJointeFromPath remplace la pièce jointe précédente', function (
     );
 
     $transaction->refresh();
+    $expectedFull = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
+
     expect($transaction->piece_jointe_nom)->toBe('nouveau.pdf')
-        ->and(Storage::disk('local')->get($transaction->piece_jointe_path))->toBe('NOUVEAU');
+        ->and(Storage::disk('local')->get($expectedFull))->toBe('NOUVEAU');
 });

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-final class MessageTemplate extends Model
+final class MessageTemplate extends TenantModel
 {
     protected $fillable = [
+        'association_id',
         'categorie',
         'nom',
         'objet',

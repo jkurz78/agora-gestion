@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\DroitImage;
 use App\Livewire\ParticipantEngagementUpload;
 use App\Livewire\ParticipantShow;
+use App\Models\Association;
 use App\Models\FormulaireToken;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -12,32 +13,44 @@ use App\Models\ParticipantDocument;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->admin = User::factory()->create([
-        'role' => 'admin',
-        'peut_voir_donnees_sensibles' => true,
-    ]);
+    $this->association = Association::factory()->create();
+    $this->admin = User::factory()->create(['peut_voir_donnees_sensibles' => true]);
+    $this->admin->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->admin);
 
     $this->typeOp = TypeOperation::factory()->create([
+        'association_id' => $this->association->id,
         'formulaire_parcours_therapeutique' => true,
         'formulaire_droit_image' => true,
     ]);
-    $this->operation = Operation::factory()->create(['type_operation_id' => $this->typeOp->id]);
-    $this->tiers = Tiers::factory()->create();
+    $this->operation = Operation::factory()->create([
+        'association_id' => $this->association->id,
+        'type_operation_id' => $this->typeOp->id,
+    ]);
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $this->participant = Participant::create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'operation_id' => $this->operation->id,
         'date_inscription' => today()->toDateString(),
     ]);
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('affiche l\'onglet engagement en mode édition quand formulaire non soumis', function () {
     FormulaireToken::factory()->create([
+        'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'rempli_at' => null,
     ]);
@@ -51,6 +64,7 @@ it('affiche l\'onglet engagement en mode édition quand formulaire non soumis', 
 
 it('affiche l\'onglet engagement en lecture seule quand formulaire soumis', function () {
     FormulaireToken::factory()->create([
+        'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'rempli_at' => now(),
         'rempli_ip' => '127.0.0.1',
@@ -65,6 +79,7 @@ it('affiche l\'onglet engagement en lecture seule quand formulaire soumis', func
 
 it('sauvegarde les engagements manuellement', function () {
     FormulaireToken::factory()->create([
+        'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'rempli_at' => null,
     ]);
@@ -88,6 +103,7 @@ it('sauvegarde les engagements manuellement', function () {
 
 it('ne modifie pas les engagements si formulaire déjà soumis', function () {
     FormulaireToken::factory()->create([
+        'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'rempli_at' => now(),
         'rempli_ip' => '127.0.0.1',
@@ -123,7 +139,9 @@ it('uploade un document avec label', function () {
     $doc = ParticipantDocument::where('participant_id', $this->participant->id)->first();
     expect($doc->label)->toBe('Attestation signée');
     expect($doc->source)->toBe('manual-upload');
-    expect(Storage::disk('local')->exists($doc->storage_path))->toBeTrue();
+    // storage_path contient désormais le nom court seulement ; le fichier est sous le chemin tenant-scoped
+    expect($doc->storage_path)->not->toContain('/');
+    expect(Storage::disk('local')->exists($doc->documentFullPath()))->toBeTrue();
 });
 
 it('refuse l\'upload sans label', function () {
@@ -142,9 +160,10 @@ it('refuse l\'upload sans label', function () {
 
 it('affiche le document dans la timeline', function () {
     ParticipantDocument::create([
+        'association_id' => $this->association->id,
         'participant_id' => $this->participant->id,
         'label' => 'Formulaire papier',
-        'storage_path' => 'participants/'.$this->participant->id.'/test.pdf',
+        'storage_path' => 'test.pdf',
         'original_filename' => 'test.pdf',
         'source' => 'manual-upload',
     ]);

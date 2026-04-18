@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Enums\TypeCategorie;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
@@ -53,7 +54,7 @@ final class BudgetTable extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Compta);
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
     }
 
     // ── Actions édition ───────────────────────────────────────────────────────

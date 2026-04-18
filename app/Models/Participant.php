@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\DroitImage;
-use Illuminate\Database\Eloquent\Model;
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
-final class Participant extends Model
+final class Participant extends TenantModel
 {
+    use TenantStorage;
+
     protected $fillable = [
+        'association_id',
         'tiers_id',
         'operation_id',
         'type_operation_tarif_id',
@@ -122,8 +125,10 @@ final class Participant extends Model
 
     protected static function booted(): void
     {
+        parent::booted();
+
         self::deleting(function (Participant $participant) {
-            $dir = "participants/{$participant->id}";
+            $dir = $participant->storagePath('participants/'.$participant->id);
             if (Storage::disk('local')->exists($dir)) {
                 Storage::disk('local')->deleteDirectory($dir);
             }

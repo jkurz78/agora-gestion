@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Rapports;
 
+use App\Tenant\TenantContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -161,6 +162,7 @@ final class CompteResultatBuilder
             ->whereNull('d.deleted_at')
             ->whereNull('tla.id')
             ->whereBetween('d.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()))
             ->select([
                 'c.id as categorie_id', 'c.nom as categorie_nom',
                 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
@@ -182,6 +184,7 @@ final class CompteResultatBuilder
             ->whereNull('transaction_lignes.deleted_at')
             ->whereNull('d.deleted_at')
             ->whereBetween('d.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()))
             ->select([
                 'c.id as categorie_id', 'c.nom as categorie_nom',
                 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom',
@@ -262,6 +265,7 @@ final class CompteResultatBuilder
             ->whereNull('tla.id')
             ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('d.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()))
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(transaction_lignes.seance, 0) as seance'), DB::raw('SUM(transaction_lignes.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(transaction_lignes.seance, 0)'))
             ->get();
@@ -277,6 +281,7 @@ final class CompteResultatBuilder
             ->whereNotNull('tla.operation_id')
             ->whereIn('tla.operation_id', $operationIds)
             ->whereBetween('d.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('d.association_id', TenantContext::currentId()))
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(tla.seance, 0) as seance'), DB::raw('SUM(tla.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(tla.seance, 0)'))
             ->get();
@@ -314,6 +319,7 @@ final class CompteResultatBuilder
             ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
             ->whereNull('tla.id')
             ->whereBetween('r.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()))
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(transaction_lignes.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
         if ($operationIds !== null) {
@@ -329,6 +335,7 @@ final class CompteResultatBuilder
             ->where('r.type', 'recette')
             ->whereNull('transaction_lignes.deleted_at')->whereNull('r.deleted_at')
             ->whereBetween('r.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()))
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('SUM(tla.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom');
         if ($operationIds !== null) {
@@ -370,6 +377,7 @@ final class CompteResultatBuilder
             ->whereNull('tla.id')
             ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('r.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()))
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(transaction_lignes.seance, 0) as seance'), DB::raw('SUM(transaction_lignes.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(transaction_lignes.seance, 0)'))
             ->get();
@@ -385,6 +393,7 @@ final class CompteResultatBuilder
             ->whereNotNull('tla.operation_id')
             ->whereIn('tla.operation_id', $operationIds)
             ->whereBetween('r.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('r.association_id', TenantContext::currentId()))
             ->select(['c.id as categorie_id', 'c.nom as categorie_nom', 'sc.id as sous_categorie_id', 'sc.nom as sous_categorie_nom', DB::raw('COALESCE(tla.seance, 0) as seance'), DB::raw('SUM(tla.montant) as montant')])
             ->groupBy('c.id', 'c.nom', 'sc.id', 'sc.nom', DB::raw('COALESCE(tla.seance, 0)'))
             ->get();
@@ -481,6 +490,7 @@ final class CompteResultatBuilder
             ->whereNull('tla.id')
             ->whereIn('transaction_lignes.operation_id', $operationIds)
             ->whereBetween('tx.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
             ->select($q1Cols)
             ->groupBy($q1Group);
 
@@ -507,6 +517,7 @@ final class CompteResultatBuilder
             ->whereNull('tx.deleted_at')
             ->whereIn('tla2.operation_id', $operationIds)
             ->whereBetween('tx.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
             ->select($q2Cols)
             ->groupBy($q2Group);
 
@@ -703,6 +714,7 @@ final class CompteResultatBuilder
     {
         return DB::table('budget_lines')
             ->where('exercice', $exercice)
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('budget_lines.association_id', TenantContext::currentId()))
             ->select('sous_categorie_id', DB::raw('SUM(montant_prevu) as budget'))
             ->groupBy('sous_categorie_id')
             ->get()

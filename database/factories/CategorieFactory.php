@@ -6,6 +6,7 @@ namespace Database\Factories;
 
 use App\Enums\TypeCategorie;
 use App\Models\Categorie;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,6 +19,7 @@ class CategorieFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => TenantContext::currentId() ?? 1,
             'nom' => fake()->word(),
             'type' => fake()->randomElement(TypeCategorie::cases()),
         ];

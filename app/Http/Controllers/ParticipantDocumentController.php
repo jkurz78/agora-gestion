@@ -21,7 +21,7 @@ final class ParticipantDocumentController extends Controller
             abort(400);
         }
 
-        $path = "participants/{$participant->id}/{$filename}";
+        $path = 'associations/'.$participant->association_id.'/participants/'.$participant->id.'/'.$filename;
 
         if (! Storage::disk('local')->exists($path)) {
             abort(404);

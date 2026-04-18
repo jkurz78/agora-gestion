@@ -5,20 +5,28 @@ declare(strict_types=1);
 use App\Enums\StatutExercice;
 use App\Enums\StatutRapprochement;
 use App\Livewire\Exercices\ClotureWizard;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\RapprochementBancaire;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->exercice = Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
+
+    $this->exercice = Exercice::create(['association_id' => $this->association->id, 'annee' => 2025, 'statut' => StatutExercice::Ouvert]);
     session(['exercice_actif' => 2025]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('renders step 1 with checks', function () {
@@ -35,8 +43,9 @@ it('can advance to step 2 when all blocking checks pass', function () {
 });
 
 it('cannot advance to step 2 when blocking checks fail', function () {
-    $compte = CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
     RapprochementBancaire::create([
+        'association_id' => $this->association->id,
         'compte_id' => $compte->id,
         'date_fin' => '2025-11-30',
         'solde_ouverture' => 0,

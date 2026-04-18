@@ -32,7 +32,7 @@ final class ParticipantXlsxImportService
      */
     public function import(array $matchedRows, int $operationId, string $filename): ParticipantXlsxImportReport
     {
-        return DB::transaction(function () use ($matchedRows, $operationId, $filename): ParticipantXlsxImportReport {
+        return DB::transaction(function () use ($matchedRows, $operationId): ParticipantXlsxImportReport {
             $created = 0;
             $linked = 0;
             $skipped = 0;

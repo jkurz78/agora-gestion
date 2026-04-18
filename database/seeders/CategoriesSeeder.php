@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\TypeCategorie;
+use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
 use Illuminate\Database\Seeder;
@@ -110,14 +111,17 @@ class CategoriesSeeder extends Seeder
             ],
         ];
 
+        $associationId = Association::first()?->id ?? 1;
+
         foreach ($data as $item) {
             $categorie = Categorie::create([
+                'association_id' => $associationId,
                 'nom' => $item['nom'],
                 'type' => $item['type'],
             ]);
 
             foreach ($item['sous'] as $sous) {
-                $categorie->sousCategories()->create($sous);
+                $categorie->sousCategories()->create(array_merge(['association_id' => $associationId], $sous));
             }
         }
     }

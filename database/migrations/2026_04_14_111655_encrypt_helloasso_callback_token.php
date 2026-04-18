@@ -39,7 +39,7 @@ return new class extends Migration
                     DB::table('helloasso_parametres')
                         ->where('id', $row->id)
                         ->update(['callback_token' => $plain]);
-                } catch (\Throwable) {
+                } catch (Throwable) {
                     // déjà en clair ou clef changée — on laisse tel quel
                 }
             });

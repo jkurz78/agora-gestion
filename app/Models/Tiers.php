@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
-final class Tiers extends Model
+final class Tiers extends TenantModel
 {
     use HasFactory;
 
     protected $fillable = [
+        'association_id',
         'type',
         'nom',
         'prenom',

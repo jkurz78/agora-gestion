@@ -3,15 +3,25 @@
 declare(strict_types=1);
 
 use App\Livewire\ImportCsv;
+use App\Models\Association;
 use App\Models\User;
 use App\Services\CsvImportResult;
 use App\Services\CsvImportService;
+use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('togglePanel shows and hides the panel', function () {

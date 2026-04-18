@@ -29,7 +29,10 @@ final class TypeOperationList extends Component
         }
 
         if ($type->logo_path) {
-            Storage::disk('public')->delete($type->logo_path);
+            $fullPath = $type->typeOpLogoFullPath();
+            if ($fullPath) {
+                Storage::disk('local')->delete($fullPath);
+            }
         }
 
         $type->delete();

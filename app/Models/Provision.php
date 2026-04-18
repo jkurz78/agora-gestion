@@ -5,17 +5,18 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\TypeTransaction;
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-final class Provision extends Model
+final class Provision extends TenantModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, TenantStorage;
 
     protected $fillable = [
+        'association_id',
         'exercice',
         'type',
         'sous_categorie_id',
@@ -90,5 +91,12 @@ final class Provision extends Model
     public function hasPieceJointe(): bool
     {
         return $this->piece_jointe_path !== null;
+    }
+
+    public function pieceJointeFullPath(): ?string
+    {
+        return $this->piece_jointe_path
+            ? $this->storagePath('provisions/'.$this->id.'/'.basename($this->piece_jointe_path))
+            : null;
     }
 }

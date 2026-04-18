@@ -42,7 +42,7 @@
                     <tr class="{{ !$type->actif ? 'opacity-50' : '' }}">
                         <td>
                             @if($type->logo_path)
-                                <img src="{{ Storage::disk('public')->url($type->logo_path) }}"
+                                <img src="{{ \App\Support\TenantAsset::url($type->typeOpLogoFullPath()) }}"
                                      alt="{{ $type->nom }}" style="width:32px;height:32px;object-fit:cover;border-radius:4px">
                             @else
                                 <span class="text-muted"><i class="bi bi-image" style="font-size:1.2rem"></i></span>

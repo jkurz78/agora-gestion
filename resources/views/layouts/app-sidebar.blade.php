@@ -1,8 +1,9 @@
 @php
-    $association   = \App\Models\Association::find(1);
+    // $association injected by LayoutAssociationComposerProvider (CurrentAssociation::tryGet())
     $nomAsso       = $association?->nom ?? 'Mon Association';
-    $logoAsset     = ($association?->logo_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($association->logo_path))
-        ? \Illuminate\Support\Facades\Storage::disk('public')->url($association->logo_path)
+    $logoFullPath  = $association?->brandingLogoFullPath();
+    $logoAsset     = ($logoFullPath && \Illuminate\Support\Facades\Storage::disk('local')->exists($logoFullPath))
+        ? \App\Support\TenantAsset::url($logoFullPath)
         : asset('images/agora-gestion.svg');
     $exerciceService = app(\App\Services\ExerciceService::class);
     $exerciceActif   = $exerciceService->current();
@@ -76,6 +77,7 @@
     </style>
 </head>
 <body>
+    @include('partials.support-mode-banner')
     @auth
     <div class="d-flex">
         {{-- Sidebar : composant separe, offcanvas-lg pour responsive --}}
@@ -169,6 +171,40 @@
                             <span class="badge bg-warning text-dark" style="font-size: .65rem;">Cloture</span>
                         @endif
                     </span>
+
+                    {{-- Dropdown Changer d'association --}}
+                    @php
+                        $currentAsso = \App\Tenant\TenantContext::current();
+                        $userAssos = auth()->user()?->associations()->whereNull('association_user.revoked_at')->get() ?? collect();
+                    @endphp
+                    @if ($currentAsso && $userAssos->count() > 1)
+                    <div class="dropdown">
+                        <a href="#" class="text-decoration-none dropdown-toggle d-flex align-items-center gap-1"
+                           role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                           style="color: rgba(255,255,255,.9);">
+                            @if ($currentAsso->brandingLogoFullPath() && \Illuminate\Support\Facades\Storage::disk('local')->exists($currentAsso->brandingLogoFullPath()))
+                                <img src="{{ \App\Support\TenantAsset::url($currentAsso->brandingLogoFullPath()) }}" style="height:20px;width:20px;object-fit:contain" alt="">
+                            @else
+                                <i class="bi bi-building"></i>
+                            @endif
+                            <span class="d-none d-md-inline small">{{ $currentAsso->nom }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Changer d'association</h6></li>
+                            @foreach ($userAssos as $asso)
+                                @if ($asso->id !== $currentAsso->id)
+                                    <li>
+                                        <form method="POST" action="{{ route('switch-association') }}">
+                                            @csrf
+                                            <input type="hidden" name="association_id" value="{{ $asso->id }}">
+                                            <button type="submit" class="dropdown-item">{{ $asso->nom }}</button>
+                                        </form>
+                                    </li>
+                                @endif
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endif
 
                     {{-- Separateur --}}
                     <span style="border-left: 1px solid rgba(255,255,255,.25); height: 20px;"></span>

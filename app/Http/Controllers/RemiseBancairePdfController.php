@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Association;
 use App\Models\RemiseBancaire;
+use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
@@ -18,19 +18,17 @@ final class RemiseBancairePdfController extends Controller
     {
         $remise->load(['compteCible', 'transactions.tiers']);
 
-        // Association (may be null)
-        $association = Association::find(1);
+        // Association resolved from TenantContext (booted by ResolveTenant middleware)
+        $association = CurrentAssociation::get();
 
         // Logo base64 (null-safe)
         $logoBase64 = null;
         $logoMime = 'image/png';
-        if ($association !== null && $association->logo_path !== null) {
-            $path = $association->logo_path;
-            if (Storage::disk('public')->exists($path)) {
-                $logoBase64 = base64_encode(Storage::disk('public')->get($path));
-                $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-                $logoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
-            }
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $logoBase64 = base64_encode(Storage::disk('local')->get($logoFullPath));
+            $ext = strtolower(pathinfo($logoFullPath, PATHINFO_EXTENSION));
+            $logoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
         $typeLabel = $remise->mode_paiement->value === 'cheque' ? 'chèques' : 'espèces';

@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 use App\Mail\CommunicationTiersMail;
 use App\Models\Association;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $assoc = Association::find(1) ?? new Association;
-    $assoc->id = 1;
-    $assoc->fill(['nom' => 'Mon Asso'])->save();
+    $assoc = Association::factory()->create(['nom' => 'Mon Asso']);
+    TenantContext::boot($assoc);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('substitutes tiers variables in body', function () {

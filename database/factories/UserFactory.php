@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\Espace;
-use App\Enums\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -31,7 +30,6 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
             'dernier_espace' => Espace::Compta,
             'peut_voir_donnees_sensibles' => false,
-            'role' => Role::Admin,
         ];
     }
 

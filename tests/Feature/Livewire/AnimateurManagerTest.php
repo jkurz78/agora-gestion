@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
 use App\Livewire\AnimateurManager;
+use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\Operation;
 use App\Models\Seance;
@@ -12,17 +13,24 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
 
-    $this->categorie = Categorie::factory()->depense()->create();
+    $this->categorie = Categorie::factory()->depense()->create(['association_id' => $this->association->id]);
     $this->sousCategorie = SousCategorie::factory()->create([
+        'association_id' => $this->association->id,
         'categorie_id' => $this->categorie->id,
     ]);
 
-    $this->operation = Operation::factory()->withSeances(3)->create();
+    $this->operation = Operation::factory()->withSeances(3)->create(['association_id' => $this->association->id]);
 
     // Create séances for the operation
     for ($i = 1; $i <= 3; $i++) {
@@ -34,9 +42,14 @@ beforeEach(function () {
     }
 
     $this->tiers = Tiers::factory()->pourDepenses()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Durand',
         'prenom' => 'Sophie',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('renders with empty matrix when no depenses exist', function () {
@@ -47,6 +60,7 @@ it('renders with empty matrix when no depenses exist', function () {
 
 it('displays animateur from existing depense transaction', function () {
     $transaction = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'date' => now(),
         'montant_total' => 100.00,
@@ -120,6 +134,7 @@ it('validates required fields on save', function () {
 
 it('opens edit modal with existing transaction data', function () {
     $transaction = Transaction::factory()->asDepense()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'date' => '2026-03-15',
         'reference' => 'REF-EDIT',

@@ -2,15 +2,29 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
 use App\Models\Tiers;
+use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = \App\Models\User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 test('seance belongs to operation', function (): void {
-    $operation = Operation::factory()->create();
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $seance = Seance::create([
         'operation_id' => $operation->id,
         'numero' => 1,
@@ -21,13 +35,13 @@ test('seance belongs to operation', function (): void {
 });
 
 test('seance unique constraint on operation and numero', function (): void {
-    $operation = Operation::factory()->create();
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     Seance::create(['operation_id' => $operation->id, 'numero' => 1]);
     Seance::create(['operation_id' => $operation->id, 'numero' => 1]);
 })->throws(QueryException::class);
 
 test('operation has many seances ordered by numero', function (): void {
-    $operation = Operation::factory()->create();
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     Seance::create(['operation_id' => $operation->id, 'numero' => 3]);
     Seance::create(['operation_id' => $operation->id, 'numero' => 1]);
     Seance::create(['operation_id' => $operation->id, 'numero' => 2]);
@@ -36,10 +50,10 @@ test('operation has many seances ordered by numero', function (): void {
 });
 
 test('presence data is encrypted', function (): void {
-    $operation = Operation::factory()->create();
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1]);
     $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
         'operation_id' => $operation->id,
         'date_inscription' => now(),
     ]);
@@ -60,10 +74,10 @@ test('presence data is encrypted', function (): void {
 });
 
 test('deleting seance cascades to presences', function (): void {
-    $operation = Operation::factory()->create();
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1]);
     $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
         'operation_id' => $operation->id,
         'date_inscription' => now(),
     ]);
@@ -77,10 +91,10 @@ test('deleting seance cascades to presences', function (): void {
 });
 
 test('presence unique constraint on seance and participant', function (): void {
-    $operation = Operation::factory()->create();
+    $operation = Operation::factory()->create(['association_id' => $this->association->id]);
     $seance = Seance::create(['operation_id' => $operation->id, 'numero' => 1]);
     $participant = Participant::create([
-        'tiers_id' => Tiers::factory()->create()->id,
+        'tiers_id' => Tiers::factory()->create(['association_id' => $this->association->id])->id,
         'operation_id' => $operation->id,
         'date_inscription' => now(),
     ]);

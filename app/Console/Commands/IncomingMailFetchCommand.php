@@ -8,6 +8,7 @@ use App\Models\IncomingMailAllowedSender;
 use App\Models\IncomingMailParametres;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use DateTimeImmutable;
 use Illuminate\Console\Command;
@@ -35,48 +36,73 @@ final class IncomingMailFetchCommand extends Command
 
     public function handle(): int
     {
-        $params = IncomingMailParametres::where('association_id', 1)->first();
+        $paramsList = IncomingMailParametres::query()
+            ->where('enabled', true)
+            ->with('association')
+            ->get();
 
-        if ($params === null || ! $params->enabled) {
-            $this->info('incoming-mail:fetch désactivé (paramètres absents ou ingestion éteinte)');
-
-            return self::SUCCESS;
-        }
-
-        if ($params->imap_host === null || $params->imap_username === null || $params->imap_password === null) {
-            $this->error('Configuration IMAP incomplète.');
-
-            return self::FAILURE;
-        }
-
-        $allowedSenders = IncomingMailAllowedSender::where('association_id', 1)
-            ->pluck('email')
-            ->map(fn (string $e): string => strtolower($e))
-            ->all();
-
-        if ($allowedSenders === []) {
-            $this->error('Liste blanche expéditeurs vide — refus explicite de poller.');
-
-            return self::FAILURE;
-        }
-
-        try {
-            $stats = $this->processMailbox($params, $allowedSenders);
-            $this->info(sprintf(
-                'fetch: %d message(s), %d traité(s), %d en attente, %d erreur(s)',
-                $stats['fetched'],
-                $stats['handled'],
-                $stats['pending'],
-                $stats['errors'],
-            ));
+        if ($paramsList->isEmpty()) {
+            $this->info('incoming-mail:fetch : aucun tenant avec ingestion activée.');
 
             return self::SUCCESS;
-        } catch (Throwable $e) {
-            Log::error('incoming-mail:fetch erreur fatale', ['exception' => $e]);
-            $this->error("Erreur fatale : {$e->getMessage()}");
-
-            return self::FAILURE;
         }
+
+        $hasFailure = false;
+
+        foreach ($paramsList as $params) {
+            $association = $params->association;
+            if ($association === null) {
+                $this->warn("Paramètres orphelins (association introuvable) id={$params->id}");
+
+                continue;
+            }
+
+            $slug = $association->slug ?? (string) $association->id;
+            $this->line("▶ [{$slug}] démarrage ingestion");
+
+            TenantContext::boot($association);
+
+            try {
+                if ($params->imap_host === null || $params->imap_username === null || $params->imap_password === null) {
+                    $this->error("[{$slug}] Configuration IMAP incomplète.");
+                    $hasFailure = true;
+
+                    continue;
+                }
+
+                $allowedSenders = IncomingMailAllowedSender::where('association_id', $association->id)
+                    ->pluck('email')
+                    ->map(fn (string $e): string => strtolower($e))
+                    ->all();
+
+                if ($allowedSenders === []) {
+                    $this->error("[{$slug}] Liste blanche expéditeurs vide — refus explicite de poller.");
+                    $hasFailure = true;
+
+                    continue;
+                }
+
+                try {
+                    $stats = $this->processMailbox($params, $allowedSenders);
+                    $this->info(sprintf(
+                        '[%s] fetch: %d message(s), %d traité(s), %d en attente, %d erreur(s)',
+                        $slug,
+                        $stats['fetched'],
+                        $stats['handled'],
+                        $stats['pending'],
+                        $stats['errors'],
+                    ));
+                } catch (Throwable $e) {
+                    Log::error("[{$slug}] incoming-mail:fetch erreur fatale", ['exception' => $e]);
+                    $this->error("[{$slug}] Erreur fatale : {$e->getMessage()}");
+                    $hasFailure = true;
+                }
+            } finally {
+                TenantContext::clear();
+            }
+        }
+
+        return $hasFailure ? self::FAILURE : self::SUCCESS;
     }
 
     /**

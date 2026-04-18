@@ -6,7 +6,7 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
-use App\Models\Association;
+use App\Support\CurrentAssociation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
@@ -73,10 +73,19 @@ final class AttestationPresenceMail extends Mailable
      */
     public function attachments(): array
     {
-        return [
+        $attachments = [
             Attachment::fromData(fn () => $this->pdfContent, $this->pdfFilename)
                 ->withMime('application/pdf'),
         ];
+
+        $logo = EmailLogo::resolve();
+        if ($logo) {
+            $attachments[] = Attachment::fromPath($logo['path'])
+                ->as(EmailLogo::CID_ASSO)
+                ->withMime($logo['mime']);
+        }
+
+        return $attachments;
     }
 
     /**
@@ -95,7 +104,7 @@ final class AttestationPresenceMail extends Mailable
             '{numero_seance}' => $this->numeroSeance ?? '',
             '{date_seance}' => $this->dateSeance ?? '',
             '{bloc_seances}' => $this->blocSeances ?? '',
-            '{association}' => Association::first()?->nom ?? '',
+            '{association}' => CurrentAssociation::tryGet()?->nom ?? '',
         ];
     }
 }

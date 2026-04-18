@@ -6,6 +6,7 @@ use App\Livewire\OperationCommunication;
 use App\Livewire\OperationDetail;
 use App\Livewire\ParticipantShow;
 use App\Mail\MessageLibreMail;
+use App\Models\Association;
 use App\Models\CampagneEmail;
 use App\Models\EmailLog;
 use App\Models\MessageTemplate;
@@ -15,23 +16,29 @@ use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Database\Seeders\MessageTemplateSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
-    $this->operation = Operation::factory()->create();
+    $this->operation = Operation::factory()->create(['association_id' => $this->association->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('mounts with operation and selects participants with email', function () {
-    $tiersWithEmail = Tiers::factory()->create(['email' => 'alice@example.com']);
-    $tiersNoEmail = Tiers::factory()->create(['email' => null]);
+    $tiersWithEmail = Tiers::factory()->create(['email' => 'alice@example.com', 'association_id' => $this->association->id]);
+    $tiersNoEmail = Tiers::factory()->create(['email' => null, 'association_id' => $this->association->id]);
 
     $p1 = Participant::create([
         'tiers_id' => $tiersWithEmail->id,
@@ -56,8 +63,8 @@ it('shows communication tab in operation detail', function () {
 });
 
 it('toggles select all participants', function () {
-    $tiers1 = Tiers::factory()->create(['email' => 'a@example.com']);
-    $tiers2 = Tiers::factory()->create(['email' => 'b@example.com']);
+    $tiers1 = Tiers::factory()->create(['email' => 'a@example.com', 'association_id' => $this->association->id]);
+    $tiers2 = Tiers::factory()->create(['email' => 'b@example.com', 'association_id' => $this->association->id]);
 
     $p1 = Participant::create([
         'tiers_id' => $tiers1->id,
@@ -85,8 +92,8 @@ it('toggles select all participants', function () {
 });
 
 it('excludes participants without email from selection', function () {
-    $tiersWithEmail = Tiers::factory()->create(['email' => 'ok@example.com']);
-    $tiersNoEmail = Tiers::factory()->create(['email' => null]);
+    $tiersWithEmail = Tiers::factory()->create(['email' => 'ok@example.com', 'association_id' => $this->association->id]);
+    $tiersNoEmail = Tiers::factory()->create(['email' => null, 'association_id' => $this->association->id]);
 
     $pWithEmail = Participant::create([
         'tiers_id' => $tiersWithEmail->id,
@@ -108,6 +115,7 @@ it('excludes participants without email from selection', function () {
 
 it('loads template into objet and corps', function () {
     $template = MessageTemplate::create([
+        'association_id' => $this->association->id,
         'nom' => 'Rappel séance',
         'objet' => 'Rappel : votre prochaine séance',
         'corps' => 'Bonjour {prenom}, à bientôt !',
@@ -172,6 +180,7 @@ it('saves a new message template', function () {
 
 it('updates existing message template', function () {
     $template = MessageTemplate::create([
+        'association_id' => $this->association->id,
         'nom' => 'Gabarit original',
         'objet' => 'Objet original',
         'corps' => 'Corps original',
@@ -193,15 +202,20 @@ it('updates existing message template', function () {
 });
 
 it('groups templates by type operation', function () {
-    $typeOp = TypeOperation::factory()->create(['nom' => 'Sophrologie']);
+    $typeOp = TypeOperation::factory()->create([
+        'nom' => 'Sophrologie',
+        'association_id' => $this->association->id,
+    ]);
 
     MessageTemplate::create([
+        'association_id' => $this->association->id,
         'nom' => 'Gabarit global',
         'objet' => 'Sujet global',
         'corps' => 'Corps global',
         'type_operation_id' => null,
     ]);
     MessageTemplate::create([
+        'association_id' => $this->association->id,
         'nom' => 'Gabarit sophrologie',
         'objet' => 'Sujet sophrologie',
         'corps' => 'Corps sophrologie',
@@ -238,10 +252,8 @@ it('validates file attachment count does not exceed 5', function () {
 });
 
 it('removes an attachment by index', function () {
-    // Test removeAttachment logic directly on the component instance
     $component = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);
 
-    // Verify removeAttachment re-indexes the array correctly
     $instance = $component->instance();
     $file0 = UploadedFile::fake()->create('a.pdf', 100, 'application/pdf');
     $file1 = UploadedFile::fake()->create('b.pdf', 100, 'application/pdf');
@@ -257,10 +269,21 @@ it('removes an attachment by index', function () {
 it('sends test email to specified address', function () {
     Mail::fake();
 
-    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => 'from@asso.fr',
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
 
-    $tiers = Tiers::factory()->create(['email' => 'alice@example.com', 'prenom' => 'Alice', 'nom' => 'Dupont']);
+    $tiers = Tiers::factory()->create([
+        'email' => 'alice@example.com',
+        'prenom' => 'Alice',
+        'nom' => 'Dupont',
+        'association_id' => $this->association->id,
+    ]);
     Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
@@ -279,10 +302,19 @@ it('sends test email to specified address', function () {
 it('requires email_from configured for test send', function () {
     Mail::fake();
 
-    $typeOp = TypeOperation::factory()->create(['email_from' => null]);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => null,
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
 
-    $tiers = Tiers::factory()->create(['email' => 'alice@example.com']);
+    $tiers = Tiers::factory()->create([
+        'email' => 'alice@example.com',
+        'association_id' => $this->association->id,
+    ]);
     Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
@@ -302,8 +334,14 @@ it('requires email_from configured for test send', function () {
 it('requires selected participant for test send', function () {
     Mail::fake();
 
-    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => 'from@asso.fr',
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
 
     Livewire::test(OperationCommunication::class, ['operation' => $operation])
         ->set('objet', 'Sujet')
@@ -321,12 +359,21 @@ it('requires selected participant for test send', function () {
 it('sends emails to all selected participants and creates campaign', function () {
     Mail::fake();
 
-    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => 'from@asso.fr',
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
 
     $participants = [];
     for ($i = 1; $i <= 3; $i++) {
-        $tiers = Tiers::factory()->create(['email' => "p{$i}@example.com"]);
+        $tiers = Tiers::factory()->create([
+            'email' => "p{$i}@example.com",
+            'association_id' => $this->association->id,
+        ]);
         $participants[] = Participant::create([
             'tiers_id' => $tiers->id,
             'operation_id' => $operation->id,
@@ -360,10 +407,19 @@ it('logs error and updates campaign nb_erreurs on send failure', function () {
     Mail::shouldReceive('to')->andReturnSelf();
     Mail::shouldReceive('send')->andThrow(new Exception('SMTP error'));
 
-    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => 'from@asso.fr',
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
 
-    $tiers = Tiers::factory()->create(['email' => 'fail@example.com']);
+    $tiers = Tiers::factory()->create([
+        'email' => 'fail@example.com',
+        'association_id' => $this->association->id,
+    ]);
     $participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
@@ -383,10 +439,19 @@ it('logs error and updates campaign nb_erreurs on send failure', function () {
 it('resets form after successful send', function () {
     Mail::fake();
 
-    $typeOp = TypeOperation::factory()->create(['email_from' => 'from@asso.fr']);
-    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => 'from@asso.fr',
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
 
-    $tiers = Tiers::factory()->create(['email' => 'alice@example.com']);
+    $tiers = Tiers::factory()->create([
+        'email' => 'alice@example.com',
+        'association_id' => $this->association->id,
+    ]);
     $participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $operation->id,
@@ -444,7 +509,7 @@ it('toggles expanded campaign detail', function () {
 // Step 15 tests
 
 it('shows message email logs in participant timeline', function () {
-    $tiers = Tiers::factory()->create(['email' => 'bob@example.com']);
+    $tiers = Tiers::factory()->create(['email' => 'bob@example.com', 'association_id' => $this->association->id]);
     $participant = Participant::create([
         'tiers_id' => $tiers->id,
         'operation_id' => $this->operation->id,

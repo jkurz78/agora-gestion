@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Livewire\FactureEdit;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
@@ -12,11 +13,16 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ExerciceService;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Route;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
     $this->exercice = app(ExerciceService::class)->current();
 
@@ -28,11 +34,13 @@ beforeEach(function () {
     });
 
     $this->tiers = Tiers::factory()->pourRecettes()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Martin',
         'prenom' => 'Sophie',
     ]);
 
     $this->facture = Facture::create([
+        'association_id' => $this->association->id,
         'numero' => null,
         'date' => now()->toDateString(),
         'statut' => StatutFacture::Brouillon,
@@ -43,6 +51,10 @@ beforeEach(function () {
     ]);
 });
 
+afterEach(function () {
+    TenantContext::clear();
+});
+
 it('renders with facture data', function () {
     Livewire::test(FactureEdit::class, ['facture' => $this->facture])
         ->assertStatus(200)
@@ -50,9 +62,10 @@ it('renders with facture data', function () {
 });
 
 it('shows available transactions for the tiers', function () {
-    $compte = CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 
     $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Inscription Yoga',
         'montant_total' => 120.00,
@@ -66,9 +79,10 @@ it('shows available transactions for the tiers', function () {
 });
 
 it('toggleTransaction adds a transaction and creates lignes', function () {
-    $compte = CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 
     $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Cotisation annuelle',
         'montant_total' => 50.00,
@@ -87,9 +101,10 @@ it('toggleTransaction adds a transaction and creates lignes', function () {
 });
 
 it('toggleTransaction removes a transaction and deletes lignes', function () {
-    $compte = CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 
     $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'libelle' => 'Stage ete',
         'montant_total' => 200.00,
@@ -114,9 +129,10 @@ it('toggleTransaction removes a transaction and deletes lignes', function () {
 });
 
 it('valider validates the facture and redirects to show', function () {
-    $compte = CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 
     $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'montant_total' => 75.00,
         'compte_id' => $compte->id,

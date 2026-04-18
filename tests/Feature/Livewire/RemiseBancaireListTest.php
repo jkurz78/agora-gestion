@@ -4,14 +4,24 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Livewire\RemiseBancaireList;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('renders the list page', function () {
@@ -21,8 +31,9 @@ it('renders the list page', function () {
 });
 
 it('displays existing remises', function () {
-    $compte = CompteBancaire::factory()->create(['nom' => 'Banque Populaire']);
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id, 'nom' => 'Banque Populaire']);
     RemiseBancaire::create([
+        'association_id' => $this->association->id,
         'numero' => 1,
         'date' => '2025-10-15',
         'mode_paiement' => ModePaiement::Cheque->value,
@@ -38,7 +49,7 @@ it('displays existing remises', function () {
 });
 
 it('creates a new remise and redirects to selection', function () {
-    $compte = CompteBancaire::factory()->create();
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 
     Livewire::test(RemiseBancaireList::class)
         ->set('date', '2025-10-15')

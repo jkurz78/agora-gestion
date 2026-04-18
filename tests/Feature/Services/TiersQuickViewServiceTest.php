@@ -13,13 +13,18 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\TiersQuickViewService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create(['peut_voir_donnees_sensibles' => false]);
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->tiers = Tiers::factory()->create([
         'email' => 'dupont@example.com',
@@ -27,6 +32,10 @@ beforeEach(function (): void {
     ]);
     $this->service = app(TiersQuickViewService::class);
     $this->exercice = 2025;
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 // ─── Helper: create a raw transaction + explicit lignes (no factory auto-lignes) ───

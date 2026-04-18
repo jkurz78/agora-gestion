@@ -8,6 +8,7 @@ use App\Enums\TypeTransaction;
 use App\Models\Provision;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,6 +19,7 @@ final class ProvisionFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => TenantContext::currentId() ?? 1,
             'exercice' => 2025,
             'type' => fake()->randomElement(TypeTransaction::cases()),
             'sous_categorie_id' => SousCategorie::factory(),

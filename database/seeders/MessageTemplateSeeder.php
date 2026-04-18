@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Association;
 use App\Models\MessageTemplate;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Seeder;
 
 final class MessageTemplateSeeder extends Seeder
 {
     public function run(): void
     {
+        $associationId = TenantContext::currentId() ?? Association::first()?->id ?? 1;
         $templates = [
             [
                 'nom' => 'Confirmation d\'inscription',
@@ -47,7 +50,7 @@ final class MessageTemplateSeeder extends Seeder
         foreach ($templates as $data) {
             MessageTemplate::firstOrCreate(
                 ['nom' => $data['nom']],
-                $data
+                array_merge(['association_id' => $associationId], $data)
             );
         }
     }
