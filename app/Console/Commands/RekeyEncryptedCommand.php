@@ -43,7 +43,7 @@ final class RekeyEncryptedCommand extends Command
         'users' => ['two_factor_secret', 'two_factor_recovery_codes'],
         'helloasso_parametres' => ['client_secret', 'callback_token'],
         'incoming_mail_parametres' => ['imap_password'],
-        'associations' => ['anthropic_api_key'],
+        'association' => ['anthropic_api_key'],
     ];
 
     public function handle(): int
