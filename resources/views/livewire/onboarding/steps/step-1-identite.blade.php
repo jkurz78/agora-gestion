@@ -143,3 +143,9 @@
 
     <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">Valider et continuer</button>
 </form>
+
+@once
+    @push('scripts')
+        <script src="{{ asset('js/onboarding-cp-ville.js') }}" defer></script>
+    @endpush
+@endonce
