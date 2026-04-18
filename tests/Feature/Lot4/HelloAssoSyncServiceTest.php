@@ -16,6 +16,7 @@ use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Services\HelloAssoSyncService;
+use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -480,4 +481,63 @@ it('does not duplicate participant on re-sync', function () {
     $result2 = $service2->synchroniser($orders, 2025);
     expect($result2->participantsCreated)->toBe(0);
     expect(Participant::where('operation_id', $operation->id)->count())->toBe(1);
+});
+
+it('preserves helloasso_item_id through TransactionService::update so re-sync does not duplicate lignes', function () {
+    $orders = [
+        [
+            'id' => 777,
+            'date' => '2025-10-15T10:00:00+02:00',
+            'amount' => 5000,
+            'formSlug' => 'dons-libres',
+            'formType' => 'Donation',
+            'items' => [
+                ['id' => 9001, 'amount' => 5000, 'state' => 'Processed', 'type' => 'Donation', 'name' => 'Don'],
+            ],
+            'user' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payer' => ['firstName' => 'Jean', 'lastName' => 'Dupont', 'email' => 'jean@test.com'],
+            'payments' => [
+                ['id' => 501, 'amount' => 5000, 'date' => '2025-10-15T10:00:00+02:00', 'paymentMeans' => 'Check'],
+            ],
+        ],
+    ];
+
+    $syncService = new HelloAssoSyncService($this->parametres);
+    $syncService->synchroniser($orders, 2025);
+
+    $tx = Transaction::where('helloasso_order_id', 777)->firstOrFail();
+    $ligne = $tx->lignes()->firstOrFail();
+    expect($ligne->helloasso_item_id)->toBe(9001);
+
+    // Simule l'utilisateur qui ouvre et enregistre la transaction (aucune modif).
+    $service = app(TransactionService::class);
+    $service->update(
+        $tx,
+        [
+            'date' => $tx->date->format('Y-m-d'),
+            'libelle' => $tx->libelle,
+            'montant_total' => $tx->montant_total,
+            'mode_paiement' => $tx->mode_paiement->value,
+            'compte_id' => $tx->compte_id,
+            'reference' => $tx->reference,
+        ],
+        [
+            [
+                'id' => $ligne->id,
+                'sous_categorie_id' => $ligne->sous_categorie_id,
+                'montant' => (string) $ligne->montant,
+                'operation_id' => $ligne->operation_id,
+                'seance' => null,
+                'notes' => null,
+            ],
+        ],
+    );
+
+    // Re-sync le même order : aucune ligne ne doit être doublée.
+    $syncService2 = new HelloAssoSyncService($this->parametres->fresh());
+    $syncService2->synchroniser($orders, 2025);
+
+    $tx->refresh();
+    expect($tx->lignes()->count())->toBe(1);
+    expect($tx->lignes()->first()->helloasso_item_id)->toBe(9001);
 });

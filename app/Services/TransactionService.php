@@ -87,12 +87,16 @@ final class TransactionService
                 }
             } else {
                 $affectationsSnapshot = [];
+                $helloAssoItemIds = [];
                 foreach ($lignes as $ligneData) {
                     $oldId = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
                     if ($oldId !== null) {
                         $existingLigne = $transaction->lignes()->where('id', $oldId)->first();
                         if ($existingLigne === null) {
                             continue;
+                        }
+                        if ($existingLigne->helloasso_item_id !== null) {
+                            $helloAssoItemIds[$oldId] = $existingLigne->helloasso_item_id;
                         }
                         $oldCents = (int) round((float) $existingLigne->montant * 100);
                         $newCents = (int) round((float) $ligneData['montant'] * 100);
@@ -112,8 +116,11 @@ final class TransactionService
                 }
                 $transaction->lignes()->forceDelete();
                 foreach ($lignes as $ligneData) {
-                    $newLigne = $transaction->lignes()->create($ligneData);
                     $oldId = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
+                    if ($oldId !== null && isset($helloAssoItemIds[$oldId])) {
+                        $ligneData['helloasso_item_id'] = $helloAssoItemIds[$oldId];
+                    }
+                    $newLigne = $transaction->lignes()->create($ligneData);
                     if ($oldId !== null && isset($affectationsSnapshot[$oldId])) {
                         foreach ($affectationsSnapshot[$oldId] as $affData) {
                             $newLigne->affectations()->create($affData);
@@ -224,7 +231,7 @@ final class TransactionService
 
         $extension = $file->guessExtension() ?? 'bin';
         $shortName = "justificatif.{$extension}";
-        $fullPath  = $transaction->storagePath('transactions/'.$transaction->id.'/'.$shortName);
+        $fullPath = $transaction->storagePath('transactions/'.$transaction->id.'/'.$shortName);
         $file->storeAs(
             $transaction->storagePath('transactions/'.$transaction->id),
             $shortName,
@@ -260,7 +267,7 @@ final class TransactionService
 
         $extension = pathinfo($originalFilename, PATHINFO_EXTENSION) ?: 'bin';
         $shortName = "justificatif.{$extension}";
-        $fullPath  = $transaction->storagePath('transactions/'.$transaction->id.'/'.$shortName);
+        $fullPath = $transaction->storagePath('transactions/'.$transaction->id.'/'.$shortName);
 
         Storage::disk('local')->put($fullPath, file_get_contents($sourcePath));
 
