@@ -7,15 +7,14 @@ namespace App\Models;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-final class Facture extends Model
+final class Facture extends TenantModel
 {
     protected $fillable = [
-        'numero', 'date', 'statut', 'tiers_id', 'compte_bancaire_id',
+        'association_id', 'numero', 'date', 'statut', 'tiers_id', 'compte_bancaire_id',
         'conditions_reglement', 'mentions_legales', 'montant_total',
         'numero_avoir', 'date_annulation', 'notes', 'saisi_par', 'exercice',
     ];

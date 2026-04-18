@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Association;
 use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
+use App\Tenant\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,18 +22,25 @@ final class HelloAssoCallbackController extends Controller
             return response()->json(['error' => 'Invalid token'], 403);
         }
 
-        $payload = $request->all();
-        $eventType = $payload['eventType'] ?? 'unknown';
-        $libelle = self::buildLibelle($eventType, $payload['data'] ?? []);
+        $association = Association::findOrFail($parametres->association_id);
+        TenantContext::boot($association);
 
-        HelloAssoNotification::create([
-            'association_id' => $parametres->association_id,
-            'event_type' => $eventType,
-            'libelle' => $libelle,
-            'payload' => $payload,
-        ]);
+        try {
+            $payload = $request->all();
+            $eventType = $payload['eventType'] ?? 'unknown';
+            $libelle = self::buildLibelle($eventType, $payload['data'] ?? []);
 
-        return response()->json(['status' => 'ok']);
+            HelloAssoNotification::create([
+                'association_id' => $parametres->association_id,
+                'event_type' => $eventType,
+                'libelle' => $libelle,
+                'payload' => $payload,
+            ]);
+
+            return response()->json(['status' => 'ok']);
+        } finally {
+            TenantContext::clear();
+        }
     }
 
     private static function buildLibelle(string $eventType, array $data): string

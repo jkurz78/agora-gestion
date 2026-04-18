@@ -21,16 +21,17 @@ trait ResolvesLogos
     {
         $assoBase64 = null;
         $assoMime = 'image/png';
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $assoBase64 = base64_encode(Storage::disk('public')->get($association->logo_path));
-            $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+        $fullPath = $association?->brandingLogoFullPath();
+        if ($fullPath && Storage::disk('local')->exists($fullPath)) {
+            $assoBase64 = base64_encode(Storage::disk('local')->get($fullPath));
+            $ext = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
             $assoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
-        $typeLogo = $operation->typeOperation?->logo_path;
-        if ($typeLogo && Storage::disk('public')->exists($typeLogo)) {
-            $typeBase64 = base64_encode(Storage::disk('public')->get($typeLogo));
-            $ext = strtolower(pathinfo($typeLogo, PATHINFO_EXTENSION));
+        $typeFullPath = $operation->typeOperation?->typeOpLogoFullPath();
+        if ($typeFullPath && Storage::disk('local')->exists($typeFullPath)) {
+            $typeBase64 = base64_encode(Storage::disk('local')->get($typeFullPath));
+            $ext = strtolower(pathinfo($typeFullPath, PATHINFO_EXTENSION));
             $typeMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
 
             return [$typeBase64, $typeMime, $assoBase64, $assoMime];
@@ -46,9 +47,10 @@ trait ResolvesLogos
      */
     private function resolveAssociationLogo(?Association $association): array
     {
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $base64 = base64_encode(Storage::disk('public')->get($association->logo_path));
-            $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+        $fullPath = $association?->brandingLogoFullPath();
+        if ($fullPath && Storage::disk('local')->exists($fullPath)) {
+            $base64 = base64_encode(Storage::disk('local')->get($fullPath));
+            $ext = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
             $mime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
 
             return [$base64, $mime];

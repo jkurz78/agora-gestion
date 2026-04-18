@@ -6,8 +6,9 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
-use App\Models\Association;
 use App\Models\Seance;
+use App\Support\CurrentAssociation;
+use App\Support\TenantUrl;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -56,7 +57,7 @@ final class MessageLibreMail extends Mailable
 
         // Append tracking pixel if token provided
         if ($this->trackingToken) {
-            $pixelUrl = route('email.tracking', ['token' => $this->trackingToken]);
+            $pixelUrl = TenantUrl::route('email.tracking', ['token' => $this->trackingToken]);
             $html .= '<img src="'.htmlspecialchars($pixelUrl).'" width="1" height="1" alt="" style="display:none">';
         }
 
@@ -82,7 +83,7 @@ final class MessageLibreMail extends Mailable
     /** @return array<int, Attachment> */
     public function attachments(): array
     {
-        return array_map(
+        $attachments = array_map(
             static function (array|string $item): Attachment {
                 if (is_array($item)) {
                     return Attachment::fromPath($item['path'])->as($item['nom']);
@@ -92,6 +93,15 @@ final class MessageLibreMail extends Mailable
             },
             $this->attachmentPaths
         );
+
+        $logo = EmailLogo::resolve();
+        if ($logo) {
+            $attachments[] = Attachment::fromPath($logo['path'])
+                ->as(EmailLogo::CID_ASSO)
+                ->withMime($logo['mime']);
+        }
+
+        return $attachments;
     }
 
     /**
@@ -133,7 +143,7 @@ final class MessageLibreMail extends Mailable
             '{titre_precedente_seance}' => $this->titrePrecedenteSeance ?? '',
             '{nb_seances_effectuees}' => (string) $this->nbSeancesEffectuees,
             '{nb_seances_restantes}' => (string) $this->nbSeancesRestantes,
-            '{association}' => Association::first()?->nom ?? '',
+            '{association}' => CurrentAssociation::tryGet()?->nom ?? '',
             '{table_seances}' => $this->buildTableSeances(false),
             '{table_seances_a_venir}' => $this->buildTableSeances(true),
         ];

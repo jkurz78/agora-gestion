@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Association;
 use App\Models\SousCategorie;
 use App\Models\TypeOperation;
 use Illuminate\Database\Seeder;
@@ -12,6 +13,8 @@ class TypeOperationSeeder extends Seeder
 {
     public function run(): void
     {
+        $associationId = Association::first()?->id ?? 1;
+
         $sousParcours = SousCategorie::where('nom', 'Parcours thérapeutiques')->firstOrFail();
         $sousFormation = SousCategorie::where('nom', 'Formations')->firstOrFail();
 
@@ -19,6 +22,7 @@ class TypeOperationSeeder extends Seeder
         $psa = TypeOperation::firstOrCreate(
             ['nom' => 'Parcours de soins A'],
             [
+                'association_id' => $associationId,
                 'nom' => 'Parcours de soins A',
                 'libelle_article' => 'le parcours de soins thérapeutique',
                 'description' => 'Parcours thérapeutique de 30 séances avec médiation animale.',
@@ -44,6 +48,7 @@ class TypeOperationSeeder extends Seeder
         $form = TypeOperation::firstOrCreate(
             ['nom' => 'Formation'],
             [
+                'association_id' => $associationId,
                 'nom' => 'Formation',
                 'libelle_article' => 'la formation',
                 'description' => 'Formation ouverte à tous, 12 séances.',

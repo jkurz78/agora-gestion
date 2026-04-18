@@ -44,8 +44,8 @@ x-on:click.window="
         @if($typeOperationId)
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                    @if($existingLogoPath)
-                        <img src="{{ Storage::disk('public')->url($existingLogoPath) }}" alt="" style="width:28px;height:28px;object-fit:cover;border-radius:4px">
+                    @if($existingLogoPath && $existingLogoUrl)
+                        <img src="{{ $existingLogoUrl }}" alt="" style="width:28px;height:28px;object-fit:cover;border-radius:4px">
                     @endif
                     <span class="fw-semibold">{{ $nom }}</span>
                     @if(!$actif)
@@ -181,9 +181,9 @@ x-on:click.window="
                             <div class="mt-2">
                                 <img src="{{ $logo->temporaryUrl() }}" alt="Aperçu" style="max-height:64px;border-radius:4px">
                             </div>
-                        @elseif($existingLogoPath !== '')
+                        @elseif($existingLogoPath !== '' && $existingLogoUrl)
                             <div class="mt-2">
-                                <img src="{{ Storage::disk('public')->url($existingLogoPath) }}" alt="Logo actuel" style="max-height:64px;border-radius:4px">
+                                <img src="{{ $existingLogoUrl }}" alt="Logo actuel" style="max-height:64px;border-radius:4px">
                                 <span class="text-muted small ms-2">Logo actuel</span>
                             </div>
                         @endif
@@ -561,9 +561,9 @@ x-on:click.window="
                 <div class="form-text small mb-2">Document joint au formulaire d'inscription que le participant doit imprimer, faire remplir par son médecin et renvoyer.</div>
                 <input type="file" wire:model="attestationMedicale" class="form-control form-control-sm @error('attestationMedicale') is-invalid @enderror" accept=".pdf,.doc,.docx">
                 @error('attestationMedicale') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                @if($existingAttestationPath)
+                @if($existingAttestationPath && $existingAttestationUrl)
                     <div class="mt-1">
-                        <a href="{{ Storage::disk('public')->url($existingAttestationPath) }}" target="_blank" class="small">
+                        <a href="{{ $existingAttestationUrl }}" target="_blank" class="small">
                             <i class="bi bi-file-earmark-pdf"></i> Voir le fichier actuel
                         </a>
                     </div>

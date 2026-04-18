@@ -5,17 +5,18 @@ declare(strict_types=1);
 use App\Enums\StatutExercice;
 use App\Enums\TypeActionExercice;
 use App\Exceptions\ExerciceCloturedException;
+use App\Models\Association;
 use App\Models\Exercice;
 use App\Models\ExerciceAction;
 use App\Models\User;
 use App\Services\ExerciceService;
+use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $association = Association::factory()->create();
+    TenantContext::boot($association);
     $this->service = app(ExerciceService::class);
     $this->user = User::factory()->create();
 });
@@ -23,6 +24,7 @@ beforeEach(function () {
 afterEach(function () {
     CarbonImmutable::setTestNow(null);
     session()->forget('exercice_actif');
+    TenantContext::clear();
 });
 
 describe('anneeForDate()', function () {

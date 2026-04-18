@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Mail\DocumentMail;
 use App\Models\DocumentPrevisionnel;
@@ -486,7 +487,7 @@ final class ParticipantShow extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Gestion);
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function render(): View
@@ -718,12 +719,12 @@ final class ParticipantShow extends Component
         return ParticipantDocument::where('participant_id', $participantId)
             ->orderByDesc('created_at')
             ->get()
-            ->filter(fn ($doc) => Storage::disk('local')->exists($doc->storage_path))
+            ->filter(fn ($doc) => Storage::disk('local')->exists($doc->documentFullPath()))
             ->map(fn ($doc) => [
                 'id' => $doc->id,
                 'name' => $doc->original_filename,
                 'label' => $doc->label,
-                'size' => Storage::disk('local')->size($doc->storage_path),
+                'size' => Storage::disk('local')->size($doc->documentFullPath()),
                 'url' => route('operations.participants.documents.download', [
                     'participant' => $participantId,
                     'filename' => basename($doc->storage_path),
@@ -764,8 +765,9 @@ final class ParticipantShow extends Component
         };
 
         // Récupérer ou générer le PDF
-        $pdfContent = $doc->pdf_path && Storage::disk('local')->exists($doc->pdf_path)
-            ? Storage::disk('local')->get($doc->pdf_path)
+        $docFullPath = $doc->pdfFullPath();
+        $pdfContent = $docFullPath && Storage::disk('local')->exists($docFullPath)
+            ? Storage::disk('local')->get($docFullPath)
             : app(DocumentPrevisionnelService::class)->genererPdf($doc);
 
         $pdfFilename = ucfirst($typeLabel)." {$doc->numero} - {$tiers->displayName()}.pdf";

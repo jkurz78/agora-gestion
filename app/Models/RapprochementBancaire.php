@@ -6,17 +6,17 @@ namespace App\Models;
 
 use App\Enums\StatutRapprochement;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-final class RapprochementBancaire extends Model
+final class RapprochementBancaire extends TenantModel
 {
     use HasFactory;
 
     protected $table = 'rapprochements_bancaires';
 
     protected $fillable = [
+        'association_id',
         'compte_id',
         'date_fin',
         'solde_ouverture',

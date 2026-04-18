@@ -11,6 +11,7 @@ use App\Models\SousCategorie;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationSeance;
 use App\Models\TypeOperationTarif;
+use App\Support\TenantAsset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -236,18 +237,6 @@ final class TypeOperationShow extends Component
         $this->validate($rules);
 
         $type = DB::transaction(function (): TypeOperation {
-            $logoPath = null;
-
-            if ($this->logo) {
-                $logoPath = $this->logo->store('type-operations', 'public');
-            }
-
-            $attestationPath = null;
-
-            if ($this->attestationMedicale) {
-                $attestationPath = $this->attestationMedicale->store('type-operations/attestations', 'public');
-            }
-
             $data = [
                 'nom' => $this->nom,
                 'libelle_article' => $this->libelle_article !== '' ? $this->libelle_article : null,
@@ -266,29 +255,49 @@ final class TypeOperationShow extends Component
                 'email_from_name' => $this->email_from_name !== '' ? $this->email_from_name : null,
             ];
 
-            if ($logoPath !== null) {
-                $data['logo_path'] = $logoPath;
-            }
-
-            if ($attestationPath !== null) {
-                $data['attestation_medicale_path'] = $attestationPath;
-            }
-
             if ($this->typeOperationId) {
                 $type = TypeOperation::findOrFail($this->typeOperationId);
 
-                if ($logoPath !== null && $type->logo_path) {
-                    Storage::disk('public')->delete($type->logo_path);
+                // Delete old logo from local disk before replacing
+                if ($this->logo !== null && $type->logo_path) {
+                    $oldPath = $type->typeOpLogoFullPath();
+                    if ($oldPath) {
+                        Storage::disk('local')->delete($oldPath);
+                    }
                 }
 
-                if ($attestationPath !== null && $type->attestation_medicale_path) {
-                    Storage::disk('public')->delete($type->attestation_medicale_path);
+                // Delete old attestation from local disk before replacing
+                if ($this->attestationMedicale !== null && $type->attestation_medicale_path) {
+                    $oldPath = $type->typeOpAttestationFullPath();
+                    if ($oldPath) {
+                        Storage::disk('local')->delete($oldPath);
+                    }
                 }
 
                 $type->update($data);
             } else {
                 $type = TypeOperation::create($data);
                 $this->typeOperationId = $type->id;
+            }
+
+            // Upload logo to tenant-scoped local disk
+            if ($this->logo !== null) {
+                $ext = $this->logo->getClientOriginalExtension() ?: 'png';
+                $shortName = 'logo.'.$ext;
+                $dir = 'associations/'.$type->association_id.'/type-operations/'.$type->id;
+                Storage::disk('local')->putFileAs($dir, $this->logo, $shortName);
+                $type->logo_path = $shortName;
+                $type->save();
+            }
+
+            // Upload attestation to tenant-scoped local disk
+            if ($this->attestationMedicale !== null) {
+                $ext = $this->attestationMedicale->getClientOriginalExtension() ?: 'pdf';
+                $shortName = 'attestation.'.$ext;
+                $dir = 'associations/'.$type->association_id.'/type-operations/'.$type->id;
+                Storage::disk('local')->putFileAs($dir, $this->attestationMedicale, $shortName);
+                $type->attestation_medicale_path = $shortName;
+                $type->save();
             }
 
             $this->syncTarifs($type);
@@ -323,7 +332,10 @@ final class TypeOperationShow extends Component
         }
 
         if ($type->logo_path) {
-            Storage::disk('public')->delete($type->logo_path);
+            $fullPath = $type->typeOpLogoFullPath();
+            if ($fullPath) {
+                Storage::disk('local')->delete($fullPath);
+            }
         }
 
         $type->delete();
@@ -610,8 +622,27 @@ final class TypeOperationShow extends Component
             ->orderBy('nom')
             ->get();
 
+        $existingLogoUrl = null;
+        $existingAttestationUrl = null;
+
+        if ($this->typeOperationId) {
+            $type = TypeOperation::find($this->typeOperationId);
+            if ($type) {
+                $logoFullPath = $type->typeOpLogoFullPath();
+                if ($logoFullPath) {
+                    $existingLogoUrl = TenantAsset::url($logoFullPath);
+                }
+                $attestationFullPath = $type->typeOpAttestationFullPath();
+                if ($attestationFullPath) {
+                    $existingAttestationUrl = TenantAsset::url($attestationFullPath);
+                }
+            }
+        }
+
         return view('livewire.type-operation-show', [
             'sousCategories' => $sousCategories,
+            'existingLogoUrl' => $existingLogoUrl,
+            'existingAttestationUrl' => $existingAttestationUrl,
         ]);
     }
 }

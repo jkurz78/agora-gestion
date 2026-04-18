@@ -2,9 +2,23 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
+use App\Models\User;
 use App\Services\NumeroPieceService;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('exerciceFromDate retourne exercice courant pour date en septembre', function () {
     $service = new NumeroPieceService;
@@ -44,7 +58,6 @@ it('deux appels consecutifs donnent deux numeros distincts', function () {
 });
 
 it('assign utilise lockForUpdate et est thread-safe dans une transaction', function () {
-    // Test that assign() can be called within DB::transaction() without error
     $service = new NumeroPieceService;
     $result = DB::transaction(function () use ($service) {
         return $service->assign(Carbon::parse('2025-10-01'));

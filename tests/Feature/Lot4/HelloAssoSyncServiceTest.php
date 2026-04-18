@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
@@ -13,22 +14,26 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
+use App\Models\User;
 use App\Services\HelloAssoSyncService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    $this->actingAs($user);
 
     $this->compte = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
-    $this->scDon = SousCategorie::where('pour_dons', true)->first()
-        ?? SousCategorie::factory()->create(['pour_dons' => true, 'nom' => 'Don']);
-    $this->scCot = SousCategorie::where('pour_cotisations', true)->first()
-        ?? SousCategorie::factory()->create(['pour_cotisations' => true, 'nom' => 'Cotisation']);
+    $this->scDon = SousCategorie::factory()->create(['pour_dons' => true, 'nom' => 'Don']);
+    $this->scCot = SousCategorie::factory()->create(['pour_cotisations' => true, 'nom' => 'Cotisation']);
 
     $this->parametres = HelloAssoParametres::create([
-        'association_id' => 1,
+        'association_id' => $this->association->id,
         'client_id' => 'test',
         'client_secret' => 'secret',
         'organisation_slug' => 'test',
@@ -43,6 +48,10 @@ beforeEach(function () {
         'nom' => 'Dupont',
         'prenom' => 'Jean',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('imports a simple donation order', function () {

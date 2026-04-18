@@ -15,12 +15,21 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use Illuminate\Database\QueryException;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->operation = Operation::factory()->create();
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('can create a reglement', function () {

@@ -216,17 +216,23 @@ final class TransactionService
             throw new \InvalidArgumentException('Type de fichier non autorisé : '.$mime);
         }
 
-        $dir = "pieces-jointes/{$transaction->id}";
-
         if ($transaction->piece_jointe_path !== null) {
-            Storage::disk('local')->deleteDirectory($dir);
+            Storage::disk('local')->deleteDirectory(
+                $transaction->storagePath('transactions/'.$transaction->id)
+            );
         }
 
         $extension = $file->guessExtension() ?? 'bin';
-        $storedPath = $file->storeAs($dir, "justificatif.{$extension}", 'local');
+        $shortName = "justificatif.{$extension}";
+        $fullPath  = $transaction->storagePath('transactions/'.$transaction->id.'/'.$shortName);
+        $file->storeAs(
+            $transaction->storagePath('transactions/'.$transaction->id),
+            $shortName,
+            'local'
+        );
 
         $transaction->update([
-            'piece_jointe_path' => $storedPath,
+            'piece_jointe_path' => $shortName,
             'piece_jointe_nom' => $file->getClientOriginalName(),
             'piece_jointe_mime' => $mime,
         ]);
@@ -246,19 +252,20 @@ final class TransactionService
             throw new \InvalidArgumentException('Fichier source introuvable : '.$sourcePath);
         }
 
-        $dir = "pieces-jointes/{$transaction->id}";
-
         if ($transaction->piece_jointe_path !== null) {
-            Storage::disk('local')->deleteDirectory($dir);
+            Storage::disk('local')->deleteDirectory(
+                $transaction->storagePath('transactions/'.$transaction->id)
+            );
         }
 
         $extension = pathinfo($originalFilename, PATHINFO_EXTENSION) ?: 'bin';
-        $storedPath = "{$dir}/justificatif.{$extension}";
+        $shortName = "justificatif.{$extension}";
+        $fullPath  = $transaction->storagePath('transactions/'.$transaction->id.'/'.$shortName);
 
-        Storage::disk('local')->put($storedPath, file_get_contents($sourcePath));
+        Storage::disk('local')->put($fullPath, file_get_contents($sourcePath));
 
         $transaction->update([
-            'piece_jointe_path' => $storedPath,
+            'piece_jointe_path' => $shortName,
             'piece_jointe_nom' => $originalFilename,
             'piece_jointe_mime' => $mime,
         ]);
@@ -270,7 +277,9 @@ final class TransactionService
             return;
         }
 
-        Storage::disk('local')->deleteDirectory("pieces-jointes/{$transaction->id}");
+        Storage::disk('local')->deleteDirectory(
+            $transaction->storagePath('transactions/'.$transaction->id)
+        );
 
         $transaction->update([
             'piece_jointe_path' => null,

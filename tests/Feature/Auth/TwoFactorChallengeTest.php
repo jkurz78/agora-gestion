@@ -3,17 +3,31 @@
 declare(strict_types=1);
 
 use App\Enums\TwoFactorMethod;
+use App\Models\Association;
 use App\Models\User;
 use App\Services\TwoFactorService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use PragmaRX\Google2FA\Google2FA;
 
 uses(RefreshDatabase::class);
 
+// Boot a tenant context so the dashboard sidebar renders without crashing.
+beforeEach(function (): void {
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+});
+
+afterEach(function (): void {
+    TenantContext::clear();
+});
+
 it('redirects to challenge when 2FA email is active', function () {
     Mail::fake();
     $user = User::factory()->create(['two_factor_method' => TwoFactorMethod::Email, 'two_factor_confirmed_at' => now()]);
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $user->update(['derniere_association_id' => $this->association->id]);
 
     $this->actingAs($user)
         ->get(route('dashboard'))
@@ -22,6 +36,8 @@ it('redirects to challenge when 2FA email is active', function () {
 
 it('allows access when 2FA is not active', function () {
     $user = User::factory()->create(['two_factor_method' => null]);
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $user->update(['derniere_association_id' => $this->association->id]);
 
     $this->actingAs($user)
         ->get(route('dashboard'))
@@ -31,6 +47,8 @@ it('allows access when 2FA is not active', function () {
 it('allows access after successful 2FA verification', function () {
     Mail::fake();
     $user = User::factory()->create(['two_factor_method' => TwoFactorMethod::Email, 'two_factor_confirmed_at' => now()]);
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $user->update(['derniere_association_id' => $this->association->id]);
 
     $this->actingAs($user)
         ->withSession(['two_factor_verified' => true])
@@ -70,6 +88,8 @@ it('verifies valid TOTP code', function () {
         'two_factor_secret' => $secret,
         'two_factor_confirmed_at' => now(),
     ]);
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $user->update(['derniere_association_id' => $this->association->id]);
 
     $validCode = $google2fa->getCurrentOtp($secret);
 
@@ -96,6 +116,8 @@ it('verifies recovery code for TOTP', function () {
         'two_factor_secret' => 'JBSWY3DPEHPK3PXP',
         'two_factor_confirmed_at' => now(),
     ]);
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    $user->update(['derniere_association_id' => $this->association->id]);
 
     $service = app(TwoFactorService::class);
     $codes = $service->generateRecoveryCodes($user);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\CompteBancaire;
+use App\Tenant\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -177,6 +178,7 @@ final class TransactionUniverselleService
             ")
             ->where('tx.type', 'depense')
             ->whereNull('tx.deleted_at')
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
             ->when($compteId !== null, fn ($q) => $q->where('tx.compte_id', $compteId))
             ->when($tiersId !== null, fn ($q) => $q->where('tx.tiers_id', $tiersId))
             ->when($dateDebut, fn ($q) => $q->where('tx.date', '>=', $dateDebut))
@@ -229,6 +231,7 @@ final class TransactionUniverselleService
             ")
             ->where('tx.type', 'recette')
             ->whereNull('tx.deleted_at')
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('tx.association_id', TenantContext::currentId()))
             ->when($compteId !== null, fn ($q) => $q->where('tx.compte_id', $compteId))
             ->when($tiersId !== null, fn ($q) => $q->where('tx.tiers_id', $tiersId))
             ->when($dateDebut, fn ($q) => $q->where('tx.date', '>=', $dateDebut))
@@ -277,6 +280,7 @@ final class TransactionUniverselleService
                 0 as is_helloasso
             ")
             ->whereNull('vi.deleted_at')
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))
             ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($compteId !== null, fn ($q) => $q->where('vi.compte_source_id', $compteId))
             ->when($dateDebut, fn ($q) => $q->where('vi.date', '>=', $dateDebut))
@@ -318,6 +322,7 @@ final class TransactionUniverselleService
                 0 as is_helloasso
             ")
             ->whereNull('vi.deleted_at')
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))
             ->when($tiersId !== null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($compteId !== null, fn ($q) => $q->where('vi.compte_destination_id', $compteId))
             ->when($dateDebut, fn ($q) => $q->where('vi.date', '>=', $dateDebut))

@@ -6,18 +6,28 @@ declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
 use App\Livewire\RapportCompteResultat;
+use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\Provision;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use App\Services\ExerciceService;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->user = User::factory()->create(['role' => 'admin']);
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
     $this->categorie = Categorie::factory()->create();
     $this->sc = SousCategorie::factory()->create(['categorie_id' => $this->categorie->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('displays provisions block in compte de resultat', function () {

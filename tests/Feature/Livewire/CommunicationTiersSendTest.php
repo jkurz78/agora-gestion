@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\Role;
 use App\Livewire\CommunicationTiers;
 use App\Mail\CommunicationTiersMail;
 use App\Models\Association;
@@ -11,25 +10,31 @@ use App\Models\EmailLog;
 use App\Models\MessageTemplate;
 use App\Models\Tiers;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
-    $this->admin = User::factory()->create(['role' => Role::Admin]);
+    $this->association = Association::factory()->create([
+        'email_from' => 'noreply@asso.fr',
+        'email_from_name' => 'Mon Asso',
+    ]);
+    $this->admin = User::factory()->create();
+    $this->admin->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->admin);
+});
 
-    $assoc = Association::find(1) ?? new Association;
-    $assoc->id = 1;
-    $assoc->fill(['nom' => 'Test Asso', 'email_from' => 'noreply@asso.fr', 'email_from_name' => 'Mon Asso'])->save();
+afterEach(function () {
+    TenantContext::clear();
 });
 
 // --- Templates ---
 
 it('loads a message template', function () {
     $tpl = MessageTemplate::create([
+        'association_id' => $this->association->id,
         'categorie' => 'communication',
         'nom' => 'Convocation',
         'objet' => 'Convocation AG',
@@ -61,8 +66,8 @@ it('saves a new message template', function () {
 it('sends campaign to selected tiers', function () {
     Mail::fake();
 
-    $t1 = Tiers::factory()->create(['nom' => 'A', 'prenom' => 'Jean', 'email' => 'a@e.com']);
-    $t2 = Tiers::factory()->create(['nom' => 'B', 'prenom' => 'Paul', 'email' => 'b@e.com']);
+    $t1 = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'A', 'prenom' => 'Jean', 'email' => 'a@e.com']);
+    $t2 = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'B', 'prenom' => 'Paul', 'email' => 'b@e.com']);
 
     Livewire::test(CommunicationTiers::class)
         ->set('objet', 'Hello {prenom}')
@@ -76,9 +81,9 @@ it('sends campaign to selected tiers', function () {
 });
 
 it('blocks send when no email_from configured', function () {
-    Association::find(1)->update(['email_from' => null]);
+    $this->association->update(['email_from' => null]);
 
-    $tiers = Tiers::factory()->create(['email' => 'a@e.com']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'a@e.com']);
 
     Livewire::test(CommunicationTiers::class)
         ->set('objet', 'Test')
@@ -101,7 +106,7 @@ it('blocks send when no tiers selected', function () {
 it('creates email log with tracking token', function () {
     Mail::fake();
 
-    $tiers = Tiers::factory()->create(['email' => 'tracked@e.com']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'tracked@e.com']);
 
     Livewire::test(CommunicationTiers::class)
         ->set('objet', 'Test')
@@ -120,7 +125,7 @@ it('creates email log with tracking token', function () {
 it('resets form after successful send', function () {
     Mail::fake();
 
-    $tiers = Tiers::factory()->create(['email' => 'a@e.com']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'a@e.com']);
 
     Livewire::test(CommunicationTiers::class)
         ->set('objet', 'Test')
@@ -136,7 +141,7 @@ it('resets form after successful send', function () {
 it('sends test email', function () {
     Mail::fake();
 
-    $tiers = Tiers::factory()->create(['email' => 'a@e.com', 'prenom' => 'Jean']);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'a@e.com', 'prenom' => 'Jean']);
 
     Livewire::test(CommunicationTiers::class)
         ->set('objet', 'Test {prenom}')
@@ -154,6 +159,7 @@ it('sends test email', function () {
 
 it('displays campaign history', function () {
     CampagneEmail::create([
+        'association_id' => $this->association->id,
         'operation_id' => null,
         'objet' => 'Passée',
         'corps' => '<p>Ancien</p>',
@@ -168,6 +174,7 @@ it('displays campaign history', function () {
 
 it('reuses a past campaign', function () {
     $campagne = CampagneEmail::create([
+        'association_id' => $this->association->id,
         'operation_id' => null,
         'objet' => 'Objet ancien',
         'corps' => '<p>Corps ancien</p>',

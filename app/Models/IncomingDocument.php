@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-final class IncomingDocument extends Model
+final class IncomingDocument extends TenantModel
 {
+    use TenantStorage;
+
     protected $fillable = [
         'association_id',
         'storage_path',
@@ -34,5 +36,10 @@ final class IncomingDocument extends Model
     public function association(): BelongsTo
     {
         return $this->belongsTo(Association::class);
+    }
+
+    public function incomingFullPath(): string
+    {
+        return $this->storagePath('incoming-documents/'.basename($this->storage_path));
     }
 }

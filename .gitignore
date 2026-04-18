@@ -49,8 +49,9 @@ public/proto-*.html
 /scripts/clone-prod.sh
 /scripts/deploy-hook.sh
 
-# Docs internes (specs, plans, design)
-/docs/
+# Docs internes (specs, plans, design) — exclus du repo
+/docs/superpowers/
+/docs/adr/
 
 # Fichiers locaux
 /tmp/

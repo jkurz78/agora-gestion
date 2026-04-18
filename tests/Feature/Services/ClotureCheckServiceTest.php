@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\StatutExercice;
 use App\Enums\StatutRapprochement;
+use App\Models\Association;
 use App\Models\BudgetLine;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
@@ -13,15 +14,21 @@ use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Services\ClotureCheckService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-uses(RefreshDatabase::class);
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
     $this->exercice = Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Ouvert]);
     $this->service = app(ClotureCheckService::class);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 describe('contrôles bloquants', function () {
@@ -32,8 +39,9 @@ describe('contrôles bloquants', function () {
     });
 
     it('rapprochements en cours: fails when one exists in exercice period', function () {
-        $compte = CompteBancaire::factory()->create();
+        $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
         RapprochementBancaire::create([
+            'association_id' => $this->association->id,
             'compte_id' => $compte->id,
             'date_fin' => '2025-11-30',
             'solde_ouverture' => 0,
@@ -54,10 +62,11 @@ describe('contrôles bloquants', function () {
     });
 
     it('lignes sans sous-categorie: fails when some lack it', function () {
-        $compte = CompteBancaire::factory()->create();
+        $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
         $transaction = Transaction::factory()->asDepense()->create([
             'date' => '2025-10-15',
             'compte_id' => $compte->id,
+            'association_id' => $this->association->id,
         ]);
         $transaction->lignes()->create([
             'montant' => 50,
@@ -78,10 +87,11 @@ describe('contrôles avertissement', function () {
     });
 
     it('transactions non pointées: warns when some exist', function () {
-        $compte = CompteBancaire::factory()->create();
+        $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
         Transaction::factory()->asDepense()->create([
             'date' => '2025-10-15',
             'compte_id' => $compte->id,
+            'association_id' => $this->association->id,
             'rapprochement_id' => null,
         ]);
 
@@ -97,9 +107,17 @@ describe('contrôles avertissement', function () {
     });
 
     it('budget absent: passes when budget lines exist', function () {
-        $categorie = Categorie::factory()->create();
-        $sc = SousCategorie::factory()->create(['categorie_id' => $categorie->id]);
-        BudgetLine::create(['sous_categorie_id' => $sc->id, 'exercice' => 2025, 'montant_prevu' => 100]);
+        $categorie = Categorie::factory()->create(['association_id' => $this->association->id]);
+        $sc = SousCategorie::factory()->create([
+            'categorie_id' => $categorie->id,
+            'association_id' => $this->association->id,
+        ]);
+        BudgetLine::create([
+            'association_id' => $this->association->id,
+            'sous_categorie_id' => $sc->id,
+            'exercice' => 2025,
+            'montant_prevu' => 100,
+        ]);
 
         $result = $this->service->executer(2025);
         $avert = collect($result->avertissements)->firstWhere('nom', 'Budget absent');
@@ -114,8 +132,9 @@ describe('peutCloturer()', function () {
     });
 
     it('returns false when a blocking check fails', function () {
-        $compte = CompteBancaire::factory()->create();
+        $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
         RapprochementBancaire::create([
+            'association_id' => $this->association->id,
             'compte_id' => $compte->id,
             'date_fin' => '2025-11-30',
             'solde_ouverture' => 0,

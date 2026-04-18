@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Models\Participant;
 use App\Models\ParticipantDocument;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +27,7 @@ final class ParticipantEngagementUpload extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()?->role->canWrite(Espace::Gestion) ?? false;
+        return RoleAssociation::tryFrom(Auth::user()?->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false;
     }
 
     public function updatedScanFormulaire(): void
@@ -48,17 +49,18 @@ final class ParticipantEngagementUpload extends Component
         ]);
 
         $participant = Participant::findOrFail($this->participantId);
-        $dir = "participants/{$participant->id}";
         $originalName = $this->scanFormulaire->getClientOriginalName();
         $extension = $this->scanFormulaire->getClientOriginalExtension();
         $filename = 'doc-'.now()->format('Y-m-d-His').'.'.$extension;
 
-        $this->scanFormulaire->storeAs($dir, $filename, 'local');
+        $tenantDir = 'associations/'.$participant->association_id.'/participants/'.$participant->id;
+        $this->scanFormulaire->storeAs($tenantDir, $filename, 'local');
 
         ParticipantDocument::create([
+            'association_id' => $participant->association_id,
             'participant_id' => $participant->id,
             'label' => $this->label,
-            'storage_path' => "{$dir}/{$filename}",
+            'storage_path' => $filename,
             'original_filename' => $originalName,
             'source' => 'manual-upload',
         ]);

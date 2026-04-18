@@ -6,9 +6,11 @@ namespace App\Services\IncomingDocuments;
 
 use App\Models\IncomingDocument;
 use App\Services\IncomingDocuments\Contracts\DocumentHandler;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 final class IncomingDocumentIngester
 {
@@ -84,14 +86,19 @@ final class IncomingDocumentIngester
             }
         }
 
-        $uuid = Str::uuid()->toString();
-        $storagePath = "incoming-documents/{$uuid}.pdf";
+        $associationId = TenantContext::currentId();
+        if ($associationId === null) {
+            throw new RuntimeException('TenantContext non booté lors de l\'ingestion du document.');
+        }
 
-        Storage::disk('local')->put($storagePath, file_get_contents($file->tempPath));
+        $shortName = Str::uuid()->toString().'.pdf';
+        $fullPath = 'associations/'.$associationId.'/incoming-documents/'.$shortName;
+
+        Storage::disk('local')->put($fullPath, file_get_contents($file->tempPath));
 
         return IncomingDocument::create([
-            'association_id' => 1,
-            'storage_path' => $storagePath,
+            'association_id' => $associationId,
+            'storage_path' => $shortName,
             'original_filename' => $file->originalFilename,
             'sender_email' => $file->senderEmail ?? 'upload-manuel',
             'recipient_email' => $file->recipientEmail,

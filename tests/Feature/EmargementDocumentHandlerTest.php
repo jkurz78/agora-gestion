@@ -7,6 +7,9 @@ use App\Models\Seance;
 use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Services\Emargement\EmargementDocumentHandler;
 use App\Services\Emargement\QrExtractionResult;
+use App\Models\Association;
+use App\Models\User;
+use App\Tenant\TenantContext;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -30,6 +33,14 @@ function makeEmargementIncomingFile(string $originalName = 'scan.pdf', string $s
 
 beforeEach(function () {
     Storage::fake('local');
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('passes non-PDF files to the next handler', function () {
@@ -124,10 +135,10 @@ it('attaches the feuille to the target seance when the QR matches', function () 
     expect($attempt->context)->toBe(['seance_id' => $seance->id]);
 
     $seance->refresh();
-    expect($seance->feuille_signee_path)->toBe("emargement/seance-{$seance->id}.pdf");
+    expect($seance->feuille_signee_path)->toBe('feuille-signee.pdf');
     expect($seance->feuille_signee_source)->toBe('email');
     expect($seance->feuille_signee_sender_email)->toBe('copieur@test.fr');
-    Storage::disk('local')->assertExists($seance->feuille_signee_path);
+    Storage::disk('local')->assertExists($seance->feuilleSigneeFullPath());
 });
 
 it('sets source to manual when the incoming file source is not email', function () {
@@ -155,11 +166,11 @@ it('overwrites a previously attached feuille on rescan', function () {
     $seance = Seance::create([
         'operation_id' => $operation->id,
         'numero' => 1,
-        'feuille_signee_path' => 'emargement/seance-old.pdf',
+        'feuille_signee_path' => 'feuille-signee.pdf',
         'feuille_signee_at' => now()->subDay(),
         'feuille_signee_source' => 'manual',
     ]);
-    Storage::disk('local')->put('emargement/seance-old.pdf', 'old content');
+    Storage::disk('local')->put($seance->feuilleSigneeFullPath(), 'old content');
 
     $extractor = Mockery::mock(QrCodeExtractor::class);
     $extractor->shouldReceive('extractSeanceIdFromPdf')
@@ -172,5 +183,5 @@ it('overwrites a previously attached feuille on rescan', function () {
     expect($attempt->outcome)->toBe('handled');
     $seance->refresh();
     expect($seance->feuille_signee_source)->toBe('email');
-    expect($seance->feuille_signee_path)->toBe("emargement/seance-{$seance->id}.pdf");
+    expect($seance->feuille_signee_path)->toBe('feuille-signee.pdf');
 });

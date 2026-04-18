@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Mail\TestEmail;
-use App\Models\Association;
 use App\Models\CompteBancaire;
+use App\Support\CurrentAssociation;
+use App\Support\TenantAsset;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -65,7 +66,7 @@ final class AssociationForm extends Component
 
     public function mount(): void
     {
-        $association = Association::find(1);
+        $association = CurrentAssociation::tryGet();
         if ($association) {
             $this->nom = $association->nom ?? '';
             $this->adresse = $association->adresse ?? '';
@@ -129,46 +130,61 @@ final class AssociationForm extends Component
 
         if ($this->logo !== null) {
             $extension = $this->logo->extension();
-            $path = Storage::disk('public')->putFileAs('association', $this->logo, 'logo.'.$extension);
+            $shortName = 'logo.'.$extension;
+            $association = CurrentAssociation::get();
+            $fullPath = $association->storagePath('branding/'.$shortName);
+            $dir = dirname($fullPath);
 
-            if ($path === false) {
+            $stored = Storage::disk('local')->putFileAs($dir, $this->logo, $shortName);
+
+            if ($stored === false) {
                 $this->addError('logo', 'Impossible de sauvegarder le logo.');
 
                 return;
             }
 
             // Delete old file only after new file is successfully written
-            if ($this->logo_path !== null && $this->logo_path !== $path && Storage::disk('public')->exists($this->logo_path)) {
-                Storage::disk('public')->delete($this->logo_path);
+            if ($this->logo_path !== null) {
+                $oldFull = $association->storagePath('branding/'.basename($this->logo_path));
+                if ($oldFull !== $fullPath && Storage::disk('local')->exists($oldFull)) {
+                    Storage::disk('local')->delete($oldFull);
+                }
             }
 
-            $data['logo_path'] = $path;
-            $this->logo_path = $path;
+            $data['logo_path'] = $shortName;
+            $this->logo_path = $shortName;
             $this->logo = null;
         }
 
         if ($this->cachet !== null) {
             $extension = $this->cachet->extension();
-            $path = Storage::disk('public')->putFileAs('association', $this->cachet, 'cachet.'.$extension);
+            $shortName = 'cachet.'.$extension;
+            $association = CurrentAssociation::get();
+            $fullPath = $association->storagePath('branding/'.$shortName);
+            $dir = dirname($fullPath);
 
-            if ($path === false) {
+            $stored = Storage::disk('local')->putFileAs($dir, $this->cachet, $shortName);
+
+            if ($stored === false) {
                 $this->addError('cachet', 'Impossible de sauvegarder le cachet.');
 
                 return;
             }
 
-            if ($this->cachet_signature_path !== null && $this->cachet_signature_path !== $path && Storage::disk('public')->exists($this->cachet_signature_path)) {
-                Storage::disk('public')->delete($this->cachet_signature_path);
+            if ($this->cachet_signature_path !== null) {
+                $oldFull = $association->storagePath('branding/'.basename($this->cachet_signature_path));
+                if ($oldFull !== $fullPath && Storage::disk('local')->exists($oldFull)) {
+                    Storage::disk('local')->delete($oldFull);
+                }
             }
 
-            $data['cachet_signature_path'] = $path;
-            $this->cachet_signature_path = $path;
+            $data['cachet_signature_path'] = $shortName;
+            $this->cachet_signature_path = $shortName;
             $this->cachet = null;
         }
 
-        // Direct assignment pattern (id not in fillable)
-        $association = Association::find(1) ?? new Association;
-        $association->id = 1;
+        // Update the current tenant association
+        $association = CurrentAssociation::get();
         $association->fill($data)->save();
 
         $this->dispatch('form-saved');
@@ -186,12 +202,12 @@ final class AssociationForm extends Component
     public function sendTestEmail(): void
     {
         $this->validate([
-            'email_from'  => 'required|email',
+            'email_from' => 'required|email',
             'testEmailTo' => 'required|email',
         ], [
-            'email_from.required'  => "L'adresse d'expédition est requise.",
+            'email_from.required' => "L'adresse d'expédition est requise.",
             'testEmailTo.required' => 'Veuillez saisir une adresse destinataire.',
-            'testEmailTo.email'    => "L'adresse destinataire n'est pas valide.",
+            'testEmailTo.email' => "L'adresse destinataire n'est pas valide.",
         ]);
 
         try {
@@ -210,13 +226,20 @@ final class AssociationForm extends Component
     public function render(): View
     {
         $logoUrl = null;
-        if ($this->logo_path !== null && Storage::disk('public')->exists($this->logo_path)) {
-            $logoUrl = Storage::disk('public')->url($this->logo_path);
+        $association = CurrentAssociation::tryGet();
+        if ($this->logo_path !== null && $association !== null) {
+            $fullPath = $association->storagePath('branding/'.basename($this->logo_path));
+            if (Storage::disk('local')->exists($fullPath)) {
+                $logoUrl = TenantAsset::url($fullPath);
+            }
         }
 
         $cachetUrl = null;
-        if ($this->cachet_signature_path !== null && Storage::disk('public')->exists($this->cachet_signature_path)) {
-            $cachetUrl = Storage::disk('public')->url($this->cachet_signature_path);
+        if ($this->cachet_signature_path !== null && $association !== null) {
+            $fullPath = $association->storagePath('branding/'.basename($this->cachet_signature_path));
+            if (Storage::disk('local')->exists($fullPath)) {
+                $cachetUrl = TenantAsset::url($fullPath);
+            }
         }
 
         $comptesBancaires = CompteBancaire::where('est_systeme', false)->orderBy('nom')->get();

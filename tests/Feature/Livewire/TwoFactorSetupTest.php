@@ -4,15 +4,25 @@ declare(strict_types=1);
 
 use App\Enums\TwoFactorMethod;
 use App\Livewire\TwoFactorSetup;
+use App\Models\Association;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 use PragmaRX\Google2FA\Google2FA;
 
-uses(RefreshDatabase::class);
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('renders disabled state when 2FA is off', function () {
     $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(TwoFactorSetup::class)
@@ -23,6 +33,7 @@ it('renders disabled state when 2FA is off', function () {
 
 it('can enable email 2FA', function () {
     $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(TwoFactorSetup::class)
@@ -35,6 +46,7 @@ it('can enable email 2FA', function () {
 
 it('can start TOTP setup and shows QR code', function () {
     $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
 
     $component = Livewire::actingAs($user)
         ->test(TwoFactorSetup::class)
@@ -49,6 +61,7 @@ it('can start TOTP setup and shows QR code', function () {
 
 it('can confirm TOTP with valid code', function () {
     $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     $google2fa = new Google2FA;
 
     $component = Livewire::actingAs($user)
@@ -67,6 +80,7 @@ it('can confirm TOTP with valid code', function () {
 
 it('shows recovery codes after TOTP confirmation', function () {
     $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     $google2fa = new Google2FA;
 
     $component = Livewire::actingAs($user)
@@ -88,6 +102,7 @@ it('can disable 2FA', function () {
         'two_factor_method' => TwoFactorMethod::Email,
         'two_factor_confirmed_at' => now(),
     ]);
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
 
     Livewire::actingAs($user)
         ->test(TwoFactorSetup::class)
@@ -105,6 +120,7 @@ it('can regenerate recovery codes', function () {
         'two_factor_confirmed_at' => now(),
         'two_factor_recovery_codes' => ['old-code-hash'],
     ]);
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
 
     $component = Livewire::actingAs($user)
         ->test(TwoFactorSetup::class)
@@ -118,6 +134,7 @@ it('can switch from email to TOTP', function () {
         'two_factor_method' => TwoFactorMethod::Email,
         'two_factor_confirmed_at' => now(),
     ]);
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
 
     $component = Livewire::actingAs($user)
         ->test(TwoFactorSetup::class)

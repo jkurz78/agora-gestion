@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
+use App\Tenant\TenantContext;
 
 afterEach(function (): void {
+    TenantContext::clear();
     @unlink(config_path('version.php'));
 });
 
@@ -38,7 +41,11 @@ it('AppServiceProvider::boot() ne régénère pas config/version.php si le fichi
 });
 
 it('le footer version est présent dans les pages authentifiées', function (): void {
+    $association = Association::factory()->create();
     $user = User::factory()->create();
+    $user->associations()->attach($association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
 
     $response = $this->actingAs($user)->get(route('dashboard'));
 

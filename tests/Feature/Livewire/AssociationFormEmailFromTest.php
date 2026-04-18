@@ -5,13 +5,20 @@ declare(strict_types=1);
 use App\Livewire\Parametres\AssociationForm;
 use App\Models\Association;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
-uses(RefreshDatabase::class);
-
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('displays email_from fields', function () {
@@ -28,7 +35,7 @@ it('saves email_from and email_from_name', function () {
         ->set('email_from_name', 'Mon Association')
         ->call('save');
 
-    $assoc = Association::find(1);
+    $assoc = $this->association->fresh();
     expect($assoc->email_from)->toBe('noreply@asso.fr')
         ->and($assoc->email_from_name)->toBe('Mon Association');
 });
@@ -42,9 +49,7 @@ it('validates email_from is a valid email', function () {
 });
 
 it('loads existing email_from on mount', function () {
-    $assoc = Association::find(1) ?? new Association;
-    $assoc->id = 1;
-    $assoc->fill(['nom' => 'Test', 'email_from' => 'existing@asso.fr', 'email_from_name' => 'Existing'])->save();
+    $this->association->update(['email_from' => 'existing@asso.fr', 'email_from_name' => 'Existing']);
 
     Livewire::test(AssociationForm::class)
         ->assertSet('email_from', 'existing@asso.fr')

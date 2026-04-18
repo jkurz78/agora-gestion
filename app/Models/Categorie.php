@@ -6,14 +6,14 @@ namespace App\Models;
 
 use App\Enums\TypeCategorie;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-final class Categorie extends Model
+final class Categorie extends TenantModel
 {
     use HasFactory;
 
     protected $fillable = [
+        'association_id',
         'nom',
         'type',
     ];

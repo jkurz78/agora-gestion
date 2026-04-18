@@ -3,21 +3,37 @@
 declare(strict_types=1);
 
 use App\Livewire\AdherentList;
+use App\Models\Association;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
-    $this->cotSc = SousCategorie::factory()->create(['pour_cotisations' => true]);
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+
+    $this->cotSc = SousCategorie::factory()->create([
+        'association_id' => $this->association->id,
+        'pour_cotisations' => true,
+    ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée', function () {
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'statut_reglement' => 'pointe',
     ]);
@@ -34,8 +50,9 @@ it('affiche bi-check-lg Bootstrap Icon pour un membre avec cotisation pointée',
 });
 
 it('n\'affiche pas le caractère unicode ✓', function () {
-    $tiers = Tiers::factory()->create();
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'statut_reglement' => 'pointe',
     ]);
@@ -52,8 +69,11 @@ it('n\'affiche pas le caractère unicode ✓', function () {
 });
 
 it('affiche un bouton bi-clock-history lié aux transactions du membre', function () {
-    $tiers = Tiers::factory()->create();
-    $tx = Transaction::factory()->asRecette()->create(['tiers_id' => $tiers->id]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'tiers_id' => $tiers->id,
+    ]);
     $tx->lignes()->forceDelete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
@@ -68,8 +88,11 @@ it('affiche un bouton bi-clock-history lié aux transactions du membre', functio
 });
 
 it('les boutons d\'action ont la classe btn-sm sans style inline de padding', function () {
-    $tiers = Tiers::factory()->create();
-    $tx = Transaction::factory()->asRecette()->create(['tiers_id' => $tiers->id]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $tx = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'tiers_id' => $tiers->id,
+    ]);
     $tx->lignes()->forceDelete();
     TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
 use App\Models\Facture;
 use App\Services\ExerciceService;
@@ -29,7 +30,7 @@ final class FactureList extends Component
 
     public function getCanEditProperty(): bool
     {
-        return Auth::user()->role->canWrite(Espace::Compta);
+        return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
     }
 
     public function updatedFilterStatut(): void

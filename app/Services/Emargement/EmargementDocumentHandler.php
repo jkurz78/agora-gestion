@@ -78,8 +78,6 @@ final class EmargementDocumentHandler implements DocumentHandler
 
     private function attachToSeance(IncomingDocumentFile $file, Seance $seance): void
     {
-        $finalPath = "emargement/seance-{$seance->id}.pdf";
-
         if ($seance->feuille_signee_path !== null) {
             Log::info('Feuille signée écrasée lors d\'un rescan', [
                 'seance_id' => $seance->id,
@@ -89,10 +87,11 @@ final class EmargementDocumentHandler implements DocumentHandler
             ]);
         }
 
-        Storage::disk('local')->put($finalPath, file_get_contents($file->tempPath));
+        $fullPath = $seance->storagePath('seances/'.$seance->id.'/feuille-signee.pdf');
+        Storage::disk('local')->put($fullPath, file_get_contents($file->tempPath));
 
         $seance->update([
-            'feuille_signee_path' => $finalPath,
+            'feuille_signee_path' => 'feuille-signee.pdf',
             'feuille_signee_at' => $file->receivedAt,
             'feuille_signee_source' => $file->source === 'email' ? 'email' : 'manual',
             'feuille_signee_sender_email' => $file->senderEmail,

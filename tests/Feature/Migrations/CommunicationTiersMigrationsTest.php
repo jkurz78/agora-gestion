@@ -2,12 +2,25 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\CampagneEmail;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
 
 it('tiers table has email_optout column', function () {
     expect(Schema::hasColumn('tiers', 'email_optout'))->toBeTrue();

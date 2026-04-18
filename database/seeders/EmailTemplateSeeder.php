@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Association;
 use App\Models\EmailTemplate;
 use Illuminate\Database\Seeder;
 
@@ -11,9 +12,12 @@ class EmailTemplateSeeder extends Seeder
 {
     public function run(): void
     {
+        $associationId = Association::first()?->id ?? 1;
+
         EmailTemplate::updateOrCreate(
             ['categorie' => 'formulaire', 'type_operation_id' => null],
             [
+                'association_id' => $associationId,
                 'objet' => 'Action requise : Formulaire à compléter pour votre inscription au parcours {operation}',
                 'corps' => '<p>Bonjour {prenom},</p>'
                     .'<p>Afin de compléter votre dossier d\'inscription au parcours {type_operation}, nous vous remercions de compléter le formulaire dont le lien est ci-dessous.</p>'
@@ -25,6 +29,7 @@ class EmailTemplateSeeder extends Seeder
         EmailTemplate::updateOrCreate(
             ['categorie' => 'attestation', 'type_operation_id' => null],
             [
+                'association_id' => $associationId,
                 'objet' => 'Attestation de présence — {operation}',
                 'corps' => '<p>Bonjour <strong>{prenom}</strong>,</p>'
                     .'<p>Veuillez trouver ci-joint votre attestation de présence pour {type_operation} « <strong>{operation}</strong> ».</p>'
@@ -36,6 +41,7 @@ class EmailTemplateSeeder extends Seeder
         EmailTemplate::updateOrCreate(
             ['categorie' => 'document', 'type_operation_id' => null],
             [
+                'association_id' => $associationId,
                 'objet' => '{type_document_uc} n°{numero_document} — {operation}',
                 'corps' => '<p>Bonjour <strong>{prenom} {nom}</strong>,</p>'
                     .'<p>Veuillez trouver ci-joint {type_document_article} n°<strong>{numero_document}</strong> du {date_document}.</p>'

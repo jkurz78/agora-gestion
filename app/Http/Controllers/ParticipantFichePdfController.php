@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
+use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -31,13 +32,13 @@ final class ParticipantFichePdfController extends Controller
             $participant->load('donneesMedicales');
         }
 
-        $association = Association::find(1);
+        $association = CurrentAssociation::get();
 
         [$headerLogoBase64, $headerLogoMime, $footerLogoBase64, $footerLogoMime] = $this->resolveLogos($association, $operation);
 
         $documents = [];
         if ($showParcours) {
-            $dir = "participants/{$participant->id}";
+            $dir = $participant->storagePath('participants/'.$participant->id);
             if (Storage::disk('local')->exists($dir)) {
                 $documents = collect(Storage::disk('local')->files($dir))
                     ->map(fn (string $path) => basename($path))
@@ -85,16 +86,17 @@ final class ParticipantFichePdfController extends Controller
     {
         $assoBase64 = null;
         $assoMime = 'image/png';
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $assoBase64 = base64_encode(Storage::disk('public')->get($association->logo_path));
-            $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $assoBase64 = base64_encode(Storage::disk('local')->get($logoFullPath));
+            $ext = strtolower(pathinfo($logoFullPath, PATHINFO_EXTENSION));
             $assoMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
         }
 
-        $typeLogo = $operation->typeOperation?->logo_path;
-        if ($typeLogo && Storage::disk('public')->exists($typeLogo)) {
-            $typeBase64 = base64_encode(Storage::disk('public')->get($typeLogo));
-            $ext = strtolower(pathinfo($typeLogo, PATHINFO_EXTENSION));
+        $typeFullPath = $operation->typeOperation?->typeOpLogoFullPath();
+        if ($typeFullPath && Storage::disk('local')->exists($typeFullPath)) {
+            $typeBase64 = base64_encode(Storage::disk('local')->get($typeFullPath));
+            $ext = strtolower(pathinfo($typeFullPath, PATHINFO_EXTENSION));
             $typeMime = $ext === 'jpg' || $ext === 'jpeg' ? 'image/jpeg' : 'image/png';
 
             return [$typeBase64, $typeMime, $assoBase64, $assoMime];

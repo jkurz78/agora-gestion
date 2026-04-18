@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\RapprochementBancaire;
@@ -10,20 +11,23 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Models\VirementInterne;
 use App\Services\HelloAssoSyncService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    DB::table('association')->insertOrIgnore(['id' => 1, 'nom' => 'Test', 'created_at' => now(), 'updated_at' => now()]);
-    User::factory()->create();
-    $this->actingAs(User::first());
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    $this->actingAs($this->user);
 
     $this->compteHA = CompteBancaire::factory()->create(['nom' => 'HelloAsso', 'solde_initial' => 0]);
     $this->compteCourant = CompteBancaire::factory()->create(['nom' => 'Compte courant']);
 
     $this->parametres = HelloAssoParametres::create([
-        'association_id' => 1,
+        'association_id' => $this->association->id,
         'client_id' => 'test',
         'client_secret' => 'secret',
         'organisation_slug' => 'test',
@@ -31,6 +35,10 @@ beforeEach(function () {
         'compte_helloasso_id' => $this->compteHA->id,
         'compte_versement_id' => $this->compteCourant->id,
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('creates virement + locked rapprochement for a complete cashout', function () {

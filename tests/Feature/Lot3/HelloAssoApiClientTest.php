@@ -2,24 +2,33 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\HelloAssoParametres;
+use App\Models\User;
+use App\Tenant\TenantContext;
 use App\Services\HelloAssoApiClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    DB::table('association')->insert(['id' => 1, 'nom' => 'Mon Asso', 'created_at' => now(), 'updated_at' => now()]);
+    $this->association = Association::factory()->create();
+    $user = User::factory()->create();
+    $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
 
     $this->parametres = HelloAssoParametres::create([
-        'association_id' => 1,
+        'association_id' => $this->association->id,
         'client_id' => 'test-client-id',
         'client_secret' => 'test-secret',
         'organisation_slug' => 'mon-asso',
         'environnement' => 'sandbox',
     ]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('fetches orders with pagination', function () {

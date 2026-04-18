@@ -6,6 +6,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Tiers;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 final class TiersFactory extends Factory
@@ -17,6 +18,7 @@ final class TiersFactory extends Factory
         $type = 'particulier';
 
         return [
+            'association_id' => TenantContext::currentId() ?? 1,
             'type' => $type,
             'nom' => fake()->lastName(),
             'prenom' => fake()->firstName(),

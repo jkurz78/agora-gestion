@@ -26,10 +26,10 @@ final class SmtpParametres extends Model
     {
         return [
             'association_id' => 'integer',
-            'enabled'        => 'boolean',
-            'smtp_port'      => 'integer',
-            'smtp_password'  => 'encrypted',
-            'timeout'        => 'integer',
+            'enabled' => 'boolean',
+            'smtp_port' => 'integer',
+            'smtp_password' => 'encrypted',
+            'timeout' => 'integer',
         ];
     }
 

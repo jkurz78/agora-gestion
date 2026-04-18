@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\CurrentAssociation;
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\Association;
 
-final class TypeOperation extends Model
+final class TypeOperation extends TenantModel
 {
     use HasFactory;
+    use TenantStorage;
 
     protected $fillable = [
+        'association_id',
         'nom',
         'libelle_article',
         'description',
@@ -83,12 +85,32 @@ final class TypeOperation extends Model
     }
 
     /**
+     * Full local-disk path for the type-operation logo, or null if not set.
+     */
+    public function typeOpLogoFullPath(): ?string
+    {
+        return $this->logo_path
+            ? $this->storagePath('type-operations/'.$this->id.'/'.basename($this->logo_path))
+            : null;
+    }
+
+    /**
+     * Full local-disk path for the attestation médicale, or null if not set.
+     */
+    public function typeOpAttestationFullPath(): ?string
+    {
+        return $this->attestation_medicale_path
+            ? $this->storagePath('type-operations/'.$this->id.'/'.basename($this->attestation_medicale_path))
+            : null;
+    }
+
+    /**
      * Adresse d'expédition effective : celle du type d'opération si définie,
      * sinon repli sur l'adresse de l'association (Paramètres > Communication).
      */
     public function effectiveEmailFrom(): ?string
     {
-        return $this->email_from ?: Association::find(1)?->email_from;
+        return $this->email_from ?: CurrentAssociation::tryGet()?->email_from;
     }
 
     /**
@@ -98,6 +120,6 @@ final class TypeOperation extends Model
     {
         return $this->email_from
             ? ($this->email_from_name ?: null)
-            : Association::find(1)?->email_from_name;
+            : CurrentAssociation::tryGet()?->email_from_name;
     }
 }

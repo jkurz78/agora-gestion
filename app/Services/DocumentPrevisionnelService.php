@@ -12,6 +12,7 @@ use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Tiers;
+use App\Support\CurrentAssociation;
 use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
@@ -167,15 +168,16 @@ final class DocumentPrevisionnelService
     {
         $document->load('participant.tiers', 'operation');
 
-        $association = Association::first();
+        $association = CurrentAssociation::get();
         $tiers = $document->participant->tiers;
 
         $headerLogoBase64 = null;
         $headerLogoMime = null;
-        if ($association?->logo_path && Storage::disk('public')->exists($association->logo_path)) {
-            $logoContent = Storage::disk('public')->get($association->logo_path);
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $logoContent = Storage::disk('local')->get($logoFullPath);
             if ($logoContent) {
-                $ext = strtolower(pathinfo($association->logo_path, PATHINFO_EXTENSION));
+                $ext = strtolower(pathinfo($logoFullPath, PATHINFO_EXTENSION));
                 $headerLogoMime = in_array($ext, ['jpg', 'jpeg']) ? 'image/jpeg' : 'image/png';
                 $headerLogoBase64 = base64_encode($logoContent);
             }
@@ -196,10 +198,10 @@ final class DocumentPrevisionnelService
         $writer = new FacturXWriter;
         $pdfA3Content = $writer->generate($pdfContent, $xml, 'minimum', false);
 
-        // Store on disk
-        $path = "documents-previsionnels/{$document->numero}.pdf";
-        Storage::disk('local')->put($path, $pdfA3Content);
-        $document->update(['pdf_path' => $path]);
+        // Store on disk — nom court uniquement, chemin tenant-scoped via pdfFullPath()
+        $shortName = "{$document->id}.pdf";
+        Storage::disk('local')->put($document->storagePath("documents-previsionnels/{$shortName}"), $pdfA3Content);
+        $document->update(['pdf_path' => $shortName]);
 
         return $pdfA3Content;
     }

@@ -7,6 +7,8 @@ use App\Models\BudgetLine;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\BudgetImportService;
 use Illuminate\Http\UploadedFile;
 
@@ -19,12 +21,19 @@ function makeBudgetCsvFile(string $content): UploadedFile
 }
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
 
     $catCharge = Categorie::factory()->create(['nom' => 'Charges', 'type' => TypeCategorie::Depense]);
     $this->scLoyers = SousCategorie::factory()->create(['nom' => 'Loyers', 'categorie_id' => $catCharge->id]);
     $this->scElec = SousCategorie::factory()->create(['nom' => 'Électricité', 'categorie_id' => $catCharge->id]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 it('importe un CSV valide et insère les lignes non nulles', function () {

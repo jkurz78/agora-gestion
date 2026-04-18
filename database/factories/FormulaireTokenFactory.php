@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\FormulaireToken;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -18,6 +19,7 @@ final class FormulaireTokenFactory extends Factory
     public function definition(): array
     {
         return [
+            'association_id' => TenantContext::currentId() ?? 1,
             'participant_id' => null, // must be provided when creating
             'token' => strtoupper(Str::random(8)),
             'expire_at' => now()->addDays(30),

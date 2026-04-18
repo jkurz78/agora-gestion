@@ -4,12 +4,23 @@
 declare(strict_types=1);
 
 use App\Livewire\TiersForm;
+use App\Models\Association;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 // --- Création particulier ---
@@ -135,6 +146,7 @@ it('validates at least one usage flag', function () {
 
 it('loads existing tiers for editing', function () {
     $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
         'nom' => 'Leclerc',
         'type' => 'entreprise',
         'entreprise' => 'Leclerc SA',
@@ -156,7 +168,7 @@ it('details section is closed on new form', function () {
 });
 
 it('can update a tiers', function () {
-    $tiers = Tiers::factory()->create(['nom' => 'Ancien', 'pour_depenses' => true]);
+    $tiers = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Ancien', 'pour_depenses' => true]);
 
     Livewire::test(TiersForm::class)
         ->dispatch('edit-tiers', id: $tiers->id)

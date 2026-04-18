@@ -9,22 +9,44 @@ use App\Models\Exercice;
 use App\Models\User;
 use App\Services\ExerciceService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        User::factory()->create([
+        // updateOrInsert: idempotent — works whether backfill migration already created
+        // the default association (migrate:fresh --seed) or not (fresh production deploy).
+        DB::table('association')->updateOrInsert(
+            ['id' => 1],
+            [
+                'nom' => 'Mon Association',
+                'slug' => 'mon-association',
+                'forme_juridique' => 'Association loi 1901',
+                'facture_conditions_reglement' => 'Payable à réception',
+                'facture_mentions_legales' => "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé",
+                'facture_mentions_penalites' => "En cas de retard de paiement, pénalités au taux de 3× le taux d'intérêt légal. Indemnité forfaitaire de recouvrement : 40 € (art. D441-5 C.Com).",
+                'wizard_completed_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+
+        $admin = User::factory()->create([
             'nom' => 'Marie Dupont',
             'email' => 'admin@monasso.fr',
             'peut_voir_donnees_sensibles' => true,
-            'role' => 'admin',
+        ]);
+        $admin->associations()->syncWithoutDetaching([
+            1 => ['role' => 'admin', 'joined_at' => now()],
         ]);
 
-        User::factory()->create([
+        $jean = User::factory()->create([
             'nom' => 'Jean Martin',
             'email' => 'jean@monasso.fr',
-            'role' => 'gestionnaire',
+        ]);
+        $jean->associations()->syncWithoutDetaching([
+            1 => ['role' => 'gestionnaire', 'joined_at' => now()],
         ]);
 
         CompteBancaire::factory()->create([
@@ -46,17 +68,6 @@ class DatabaseSeeder extends Seeder
             'iban' => null,
             'solde_initial' => 0.00,
             'date_solde_initial' => '2025-09-01',
-        ]);
-
-        \DB::table('association')->insert([
-            'id' => 1,
-            'nom' => 'Mon Association',
-            'forme_juridique' => 'Association loi 1901',
-            'facture_conditions_reglement' => 'Payable à réception',
-            'facture_mentions_legales' => "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé",
-            'facture_mentions_penalites' => "En cas de retard de paiement, pénalités au taux de 3× le taux d'intérêt légal. Indemnité forfaitaire de recouvrement : 40 € (art. D441-5 C.Com).",
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
 
         $this->call(CategoriesSeeder::class);

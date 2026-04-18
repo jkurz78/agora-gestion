@@ -6,6 +6,7 @@ namespace App\Livewire\Parametres;
 
 use App\Models\SmtpParametres;
 use App\Services\SmtpService;
+use App\Tenant\TenantContext;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -32,47 +33,47 @@ final class SmtpForm extends Component
 
     public function mount(): void
     {
-        $params = SmtpParametres::where('association_id', 1)->first();
+        $params = SmtpParametres::where('association_id', TenantContext::currentId())->first();
         if ($params === null) {
             return;
         }
 
-        $this->enabled                = $params->enabled;
-        $this->smtpHost               = $params->smtp_host ?? '';
-        $this->smtpPort               = $params->smtp_port;
-        $this->smtpEncryption         = $params->smtp_encryption;
-        $this->smtpUsername           = $params->smtp_username ?? '';
+        $this->enabled = $params->enabled;
+        $this->smtpHost = $params->smtp_host ?? '';
+        $this->smtpPort = $params->smtp_port;
+        $this->smtpEncryption = $params->smtp_encryption;
+        $this->smtpUsername = $params->smtp_username ?? '';
         $this->passwordDejaEnregistre = $params->smtp_password !== null;
-        $this->timeout                = $params->timeout;
+        $this->timeout = $params->timeout;
     }
 
     public function sauvegarder(): void
     {
         $this->validate([
-            'smtpHost'       => ['nullable', 'string', 'max:255'],
-            'smtpPort'       => ['required', 'integer', 'min:1', 'max:65535'],
+            'smtpHost' => ['nullable', 'string', 'max:255'],
+            'smtpPort' => ['required', 'integer', 'min:1', 'max:65535'],
             'smtpEncryption' => ['required', 'in:ssl,tls,starttls,none'],
-            'smtpUsername'   => ['nullable', 'string', 'max:255'],
-            'smtpPassword'   => ['nullable', 'string'],
-            'timeout'        => ['required', 'integer', 'min:5', 'max:120'],
+            'smtpUsername' => ['nullable', 'string', 'max:255'],
+            'smtpPassword' => ['nullable', 'string'],
+            'timeout' => ['required', 'integer', 'min:5', 'max:120'],
         ]);
 
         $payload = [
-            'enabled'         => $this->enabled,
-            'smtp_host'       => $this->smtpHost ?: null,
-            'smtp_port'       => $this->smtpPort,
+            'enabled' => $this->enabled,
+            'smtp_host' => $this->smtpHost ?: null,
+            'smtp_port' => $this->smtpPort,
             'smtp_encryption' => $this->smtpEncryption,
-            'smtp_username'   => $this->smtpUsername ?: null,
-            'timeout'         => $this->timeout,
+            'smtp_username' => $this->smtpUsername ?: null,
+            'timeout' => $this->timeout,
         ];
 
         if ($this->smtpPassword !== '') {
-            $payload['smtp_password']     = $this->smtpPassword;
+            $payload['smtp_password'] = $this->smtpPassword;
             $this->passwordDejaEnregistre = true;
-            $this->smtpPassword           = '';
+            $this->smtpPassword = '';
         }
 
-        SmtpParametres::updateOrCreate(['association_id' => 1], $payload);
+        SmtpParametres::updateOrCreate(['association_id' => TenantContext::currentId()], $payload);
         $this->testResult = null;
         $this->dispatch('form-saved');
         session()->flash('success', 'Paramètres SMTP enregistrés.');
@@ -81,14 +82,14 @@ final class SmtpForm extends Component
     public function testerConnexion(SmtpService $service): void
     {
         $this->validate([
-            'smtpHost'       => ['required', 'string'],
-            'smtpPort'       => ['required', 'integer'],
+            'smtpHost' => ['required', 'string'],
+            'smtpPort' => ['required', 'integer'],
             'smtpEncryption' => ['required', 'in:ssl,tls,starttls,none'],
         ]);
 
         $password = $this->smtpPassword;
         if ($password === '' && $this->passwordDejaEnregistre) {
-            $existing = SmtpParametres::where('association_id', 1)->first();
+            $existing = SmtpParametres::where('association_id', TenantContext::currentId())->first();
             $password = $existing?->smtp_password ?? '';
         }
 
@@ -103,8 +104,8 @@ final class SmtpForm extends Component
 
         $this->testResult = [
             'success' => $result->success,
-            'error'   => $result->error,
-            'banner'  => $result->banner,
+            'error' => $result->error,
+            'banner' => $result->banner,
         ];
     }
 
@@ -123,7 +124,7 @@ final class SmtpForm extends Component
             }
 
             if ($errors !== []) {
-                session()->flash('error', 'Impossible d\'activer : ' . implode(', ', $errors));
+                session()->flash('error', 'Impossible d\'activer : '.implode(', ', $errors));
 
                 return;
             }

@@ -14,13 +14,18 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\RapprochementBancaireService;
 use App\Services\TransactionService;
+use App\Models\Association;
+use App\Tenant\TenantContext;
 use App\Services\VirementInterneService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+    TenantContext::boot($this->association);
     $this->actingAs($this->user);
     session(['exercice_actif' => 2025]);
     $this->compte = CompteBancaire::factory()->create();
@@ -31,6 +36,10 @@ beforeEach(function () {
     Exercice::create(['annee' => 2025, 'statut' => StatutExercice::Cloture]);
     // Exercice 2024 ouvert
     Exercice::create(['annee' => 2024, 'statut' => StatutExercice::Ouvert]);
+});
+
+afterEach(function () {
+    TenantContext::clear();
 });
 
 describe('TransactionService verrou', function () {

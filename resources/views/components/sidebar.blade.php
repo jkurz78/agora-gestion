@@ -481,7 +481,7 @@ $activeGroup = match(true) {
 
             {{-- ─── PARAMÈTRES ─── --}}
             @auth
-            @if(auth()->user()->role->canAccessParametres())
+            @if(auth()->user()->currentRoleEnum()?->canAccessParametres())
             <div class="accordion-item border-0">
                 <h2 class="accordion-header">
                     <button class="accordion-button {{ $activeGroup === 'parametres' ? '' : 'collapsed' }}"

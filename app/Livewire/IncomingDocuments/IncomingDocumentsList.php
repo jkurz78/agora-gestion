@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\IncomingDocuments;
 
 use App\Enums\Espace;
-use App\Enums\Role;
+use App\Enums\RoleAssociation;
 use App\Models\IncomingDocument;
 use App\Models\IncomingMailAllowedSender;
 use App\Models\Operation;
@@ -15,6 +15,7 @@ use App\Models\Seance;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
 use App\Services\InvoiceOcrService;
+use App\Support\CurrentAssociation;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -104,7 +105,7 @@ final class IncomingDocumentsList extends Component
 
     public function assignerASeance(): void
     {
-        abort_unless(Auth::user()->role->canWrite(Espace::Gestion), 403);
+        abort_unless(RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false, 403);
 
         $this->validate([
             'selectedSeanceId' => ['required', 'integer', 'exists:seances,id'],
@@ -114,20 +115,19 @@ final class IncomingDocumentsList extends Component
         $seance = Seance::findOrFail($this->selectedSeanceId);
 
         DB::transaction(function () use ($doc, $seance): void {
-            $finalPath = "emargement/seance-{$seance->id}.pdf";
-
             if ($seance->feuille_signee_path !== null) {
                 Log::info('Feuille signée écrasée via assignation depuis inbox', [
                     'seance_id' => $seance->id,
                     'doc_id' => $doc->id,
                 ]);
-                Storage::disk('local')->delete($seance->feuille_signee_path);
+                Storage::disk('local')->delete($seance->feuilleSigneeFullPath());
             }
 
-            Storage::disk('local')->move($doc->storage_path, $finalPath);
+            $finalFullPath = $seance->storagePath('seances/'.$seance->id.'/feuille-signee.pdf');
+            Storage::disk('local')->move($doc->incomingFullPath(), $finalFullPath);
 
             $seance->update([
-                'feuille_signee_path' => $finalPath,
+                'feuille_signee_path' => 'feuille-signee.pdf',
                 'feuille_signee_at' => now(),
                 'feuille_signee_source' => $doc->sender_email === 'upload-manuel' ? 'manual' : 'email',
                 'feuille_signee_sender_email' => $doc->sender_email === 'upload-manuel' ? null : $doc->sender_email,
@@ -158,7 +158,7 @@ final class IncomingDocumentsList extends Component
 
     public function assignerAParticipant(): void
     {
-        abort_unless(Auth::user()->role->canWrite(Espace::Gestion), 403);
+        abort_unless(RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Gestion) ?? false, 403);
 
         $this->validate([
             'selectedParticipantId' => ['required', 'integer', 'exists:participants,id'],
@@ -169,18 +169,19 @@ final class IncomingDocumentsList extends Component
         $participant = Participant::findOrFail($this->selectedParticipantId);
 
         DB::transaction(function () use ($doc, $participant): void {
-            $dir = "participants/{$participant->id}";
             $extension = pathinfo($doc->original_filename, PATHINFO_EXTENSION) ?: 'pdf';
             $filename = 'doc-'.now()->format('Y-m-d-His').'.'.$extension;
-            $finalPath = "{$dir}/{$filename}";
+            $tenantDir = 'associations/'.$participant->association_id.'/participants/'.$participant->id;
+            $finalPath = $tenantDir.'/'.$filename;
 
-            Storage::disk('local')->makeDirectory($dir);
-            Storage::disk('local')->move($doc->storage_path, $finalPath);
+            Storage::disk('local')->makeDirectory($tenantDir);
+            Storage::disk('local')->move($doc->incomingFullPath(), $finalPath);
 
             ParticipantDocument::create([
+                'association_id' => $participant->association_id,
                 'participant_id' => $participant->id,
                 'label' => $this->assignParticipantLabel,
-                'storage_path' => $finalPath,
+                'storage_path' => $filename,
                 'original_filename' => $doc->original_filename,
                 'source' => 'inbox',
             ]);
@@ -195,10 +196,10 @@ final class IncomingDocumentsList extends Component
 
     public function supprimer(int $docId): void
     {
-        abort_unless(Auth::user()->role === Role::Admin, 403);
+        abort_unless(Auth::user()->currentRole() === RoleAssociation::Admin->value, 403);
 
         $doc = IncomingDocument::findOrFail($docId);
-        Storage::disk('local')->delete($doc->storage_path);
+        Storage::disk('local')->delete($doc->incomingFullPath());
         $doc->delete();
         session()->flash('success', 'Document supprimé.');
         $this->redirect($this->pageUrl, navigate: false);
@@ -208,7 +209,7 @@ final class IncomingDocumentsList extends Component
     {
         abort_unless(
             InvoiceOcrService::isConfigured()
-                && Auth::user()?->role->canWrite(Espace::Compta),
+                && (RoleAssociation::tryFrom(Auth::user()?->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false),
             403
         );
 
@@ -219,10 +220,10 @@ final class IncomingDocumentsList extends Component
     public function render(): View
     {
         return view('livewire.incoming-documents.list', [
-            'documents' => IncomingDocument::where('association_id', 1)
+            'documents' => IncomingDocument::where('association_id', CurrentAssociation::id())
                 ->orderBy('received_at', 'desc')
                 ->paginate(20),
-            'senderLabels' => IncomingMailAllowedSender::where('association_id', 1)
+            'senderLabels' => IncomingMailAllowedSender::where('association_id', CurrentAssociation::id())
                 ->whereNotNull('label')
                 ->pluck('label', 'email'),
             'operations' => $this->showAssignModal
