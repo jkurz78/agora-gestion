@@ -94,7 +94,17 @@
         </div>
         <div class="col-md-6 d-flex align-items-center justify-content-center">
             <div class="branding-preview border rounded bg-light p-3 text-center" style="min-height: 150px; width: 100%;">
-                <div class="text-muted small"><i class="bi bi-image" style="font-size: 2rem;"></i><br>Aucun logo</div>
+                @if ($logoUpload)
+                    <img src="{{ $logoUpload->temporaryUrl() }}"
+                         alt="Aperçu du nouveau logo"
+                         style="max-width: 100%; max-height: 150px;">
+                @elseif ($this->hasLogoStored)
+                    <img src="{{ route('onboarding.branding', ['kind' => 'logo']) }}?v={{ now()->timestamp }}"
+                         alt="Logo actuel de l'association"
+                         style="max-width: 100%; max-height: 150px;">
+                @else
+                    <div class="text-muted small"><i class="bi bi-image" style="font-size: 2rem;"></i><br>Aucun logo</div>
+                @endif
             </div>
         </div>
     </div>
@@ -116,7 +126,17 @@
         </div>
         <div class="col-md-6 d-flex align-items-center justify-content-center">
             <div class="branding-preview border rounded bg-light p-3 text-center" style="min-height: 150px; width: 100%;">
-                <div class="text-muted small"><i class="bi bi-file-earmark-text" style="font-size: 2rem;"></i><br>Aucun cachet</div>
+                @if ($cachetUpload)
+                    <img src="{{ $cachetUpload->temporaryUrl() }}"
+                         alt="Aperçu du nouveau cachet"
+                         style="max-width: 100%; max-height: 150px;">
+                @elseif ($this->hasCachetStored)
+                    <img src="{{ route('onboarding.branding', ['kind' => 'cachet']) }}?v={{ now()->timestamp }}"
+                         alt="Cachet actuel de l'association"
+                         style="max-width: 100%; max-height: 150px;">
+                @else
+                    <div class="text-muted small"><i class="bi bi-file-earmark-text" style="font-size: 2rem;"></i><br>Aucun cachet</div>
+                @endif
             </div>
         </div>
     </div>
