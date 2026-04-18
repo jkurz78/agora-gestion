@@ -87,6 +87,7 @@
                             <th class="text-end">Solde fin</th>
                             <th>Statut</th>
                             <th>Verrouillé le</th>
+                            <th class="text-center" style="width: 80px">Pièce</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -106,6 +107,32 @@
                                     @endif
                                 </td>
                                 <td class="small text-muted text-nowrap">{{ $rapprochement->verrouille_at?->format('d/m/Y H:i') ?? '—' }}</td>
+                                <td class="text-center">
+                                    @if ($rapprochement->hasPieceJointe())
+                                        <a href="{{ $rapprochement->pieceJointeUrl() }}" target="_blank"
+                                           class="btn btn-sm btn-outline-success"
+                                           title="{{ $rapprochement->piece_jointe_nom }}">
+                                            <i class="bi bi-paperclip"></i>
+                                        </a>
+                                        @if (! $exerciceCloture)
+                                            <button wire:click="openPieceJointeModal({{ $rapprochement->id }})"
+                                                    class="btn btn-sm btn-outline-secondary ms-1"
+                                                    title="Remplacer ou supprimer">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                        @endif
+                                    @else
+                                        @if (! $exerciceCloture)
+                                            <button wire:click="openPieceJointeModal({{ $rapprochement->id }})"
+                                                    class="btn btn-sm btn-outline-secondary"
+                                                    title="Joindre un fichier">
+                                                <i class="bi bi-paperclip"></i>
+                                            </button>
+                                        @else
+                                            <span class="text-muted small">—</span>
+                                        @endif
+                                    @endif
+                                </td>
                                 <td>
                                     <div class="d-flex gap-1">
                                         <a href="{{ route('banques.rapprochement.detail', $rapprochement) }}"
@@ -143,6 +170,87 @@
     @else
         <div class="alert alert-info">
             <i class="bi bi-info-circle"></i> Sélectionnez un compte bancaire pour afficher ses rapprochements.
+        </div>
+    @endif
+
+    {{-- Modale pièce jointe --}}
+    @if ($showPieceJointeModal)
+        @php($currentRapp = $this->currentPieceJointeRapprochement)
+        <div class="modal-backdrop fade show" style="z-index: 1050;"></div>
+        <div class="modal fade show d-block" tabindex="-1" style="z-index: 1055;"
+             wire:ignore.self wire:click.self="closePieceJointeModal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="bi bi-paperclip me-2"></i>
+                            Pièce jointe du rapprochement
+                        </h5>
+                        <button type="button" class="btn-close"
+                                wire:click="closePieceJointeModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if ($currentRapp && $currentRapp->hasPieceJointe())
+                            <div class="mb-3 p-3 border rounded bg-light">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="bi bi-file-earmark-text fs-4 text-success"></i>
+                                    <div>
+                                        <div class="fw-semibold">{{ $currentRapp->piece_jointe_nom }}</div>
+                                        <div class="small text-muted">{{ $currentRapp->piece_jointe_mime }}</div>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <a href="{{ $currentRapp->pieceJointeUrl() }}" target="_blank"
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Voir
+                                    </a>
+                                    <button wire:click="deletePieceJointe({{ $currentRapp->id }})"
+                                            wire:confirm="Supprimer définitivement cette pièce jointe ?"
+                                            class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i> Supprimer
+                                    </button>
+                                </div>
+                            </div>
+                            <hr>
+                            <p class="fw-semibold mb-2">Remplacer par un nouveau fichier</p>
+                        @else
+                            <p class="text-muted mb-3">Aucun fichier attaché pour l'instant.</p>
+                        @endif
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Fichier (PDF, JPG ou PNG — 5 Mo max)
+                            </label>
+                            <input type="file" wire:model="pieceJointeUpload"
+                                   accept=".pdf,image/jpeg,image/png"
+                                   class="form-control @error('pieceJointeUpload') is-invalid @enderror">
+                            @error('pieceJointeUpload')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <div wire:loading wire:target="pieceJointeUpload" class="text-muted small mt-1">
+                                Téléchargement…
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary"
+                                wire:click="closePieceJointeModal">
+                            Fermer
+                        </button>
+                        <button type="button" class="btn btn-primary"
+                                wire:click="uploadPieceJointe"
+                                wire:loading.attr="disabled"
+                                @disabled(! $pieceJointeUpload)>
+                            <span wire:loading.remove wire:target="uploadPieceJointe">
+                                <i class="bi bi-upload"></i> Enregistrer
+                            </span>
+                            <span wire:loading wire:target="uploadPieceJointe">
+                                <span class="spinner-border spinner-border-sm"></span> Enregistrement…
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     @endif
 </div>
