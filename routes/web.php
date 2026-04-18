@@ -85,6 +85,9 @@ Route::middleware(['auth'])->group(function (): void {
 // ── Onboarding ──
 Route::middleware(['auth', EnsureTwoFactor::class])->prefix('onboarding')->name('onboarding.')->group(function (): void {
     Route::get('/', [\App\Http\Controllers\OnboardingController::class, 'index'])->name('index');
+    Route::get('/branding/{kind}', [\App\Http\Controllers\OnboardingBrandingController::class, 'show'])
+        ->where('kind', 'logo|cachet')
+        ->name('branding');
 });
 
 // ── Operations ──
