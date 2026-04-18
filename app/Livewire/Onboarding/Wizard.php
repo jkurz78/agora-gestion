@@ -560,6 +560,16 @@ final class Wizard extends Component
         ];
     }
 
+    public function getHasLogoStoredProperty(): bool
+    {
+        return $this->currentAssociation()->logo_path !== null;
+    }
+
+    public function getHasCachetStoredProperty(): bool
+    {
+        return $this->currentAssociation()->cachet_signature_path !== null;
+    }
+
     protected function advanceTo(int $step): void
     {
         $association = $this->currentAssociation();
