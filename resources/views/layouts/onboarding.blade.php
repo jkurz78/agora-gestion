@@ -11,7 +11,10 @@
 <body class="bg-light">
     <nav class="navbar navbar-dark bg-primary">
         <div class="container">
-            <span class="navbar-brand mb-0 h1">AgoraGestion — Onboarding</span>
+            @php($tenantAssociation = \App\Tenant\TenantContext::current())
+            <span class="navbar-brand mb-0 h1">
+                AgoraGestion — Onboarding{{ $tenantAssociation !== null ? ' de ' . $tenantAssociation->nom : '' }}
+            </span>
             <form method="POST" action="{{ route('logout') }}" class="mb-0">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-outline-light">Déconnexion</button>
