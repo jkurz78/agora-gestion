@@ -13,6 +13,8 @@ use App\Http\Controllers\EmailTrackingController;
 use App\Http\Controllers\FacturePdfController;
 use App\Http\Controllers\FormulaireController;
 use App\Http\Controllers\IncomingDocumentsController;
+use App\Http\Controllers\OnboardingBrandingController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ParticipantDocumentController;
 use App\Http\Controllers\ParticipantExportController;
 use App\Http\Controllers\ParticipantFichePdfController;
@@ -20,11 +22,13 @@ use App\Http\Controllers\ParticipantImportTemplateController;
 use App\Http\Controllers\ParticipantPdfController;
 use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
+use App\Http\Controllers\RapprochementPieceJointeController;
 use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeanceFeuilleController;
 use App\Http\Controllers\SeancePdfController;
 use App\Http\Controllers\SousCategorieController;
+use App\Http\Controllers\SuperAdmin\SupportModeController;
 use App\Http\Controllers\SwitchAssociationController;
 use App\Http\Controllers\TenantAssetController;
 use App\Http\Controllers\TiersExportController;
@@ -35,6 +39,7 @@ use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\EnsureTwoFactor;
 use App\Http\Middleware\VerifyTenantAsset;
 use App\Livewire\Auth\AssociationSelector;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
@@ -80,12 +85,14 @@ Route::middleware(['auth'])->group(function (): void {
     Route::view('/profil', 'profil.index')->name('profil.index');
     Route::get('/transactions/{transaction}/piece-jointe', TransactionPieceJointeController::class)
         ->name('transactions.piece-jointe');
+    Route::get('/rapprochements/{rapprochement}/piece-jointe', RapprochementPieceJointeController::class)
+        ->name('rapprochements.piece-jointe');
 });
 
 // ── Onboarding ──
 Route::middleware(['auth', EnsureTwoFactor::class])->prefix('onboarding')->name('onboarding.')->group(function (): void {
-    Route::get('/', [\App\Http\Controllers\OnboardingController::class, 'index'])->name('index');
-    Route::get('/branding/{kind}', [\App\Http\Controllers\OnboardingBrandingController::class, 'show'])
+    Route::get('/', [OnboardingController::class, 'index'])->name('index');
+    Route::get('/branding/{kind}', [OnboardingBrandingController::class, 'show'])
         ->where('kind', 'logo|cachet')
         ->name('branding');
 });
@@ -349,11 +356,11 @@ Route::middleware(['auth', 'super-admin'])
             Route::view('/', 'super-admin.associations.index')->name('index');
             // Stubs — remplacés dans Tasks 3/4/5
             Route::view('/create', 'super-admin.associations.create')->name('create');
-            Route::get('/{association:slug}', fn (\App\Models\Association $association) => view('super-admin.associations.show', compact('association')))->name('show');
-            Route::post('/{association:slug}/support/enter', [\App\Http\Controllers\SuperAdmin\SupportModeController::class, 'enter'])
+            Route::get('/{association:slug}', fn (Association $association) => view('super-admin.associations.show', compact('association')))->name('show');
+            Route::post('/{association:slug}/support/enter', [SupportModeController::class, 'enter'])
                 ->name('support.enter');
         });
-        Route::post('/support/exit', [\App\Http\Controllers\SuperAdmin\SupportModeController::class, 'exit'])
+        Route::post('/support/exit', [SupportModeController::class, 'exit'])
             ->name('support.exit');
     });
 

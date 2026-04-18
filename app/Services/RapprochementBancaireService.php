@@ -11,11 +11,19 @@ use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 final class RapprochementBancaireService
 {
+    private const ALLOWED_MIMES = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+    ];
+
     public function __construct(
         private readonly ExerciceService $exerciceService,
     ) {}
@@ -249,6 +257,9 @@ final class RapprochementBancaireService
         DB::transaction(function () use ($rapprochement) {
             $id = $rapprochement->id;
 
+            // Supprimer la pièce jointe si présente
+            $this->deletePieceJointe($rapprochement);
+
             Transaction::where('rapprochement_id', $id)->each(function (Transaction $tx): void {
                 $tx->update([
                     'rapprochement_id' => null,
@@ -325,5 +336,50 @@ final class RapprochementBancaireService
             $rapprochement->verrouille_at = now();
             $rapprochement->save();
         });
+    }
+
+    public function storePieceJointe(RapprochementBancaire $rapprochement, UploadedFile $file): void
+    {
+        $mime = $file->getMimeType();
+        if (! in_array($mime, self::ALLOWED_MIMES, true)) {
+            throw new \InvalidArgumentException('Type de fichier non autorisé : '.$mime);
+        }
+
+        if ($rapprochement->piece_jointe_path !== null) {
+            Storage::disk('local')->deleteDirectory(
+                $rapprochement->storagePath('rapprochements/'.$rapprochement->id)
+            );
+        }
+
+        $extension = $file->guessExtension() ?? 'bin';
+        $shortName = "releve.{$extension}";
+        $file->storeAs(
+            $rapprochement->storagePath('rapprochements/'.$rapprochement->id),
+            $shortName,
+            'local'
+        );
+
+        $rapprochement->update([
+            'piece_jointe_path' => $shortName,
+            'piece_jointe_nom' => $file->getClientOriginalName(),
+            'piece_jointe_mime' => $mime,
+        ]);
+    }
+
+    public function deletePieceJointe(RapprochementBancaire $rapprochement): void
+    {
+        if ($rapprochement->piece_jointe_path === null) {
+            return;
+        }
+
+        Storage::disk('local')->deleteDirectory(
+            $rapprochement->storagePath('rapprochements/'.$rapprochement->id)
+        );
+
+        $rapprochement->update([
+            'piece_jointe_path' => null,
+            'piece_jointe_nom' => null,
+            'piece_jointe_mime' => null,
+        ]);
     }
 }
