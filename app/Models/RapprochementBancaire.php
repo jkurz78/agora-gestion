@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\StatutRapprochement;
+use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class RapprochementBancaire extends TenantModel
 {
-    use HasFactory;
+    use HasFactory, TenantStorage;
 
     protected $table = 'rapprochements_bancaires';
 
@@ -24,6 +25,9 @@ final class RapprochementBancaire extends TenantModel
         'statut',
         'saisi_par',
         'verrouille_at',
+        'piece_jointe_path',
+        'piece_jointe_nom',
+        'piece_jointe_mime',
     ];
 
     protected function casts(): array
@@ -83,5 +87,26 @@ final class RapprochementBancaire extends TenantModel
     public function isEnCours(): bool
     {
         return $this->statut === StatutRapprochement::EnCours;
+    }
+
+    public function hasPieceJointe(): bool
+    {
+        return $this->piece_jointe_path !== null;
+    }
+
+    public function pieceJointeFullPath(): ?string
+    {
+        return $this->piece_jointe_path
+            ? $this->storagePath('rapprochements/'.$this->id.'/'.basename($this->piece_jointe_path))
+            : null;
+    }
+
+    public function pieceJointeUrl(): ?string
+    {
+        if (! $this->hasPieceJointe()) {
+            return null;
+        }
+
+        return route('rapprochements.piece-jointe', $this);
     }
 }
