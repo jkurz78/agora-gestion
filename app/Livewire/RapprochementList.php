@@ -15,11 +15,14 @@ use App\Models\VirementInterne;
 use App\Services\RapprochementBancaireService;
 use Illuminate\View\View;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
 final class RapprochementList extends Component
 {
     use RespectsExerciceCloture;
+    use WithFileUploads;
     use WithPagination;
     use WithPerPage;
 
@@ -28,6 +31,13 @@ final class RapprochementList extends Component
     public ?int $compte_id = null;
 
     public bool $showCreateForm = false;
+
+    public bool $showPieceJointeModal = false;
+
+    public ?int $pieceJointeRapprochementId = null;
+
+    /** @var TemporaryUploadedFile|null */
+    public $pieceJointeUpload = null;
 
     public function mount(): void
     {
@@ -92,6 +102,57 @@ final class RapprochementList extends Component
         } catch (\RuntimeException $e) {
             $this->addError('date_fin', $e->getMessage());
         }
+    }
+
+    public function openPieceJointeModal(int $rapprochementId): void
+    {
+        $this->pieceJointeRapprochementId = $rapprochementId;
+        $this->pieceJointeUpload = null;
+        $this->resetErrorBag('pieceJointeUpload');
+        $this->showPieceJointeModal = true;
+    }
+
+    public function closePieceJointeModal(): void
+    {
+        $this->showPieceJointeModal = false;
+        $this->pieceJointeRapprochementId = null;
+        $this->pieceJointeUpload = null;
+        $this->resetErrorBag('pieceJointeUpload');
+    }
+
+    public function uploadPieceJointe(): void
+    {
+        $this->validate([
+            'pieceJointeUpload' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+        ]);
+
+        $rapprochement = RapprochementBancaire::findOrFail($this->pieceJointeRapprochementId);
+
+        try {
+            app(RapprochementBancaireService::class)->storePieceJointe(
+                $rapprochement,
+                $this->pieceJointeUpload
+            );
+            session()->flash('success', 'Pièce jointe enregistrée.');
+            $this->closePieceJointeModal();
+        } catch (\InvalidArgumentException $e) {
+            $this->addError('pieceJointeUpload', $e->getMessage());
+        }
+    }
+
+    public function deletePieceJointe(int $rapprochementId): void
+    {
+        $rapprochement = RapprochementBancaire::findOrFail($rapprochementId);
+        app(RapprochementBancaireService::class)->deletePieceJointe($rapprochement);
+        session()->flash('success', 'Pièce jointe supprimée.');
+        $this->closePieceJointeModal();
+    }
+
+    public function getCurrentPieceJointeRapprochementProperty(): ?RapprochementBancaire
+    {
+        return $this->pieceJointeRapprochementId !== null
+            ? RapprochementBancaire::find($this->pieceJointeRapprochementId)
+            : null;
     }
 
     public function render(): View
