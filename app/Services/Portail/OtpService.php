@@ -10,6 +10,7 @@ use App\Models\Tiers;
 use App\Models\TiersPortailOtp;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -20,6 +21,8 @@ final class OtpService
         $emailKey = mb_strtolower($email);
 
         if ($this->cooldownActive($association, $emailKey)) {
+            Log::info('portail.cooldown.triggered', ['email' => $emailKey]);
+
             return RequestResult::Cooldown;
         }
 
@@ -60,6 +63,8 @@ final class OtpService
 
         Mail::to($emailKey)->send(new OtpMail($association, $code));
 
+        Log::info('portail.otp.requested', ['email' => $emailKey]);
+
         return RequestResult::Sent;
     }
 
@@ -80,6 +85,11 @@ final class OtpService
         if ($otp === null) {
             // Pas d'OTP valide — on incrémente quand même le compteur de cooldown
             $this->recordFailure($association, $emailKey);
+            Log::info('portail.otp.failed', ['email' => $emailKey, 'attempts' => null]);
+
+            if ($this->cooldownActive($association, $emailKey)) {
+                Log::info('portail.cooldown.triggered', ['email' => $emailKey]);
+            }
 
             return VerifyResult::invalid();
         }
@@ -87,6 +97,11 @@ final class OtpService
         if (! Hash::check($code, $otp->code_hash)) {
             $otp->increment('attempts');
             $this->recordFailure($association, $emailKey);
+            Log::info('portail.otp.failed', ['email' => $emailKey, 'attempts' => $otp->attempts]);
+
+            if ($this->cooldownActive($association, $emailKey)) {
+                Log::info('portail.cooldown.triggered', ['email' => $emailKey]);
+            }
 
             return VerifyResult::invalid();
         }
@@ -101,6 +116,8 @@ final class OtpService
 
         // Reset cooldown on success
         RateLimiter::clear($this->cooldownKey($association, $emailKey));
+
+        Log::info('portail.otp.verified', ['email' => $emailKey, 'tiers_count' => count($tiersIds)]);
 
         return VerifyResult::success($tiersIds);
     }

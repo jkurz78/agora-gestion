@@ -8,6 +8,7 @@ use App\Models\Tiers;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 final class AuthSessionService
 {
@@ -65,6 +66,8 @@ final class AuthSessionService
         $tiers = Tiers::findOrFail($tiersId);
         Auth::guard('tiers-portail')->login($tiers);
         session()->forget(self::SESSION_KEY);
+
+        Log::info('portail.tiers.chosen', ['tiers_id' => (int) $tiers->id]);
     }
 
     /**
@@ -74,6 +77,8 @@ final class AuthSessionService
     public function loginSingleTiers(Tiers $tiers): void
     {
         Auth::guard('tiers-portail')->login($tiers);
+
+        Log::info('portail.login.success', ['tiers_id' => (int) $tiers->id, 'email' => $tiers->email]);
     }
 
     /**
