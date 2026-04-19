@@ -7,7 +7,10 @@ namespace App\Providers;
 use App\Console\Commands\VersionStampCommand;
 use App\Models\Association;
 use App\Models\IncomingDocument;
+use App\Models\NoteDeFrais;
 use App\Observers\ImmutableSlugObserver;
+use App\Policies\NoteDeFraisPolicy;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -17,6 +20,8 @@ final class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
+
         Association::observe(ImmutableSlugObserver::class);
 
         if (! file_exists(config_path('version.php'))) {
