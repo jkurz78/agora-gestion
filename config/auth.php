@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Tiers;
 use App\Models\User;
 
 return [
@@ -42,6 +43,11 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        'tiers-portail' => [
+            'driver' => 'session',
+            'provider' => 'tiers',
+        ],
     ],
 
     /*
@@ -65,6 +71,11 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', User::class),
+        ],
+
+        'tiers' => [
+            'driver' => 'eloquent',
+            'model' => Tiers::class,
         ],
 
         // 'users' => [

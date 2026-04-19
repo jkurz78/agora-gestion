@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
-final class Tiers extends TenantModel
+final class Tiers extends TenantModel implements AuthenticatableContract
 {
-    use HasFactory;
+    use Authenticatable, HasFactory;
 
     protected $fillable = [
         'association_id',
@@ -40,6 +42,33 @@ final class Tiers extends TenantModel
             'est_helloasso' => 'boolean',
             'email_optout' => 'boolean',
         ];
+    }
+
+    /**
+     * Tiers n'a pas de colonne password — retourne une chaîne vide
+     * pour satisfaire le contrat Authenticatable sans lever d'exception.
+     */
+    public function getAuthPassword(): string
+    {
+        return '';
+    }
+
+    /**
+     * Tiers n'a pas de colonne remember_token — désactivé.
+     */
+    public function getRememberTokenName(): string
+    {
+        return '';
+    }
+
+    public function getRememberToken(): ?string
+    {
+        return null;
+    }
+
+    public function setRememberToken($value): void
+    {
+        // no-op — pas de remember_token sur Tiers
     }
 
     public function getNomAttribute(?string $value): ?string
