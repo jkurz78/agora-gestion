@@ -142,7 +142,7 @@
                                             <i class="bi bi-eye"></i>
                                             {{ $rapprochement->isEnCours() && ! $exerciceCloture ? 'Continuer' : 'Consulter' }}
                                         </a>
-                                        <a href="{{ route('banques.rapprochement.pdf', $rapprochement) }}" target="_blank"
+                                        <a href="{{ route('banques.rapprochement.pdf', ['rapprochement' => $rapprochement, 'mode' => 'inline']) }}" target="_blank"
                                            class="btn btn-sm btn-outline-danger"
                                            title="Visualiser le PDF">
                                             <i class="bi bi-file-earmark-pdf"></i>

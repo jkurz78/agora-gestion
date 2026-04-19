@@ -305,8 +305,8 @@
                     <th class="text-end" style="width: 11%; white-space: nowrap;">Crédit</th>
                 </tr>
                 <tr style="background-color: #f0f4fb; font-weight: bold;">
-                    <td colspan="7" style="padding: 5px 8px; border-bottom: 1px solid #dee2e6;">Solde d'ouverture</td>
-                    <td colspan="2" class="text-end" style="padding: 5px 8px; border-bottom: 1px solid #dee2e6; white-space: nowrap;">
+                    <td colspan="7" style="padding: 5px 8px; border-bottom: 1px solid #dee2e6; text-align: left;">Solde d'ouverture</td>
+                    <td colspan="2" style="padding: 5px 8px; border-bottom: 1px solid #dee2e6; white-space: nowrap; text-align: right;">
                         {{ number_format((float) $rapprochement->solde_ouverture, 2, ',', ' ') }} €
                     </td>
                 </tr>
@@ -393,8 +393,8 @@
                     <td class="text-end text-success">{{ number_format($totalCredit, 2, ',', ' ') }}</td>
                 </tr>
                 <tr style="background-color: #f0f4fb;">
-                    <td colspan="7">Solde final au {{ $rapprochement->date_fin->format('d/m/Y') }}</td>
-                    <td colspan="2" class="text-end" style="white-space: nowrap;">
+                    <td colspan="7" style="text-align: left;">Solde final au {{ $rapprochement->date_fin->format('d/m/Y') }}</td>
+                    <td colspan="2" style="white-space: nowrap; text-align: right;">
                         {{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €
                     </td>
                 </tr>
