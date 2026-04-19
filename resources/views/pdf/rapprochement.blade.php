@@ -304,6 +304,12 @@
                     <th class="text-end" style="width: 11%; white-space: nowrap;">Débit</th>
                     <th class="text-end" style="width: 11%; white-space: nowrap;">Crédit</th>
                 </tr>
+                <tr style="background-color: #f0f4fb; font-weight: bold;">
+                    <td colspan="7" style="padding: 5px 8px; border-bottom: 1px solid #dee2e6;">Solde d'ouverture</td>
+                    <td colspan="2" class="text-end" style="padding: 5px 8px; border-bottom: 1px solid #dee2e6; white-space: nowrap;">
+                        {{ number_format((float) $rapprochement->solde_ouverture, 2, ',', ' ') }} €
+                    </td>
+                </tr>
             </thead>
             <tbody>
                 @forelse ($transactions as $i => $tx)
@@ -385,6 +391,12 @@
                     <td colspan="7">Total</td>
                     <td class="text-end text-danger">{{ number_format($totalDebit, 2, ',', ' ') }}</td>
                     <td class="text-end text-success">{{ number_format($totalCredit, 2, ',', ' ') }}</td>
+                </tr>
+                <tr style="background-color: #f0f4fb;">
+                    <td colspan="7">Solde final au {{ $rapprochement->date_fin->format('d/m/Y') }}</td>
+                    <td colspan="2" class="text-end" style="white-space: nowrap;">
+                        {{ number_format((float) $rapprochement->solde_fin, 2, ',', ' ') }} €
+                    </td>
                 </tr>
             </tfoot>
         </table>
