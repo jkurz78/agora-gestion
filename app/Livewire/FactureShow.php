@@ -174,7 +174,7 @@ final class FactureShow extends Component
         $montantRegle = $this->facture->montantRegle();
         $isAcquittee = $this->facture->isAcquittee();
 
-        $transactionsAEncaisser = $this->facture->transactions
+        $transactionsEnAttente = $this->facture->transactions
             ->filter(fn ($t) => $t->statut_reglement === StatutReglement::EnAttente);
 
         // Opérations liées via transactions
@@ -192,7 +192,7 @@ final class FactureShow extends Component
         return view('livewire.facture-show', [
             'montantRegle' => $montantRegle,
             'isAcquittee' => $isAcquittee,
-            'transactionsAEncaisser' => $transactionsAEncaisser,
+            'transactionsEnAttente' => $transactionsEnAttente,
             'operationsLiees' => $operationsLiees,
         ]);
     }
