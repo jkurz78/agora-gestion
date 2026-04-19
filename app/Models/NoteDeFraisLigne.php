@@ -7,12 +7,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 final class NoteDeFraisLigne extends Model
 {
     use HasFactory;
 
     protected $table = 'notes_de_frais_lignes';
+
+    protected static function booted(): void
+    {
+        self::deleting(function (self $ligne): void {
+            if ($ligne->piece_jointe_path && Storage::disk('local')->exists($ligne->piece_jointe_path)) {
+                Storage::disk('local')->delete($ligne->piece_jointe_path);
+            }
+        });
+    }
 
     protected $fillable = [
         'note_de_frais_id',
