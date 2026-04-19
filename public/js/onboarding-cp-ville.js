@@ -71,11 +71,23 @@
         });
     }
 
-    document.addEventListener('DOMContentLoaded', init);
-    document.addEventListener('livewire:navigated', init);
-    document.addEventListener('livewire:init', function () {
-        if (typeof Livewire !== 'undefined') {
-            Livewire.hook('morph.updated', init);
+    function bindLivewire() {
+        if (typeof window.Livewire !== 'undefined' && typeof window.Livewire.hook === 'function') {
+            window.Livewire.hook('morph.updated', init);
         }
-    });
+    }
+
+    function boot() {
+        init();
+        bindLivewire();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+
+    document.addEventListener('livewire:init', bindLivewire);
+    document.addEventListener('livewire:navigated', init);
 })();

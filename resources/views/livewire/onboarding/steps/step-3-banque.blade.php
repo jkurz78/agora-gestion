@@ -2,6 +2,9 @@
 <p class="text-muted">Ajoutez votre compte bancaire principal. Vous pourrez en ajouter d'autres ensuite depuis les paramètres.</p>
 
 <form wire:submit="saveStep3">
+    {{-- ─── Coordonnées du compte ─── --}}
+    <h5 class="mt-4 mb-3"><i class="bi bi-bank me-2"></i>Coordonnées du compte</h5>
+
     <div class="mb-3">
         <label class="form-label">Nom du compte</label>
         <input type="text" wire:model="banqueNom" class="form-control @error('banqueNom') is-invalid @enderror" placeholder="Compte courant principal">
@@ -24,18 +27,26 @@
             @error('banqueDomiciliation') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
     </div>
+
+    <hr class="my-4">
+
+    {{-- ─── Solde initial ─── --}}
+    <h5 class="mt-4 mb-3"><i class="bi bi-cash-coin me-2"></i>Solde initial</h5>
+    <p class="text-muted small">Le solde du compte à une date donnée, à partir de laquelle la comptabilité commencera à être tenue.</p>
+
     <div class="row">
         <div class="col-md-6 mb-3">
-            <label class="form-label">Solde initial</label>
-            <input type="number" step="0.01" wire:model="banqueSoldeInitial" class="form-control @error('banqueSoldeInitial') is-invalid @enderror">
-            @error('banqueSoldeInitial') <div class="invalid-feedback">{{ $message }}</div> @enderror
-        </div>
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Date du solde initial</label>
+            <label class="form-label">Date du solde</label>
             <input type="date" wire:model="banqueDateSoldeInitial" class="form-control @error('banqueDateSoldeInitial') is-invalid @enderror">
             @error('banqueDateSoldeInitial') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Montant (€)</label>
+            <input type="number" step="0.01" wire:model="banqueSoldeInitial" class="form-control @error('banqueSoldeInitial') is-invalid @enderror">
+            @error('banqueSoldeInitial') <div class="invalid-feedback">{{ $message }}</div> @enderror
+        </div>
     </div>
+
     <button type="button" wire:click="goToStep(2)" class="btn btn-link">← Retour</button>
     <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">Valider et continuer</button>
 </form>
