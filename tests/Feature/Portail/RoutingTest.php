@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\Tiers;
+use App\Services\Portail\AuthSessionService;
 use App\Tenant\TenantContext;
 
 beforeEach(fn () => TenantContext::clear());
@@ -35,8 +37,15 @@ it('GET /portail/{slug}/otp redirige vers login si pas de session', function () 
         ->assertRedirect("/portail/{$asso->slug}/login");
 });
 
-it('GET /portail/{slug}/choisir retourne 200', function () {
+it('GET /portail/{slug}/choisir avec pending retourne 200', function () {
     $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $tiers1 = Tiers::factory()->create(['association_id' => $asso->id]);
+    $tiers2 = Tiers::factory()->create(['association_id' => $asso->id]);
+
+    $service = new AuthSessionService;
+    $service->markPendingTiers([(int) $tiers1->id, (int) $tiers2->id]);
 
     $this->get("/portail/{$asso->slug}/choisir")
         ->assertStatus(200);
