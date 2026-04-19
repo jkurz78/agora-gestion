@@ -87,7 +87,7 @@
                             <th class="text-end">Solde fin</th>
                             <th>Statut</th>
                             <th>Verrouillé le</th>
-                            <th class="text-center" style="width: 80px">Pièce</th>
+                            <th class="text-center text-nowrap" style="width: 110px">Pièce</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -107,20 +107,22 @@
                                     @endif
                                 </td>
                                 <td class="small text-muted text-nowrap">{{ $rapprochement->verrouille_at?->format('d/m/Y H:i') ?? '—' }}</td>
-                                <td class="text-center">
+                                <td class="text-center text-nowrap">
                                     @if ($rapprochement->hasPieceJointe())
-                                        <a href="{{ $rapprochement->pieceJointeUrl() }}" target="_blank"
-                                           class="btn btn-sm btn-outline-success"
-                                           title="{{ $rapprochement->piece_jointe_nom }}">
-                                            <i class="bi bi-paperclip"></i>
-                                        </a>
-                                        @if (! $exerciceCloture)
-                                            <button wire:click="openPieceJointeModal({{ $rapprochement->id }})"
-                                                    class="btn btn-sm btn-outline-secondary ms-1"
-                                                    title="Remplacer ou supprimer">
-                                                <i class="bi bi-pencil"></i>
-                                            </button>
-                                        @endif
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="{{ $rapprochement->pieceJointeUrl() }}" target="_blank"
+                                               class="btn btn-sm btn-outline-success"
+                                               title="{{ $rapprochement->piece_jointe_nom }}">
+                                                <i class="bi bi-paperclip"></i>
+                                            </a>
+                                            @if (! $exerciceCloture)
+                                                <button wire:click="openPieceJointeModal({{ $rapprochement->id }})"
+                                                        class="btn btn-sm btn-outline-secondary"
+                                                        title="Remplacer ou supprimer">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                            @endif
+                                        </div>
                                     @else
                                         @if (! $exerciceCloture)
                                             <button wire:click="openPieceJointeModal({{ $rapprochement->id }})"
