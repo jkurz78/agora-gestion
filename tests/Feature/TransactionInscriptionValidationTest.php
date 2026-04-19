@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\User;
-use App\Models\Association;
-use App\Tenant\TenantContext;
 use App\Services\TransactionService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

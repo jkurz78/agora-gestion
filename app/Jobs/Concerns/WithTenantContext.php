@@ -12,6 +12,7 @@ trait WithTenantContext
 {
     /**
      * @template TReturn
+     *
      * @param  Closure():TReturn  $callback
      * @return TReturn
      */

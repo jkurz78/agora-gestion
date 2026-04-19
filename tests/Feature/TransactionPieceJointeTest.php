@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 use App\Enums\TypeTransaction;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Models\Association;
-use App\Tenant\TenantContext;
 use App\Services\TransactionService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -105,7 +105,7 @@ it('storePieceJointe stocke le fichier et met à jour la transaction', function 
 
     $transaction->refresh();
     $expectedShort = 'justificatif.pdf';
-    $expectedFull  = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
+    $expectedFull = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
 
     expect($transaction->piece_jointe_path)->toBe($expectedShort)
         ->and($transaction->piece_jointe_nom)->toBe('facture.pdf')
@@ -205,7 +205,7 @@ it('storePieceJointeFromPath copie le fichier depuis un chemin et met à jour la
 
     $transaction->refresh();
     $expectedShort = 'justificatif.pdf';
-    $expectedFull  = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
+    $expectedFull = "associations/{$this->aid}/transactions/{$transaction->id}/justificatif.pdf";
 
     expect($transaction->piece_jointe_path)->toBe($expectedShort)
         ->and($transaction->piece_jointe_nom)->toBe('facture-edf.pdf')

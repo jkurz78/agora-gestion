@@ -16,6 +16,7 @@ trait TenantStorage
         if ($this->association_id === null) {
             throw new InvalidArgumentException('association_id manquant sur '.static::class);
         }
+
         return 'associations/'.$this->association_id.'/'.ltrim($suffix, '/');
     }
 }

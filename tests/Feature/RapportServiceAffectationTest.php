@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\TypeCategorie;
+use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
@@ -11,9 +12,8 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
 use App\Models\User;
-use App\Models\Association;
-use App\Tenant\TenantContext;
 use App\Services\RapportService;
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
     $this->association = Association::factory()->create();

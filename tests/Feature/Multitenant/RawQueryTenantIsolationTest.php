@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\DB;
  * Both CompteResultatBuilder and TransactionUniverselleService used DB::table()
  * without filtering by association_id, meaning data from all tenants was mixed.
  */
-
 beforeEach(function () {
     TenantContext::clear();
 
@@ -38,7 +37,7 @@ it('TransactionUniverselleService does not leak cross-tenant data when compteId 
     $compteA = CompteBancaire::factory()->create(['solde_initial' => 0]);
     Transaction::factory()->asDepense()->create([
         'compte_id' => $compteA->id,
-        'date'      => '2025-01-15',
+        'date' => '2025-01-15',
     ]);
 
     // Tenant B : 1 dépense
@@ -46,7 +45,7 @@ it('TransactionUniverselleService does not leak cross-tenant data when compteId 
     $compteB = CompteBancaire::factory()->create(['solde_initial' => 0]);
     Transaction::factory()->asDepense()->create([
         'compte_id' => $compteB->id,
-        'date'      => '2025-01-15',
+        'date' => '2025-01-15',
     ]);
 
     // Requête depuis la perspective du tenant A — sans filtre compte ni tiers
@@ -81,8 +80,8 @@ it('CompteResultatBuilder::compteDeResultat does not aggregate other-tenant char
     TenantContext::boot($this->assoA);
     $compteA = CompteBancaire::factory()->create(['solde_initial' => 0]);
     $txA = Transaction::factory()->asDepense()->create([
-        'compte_id'     => $compteA->id,
-        'date'          => '2025-01-10',
+        'compte_id' => $compteA->id,
+        'date' => '2025-01-10',
         'montant_total' => 100.00,
     ]);
 
@@ -90,8 +89,8 @@ it('CompteResultatBuilder::compteDeResultat does not aggregate other-tenant char
     TenantContext::boot($this->assoB);
     $compteB = CompteBancaire::factory()->create(['solde_initial' => 0]);
     Transaction::factory()->asDepense()->create([
-        'compte_id'     => $compteB->id,
-        'date'          => '2025-01-11',
+        'compte_id' => $compteB->id,
+        'date' => '2025-01-11',
         'montant_total' => 9876.00,
     ]);
 
@@ -113,29 +112,29 @@ it('CompteResultatBuilder fetchBudgetMap does not leak cross-tenant budget lines
     $compteA = CompteBancaire::factory()->create(['solde_initial' => 0]);
     $souscatA = SousCategorie::factory()->create();
     $txA = Transaction::factory()->asDepense()->create([
-        'compte_id'     => $compteA->id,
-        'date'          => '2025-01-10',
+        'compte_id' => $compteA->id,
+        'date' => '2025-01-10',
         'montant_total' => 100.00,
     ]);
     $txA->lignes()->update(['sous_categorie_id' => $souscatA->id]);
     DB::table('budget_lines')->insert([
-        'association_id'    => $this->assoA->id,
-        'exercice'          => 2024,
+        'association_id' => $this->assoA->id,
+        'exercice' => 2024,
         'sous_categorie_id' => $souscatA->id,
-        'montant_prevu'     => 200.00,
-        'created_at'        => now(),
-        'updated_at'        => now(),
+        'montant_prevu' => 200.00,
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
     // Tenant B inserts a budget for THE SAME sous_categorie_id (cross-tenant collision).
     // This is the realistic scenario: in a shared DB, IDs from table A can appear in table B.
     DB::table('budget_lines')->insert([
-        'association_id'    => $this->assoB->id,
-        'exercice'          => 2024,
+        'association_id' => $this->assoB->id,
+        'exercice' => 2024,
         'sous_categorie_id' => $souscatA->id, // intentionally same sous_categorie_id
-        'montant_prevu'     => 9999.00,
-        'created_at'        => now(),
-        'updated_at'        => now(),
+        'montant_prevu' => 9999.00,
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
     // From tenant A's perspective, budget for souscatA must be 200€, not 200+9999=10199€

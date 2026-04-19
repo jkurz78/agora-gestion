@@ -6,8 +6,8 @@ use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\User;
-use App\Tenant\TenantContext;
 use App\Services\Emargement\Contracts\QrCodeExtractor;
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
     $this->association = Association::factory()->create();

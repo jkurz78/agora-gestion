@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Livewire\Provisions\ProvisionIndex;
 use App\Models\Association;
 use App\Models\Provision;
+use App\Models\SousCategorie;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
@@ -51,10 +53,10 @@ it('pieceJointeFullPath() retourne uniquement le basename si piece_jointe_path c
 // ── Upload via ProvisionIndex → chemin tenant-scoped ─────────────────────────
 
 it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provisions/{pid}/piece-jointe.{ext}', function () {
-    $component = Livewire\Livewire::test(App\Livewire\Provisions\ProvisionIndex::class);
+    $component = Livewire\Livewire::test(ProvisionIndex::class);
 
     // On prépare les données du formulaire
-    $sc = App\Models\SousCategorie::factory()->create();
+    $sc = SousCategorie::factory()->create();
     $file = UploadedFile::fake()->create('contrat.pdf', 100, 'application/pdf');
 
     $component
@@ -79,9 +81,9 @@ it('upload PJ dans ProvisionIndex place le fichier sous associations/{aid}/provi
 });
 
 it('piece_jointe_path sans PJ reste null', function () {
-    $sc = App\Models\SousCategorie::factory()->create();
+    $sc = SousCategorie::factory()->create();
 
-    Livewire\Livewire::test(App\Livewire\Provisions\ProvisionIndex::class)
+    Livewire\Livewire::test(ProvisionIndex::class)
         ->set('libelle', 'Provision sans PJ')
         ->set('sous_categorie_id', (string) $sc->id)
         ->set('type', 'recette')

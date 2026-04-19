@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ModePaiement;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -11,7 +12,6 @@ use App\Models\RemiseBancaire;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;

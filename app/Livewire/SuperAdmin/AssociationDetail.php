@@ -26,6 +26,7 @@ final class AssociationDetail extends Component
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
         if ($this->association->statut !== 'actif') {
             $this->addError('statut', "Transition impossible depuis '{$this->association->statut}'.");
+
             return;
         }
 
@@ -40,6 +41,7 @@ final class AssociationDetail extends Component
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
         if ($this->association->statut !== 'suspendu') {
             $this->addError('statut', "Transition impossible depuis '{$this->association->statut}'.");
+
             return;
         }
 
@@ -53,7 +55,8 @@ final class AssociationDetail extends Component
     {
         abort_unless(auth()->user()?->isSuperAdmin(), 403);
         if ($this->association->statut !== 'suspendu') {
-            $this->addError('statut', "Seule une asso suspendue peut être archivée.");
+            $this->addError('statut', 'Seule une asso suspendue peut être archivée.');
+
             return;
         }
 

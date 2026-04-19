@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\RoleSysteme;
+use App\Livewire\SuperAdmin\Dashboard;
 use App\Models\Association;
 use App\Models\User;
 use Livewire\Livewire;
@@ -18,7 +19,7 @@ it('computes tenant kpis for super-admin dashboard', function () {
     $superAdmin = User::factory()->create(['role_systeme' => RoleSysteme::SuperAdmin]);
 
     Livewire::actingAs($superAdmin)
-        ->test(\App\Livewire\SuperAdmin\Dashboard::class)
+        ->test(Dashboard::class)
         ->assertViewHas('kpiActifs', $baseline + 2)
         ->assertViewHas('kpiSuspendus', 1)
         ->assertViewHas('kpiArchives', 1);

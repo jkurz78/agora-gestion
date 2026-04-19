@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\RoleAssociation;
 use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;

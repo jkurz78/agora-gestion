@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\DroitImage;
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;

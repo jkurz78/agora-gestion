@@ -27,7 +27,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->association = \App\Models\Association::factory()->create();
+    $this->association = Association::factory()->create();
     $this->user = User::factory()->create();
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     TenantContext::boot($this->association);

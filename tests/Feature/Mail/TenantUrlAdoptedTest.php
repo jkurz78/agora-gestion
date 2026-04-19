@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Support\TenantUrl;
-
 it('TenantUrl is invoked from at least one mail template', function () {
     $files = array_merge(
         glob(app_path('Mail/*.php')) ?: [],

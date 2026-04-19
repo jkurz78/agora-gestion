@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
-use App\Models\VirementInterne;
-use App\Models\Association;
 use App\Models\User;
-use App\Tenant\TenantContext;
+use App\Models\VirementInterne;
 use App\Services\RapportService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

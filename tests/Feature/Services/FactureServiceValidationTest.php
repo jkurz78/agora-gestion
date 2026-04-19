@@ -7,6 +7,7 @@ use App\Enums\StatutExercice;
 use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
 use App\Exceptions\ExerciceCloturedException;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\Facture;
@@ -15,9 +16,8 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
-use App\Models\Association;
-use App\Tenant\TenantContext;
 use App\Services\FactureService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

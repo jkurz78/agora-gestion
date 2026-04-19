@@ -56,7 +56,7 @@ it('storePieceJointe place le fichier sous associations/{aid}/transactions/{tid}
 
     $tx->refresh();
     $expectedShort = 'justificatif.pdf';
-    $expectedFull  = "associations/{$this->aid}/transactions/{$tx->id}/justificatif.pdf";
+    $expectedFull = "associations/{$this->aid}/transactions/{$tx->id}/justificatif.pdf";
 
     expect($tx->piece_jointe_path)->toBe($expectedShort);
     Storage::disk('local')->assertExists($expectedFull);
@@ -131,7 +131,7 @@ it('storePieceJointeFromPath copie depuis chemin disque vers le nouveau chemin t
 
     $tx->refresh();
     $expectedShort = 'justificatif.pdf';
-    $expectedFull  = "associations/{$this->aid}/transactions/{$tx->id}/justificatif.pdf";
+    $expectedFull = "associations/{$this->aid}/transactions/{$tx->id}/justificatif.pdf";
 
     expect($tx->piece_jointe_path)->toBe($expectedShort);
     Storage::disk('local')->assertExists($expectedFull);
@@ -143,7 +143,7 @@ it('storePieceJointeFromPath copie depuis chemin disque vers le nouveau chemin t
 it('download via TransactionPieceJointeController sert le bon contenu depuis le chemin tenant-scoped', function () {
     $tx = Transaction::factory()->create([
         'piece_jointe_path' => 'justificatif.pdf',
-        'piece_jointe_nom'  => 'ma-facture.pdf',
+        'piece_jointe_nom' => 'ma-facture.pdf',
         'piece_jointe_mime' => 'application/pdf',
     ]);
 
@@ -159,7 +159,7 @@ it('download via TransactionPieceJointeController sert le bon contenu depuis le 
 it('download retourne 404 si le fichier est absent du disque', function () {
     $tx = Transaction::factory()->create([
         'piece_jointe_path' => 'justificatif.pdf',
-        'piece_jointe_nom'  => 'ma-facture.pdf',
+        'piece_jointe_nom' => 'ma-facture.pdf',
         'piece_jointe_mime' => 'application/pdf',
     ]);
     // Fichier non créé sur le disque fake
@@ -175,13 +175,13 @@ it('la suppression d\'une transaction efface aussi la pièce jointe tenant-scope
     $service = app(TransactionService::class);
 
     $tx = $service->create([
-        'type'          => TypeTransaction::Depense->value,
-        'date'          => '2025-10-01',
-        'libelle'       => 'Test suppression',
+        'type' => TypeTransaction::Depense->value,
+        'date' => '2025-10-01',
+        'libelle' => 'Test suppression',
         'montant_total' => '50.00',
         'mode_paiement' => 'virement',
-        'reference'     => 'REF-DEL',
-        'compte_id'     => $compte->id,
+        'reference' => 'REF-DEL',
+        'compte_id' => $compte->id,
     ], [['sous_categorie_id' => $sc->id, 'montant' => '50.00', 'operation_id' => null, 'seance' => null, 'notes' => null]]);
 
     $file = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');

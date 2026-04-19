@@ -167,6 +167,6 @@ it('DocumentPrevisionnelPdfController retourne 404 quand le PDF est absent et la
 
     // Le controller doit générer à la volée — le test vérifie juste que le chemin
     // tenant-scoped est utilisé pour la vérification d'existence (pas l'ancien chemin)
-    $oldPath = "documents-previsionnels/inexistant.pdf";
+    $oldPath = 'documents-previsionnels/inexistant.pdf';
     Storage::disk('local')->assertMissing($oldPath);
 });

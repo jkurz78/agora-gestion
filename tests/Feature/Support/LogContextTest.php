@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
+use App\Models\User;
 use App\Support\LogContext;
 use Illuminate\Support\Facades\Log;
 
@@ -29,8 +31,8 @@ it('injects association_id only when user is null', function () {
 });
 
 it('populates log context via BootTenantConfig middleware', function () {
-    $asso = \App\Models\Association::factory()->create();
-    $user = \App\Models\User::factory()->create();
+    $asso = Association::factory()->create();
+    $user = User::factory()->create();
     $user->associations()->attach($asso->id, ['role' => 'admin', 'joined_at' => now()]);
     $user->update(['derniere_association_id' => $asso->id]);
 

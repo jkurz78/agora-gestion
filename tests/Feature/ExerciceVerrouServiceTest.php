@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\StatutExercice;
 use App\Enums\StatutRapprochement;
 use App\Exceptions\ExerciceCloturedException;
+use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
@@ -14,9 +15,8 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Services\RapprochementBancaireService;
 use App\Services\TransactionService;
-use App\Models\Association;
-use App\Tenant\TenantContext;
 use App\Services\VirementInterneService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

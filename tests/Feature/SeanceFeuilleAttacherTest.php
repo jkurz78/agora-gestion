@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Seance;
+use App\Models\User;
 use App\Services\Emargement\Contracts\QrCodeExtractor;
 use App\Services\Emargement\QrExtractionResult;
-use App\Models\Association;
-use App\Models\User;
-use App\Tenant\TenantContext;
 use App\Services\Emargement\SeanceFeuilleAttacher;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {

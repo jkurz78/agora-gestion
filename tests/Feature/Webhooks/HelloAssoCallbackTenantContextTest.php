@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
 use App\Tenant\TenantContext;
 
@@ -22,7 +23,7 @@ it('boots TenantContext for the resolved association during the webhook', functi
     $observed = null;
 
     // Observe via a model event listener on HelloAssoNotification::created
-    \App\Models\HelloAssoNotification::created(function ($notification) use (&$observed) {
+    HelloAssoNotification::created(function ($notification) use (&$observed) {
         $observed = TenantContext::currentId();
     });
 
