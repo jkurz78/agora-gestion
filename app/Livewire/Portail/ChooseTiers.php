@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Portail;
 
+use App\Livewire\Portail\Concerns\WithPortailTenant;
 use App\Models\Association;
 use App\Services\Portail\AuthSessionService;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -12,6 +13,8 @@ use Livewire\Component;
 
 final class ChooseTiers extends Component
 {
+    use WithPortailTenant;
+
     public Association $association;
 
     public function mount(Association $association, AuthSessionService $authSession): void

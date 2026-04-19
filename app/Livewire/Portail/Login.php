@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Portail;
 
+use App\Livewire\Portail\Concerns\WithPortailTenant;
 use App\Models\Association;
 use App\Services\Portail\OtpService;
 use Illuminate\View\View;
@@ -12,6 +13,8 @@ use Livewire\Component;
 
 final class Login extends Component
 {
+    use WithPortailTenant;
+
     public Association $association;
 
     #[Validate('required|email|max:255')]
