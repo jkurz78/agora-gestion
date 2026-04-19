@@ -16,7 +16,7 @@ final class CompteBancaireController extends Controller
     public function index(): View
     {
         return view('parametres.comptes-bancaires.index', [
-            'comptesBancaires' => CompteBancaire::orderBy('nom')->get(),
+            'comptesBancaires' => CompteBancaire::where('est_systeme', false)->orderBy('nom')->get(),
         ]);
     }
 
