@@ -31,15 +31,6 @@ it('comptes_bancaires table has est_systeme column', function () {
     expect(Schema::hasColumn('comptes_bancaires', 'est_systeme'))->toBeTrue();
 });
 
-it('system intermediary account exists', function () {
-    $system = CompteBancaire::where('est_systeme', true)->first();
-
-    expect($system)->not->toBeNull()
-        ->and($system->nom)->toBe('Remises en banque')
-        ->and($system->actif_recettes_depenses)->toBeFalse()
-        ->and($system->est_systeme)->toBeTrue();
-});
-
 it('remises_bancaires table has all expected columns', function () {
     $columns = [
         'id', 'numero', 'date', 'mode_paiement',

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\User;
 use App\Services\ExerciceService;
+use App\Tenant\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -31,6 +33,10 @@ class DatabaseSeeder extends Seeder
                 'updated_at' => now(),
             ],
         );
+
+        // Boot tenant context so sub-seeders can query tenant-scoped models
+        // (SousCategorie, TypeOperation, Tiers, EmailTemplate, etc.).
+        TenantContext::boot(Association::findOrFail(1));
 
         $admin = User::factory()->create([
             'nom' => 'Marie Dupont',

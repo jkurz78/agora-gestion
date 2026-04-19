@@ -209,7 +209,7 @@ it('intègre les comptes système dans le rapprochement avec détail', function 
         'solde_initial' => 0,
         'date_solde_initial' => '2025-09-01',
         'est_systeme' => true,
-        'nom' => 'Créances à recevoir',
+        'nom' => 'Compte technique test',
     ]);
 
     // Recette sur compte système (créance)
@@ -228,7 +228,7 @@ it('intègre les comptes système dans le rapprochement avec détail', function 
 
     // Le rapprochement montre le compte système
     expect($data['rapprochement']['comptes_systeme'])->toHaveCount(1);
-    expect($data['rapprochement']['comptes_systeme'][0]['nom'])->toBe('Créances à recevoir');
+    expect($data['rapprochement']['comptes_systeme'][0]['nom'])->toBe('Compte technique test');
     expect($data['rapprochement']['comptes_systeme'][0]['solde'])->toBe(50000.00);
     expect($data['rapprochement']['comptes_systeme'][0]['ecritures'])->toHaveCount(1);
     expect($data['rapprochement']['comptes_systeme'][0]['ecritures'][0]['libelle'])->toBe('Facture client X');
@@ -245,7 +245,7 @@ it('masque les comptes système à solde nul', function () {
         'solde_initial' => 0,
         'date_solde_initial' => '2025-09-01',
         'est_systeme' => true,
-        'nom' => 'Remise bancaire',
+        'nom' => 'Compte technique vide',
     ]);
 
     $data = app(RapportService::class)->fluxTresorerie(2025);
