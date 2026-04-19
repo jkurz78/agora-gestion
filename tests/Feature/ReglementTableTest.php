@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Livewire\ReglementTable;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\RemiseBancaire;
 use App\Models\Seance;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Models\TypeOperation;
 use App\Models\User;
-use Illuminate\Database\QueryException;
-use App\Models\Association;
 use App\Tenant\TenantContext;
+use Illuminate\Database\QueryException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -335,4 +337,73 @@ it('displays realized amounts from transactions', function () {
 
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
         ->assertSee('30,00');
+});
+
+it('comptabilise une séance à la date saisie (défaut = date de la séance)', function () {
+    $sousCategorie = SousCategorie::factory()->create();
+    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sousCategorie->id]);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $compte = CompteBancaire::factory()->create(['est_systeme' => false, 'actif_recettes_depenses' => true]);
+
+    $seance = Seance::create([
+        'operation_id' => $operation->id,
+        'numero' => 1,
+        'date' => '2025-11-03',
+    ]);
+    $participant = Participant::create([
+        'tiers_id' => Tiers::factory()->create()->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => now(),
+    ]);
+    Reglement::create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'montant_prevu' => 30.00,
+    ]);
+
+    Livewire::test(ReglementTable::class, ['operation' => $operation])
+        ->call('ouvrirComptabiliser', $seance->id)
+        ->assertSet('comptabiliserDate', '2025-11-03')
+        ->set('comptabiliserCompteId', $compte->id)
+        ->call('comptabiliserSeance');
+
+    $tx = Transaction::where('compte_id', $compte->id)->sole();
+    expect($tx->date->format('Y-m-d'))->toBe('2025-11-03');
+});
+
+it('le bouton Aujourd\'hui remplace la date par celle du jour et est utilisée à la comptabilisation', function () {
+    $sousCategorie = SousCategorie::factory()->create();
+    $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sousCategorie->id]);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
+    $compte = CompteBancaire::factory()->create(['est_systeme' => false, 'actif_recettes_depenses' => true]);
+
+    $seance = Seance::create([
+        'operation_id' => $operation->id,
+        'numero' => 1,
+        'date' => '2025-11-03',
+    ]);
+    $participant = Participant::create([
+        'tiers_id' => Tiers::factory()->create()->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => now(),
+    ]);
+    Reglement::create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'mode_paiement' => ModePaiement::Especes->value,
+        'montant_prevu' => 20.00,
+    ]);
+
+    $aujourdhui = now()->format('Y-m-d');
+
+    Livewire::test(ReglementTable::class, ['operation' => $operation])
+        ->call('ouvrirComptabiliser', $seance->id)
+        ->call('setComptabiliserDateAujourdhui')
+        ->assertSet('comptabiliserDate', $aujourdhui)
+        ->set('comptabiliserCompteId', $compte->id)
+        ->call('comptabiliserSeance');
+
+    $tx = Transaction::where('compte_id', $compte->id)->sole();
+    expect($tx->date->format('Y-m-d'))->toBe($aujourdhui);
 });
