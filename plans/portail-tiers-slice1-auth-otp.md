@@ -2,7 +2,7 @@
 
 **Created**: 2026-04-19
 **Branch**: `feat/portail-tiers-slice1-auth-otp` (à créer)
-**Status**: approved (2026-04-19)
+**Status**: implemented (2026-04-19)
 **Specs**: [docs/specs/2026-04-19-portail-tiers-slice1-auth-otp.md](../docs/specs/2026-04-19-portail-tiers-slice1-auth-otp.md) — Consistency Gate PASS
 
 ## Goal
