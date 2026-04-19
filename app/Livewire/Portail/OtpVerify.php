@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Portail;
 
+use App\Livewire\Portail\Concerns\WithPortailTenant;
 use App\Models\Association;
 use App\Models\Tiers;
 use App\Services\Portail\AuthSessionService;
@@ -14,6 +15,8 @@ use Livewire\Component;
 
 final class OtpVerify extends Component
 {
+    use WithPortailTenant;
+
     public Association $association;
 
     public string $code = '';
