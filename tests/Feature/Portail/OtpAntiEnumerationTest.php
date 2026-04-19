@@ -6,6 +6,7 @@ use App\Models\Association;
 use App\Models\Tiers;
 use App\Models\TiersPortailOtp;
 use App\Services\Portail\OtpService;
+use App\Services\Portail\RequestResult;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Hashing\BcryptHasher;
@@ -25,7 +26,7 @@ it('email inconnu — aucun enregistrement créé, aucun mail envoyé, aucune ex
 
     expect(TiersPortailOtp::count())->toBe(0);
     Mail::assertNothingSent();
-    expect($result)->toBeNull();
+    expect($result)->toBe(RequestResult::Silent);
 });
 
 /**
