@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
 use App\Http\Middleware\Portail\Authenticate;
 use App\Http\Middleware\Portail\BootTenantFromSlug;
@@ -17,6 +18,7 @@ Route::prefix('portail/{association:slug}')
     ->middleware(['web', BootTenantFromSlug::class])
     ->name('portail.')
     ->group(function () {
+        Route::get('/logo', LogoController::class)->name('logo');
         Route::get('/login', Login::class)->name('login');
         Route::get('/otp', OtpVerify::class)->name('otp');
         Route::get('/choisir', ChooseTiers::class)->name('choisir');
