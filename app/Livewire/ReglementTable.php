@@ -47,6 +47,8 @@ final class ReglementTable extends Component
 
     public ?int $comptabiliserSeanceId = null;
 
+    public string $comptabiliserDate = '';
+
     public bool $showComptabiliserModal = false;
 
     public function openDocModal(int $participantId, string $type): void
@@ -248,8 +250,15 @@ final class ReglementTable extends Component
         $this->comptabiliserCompteId = CompteBancaire::where('est_systeme', false)
             ->where('actif_recettes_depenses', true)
             ->value('id');
+        $seance = Seance::find($seanceId);
+        $this->comptabiliserDate = $seance?->date?->format('Y-m-d') ?? now()->format('Y-m-d');
         $this->showComptabiliserModal = true;
         $this->dispatch('comptabiliser-modal-open');
+    }
+
+    public function setComptabiliserDateAujourdhui(): void
+    {
+        $this->comptabiliserDate = now()->format('Y-m-d');
     }
 
     public function comptabiliserSeance(): void
@@ -261,6 +270,7 @@ final class ReglementTable extends Component
         $this->validate([
             'comptabiliserCompteId' => 'required|exists:comptes_bancaires,id',
             'comptabiliserSeanceId' => 'required|exists:seances,id',
+            'comptabiliserDate' => 'required|date',
         ]);
 
         $seance = Seance::with('operation.typeOperation')->findOrFail((int) $this->comptabiliserSeanceId);
@@ -295,12 +305,13 @@ final class ReglementTable extends Component
             return;
         }
 
-        DB::transaction(function () use ($reglements, $seance, $operation, $sousCategorieId): void {
+        $date = \Carbon\Carbon::parse($this->comptabiliserDate);
+
+        DB::transaction(function () use ($reglements, $seance, $operation, $sousCategorieId, $date): void {
             foreach ($reglements as $reglement) {
                 $tiers = $reglement->participant->tiers;
                 $libelle = "Règlement {$tiers->displayName()} — {$operation->nom} S{$seance->numero}";
 
-                $date = now();
                 $tx = Transaction::create([
                     'type' => TypeTransaction::Recette->value,
                     'date' => $date->toDateString(),

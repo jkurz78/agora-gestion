@@ -330,6 +330,9 @@
                     @error('comptabiliserCompteId')
                         <div class="alert alert-danger py-1 px-2 small mb-2">{{ $message }}</div>
                     @enderror
+                    @error('comptabiliserDate')
+                        <div class="alert alert-danger py-1 px-2 small mb-2">{{ $message }}</div>
+                    @enderror
                     <div class="mb-3">
                         <label class="form-label small mb-1">Compte bancaire cible</label>
                         <select wire:model="comptabiliserCompteId" class="form-select form-select-sm">
@@ -337,6 +340,16 @@
                                 <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
                             @endforeach
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small mb-1">Date des transactions</label>
+                        <div class="input-group input-group-sm">
+                            <input type="date" wire:model="comptabiliserDate" class="form-control form-control-sm @error('comptabiliserDate') is-invalid @enderror">
+                            <button type="button" class="btn btn-outline-secondary" wire:click="setComptabiliserDateAujourdhui" title="Utiliser la date du jour">
+                                Aujourd'hui
+                            </button>
+                        </div>
+                        <div class="form-text small">Par défaut : la date de la séance.</div>
                     </div>
                 </div>
                 <div class="modal-footer py-2">
