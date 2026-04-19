@@ -18,14 +18,17 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     TenantContext::clear();
-    // Use the default association from migration so system accounts ('Créances à recevoir') are in scope.
     $this->association = Association::firstOrFail();
     $this->user = User::factory()->create();
     $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     TenantContext::boot($this->association);
     $this->actingAs($this->user);
     $this->service = app(FactureService::class);
-    $this->compteCreances = CompteBancaire::where('nom', 'Créances à recevoir')->firstOrFail();
+    $this->compteCreances = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Compte test règlement',
+        'est_systeme' => false,
+    ]);
     $this->tiers = Tiers::factory()->create();
     $this->exercice = now()->month >= 9 ? now()->year : now()->year - 1;
 });
