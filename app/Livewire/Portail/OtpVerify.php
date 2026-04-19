@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Portail;
 
 use App\Models\Association;
+use App\Models\Tiers;
+use App\Services\Portail\AuthSessionService;
 use App\Services\Portail\OtpService;
 use App\Services\Portail\VerifyStatus;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -30,7 +31,7 @@ final class OtpVerify extends Component
         }
     }
 
-    public function submit(OtpService $otp): void
+    public function submit(OtpService $otp, AuthSessionService $authSession): void
     {
         $this->validate(
             rules: ['code' => 'required|string'],
@@ -57,22 +58,23 @@ final class OtpVerify extends Component
             return;
         }
 
-        // Success
-        $tiersIds = $result->tiersIds;
+        $this->handleSuccess($result->tiersIds, $authSession);
+    }
+
+    /** @param list<int> $tiersIds */
+    private function handleSuccess(array $tiersIds, AuthSessionService $authSession): void
+    {
+        session()->forget('portail.pending_email');
 
         if (count($tiersIds) === 1) {
-            Auth::guard('tiers-portail')->loginUsingId($tiersIds[0]);
-            session()->forget('portail.pending_email');
+            $authSession->loginSingleTiers(Tiers::findOrFail($tiersIds[0]));
             $this->redirectRoute('portail.home', ['association' => $this->association->slug]);
 
             return;
         }
 
         // Multi-Tiers → chooser
-        session([
-            'portail.pending_tiers_ids' => array_map('intval', $tiersIds),
-        ]);
-        session()->forget('portail.pending_email');
+        $authSession->markPendingTiers($tiersIds);
         $this->redirectRoute('portail.choisir', ['association' => $this->association->slug]);
     }
 
