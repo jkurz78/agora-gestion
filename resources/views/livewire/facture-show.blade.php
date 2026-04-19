@@ -112,9 +112,9 @@
                         <div class="text-center mt-3">
                             <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> Acquittée</span>
                         </div>
-                    @elseif ($transactionsAEncaisser->isNotEmpty() && $this->canEdit)
+                    @elseif ($transactionsEnAttente->isNotEmpty() && $this->canEdit)
                         <div class="text-center mt-3">
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#encaissementModal">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#reglementModal">
                                 <i class="bi bi-cash-coin"></i> Enregistrer le règlement
                             </button>
                         </div>
@@ -257,8 +257,8 @@
     @endif
 
     {{-- Modale de règlement (unifiée chèque/espèces et virement/CB/prélèvement) --}}
-    @if ($transactionsAEncaisser->isNotEmpty())
-    <div class="modal fade" id="encaissementModal" tabindex="-1" wire:ignore.self>
+    @if ($transactionsEnAttente->isNotEmpty())
+    <div class="modal fade" id="reglementModal" tabindex="-1" wire:ignore.self>
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -271,7 +271,7 @@
                         Elles resteront disponibles pour le rapprochement bancaire.
                     </p>
                     <div class="mb-2">
-                        @foreach ($transactionsAEncaisser as $tx)
+                        @foreach ($transactionsEnAttente as $tx)
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="tx-{{ $tx->id }}"
                                        wire:click="toggleTransaction({{ $tx->id }})"

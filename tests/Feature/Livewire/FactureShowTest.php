@@ -179,7 +179,7 @@ it('shows badge Acquittee when fully paid', function () {
 it('enregistre un règlement chèque via le bouton unifié', function () {
     $compteCreances = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
-        'nom' => 'Créances à recevoir',
+        'nom' => 'Compte de règlement test',
     ]);
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $exercice = now()->month >= 9 ? now()->year : now()->year - 1;

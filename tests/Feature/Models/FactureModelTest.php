@@ -241,7 +241,7 @@ test('montantRegle returns sum for transactions on non-système accounts', funct
 test('montantRegle considers remise transactions on système account as paid', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
-    $compteSysteme = CompteBancaire::factory()->create(['est_systeme' => true, 'nom' => 'Remises en banque']);
+    $compteSysteme = CompteBancaire::factory()->create(['est_systeme' => true, 'nom' => 'Compte système test']);
     $compteReel = CompteBancaire::factory()->create(['est_systeme' => false]);
 
     $remise = RemiseBancaire::create([
