@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tiers_portail_otps', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('association_id')->constrained('associations')->cascadeOnDelete();
+            $table->foreignId('association_id')->constrained('association')->cascadeOnDelete();
             $table->string('email', 255);
             $table->string('code_hash');
             $table->timestamp('expires_at');
