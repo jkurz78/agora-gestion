@@ -15,17 +15,17 @@ it('system accounts are excluded from selectors but visible in lists', function 
     // Normal accounts
     $compteNormal = CompteBancaire::factory()->create(['nom' => 'Banque Pop', 'est_systeme' => false]);
     // System account (created by migration, or manually here)
-    $compteSysteme = CompteBancaire::factory()->create(['nom' => 'Remises en banque', 'est_systeme' => true]);
+    $compteSysteme = CompteBancaire::factory()->create(['nom' => 'Compte système test', 'est_systeme' => true]);
 
     // Selector query (used in forms)
     $selectableComptes = CompteBancaire::where('est_systeme', false)->get();
     expect($selectableComptes->pluck('nom')->toArray())->toContain('Banque Pop')
-        ->and($selectableComptes->pluck('nom')->toArray())->not->toContain('Remises en banque');
+        ->and($selectableComptes->pluck('nom')->toArray())->not->toContain('Compte système test');
 
     // List query (used in consultation)
     $allComptes = CompteBancaire::all();
     expect($allComptes->pluck('nom')->toArray())->toContain('Banque Pop')
-        ->and($allComptes->pluck('nom')->toArray())->toContain('Remises en banque');
+        ->and($allComptes->pluck('nom')->toArray())->toContain('Compte système test');
 });
 
 it('TransactionForm already filters system accounts via actif_recettes_depenses', function () {
@@ -36,12 +36,12 @@ it('TransactionForm already filters system accounts via actif_recettes_depenses'
         'est_systeme' => false,
     ]);
     $compteSysteme = CompteBancaire::factory()->create([
-        'nom' => 'Remises en banque',
+        'nom' => 'Compte système test',
         'actif_recettes_depenses' => false,
         'est_systeme' => true,
     ]);
 
     $comptes = CompteBancaire::where('actif_recettes_depenses', true)->orderBy('nom')->get();
     expect($comptes->pluck('nom')->toArray())->toContain('Compte Normal')
-        ->and($comptes->pluck('nom')->toArray())->not->toContain('Remises en banque');
+        ->and($comptes->pluck('nom')->toArray())->not->toContain('Compte système test');
 });
