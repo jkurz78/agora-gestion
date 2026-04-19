@@ -9,4 +9,5 @@ enum RequestResult: string
     case Sent = 'sent';
     case Silent = 'silent'; // anti-énum : Tiers inconnu
     case TooSoon = 'too_soon'; // renvoi trop tôt
+    case Cooldown = 'cooldown'; // cooldown actif après 3 échecs
 }
