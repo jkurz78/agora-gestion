@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Models\Association;
-use App\Tenant\TenantContext;
 use App\Services\RemiseBancaireService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

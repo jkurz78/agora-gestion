@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\DroitImage;
 use App\Enums\ModePaiement;
+use App\Models\Association;
 use App\Models\FormulaireToken;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -14,9 +15,8 @@ use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
 use App\Models\User;
-use App\Models\Association;
-use App\Tenant\TenantContext;
 use App\Services\FormulaireTokenService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;

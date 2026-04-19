@@ -10,6 +10,7 @@ use App\Models\Categorie;
 use App\Models\Operation;
 use App\Models\Provision;
 use App\Services\ExerciceService;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -171,16 +172,16 @@ final class ProvisionIndex extends Component
         if ($this->piece_jointe !== null) {
             $extension = $this->piece_jointe->getClientOriginalExtension() ?: 'pdf';
             $shortName = 'piece-jointe.'.$extension;
-            $fullPath  = $provision->storagePath('provisions/'.$provision->id.'/'.$shortName);
+            $fullPath = $provision->storagePath('provisions/'.$provision->id.'/'.$shortName);
 
-            \Illuminate\Support\Facades\Storage::disk('local')->put(
+            Storage::disk('local')->put(
                 $fullPath,
                 $this->piece_jointe->get(),
             );
 
             $provision->update([
                 'piece_jointe_path' => $shortName,
-                'piece_jointe_nom'  => $this->piece_jointe->getClientOriginalName(),
+                'piece_jointe_nom' => $this->piece_jointe->getClientOriginalName(),
                 'piece_jointe_mime' => $this->piece_jointe->getMimeType(),
             ]);
         }

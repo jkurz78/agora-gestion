@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
+use Symfony\Component\Console\Command\Command;
 
 it('runs tenant:benchmark in smoke mode without fatal', function () {
     $code = Artisan::call('tenant:benchmark', ['--tenants' => 2, '--transactions' => 10]);
@@ -25,7 +26,7 @@ it('refuses to run in production-like environment without --force', function () 
 
     try {
         $code = Artisan::call('tenant:benchmark', ['--tenants' => 1, '--transactions' => 1]);
-        expect($code)->toBe(Symfony\Component\Console\Command\Command::FAILURE);
+        expect($code)->toBe(Command::FAILURE);
         expect(Artisan::output())->toContain('Refus de');
     } finally {
         app()->detectEnvironment(fn () => 'testing');

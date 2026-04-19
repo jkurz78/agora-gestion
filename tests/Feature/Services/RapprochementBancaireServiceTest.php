@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\User;
-use App\Models\Association;
-use App\Tenant\TenantContext;
 use App\Services\RapprochementBancaireService;
+use App\Tenant\TenantContext;
 
 beforeEach(function () {
     $this->association = Association::factory()->create();

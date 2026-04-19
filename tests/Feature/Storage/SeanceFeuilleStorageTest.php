@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Livewire\IncomingDocuments\IncomingDocumentsList;
+use App\Livewire\SeanceFeuilleAttachment;
 use App\Models\Association;
 use App\Models\IncomingDocument;
 use App\Models\Operation;
@@ -117,7 +118,7 @@ it('retirer efface le fichier tenant-scoped et met feuille_signee_path à null',
     ]);
 
     Livewire::actingAs($this->user)
-        ->test(\App\Livewire\SeanceFeuilleAttachment::class)
+        ->test(SeanceFeuilleAttachment::class)
         ->set('seanceId', $this->sid)
         ->set('show', true)
         ->call('retirer')

@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\Association;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;

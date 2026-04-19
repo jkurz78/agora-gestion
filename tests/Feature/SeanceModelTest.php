@@ -8,13 +8,14 @@ use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
 use App\Models\Tiers;
+use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->association = Association::factory()->create();
-    $user = \App\Models\User::factory()->create();
+    $user = User::factory()->create();
     $user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
     TenantContext::boot($this->association);
 });

@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Models\Association;
 use App\Models\HelloAssoParametres;
 use App\Models\User;
-use App\Tenant\TenantContext;
 use App\Services\HelloAssoApiClient;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 

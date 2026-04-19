@@ -31,6 +31,7 @@ function makeUserWithPivotRole(Association $association, string $role): User
 {
     $user = User::factory()->create();
     $user->associations()->attach($association->id, ['role' => $role, 'joined_at' => now()]);
+
     return $user;
 }
 

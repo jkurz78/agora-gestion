@@ -14,8 +14,8 @@ use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
-use App\Tenant\TenantContext;
 use App\Services\DocumentPrevisionnelService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

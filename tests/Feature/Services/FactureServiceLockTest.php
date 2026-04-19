@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\StatutFacture;
+use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
@@ -11,9 +12,8 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
-use App\Models\Association;
-use App\Tenant\TenantContext;
 use App\Services\TransactionService;
+use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

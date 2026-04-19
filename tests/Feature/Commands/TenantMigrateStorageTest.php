@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\File;
  * (elle lit la DB directement). Le context n'est booté qu'en interne par la commande
  * lors de l'itération par association.
  */
-
 beforeEach(function () {
     $this->association = Association::factory()->create();
     $this->aid = $this->association->id;

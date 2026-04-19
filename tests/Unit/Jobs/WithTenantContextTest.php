@@ -15,7 +15,7 @@ it('boots TenantContext before running the inner callable and clears after', fun
     }) {
         use WithTenantContext;
 
-        public function __construct(public int $associationId, public \Closure $work) {}
+        public function __construct(public int $associationId, public Closure $work) {}
 
         public function handle(): void
         {
@@ -33,7 +33,8 @@ it('boots TenantContext before running the inner callable and clears after', fun
 it('clears TenantContext even when the job throws', function () {
     $asso = Association::factory()->create();
 
-    $job = new class($asso->id) {
+    $job = new class($asso->id)
+    {
         use WithTenantContext;
 
         public function __construct(public int $associationId) {}
@@ -41,7 +42,7 @@ it('clears TenantContext even when the job throws', function () {
         public function handle(): void
         {
             $this->runWithTenantContext(function () {
-                throw new \RuntimeException('boom');
+                throw new RuntimeException('boom');
             });
         }
     };
@@ -50,7 +51,7 @@ it('clears TenantContext even when the job throws', function () {
 
     try {
         $job->handle();
-    } catch (\RuntimeException) {
+    } catch (RuntimeException) {
         // expected
     }
 

@@ -6,6 +6,7 @@ use App\Enums\RoleAssociation;
 use App\Enums\RoleSysteme;
 use App\Models\Association;
 use App\Models\User;
+use Livewire\Livewire;
 
 beforeEach(function () {
     $this->association = Association::factory()->unonboarded()->create();
@@ -63,7 +64,7 @@ it('does not redirect Livewire hashed upload endpoint during onboarding', functi
     // Sans exemption, le wizard admin serait redirigé vers /onboarding
     // et toutes les actions Livewire (upload de logo/cachet, submit de step)
     // retourneraient 302 → la JS Livewire échoue silencieusement.
-    $updateUri = \Livewire\Livewire::getUpdateUri();
+    $updateUri = Livewire::getUpdateUri();
     expect($updateUri)->toMatch('#^/livewire-[a-f0-9]+/update$#');
 
     $response = $this->actingAs($this->admin)

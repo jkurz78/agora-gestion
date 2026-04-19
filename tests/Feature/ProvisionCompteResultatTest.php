@@ -11,8 +11,8 @@ use App\Models\Categorie;
 use App\Models\Provision;
 use App\Models\SousCategorie;
 use App\Models\User;
-use App\Tenant\TenantContext;
 use App\Services\ExerciceService;
+use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
 beforeEach(function () {

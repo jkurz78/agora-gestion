@@ -9,7 +9,6 @@ use App\Models\User;
 use App\Services\HelloAssoService;
 use App\Services\HelloAssoTestResult;
 use App\Tenant\TenantContext;
-use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function () {
