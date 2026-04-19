@@ -27,6 +27,6 @@ final class OtpMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(view: 'mail.portail.otp');
+        return new Content(markdown: 'mail.portail.otp');
     }
 }
