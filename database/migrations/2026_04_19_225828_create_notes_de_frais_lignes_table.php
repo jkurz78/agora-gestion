@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('notes_de_frais_lignes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('note_de_frais_id')->constrained('notes_de_frais')->cascadeOnDelete();
-            $table->foreignId('sous_categorie_id')->constrained('sous_categories');
+            $table->foreignId('sous_categorie_id')->nullable()->constrained('sous_categories')->nullOnDelete();
             $table->foreignId('operation_id')->nullable()->constrained('operations')->nullOnDelete();
             $table->foreignId('seance_id')->nullable()->constrained('seances')->nullOnDelete();
             $table->string('libelle')->nullable();
