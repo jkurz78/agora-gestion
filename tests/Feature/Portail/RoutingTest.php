@@ -51,11 +51,11 @@ it('GET /portail/{slug}/choisir avec pending retourne 200', function () {
         ->assertStatus(200);
 });
 
-it('GET /portail/{slug}/ retourne 200', function () {
+it('GET /portail/{slug}/ sans auth redirige vers login', function () {
     $asso = Association::factory()->create();
 
     $this->get("/portail/{$asso->slug}/")
-        ->assertStatus(200);
+        ->assertRedirect("/portail/{$asso->slug}/login");
 });
 
 it('le layout portail affiche le nom de l\'association', function () {
