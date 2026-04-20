@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\NoteDeFraisLigneType;
+use App\Models\NoteDeFraisLigne;
 
 it('expose les deux cas standard et kilometrique', function () {
     expect(NoteDeFraisLigneType::Standard->value)->toBe('standard');
@@ -11,7 +12,7 @@ it('expose les deux cas standard et kilometrique', function () {
 });
 
 it('cast type enum et metadata array sur NoteDeFraisLigne', function () {
-    $ligne = new \App\Models\NoteDeFraisLigne();
+    $ligne = new NoteDeFraisLigne;
     $ligne->type = NoteDeFraisLigneType::Kilometrique;
     $ligne->metadata = ['cv_fiscaux' => 5, 'distance_km' => 420, 'bareme_eur_km' => 0.636];
 

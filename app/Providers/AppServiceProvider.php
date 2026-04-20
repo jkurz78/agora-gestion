@@ -15,6 +15,7 @@ use App\Models\Transaction;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\TransactionObserver;
 use App\Policies\NoteDeFraisPolicy;
+use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -25,7 +26,7 @@ final class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(\App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry::class);
+        $this->app->singleton(LigneTypeRegistry::class);
     }
 
     public function boot(): void
