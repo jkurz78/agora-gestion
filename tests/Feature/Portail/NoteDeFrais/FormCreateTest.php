@@ -117,7 +117,7 @@ it('form create: saveDraft crée un brouillon lié au tiers et à l\'asso', func
         'montant' => '45.50',
         'sous_categorie_id' => $sc->id,
         'operation_id' => null,
-        'seance_id' => null,
+        'seance' => null,
         'piece_jointe_path' => null,
         'justif' => null,
     ]];

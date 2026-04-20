@@ -7,7 +7,6 @@ use App\Models\Association;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
-use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
@@ -161,7 +160,7 @@ it('wizard: wizardConfirm ajoute la ligne à $lignes, reset draftLigne, wizardSt
         'montant' => '45.00',
         'sous_categorie_id' => (string) $sc->id,
         'operation_id' => null,
-        'seance_id' => null,
+        'seance' => null,
     ];
 
     expect($component->lignes)->toHaveCount(0);
@@ -217,28 +216,13 @@ it('wizard: wizardPrev retourne à l\'étape précédente sans perdre les donné
 });
 
 // ---------------------------------------------------------------------------
-// Test 10 : Séances apparaissent dans render quand opération choisie
+// Test 10 : selectedOperation passé dans render quand operation_id est sélectionné
 // ---------------------------------------------------------------------------
 
-it('wizard: séances disponibles dans render quand operation_id est sélectionné', function () {
-    $op = Operation::factory()->create(['association_id' => $this->asso->id]);
-
-    $seance = Seance::create([
+it('wizard: selectedOperation dans render quand operation_id est sélectionné', function () {
+    $op = Operation::factory()->create([
         'association_id' => $this->asso->id,
-        'operation_id' => $op->id,
-        'numero' => 1,
-        'date' => '2026-05-10',
-        'titre' => 'Séance de printemps',
-    ]);
-
-    // Séance d'une autre opération — ne doit pas apparaître
-    $autreOp = Operation::factory()->create(['association_id' => $this->asso->id]);
-    Seance::create([
-        'association_id' => $this->asso->id,
-        'operation_id' => $autreOp->id,
-        'numero' => 1,
-        'date' => '2026-06-01',
-        'titre' => 'Autre séance',
+        'nombre_seances' => 4,
     ]);
 
     TenantContext::boot($this->asso);
@@ -248,20 +232,12 @@ it('wizard: séances disponibles dans render quand operation_id est sélectionn�
     $view = $component->render();
     $data = $view->getData();
 
-    expect($data['seances'])->toHaveCount(1)
-        ->and((int) $data['seances']->first()->id)->toBe((int) $seance->id);
+    expect($data['selectedOperation'])->not->toBeNull()
+        ->and((int) $data['selectedOperation']->id)->toBe((int) $op->id)
+        ->and($data['selectedOperation']->nombre_seances)->toBe(4);
 });
 
-it('wizard: séances vide dans render quand aucune opération choisie', function () {
-    $op = Operation::factory()->create(['association_id' => $this->asso->id]);
-    Seance::create([
-        'association_id' => $this->asso->id,
-        'operation_id' => $op->id,
-        'numero' => 1,
-        'date' => '2026-05-10',
-        'titre' => 'Test',
-    ]);
-
+it('wizard: selectedOperation est null dans render quand aucune opération choisie', function () {
     TenantContext::boot($this->asso);
     $component = makeForm($this->asso);
     // operation_id reste null
@@ -269,7 +245,7 @@ it('wizard: séances vide dans render quand aucune opération choisie', function
     $view = $component->render();
     $data = $view->getData();
 
-    expect($data['seances'])->toHaveCount(0);
+    expect($data['selectedOperation'])->toBeNull();
 });
 
 // ---------------------------------------------------------------------------
