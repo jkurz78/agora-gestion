@@ -162,9 +162,140 @@ Statut : livré 2026-04-19.
 - Validation opérations actives + exercice courant : à vérifier implementation.
 - Archivage des NDF rejetées/payées : non prévu (Q6-A).
 
-## À venir (Slice 3 du programme Notes de frais)
+## Slice 3 — Back-office NDF comptable (2026-04-20)
 
-- Slice 3 — Back-office NDF comptable (validation, rejet, comptabilisation).
+Statut : livré 2026-04-20, branche feat/portail-tiers-slice1-auth-otp.
+
+### Intent
+
+Permettre à un utilisateur Admin ou Comptable de traiter les Notes de frais soumises
+par les Tiers depuis le portail : validation (création d'une Transaction Dépense),
+rejet avec motif obligatoire, et dé-comptabilisation implicite si la Transaction liée
+est supprimée. Un badge dans la top-bar signale le nombre de NDF en attente.
+
+C'est la v0 de ce périmètre — les dettes portées sont listées dans §6 de
+`docs/specs/2026-04-20-portail-tiers-slice3-back-office-ndf.md`.
+
+### Routes
+
+```
+GET  /comptabilite/notes-de-frais
+     └─ liste (Livewire Index, 4 onglets : À traiter / Validées / Rejetées / Toutes)
+        onglet par défaut : À traiter (statut=Soumise)
+        tri : date décroissante
+
+GET  /comptabilite/notes-de-frais/{noteDeFrais}
+     └─ détail (Livewire Show)
+        statut Soumise   → bouton "Valider & comptabiliser" (mini-form inline) + bouton "Rejeter" (modal Bootstrap)
+        statut Validée   → panneau "Transaction #XXX" + lien /comptabilite/transactions?edit={id}
+        statut Rejetée   → affichage motif
+        statut Payée     → lecture seule (dérivé : Transaction en statut Pointe)
+
+GET  /comptabilite/notes-de-frais/{noteDeFrais}/lignes/{ligne}/piece-jointe
+     └─ contrôleur NoteDeFraisPieceJointeController (Storage::response)
+        Gate treat + vérification appartenance ligne/NDF
+```
+
+### Rôles
+
+- Admin et Comptable uniquement (Policy `treat` défensive tenant-aware → retourne `false` si TenantContext non booté).
+- Gestionnaire / Consultation → 403.
+- Super-admin en mode support → bloqué par `BlockWritesInSupport` (valider / rejeter impossibles).
+- Règle "Comptable ne peut pas traiter sa propre NDF" abandonnée en v0 : aucun rattachement user↔tiers dans le modèle aujourd'hui. Cette règle est une dette tracée.
+
+### Flux validation
+
+```
+Comptable ouvre NDF (statut Soumise)
+  │
+  ▼  Clique "Valider & comptabiliser"
+  mini-form inline : compte_id (select) + mode_paiement (default Virement) + date (default ndf.date, bouton Aujourd'hui)
+  │
+  ▼  Submit
+  NoteDeFraisValidationService::valider(ndf, ValidationData)
+    ├─ DB::transaction {
+    │    lockForUpdate sur NDF (anti-double-validation)
+    │    refresh + vérif statut=Soumise (DomainException sinon)
+    │    TransactionService::create(type=Depense, statut_reglement=EnAttente, tiers=ndf.tiers, …)
+    │    pour chaque ligne NDF : Storage::disk('local')->copy(source, associations/{id}/transactions/{tr_id}/ligne-{N}-{slug}.{ext})
+    │    ndf.update(statut=Validee, transaction_id, validee_at)
+    │    log comptabilite.ndf.validated
+    │  }
+    └─ retourne Transaction
+```
+
+- Si la date tombe dans un exercice clôturé → `ExerciceService::assertOuvert()` lève une exception, flash erreur, NDF reste Soumise.
+- Si `Storage::copy` échoue → rollback DB, NDF reste Soumise. Les fichiers déjà copiés avant l'échec deviennent des orphelins (dette mineure acceptée).
+
+### Flux rejet
+
+```
+Comptable clique "Rejeter"
+  │
+  ▼  Modal Bootstrap : textarea motif (requis, min 1 caractère)
+  │
+  ▼  Confirmer le rejet
+  NoteDeFraisValidationService::rejeter(ndf, motif)
+    ├─ ValidationException si motif vide
+    ├─ DomainException si statut ≠ Soumise
+    ├─ ndf.update(statut=Rejetee, motif_rejet)
+    └─ log comptabilite.ndf.rejected
+```
+
+### Dé-comptabilisation implicite
+
+`TransactionObserver` (enregistré dans `AppServiceProvider::boot()`) :
+
+```
+Transaction::delete() ou Transaction::forceDelete()
+  │
+  ▼  Observer::deleting() — capture la NDF liée avant que la FK nullOnDelete n'efface transaction_id
+  Observer::deleted()
+    └─ si NDF liée → update(statut=Soumise, transaction_id=null, validee_at=null)
+       log comptabilite.ndf.reverted_to_submitted
+```
+
+Pas de bouton "Dé-comptabiliser" dédié. La suppression de la Transaction (via l'écran Transactions existant) déclenche automatiquement le revert.
+
+### Badge top-bar
+
+- View Composer (`AppServiceProvider::boot()`) injecte `ndfPendingCount` (count DB direct, pas d'accessor) et `canSeeNdf` dans `layouts.app`.
+- Affiché si `canSeeNdf` (Admin ou Comptable dans le tenant courant).
+- Icône `bi-receipt-cutoff` + texte "Notes de frais" + badge warning si count > 0.
+- Clic → `/comptabilite/notes-de-frais` (onglet À traiter par défaut).
+- Count scopé au tenant courant via TenantScope (aucune contamination cross-tenant).
+
+### Logs structurés
+
+Tous portés par `LogContext` (porte automatiquement `association_id` + `user_id`) :
+
+| Clé | Déclencheur | Contexte |
+|---|---|---|
+| `comptabilite.ndf.validated` | `NoteDeFraisValidationService::valider()` | `ndf_id`, `transaction_id`, `montant_total`, `valide_par` |
+| `comptabilite.ndf.rejected` | `NoteDeFraisValidationService::rejeter()` | `ndf_id`, `tiers_id`, `motif` |
+| `comptabilite.ndf.reverted_to_submitted` | `TransactionObserver::revertLinkedNdf()` | `ndf_id`, `transaction_id` |
+
+### Invariants multi-tenant
+
+- TenantScope fail-closed sur `NoteDeFrais` et `Transaction` : un comptable asso A ne peut pas accéder aux NDF asso B (→ 404).
+- Policy `treat` vérifie défensivement que `ndf.association_id === TenantContext::currentId()`.
+- Stockage PJ transaction : `associations/{asso_id}/transactions/{tx_id}/ligne-{N}-{slug}.{ext}` — scopé par ID numérique immuable.
+- Badge count : query DB `WHERE statut='soumise'` filtrée par TenantScope courant.
+
+### Dettes portées (v0)
+
+- **Slice 4** : refonte écrans Transaction (affichage + édition PJ au niveau ligne dans tous les formulaires Transaction existants).
+- Rattachement user↔tiers (règle "Comptable ne traite pas sa propre NDF").
+- Notifications email (validation / rejet) → slice dédiée.
+- Pagination back-office NDF (cohérent Slice 2, dette tracée).
+- Export liste NDF (CSV/PDF).
+- Lightbox preview PJ.
+- Bouton "Dé-comptabiliser" dédié si le flux via suppression Transaction s'avère contre-intuitif.
+- Orphelins stockage en cas d'échec partiel de copie PJ : nettoyage via script maintenance.
+
+### Prochaines slices
+
+- **Slice 4** : unification PJ au niveau ligne dans les écrans Transaction (refonte multi-écrans — hors programme NDF portail).
 
 ## Dette technique
 
