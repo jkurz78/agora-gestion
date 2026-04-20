@@ -71,7 +71,7 @@ it('migration: table notes_de_frais_lignes exists with expected columns', functi
         'note_de_frais_id',
         'sous_categorie_id',
         'operation_id',
-        'seance_id',
+        'seance',
         'libelle',
         'montant',
         'piece_jointe_path',
@@ -194,7 +194,7 @@ it('model: NoteDeFraisLigne fillable contains required fields', function () {
     $fillable = $ligne->getFillable();
 
     foreach ([
-        'note_de_frais_id', 'sous_categorie_id', 'operation_id', 'seance_id',
+        'note_de_frais_id', 'sous_categorie_id', 'operation_id', 'seance',
         'libelle', 'montant', 'piece_jointe_path',
     ] as $field) {
         expect(in_array($field, $fillable, true))->toBeTrue("Field '{$field}' missing from fillable");
@@ -219,10 +219,12 @@ it('model: NoteDeFraisLigne has operation() BelongsTo relation', function () {
     expect($ligne->operation())->toBeInstanceOf(BelongsTo::class);
 });
 
-it('model: NoteDeFraisLigne has seance() BelongsTo relation', function () {
+it('model: NoteDeFraisLigne casts seance as integer', function () {
     $ligne = new NoteDeFraisLigne;
+    $casts = $ligne->getCasts();
 
-    expect($ligne->seance())->toBeInstanceOf(BelongsTo::class);
+    expect($casts)->toHaveKey('seance')
+        ->and($casts['seance'])->toBe('integer');
 });
 
 // ---------------------------------------------------------------------------

@@ -32,7 +32,7 @@ final class NoteDeFraisLigne extends Model
         'note_de_frais_id',
         'sous_categorie_id',
         'operation_id',
-        'seance_id',
+        'seance',
         'libelle',
         'montant',
         'piece_jointe_path',
@@ -42,6 +42,7 @@ final class NoteDeFraisLigne extends Model
     {
         return [
             'montant' => 'decimal:2',
+            'seance' => 'integer',
         ];
     }
 
@@ -58,10 +59,5 @@ final class NoteDeFraisLigne extends Model
     public function operation(): BelongsTo
     {
         return $this->belongsTo(Operation::class);
-    }
-
-    public function seance(): BelongsTo
-    {
-        return $this->belongsTo(Seance::class);
     }
 }

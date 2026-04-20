@@ -30,7 +30,7 @@ final class NoteDeFraisService
      *         montant: float|int,
      *         sous_categorie_id: int|null,
      *         operation_id?: int|null,
-     *         seance_id?: int|null,
+     *         seance?: int|null,
      *         piece_jointe_path: string|null,
      *     }>
      * }  $data
@@ -88,7 +88,7 @@ final class NoteDeFraisService
                     'montant' => $ligneData['montant'],
                     'sous_categorie_id' => $ligneData['sous_categorie_id'] ?? null,
                     'operation_id' => $ligneData['operation_id'] ?? null,
-                    'seance_id' => $ligneData['seance_id'] ?? null,
+                    'seance' => $ligneData['seance'] ?? null,
                     'piece_jointe_path' => $ligneData['piece_jointe_path'] ?? null,
                 ]);
             }

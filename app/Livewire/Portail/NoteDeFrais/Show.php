@@ -41,7 +41,7 @@ final class Show extends Component
 
     public function render(): View
     {
-        $ndf = $this->noteDeFrais->load('lignes.sousCategorie', 'lignes.operation', 'lignes.seance');
+        $ndf = $this->noteDeFrais->load('lignes.sousCategorie', 'lignes.operation');
 
         return view('livewire.portail.note-de-frais.show', [
             'ndf' => $ndf,
