@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AttestationPresencePdfController;
+use App\Http\Controllers\BackOffice\NoteDeFraisPieceJointeController;
 use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
@@ -40,6 +41,7 @@ use App\Http\Middleware\EnsureTwoFactor;
 use App\Http\Middleware\VerifyTenantAsset;
 use App\Livewire\Auth\AssociationSelector;
 use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
+use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -174,7 +176,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::view('/budget', 'budget.index')->name('budget');
         Route::get('/budget/export', BudgetExportController::class)->name('budget.export');
         Route::get('/notes-de-frais', NdfIndex::class)->name('ndf.index');
-        Route::get('/notes-de-frais/{noteDeFrais}', fn (\App\Models\NoteDeFrais $noteDeFrais) => abort(404))->name('ndf.show');
+        Route::get('/notes-de-frais/{noteDeFrais}', NdfShow::class)->name('ndf.show');
+        Route::get('/notes-de-frais/{noteDeFrais}/lignes/{ligne}/piece-jointe', NoteDeFraisPieceJointeController::class)->name('ndf.piece-jointe');
     });
 
 // ── Banques ──

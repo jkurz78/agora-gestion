@@ -14,7 +14,7 @@ use Livewire\Livewire;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeUserWithRole(Association $association, RoleAssociation $role): User
+function ndfIndexMakeUserWithRole(Association $association, RoleAssociation $role): User
 {
     $user = User::factory()->create();
     $user->associations()->attach($association->id, [
@@ -34,7 +34,7 @@ it('returns 200 for an Admin', function (): void {
     TenantContext::boot($association);
     session(['current_association_id' => $association->id]);
 
-    $admin = makeUserWithRole($association, RoleAssociation::Admin);
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
 
     $this->actingAs($admin)
         ->get(route('comptabilite.ndf.index'))
@@ -47,7 +47,7 @@ it('returns 200 for a Comptable', function (): void {
     TenantContext::boot($association);
     session(['current_association_id' => $association->id]);
 
-    $comptable = makeUserWithRole($association, RoleAssociation::Comptable);
+    $comptable = ndfIndexMakeUserWithRole($association, RoleAssociation::Comptable);
 
     $this->actingAs($comptable)
         ->get(route('comptabilite.ndf.index'))
@@ -60,7 +60,7 @@ it('returns 403 for a Gestionnaire', function (): void {
     TenantContext::boot($association);
     session(['current_association_id' => $association->id]);
 
-    $gestionnaire = makeUserWithRole($association, RoleAssociation::Gestionnaire);
+    $gestionnaire = ndfIndexMakeUserWithRole($association, RoleAssociation::Gestionnaire);
 
     $this->actingAs($gestionnaire)
         ->get(route('comptabilite.ndf.index'))
@@ -80,7 +80,7 @@ it('shows only Soumise NDF on the default a_traiter tab', function (): void {
     TenantContext::boot($association);
     session(['current_association_id' => $association->id]);
 
-    $admin = makeUserWithRole($association, RoleAssociation::Admin);
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
     $soumise = NoteDeFrais::factory()->soumise()->create([
@@ -110,7 +110,7 @@ it('shows only Validee NDF on the validees tab', function (): void {
     TenantContext::boot($association);
     session(['current_association_id' => $association->id]);
 
-    $admin = makeUserWithRole($association, RoleAssociation::Admin);
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
     NoteDeFrais::factory()->validee()->create([
@@ -141,7 +141,7 @@ it('shows only Rejetee NDF on the rejetees tab', function (): void {
     TenantContext::boot($association);
     session(['current_association_id' => $association->id]);
 
-    $admin = makeUserWithRole($association, RoleAssociation::Admin);
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
     NoteDeFrais::factory()->create([
@@ -173,7 +173,7 @@ it('shows Soumise + Validee + Rejetee on the toutes tab (not Brouillon)', functi
     TenantContext::boot($association);
     session(['current_association_id' => $association->id]);
 
-    $admin = makeUserWithRole($association, RoleAssociation::Admin);
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
     NoteDeFrais::factory()->soumise()->create([
@@ -220,7 +220,7 @@ it('never shows Brouillon NDF in back-office even on toutes tab', function (): v
     TenantContext::boot($association);
     session(['current_association_id' => $association->id]);
 
-    $admin = makeUserWithRole($association, RoleAssociation::Admin);
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
     NoteDeFrais::factory()->create([
@@ -248,7 +248,7 @@ it('orders NDF by date descending by default', function (): void {
     TenantContext::boot($association);
     session(['current_association_id' => $association->id]);
 
-    $admin = makeUserWithRole($association, RoleAssociation::Admin);
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
     NoteDeFrais::factory()->soumise()->create([
@@ -285,7 +285,7 @@ it('does not show NDF from another association', function (): void {
     TenantContext::boot($assocA);
     session(['current_association_id' => $assocA->id]);
 
-    $admin = makeUserWithRole($assocA, RoleAssociation::Admin);
+    $admin = ndfIndexMakeUserWithRole($assocA, RoleAssociation::Admin);
 
     $tiersB = Tiers::factory()->create(['association_id' => $assocB->id]);
 
