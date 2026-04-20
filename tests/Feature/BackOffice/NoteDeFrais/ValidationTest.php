@@ -339,3 +339,37 @@ it('emits comptabilite.ndf.validated log with correct context', function (): voi
         )
         ->once();
 });
+
+// ---------------------------------------------------------------------------
+// Regression — lockForUpdate targets the correct NDF row
+// ---------------------------------------------------------------------------
+
+it('validates the targeted NDF without touching the other NDF in the same tenant', function (): void {
+    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+
+    $ndf1 = NoteDeFrais::factory()->soumise()->create();
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf1->id,
+        'sous_categorie_id' => $sousCategorie->id,
+        'montant' => '10.00',
+        'piece_jointe_path' => null,
+    ]);
+
+    $ndf2 = NoteDeFrais::factory()->soumise()->create();
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf2->id,
+        'sous_categorie_id' => $sousCategorie->id,
+        'montant' => '20.00',
+        'piece_jointe_path' => null,
+    ]);
+
+    // Validate only the second NDF
+    $this->service->valider($ndf2, $this->validationData);
+
+    $ndf1->refresh();
+    $ndf2->refresh();
+
+    expect($ndf2->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Validee->value);
+    expect($ndf1->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Soumise->value);
+    expect($ndf1->transaction_id)->toBeNull();
+});
