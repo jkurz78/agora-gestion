@@ -2,14 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Enums\StatutNoteDeFrais;
 use App\Models\Association;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Livewire;
 
 beforeEach(function () {
     TenantContext::clear();
@@ -105,7 +103,7 @@ it('index: bouton Modifier visible sur brouillon', function () {
         ->assertSeeText('Modifier');
 });
 
-it('index: bouton Consulter visible sur NDF soumise', function () {
+it('index: bouton Modifier visible sur NDF soumise', function () {
     $ndf = NoteDeFrais::factory()->soumise()->create([
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
@@ -113,7 +111,18 @@ it('index: bouton Consulter visible sur NDF soumise', function () {
 
     $this->get("/portail/{$this->asso->slug}/notes-de-frais")
         ->assertStatus(200)
-        ->assertSee("notes-de-frais/{$ndf->id}")
+        ->assertSee("notes-de-frais/{$ndf->id}/edit")
+        ->assertSeeText('Modifier');
+});
+
+it('index: bouton Consulter visible sur NDF validée', function () {
+    $ndf = NoteDeFrais::factory()->validee()->create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+    ]);
+
+    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+        ->assertStatus(200)
         ->assertSeeText('Consulter');
 });
 

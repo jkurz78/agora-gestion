@@ -181,18 +181,48 @@ it('saveDraft: refuse de mettre à jour un brouillon appartenant à un autre tie
 });
 
 // ---------------------------------------------------------------------------
-// 8. Refus update d'une NDF non-brouillon
+// 8. Update d'une NDF soumise → autorisé, statut revient à Brouillon
 // ---------------------------------------------------------------------------
 
-it('saveDraft: refuse de mettre à jour une NDF non-brouillon', function () {
+it('saveDraft: met à jour une NDF soumise et remet le statut à Brouillon', function () {
     $tiers = Tiers::factory()->create();
+    $sousCategorie = SousCategorie::factory()->create();
 
-    $ndf = NoteDeFrais::factory()->soumise()->create(['tiers_id' => $tiers->id]);
+    $ndf = NoteDeFrais::factory()->soumise()->create([
+        'tiers_id' => $tiers->id,
+        'libelle' => 'NDF soumise',
+    ]);
 
     $data = [
         'id' => $ndf->id,
         'date' => '2026-04-15',
-        'libelle' => 'Tentative édition soumise',
+        'libelle' => 'NDF soumise modifiée',
+        'lignes' => [
+            ['libelle' => 'Repas', 'montant' => 25.00, 'sous_categorie_id' => $sousCategorie->id, 'piece_jointe_path' => null],
+        ],
+    ];
+
+    $updated = makeService()->saveDraft($tiers, $data);
+
+    expect((int) $updated->id)->toBe((int) $ndf->id)
+        ->and($updated->fresh()->libelle)->toBe('NDF soumise modifiée')
+        ->and($updated->fresh()->statut)->toBe(StatutNoteDeFrais::Brouillon)
+        ->and($updated->fresh()->submitted_at)->toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// 8b. Refus update d'une NDF validée (statut read-only)
+// ---------------------------------------------------------------------------
+
+it('saveDraft: refuse de mettre à jour une NDF validée', function () {
+    $tiers = Tiers::factory()->create();
+
+    $ndf = NoteDeFrais::factory()->validee()->create(['tiers_id' => $tiers->id]);
+
+    $data = [
+        'id' => $ndf->id,
+        'date' => '2026-04-15',
+        'libelle' => 'Tentative édition validée',
         'lignes' => [],
     ];
 

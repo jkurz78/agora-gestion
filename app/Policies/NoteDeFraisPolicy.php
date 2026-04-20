@@ -32,7 +32,15 @@ final class NoteDeFraisPolicy
             return false;
         }
 
-        return (int) $user->id === (int) $noteDeFrais->tiers_id;
+        if ((int) $user->id !== (int) $noteDeFrais->tiers_id) {
+            return false;
+        }
+
+        // Brouillon et Soumise sont éditables — Rejetee/Validee/Payee sont read-only
+        return in_array($noteDeFrais->statut, [
+            StatutNoteDeFrais::Brouillon,
+            StatutNoteDeFrais::Soumise,
+        ], true);
     }
 
     public function delete(?Authenticatable $user, NoteDeFrais $noteDeFrais): Response|bool
@@ -45,7 +53,10 @@ final class NoteDeFraisPolicy
             return false;
         }
 
-        // Seul un brouillon peut être supprimé
-        return $noteDeFrais->statut === StatutNoteDeFrais::Brouillon;
+        // Brouillon et Soumise peuvent être supprimées — Rejetee/Validee/Payee non
+        return in_array($noteDeFrais->statut, [
+            StatutNoteDeFrais::Brouillon,
+            StatutNoteDeFrais::Soumise,
+        ], true);
     }
 }
