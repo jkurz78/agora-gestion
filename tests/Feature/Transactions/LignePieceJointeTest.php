@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 use App\Livewire\TransactionForm;
 use App\Models\Association;
+use App\Models\Categorie;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
-use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
@@ -109,7 +109,7 @@ it('controller retourne 404 pour une transaction hors tenant (TenantScope)', fun
 // ─────────────────────────────────────────────────────────────────────────────
 it('persiste la PJ de ligne lors du create', function () {
     $sousCategorie = SousCategorie::factory()
-        ->for(\App\Models\Categorie::factory()->depense()->create(['association_id' => $this->association->id]), 'categorie')
+        ->for(Categorie::factory()->depense()->create(['association_id' => $this->association->id]), 'categorie')
         ->create(['association_id' => $this->association->id]);
 
     $file = UploadedFile::fake()->create('recu.pdf', 100, 'application/pdf');

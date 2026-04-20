@@ -6,7 +6,7 @@ use App\Enums\NoteDeFraisLigneType;
 use App\Services\NoteDeFrais\LigneTypes\StandardLigneType;
 
 beforeEach(function () {
-    $this->strategy = new StandardLigneType();
+    $this->strategy = new StandardLigneType;
 });
 
 it('retourne la clé Standard', function () {

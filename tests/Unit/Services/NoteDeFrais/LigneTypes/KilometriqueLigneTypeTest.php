@@ -11,7 +11,7 @@ use App\Tenant\TenantContext;
 use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
-    $this->strategy = new KilometriqueLigneType();
+    $this->strategy = new KilometriqueLigneType;
 });
 
 it('retourne la clé Kilometrique', function () {

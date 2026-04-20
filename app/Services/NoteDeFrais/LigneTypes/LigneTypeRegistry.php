@@ -15,8 +15,8 @@ final class LigneTypeRegistry
     {
         if (! isset($this->cache[$type->value])) {
             $this->cache[$type->value] = match ($type) {
-                NoteDeFraisLigneType::Standard => new StandardLigneType(),
-                NoteDeFraisLigneType::Kilometrique => new KilometriqueLigneType(),
+                NoteDeFraisLigneType::Standard => new StandardLigneType,
+                NoteDeFraisLigneType::Kilometrique => new KilometriqueLigneType,
             };
         }
 

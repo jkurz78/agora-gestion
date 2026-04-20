@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\NoteDeFraisLigneType;
 use App\Models\Association;
 use App\Models\Categorie;
-use App\Models\NoteDeFrais;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;

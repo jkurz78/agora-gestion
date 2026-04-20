@@ -8,12 +8,12 @@ use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Services\NoteDeFrais\LigneTypes\StandardLigneType;
 
 it('résout Standard vers StandardLigneType', function () {
-    $registry = new LigneTypeRegistry();
+    $registry = new LigneTypeRegistry;
     expect($registry->for(NoteDeFraisLigneType::Standard))->toBeInstanceOf(StandardLigneType::class);
 });
 
 it('résout Kilometrique vers KilometriqueLigneType', function () {
-    $registry = new LigneTypeRegistry();
+    $registry = new LigneTypeRegistry;
     expect($registry->for(NoteDeFraisLigneType::Kilometrique))->toBeInstanceOf(KilometriqueLigneType::class);
 });
 
