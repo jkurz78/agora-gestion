@@ -166,6 +166,14 @@ it('confirme la ligne km et l\'ajoute au tableau des lignes', function () {
     expect((float) $component->lignes[0]['montant'])->toBe(267.12);
 });
 
+it('affiche les deux boutons "Ajouter"', function () {
+    $response = $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle");
+
+    $response->assertStatus(200);
+    $response->assertSee('Ajouter une ligne de dépense');
+    $response->assertSee('Ajouter un déplacement');
+});
+
 it('recharge une ligne km existante en édition avec ses métadonnées', function () {
     $ndf = NoteDeFrais::create([
         'association_id' => $this->asso->id,
