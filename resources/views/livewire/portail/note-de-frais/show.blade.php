@@ -30,6 +30,13 @@
         <div class="alert alert-success">{{ session('portail.success') }}</div>
     @endif
 
+    @if ($statut->value === 'rejetee' && $ndf->motif_rejet)
+        <div class="alert alert-danger mb-3">
+            <strong><i class="bi bi-x-octagon me-1"></i>Motif de rejet :</strong>
+            {{ $ndf->motif_rejet }}
+        </div>
+    @endif
+
     <div class="card mb-3">
         <div class="card-body">
             <dl class="row mb-0">
@@ -38,11 +45,6 @@
 
                 <dt class="col-sm-3">Libellé</dt>
                 <dd class="col-sm-9">{{ $ndf->libelle }}</dd>
-
-                @if ($statut->value === 'rejetee' && $ndf->motif_rejet)
-                    <dt class="col-sm-3 text-danger">Motif de rejet</dt>
-                    <dd class="col-sm-9 text-danger">{{ $ndf->motif_rejet }}</dd>
-                @endif
 
                 @if ($statut->value === 'payee')
                     <dt class="col-sm-3">Date de validation</dt>
