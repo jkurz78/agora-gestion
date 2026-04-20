@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Portail\NoteDeFrais;
 
+use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutNoteDeFrais;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Tiers;
+use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
 use DomainException;
 use Illuminate\Support\Facades\DB;
@@ -26,12 +28,16 @@ final class NoteDeFraisService
      *     date: string,
      *     libelle: string,
      *     lignes: list<array{
+     *         type?: string,
      *         libelle: string|null,
      *         montant: float|int,
      *         sous_categorie_id: int|null,
      *         operation_id?: int|null,
      *         seance?: int|null,
      *         piece_jointe_path: string|null,
+     *         cv_fiscaux?: int|null,
+     *         distance_km?: float|int|null,
+     *         bareme_eur_km?: float|null,
      *     }>
      * }  $data
      */
@@ -83,12 +89,26 @@ final class NoteDeFraisService
                 ]);
             }
 
+            $registry = app(LigneTypeRegistry::class);
+
             foreach ($data['lignes'] as $ligneData) {
+                $typeValue = $ligneData['type'] ?? NoteDeFraisLigneType::Standard->value;
+                $type = NoteDeFraisLigneType::from($typeValue);
+                $strategy = $registry->for($type);
+
+                $montant = $strategy->computeMontant($ligneData);
+                $metadata = $strategy->metadata($ligneData);
+                $sousCategorieId = $strategy->resolveSousCategorieId(
+                    isset($ligneData['sous_categorie_id']) ? (int) $ligneData['sous_categorie_id'] : null
+                );
+
                 NoteDeFraisLigne::create([
                     'note_de_frais_id' => $ndf->id,
+                    'type' => $type->value,
                     'libelle' => $ligneData['libelle'] ?? null,
-                    'montant' => $ligneData['montant'],
-                    'sous_categorie_id' => $ligneData['sous_categorie_id'] ?? null,
+                    'montant' => $montant,
+                    'metadata' => $metadata !== [] ? $metadata : null,
+                    'sous_categorie_id' => $sousCategorieId,
                     'operation_id' => $ligneData['operation_id'] ?? null,
                     'seance' => $ligneData['seance'] ?? null,
                     'piece_jointe_path' => $ligneData['piece_jointe_path'] ?? null,
