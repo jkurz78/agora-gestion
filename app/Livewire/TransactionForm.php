@@ -208,6 +208,7 @@ final class TransactionForm extends Component
             'piece_jointe_upload' => null,
             'piece_jointe_remove' => false,
             'piece_jointe_existing_url' => null,
+            'piece_jointe_filename' => null,
         ];
     }
 
@@ -364,6 +365,9 @@ final class TransactionForm extends Component
             'piece_jointe_remove' => false,
             'piece_jointe_existing_url' => $ligne->piece_jointe_path
                 ? route('comptabilite.transactions.piece-jointe-ligne', ['transaction' => $id, 'ligne' => $ligne->id])
+                : null,
+            'piece_jointe_filename' => $ligne->piece_jointe_path
+                ? basename($ligne->piece_jointe_path)
                 : null,
         ])->toArray();
 
@@ -747,6 +751,7 @@ final class TransactionForm extends Component
                     'piece_jointe_upload' => null,
                     'piece_jointe_remove' => false,
                     'piece_jointe_existing_url' => null,
+                    'piece_jointe_filename' => null,
                 ];
             }
         }
