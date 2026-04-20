@@ -66,7 +66,9 @@
                     @foreach ($lignes as $i => $ligne)
                         <tr>
                             <td class="text-muted small">{{ $i + 1 }}</td>
-                            <td>{{ $ligne['libelle'] ?: '—' }}</td>
+                            <td>
+                                @include('livewire.portail.note-de-frais.partials.ligne-details', ['ligne' => $ligne])
+                            </td>
                             <td>
                                 @php
                                     $scNom = $sousCategories->find($ligne['sous_categorie_id'])?->nom ?? '—';

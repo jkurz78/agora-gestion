@@ -174,6 +174,31 @@ it('affiche les deux boutons "Ajouter"', function () {
     $response->assertSee('Ajouter un déplacement');
 });
 
+it('affiche badge Km et sous-ligne d\'infos pour une ligne kilometrique existante', function () {
+    $ndf = App\Models\NoteDeFrais::create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+        'date' => '2026-04-20',
+        'libelle' => 'NDF avril',
+        'statut' => App\Enums\StatutNoteDeFrais::Brouillon->value,
+    ]);
+
+    App\Models\NoteDeFraisLigne::create([
+        'note_de_frais_id' => $ndf->id,
+        'type' => App\Enums\NoteDeFraisLigneType::Kilometrique->value,
+        'libelle' => 'Paris-Rennes AG',
+        'montant' => 267.12,
+        'metadata' => ['cv_fiscaux' => 5, 'distance_km' => 420, 'bareme_eur_km' => 0.636],
+    ]);
+
+    $this->get(route('portail.ndf.edit', ['association' => $this->asso->slug, 'noteDeFrais' => $ndf->id]))
+        ->assertSeeText('Km')
+        ->assertSeeText('Paris-Rennes AG')
+        ->assertSeeText('5 CV')
+        ->assertSeeText('420 km')
+        ->assertSeeText('0,636');
+});
+
 it('recharge une ligne km existante en édition avec ses métadonnées', function () {
     $ndf = NoteDeFrais::create([
         'association_id' => $this->asso->id,

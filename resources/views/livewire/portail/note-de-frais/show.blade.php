@@ -76,7 +76,17 @@
                 <tbody>
                     @foreach ($ndf->lignes as $ligne)
                         <tr>
-                            <td>{{ $ligne->libelle }}</td>
+                            <td>
+                                @include('livewire.portail.note-de-frais.partials.ligne-details', [
+                                    'ligne' => [
+                                        'type' => $ligne->type->value,
+                                        'libelle' => $ligne->libelle,
+                                        'cv_fiscaux' => $ligne->metadata['cv_fiscaux'] ?? null,
+                                        'distance_km' => $ligne->metadata['distance_km'] ?? null,
+                                        'bareme_eur_km' => $ligne->metadata['bareme_eur_km'] ?? null,
+                                    ]
+                                ])
+                            </td>
                             <td>{{ $ligne->sousCategorie?->nom ?? '—' }}</td>
                             <td class="text-end">{{ number_format((float) $ligne->montant, 2, ',', ' ') }} €</td>
                             <td>
