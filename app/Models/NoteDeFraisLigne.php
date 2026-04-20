@@ -18,8 +18,12 @@ final class NoteDeFraisLigne extends Model
     protected static function booted(): void
     {
         self::deleting(function (self $ligne): void {
-            if ($ligne->piece_jointe_path && Storage::disk('local')->exists($ligne->piece_jointe_path)) {
-                Storage::disk('local')->delete($ligne->piece_jointe_path);
+            try {
+                if ($ligne->piece_jointe_path && Storage::disk('local')->exists($ligne->piece_jointe_path)) {
+                    Storage::disk('local')->delete($ligne->piece_jointe_path);
+                }
+            } catch (\Throwable) {
+                // ignore storage errors to avoid cascading failures on line removal
             }
         });
     }
