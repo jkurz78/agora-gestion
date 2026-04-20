@@ -103,6 +103,12 @@ final class TransactionUniverselle extends Component
         $range = $exerciceService->dateRange($ex);
         $this->filterDateDebut = $range['start']->toDateString();
         $this->filterDateFin = $range['end']->toDateString();
+
+        // Auto-ouverture du form d'édition via query string ?edit={id}
+        $editId = (int) request()->query('edit');
+        if ($editId > 0) {
+            $this->dispatch('edit-transaction', id: $editId);
+        }
     }
 
     // Presets date
