@@ -30,6 +30,8 @@ final class SousCategorieList extends Component
 
     public bool $pour_inscriptions = false;
 
+    public bool $pour_frais_kilometriques = false;
+
     // ── Flash message ────────────────────────────────────────────
     public string $flashMessage = '';
 
@@ -67,6 +69,7 @@ final class SousCategorieList extends Component
         $this->pour_dons = $sc->pour_dons;
         $this->pour_cotisations = $sc->pour_cotisations;
         $this->pour_inscriptions = $sc->pour_inscriptions;
+        $this->pour_frais_kilometriques = $sc->pour_frais_kilometriques;
 
         $this->showModal = true;
     }
@@ -80,6 +83,7 @@ final class SousCategorieList extends Component
             'pour_dons' => 'boolean',
             'pour_cotisations' => 'boolean',
             'pour_inscriptions' => 'boolean',
+            'pour_frais_kilometriques' => 'boolean',
         ]);
 
         $data = [
@@ -89,6 +93,7 @@ final class SousCategorieList extends Component
             'pour_dons' => $this->pour_dons,
             'pour_cotisations' => $this->pour_cotisations,
             'pour_inscriptions' => $this->pour_inscriptions,
+            'pour_frais_kilometriques' => $this->pour_frais_kilometriques,
         ];
 
         if ($this->editingId !== null) {
@@ -105,7 +110,7 @@ final class SousCategorieList extends Component
 
     public function toggleFlag(int $id, string $flag): void
     {
-        if (! in_array($flag, ['pour_dons', 'pour_cotisations', 'pour_inscriptions'], true)) {
+        if (! in_array($flag, ['pour_dons', 'pour_cotisations', 'pour_inscriptions', 'pour_frais_kilometriques'], true)) {
             return;
         }
 
@@ -167,6 +172,7 @@ final class SousCategorieList extends Component
         $this->pour_dons = false;
         $this->pour_cotisations = false;
         $this->pour_inscriptions = false;
+        $this->pour_frais_kilometriques = false;
         $this->flashMessage = '';
         $this->flashType = '';
         $this->resetValidation();
