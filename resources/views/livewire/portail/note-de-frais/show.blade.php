@@ -97,7 +97,7 @@
         </a>
 
         <div class="d-flex gap-2">
-            @if ($statut->value === 'brouillon')
+            @if (in_array($statut->value, ['brouillon', 'soumise']))
                 <a href="{{ route('portail.ndf.edit', ['association' => $association->slug, 'noteDeFrais' => $ndf->id]) }}"
                    class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-pencil me-1"></i>Modifier
@@ -115,7 +115,7 @@
     </div>
 
     {{-- Modale de confirmation de suppression --}}
-    @if ($statut->value === 'brouillon')
+    @if (in_array($statut->value, ['brouillon', 'soumise']))
         <div class="modal fade" id="modalSupprimer" tabindex="-1" aria-labelledby="modalSupprimerLabel" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">

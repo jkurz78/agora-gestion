@@ -47,14 +47,25 @@ final class NoteDeFraisService
                     throw new DomainException('Cette note de frais n\'appartient pas à ce tiers.');
                 }
 
-                if ($ndf->statut !== StatutNoteDeFrais::Brouillon) {
-                    throw new DomainException('Seul un brouillon peut être modifié.');
+                $editableStatuts = [StatutNoteDeFrais::Brouillon, StatutNoteDeFrais::Soumise];
+                if (! in_array($ndf->statut, $editableStatuts, true)) {
+                    throw new DomainException('Seul un brouillon ou une NDF soumise peut être modifié(e).');
                 }
+
+                $wasSubmitted = $ndf->statut === StatutNoteDeFrais::Soumise;
 
                 $ndf->update([
                     'date' => $data['date'],
                     'libelle' => $data['libelle'] ?? '',
                 ]);
+
+                // Si la NDF était soumise, on remet en brouillon : l'utilisateur doit re-soumettre
+                if ($wasSubmitted) {
+                    $ndf->update([
+                        'statut' => StatutNoteDeFrais::Brouillon->value,
+                        'submitted_at' => null,
+                    ]);
+                }
 
                 // Remplace toutes les lignes existantes
                 $ndf->lignes()->delete();
@@ -170,8 +181,9 @@ final class NoteDeFraisService
      */
     public function delete(NoteDeFrais $ndf): void
     {
-        if ($ndf->statut !== StatutNoteDeFrais::Brouillon) {
-            throw new DomainException('Seul un brouillon peut être supprimé.');
+        $deletableStatuts = [StatutNoteDeFrais::Brouillon, StatutNoteDeFrais::Soumise];
+        if (! in_array($ndf->statut, $deletableStatuts, true)) {
+            throw new DomainException('Seul un brouillon ou une NDF soumise peut être supprimé(e).');
         }
 
         DB::transaction(function () use ($ndf): void {

@@ -92,18 +92,17 @@ it('delete: fonctionne quand les lignes n\'ont pas de PJ', function () {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Refus si NDF non-brouillon (soumise)
+// 4. Suppression d'une NDF soumise → autorisé depuis Changement 1
 // ---------------------------------------------------------------------------
 
-it('delete: refuse de supprimer une NDF soumise', function () {
+it('delete: supprime (softdelete) une NDF soumise', function () {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->soumise()->create(['tiers_id' => $tiers->id]);
 
-    expect(fn () => deleteService()->delete($ndf))
-        ->toThrow(DomainException::class);
+    deleteService()->delete($ndf);
 
-    // NDF toujours présente
-    expect(NoteDeFrais::find($ndf->id))->not->toBeNull();
+    expect(NoteDeFrais::find($ndf->id))->toBeNull()
+        ->and(NoteDeFrais::withTrashed()->find($ndf->id)?->deleted_at)->not->toBeNull();
 });
 
 // ---------------------------------------------------------------------------

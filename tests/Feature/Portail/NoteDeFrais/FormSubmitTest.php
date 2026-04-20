@@ -41,17 +41,19 @@ it('form edit: brouillon existant pré-remplit le formulaire', function () {
 });
 
 // ---------------------------------------------------------------------------
-// Test 2 : Édition NDF soumise → 403
+// Test 2 : Édition NDF soumise → 200 (autorisé depuis Changement 1)
 // ---------------------------------------------------------------------------
 
-it('form edit: NDF soumise retourne 403', function () {
+it('form edit: NDF soumise est éditable (200)', function () {
     $ndf = NoteDeFrais::factory()->soumise()->create([
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
+        'libelle' => 'Frais soumis éditables',
     ]);
 
     $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}/edit")
-        ->assertStatus(403);
+        ->assertStatus(200)
+        ->assertSee('Modifier la note de frais');
 });
 
 // ---------------------------------------------------------------------------
@@ -100,7 +102,7 @@ it('form submit: brouillon valide soumis passe à statut Soumise', function () {
     TenantContext::boot($this->asso);
     Auth::guard('tiers-portail')->login($this->tiers);
 
-    $component = new Form();
+    $component = new Form;
     $component->mount($this->asso, $ndf);
     $component->submit();
 
@@ -137,7 +139,7 @@ it('form submit: date future retourne erreur et laisse en brouillon', function (
     TenantContext::boot($this->asso);
     Auth::guard('tiers-portail')->login($this->tiers);
 
-    $component = new Form();
+    $component = new Form;
     $component->mount($this->asso, $ndf);
     $component->submit();
 
@@ -169,7 +171,7 @@ it('form submit: ligne sans pièce jointe retourne erreur', function () {
     TenantContext::boot($this->asso);
     Auth::guard('tiers-portail')->login($this->tiers);
 
-    $component = new Form();
+    $component = new Form;
     $component->mount($this->asso, $ndf);
     $component->submit();
 

@@ -6,10 +6,9 @@ use App\Enums\StatutNoteDeFrais;
 use App\Livewire\Portail\NoteDeFrais\Show;
 use App\Models\Association;
 use App\Models\NoteDeFrais;
-use App\Models\NoteDeFraisLigne;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
@@ -40,10 +39,10 @@ it('show: brouillon du tiers affiché avec bouton Supprimer', function () {
 });
 
 // ---------------------------------------------------------------------------
-// Test 2 : Show soumise → affichée sans bouton Supprimer
+// Test 2 : Show soumise → affichée AVEC bouton Modifier et Supprimer (Changement 1)
 // ---------------------------------------------------------------------------
 
-it('show: NDF soumise affichée sans bouton Supprimer', function () {
+it('show: NDF soumise affichée avec boutons Modifier et Supprimer', function () {
     $ndf = NoteDeFrais::factory()->soumise()->create([
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
@@ -53,7 +52,8 @@ it('show: NDF soumise affichée sans bouton Supprimer', function () {
     $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSeeText('Soumise')
-        ->assertDontSee('Supprimer');
+        ->assertSee('Modifier')
+        ->assertSee('Supprimer');
 });
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ it('show: delete brouillon softdelete et redirige', function () {
     TenantContext::boot($this->asso);
     Auth::guard('tiers-portail')->login($this->tiers);
 
-    $component = new Show();
+    $component = new Show;
     $component->association = $this->asso;
     $component->noteDeFrais = $ndf;
 
@@ -128,27 +128,47 @@ it('show: delete brouillon softdelete et redirige', function () {
 });
 
 // ---------------------------------------------------------------------------
-// Test 7 : Delete NDF soumise → refusé (DomainException)
+// Test 7 : Delete NDF soumise → autorisé depuis Changement 1
 // ---------------------------------------------------------------------------
 
-it('show: delete NDF soumise refusé via policy', function () {
+it('show: delete NDF soumise autorisé et softdelete', function () {
     $ndf = NoteDeFrais::factory()->soumise()->create([
         'association_id' => $this->asso->id,
         'tiers_id' => $this->tiers->id,
     ]);
 
-    // The policy deny for delete when not brouillon
-    // Verify via HTTP route that delete of soumise fails
-    // Since delete is called via Livewire action, we test the component directly
     TenantContext::boot($this->asso);
     Auth::guard('tiers-portail')->login($this->tiers);
 
-    $component = new Show();
+    $component = new Show;
+    $component->association = $this->asso;
+    $component->noteDeFrais = $ndf;
+
+    $component->delete();
+
+    $ndf->refresh();
+    expect($ndf->trashed())->toBeTrue();
+});
+
+// ---------------------------------------------------------------------------
+// Test 8 : Delete NDF validée → refusé (policy refus)
+// ---------------------------------------------------------------------------
+
+it('show: delete NDF validée refusé via policy', function () {
+    $ndf = NoteDeFrais::factory()->validee()->create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+    ]);
+
+    TenantContext::boot($this->asso);
+    Auth::guard('tiers-portail')->login($this->tiers);
+
+    $component = new Show;
     $component->association = $this->asso;
     $component->noteDeFrais = $ndf;
 
     expect(fn () => $component->delete())
-        ->toThrow(\Illuminate\Auth\Access\AuthorizationException::class);
+        ->toThrow(AuthorizationException::class);
 
     $ndf->refresh();
     expect($ndf->trashed())->toBeFalse();

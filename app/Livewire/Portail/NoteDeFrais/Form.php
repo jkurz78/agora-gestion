@@ -14,6 +14,7 @@ use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
+use App\Services\Portail\NoteDeFrais\JustificatifAnalyser;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -40,6 +41,23 @@ final class Form extends Component
     /** @var list<array<string, mixed>> */
     public array $lignes = [];
 
+    // ---------------------------------------------------------------------------
+    // Wizard d'ajout de ligne
+    // ---------------------------------------------------------------------------
+
+    /** 0 = fermé, 1-3 = étape courante du wizard */
+    public int $wizardStep = 0;
+
+    /** @var array{justif: mixed, libelle: string, montant: string, sous_categorie_id: int|null, operation_id: int|null, seance_id: int|null} */
+    public array $draftLigne = [
+        'justif' => null,
+        'libelle' => '',
+        'montant' => '',
+        'sous_categorie_id' => null,
+        'operation_id' => null,
+        'seance_id' => null,
+    ];
+
     public function mount(Association $association, ?NoteDeFrais $noteDeFrais = null): void
     {
         $this->association = $association;
@@ -47,9 +65,10 @@ final class Form extends Component
         if ($noteDeFrais !== null) {
             Gate::forUser(Auth::guard('tiers-portail')->user())->authorize('update', $noteDeFrais);
 
-            // Seul un brouillon peut être édité
-            if ($noteDeFrais->statut !== StatutNoteDeFrais::Brouillon) {
-                abort(403, 'Seul un brouillon peut être modifié.');
+            // Brouillon et Soumise peuvent être édités — les autres statuts sont refusés par la policy
+            $editableStatuts = [StatutNoteDeFrais::Brouillon, StatutNoteDeFrais::Soumise];
+            if (! in_array($noteDeFrais->statut, $editableStatuts, true)) {
+                abort(403, 'Seul un brouillon ou une NDF soumise peut être modifié(e).');
             }
 
             $this->noteDeFrais = $noteDeFrais;
@@ -67,9 +86,104 @@ final class Form extends Component
             ])->all();
         } else {
             $this->dateInput = now()->format('Y-m-d');
-            $this->addLigne();
+            // Pas de ligne par défaut — l'utilisateur ajoute ses lignes via le wizard
         }
     }
+
+    // ---------------------------------------------------------------------------
+    // Wizard methods
+    // ---------------------------------------------------------------------------
+
+    public function openLigneWizard(): void
+    {
+        $this->resetDraftLigne();
+        $this->wizardStep = 1;
+        $this->dispatch('ligne-wizard-opened');
+    }
+
+    public function cancelLigneWizard(): void
+    {
+        $this->resetDraftLigne();
+        $this->wizardStep = 0;
+        $this->dispatch('ligne-wizard-closed');
+    }
+
+    public function wizardNext(): void
+    {
+        if ($this->wizardStep === 1) {
+            $this->validateOnly('draftLigne.justif', [
+                'draftLigne.justif' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,heic', 'max:5120'],
+            ], [
+                'draftLigne.justif.required' => 'Un justificatif est obligatoire.',
+                'draftLigne.justif.file' => 'Le justificatif doit être un fichier.',
+                'draftLigne.justif.mimes' => 'Le justificatif doit être un PDF, JPG, PNG ou HEIC.',
+                'draftLigne.justif.max' => 'Le justificatif ne doit pas dépasser 5 Mo.',
+            ]);
+
+            /** @var TemporaryUploadedFile $justif */
+            $justif = $this->draftLigne['justif'];
+            $hints = app(JustificatifAnalyser::class)->analyse($justif);
+
+            if ($hints['libelle']) {
+                $this->draftLigne['libelle'] = $hints['libelle'];
+            }
+
+            if ($hints['montant']) {
+                $this->draftLigne['montant'] = (string) $hints['montant'];
+            }
+
+            $this->wizardStep = 2;
+
+            return;
+        }
+
+        if ($this->wizardStep === 2) {
+            $this->validateOnly('draftLigne.montant', [
+                'draftLigne.montant' => ['required', 'numeric', 'gt:0'],
+            ], [
+                'draftLigne.montant.required' => 'Le montant est obligatoire.',
+                'draftLigne.montant.numeric' => 'Le montant doit être un nombre.',
+                'draftLigne.montant.gt' => 'Le montant doit être supérieur à zéro.',
+            ]);
+
+            $this->wizardStep = 3;
+        }
+    }
+
+    public function wizardPrev(): void
+    {
+        if ($this->wizardStep > 1) {
+            $this->wizardStep--;
+        }
+    }
+
+    public function wizardConfirm(): void
+    {
+        $this->validateOnly('draftLigne.sous_categorie_id', [
+            'draftLigne.sous_categorie_id' => ['required'],
+        ], [
+            'draftLigne.sous_categorie_id.required' => 'La sous-catégorie est obligatoire.',
+        ]);
+
+        $this->lignes[] = [
+            'id' => null,
+            'sous_categorie_id' => $this->draftLigne['sous_categorie_id'],
+            'operation_id' => $this->draftLigne['operation_id'],
+            'seance_id' => $this->draftLigne['seance_id'],
+            'libelle' => $this->draftLigne['libelle'],
+            'montant' => $this->draftLigne['montant'],
+            'piece_jointe_path' => null,
+            'justif' => $this->draftLigne['justif'],
+        ];
+
+        $this->resetDraftLigne();
+        $this->wizardStep = 0;
+        $this->dispatch('ligne-wizard-closed');
+    }
+
+    // ---------------------------------------------------------------------------
+    // Ligne methods (inline)
+    // ---------------------------------------------------------------------------
 
     public function addLigne(): void
     {
@@ -238,5 +352,20 @@ final class Form extends Component
 
             $ligne->update(['piece_jointe_path' => $path]);
         }
+    }
+
+    private function resetDraftLigne(): void
+    {
+        $this->draftLigne = [
+            'justif' => null,
+            'libelle' => '',
+            'montant' => '',
+            'sous_categorie_id' => null,
+            'operation_id' => null,
+            'seance_id' => null,
+        ];
+        $this->resetErrorBag('draftLigne.justif');
+        $this->resetErrorBag('draftLigne.montant');
+        $this->resetErrorBag('draftLigne.sous_categorie_id');
     }
 }
