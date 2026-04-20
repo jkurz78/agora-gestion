@@ -22,6 +22,7 @@ final class SousCategorie extends TenantModel
         'pour_dons',
         'pour_cotisations',
         'pour_inscriptions',
+        'pour_frais_kilometriques',
     ];
 
     protected function casts(): array
@@ -31,6 +32,7 @@ final class SousCategorie extends TenantModel
             'pour_dons' => 'boolean',
             'pour_cotisations' => 'boolean',
             'pour_inscriptions' => 'boolean',
+            'pour_frais_kilometriques' => 'boolean',
         ];
     }
 
