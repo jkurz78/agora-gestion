@@ -84,7 +84,7 @@
                                         <span class="badge bg-success">{{ $statut->label() }}</span>
                                         @break
                                     @case('payee')
-                                        <span class="badge bg-success text-dark">{{ $statut->label() }}</span>
+                                        <span class="badge bg-success">{{ $statut->label() }}</span>
                                         @break
                                     @default
                                         <span class="badge bg-secondary">{{ $statut->label() }}</span>
