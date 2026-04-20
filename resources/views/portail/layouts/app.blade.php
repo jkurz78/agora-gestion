@@ -1,6 +1,7 @@
 @php
-    $nomAsso  = $portailAssociation->nom;
-    $logoUrl  = route('portail.logo', ['association' => $portailAssociation->slug]);
+    $nomAsso = $portailAssociation->nom;
+    $logoUrl = route('portail.logo', ['association' => $portailAssociation->slug]);
+    $contentClass = $contentClass ?? 'col-lg-11 col-xl-10';
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -14,11 +15,11 @@
     @livewireStyles
 </head>
 <body class="bg-light">
-    <div class="container">
-        <div class="row justify-content-center mt-5">
-            <div class="col-md-5">
+    <div class="container-xl">
+        <div class="row justify-content-center mt-4 mt-md-5">
+            <div class="{{ $contentClass }}">
                 <div class="text-center mb-4">
-                    <img src="{{ $logoUrl }}" alt="{{ $nomAsso }}" height="100" class="mb-3">
+                    <img src="{{ $logoUrl }}" alt="{{ $nomAsso }}" height="80" class="mb-2">
                     <h2 class="mb-0">{{ $nomAsso }}</h2>
                     <p class="text-muted mb-0">Portail</p>
                 </div>
@@ -31,7 +32,7 @@
         </div>
     </div>
     <div class="text-center mt-4 mb-3">
-        <img src="{{ asset('images/agora-gestion.svg') }}" alt="AgoraGestion" height="80" class="opacity-75 d-block mx-auto">
+        <img src="{{ asset('images/agora-gestion.svg') }}" alt="AgoraGestion" height="60" class="opacity-75 d-block mx-auto">
         <small class="text-muted">{{ config('version.tag', '') }}</small>
     </div>
 

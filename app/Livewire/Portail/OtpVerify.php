@@ -103,6 +103,6 @@ final class OtpVerify extends Component
     public function render(): View
     {
         return view('livewire.portail.otp-verify')
-            ->layout('portail.layouts.app');
+            ->layout('portail.layouts.app', ['contentClass' => 'col-md-6 col-lg-5']);
     }
 }
