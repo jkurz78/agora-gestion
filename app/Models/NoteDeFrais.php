@@ -39,12 +39,18 @@ final class NoteDeFrais extends TenantModel
     }
 
     /**
-     * Accessor for statut: returns Payee when the linked transaction is Pointe
-     * (bank-reconciled = effectively paid), otherwise casts from DB value.
+     * Accessor for statut: returns Payee when the linked transaction is Recu or Pointe
+     * (payment received or bank-reconciled = effectively paid), otherwise casts from DB value.
      */
     public function getStatutAttribute(mixed $value): StatutNoteDeFrais
     {
-        if ($value === 'validee' && $this->transaction?->statut_reglement === StatutReglement::Pointe) {
+        if ($value === 'validee'
+            && in_array(
+                $this->transaction?->statut_reglement,
+                [StatutReglement::Recu, StatutReglement::Pointe],
+                true
+            )
+        ) {
             return StatutNoteDeFrais::Payee;
         }
 

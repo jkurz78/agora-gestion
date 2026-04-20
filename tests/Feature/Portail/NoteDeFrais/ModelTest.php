@@ -279,7 +279,20 @@ it('accessor: statut returns Payee when linked transaction statut_reglement is P
     expect($ndf->statut)->toBe(StatutNoteDeFrais::Payee);
 });
 
-it('accessor: statut returns Validee when linked transaction is not Pointe', function () {
+it('accessor: statut returns Payee when linked transaction statut_reglement is Recu', function () {
+    $transaction = Transaction::factory()->create([
+        'statut_reglement' => StatutReglement::Recu,
+    ]);
+
+    $ndf = NoteDeFrais::factory()->create([
+        'statut' => 'validee',
+        'transaction_id' => $transaction->id,
+    ]);
+
+    expect($ndf->statut)->toBe(StatutNoteDeFrais::Payee);
+});
+
+it('accessor: statut returns Validee when linked transaction statut_reglement is EnAttente', function () {
     $transaction = Transaction::factory()->create([
         'statut_reglement' => StatutReglement::EnAttente,
     ]);
