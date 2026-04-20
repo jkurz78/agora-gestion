@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 beforeEach(function (): void {
-    $this->service = new NoteDeFraisValidationService;
+    $this->service = app(NoteDeFraisValidationService::class);
 });
 
 it('rejects a soumise ndf with a non-empty motif', function (): void {
