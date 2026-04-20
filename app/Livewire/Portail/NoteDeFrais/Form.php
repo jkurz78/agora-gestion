@@ -216,6 +216,19 @@ final class Form extends Component
         }
     }
 
+    public function deleteNdf(): void
+    {
+        if ($this->noteDeFrais === null) {
+            return;
+        }
+
+        Gate::forUser(Auth::guard('tiers-portail')->user())->authorize('delete', $this->noteDeFrais);
+        app(NoteDeFraisService::class)->delete($this->noteDeFrais);
+
+        session()->flash('portail.success', 'Note de frais supprimée.');
+        $this->redirectRoute('portail.ndf.index', ['association' => $this->association->slug]);
+    }
+
     public function getTotalProperty(): float
     {
         $total = 0.0;
@@ -273,10 +286,7 @@ final class Form extends Component
         }
 
         session()->flash('portail.success', 'Note de frais soumise.');
-        $this->redirectRoute('portail.ndf.show', [
-            'association' => $this->association->slug,
-            'noteDeFrais' => $ndf->id,
-        ]);
+        $this->redirectRoute('portail.ndf.index', ['association' => $this->association->slug]);
     }
 
     public function render(): View

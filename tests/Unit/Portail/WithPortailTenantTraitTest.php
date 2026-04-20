@@ -21,7 +21,7 @@ it('boots the TenantContext from the component association', function () {
     };
     $component->association = $asso;
 
-    $component->bootWithPortailTenant();
+    $component->bootedWithPortailTenant();
 
     expect(TenantContext::currentId())->toBe($asso->id);
 });
@@ -34,7 +34,7 @@ it('does not boot if association is not set', function () {
         public ?Association $association = null;
     };
 
-    $component->bootWithPortailTenant();
+    $component->bootedWithPortailTenant();
 
     expect(TenantContext::hasBooted())->toBeFalse();
 });

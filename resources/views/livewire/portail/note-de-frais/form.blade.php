@@ -127,6 +127,14 @@
             <i class="bi bi-arrow-left me-1"></i>Annuler
         </a>
         <div class="d-flex gap-2">
+            @if ($noteDeFrais)
+                <button type="button"
+                        class="btn btn-outline-danger btn-sm"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalSupprimerNdf">
+                    <i class="bi bi-trash me-1"></i>Supprimer
+                </button>
+            @endif
             <button type="button" wire:click="saveDraft" class="btn btn-outline-primary btn-sm">
                 <i class="bi bi-save me-1"></i>Enregistrer brouillon
             </button>
@@ -135,6 +143,29 @@
             </button>
         </div>
     </div>
+
+    @if ($noteDeFrais)
+        {{-- Modale confirmation suppression NDF --}}
+        <div class="modal fade" id="modalSupprimerNdf" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirmer la suppression</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        Êtes-vous sûr de vouloir supprimer cette note de frais ? Cette action est irréversible.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="button" wire:click="deleteNdf" class="btn btn-danger">
+                            <i class="bi bi-trash me-1"></i>Supprimer définitivement
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- ===== Wizard modale Bootstrap ===== --}}
     <div class="modal fade" id="ligneWizardModal" tabindex="-1" wire:ignore.self>
@@ -224,17 +255,23 @@
                                 @endforeach
                             </select>
                         </div>
-                        @if ($seances->isNotEmpty())
+                        @if (! empty($draftLigne['operation_id']))
                             <div class="mb-3">
                                 <label class="form-label">Séance <span class="text-muted small">(optionnel)</span></label>
-                                <select wire:model.live="draftLigne.seance_id" class="form-select">
-                                    <option value="">— aucune —</option>
-                                    @foreach ($seances as $s)
-                                        <option value="{{ $s->id }}">
-                                            {{ $s->date?->format('d/m/Y') }}{{ $s->titre ? ' — '.$s->titre : '' }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                @if ($seances->isEmpty())
+                                    <p class="form-control-plaintext text-muted small mb-0">
+                                        Aucune séance disponible pour cette opération.
+                                    </p>
+                                @else
+                                    <select wire:model.live="draftLigne.seance_id" class="form-select">
+                                        <option value="">— aucune —</option>
+                                        @foreach ($seances as $s)
+                                            <option value="{{ $s->id }}">
+                                                {{ $s->date?->format('d/m/Y') }}{{ $s->titre ? ' — '.$s->titre : '' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                @endif
                             </div>
                         @endif
                     @endif
