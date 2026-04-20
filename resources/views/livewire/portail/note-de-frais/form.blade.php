@@ -104,11 +104,14 @@
         </div>
     @endif
 
-    <button type="button"
-            wire:click="openLigneWizard"
-            class="btn btn-outline-secondary btn-sm mb-3">
-        <i class="bi bi-plus-lg me-1"></i>Ajouter une ligne de dépense
-    </button>
+    <div class="d-flex gap-2 flex-wrap mb-3">
+        <button type="button" wire:click="openLigneWizard" class="btn btn-outline-primary" @if($wizardStep > 0) disabled @endif>
+            <i class="bi bi-plus-lg me-1"></i>Ajouter une ligne de dépense
+        </button>
+        <button type="button" wire:click="openKilometriqueWizard" class="btn btn-outline-primary" @if($wizardStep > 0) disabled @endif>
+            <i class="bi bi-car-front me-1"></i>Ajouter un déplacement
+        </button>
+    </div>
 
     {{-- Total --}}
     <div class="card mb-3 border-primary">
@@ -173,144 +176,279 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        <i class="bi bi-receipt me-1"></i>
-                        Ajouter une ligne de dépense
-                        @if ($wizardStep > 0)
-                            — étape {{ $wizardStep }}/3
+                        @if ($wizardType === 'kilometrique')
+                            <i class="bi bi-car-front me-1"></i>
+                            Nouveau déplacement
+                            @if ($wizardStep > 0)
+                                — étape {{ $wizardStep }}/2
+                            @endif
+                        @else
+                            <i class="bi bi-receipt me-1"></i>
+                            Ajouter une ligne de dépense
+                            @if ($wizardStep > 0)
+                                — étape {{ $wizardStep }}/3
+                            @endif
                         @endif
                     </h5>
                     <button type="button" class="btn-close" wire:click="cancelLigneWizard" aria-label="Fermer"></button>
                 </div>
                 <div class="modal-body">
-                    @if ($wizardStep === 1)
-                        {{-- Étape 1 : Justificatif --}}
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">
-                                Justificatif <span class="text-danger">*</span>
-                            </label>
-                            <p class="text-muted small">Importez le reçu, la facture ou tout document justifiant la dépense (PDF, JPG, PNG ou HEIC, max 5 Mo).</p>
-                            <input type="file"
-                                   wire:model="draftLigne.justif"
-                                   accept=".pdf,.jpg,.jpeg,.png,.heic"
-                                   class="form-control @error('draftLigne.justif') is-invalid @enderror">
-                            @error('draftLigne.justif')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                            @if ($draftLigne['justif'] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
-                                <div class="mt-2 text-success small">
-                                    <i class="bi bi-check-circle me-1"></i>
-                                    Fichier sélectionné : {{ $draftLigne['justif']->getClientOriginalName() }}
-                                </div>
-                            @endif
-                        </div>
-
-                    @elseif ($wizardStep === 2)
-                        {{-- Étape 2 : Libellé + montant --}}
-                        <div class="mb-3">
-                            <label class="form-label">Libellé <span class="text-muted small">(optionnel)</span></label>
-                            <input type="text"
-                                   wire:model.live="draftLigne.libelle"
-                                   class="form-control"
-                                   placeholder="Description de la dépense">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">
-                                Montant (€) <span class="text-danger">*</span>
-                            </label>
-                            <input type="number"
-                                   step="0.01"
-                                   min="0.01"
-                                   wire:model.live="draftLigne.montant"
-                                   class="form-control @error('draftLigne.montant') is-invalid @enderror"
-                                   placeholder="0,00">
-                            @error('draftLigne.montant')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                    @elseif ($wizardStep === 3)
-                        {{-- Étape 3 : Catégorisation --}}
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">
-                                Sous-catégorie <span class="text-danger">*</span>
-                            </label>
-                            <select wire:model.live="draftLigne.sous_categorie_id"
-                                    class="form-select @error('draftLigne.sous_categorie_id') is-invalid @enderror">
-                                <option value="">— choisir —</option>
-                                @foreach ($sousCategories as $sc)
-                                    <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
-                                @endforeach
-                            </select>
-                            @error('draftLigne.sous_categorie_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Opération <span class="text-muted small">(optionnel)</span></label>
-                            <select wire:model.live="draftLigne.operation_id"
-                                    class="form-select">
-                                <option value="">— aucune —</option>
-                                @foreach ($operations as $op)
-                                    <option value="{{ $op->id }}">{{ $op->nom }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        @if (! empty($draftLigne['operation_id']) && $selectedOperation?->nombre_seances)
+                    @if ($wizardType === 'standard' || $wizardType === null)
+                        {{-- ===== Wizard standard (3 étapes) ===== --}}
+                        @if ($wizardStep === 1)
+                            {{-- Étape 1 : Justificatif --}}
                             <div class="mb-3">
-                                <label class="form-label">Séance <span class="text-muted small">(optionnel)</span></label>
-                                <select wire:model.live="draftLigne.seance" class="form-select">
+                                <label class="form-label fw-semibold">
+                                    Justificatif <span class="text-danger">*</span>
+                                </label>
+                                <p class="text-muted small">Importez le reçu, la facture ou tout document justifiant la dépense (PDF, JPG, PNG ou HEIC, max 5 Mo).</p>
+                                <input type="file"
+                                       wire:model="draftLigne.justif"
+                                       accept=".pdf,.jpg,.jpeg,.png,.heic"
+                                       class="form-control @error('draftLigne.justif') is-invalid @enderror">
+                                @error('draftLigne.justif')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                                @if ($draftLigne['justif'] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
+                                    <div class="mt-2 text-success small">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        Fichier sélectionné : {{ $draftLigne['justif']->getClientOriginalName() }}
+                                    </div>
+                                @endif
+                            </div>
+
+                        @elseif ($wizardStep === 2)
+                            {{-- Étape 2 : Libellé + montant --}}
+                            <div class="mb-3">
+                                <label class="form-label">Libellé <span class="text-muted small">(optionnel)</span></label>
+                                <input type="text"
+                                       wire:model.live="draftLigne.libelle"
+                                       class="form-control"
+                                       placeholder="Description de la dépense">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    Montant (€) <span class="text-danger">*</span>
+                                </label>
+                                <input type="number"
+                                       step="0.01"
+                                       min="0.01"
+                                       wire:model.live="draftLigne.montant"
+                                       class="form-control @error('draftLigne.montant') is-invalid @enderror"
+                                       placeholder="0,00">
+                                @error('draftLigne.montant')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+
+                        @elseif ($wizardStep === 3)
+                            {{-- Étape 3 : Catégorisation --}}
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    Sous-catégorie <span class="text-danger">*</span>
+                                </label>
+                                <select wire:model.live="draftLigne.sous_categorie_id"
+                                        class="form-select @error('draftLigne.sous_categorie_id') is-invalid @enderror">
+                                    <option value="">— choisir —</option>
+                                    @foreach ($sousCategories as $sc)
+                                        <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
+                                    @endforeach
+                                </select>
+                                @error('draftLigne.sous_categorie_id')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Opération <span class="text-muted small">(optionnel)</span></label>
+                                <select wire:model.live="draftLigne.operation_id"
+                                        class="form-select">
                                     <option value="">— aucune —</option>
-                                    @for ($s = 1; $s <= $selectedOperation->nombre_seances; $s++)
-                                        <option value="{{ $s }}">Séance {{ $s }}</option>
-                                    @endfor
+                                    @foreach ($operations as $op)
+                                        <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                    @endforeach
                                 </select>
                             </div>
-                        @elseif (! empty($draftLigne['operation_id']))
+                            @if (! empty($draftLigne['operation_id']) && $selectedOperation?->nombre_seances)
+                                <div class="mb-3">
+                                    <label class="form-label">Séance <span class="text-muted small">(optionnel)</span></label>
+                                    <select wire:model.live="draftLigne.seance" class="form-select">
+                                        <option value="">— aucune —</option>
+                                        @for ($s = 1; $s <= $selectedOperation->nombre_seances; $s++)
+                                            <option value="{{ $s }}">Séance {{ $s }}</option>
+                                        @endfor
+                                    </select>
+                                </div>
+                            @elseif (! empty($draftLigne['operation_id']))
+                                <div class="mb-3">
+                                    <p class="form-control-plaintext text-muted small mb-0">
+                                        Cette opération ne comporte pas de séance numérotée.
+                                    </p>
+                                </div>
+                            @endif
+                        @endif
+
+                    @elseif ($wizardType === 'kilometrique')
+                        {{-- ===== Wizard kilométrique (2 étapes) ===== --}}
+                        @if ($wizardStep === 1)
+                            {{-- Étape 1 : Carte grise --}}
                             <div class="mb-3">
-                                <p class="form-control-plaintext text-muted small mb-0">
-                                    Cette opération ne comporte pas de séance numérotée.
-                                </p>
+                                <label for="km-justif" class="form-label fw-semibold">Carte grise <span class="text-danger">*</span></label>
+                                <p class="text-muted small">Importez la carte grise du véhicule (PDF, JPG, PNG ou HEIC, max 5 Mo).</p>
+                                <input type="file"
+                                       id="km-justif"
+                                       wire:model="draftLigne.justif"
+                                       class="form-control @error('draftLigne.justif') is-invalid @enderror"
+                                       accept=".pdf,.jpg,.jpeg,.png,.heic">
+                                <div class="form-text">PDF, JPG, PNG ou HEIC — 5 Mo max.</div>
+                                @error('draftLigne.justif')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                @if ($draftLigne['justif'] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)
+                                    <div class="mt-2 text-success small">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        Fichier sélectionné : {{ $draftLigne['justif']->getClientOriginalName() }}
+                                    </div>
+                                @endif
+                            </div>
+
+                        @elseif ($wizardStep === 2)
+                            {{-- Étape 2 : Paramètres kilométriques --}}
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label for="km-libelle" class="form-label">Libellé du déplacement <span class="text-danger">*</span></label>
+                                    <input type="text"
+                                           id="km-libelle"
+                                           wire:model.live.debounce.300ms="draftLigne.libelle"
+                                           class="form-control @error('draftLigne.libelle') is-invalid @enderror"
+                                           placeholder="ex. Paris-Rennes AG annuelle">
+                                    @error('draftLigne.libelle')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="km-cv" class="form-label">Puissance fiscale (CV) <span class="text-danger">*</span></label>
+                                    <input type="number" step="1" min="1" max="50"
+                                           id="km-cv"
+                                           wire:model.live.debounce.300ms="draftLigne.cv_fiscaux"
+                                           class="form-control @error('draftLigne.cv_fiscaux') is-invalid @enderror">
+                                    @error('draftLigne.cv_fiscaux')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="km-distance" class="form-label">Distance (km) <span class="text-danger">*</span></label>
+                                    <input type="number" step="0.1" min="0"
+                                           id="km-distance"
+                                           wire:model.live.debounce.300ms="draftLigne.distance_km"
+                                           class="form-control @error('draftLigne.distance_km') is-invalid @enderror">
+                                    @error('draftLigne.distance_km')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label for="km-bareme" class="form-label">Barème (€/km) <span class="text-danger">*</span></label>
+                                    <input type="number" step="0.001" min="0"
+                                           id="km-bareme"
+                                           wire:model.live.debounce.300ms="draftLigne.bareme_eur_km"
+                                           class="form-control @error('draftLigne.bareme_eur_km') is-invalid @enderror">
+                                    <div class="form-text">
+                                        <a href="https://www.impots.gouv.fr/particulier/frais-de-deplacement" target="_blank" rel="noopener noreferrer">
+                                            Consulter le barème officiel
+                                        </a>
+                                    </div>
+                                    @error('draftLigne.bareme_eur_km')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="km-operation" class="form-label">Opération (facultatif)</label>
+                                    <select id="km-operation"
+                                            wire:model="draftLigne.operation_id"
+                                            class="form-select">
+                                        <option value="">—</option>
+                                        @foreach ($operations as $op)
+                                            <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6 d-flex align-items-end justify-content-end">
+                                    <div class="text-end">
+                                        <div class="text-muted small">Montant calculé</div>
+                                        <div class="h4 mb-0">{{ number_format($this->draftMontantCalcule, 2, ',', ' ') }} €</div>
+                                    </div>
+                                </div>
                             </div>
                         @endif
                     @endif
                 </div>
                 <div class="modal-footer">
-                    @if ($wizardStep === 1)
-                        <button type="button"
-                                class="btn btn-secondary"
-                                wire:click="cancelLigneWizard">
-                            Annuler
-                        </button>
-                        <button type="button"
-                                class="btn btn-primary"
-                                wire:click="wizardNext"
-                                @if (!($draftLigne['justif'] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)) disabled @endif>
-                            Suivant <i class="bi bi-arrow-right ms-1"></i>
-                        </button>
+                    @if ($wizardType === 'standard' || $wizardType === null)
+                        {{-- Footer wizard standard --}}
+                        @if ($wizardStep === 1)
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    wire:click="cancelLigneWizard">
+                                Annuler
+                            </button>
+                            <button type="button"
+                                    class="btn btn-primary"
+                                    wire:click="wizardNext"
+                                    @if (!($draftLigne['justif'] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)) disabled @endif>
+                                Suivant <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
 
-                    @elseif ($wizardStep === 2)
-                        <button type="button"
-                                class="btn btn-outline-secondary"
-                                wire:click="wizardPrev">
-                            <i class="bi bi-arrow-left me-1"></i>Précédent
-                        </button>
-                        <button type="button"
-                                class="btn btn-primary"
-                                wire:click="wizardNext">
-                            Suivant <i class="bi bi-arrow-right ms-1"></i>
-                        </button>
+                        @elseif ($wizardStep === 2)
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    wire:click="wizardPrev">
+                                <i class="bi bi-arrow-left me-1"></i>Précédent
+                            </button>
+                            <button type="button"
+                                    class="btn btn-primary"
+                                    wire:click="wizardNext">
+                                Suivant <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
 
-                    @elseif ($wizardStep === 3)
-                        <button type="button"
-                                class="btn btn-outline-secondary"
-                                wire:click="wizardPrev">
-                            <i class="bi bi-arrow-left me-1"></i>Précédent
-                        </button>
-                        <button type="button"
-                                class="btn btn-success"
-                                wire:click="wizardConfirm">
-                            <i class="bi bi-plus-lg me-1"></i>Ajouter la ligne
-                        </button>
+                        @elseif ($wizardStep === 3)
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    wire:click="wizardPrev">
+                                <i class="bi bi-arrow-left me-1"></i>Précédent
+                            </button>
+                            <button type="button"
+                                    class="btn btn-success"
+                                    wire:click="wizardConfirm">
+                                <i class="bi bi-plus-lg me-1"></i>Ajouter la ligne
+                            </button>
+                        @endif
+
+                    @elseif ($wizardType === 'kilometrique')
+                        {{-- Footer wizard kilométrique --}}
+                        @if ($wizardStep === 1)
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    wire:click="cancelLigneWizard">
+                                Annuler
+                            </button>
+                            <button type="button"
+                                    class="btn btn-primary"
+                                    wire:click="wizardNext"
+                                    @if (!($draftLigne['justif'] instanceof \Livewire\Features\SupportFileUploads\TemporaryUploadedFile)) disabled @endif>
+                                Suivant <i class="bi bi-arrow-right ms-1"></i>
+                            </button>
+
+                        @elseif ($wizardStep === 2)
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    wire:click="wizardPrev">
+                                <i class="bi bi-arrow-left me-1"></i>Retour
+                            </button>
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    wire:click="cancelLigneWizard">
+                                Annuler
+                            </button>
+                            <button type="button"
+                                    class="btn btn-primary"
+                                    wire:click="wizardConfirm">
+                                <i class="bi bi-plus-lg me-1"></i>Ajouter le déplacement
+                            </button>
+                        @endif
                     @endif
                 </div>
             </div>
