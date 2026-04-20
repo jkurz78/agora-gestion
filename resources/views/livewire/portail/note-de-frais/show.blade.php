@@ -1,24 +1,29 @@
 <div>
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="h5 mb-0"><i class="bi bi-receipt me-1"></i> Note de frais</h2>
-        @php $statut = $ndf->statut; @endphp
-        @switch($statut->value)
-            @case('brouillon')
-                <span class="badge bg-secondary fs-6">{{ $statut->label() }}</span>
-                @break
-            @case('soumise')
-                <span class="badge bg-primary fs-6">{{ $statut->label() }}</span>
-                @break
-            @case('rejetee')
-                <span class="badge bg-danger fs-6">{{ $statut->label() }}</span>
-                @break
-            @case('validee')
-                <span class="badge bg-success fs-6">{{ $statut->label() }}</span>
-                @break
-            @case('payee')
-                <span class="badge bg-success text-dark fs-6">{{ $statut->label() }}</span>
-                @break
-        @endswitch
+        <div class="d-flex gap-2 align-items-center">
+            @if ($ndf->isArchived())
+                <span class="badge bg-secondary fs-6">Archivée</span>
+            @endif
+            @php $statut = $ndf->statut; @endphp
+            @switch($statut->value)
+                @case('brouillon')
+                    <span class="badge bg-secondary fs-6">{{ $statut->label() }}</span>
+                    @break
+                @case('soumise')
+                    <span class="badge bg-primary fs-6">{{ $statut->label() }}</span>
+                    @break
+                @case('rejetee')
+                    <span class="badge bg-danger fs-6">{{ $statut->label() }}</span>
+                    @break
+                @case('validee')
+                    <span class="badge bg-success fs-6">{{ $statut->label() }}</span>
+                    @break
+                @case('payee')
+                    <span class="badge bg-success text-dark fs-6">{{ $statut->label() }}</span>
+                    @break
+            @endswitch
+        </div>
     </div>
 
     @if (session('portail.success'))
@@ -42,6 +47,11 @@
                 @if ($statut->value === 'payee')
                     <dt class="col-sm-3">Date de validation</dt>
                     <dd class="col-sm-9">{{ $ndf->validee_at?->format('d/m/Y') }}</dd>
+                @endif
+
+                @if ($ndf->isArchived())
+                    <dt class="col-sm-3">Archivée le</dt>
+                    <dd class="col-sm-9">{{ $ndf->archived_at?->format('d/m/Y') }}</dd>
                 @endif
             </dl>
         </div>
@@ -96,26 +106,38 @@
             <i class="bi bi-arrow-left me-1"></i>Retour à la liste
         </a>
 
-        <div class="d-flex gap-2">
-            @if (in_array($statut->value, ['brouillon', 'soumise', 'rejetee']))
-                <a href="{{ route('portail.ndf.edit', ['association' => $association->slug, 'noteDeFrais' => $ndf->id]) }}"
-                   class="btn btn-outline-primary btn-sm">
-                    <i class="bi bi-pencil me-1"></i>Modifier
-                </a>
+        @if (! $ndf->isArchived())
+            <div class="d-flex gap-2">
+                @if (in_array($statut->value, ['brouillon', 'soumise', 'rejetee']))
+                    <a href="{{ route('portail.ndf.edit', ['association' => $association->slug, 'noteDeFrais' => $ndf->id]) }}"
+                       class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-pencil me-1"></i>Modifier
+                    </a>
 
-                {{-- Bouton Supprimer avec confirmation via modale Bootstrap --}}
-                <button type="button"
-                        class="btn btn-outline-danger btn-sm"
-                        data-bs-toggle="modal"
-                        data-bs-target="#modalSupprimer">
-                    <i class="bi bi-trash me-1"></i>Supprimer
-                </button>
-            @endif
-        </div>
+                    {{-- Bouton Supprimer avec confirmation via modale Bootstrap --}}
+                    <button type="button"
+                            class="btn btn-outline-danger btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalSupprimer">
+                        <i class="bi bi-trash me-1"></i>Supprimer
+                    </button>
+                @endif
+
+                @if (in_array($statut->value, ['payee', 'rejetee']))
+                    {{-- Bouton Archiver avec confirmation via modale Bootstrap --}}
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalArchiver">
+                        <i class="bi bi-archive me-1"></i>Archiver
+                    </button>
+                @endif
+            </div>
+        @endif
     </div>
 
     {{-- Modale de confirmation de suppression --}}
-    @if (in_array($statut->value, ['brouillon', 'soumise', 'rejetee']))
+    @if (! $ndf->isArchived() && in_array($statut->value, ['brouillon', 'soumise', 'rejetee']))
         <div class="modal fade" id="modalSupprimer" tabindex="-1" aria-labelledby="modalSupprimerLabel" aria-hidden="true">
             <div class="modal-dialog">
                 <div class="modal-content">
@@ -130,6 +152,30 @@
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
                         <button type="button" wire:click="delete" class="btn btn-danger">
                             <i class="bi bi-trash me-1"></i>Supprimer définitivement
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modale de confirmation d'archivage --}}
+    @if (! $ndf->isArchived() && in_array($statut->value, ['payee', 'rejetee']))
+        <div class="modal fade" id="modalArchiver" tabindex="-1" aria-labelledby="modalArchiverLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalArchiverLabel">Confirmer l'archivage</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+                    </div>
+                    <div class="modal-body">
+                        Archiver cette note de frais la masquera de la liste des notes actives.
+                        Cette action est irréversible.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                        <button type="button" wire:click="archiveNdf" data-bs-dismiss="modal" class="btn btn-warning">
+                            <i class="bi bi-archive me-1"></i>Archiver
                         </button>
                     </div>
                 </div>

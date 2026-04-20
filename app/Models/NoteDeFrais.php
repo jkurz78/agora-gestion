@@ -27,6 +27,7 @@ final class NoteDeFrais extends TenantModel
         'transaction_id',
         'submitted_at',
         'validee_at',
+        'archived_at',
     ];
 
     protected function casts(): array
@@ -35,7 +36,13 @@ final class NoteDeFrais extends TenantModel
             'date' => 'date',
             'submitted_at' => 'datetime',
             'validee_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->archived_at !== null;
     }
 
     /**

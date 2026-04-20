@@ -177,6 +177,31 @@ final class NoteDeFraisService
     }
 
     /**
+     * Archive une NDF Payée ou Rejetée (action portail uniquement, irréversible en v0).
+     *
+     * @throws DomainException si la NDF est déjà archivée ou si son statut ne le permet pas
+     */
+    public function archive(NoteDeFrais $ndf): void
+    {
+        if ($ndf->isArchived()) {
+            throw new DomainException('Cette note de frais est déjà archivée.');
+        }
+
+        $archivableStatuts = [StatutNoteDeFrais::Payee, StatutNoteDeFrais::Rejetee];
+        if (! in_array($ndf->statut, $archivableStatuts, true)) {
+            throw new DomainException('Seule une note de frais Payée ou Rejetée peut être archivée.');
+        }
+
+        $ndf->update(['archived_at' => now()]);
+
+        Log::info('portail.ndf.archived', [
+            'ndf_id' => $ndf->id,
+            'tiers_id' => $ndf->tiers_id,
+            'statut' => $ndf->getRawOriginal('statut'),
+        ]);
+    }
+
+    /**
      * Supprime (softdelete) un brouillon et nettoie les fichiers PJ.
      *
      * @throws DomainException si la NDF n'est pas en brouillon

@@ -7,6 +7,32 @@
         </a>
     </div>
 
+    @if (session('portail.success'))
+        <div class="alert alert-success">{{ session('portail.success') }}</div>
+    @endif
+
+    {{-- Onglets Actives / Archivées / Toutes --}}
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link {{ $onglet === 'actives' ? 'active' : '' }}"
+                    wire:click="$set('onglet', 'actives')">
+                Actives
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link {{ $onglet === 'archivees' ? 'active' : '' }}"
+                    wire:click="$set('onglet', 'archivees')">
+                Archivées
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link {{ $onglet === 'toutes' ? 'active' : '' }}"
+                    wire:click="$set('onglet', 'toutes')">
+                Toutes
+            </button>
+        </li>
+    </ul>
+
     @if ($notes->isEmpty())
         <div class="alert alert-info">
             Aucune note de frais pour le moment.
@@ -28,12 +54,18 @@
                         @php
                             $total = $note->lignes->sum('montant');
                             $statut = $note->statut;
+                            $archived = $note->isArchived();
                         @endphp
                         <tr>
                             <td data-sort="{{ $note->date?->format('Y-m-d') }}">
                                 {{ $note->date?->format('d/m/Y') }}
                             </td>
-                            <td>{{ $note->libelle }}</td>
+                            <td>
+                                {{ $note->libelle }}
+                                @if ($archived)
+                                    <span class="badge bg-secondary ms-1">Archivée</span>
+                                @endif
+                            </td>
                             <td class="text-end" data-sort="{{ number_format($total, 2, '.', '') }}">
                                 {{ number_format((float) $total, 2, ',', ' ') }} €
                             </td>
@@ -59,19 +91,67 @@
                                 @endswitch
                             </td>
                             <td class="text-end">
-                                @if (in_array($statut->value, ['brouillon', 'soumise', 'rejetee']))
+                                @if ($archived)
+                                    {{-- NDF archivée : lecture seule --}}
+                                    <a href="{{ route('portail.ndf.show', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
+                                       class="btn btn-outline-secondary btn-sm">
+                                        <i class="bi bi-eye me-1"></i>Consulter
+                                    </a>
+                                @elseif (in_array($statut->value, ['brouillon', 'soumise', 'rejetee']))
                                     <a href="{{ route('portail.ndf.edit', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
                                        class="btn btn-outline-primary btn-sm">
                                         <i class="bi bi-pencil me-1"></i>Modifier
                                     </a>
                                 @else
-                                    <a href="{{ route('portail.ndf.show', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
-                                       class="btn btn-outline-secondary btn-sm">
-                                        <i class="bi bi-eye me-1"></i>Consulter
-                                    </a>
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        <a href="{{ route('portail.ndf.show', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
+                                           class="btn btn-outline-secondary btn-sm">
+                                            <i class="bi bi-eye me-1"></i>Consulter
+                                        </a>
+                                        @if (in_array($statut->value, ['payee', 'rejetee']))
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary btn-sm"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalArchiver-{{ $note->id }}">
+                                                <i class="bi bi-archive me-1"></i>Archiver
+                                            </button>
+                                        @endif
+                                    </div>
                                 @endif
                             </td>
                         </tr>
+
+                        {{-- Modale de confirmation d'archivage --}}
+                        @if (! $archived && in_array($statut->value, ['payee', 'rejetee']))
+                            <div class="modal fade" id="modalArchiver-{{ $note->id }}" tabindex="-1"
+                                 aria-labelledby="modalArchiverLabel-{{ $note->id }}" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="modalArchiverLabel-{{ $note->id }}">
+                                                Confirmer l'archivage
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                    aria-label="Fermer"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            Archiver cette note de frais la masquera de la liste des notes actives.
+                                            Cette action est irréversible.
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary"
+                                                    data-bs-dismiss="modal">Annuler</button>
+                                            <button type="button"
+                                                    wire:click="archiveNdf({{ $note->id }})"
+                                                    data-bs-dismiss="modal"
+                                                    class="btn btn-warning">
+                                                <i class="bi bi-archive me-1"></i>Archiver
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
                     @endforeach
                 </tbody>
             </table>
