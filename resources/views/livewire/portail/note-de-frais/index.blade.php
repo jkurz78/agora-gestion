@@ -59,7 +59,7 @@
                                 @endswitch
                             </td>
                             <td class="text-end">
-                                @if (in_array($statut->value, ['brouillon', 'soumise']))
+                                @if (in_array($statut->value, ['brouillon', 'soumise', 'rejetee']))
                                     <a href="{{ route('portail.ndf.edit', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
                                        class="btn btn-outline-primary btn-sm">
                                         <i class="bi bi-pencil me-1"></i>Modifier
