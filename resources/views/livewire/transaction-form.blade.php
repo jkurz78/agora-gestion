@@ -331,20 +331,18 @@
                                                 @if (! $exerciceCloture)
                                                     @if (! empty($lignes[$index]['piece_jointe_upload']))
                                                         <span class="badge bg-info text-nowrap"
-                                                              data-bs-toggle="tooltip"
-                                                              title="{{ $lignes[$index]['piece_jointe_upload']->getClientOriginalName() }}">
+                                                              data-tooltip="{{ $lignes[$index]['piece_jointe_upload']->getClientOriginalName() }}">
                                                             <i class="bi bi-paperclip"></i>
                                                         </span>
                                                         <button type="button" wire:click="$set('lignes.{{ $index }}.piece_jointe_upload', null)"
                                                                 class="btn btn-sm btn-link text-danger p-0"
-                                                                data-bs-toggle="tooltip" title="Annuler l'upload">
+                                                                data-tooltip="Annuler l'upload">
                                                             <i class="bi bi-x-circle"></i>
                                                         </button>
                                                     @elseif (! empty($lignes[$index]['piece_jointe_path']) && empty($lignes[$index]['piece_jointe_remove']))
-                                                        <div class="dropdown">
+                                                        <div class="dropdown" data-tooltip="{{ $lignes[$index]['piece_jointe_filename'] ?? 'Pièce jointe' }}">
                                                             <button type="button" class="btn btn-sm btn-outline-primary"
-                                                                    data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false"
-                                                                    title="{{ $lignes[$index]['piece_jointe_filename'] ?? 'Pièce jointe' }}">
+                                                                    data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false">
                                                                 <i class="bi bi-paperclip"></i>
                                                             </button>
                                                             <ul class="dropdown-menu">
@@ -371,17 +369,17 @@
                                                         </div>
                                                     @elseif (! empty($lignes[$index]['piece_jointe_remove']))
                                                         <span class="badge bg-warning text-dark text-nowrap"
-                                                              data-bs-toggle="tooltip" title="Sera supprimée au prochain enregistrement">
+                                                              data-tooltip="Sera supprimée au prochain enregistrement">
                                                             <i class="bi bi-exclamation-triangle"></i>
                                                         </span>
                                                         <button type="button" wire:click="$set('lignes.{{ $index }}.piece_jointe_remove', false)"
                                                                 class="btn btn-sm btn-link p-0"
-                                                                data-bs-toggle="tooltip" title="Annuler la suppression">
+                                                                data-tooltip="Annuler la suppression">
                                                             <i class="bi bi-arrow-counterclockwise"></i>
                                                         </button>
                                                     @else
                                                         <label class="btn btn-sm btn-outline-secondary mb-0"
-                                                               data-bs-toggle="tooltip" title="Ajouter un justificatif">
+                                                               data-tooltip="Ajouter un justificatif">
                                                             <i class="bi bi-paperclip"></i>
                                                             <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
                                                         </label>
@@ -391,7 +389,7 @@
                                                     {{-- Lecture seule --}}
                                                     <a href="{{ $lignes[$index]['piece_jointe_existing_url'] }}" target="_blank"
                                                        class="btn btn-sm btn-outline-primary"
-                                                       data-bs-toggle="tooltip" title="{{ $lignes[$index]['piece_jointe_filename'] ?? 'Consulter la pièce jointe' }}">
+                                                       data-tooltip="{{ $lignes[$index]['piece_jointe_filename'] ?? 'Consulter la pièce jointe' }}">
                                                         <i class="bi bi-paperclip"></i>
                                                     </a>
                                                 @endif

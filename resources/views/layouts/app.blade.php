@@ -107,6 +107,37 @@
             border-color: rgba(255, 255, 255, 0.7);
             color: #fff;
         }
+
+        /* Tooltip CSS-only instantané — bulle noire, pas de délai, pas de JS. */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #212529;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: .75rem;
+            white-space: nowrap;
+            z-index: 2100;
+            pointer-events: none;
+        }
+        [data-tooltip]:hover::before {
+            content: "";
+            position: absolute;
+            bottom: calc(100% + 2px);
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent;
+            border-top-color: #212529;
+            z-index: 2100;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
