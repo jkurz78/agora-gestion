@@ -301,6 +301,28 @@ Tous portés par `LogContext` (porte automatiquement `association_id` + `user_id
 
 - **Slice 4** : unification PJ au niveau ligne dans les écrans Transaction (refonte multi-écrans — hors programme NDF portail).
 
+## Lignes de frais kilométriques (Slice 2+3, livré 2026-04-20)
+
+### Lignes de frais kilométriques
+
+En plus de la ligne de frais standard, le Tiers peut saisir un **déplacement** via un second bouton "Ajouter un déplacement". Le wizard km demande en deux étapes :
+
+1. **Carte grise** du véhicule (PDF / JPG / PNG / HEIC, 5 Mo max, obligatoire).
+2. **Libellé**, **puissance fiscale (CV)**, **distance (km)** et **barème (€/km)**. Un lien vers le barème officiel (`impots.gouv.fr`) est fourni à titre d'aide. Le montant s'affiche en temps réel : `montant = distance × barème`, arrondi à 2 décimales. L'opération et la séance restent facultatives. Aucune sous-catégorie n'est demandée au Tiers — voir résolution automatique ci-dessous.
+
+**Stockage ligne** : la ligne utilise la même table `notes_de_frais_lignes` que les lignes standards, distinguées via le champ `type` (`standard` | `kilometrique`). Les paramètres km sont persistés dans le champ JSON `metadata` (`cv_fiscaux`, `distance_km`, `bareme_eur_km`). Le montant stocké est recalculé côté serveur à chaque save — aucune valeur client n'est prise en confiance.
+
+**Résolution de la sous-catégorie** : l'écran Paramètres → Sous-catégories expose un flag `Frais kilométriques`. Au save d'une ligne km, le service applique automatiquement la sous-catégorie flaggée si elle est unique dans l'asso. Si 0 ou plusieurs sont flaggées, `sous_categorie_id` reste `null` et le comptable tranchera au back-office (mini-form déjà éditable).
+
+**Back-office** : aucune modification UI. Lors de la validation d'une NDF, le champ `transaction_lignes.notes` est enrichi :
+
+- Ligne standard → `notes = libelle NDF` (comportement inchangé).
+- Ligne km → `notes = "{libelle Tiers} — Déplacement de {km} km avec un véhicule {CV} CV au barème de {bareme} €/km"`.
+
+Le comptable conserve la description fiscale nécessaire à sa validation, la carte grise est copiée vers `transaction_lignes.piece_jointe_path` selon la convention existante.
+
+**Architecture extensible** : `App\Services\NoteDeFrais\LigneTypes\LigneTypeInterface` + `LigneTypeRegistry` préparent l'ajout futur de types normés (repas, hébergement) — chaque nouveau type ajoute un case à l'enum `NoteDeFraisLigneType` + une classe strategy, sans migration.
+
 ## Dette technique
 
 - Champ `archived` sur `Tiers` : scénarios "Tiers archivé" skippés (décision Q1). Le service traite un Tiers archivé comme email inconnu ; à activer quand le champ `archived` sera ajouté au modèle.
