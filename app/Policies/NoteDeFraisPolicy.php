@@ -40,6 +40,11 @@ final class NoteDeFraisPolicy
             return false;
         }
 
+        // Une NDF archivée est toujours en lecture seule
+        if ($noteDeFrais->isArchived()) {
+            return false;
+        }
+
         // Brouillon, Soumise et Rejetee sont éditables — Validee/Payee sont read-only
         return in_array($noteDeFrais->statut, [
             StatutNoteDeFrais::Brouillon,
@@ -97,10 +102,39 @@ final class NoteDeFraisPolicy
             return false;
         }
 
+        // Une NDF archivée est toujours en lecture seule
+        if ($noteDeFrais->isArchived()) {
+            return false;
+        }
+
         // Brouillon, Soumise et Rejetee peuvent être supprimées — Validee/Payee non
         return in_array($noteDeFrais->statut, [
             StatutNoteDeFrais::Brouillon,
             StatutNoteDeFrais::Soumise,
+            StatutNoteDeFrais::Rejetee,
+        ], true);
+    }
+
+    /**
+     * Tiers propriétaire peut archiver une NDF Payée ou Rejetée non encore archivée.
+     * Le "user" sur la garde tiers-portail est un Tiers.
+     */
+    public function archive(?Authenticatable $user, NoteDeFrais $noteDeFrais): bool
+    {
+        if (! $user instanceof Tiers) {
+            return false;
+        }
+
+        if ((int) $user->id !== (int) $noteDeFrais->tiers_id) {
+            return false;
+        }
+
+        if ($noteDeFrais->isArchived()) {
+            return false;
+        }
+
+        return in_array($noteDeFrais->statut, [
+            StatutNoteDeFrais::Payee,
             StatutNoteDeFrais::Rejetee,
         ], true);
     }

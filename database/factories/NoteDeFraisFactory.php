@@ -60,4 +60,9 @@ final class NoteDeFraisFactory extends Factory
             'validee_at' => now(),
         ]);
     }
+
+    public function archived(): static
+    {
+        return $this->state(['archived_at' => now()]);
+    }
 }

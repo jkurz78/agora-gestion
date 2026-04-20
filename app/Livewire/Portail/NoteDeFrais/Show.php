@@ -39,6 +39,18 @@ final class Show extends Component
         $this->redirectRoute('portail.ndf.index', ['association' => $this->association->slug]);
     }
 
+    public function archiveNdf(): void
+    {
+        $ndf = $this->noteDeFrais;
+        Gate::forUser(Auth::guard('tiers-portail')->user())->authorize('archive', $ndf);
+
+        app(NoteDeFraisService::class)->archive($ndf);
+
+        $this->noteDeFrais = $ndf->fresh();
+
+        session()->flash('portail.success', 'Note de frais archivée.');
+    }
+
     public function render(): View
     {
         $ndf = $this->noteDeFrais->load('lignes.sousCategorie', 'lignes.operation');
