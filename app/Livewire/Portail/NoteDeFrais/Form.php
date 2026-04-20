@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Portail\NoteDeFrais;
 
+use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutOperation;
 use App\Enums\TypeCategorie;
 use App\Livewire\Portail\Concerns\WithPortailTenant;
@@ -14,6 +15,7 @@ use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
+use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Services\Portail\NoteDeFrais\JustificatifAnalyser;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
 use Illuminate\Support\Facades\Auth;
@@ -49,7 +51,10 @@ final class Form extends Component
     /** 0 = fermé, 1-3 = étape courante du wizard */
     public int $wizardStep = 0;
 
-    /** @var array{justif: mixed, libelle: string, montant: string, sous_categorie_id: int|null, operation_id: int|null, seance: int|null} */
+    /** 'standard' | 'kilometrique' | null */
+    public ?string $wizardType = null;
+
+    /** @var array{justif: mixed, libelle: string, montant: string, sous_categorie_id: int|null, operation_id: int|null, seance: int|null, cv_fiscaux: int|null, distance_km: string|null, bareme_eur_km: string|null} */
     public array $draftLigne = [
         'justif' => null,
         'libelle' => '',
@@ -57,6 +62,9 @@ final class Form extends Component
         'sous_categorie_id' => null,
         'operation_id' => null,
         'seance' => null,
+        'cv_fiscaux' => null,
+        'distance_km' => null,
+        'bareme_eur_km' => null,
     ];
 
     public function mount(Association $association, ?NoteDeFrais $noteDeFrais = null): void
@@ -72,12 +80,16 @@ final class Form extends Component
             $this->libelle = $noteDeFrais->libelle;
             $this->lignes = $noteDeFrais->lignes->map(fn (NoteDeFraisLigne $l) => [
                 'id' => $l->id,
+                'type' => $l->type->value,
                 'sous_categorie_id' => $l->sous_categorie_id,
                 'operation_id' => $l->operation_id,
                 'seance' => $l->seance,
                 'libelle' => $l->libelle,
                 'montant' => (string) $l->montant,
                 'piece_jointe_path' => $l->piece_jointe_path,
+                'cv_fiscaux' => $l->metadata['cv_fiscaux'] ?? null,
+                'distance_km' => $l->metadata['distance_km'] ?? null,
+                'bareme_eur_km' => $l->metadata['bareme_eur_km'] ?? null,
                 'justif' => null,
             ])->all();
         } else {
@@ -93,6 +105,15 @@ final class Form extends Component
     public function openLigneWizard(): void
     {
         $this->resetDraftLigne();
+        $this->wizardType = 'standard';
+        $this->wizardStep = 1;
+        $this->dispatch('ligne-wizard-opened');
+    }
+
+    public function openKilometriqueWizard(): void
+    {
+        $this->resetDraftLigne();
+        $this->wizardType = 'kilometrique';
         $this->wizardStep = 1;
         $this->dispatch('ligne-wizard-opened');
     }
@@ -100,6 +121,7 @@ final class Form extends Component
     public function cancelLigneWizard(): void
     {
         $this->resetDraftLigne();
+        $this->wizardType = null;
         $this->wizardStep = 0;
         $this->dispatch('ligne-wizard-closed');
     }
@@ -110,30 +132,39 @@ final class Form extends Component
             $this->validateOnly('draftLigne.justif', [
                 'draftLigne.justif' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,heic', 'max:5120'],
             ], [
-                'draftLigne.justif.required' => 'Un justificatif est obligatoire.',
-                'draftLigne.justif.file' => 'Le justificatif doit être un fichier.',
-                'draftLigne.justif.mimes' => 'Le justificatif doit être un PDF, JPG, PNG ou HEIC.',
-                'draftLigne.justif.max' => 'Le justificatif ne doit pas dépasser 5 Mo.',
+                'draftLigne.justif.required' => $this->wizardType === 'kilometrique'
+                    ? 'La carte grise est obligatoire.'
+                    : 'Un justificatif est obligatoire.',
+                'draftLigne.justif.file' => 'Le fichier est invalide.',
+                'draftLigne.justif.mimes' => 'Formats acceptés : PDF, JPG, PNG, HEIC.',
+                'draftLigne.justif.max' => 'Le fichier ne doit pas dépasser 5 Mo.',
             ]);
 
-            /** @var TemporaryUploadedFile $justif */
-            $justif = $this->draftLigne['justif'];
-            $hints = app(JustificatifAnalyser::class)->analyse($justif);
+            if ($this->wizardType !== 'kilometrique') {
+                /** @var TemporaryUploadedFile $justif */
+                $justif = $this->draftLigne['justif'];
+                $hints = app(JustificatifAnalyser::class)->analyse($justif);
 
-            if ($hints['libelle']) {
-                $this->draftLigne['libelle'] = $hints['libelle'];
+                if ($hints['libelle']) {
+                    $this->draftLigne['libelle'] = $hints['libelle'];
+                }
+
+                if ($hints['montant']) {
+                    $this->draftLigne['montant'] = (string) $hints['montant'];
+                }
+
+                $this->wizardStep = 2;
+
+                return;
             }
 
-            if ($hints['montant']) {
-                $this->draftLigne['montant'] = (string) $hints['montant'];
-            }
-
+            // kilometrique : pas d'OCR
             $this->wizardStep = 2;
 
             return;
         }
 
-        if ($this->wizardStep === 2) {
+        if ($this->wizardStep === 2 && $this->wizardType !== 'kilometrique') {
             $this->validateOnly('draftLigne.montant', [
                 'draftLigne.montant' => ['required', 'numeric', 'gt:0'],
             ], [
@@ -155,6 +186,57 @@ final class Form extends Component
 
     public function wizardConfirm(): void
     {
+        if ($this->wizardType === 'kilometrique') {
+            // Normalize comma decimals before validation
+            if (is_string($this->draftLigne['distance_km'])) {
+                $this->draftLigne['distance_km'] = str_replace(',', '.', $this->draftLigne['distance_km']);
+            }
+            if (is_string($this->draftLigne['bareme_eur_km'])) {
+                $this->draftLigne['bareme_eur_km'] = str_replace(',', '.', $this->draftLigne['bareme_eur_km']);
+            }
+
+            $this->validate([
+                'draftLigne.libelle' => ['required', 'string', 'min:1'],
+                'draftLigne.cv_fiscaux' => ['required', 'integer', 'between:1,50'],
+                'draftLigne.distance_km' => ['required', 'numeric', 'gt:0'],
+                'draftLigne.bareme_eur_km' => ['required', 'numeric', 'gt:0'],
+            ], [
+                'draftLigne.libelle.required' => 'Le libellé est obligatoire.',
+                'draftLigne.cv_fiscaux.required' => 'La puissance fiscale est obligatoire.',
+                'draftLigne.cv_fiscaux.integer' => 'La puissance fiscale doit être un entier.',
+                'draftLigne.cv_fiscaux.between' => 'La puissance fiscale doit être entre 1 et 50 CV.',
+                'draftLigne.distance_km.required' => 'La distance est obligatoire.',
+                'draftLigne.distance_km.numeric' => 'La distance doit être un nombre.',
+                'draftLigne.distance_km.gt' => 'La distance doit être supérieure à zéro.',
+                'draftLigne.bareme_eur_km.required' => 'Le barème est obligatoire.',
+                'draftLigne.bareme_eur_km.numeric' => 'Le barème doit être un nombre.',
+                'draftLigne.bareme_eur_km.gt' => 'Le barème doit être supérieur à zéro.',
+            ]);
+
+            $this->lignes[] = [
+                'id' => null,
+                'type' => 'kilometrique',
+                'sous_categorie_id' => null,
+                'operation_id' => $this->draftLigne['operation_id'] ?? null,
+                'seance' => $this->draftLigne['seance'] ?? null,
+                'libelle' => $this->draftLigne['libelle'],
+                'montant' => (string) $this->draftMontantCalcule,
+                'cv_fiscaux' => (int) $this->draftLigne['cv_fiscaux'],
+                'distance_km' => $this->toFloatNormalized($this->draftLigne['distance_km']),
+                'bareme_eur_km' => $this->toFloatNormalized($this->draftLigne['bareme_eur_km']),
+                'piece_jointe_path' => null,
+                'justif' => $this->draftLigne['justif'],
+            ];
+
+            $this->resetDraftLigne();
+            $this->wizardStep = 0;
+            $this->wizardType = null;
+            $this->dispatch('ligne-wizard-closed');
+
+            return;
+        }
+
+        // Flux standard existant
         $this->validateOnly('draftLigne.sous_categorie_id', [
             'draftLigne.sous_categorie_id' => ['required'],
         ], [
@@ -163,6 +245,7 @@ final class Form extends Component
 
         $this->lignes[] = [
             'id' => null,
+            'type' => 'standard',
             'sous_categorie_id' => $this->draftLigne['sous_categorie_id'],
             'operation_id' => $this->draftLigne['operation_id'],
             'seance' => $this->draftLigne['seance'],
@@ -174,6 +257,7 @@ final class Form extends Component
 
         $this->resetDraftLigne();
         $this->wizardStep = 0;
+        $this->wizardType = null;
         $this->dispatch('ligne-wizard-closed');
     }
 
@@ -185,6 +269,7 @@ final class Form extends Component
     {
         $this->lignes[] = [
             'id' => null,
+            'type' => 'standard',
             'sous_categorie_id' => null,
             'operation_id' => null,
             'seance' => null,
@@ -235,6 +320,21 @@ final class Form extends Component
         }
 
         return $total;
+    }
+
+    public function getDraftMontantCalculeProperty(): float
+    {
+        if ($this->wizardType !== 'kilometrique') {
+            return 0.0;
+        }
+
+        $registry = app(LigneTypeRegistry::class);
+        $strategy = $registry->for(NoteDeFraisLigneType::Kilometrique);
+
+        return $strategy->computeMontant([
+            'distance_km' => $this->draftLigne['distance_km'] ?? 0,
+            'bareme_eur_km' => $this->draftLigne['bareme_eur_km'] ?? 0,
+        ]);
     }
 
     public function saveDraft(): void
@@ -317,6 +417,7 @@ final class Form extends Component
         $lignesData = [];
         foreach ($this->lignes as $ligne) {
             $lignesData[] = [
+                'type' => $ligne['type'] ?? 'standard',
                 'libelle' => $ligne['libelle'] ?? null,
                 'montant' => $ligne['montant'] !== null && $ligne['montant'] !== ''
                     ? (float) str_replace(',', '.', (string) $ligne['montant'])
@@ -325,6 +426,9 @@ final class Form extends Component
                 'operation_id' => $ligne['operation_id'] ? (int) $ligne['operation_id'] : null,
                 'seance' => $ligne['seance'] ? (int) $ligne['seance'] : null,
                 'piece_jointe_path' => $ligne['piece_jointe_path'] ?? null,
+                'cv_fiscaux' => $ligne['cv_fiscaux'] ?? null,
+                'distance_km' => $ligne['distance_km'] ?? null,
+                'bareme_eur_km' => $ligne['bareme_eur_km'] ?? null,
             ];
         }
 
@@ -382,9 +486,19 @@ final class Form extends Component
             'sous_categorie_id' => null,
             'operation_id' => null,
             'seance' => null,
+            'cv_fiscaux' => null,
+            'distance_km' => null,
+            'bareme_eur_km' => null,
         ];
-        $this->resetErrorBag('draftLigne.justif');
-        $this->resetErrorBag('draftLigne.montant');
-        $this->resetErrorBag('draftLigne.sous_categorie_id');
+        $this->resetErrorBag();
+    }
+
+    private function toFloatNormalized(mixed $value): float
+    {
+        if (is_string($value)) {
+            $value = str_replace(',', '.', $value);
+        }
+
+        return (float) $value;
     }
 }
