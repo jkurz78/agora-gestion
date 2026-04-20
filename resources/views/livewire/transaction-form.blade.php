@@ -323,72 +323,80 @@
                                             @endif
                                         </td>
                                         <td>
-                                            <input type="text" wire:model="lignes.{{ $index }}.notes"
-                                                   class="form-control form-control-sm"
-                                                   {{ $exerciceCloture ? 'disabled' : '' }}>
-                                            {{-- PJ niveau ligne --}}
-                                            @if (! $exerciceCloture)
-                                            <div class="mt-1">
-                                                @if (! empty($lignes[$index]['piece_jointe_upload']))
-                                                    {{-- Nouveau fichier uploadé, pas encore sauvé --}}
-                                                    <span class="badge bg-info text-nowrap" title="{{ $lignes[$index]['piece_jointe_upload']->getClientOriginalName() }}">
-                                                        <i class="bi bi-paperclip"></i> {{ $lignes[$index]['piece_jointe_upload']->getClientOriginalName() }}
-                                                    </span>
-                                                    <button type="button" wire:click="$set('lignes.{{ $index }}.piece_jointe_upload', null)" class="btn btn-sm btn-link text-danger p-0 ms-1" title="Annuler l'upload">
-                                                        <i class="bi bi-x-circle"></i>
-                                                    </button>
-                                                @elseif (! empty($lignes[$index]['piece_jointe_path']) && empty($lignes[$index]['piece_jointe_remove']))
-                                                    {{-- Fichier existant : icône trombone + dropdown actions --}}
-                                                    <div class="dropdown d-inline-block">
-                                                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="dropdown" aria-expanded="false"
-                                                                title="{{ $lignes[$index]['piece_jointe_filename'] ?? 'Pièce jointe' }}">
+                                            <div class="d-flex align-items-center gap-1">
+                                                <input type="text" wire:model="lignes.{{ $index }}.notes"
+                                                       class="form-control form-control-sm"
+                                                       {{ $exerciceCloture ? 'disabled' : '' }}>
+                                                {{-- PJ niveau ligne --}}
+                                                @if (! $exerciceCloture)
+                                                    @if (! empty($lignes[$index]['piece_jointe_upload']))
+                                                        <span class="badge bg-info text-nowrap"
+                                                              data-bs-toggle="tooltip"
+                                                              title="{{ $lignes[$index]['piece_jointe_upload']->getClientOriginalName() }}">
                                                             <i class="bi bi-paperclip"></i>
+                                                        </span>
+                                                        <button type="button" wire:click="$set('lignes.{{ $index }}.piece_jointe_upload', null)"
+                                                                class="btn btn-sm btn-link text-danger p-0"
+                                                                data-bs-toggle="tooltip" title="Annuler l'upload">
+                                                            <i class="bi bi-x-circle"></i>
                                                         </button>
-                                                        <ul class="dropdown-menu">
-                                                            <li>
-                                                                <a class="dropdown-item" href="{{ $lignes[$index]['piece_jointe_existing_url'] }}" target="_blank">
-                                                                    <i class="bi bi-eye me-2"></i>Consulter
-                                                                </a>
-                                                            </li>
-                                                            @if (! $isLockedByFacture)
-                                                            <li>
-                                                                <label class="dropdown-item mb-0" style="cursor:pointer;">
-                                                                    <i class="bi bi-arrow-repeat me-2"></i>Remplacer
-                                                                    <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
-                                                                </label>
-                                                            </li>
-                                                            <li><hr class="dropdown-divider"></li>
-                                                            <li>
-                                                                <button type="button" class="dropdown-item text-danger" wire:click="$set('lignes.{{ $index }}.piece_jointe_remove', true)">
-                                                                    <i class="bi bi-trash me-2"></i>Supprimer
-                                                                </button>
-                                                            </li>
-                                                            @endif
-                                                        </ul>
-                                                    </div>
-                                                @elseif (! empty($lignes[$index]['piece_jointe_remove']))
-                                                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Sera supprimée</span>
-                                                    <button type="button" wire:click="$set('lignes.{{ $index }}.piece_jointe_remove', false)" class="btn btn-sm btn-link p-0 ms-1" title="Annuler la suppression">
-                                                        <i class="bi bi-arrow-counterclockwise"></i>
-                                                    </button>
-                                                @else
-                                                    {{-- Aucune PJ --}}
-                                                    <label class="btn btn-sm btn-outline-secondary" title="Ajouter un justificatif">
+                                                    @elseif (! empty($lignes[$index]['piece_jointe_path']) && empty($lignes[$index]['piece_jointe_remove']))
+                                                        <div class="dropdown">
+                                                            <button type="button" class="btn btn-sm btn-outline-primary"
+                                                                    data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false"
+                                                                    title="{{ $lignes[$index]['piece_jointe_filename'] ?? 'Pièce jointe' }}">
+                                                                <i class="bi bi-paperclip"></i>
+                                                            </button>
+                                                            <ul class="dropdown-menu">
+                                                                <li>
+                                                                    <a class="dropdown-item" href="{{ $lignes[$index]['piece_jointe_existing_url'] }}" target="_blank">
+                                                                        <i class="bi bi-eye me-2"></i>Consulter
+                                                                    </a>
+                                                                </li>
+                                                                @if (! $isLockedByFacture)
+                                                                <li>
+                                                                    <label class="dropdown-item mb-0" style="cursor:pointer;">
+                                                                        <i class="bi bi-arrow-repeat me-2"></i>Remplacer
+                                                                        <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                                                    </label>
+                                                                </li>
+                                                                <li><hr class="dropdown-divider"></li>
+                                                                <li>
+                                                                    <button type="button" class="dropdown-item text-danger" wire:click="$set('lignes.{{ $index }}.piece_jointe_remove', true)">
+                                                                        <i class="bi bi-trash me-2"></i>Supprimer
+                                                                    </button>
+                                                                </li>
+                                                                @endif
+                                                            </ul>
+                                                        </div>
+                                                    @elseif (! empty($lignes[$index]['piece_jointe_remove']))
+                                                        <span class="badge bg-warning text-dark text-nowrap"
+                                                              data-bs-toggle="tooltip" title="Sera supprimée au prochain enregistrement">
+                                                            <i class="bi bi-exclamation-triangle"></i>
+                                                        </span>
+                                                        <button type="button" wire:click="$set('lignes.{{ $index }}.piece_jointe_remove', false)"
+                                                                class="btn btn-sm btn-link p-0"
+                                                                data-bs-toggle="tooltip" title="Annuler la suppression">
+                                                            <i class="bi bi-arrow-counterclockwise"></i>
+                                                        </button>
+                                                    @else
+                                                        <label class="btn btn-sm btn-outline-secondary mb-0"
+                                                               data-bs-toggle="tooltip" title="Ajouter un justificatif">
+                                                            <i class="bi bi-paperclip"></i>
+                                                            <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                                        </label>
+                                                    @endif
+                                                    <span wire:loading wire:target="lignes.{{ $index }}.piece_jointe_upload" class="spinner-border spinner-border-sm"></span>
+                                                @elseif (! empty($lignes[$index]['piece_jointe_path']))
+                                                    {{-- Lecture seule --}}
+                                                    <a href="{{ $lignes[$index]['piece_jointe_existing_url'] }}" target="_blank"
+                                                       class="btn btn-sm btn-outline-primary"
+                                                       data-bs-toggle="tooltip" title="{{ $lignes[$index]['piece_jointe_filename'] ?? 'Consulter la pièce jointe' }}">
                                                         <i class="bi bi-paperclip"></i>
-                                                        <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
-                                                    </label>
-                                                @endif
-                                                @error("lignes.{$index}.piece_jointe_upload") <div class="text-danger small">{{ $message }}</div> @enderror
-                                                <span wire:loading wire:target="lignes.{{ $index }}.piece_jointe_upload" class="spinner-border spinner-border-sm ms-1"></span>
-                                            </div>
-                                            @elseif (! empty($lignes[$index]['piece_jointe_path']))
-                                                {{-- Mode lecture seule : lien consulter uniquement --}}
-                                                <div class="mt-1">
-                                                    <a href="{{ $lignes[$index]['piece_jointe_existing_url'] }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                                                        <i class="bi bi-paperclip"></i> Consulter
                                                     </a>
-                                                </div>
-                                            @endif
+                                                @endif
+                                            </div>
+                                            @error("lignes.{$index}.piece_jointe_upload") <div class="text-danger small">{{ $message }}</div> @enderror
                                         </td>
                                         <td class="text-center">
                                             @if (! $isLocked && ! $isLockedByFacture && ! $exerciceCloture)
