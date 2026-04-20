@@ -22,7 +22,7 @@ final class NoteDeFraisLigneFactory extends Factory
             'note_de_frais_id' => NoteDeFrais::factory(),
             'sous_categorie_id' => SousCategorie::factory(),
             'operation_id' => null,
-            'seance_id' => null,
+            'seance' => null,
             'libelle' => fake()->optional(0.7)->sentence(3),
             'montant' => fake()->randomFloat(2, 5, 500),
             'piece_jointe_path' => null,
