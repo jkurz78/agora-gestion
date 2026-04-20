@@ -62,6 +62,7 @@ it('creates a Transaction of type Depense when validating a soumise NDF', functi
     expect($transaction->date->format('Y-m-d'))->toBe('2025-10-15');
     expect((int) $transaction->compte_id)->toBe((int) $this->compte->id);
     expect($transaction->mode_paiement)->toBe(ModePaiement::Virement);
+    expect($transaction->reference)->toBe(sprintf('NDF #%d — %s', (int) $ndf->id, $ndf->date->format('d/m/Y')));
 });
 
 it('creates one TransactionLigne per NDF ligne with correct values', function (): void {

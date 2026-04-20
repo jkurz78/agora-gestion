@@ -107,6 +107,7 @@ final class NoteDeFraisValidationService
                 'type' => TypeTransaction::Depense->value,
                 'date' => $data->date,
                 'libelle' => $ndf->libelle,
+                'reference' => sprintf('NDF #%d — %s', (int) $ndf->id, $ndf->date->format('d/m/Y')),
                 'montant_total' => $montantTotal,
                 'mode_paiement' => $data->mode_paiement->value,
                 'tiers_id' => $ndf->tiers_id,
