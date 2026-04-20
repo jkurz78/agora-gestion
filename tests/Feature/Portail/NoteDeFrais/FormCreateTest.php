@@ -31,14 +31,27 @@ beforeEach(function () {
 });
 
 // ---------------------------------------------------------------------------
-// Test 1 : Form vierge rendu avec une ligne vide par défaut
+// Test 1 : Form vierge rendu sans ligne par défaut (Changement 2)
 // ---------------------------------------------------------------------------
 
-it('form create: page create affichée avec formulaire', function () {
+it('form create: page create affichée sans ligne par défaut', function () {
     $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle")
         ->assertStatus(200)
         ->assertSee('Nouvelle note de frais')
-        ->assertSee('Ajouter une ligne');
+        ->assertSee('Ajouter une ligne de dépense');
+});
+
+// ---------------------------------------------------------------------------
+// Test 1b : Brouillon vide sans ligne par défaut (Changement 2)
+// ---------------------------------------------------------------------------
+
+it('form create: crée un brouillon vide sans ligne par défaut', function () {
+    TenantContext::boot($this->asso);
+
+    $component = new Form;
+    $component->mount($this->asso);
+
+    expect($component->lignes)->toHaveCount(0);
 });
 
 // ---------------------------------------------------------------------------
@@ -48,15 +61,15 @@ it('form create: page create affichée avec formulaire', function () {
 it('form create: addLigne ajoute une ligne vide', function () {
     TenantContext::boot($this->asso);
 
-    $component = new Form();
+    $component = new Form;
     $component->mount($this->asso);
 
-    expect($component->lignes)->toHaveCount(1);
+    expect($component->lignes)->toHaveCount(0);
 
     $component->addLigne();
 
-    expect($component->lignes)->toHaveCount(2);
-    expect($component->lignes[1])->toMatchArray([
+    expect($component->lignes)->toHaveCount(1);
+    expect($component->lignes[0])->toMatchArray([
         'id' => null,
         'montant' => null,
         'sous_categorie_id' => null,
@@ -70,8 +83,9 @@ it('form create: addLigne ajoute une ligne vide', function () {
 it('form create: removeLigne supprime une ligne', function () {
     TenantContext::boot($this->asso);
 
-    $component = new Form();
+    $component = new Form;
     $component->mount($this->asso);
+    $component->addLigne();
     $component->addLigne();
 
     expect($component->lignes)->toHaveCount(2);
@@ -91,7 +105,7 @@ it('form create: saveDraft crée un brouillon lié au tiers et à l\'asso', func
     TenantContext::boot($this->asso);
     Auth::guard('tiers-portail')->login($this->tiers);
 
-    $component = new Form();
+    $component = new Form;
     $component->mount($this->asso);
     $component->dateInput = '2026-04-15';
     $component->libelle = 'Frais déplacement';
@@ -123,8 +137,9 @@ it('form create: saveDraft crée un brouillon lié au tiers et à l\'asso', func
 it('form create: total calculé = somme des montants des lignes', function () {
     TenantContext::boot($this->asso);
 
-    $component = new Form();
+    $component = new Form;
     $component->mount($this->asso);
+    $component->addLigne();
     $component->lignes[0]['montant'] = '25.50';
     $component->addLigne();
     $component->lignes[1]['montant'] = '10.00';
@@ -133,25 +148,24 @@ it('form create: total calculé = somme des montants des lignes', function () {
 });
 
 // ---------------------------------------------------------------------------
-// Test 6 : Sous-catégories affichées dans le form
+// Test 6 : Page create affichée avec le bouton wizard
 // ---------------------------------------------------------------------------
 
-it('form create: sous-catégories affichées dans le formulaire', function () {
+it('form create: page affichée avec le bouton Ajouter une ligne de dépense', function () {
+    $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle")
+        ->assertStatus(200)
+        ->assertSee('Ajouter une ligne de dépense');
+});
+
+// ---------------------------------------------------------------------------
+// Test 7 : Sous-catégories et opérations disponibles dans le render (via component)
+// ---------------------------------------------------------------------------
+
+it('form create: sous-catégories accessibles via le composant', function () {
     SousCategorie::factory()->create([
         'association_id' => $this->asso->id,
         'nom' => 'Transport',
     ]);
-
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle")
-        ->assertStatus(200)
-        ->assertSee('Transport');
-});
-
-// ---------------------------------------------------------------------------
-// Test 7 : Opérations actives affichées, clôturées exclues
-// ---------------------------------------------------------------------------
-
-it('form create: opérations actives affichées, clôturées exclues', function () {
     Operation::factory()->create([
         'association_id' => $this->asso->id,
         'nom' => 'Op Active',
@@ -163,10 +177,17 @@ it('form create: opérations actives affichées, clôturées exclues', function 
         'statut' => StatutOperation::Cloturee,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle")
-        ->assertStatus(200)
-        ->assertSee('Op Active')
-        ->assertDontSee('Op Clôturée');
+    TenantContext::boot($this->asso);
+    $component = new Form;
+    $component->mount($this->asso);
+
+    // Les sous-catégories et opérations sont bien chargées dans render()
+    $view = $component->render();
+    $data = $view->getData();
+
+    expect($data['sousCategories']->pluck('nom')->toArray())->toContain('Transport');
+    expect($data['operations']->pluck('nom')->toArray())->toContain('Op Active');
+    expect($data['operations']->pluck('nom')->toArray())->not->toContain('Op Clôturée');
 });
 
 // ---------------------------------------------------------------------------
@@ -180,10 +201,11 @@ it('form create: upload justificatif stocké dans storage tenant', function () {
     TenantContext::boot($this->asso);
     Auth::guard('tiers-portail')->login($this->tiers);
 
-    $component = new Form();
+    $component = new Form;
     $component->mount($this->asso);
     $component->dateInput = '2026-04-15';
     $component->libelle = 'Frais avec PJ';
+    $component->addLigne();
     $component->lignes[0]['montant'] = '50.00';
     $component->lignes[0]['sous_categorie_id'] = $sc->id;
 
