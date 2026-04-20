@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutOperation;
+use App\Enums\TypeCategorie;
 use App\Livewire\Portail\NoteDeFrais\Form;
 use App\Models\Association;
+use App\Models\Categorie;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
@@ -162,8 +164,13 @@ it('form create: page affichée avec le bouton Ajouter une ligne de dépense', f
 // ---------------------------------------------------------------------------
 
 it('form create: sous-catégories accessibles via le composant', function () {
+    $catDepense = Categorie::factory()->create([
+        'association_id' => $this->asso->id,
+        'type' => TypeCategorie::Depense,
+    ]);
     SousCategorie::factory()->create([
         'association_id' => $this->asso->id,
+        'categorie_id' => $catDepense->id,
         'nom' => 'Transport',
     ]);
     Operation::factory()->create([
@@ -224,4 +231,41 @@ it('form create: upload justificatif stocké dans storage tenant', function () {
     $expectedPrefix = "associations/{$this->asso->id}/notes-de-frais/{$ndf->id}/";
     expect($ligne)->not->toBeNull()
         ->and((int) $ndf->association_id)->toBe((int) $this->asso->id);
+});
+
+// ---------------------------------------------------------------------------
+// Test 9 : render() filtre les sous-catégories sur type=Depense uniquement
+// ---------------------------------------------------------------------------
+
+it('form create: render filtre les sous-catégories de type Depense uniquement', function () {
+    $catDepense = Categorie::factory()->create([
+        'association_id' => $this->asso->id,
+        'type' => TypeCategorie::Depense,
+    ]);
+    $catRecette = Categorie::factory()->create([
+        'association_id' => $this->asso->id,
+        'type' => TypeCategorie::Recette,
+    ]);
+
+    $scDepense = SousCategorie::factory()->create([
+        'association_id' => $this->asso->id,
+        'categorie_id' => $catDepense->id,
+        'nom' => 'Frais kilométriques',
+    ]);
+    $scRecette = SousCategorie::factory()->create([
+        'association_id' => $this->asso->id,
+        'categorie_id' => $catRecette->id,
+        'nom' => 'Cotisation membre',
+    ]);
+
+    TenantContext::boot($this->asso);
+    $component = new Form;
+    $component->mount($this->asso);
+
+    $view = $component->render();
+    $data = $view->getData();
+
+    expect($data['sousCategories']->pluck('nom')->toArray())
+        ->toContain('Frais kilométriques')
+        ->not->toContain('Cotisation membre');
 });

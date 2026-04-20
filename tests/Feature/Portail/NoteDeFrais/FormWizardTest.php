@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 use App\Livewire\Portail\NoteDeFrais\Form;
 use App\Models\Association;
+use App\Models\NoteDeFrais;
+use App\Models\NoteDeFraisLigne;
+use App\Models\Operation;
+use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
@@ -210,4 +214,127 @@ it('wizard: wizardPrev retourne à l\'étape précédente sans perdre les donné
     $component->wizardPrev();
 
     expect($component->wizardStep)->toBe(1);
+});
+
+// ---------------------------------------------------------------------------
+// Test 10 : Séances apparaissent dans render quand opération choisie
+// ---------------------------------------------------------------------------
+
+it('wizard: séances disponibles dans render quand operation_id est sélectionné', function () {
+    $op = Operation::factory()->create(['association_id' => $this->asso->id]);
+
+    $seance = Seance::create([
+        'association_id' => $this->asso->id,
+        'operation_id' => $op->id,
+        'numero' => 1,
+        'date' => '2026-05-10',
+        'titre' => 'Séance de printemps',
+    ]);
+
+    // Séance d'une autre opération — ne doit pas apparaître
+    $autreOp = Operation::factory()->create(['association_id' => $this->asso->id]);
+    Seance::create([
+        'association_id' => $this->asso->id,
+        'operation_id' => $autreOp->id,
+        'numero' => 1,
+        'date' => '2026-06-01',
+        'titre' => 'Autre séance',
+    ]);
+
+    TenantContext::boot($this->asso);
+    $component = makeForm($this->asso);
+    $component->draftLigne['operation_id'] = (string) $op->id;
+
+    $view = $component->render();
+    $data = $view->getData();
+
+    expect($data['seances'])->toHaveCount(1)
+        ->and((int) $data['seances']->first()->id)->toBe((int) $seance->id);
+});
+
+it('wizard: séances vide dans render quand aucune opération choisie', function () {
+    $op = Operation::factory()->create(['association_id' => $this->asso->id]);
+    Seance::create([
+        'association_id' => $this->asso->id,
+        'operation_id' => $op->id,
+        'numero' => 1,
+        'date' => '2026-05-10',
+        'titre' => 'Test',
+    ]);
+
+    TenantContext::boot($this->asso);
+    $component = makeForm($this->asso);
+    // operation_id reste null
+
+    $view = $component->render();
+    $data = $view->getData();
+
+    expect($data['seances'])->toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------
+// Test 11 : removeLigne sur NDF existante (Edit) — pas d'exception
+// ---------------------------------------------------------------------------
+
+it('removeLigne: supprime une ligne persistée sans exception, même si storage absent', function () {
+    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+
+    $ndf = NoteDeFrais::factory()->create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+        'statut' => 'brouillon',
+    ]);
+
+    $ligne = NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'sous_categorie_id' => $sc->id,
+        'montant' => 25.00,
+        // piece_jointe_path null → pas de fichier à supprimer
+    ]);
+
+    TenantContext::boot($this->asso);
+    Auth::guard('tiers-portail')->login($this->tiers);
+
+    $component = new Form;
+    $component->mount($this->asso, $ndf);
+
+    expect($component->lignes)->toHaveCount(1);
+
+    // removeLigne doit passer sans exception
+    $component->removeLigne(0);
+
+    expect($component->lignes)->toHaveCount(0);
+    expect(NoteDeFraisLigne::find((int) $ligne->id))->toBeNull();
+});
+
+it('removeLigne: supprime une ligne avec piece_jointe_path sans exception si fichier absent', function () {
+    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+
+    $ndf = NoteDeFrais::factory()->create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+        'statut' => 'brouillon',
+    ]);
+
+    // Ligne avec un chemin de fichier qui n'existe pas sur le disk fake
+    $ligne = NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'sous_categorie_id' => $sc->id,
+        'montant' => 15.00,
+        'piece_jointe_path' => 'associations/1/notes-de-frais/999/ligne-1.pdf',
+    ]);
+
+    TenantContext::boot($this->asso);
+    Auth::guard('tiers-portail')->login($this->tiers);
+
+    $component = new Form;
+    $component->mount($this->asso, $ndf);
+
+    expect($component->lignes)->toHaveCount(1);
+
+    // Ne doit pas lever d'exception même si le fichier est absent du disk fake
+    $component->removeLigne(0);
+
+    expect($component->lignes)->toHaveCount(0);
+    expect(NoteDeFraisLigne::find((int) $ligne->id))->toBeNull();
 });

@@ -6,11 +6,13 @@ namespace App\Livewire\Portail\NoteDeFrais;
 
 use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutOperation;
+use App\Enums\TypeCategorie;
 use App\Livewire\Portail\Concerns\WithPortailTenant;
 use App\Models\Association;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
+use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
@@ -281,15 +283,25 @@ final class Form extends Component
     {
         $exerciceCourant = app(ExerciceService::class)->current();
 
-        $sousCategories = SousCategorie::orderBy('nom')->get();
+        $sousCategories = SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Depense))
+            ->orderBy('nom')
+            ->get();
 
         $operations = Operation::where('statut', '!=', StatutOperation::Cloturee->value)
             ->orderBy('nom')
             ->get();
 
+        $seances = collect();
+        if (! empty($this->draftLigne['operation_id'])) {
+            $seances = Seance::where('operation_id', (int) $this->draftLigne['operation_id'])
+                ->orderBy('date')
+                ->get();
+        }
+
         return view('livewire.portail.note-de-frais.form', [
             'sousCategories' => $sousCategories,
             'operations' => $operations,
+            'seances' => $seances,
         ])->layout('portail.layouts.app');
     }
 

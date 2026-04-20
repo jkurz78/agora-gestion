@@ -224,6 +224,19 @@
                                 @endforeach
                             </select>
                         </div>
+                        @if ($seances->isNotEmpty())
+                            <div class="mb-3">
+                                <label class="form-label">Séance <span class="text-muted small">(optionnel)</span></label>
+                                <select wire:model.live="draftLigne.seance_id" class="form-select">
+                                    <option value="">— aucune —</option>
+                                    @foreach ($seances as $s)
+                                        <option value="{{ $s->id }}">
+                                            {{ $s->date?->format('d/m/Y') }}{{ $s->titre ? ' — '.$s->titre : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
                     @endif
                 </div>
                 <div class="modal-footer">
