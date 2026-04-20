@@ -31,13 +31,29 @@ it('boote le TenantContext avec l\'association du slug', function () {
     expect(TenantContext::currentId())->toBe($asso->id);
 });
 
-it('abort 404 si le paramètre association n\'est pas un model Association', function () {
+it('passe silencieusement quand le paramètre association est absent (cas /livewire/update)', function () {
+    $request = Request::create('/livewire/update', 'POST');
+    $request->setRouteResolver(function () {
+        $route = new Route('POST', '/livewire/update', []);
+        $route->bind(Request::create('/livewire/update', 'POST'));
+
+        // Pas de paramètre association — simule une requête Livewire
+        return $route;
+    });
+
+    $middleware = new BootTenantFromSlug;
+    $response = $middleware->handle($request, fn ($req) => new Response('ok'));
+
+    expect($response->getContent())->toBe('ok');
+    expect(TenantContext::hasBooted())->toBeFalse();
+});
+
+it('abort 404 si le slug ne correspond à aucune Association', function () {
     $request = Request::create('/portail/inexistant/login', 'GET');
     $request->setRouteResolver(function () {
         $route = new Route('GET', '/portail/{association:slug}/login', []);
         $route->bind(Request::create('/portail/inexistant/login'));
-        // Pas de paramètre association — simuler slug non résolu (null)
-        $route->setParameter('association', null);
+        $route->setParameter('association', 'inexistant');
 
         return $route;
     });

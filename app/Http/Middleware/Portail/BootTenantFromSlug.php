@@ -16,6 +16,14 @@ final class BootTenantFromSlug
     {
         $param = $request->route('association');
 
+        // Livewire peut rejouer ce middleware sur /livewire/update où aucun
+        // route param n'est présent. Le composant Livewire boote lui-même
+        // le TenantContext via le trait WithPortailTenant depuis sa propriété
+        // $association rehydratée. On passe donc silencieusement.
+        if ($param === null) {
+            return $next($request);
+        }
+
         // If SubstituteBindings has already resolved the model, use it directly.
         // Otherwise, resolve from the raw slug string.
         if ($param instanceof Association) {
