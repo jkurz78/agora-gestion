@@ -126,6 +126,8 @@
                                 <th>#</th>
                                 <th>Libellé</th>
                                 <th>Sous-catégorie</th>
+                                <th>Opération</th>
+                                <th>Séance</th>
                                 <th class="text-end">Montant</th>
                                 <th>Pièce jointe</th>
                             </tr>
@@ -135,7 +137,9 @@
                                 <tr>
                                     <td>{{ $index + 1 }}</td>
                                     <td>{{ $ligne->libelle ?? '—' }}</td>
-                                    <td>{{ $ligne->sousCategorie?->libelle ?? '—' }}</td>
+                                    <td>{{ $ligne->sousCategorie?->nom ?? '—' }}</td>
+                                    <td>{{ $ligne->operation?->nom ?? '—' }}</td>
+                                    <td>{{ $ligne->seance ?? '—' }}</td>
                                     <td class="text-end" data-sort="{{ number_format((float) $ligne->montant, 2, '.', '') }}">
                                         {{ number_format((float) $ligne->montant, 2, ',', ' ') }} €
                                     </td>
