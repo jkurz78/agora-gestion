@@ -5,6 +5,7 @@ use App\Http\Middleware\BootTenantConfig;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureTenantAccess;
 use App\Http\Middleware\ForceWizardIfNotCompleted;
+use App\Http\Middleware\Portail\BootTenantFromSlug;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\Middleware\Authenticate;
@@ -55,6 +56,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ShareErrorsFromSession::class,
             ValidateCsrfToken::class,
             ResolveTenant::class,
+            BootTenantFromSlug::class,
             BootTenantConfig::class,
             Authenticate::class,
             ThrottleRequests::class,
