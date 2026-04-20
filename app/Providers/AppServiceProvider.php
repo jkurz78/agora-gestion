@@ -8,7 +8,9 @@ use App\Console\Commands\VersionStampCommand;
 use App\Models\Association;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
+use App\Models\Transaction;
 use App\Observers\ImmutableSlugObserver;
+use App\Observers\TransactionObserver;
 use App\Policies\NoteDeFraisPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
@@ -23,6 +25,7 @@ final class AppServiceProvider extends ServiceProvider
         Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
 
         Association::observe(ImmutableSlugObserver::class);
+        Transaction::observe(TransactionObserver::class);
 
         if (! file_exists(config_path('version.php'))) {
             $data = VersionStampCommand::readGitVersion();
