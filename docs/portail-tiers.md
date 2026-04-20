@@ -156,11 +156,15 @@ Statut : livré 2026-04-19.
 - `portail.ndf.submitted`
 - `portail.ndf.deleted`
 
+### Dettes résolues (post-Slice 2)
+
+- **Q6-A résolue (2026-04-20)** : les NDF Rejetées sont désormais éditables (avec re-soumission) et supprimables depuis le portail. La policy `update` et `delete` incluent maintenant le statut `Rejetee`. Le service `saveDraft` efface `motif_rejet` et `submitted_at` au retour en Brouillon. Les boutons Modifier/Supprimer sont affichés sur la page Show et dans la liste Index pour les NDF Rejetées.
+
 ### Dettes portées en Slice 3
 
 - Filtre sous-catégorie `pour_depenses=true` : simplifié pour Slice 2 (toutes les sous-catégories affichées). Le champ `pour_depenses` est sur `Tiers`, pas sur `SousCategorie` — à clarifier avec produit.
 - Validation opérations actives + exercice courant : à vérifier implementation.
-- Archivage des NDF rejetées/payées : non prévu (Q6-A).
+- Archivage des NDF rejetées/payées : non prévu (Q6-A — dette résolue pour édit+suppression, archivage reste non prévu).
 
 ## Slice 3 — Back-office NDF comptable (2026-04-20)
 

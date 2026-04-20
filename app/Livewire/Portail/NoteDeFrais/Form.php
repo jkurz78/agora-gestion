@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Portail\NoteDeFrais;
 
-use App\Enums\StatutNoteDeFrais;
 use App\Enums\StatutOperation;
 use App\Enums\TypeCategorie;
 use App\Livewire\Portail\Concerns\WithPortailTenant;
@@ -65,13 +64,8 @@ final class Form extends Component
         $this->association = $association;
 
         if ($noteDeFrais !== null) {
+            // La policy authorize() couvre Brouillon, Soumise et Rejetee
             Gate::forUser(Auth::guard('tiers-portail')->user())->authorize('update', $noteDeFrais);
-
-            // Brouillon et Soumise peuvent être édités — les autres statuts sont refusés par la policy
-            $editableStatuts = [StatutNoteDeFrais::Brouillon, StatutNoteDeFrais::Soumise];
-            if (! in_array($noteDeFrais->statut, $editableStatuts, true)) {
-                abort(403, 'Seul un brouillon ou une NDF soumise peut être modifié(e).');
-            }
 
             $this->noteDeFraisId = $noteDeFrais->id;
             $this->dateInput = $noteDeFrais->date?->format('Y-m-d');

@@ -40,10 +40,11 @@ final class NoteDeFraisPolicy
             return false;
         }
 
-        // Brouillon et Soumise sont éditables — Rejetee/Validee/Payee sont read-only
+        // Brouillon, Soumise et Rejetee sont éditables — Validee/Payee sont read-only
         return in_array($noteDeFrais->statut, [
             StatutNoteDeFrais::Brouillon,
             StatutNoteDeFrais::Soumise,
+            StatutNoteDeFrais::Rejetee,
         ], true);
     }
 
@@ -96,10 +97,11 @@ final class NoteDeFraisPolicy
             return false;
         }
 
-        // Brouillon et Soumise peuvent être supprimées — Rejetee/Validee/Payee non
+        // Brouillon, Soumise et Rejetee peuvent être supprimées — Validee/Payee non
         return in_array($noteDeFrais->statut, [
             StatutNoteDeFrais::Brouillon,
             StatutNoteDeFrais::Soumise,
+            StatutNoteDeFrais::Rejetee,
         ], true);
     }
 }

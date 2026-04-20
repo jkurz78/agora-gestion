@@ -47,23 +47,25 @@ final class NoteDeFraisService
                     throw new DomainException('Cette note de frais n\'appartient pas à ce tiers.');
                 }
 
-                $editableStatuts = [StatutNoteDeFrais::Brouillon, StatutNoteDeFrais::Soumise];
+                $editableStatuts = [StatutNoteDeFrais::Brouillon, StatutNoteDeFrais::Soumise, StatutNoteDeFrais::Rejetee];
                 if (! in_array($ndf->statut, $editableStatuts, true)) {
-                    throw new DomainException('Seul un brouillon ou une NDF soumise peut être modifié(e).');
+                    throw new DomainException('Seul un brouillon, une NDF soumise ou rejetée peut être modifié(e).');
                 }
 
-                $wasSubmitted = $ndf->statut === StatutNoteDeFrais::Soumise;
+                $wasNonBrouillon = $ndf->statut !== StatutNoteDeFrais::Brouillon;
 
                 $ndf->update([
                     'date' => $data['date'],
                     'libelle' => $data['libelle'] ?? '',
                 ]);
 
-                // Si la NDF était soumise, on remet en brouillon : l'utilisateur doit re-soumettre
-                if ($wasSubmitted) {
+                // Si la NDF n'était pas déjà un brouillon, on remet en brouillon :
+                // l'utilisateur doit re-soumettre. Le motif de rejet est effacé.
+                if ($wasNonBrouillon) {
                     $ndf->update([
                         'statut' => StatutNoteDeFrais::Brouillon->value,
                         'submitted_at' => null,
+                        'motif_rejet' => null,
                     ]);
                 }
 
@@ -181,9 +183,9 @@ final class NoteDeFraisService
      */
     public function delete(NoteDeFrais $ndf): void
     {
-        $deletableStatuts = [StatutNoteDeFrais::Brouillon, StatutNoteDeFrais::Soumise];
+        $deletableStatuts = [StatutNoteDeFrais::Brouillon, StatutNoteDeFrais::Soumise, StatutNoteDeFrais::Rejetee];
         if (! in_array($ndf->statut, $deletableStatuts, true)) {
-            throw new DomainException('Seul un brouillon ou une NDF soumise peut être supprimé(e).');
+            throw new DomainException('Seul un brouillon, une NDF soumise ou rejetée peut être supprimé(e).');
         }
 
         DB::transaction(function () use ($ndf): void {

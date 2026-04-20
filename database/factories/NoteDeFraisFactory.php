@@ -45,6 +45,14 @@ final class NoteDeFraisFactory extends Factory
         ]);
     }
 
+    public function rejetee(string $motif = 'Justificatif manquant'): static
+    {
+        return $this->state([
+            'statut' => StatutNoteDeFrais::Rejetee->value,
+            'motif_rejet' => $motif,
+        ]);
+    }
+
     public function validee(): static
     {
         return $this->state([
