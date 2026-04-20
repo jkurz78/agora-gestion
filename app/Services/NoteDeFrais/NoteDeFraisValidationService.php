@@ -9,6 +9,7 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
+use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use DomainException;
@@ -23,6 +24,7 @@ final class NoteDeFraisValidationService
 {
     public function __construct(
         private readonly TransactionService $transactionService,
+        private readonly LigneTypeRegistry $ligneTypeRegistry,
     ) {}
 
     /**
@@ -117,13 +119,22 @@ final class NoteDeFraisValidationService
             ];
 
             // Construire les lignes transaction (libelle NDF → notes transaction)
-            $lignesData = $lignesNdf->map(fn ($ligne) => [
-                'sous_categorie_id' => $ligne->sous_categorie_id,
-                'operation_id' => $ligne->operation_id,
-                'seance' => $ligne->seance,
-                'notes' => $ligne->libelle,
-                'montant' => (float) $ligne->montant,
-            ])->toArray();
+            $lignesData = $lignesNdf->map(function ($ligne) {
+                $strategy = $this->ligneTypeRegistry->for($ligne->type);
+                $description = $strategy->renderDescription($ligne->metadata ?? []);
+
+                $notes = $description !== ''
+                    ? ($ligne->libelle ? "{$ligne->libelle} — {$description}" : $description)
+                    : $ligne->libelle;
+
+                return [
+                    'sous_categorie_id' => $ligne->sous_categorie_id,
+                    'operation_id' => $ligne->operation_id,
+                    'seance' => $ligne->seance,
+                    'notes' => $notes,
+                    'montant' => (float) $ligne->montant,
+                ];
+            })->toArray();
 
             // Créer la transaction (assertOuvert levée ici si exercice clôturé)
             $transaction = $this->transactionService->create($txData, $lignesData);
