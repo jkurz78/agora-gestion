@@ -39,6 +39,7 @@ use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\EnsureTwoFactor;
 use App\Http\Middleware\VerifyTenantAsset;
 use App\Livewire\Auth\AssociationSelector;
+use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -172,6 +173,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
             ->name('transactions.import.template');
         Route::view('/budget', 'budget.index')->name('budget');
         Route::get('/budget/export', BudgetExportController::class)->name('budget.export');
+        Route::get('/notes-de-frais', NdfIndex::class)->name('ndf.index');
+        Route::get('/notes-de-frais/{noteDeFrais}', fn (\App\Models\NoteDeFrais $noteDeFrais) => abort(404))->name('ndf.show');
     });
 
 // ── Banques ──
