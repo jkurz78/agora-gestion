@@ -39,6 +39,6 @@ final class ChooseTiers extends Component
     {
         return view('livewire.portail.choose-tiers', [
             'tiers' => $authSession->pendingTiers(),
-        ])->layout('portail.layouts.app');
+        ])->layout('portail.layouts.app', ['contentClass' => 'col-md-6 col-lg-5']);
     }
 }

@@ -53,6 +53,6 @@ final class Login extends Component
     public function render(): View
     {
         return view('livewire.portail.login')
-            ->layout('portail.layouts.app');
+            ->layout('portail.layouts.app', ['contentClass' => 'col-md-6 col-lg-5']);
     }
 }
