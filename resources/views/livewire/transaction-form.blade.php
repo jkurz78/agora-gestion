@@ -248,7 +248,7 @@
                         <div class="alert alert-danger py-2">{{ $message }}</div>
                     @enderror
 
-                    <div class="table-responsive mb-3">
+                    <div class="table-responsive mb-3" style="overflow: visible;">
                         <table class="table table-sm table-bordered align-middle">
                             <thead class="table-light">
                                 <tr>
