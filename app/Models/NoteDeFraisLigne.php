@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\NoteDeFraisLigneType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,6 +37,8 @@ final class NoteDeFraisLigne extends Model
         'libelle',
         'montant',
         'piece_jointe_path',
+        'type',
+        'metadata',
     ];
 
     protected function casts(): array
@@ -43,6 +46,8 @@ final class NoteDeFraisLigne extends Model
         return [
             'montant' => 'decimal:2',
             'seance' => 'integer',
+            'type' => NoteDeFraisLigneType::class,
+            'metadata' => 'array',
         ];
     }
 
