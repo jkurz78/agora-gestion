@@ -273,11 +273,13 @@ it('confirmValidation with invalid compte_id returns a validation error', functi
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+        ->set('showMiniForm', true)
         ->set('compteId', 99999)
         ->set('modePaiement', 'virement')
         ->set('dateComptabilisation', '2025-10-15')
         ->call('confirmValidation')
-        ->assertHasErrors(['compteId']);
+        ->assertHasErrors(['compteId'])
+        ->assertSet('showMiniForm', true);
 });
 
 // ── 10. confirmValidation avec mode_paiement invalide → erreur ───────────────
@@ -301,11 +303,13 @@ it('confirmValidation with invalid modePaiement returns a validation error', fun
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+        ->set('showMiniForm', true)
         ->set('compteId', $compte->id)
         ->set('modePaiement', 'invalid_mode')
         ->set('dateComptabilisation', '2025-10-15')
         ->call('confirmValidation')
-        ->assertHasErrors(['modePaiement']);
+        ->assertHasErrors(['modePaiement'])
+        ->assertSet('showMiniForm', true);
 });
 
 // ── 11. confirmValidation avec exercice clôturé → flash error, NDF Soumise ───
