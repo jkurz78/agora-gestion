@@ -91,24 +91,32 @@
                                 @endswitch
                             </td>
                             <td class="text-end">
-                                @if ($archived)
-                                    {{-- NDF archivée : lecture seule --}}
-                                    <a href="{{ route('portail.ndf.show', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
-                                       class="btn btn-outline-secondary btn-sm">
-                                        <i class="bi bi-eye me-1"></i>Consulter
-                                    </a>
-                                @elseif (in_array($statut->value, ['brouillon', 'soumise', 'rejetee']))
-                                    <a href="{{ route('portail.ndf.edit', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
-                                       class="btn btn-outline-primary btn-sm">
-                                        <i class="bi bi-pencil me-1"></i>Modifier
-                                    </a>
-                                @else
-                                    <div class="d-flex gap-1 justify-content-end">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    @if ($archived)
+                                        {{-- Archivée : lecture seule --}}
                                         <a href="{{ route('portail.ndf.show', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
                                            class="btn btn-outline-secondary btn-sm">
                                             <i class="bi bi-eye me-1"></i>Consulter
                                         </a>
-                                        @if (in_array($statut->value, ['payee', 'rejetee']))
+                                    @else
+                                        {{-- Consulter : toujours disponible sauf pour brouillon/soumise (info identique au Modifier) --}}
+                                        @if (! in_array($statut->value, ['brouillon', 'soumise'], true))
+                                            <a href="{{ route('portail.ndf.show', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
+                                               class="btn btn-outline-secondary btn-sm">
+                                                <i class="bi bi-eye me-1"></i>Consulter
+                                            </a>
+                                        @endif
+
+                                        {{-- Modifier : brouillon, soumise, rejetée --}}
+                                        @if (in_array($statut->value, ['brouillon', 'soumise', 'rejetee'], true))
+                                            <a href="{{ route('portail.ndf.edit', ['association' => $association->slug, 'noteDeFrais' => $note->id]) }}"
+                                               class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-pencil me-1"></i>Modifier
+                                            </a>
+                                        @endif
+
+                                        {{-- Archiver : payée, rejetée --}}
+                                        @if (in_array($statut->value, ['payee', 'rejetee'], true))
                                             <button type="button"
                                                     class="btn btn-outline-secondary btn-sm"
                                                     data-bs-toggle="modal"
@@ -116,8 +124,8 @@
                                                 <i class="bi bi-archive me-1"></i>Archiver
                                             </button>
                                         @endif
-                                    </div>
-                                @endif
+                                    @endif
+                                </div>
                             </td>
                         </tr>
 
