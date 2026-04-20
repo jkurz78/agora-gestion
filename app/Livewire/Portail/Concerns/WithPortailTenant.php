@@ -9,7 +9,7 @@ use App\Tenant\TenantContext;
 
 trait WithPortailTenant
 {
-    public function bootWithPortailTenant(): void
+    public function bootedWithPortailTenant(): void
     {
         /** @var Association|null $asso */
         $asso = $this->association ?? null;
