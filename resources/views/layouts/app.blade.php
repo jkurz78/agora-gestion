@@ -233,6 +233,19 @@
                         </ul>
                     </li>
 
+                    {{-- Notes de frais --}}
+                    @if(($canSeeNdf ?? false) && Route::has('comptabilite.ndf.index'))
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('comptabilite.ndf.*') ? 'active' : '' }}"
+                               href="{{ route('comptabilite.ndf.index') }}">
+                                <i class="bi bi-receipt-cutoff"></i> Notes de frais
+                                @if(($ndfPendingCount ?? 0) > 0)
+                                    <span class="badge bg-warning text-dark">{{ $ndfPendingCount }}</span>
+                                @endif
+                            </a>
+                        </li>
+                    @endif
+
                     {{-- Budget --}}
                     @if (Route::has('comptabilite.budget'))
                         <li class="nav-item">
