@@ -179,3 +179,60 @@ it('form submit: ligne sans pièce jointe retourne erreur', function () {
     expect($ndf->statut)->toBe(StatutNoteDeFrais::Brouillon);
     expect($component->getErrorBag()->has('submit'))->toBeTrue();
 });
+
+// ---------------------------------------------------------------------------
+// Test 7 : removeLigne sur NDF chargée par noteDeFraisId (résistance rehydratation)
+// ---------------------------------------------------------------------------
+
+it('removeLigne: fonctionne sur une NDF existante chargée par noteDeFraisId', function () {
+    $sc = SousCategorie::factory()->create(['association_id' => $this->asso->id]);
+
+    $ndf = NoteDeFrais::factory()->brouillon()->create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+    ]);
+    $ligne = NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'sous_categorie_id' => $sc->id,
+        'montant' => 30.00,
+    ]);
+
+    TenantContext::boot($this->asso);
+    Auth::guard('tiers-portail')->login($this->tiers);
+
+    $component = new Form;
+    $component->mount($this->asso, $ndf);
+
+    // Simule la rehydratation : noteDeFraisId est un int, pas un objet Eloquent
+    expect($component->noteDeFraisId)->toBe((int) $ndf->id);
+    expect($component->lignes)->toHaveCount(1);
+
+    $component->removeLigne(0);
+
+    expect($component->lignes)->toHaveCount(0);
+    expect(NoteDeFraisLigne::find((int) $ligne->id))->toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// Test 8 : deleteNdf sur NDF chargée par noteDeFraisId
+// ---------------------------------------------------------------------------
+
+it('deleteNdf: supprime la NDF récupérée via noteDeFraisId', function () {
+    $ndf = NoteDeFrais::factory()->brouillon()->create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+    ]);
+
+    TenantContext::boot($this->asso);
+    Auth::guard('tiers-portail')->login($this->tiers);
+
+    $component = new Form;
+    $component->mount($this->asso, $ndf);
+
+    expect($component->noteDeFraisId)->toBe((int) $ndf->id);
+
+    $component->deleteNdf();
+
+    $ndf->refresh();
+    expect($ndf->trashed())->toBeTrue();
+});

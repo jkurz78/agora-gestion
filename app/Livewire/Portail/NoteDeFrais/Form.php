@@ -12,7 +12,6 @@ use App\Models\Association;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
-use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
@@ -34,7 +33,8 @@ final class Form extends Component
 
     public Association $association;
 
-    public ?NoteDeFrais $noteDeFrais = null;
+    /** Stocké comme int pour survivre à la rehydratation Livewire sans TenantContext. */
+    public ?int $noteDeFraisId = null;
 
     public ?string $dateInput = null;
 
@@ -50,14 +50,14 @@ final class Form extends Component
     /** 0 = fermé, 1-3 = étape courante du wizard */
     public int $wizardStep = 0;
 
-    /** @var array{justif: mixed, libelle: string, montant: string, sous_categorie_id: int|null, operation_id: int|null, seance_id: int|null} */
+    /** @var array{justif: mixed, libelle: string, montant: string, sous_categorie_id: int|null, operation_id: int|null, seance: int|null} */
     public array $draftLigne = [
         'justif' => null,
         'libelle' => '',
         'montant' => '',
         'sous_categorie_id' => null,
         'operation_id' => null,
-        'seance_id' => null,
+        'seance' => null,
     ];
 
     public function mount(Association $association, ?NoteDeFrais $noteDeFrais = null): void
@@ -73,14 +73,14 @@ final class Form extends Component
                 abort(403, 'Seul un brouillon ou une NDF soumise peut être modifié(e).');
             }
 
-            $this->noteDeFrais = $noteDeFrais;
+            $this->noteDeFraisId = $noteDeFrais->id;
             $this->dateInput = $noteDeFrais->date?->format('Y-m-d');
             $this->libelle = $noteDeFrais->libelle;
             $this->lignes = $noteDeFrais->lignes->map(fn (NoteDeFraisLigne $l) => [
                 'id' => $l->id,
                 'sous_categorie_id' => $l->sous_categorie_id,
                 'operation_id' => $l->operation_id,
-                'seance_id' => $l->seance_id,
+                'seance' => $l->seance,
                 'libelle' => $l->libelle,
                 'montant' => (string) $l->montant,
                 'piece_jointe_path' => $l->piece_jointe_path,
@@ -171,7 +171,7 @@ final class Form extends Component
             'id' => null,
             'sous_categorie_id' => $this->draftLigne['sous_categorie_id'],
             'operation_id' => $this->draftLigne['operation_id'],
-            'seance_id' => $this->draftLigne['seance_id'],
+            'seance' => $this->draftLigne['seance'],
             'libelle' => $this->draftLigne['libelle'],
             'montant' => $this->draftLigne['montant'],
             'piece_jointe_path' => null,
@@ -193,7 +193,7 @@ final class Form extends Component
             'id' => null,
             'sous_categorie_id' => null,
             'operation_id' => null,
-            'seance_id' => null,
+            'seance' => null,
             'libelle' => null,
             'montant' => null,
             'piece_jointe_path' => null,
@@ -218,12 +218,13 @@ final class Form extends Component
 
     public function deleteNdf(): void
     {
-        if ($this->noteDeFrais === null) {
+        $ndf = $this->getNoteDeFrais();
+        if ($ndf === null) {
             return;
         }
 
-        Gate::forUser(Auth::guard('tiers-portail')->user())->authorize('delete', $this->noteDeFrais);
-        app(NoteDeFraisService::class)->delete($this->noteDeFrais);
+        Gate::forUser(Auth::guard('tiers-portail')->user())->authorize('delete', $ndf);
+        app(NoteDeFraisService::class)->delete($ndf);
 
         session()->flash('portail.success', 'Note de frais supprimée.');
         $this->redirectRoute('portail.ndf.index', ['association' => $this->association->slug]);
@@ -301,17 +302,14 @@ final class Form extends Component
             ->orderBy('nom')
             ->get();
 
-        $seances = collect();
-        if (! empty($this->draftLigne['operation_id'])) {
-            $seances = Seance::where('operation_id', (int) $this->draftLigne['operation_id'])
-                ->orderBy('date')
-                ->get();
-        }
+        $selectedOperation = ! empty($this->draftLigne['operation_id'])
+            ? Operation::find((int) $this->draftLigne['operation_id'])
+            : null;
 
         return view('livewire.portail.note-de-frais.form', [
             'sousCategories' => $sousCategories,
             'operations' => $operations,
-            'seances' => $seances,
+            'selectedOperation' => $selectedOperation,
         ])->layout('portail.layouts.app');
     }
 
@@ -331,7 +329,7 @@ final class Form extends Component
                     : 0,
                 'sous_categorie_id' => $ligne['sous_categorie_id'] ? (int) $ligne['sous_categorie_id'] : null,
                 'operation_id' => $ligne['operation_id'] ? (int) $ligne['operation_id'] : null,
-                'seance_id' => $ligne['seance_id'] ? (int) $ligne['seance_id'] : null,
+                'seance' => $ligne['seance'] ? (int) $ligne['seance'] : null,
                 'piece_jointe_path' => $ligne['piece_jointe_path'] ?? null,
             ];
         }
@@ -342,8 +340,8 @@ final class Form extends Component
             'lignes' => $lignesData,
         ];
 
-        if ($this->noteDeFrais !== null) {
-            $data['id'] = $this->noteDeFrais->id;
+        if ($this->noteDeFraisId !== null) {
+            $data['id'] = $this->noteDeFraisId;
         }
 
         return $data;
@@ -376,6 +374,11 @@ final class Form extends Component
         }
     }
 
+    private function getNoteDeFrais(): ?NoteDeFrais
+    {
+        return $this->noteDeFraisId !== null ? NoteDeFrais::find($this->noteDeFraisId) : null;
+    }
+
     private function resetDraftLigne(): void
     {
         $this->draftLigne = [
@@ -384,7 +387,7 @@ final class Form extends Component
             'montant' => '',
             'sous_categorie_id' => null,
             'operation_id' => null,
-            'seance_id' => null,
+            'seance' => null,
         ];
         $this->resetErrorBag('draftLigne.justif');
         $this->resetErrorBag('draftLigne.montant');

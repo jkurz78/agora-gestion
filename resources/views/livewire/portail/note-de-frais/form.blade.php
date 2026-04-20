@@ -3,7 +3,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="h5 mb-0">
             <i class="bi bi-receipt me-1"></i>
-            {{ $noteDeFrais ? 'Modifier la note de frais' : 'Nouvelle note de frais' }}
+            {{ $noteDeFraisId ? 'Modifier la note de frais' : 'Nouvelle note de frais' }}
         </h2>
     </div>
 
@@ -127,7 +127,7 @@
             <i class="bi bi-arrow-left me-1"></i>Annuler
         </a>
         <div class="d-flex gap-2">
-            @if ($noteDeFrais)
+            @if ($noteDeFraisId)
                 <button type="button"
                         class="btn btn-outline-danger btn-sm"
                         data-bs-toggle="modal"
@@ -144,7 +144,7 @@
         </div>
     </div>
 
-    @if ($noteDeFrais)
+    @if ($noteDeFraisId)
         {{-- Modale confirmation suppression NDF --}}
         <div class="modal fade" id="modalSupprimerNdf" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog">
@@ -255,23 +255,21 @@
                                 @endforeach
                             </select>
                         </div>
-                        @if (! empty($draftLigne['operation_id']))
+                        @if (! empty($draftLigne['operation_id']) && $selectedOperation?->nombre_seances)
                             <div class="mb-3">
                                 <label class="form-label">Séance <span class="text-muted small">(optionnel)</span></label>
-                                @if ($seances->isEmpty())
-                                    <p class="form-control-plaintext text-muted small mb-0">
-                                        Aucune séance disponible pour cette opération.
-                                    </p>
-                                @else
-                                    <select wire:model.live="draftLigne.seance_id" class="form-select">
-                                        <option value="">— aucune —</option>
-                                        @foreach ($seances as $s)
-                                            <option value="{{ $s->id }}">
-                                                {{ $s->date?->format('d/m/Y') }}{{ $s->titre ? ' — '.$s->titre : '' }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                @endif
+                                <select wire:model.live="draftLigne.seance" class="form-select">
+                                    <option value="">— aucune —</option>
+                                    @for ($s = 1; $s <= $selectedOperation->nombre_seances; $s++)
+                                        <option value="{{ $s }}">Séance {{ $s }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                        @elseif (! empty($draftLigne['operation_id']))
+                            <div class="mb-3">
+                                <p class="form-control-plaintext text-muted small mb-0">
+                                    Cette opération ne comporte pas de séance numérotée.
+                                </p>
                             </div>
                         @endif
                     @endif
