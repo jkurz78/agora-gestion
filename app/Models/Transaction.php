@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class Transaction extends TenantModel
@@ -103,6 +104,11 @@ final class Transaction extends TenantModel
     public function lignes(): HasMany
     {
         return $this->hasMany(TransactionLigne::class);
+    }
+
+    public function noteDeFrais(): HasOne
+    {
+        return $this->hasOne(NoteDeFrais::class);
     }
 
     public function montantSigne(): float

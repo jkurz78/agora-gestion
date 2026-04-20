@@ -34,6 +34,7 @@ use App\Http\Controllers\SwitchAssociationController;
 use App\Http\Controllers\TenantAssetController;
 use App\Http\Controllers\TiersExportController;
 use App\Http\Controllers\TiersTemplateController;
+use App\Http\Controllers\TransactionLignePieceJointeController;
 use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\CheckEspaceAccess;
@@ -178,6 +179,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/notes-de-frais', NdfIndex::class)->name('ndf.index');
         Route::get('/notes-de-frais/{noteDeFrais}', NdfShow::class)->name('ndf.show');
         Route::get('/notes-de-frais/{noteDeFrais}/lignes/{ligne}/piece-jointe', NoteDeFraisPieceJointeController::class)->name('ndf.piece-jointe');
+        Route::get('/transactions/{transaction}/lignes/{ligne}/piece-jointe', TransactionLignePieceJointeController::class)->name('transactions.piece-jointe-ligne');
     });
 
 // ── Banques ──
