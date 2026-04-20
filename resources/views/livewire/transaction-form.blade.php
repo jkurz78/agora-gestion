@@ -33,6 +33,18 @@
                 </div>
             @endif
             <div class="card-body">
+                @if ($transactionId && $linkedNdf)
+                    <div class="alert alert-info d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-receipt fs-5"></i>
+                        <div>
+                            Cette transaction provient de la note de frais
+                            <a href="{{ route('comptabilite.ndf.show', ['noteDeFrais' => $linkedNdf->id]) }}" target="_blank" class="fw-semibold">
+                                NDF #{{ $linkedNdf->id }}
+                            </a>
+                            @if ($linkedNdf->libelle)({{ $linkedNdf->libelle }})@endif.
+                        </div>
+                    </div>
+                @endif
                 @if ($ocrMode && $ocrWaitingForFile)
                     <div class="text-center py-5">
                         <div class="mb-4">
@@ -314,6 +326,54 @@
                                             <input type="text" wire:model="lignes.{{ $index }}.notes"
                                                    class="form-control form-control-sm"
                                                    {{ $exerciceCloture ? 'disabled' : '' }}>
+                                            {{-- PJ niveau ligne --}}
+                                            @if (! $exerciceCloture)
+                                            <div class="mt-1">
+                                                @if (! empty($lignes[$index]['piece_jointe_upload']))
+                                                    {{-- Nouveau fichier uploadé, pas encore sauvé --}}
+                                                    <span class="badge bg-info text-nowrap">
+                                                        <i class="bi bi-paperclip"></i> {{ $lignes[$index]['piece_jointe_upload']->getClientOriginalName() }}
+                                                    </span>
+                                                    <button type="button" wire:click="$set('lignes.{{ $index }}.piece_jointe_upload', null)" class="btn btn-sm btn-outline-secondary ms-1">
+                                                        Annuler
+                                                    </button>
+                                                @elseif (! empty($lignes[$index]['piece_jointe_path']) && empty($lignes[$index]['piece_jointe_remove']))
+                                                    {{-- Fichier existant non marqué à supprimer --}}
+                                                    <a href="{{ $lignes[$index]['piece_jointe_existing_url'] }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-paperclip"></i> Consulter
+                                                    </a>
+                                                    @if (! $isLockedByFacture)
+                                                    <label class="btn btn-sm btn-outline-secondary ms-1">
+                                                        Remplacer
+                                                        <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                                    </label>
+                                                    <button type="button" wire:click="$set('lignes.{{ $index }}.piece_jointe_remove', true)" class="btn btn-sm btn-outline-danger ms-1">
+                                                        Supprimer
+                                                    </button>
+                                                    @endif
+                                                @elseif (! empty($lignes[$index]['piece_jointe_remove']))
+                                                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Sera supprimée</span>
+                                                    <button type="button" wire:click="$set('lignes.{{ $index }}.piece_jointe_remove', false)" class="btn btn-sm btn-outline-secondary ms-1">
+                                                        Annuler
+                                                    </button>
+                                                @else
+                                                    {{-- Aucune PJ --}}
+                                                    <label class="btn btn-sm btn-outline-secondary">
+                                                        <i class="bi bi-paperclip"></i> Justificatif
+                                                        <input type="file" wire:model="lignes.{{ $index }}.piece_jointe_upload" accept=".pdf,.jpg,.jpeg,.png" class="d-none">
+                                                    </label>
+                                                @endif
+                                                @error("lignes.{$index}.piece_jointe_upload") <div class="text-danger small">{{ $message }}</div> @enderror
+                                                <div wire:loading wire:target="lignes.{{ $index }}.piece_jointe_upload" class="spinner-border spinner-border-sm d-inline-block"></div>
+                                            </div>
+                                            @elseif (! empty($lignes[$index]['piece_jointe_path']))
+                                                {{-- Mode lecture seule : lien consulter uniquement --}}
+                                                <div class="mt-1">
+                                                    <a href="{{ $lignes[$index]['piece_jointe_existing_url'] }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-paperclip"></i> Consulter
+                                                    </a>
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="text-center">
                                             @if (! $isLocked && ! $isLockedByFacture && ! $exerciceCloture)
