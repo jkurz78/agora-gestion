@@ -34,6 +34,7 @@ final class TransactionUniverselleService
         string $sortDirection = 'desc',
         int $perPage = 25,
         int $page = 1,
+        bool $ndfUniquement = false,
     ): array {
         $allowedColumns = ['id', 'date', 'numero_piece', 'reference', 'tiers', 'libelle',
             'categorie_label', 'nb_lignes', 'compte_id', 'compte_nom', 'mode_paiement',
@@ -43,7 +44,7 @@ final class TransactionUniverselleService
         }
         $sortDirection = $sortDirection === 'asc' ? 'asc' : 'desc';
 
-        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter);
+        $union = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
 
         $outer = DB::query()->fromSub($union, 't')
             ->when($searchTiers, fn ($q) => $q->where('t.tiers', 'like', "%{$searchTiers}%"))
@@ -65,7 +66,7 @@ final class TransactionUniverselleService
                 $offset = ($paginator->currentPage() - 1) * $perPage;
                 $sumAvant = 0.0;
                 if ($offset > 0) {
-                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter);
+                    $unionForSolde = $this->buildUnion($compteId, $tiersId, $types, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
                     $inner = DB::query()->fromSub($unionForSolde, 'u')
                         ->select('montant')
                         ->orderBy("u.{$sortColumn}", $sortDirection)
@@ -94,6 +95,7 @@ final class TransactionUniverselleService
         ?string $dateDebut,
         ?string $dateFin,
         ?string $sousCategorieFilter = null,
+        bool $ndfUniquement = false,
     ): Builder {
         // Whitelist sous-catégorie filter to prevent SQL injection (column name interpolation)
         $allowedFilters = ['pour_dons', 'pour_cotisations', 'pour_inscriptions'];
@@ -109,12 +111,12 @@ final class TransactionUniverselleService
 
         $queries = [];
         if ($include['depense']) {
-            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin, $sousCategorieFilter);
+            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
         }
         if ($include['recette']) {
-            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin, $sousCategorieFilter);
+            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
         }
-        if ($include['virement'] && $sousCategorieFilter === null) {
+        if ($include['virement'] && $sousCategorieFilter === null && ! $ndfUniquement) {
             $queries[] = $this->brancheVirementSortant($compteId, $tiersId, $dateDebut, $dateFin);
             $queries[] = $this->brancheVirementEntrant($compteId, $tiersId, $dateDebut, $dateFin);
         }
@@ -145,6 +147,7 @@ final class TransactionUniverselleService
         ?string $dateDebut,
         ?string $dateFin,
         ?string $sousCategorieFilter = null,
+        bool $ndfUniquement = false,
     ): Builder {
         return DB::table('transactions as tx')
             ->leftJoin('tiers as t', 't.id', '=', 'tx.tiers_id')
@@ -189,6 +192,12 @@ final class TransactionUniverselleService
                     ->join('sous_categories as sc_filter', 'sc_filter.id', '=', 'tl_filter.sous_categorie_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
                     ->where("sc_filter.{$sousCategorieFilter}", true);
+            }))
+            ->when($ndfUniquement, fn ($q) => $q->whereExists(function ($sub) {
+                $sub->select(DB::raw(1))
+                    ->from('notes_de_frais as ndf')
+                    ->whereColumn('ndf.transaction_id', 'tx.id')
+                    ->whereNull('ndf.deleted_at');
             }));
     }
 
@@ -198,6 +207,7 @@ final class TransactionUniverselleService
         ?string $dateDebut,
         ?string $dateFin,
         ?string $sousCategorieFilter = null,
+        bool $ndfUniquement = false,
     ): Builder {
         return DB::table('transactions as tx')
             ->leftJoin('tiers as t', 't.id', '=', 'tx.tiers_id')
@@ -242,6 +252,12 @@ final class TransactionUniverselleService
                     ->join('sous_categories as sc_filter', 'sc_filter.id', '=', 'tl_filter.sous_categorie_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
                     ->where("sc_filter.{$sousCategorieFilter}", true);
+            }))
+            ->when($ndfUniquement, fn ($q) => $q->whereExists(function ($sub) {
+                $sub->select(DB::raw(1))
+                    ->from('notes_de_frais as ndf')
+                    ->whereColumn('ndf.transaction_id', 'tx.id')
+                    ->whereNull('ndf.deleted_at');
             }));
     }
 
