@@ -81,10 +81,11 @@ final class NoteDeFraisValidationService
     public function valider(NoteDeFrais $ndf, ValidationData $data): Transaction
     {
         return DB::transaction(function () use ($ndf, $data): Transaction {
-            // Lock pessimiste pour éviter la double-validation concurrente
-            $ndf->refresh()->lockForUpdate()->first();
+            // Lock pessimiste sur la ligne ciblée pour éviter la double-validation concurrente
+            NoteDeFrais::whereKey($ndf->id)->lockForUpdate()->firstOrFail();
+            $ndf->refresh();
 
-            // Re-read statut après lock (bypass accesseur Payee)
+            // Statut relu depuis la BDD après refresh (bypass accesseur Payee)
             $statutRaw = (string) $ndf->getRawOriginal('statut');
             if ($statutRaw !== StatutNoteDeFrais::Soumise->value) {
                 throw new DomainException(
