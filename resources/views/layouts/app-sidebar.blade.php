@@ -93,6 +93,8 @@
                     :nom-asso="$nomAsso"
                     :exercice-cloture="$exerciceCloture"
                     :exercice-label="$exerciceLabel"
+                    :can-see-ndf="$canSeeNdf ?? false"
+                    :ndf-pending-count="$ndfPendingCount ?? 0"
                 />
             </div>
         </div>
@@ -113,7 +115,7 @@
                 {{-- Breadcrumb --}}
                 @php
                     $breadcrumbGroup = match(true) {
-                        request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*') => 'Comptabilité',
+                        request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*') => 'Comptabilité',
                         request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
                             'banques.comptes.*', 'banques.remises*') => 'Banques',
                         request()->routeIs('tiers.*') => 'Tiers',
@@ -160,6 +162,17 @@
                            title="{{ $incomingDocumentsCount }} document(s) en attente">
                             <i class="bi bi-inbox"></i>
                             <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $incomingDocumentsCount }}</span>
+                        </a>
+                    @endif
+
+                    {{-- NDF en attente --}}
+                    @if(($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
+                        <a href="{{ route('comptabilite.ndf.index') }}"
+                           class="text-decoration-none d-flex align-items-center gap-1"
+                           style="color: rgba(255,255,255,.9);"
+                           title="{{ $ndfPendingCount }} note(s) de frais à traiter">
+                            <i class="bi bi-receipt-cutoff"></i>
+                            <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $ndfPendingCount }}</span>
                         </a>
                     @endif
 
