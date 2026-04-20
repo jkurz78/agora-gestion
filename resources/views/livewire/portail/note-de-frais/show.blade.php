@@ -20,7 +20,7 @@
                     <span class="badge bg-success fs-6">{{ $statut->label() }}</span>
                     @break
                 @case('payee')
-                    <span class="badge bg-success text-dark fs-6">{{ $statut->label() }}</span>
+                    <span class="badge bg-success fs-6">{{ $statut->label() }}</span>
                     @break
             @endswitch
         </div>

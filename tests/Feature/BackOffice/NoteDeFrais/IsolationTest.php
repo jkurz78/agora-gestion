@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\RoleAssociation;
 use App\Enums\RoleSysteme;
 use App\Enums\StatutNoteDeFrais;
+use App\Livewire\BackOffice\NoteDeFrais\Index;
 use App\Livewire\BackOffice\NoteDeFrais\Show;
 use App\Models\Association;
 use App\Models\NoteDeFrais;
@@ -14,6 +15,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -101,7 +103,7 @@ it('comptable from A only sees its own NDF on the index — not those from B', f
     isoBootTenant($assocA);
     $this->actingAs($comptableA);
 
-    $component = Livewire::test(\App\Livewire\BackOffice\NoteDeFrais\Index::class);
+    $component = Livewire::test(Index::class);
     $notes = $component->viewData('notes');
 
     expect($notes)->toHaveCount(3);
@@ -151,7 +153,7 @@ it('comptable from A cannot call confirmRejection on NDF from B — HTTP 404 via
 });
 
 it('comptable from A cannot access piece-jointe of NDF from B', function (): void {
-    \Illuminate\Support\Facades\Storage::fake('local');
+    Storage::fake('local');
 
     $assocA = Association::factory()->create();
     $assocB = Association::factory()->create();
@@ -161,7 +163,7 @@ it('comptable from A cannot access piece-jointe of NDF from B', function (): voi
     $ndfB = isoMakeSoumise($assocB);
     $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
     $path = "associations/{$assocB->id}/notes-de-frais/{$ndfB->id}/ligne-1.pdf";
-    \Illuminate\Support\Facades\Storage::disk('local')->put($path, 'fake-pdf');
+    Storage::disk('local')->put($path, 'fake-pdf');
     $ligneB = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndfB->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -272,7 +274,7 @@ it('deleting a transaction in A reverts its NDF to Soumise but does not affect N
 // ═══════════════════════════════════════════════════════════════════════════════
 
 it('super-admin in support mode cannot call confirmValidation on a NDF (403)', function (): void {
-    \Illuminate\Support\Facades\Storage::fake('local');
+    Storage::fake('local');
 
     $association = Association::factory()->create();
     isoBootTenant($association);
