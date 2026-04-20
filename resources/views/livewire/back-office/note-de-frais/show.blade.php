@@ -136,7 +136,17 @@
                             @foreach ($ndf->lignes as $index => $ligne)
                                 <tr>
                                     <td>{{ $index + 1 }}</td>
-                                    <td>{{ $ligne->libelle ?? '—' }}</td>
+                                    <td>
+                                        @include('livewire.portail.note-de-frais.partials.ligne-details', [
+                                            'ligne' => [
+                                                'type' => $ligne->type->value,
+                                                'libelle' => $ligne->libelle,
+                                                'cv_fiscaux' => $ligne->metadata['cv_fiscaux'] ?? null,
+                                                'distance_km' => $ligne->metadata['distance_km'] ?? null,
+                                                'bareme_eur_km' => $ligne->metadata['bareme_eur_km'] ?? null,
+                                            ]
+                                        ])
+                                    </td>
                                     <td>{{ $ligne->sousCategorie?->nom ?? '—' }}</td>
                                     <td>{{ $ligne->operation?->nom ?? '—' }}</td>
                                     <td>{{ $ligne->seance ?? '—' }}</td>
