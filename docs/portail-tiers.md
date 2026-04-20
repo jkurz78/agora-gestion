@@ -117,9 +117,53 @@ sur `tiers-portail`, et vice-versa.
 Garantie : aucun log ne contient le code OTP (8 chiffres consécutifs) ni le champ `code_hash`
 (vérifié par assertion dans `ObservabilityTest`).
 
-## À venir (Slices 2 & 3 du programme Notes de frais)
+## Notes de frais (Slice 2)
 
-- Slice 2 — Écran NDF dans le portail (saisie, consultation, suivi statut).
+Statut : livré 2026-04-19.
+
+### Flux Tiers
+- Liste `/portail/{slug}/notes-de-frais` — NDF du Tiers connecté avec badge statut.
+- Création `/portail/{slug}/notes-de-frais/nouvelle` — form avec N lignes dynamiques.
+- Édition `/portail/{slug}/notes-de-frais/{id}/edit` — uniquement brouillon.
+- Consultation `/portail/{slug}/notes-de-frais/{id}` — lecture seule.
+
+### Statuts
+
+| Statut | Par qui | Quand |
+|---|---|---|
+| brouillon | Tiers | À la création/sauvegarde |
+| soumise | Tiers | Clic "Soumettre" (validations passent) |
+| rejetee | Comptable (Slice 3) | Avec motif |
+| validee | Comptable (Slice 3) | Avec création de Transaction |
+| payée | Dérivé | Quand `transaction.statut_reglement === Pointe` |
+
+### Règles de soumission
+- date ≤ aujourd'hui
+- libellé obligatoire
+- ≥ 1 ligne
+- chaque ligne : sous-catégorie + montant > 0 + pièce jointe obligatoire
+
+### Justificatifs
+- Formats : PDF, JPG, PNG, HEIC. Max 5 Mo.
+- Stockage : `storage/app/associations/{id}/notes-de-frais/{note_id}/ligne-{ligne_id}.{ext}`.
+- Suppression : cascade via event Eloquent `deleting` sur `NoteDeFraisLigne`.
+
+### Observabilité
+
+4 événements loggés avec `LogContext` portant `association_id` :
+- `portail.ndf.created`
+- `portail.ndf.updated`
+- `portail.ndf.submitted`
+- `portail.ndf.deleted`
+
+### Dettes portées en Slice 3
+
+- Filtre sous-catégorie `pour_depenses=true` : simplifié pour Slice 2 (toutes les sous-catégories affichées). Le champ `pour_depenses` est sur `Tiers`, pas sur `SousCategorie` — à clarifier avec produit.
+- Validation opérations actives + exercice courant : à vérifier implementation.
+- Archivage des NDF rejetées/payées : non prévu (Q6-A).
+
+## À venir (Slice 3 du programme Notes de frais)
+
 - Slice 3 — Back-office NDF comptable (validation, rejet, comptabilisation).
 
 ## Dette technique

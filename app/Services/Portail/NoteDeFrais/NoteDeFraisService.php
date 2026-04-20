@@ -11,6 +11,7 @@ use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use DomainException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -81,7 +82,22 @@ final class NoteDeFraisService
                 ]);
             }
 
-            return $ndf->refresh();
+            $ndf->refresh();
+
+            if ($id !== null) {
+                Log::info('portail.ndf.updated', [
+                    'ndf_id' => $ndf->id,
+                    'tiers_id' => $tiers->id,
+                ]);
+            } else {
+                Log::info('portail.ndf.created', [
+                    'ndf_id' => $ndf->id,
+                    'tiers_id' => $tiers->id,
+                    'libelle' => $ndf->libelle,
+                ]);
+            }
+
+            return $ndf;
         });
     }
 
@@ -137,6 +153,14 @@ final class NoteDeFraisService
             'statut' => StatutNoteDeFrais::Soumise->value,
             'submitted_at' => now(),
         ]);
+
+        $montantTotal = $ndf->lignes()->sum('montant');
+
+        Log::info('portail.ndf.submitted', [
+            'ndf_id' => $ndf->id,
+            'tiers_id' => $ndf->tiers_id,
+            'montant_total' => (float) $montantTotal,
+        ]);
     }
 
     /**
@@ -159,5 +183,10 @@ final class NoteDeFraisService
 
             $ndf->delete(); // softdelete sur NDF, les lignes restent en DB
         });
+
+        Log::info('portail.ndf.deleted', [
+            'ndf_id' => $ndf->id,
+            'tiers_id' => $ndf->tiers_id,
+        ]);
     }
 }
