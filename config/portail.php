@@ -34,4 +34,16 @@ return [
     // Portail session lifetime in minutes (sliding)
     'session_lifetime_minutes' => 60,
 
+    /*
+    |--------------------------------------------------------------------------
+    | OCR / Justificatif analyser (préparation v1 Claude API)
+    |--------------------------------------------------------------------------
+    */
+
+    'ocr' => [
+        'driver' => env('PORTAIL_OCR_DRIVER', 'none'), // none | claude
+        'claude_api_key' => env('PORTAIL_CLAUDE_API_KEY'),
+        'claude_model' => env('PORTAIL_CLAUDE_MODEL', 'claude-haiku-4-5-20251001'),
+    ],
+
 ];
