@@ -95,3 +95,79 @@ test('observer emits comptabilite.ndf.reverted_to_submitted log on force-delete'
         )
         ->once();
 });
+
+// ── Abandon de créance — suppression Transaction Dépense ──────────────────────
+
+test('deleting the depense transaction of an abandon ndf reverts ndf to soumise and soft-deletes the don transaction', function (): void {
+    $txDepense = Transaction::factory()->create();
+    $txDon = Transaction::factory()->create();
+
+    $ndf = NoteDeFrais::factory()->create([
+        'statut' => StatutNoteDeFrais::DonParAbandonCreances->value,
+        'transaction_id' => $txDepense->id,
+        'don_transaction_id' => $txDon->id,
+        'validee_at' => now(),
+    ]);
+
+    $txDepense->delete();
+
+    $ndf->refresh();
+    expect($ndf->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Soumise->value);
+    expect($ndf->transaction_id)->toBeNull();
+    expect($ndf->don_transaction_id)->toBeNull();
+    expect($ndf->validee_at)->toBeNull();
+
+    // The don transaction should have been soft-deleted.
+    expect(Transaction::withTrashed()->find($txDon->id)?->trashed())->toBeTrue();
+});
+
+// ── Abandon de créance — suppression Transaction Don ─────────────────────────
+
+test('deleting the don transaction of an abandon ndf reverts ndf to soumise and soft-deletes the depense transaction', function (): void {
+    $txDepense = Transaction::factory()->create();
+    $txDon = Transaction::factory()->create();
+
+    $ndf = NoteDeFrais::factory()->create([
+        'statut' => StatutNoteDeFrais::DonParAbandonCreances->value,
+        'transaction_id' => $txDepense->id,
+        'don_transaction_id' => $txDon->id,
+        'validee_at' => now(),
+    ]);
+
+    $txDon->delete();
+
+    $ndf->refresh();
+    expect($ndf->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Soumise->value);
+    expect($ndf->transaction_id)->toBeNull();
+    expect($ndf->don_transaction_id)->toBeNull();
+    expect($ndf->validee_at)->toBeNull();
+
+    // The depense transaction should have been soft-deleted.
+    expect(Transaction::withTrashed()->find($txDepense->id)?->trashed())->toBeTrue();
+});
+
+// ── Abandon de créance — suppression séquentielle (idempotence) ───────────────
+
+test('sequential deletion of both abandon transactions is idempotent and raises no error', function (): void {
+    $txDepense = Transaction::factory()->create();
+    $txDon = Transaction::factory()->create();
+
+    $ndf = NoteDeFrais::factory()->create([
+        'statut' => StatutNoteDeFrais::DonParAbandonCreances->value,
+        'transaction_id' => $txDepense->id,
+        'don_transaction_id' => $txDon->id,
+        'validee_at' => now(),
+    ]);
+
+    // First deletion reverts the NDF and soft-deletes the sister (txDon).
+    $txDepense->delete();
+
+    // Second deletion: txDon is already soft-deleted; observer finds no NDF to revert
+    // (both FKs are null), so it is a no-op. Must not throw.
+    $txDon->delete();
+
+    $ndf->refresh();
+    expect($ndf->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Soumise->value);
+    expect($ndf->transaction_id)->toBeNull();
+    expect($ndf->don_transaction_id)->toBeNull();
+});
