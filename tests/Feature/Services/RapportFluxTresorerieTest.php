@@ -24,7 +24,6 @@ beforeEach(function () {
     $this->compte = CompteBancaire::factory()->create([
         'solde_initial' => 10000.00,
         'date_solde_initial' => '2025-09-01',
-        'est_systeme' => false,
     ]);
 });
 
@@ -98,7 +97,6 @@ it('consolide plusieurs comptes et annule les virements internes', function () {
     $compte2 = CompteBancaire::factory()->create([
         'solde_initial' => 5000.00,
         'date_solde_initial' => '2025-09-01',
-        'est_systeme' => false,
     ]);
 
     Transaction::factory()->create([
@@ -158,35 +156,6 @@ it('calcule le rapprochement avec écritures non pointées', function () {
     expect($data['rapprochement']['solde_reel'])->toBe($data['rapprochement']['solde_theorique'] - 1500.00 + 500.00);
 });
 
-it('exclut les comptes système du rapprochement', function () {
-    $compteSys = CompteBancaire::factory()->create([
-        'solde_initial' => 0,
-        'date_solde_initial' => '2025-09-01',
-        'est_systeme' => true,
-    ]);
-
-    Transaction::factory()->create([
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => 999.00,
-        'compte_id' => $compteSys->id,
-        'rapprochement_id' => null,
-    ]);
-    Transaction::factory()->create([
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => 500.00,
-        'compte_id' => $this->compte->id,
-        'rapprochement_id' => null,
-    ]);
-
-    $data = app(RapportService::class)->fluxTresorerie(2025);
-
-    expect($data['rapprochement']['nb_recettes_non_pointees'])->toBe(1);
-    expect($data['rapprochement']['recettes_non_pointees'])->toBe(500.00);
-    expect($data['synthese']['total_recettes'])->toBe(1499.00);
-});
-
 it('expose la liste des écritures non pointées pour le PDF', function () {
     Transaction::factory()->create([
         'type' => 'recette',
@@ -202,56 +171,6 @@ it('expose la liste des écritures non pointées pour le PDF', function () {
 
     expect($data['ecritures_non_pointees'])->toHaveCount(1);
     expect($data['ecritures_non_pointees'][0])->toHaveKeys(['numero_piece', 'date', 'tiers', 'libelle', 'type', 'montant']);
-});
-
-it('intègre les comptes système dans le rapprochement avec détail', function () {
-    $compteSys = CompteBancaire::factory()->create([
-        'solde_initial' => 0,
-        'date_solde_initial' => '2025-09-01',
-        'est_systeme' => true,
-        'nom' => 'Compte technique test',
-    ]);
-
-    // Recette sur compte système (créance)
-    Transaction::factory()->create([
-        'type' => 'recette',
-        'date' => '2025-10-01',
-        'montant_total' => 50000.00,
-        'compte_id' => $compteSys->id,
-        'libelle' => 'Facture client X',
-    ]);
-
-    $data = app(RapportService::class)->fluxTresorerie(2025);
-
-    // Le solde théorique inclut les 50000
-    expect($data['synthese']['total_recettes'])->toBe(50000.00);
-
-    // Le rapprochement montre le compte système
-    expect($data['rapprochement']['comptes_systeme'])->toHaveCount(1);
-    expect($data['rapprochement']['comptes_systeme'][0]['nom'])->toBe('Compte technique test');
-    expect($data['rapprochement']['comptes_systeme'][0]['solde'])->toBe(50000.00);
-    expect($data['rapprochement']['comptes_systeme'][0]['ecritures'])->toHaveCount(1);
-    expect($data['rapprochement']['comptes_systeme'][0]['ecritures'][0]['libelle'])->toBe('Facture client X');
-    expect($data['rapprochement']['total_comptes_systeme'])->toBe(50000.00);
-
-    // Le solde réel = théorique - non pointées + non pointées - comptes système
-    // solde_ouverture=10000, recettes=50000, solde_theorique=60000
-    // solde_reel = 60000 - 0 + 0 - 50000 = 10000
-    expect($data['rapprochement']['solde_reel'])->toBe(10000.00);
-});
-
-it('masque les comptes système à solde nul', function () {
-    CompteBancaire::factory()->create([
-        'solde_initial' => 0,
-        'date_solde_initial' => '2025-09-01',
-        'est_systeme' => true,
-        'nom' => 'Compte technique vide',
-    ]);
-
-    $data = app(RapportService::class)->fluxTresorerie(2025);
-
-    expect($data['rapprochement']['comptes_systeme'])->toHaveCount(0);
-    expect($data['rapprochement']['total_comptes_systeme'])->toBe(0.0);
 });
 
 it('retourne les informations exercice avec statut clôturé', function () {
