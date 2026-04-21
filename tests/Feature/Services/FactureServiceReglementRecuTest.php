@@ -27,7 +27,6 @@ beforeEach(function () {
     $this->compteCreances = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
         'nom' => 'Compte test règlement',
-        'est_systeme' => false,
     ]);
     $this->tiers = Tiers::factory()->create();
     $this->exercice = now()->month >= 9 ? now()->year : now()->year - 1;
@@ -104,7 +103,7 @@ describe('marquerReglementRecu', function () {
     })->throws(RuntimeException::class, 'validée');
 
     it('refuse si la facture est déjà acquittée', function () {
-        $compteReel = CompteBancaire::factory()->create(['est_systeme' => false]);
+        $compteReel = CompteBancaire::factory()->create();
         $facture = Facture::create([
             'date' => now(),
             'statut' => StatutFacture::Validee,

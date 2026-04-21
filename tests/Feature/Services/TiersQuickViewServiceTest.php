@@ -530,7 +530,7 @@ describe('factures', function (): void {
     });
 
     test('impayees = 0 si toutes les factures validées sont acquittées', function (): void {
-        $compte = CompteBancaire::factory()->create(['est_systeme' => false]);
+        $compte = CompteBancaire::factory()->create();
         $facture = Facture::forceCreate([
             'tiers_id' => $this->tiers->id,
             'exercice' => $this->exercice,
