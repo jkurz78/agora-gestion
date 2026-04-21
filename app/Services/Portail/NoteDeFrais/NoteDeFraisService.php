@@ -27,6 +27,7 @@ final class NoteDeFraisService
      *     id?: int|null,
      *     date: string,
      *     libelle: string,
+     *     abandon_creance_propose?: bool,
      *     lignes: list<array{
      *         type?: string,
      *         libelle: string|null,
@@ -63,6 +64,7 @@ final class NoteDeFraisService
                 $ndf->update([
                     'date' => $data['date'],
                     'libelle' => $data['libelle'] ?? '',
+                    'abandon_creance_propose' => $data['abandon_creance_propose'] ?? $ndf->abandon_creance_propose,
                 ]);
 
                 // Si la NDF n'était pas déjà un brouillon, on remet en brouillon :
@@ -83,6 +85,7 @@ final class NoteDeFraisService
                     'tiers_id' => $tiers->id,
                     'date' => $data['date'],
                     'libelle' => $data['libelle'] ?? '',
+                    'abandon_creance_propose' => $data['abandon_creance_propose'] ?? false,
                     'statut' => StatutNoteDeFrais::Brouillon->value,
                     'submitted_at' => null,
                     'validee_at' => null,
