@@ -25,6 +25,8 @@ final class NoteDeFrais extends TenantModel
         'statut',
         'motif_rejet',
         'transaction_id',
+        'don_transaction_id',
+        'abandon_creance_propose',
         'submitted_at',
         'validee_at',
         'archived_at',
@@ -37,6 +39,7 @@ final class NoteDeFrais extends TenantModel
             'submitted_at' => 'datetime',
             'validee_at' => 'datetime',
             'archived_at' => 'datetime',
+            'abandon_creance_propose' => 'boolean',
         ];
     }
 
@@ -72,6 +75,11 @@ final class NoteDeFrais extends TenantModel
     public function transaction(): BelongsTo
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    public function donTransaction(): BelongsTo
+    {
+        return $this->belongsTo(Transaction::class, 'don_transaction_id');
     }
 
     public function lignes(): HasMany
