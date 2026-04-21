@@ -25,6 +25,57 @@
         </ol>
     </nav>
 
+    {{-- Encart intention abandon de créance --}}
+    @if ($ndf->abandon_creance_propose)
+        <div class="card border-info mb-4">
+            <div class="card-header bg-info text-dark">
+                <h3 class="h6 mb-0">
+                    <i class="bi bi-heart-fill me-2"></i>Don par abandon de créance proposé
+                </h3>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    Le tiers a déclaré renoncer au remboursement. Tu peux constater l'abandon (2 transactions réglées&nbsp;: dépense + don), ou valider normalement (remboursement à régler).
+                </p>
+
+                {{-- État de la sous-catégorie désignée --}}
+                @if ($sousCatAbandon)
+                    <div class="alert alert-success py-2 mb-3">
+                        <i class="bi bi-check-circle me-1"></i>
+                        Sous-catégorie désignée&nbsp;:
+                        <strong>{{ $sousCatAbandon->nom }}</strong>
+                        @if ($sousCatAbandon->code_cerfa)
+                            <span class="text-muted">({{ $sousCatAbandon->code_cerfa }})</span>
+                        @endif
+                    </div>
+                @else
+                    <div class="alert alert-warning py-2 mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Aucune sous-catégorie n'est désignée pour l'usage Abandon de créance.
+                        <a href="{{ route('parametres.comptabilite.usages') }}" class="ms-1">
+                            Configure l'usage dans Paramètres → Comptabilité → Usages
+                        </a>
+                    </div>
+                @endif
+
+                {{-- Boutons d'action --}}
+                <div class="d-flex gap-2">
+                    <button type="button"
+                            class="btn btn-primary"
+                            wire:click="openAbandonForm"
+                            @if (! $sousCatAbandon) disabled @endif>
+                        <i class="bi bi-gift me-1"></i>Valider et constater l'abandon
+                    </button>
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            wire:click="openMiniForm">
+                        <i class="bi bi-check-lg me-1"></i>Valider sans constater l'abandon
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- En-tête NDF --}}
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center"
