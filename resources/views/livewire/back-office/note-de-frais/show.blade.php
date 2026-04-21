@@ -25,53 +25,27 @@
         </ol>
     </nav>
 
-    {{-- Encart intention abandon de créance --}}
-    @if ($ndf->abandon_creance_propose)
-        <div class="card border-info mb-4">
-            <div class="card-header bg-info text-dark">
-                <h3 class="h6 mb-0">
-                    <i class="bi bi-heart-fill me-2"></i>Don par abandon de créance proposé
-                </h3>
-            </div>
-            <div class="card-body">
-                <p class="mb-3">
-                    Le tiers a déclaré renoncer au remboursement. Tu peux constater l'abandon (2 transactions réglées&nbsp;: dépense + don), ou valider normalement (remboursement à régler).
+    {{-- Bandeau informatif abandon de créance (uniquement si statut Soumise) --}}
+    @if ($ndf->abandon_creance_propose && $ndf->statut === $statutSoumise)
+        <div class="alert alert-info d-flex align-items-start gap-2 mb-3">
+            <i class="bi bi-info-circle fs-5"></i>
+            <div>
+                <strong>Proposition de don par abandon de créance</strong>
+                <p class="mb-1">
+                    Le tiers propose un don par abandon de créance de
+                    <strong>{{ number_format((float) $ndf->lignes->sum('montant'), 2, ',', ' ') }} €</strong>.
                 </p>
-
-                {{-- État de la sous-catégorie désignée --}}
                 @if ($sousCatAbandon)
-                    <div class="alert alert-success py-2 mb-3">
-                        <i class="bi bi-check-circle me-1"></i>
-                        Sous-catégorie désignée&nbsp;:
-                        <strong>{{ $sousCatAbandon->nom }}</strong>
-                        @if ($sousCatAbandon->code_cerfa)
-                            <span class="text-muted">({{ $sousCatAbandon->code_cerfa }})</span>
-                        @endif
-                    </div>
+                    <small class="text-muted">
+                        Sous-catégorie désignée : {{ $sousCatAbandon->nom }}
+                    </small>
                 @else
-                    <div class="alert alert-warning py-2 mb-3">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
+                    <small class="text-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
                         Aucune sous-catégorie n'est désignée pour l'usage Abandon de créance.
-                        <a href="{{ route('parametres.comptabilite.usages') }}" class="ms-1">
-                            Configure l'usage dans Paramètres → Comptabilité → Usages
-                        </a>
-                    </div>
+                        <a href="{{ route('parametres.comptabilite.usages') }}">Configurer l'usage</a>.
+                    </small>
                 @endif
-
-                {{-- Boutons d'action --}}
-                <div class="d-flex gap-2">
-                    <button type="button"
-                            class="btn btn-primary"
-                            wire:click="openAbandonForm"
-                            @if (! $sousCatAbandon) disabled @endif>
-                        <i class="bi bi-gift me-1"></i>Valider et constater l'abandon
-                    </button>
-                    <button type="button"
-                            class="btn btn-outline-secondary"
-                            wire:click="openMiniForm">
-                        <i class="bi bi-check-lg me-1"></i>Valider sans constater l'abandon
-                    </button>
-                </div>
             </div>
         </div>
     @endif
@@ -246,6 +220,51 @@
                     <h4 class="h6 mb-0"><i class="bi bi-check-circle me-2"></i>Comptabiliser la note de frais</h4>
                 </div>
                 <div class="card-body">
+                    {{-- Choix abandon de créance (conditionnel) --}}
+                    @if ($ndf->abandon_creance_propose)
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Comment traiter la proposition du tiers ?</label>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" id="choix-normal"
+                                       name="choixValidation" wire:model.live="choixValidation" value="normal">
+                                <label class="form-check-label" for="choix-normal">
+                                    Procéder au remboursement normal
+                                </label>
+                            </div>
+
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" id="choix-abandon"
+                                       name="choixValidation" wire:model.live="choixValidation" value="abandon"
+                                       @if (! $sousCatAbandon) disabled @endif>
+                                <label class="form-check-label" for="choix-abandon">
+                                    Accepter l'abandon de créance (don)
+                                    @if (! $sousCatAbandon)
+                                        <small class="text-muted d-block">
+                                            Désignation d'une sous-catégorie requise dans
+                                            <a href="{{ route('parametres.comptabilite.usages') }}">Paramètres → Comptabilité → Usages</a>.
+                                        </small>
+                                    @endif
+                                </label>
+                            </div>
+                        </div>
+
+                        @if ($choixValidation === 'abandon')
+                            <div class="mb-3">
+                                <label for="dateDon" class="form-label">Date du don <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="date" id="dateDon" wire:model="dateDon"
+                                           class="form-control @error('dateDon') is-invalid @enderror">
+                                    <button type="button" wire:click="setDateDonToday"
+                                            class="btn btn-outline-secondary">Aujourd'hui</button>
+                                    @error('dateDon')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
+                        @endif
+                    @endif
+
                     <div class="row g-3">
                         {{-- Compte bancaire --}}
                         <div class="col-md-4">
@@ -304,7 +323,7 @@
                                 wire:click="confirmValidation"
                                 wire:loading.attr="disabled">
                             <span wire:loading wire:target="confirmValidation" class="spinner-border spinner-border-sm me-1"></span>
-                            Confirmer la validation
+                            Valider &amp; comptabiliser
                         </button>
                         <button type="button"
                                 class="btn btn-outline-secondary"
@@ -322,143 +341,6 @@
         <a href="{{ route('comptabilite.ndf.index') }}" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-arrow-left me-1"></i>Retour à la liste
         </a>
-    </div>
-
-    {{-- Modal Abandon de créance Bootstrap --}}
-    <div class="modal fade {{ $showAbandonForm ? 'show d-block' : '' }}"
-         id="abandonModal"
-         tabindex="-1"
-         role="dialog"
-         aria-labelledby="abandonModalLabel"
-         aria-modal="true"
-         style="{{ $showAbandonForm ? 'background:rgba(0,0,0,.5)' : '' }}">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header" style="background-color:#3d5473;color:#fff;">
-                    <h5 class="modal-title" id="abandonModalLabel">
-                        <i class="bi bi-gift me-2"></i>Constater l'abandon de créance
-                    </h5>
-                    <button type="button"
-                            class="btn-close btn-close-white"
-                            wire:click="$set('showAbandonForm', false)"
-                            aria-label="Fermer"></button>
-                </div>
-                <div class="modal-body">
-                    {{-- Récap --}}
-                    <div class="alert alert-info py-2 mb-3">
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <span class="text-muted small">Montant total :</span>
-                                <strong>{{ number_format((float) $ndf->lignes->sum('montant'), 2, ',', ' ') }} €</strong>
-                            </div>
-                            <div class="col-md-4">
-                                <span class="text-muted small">Tiers :</span>
-                                <strong>{{ $ndf->tiers?->prenom }} {{ $ndf->tiers?->nom }}</strong>
-                            </div>
-                            @if ($sousCatAbandon)
-                                <div class="col-md-4">
-                                    <span class="text-muted small">Sous-catégorie :</span>
-                                    <strong>{{ $sousCatAbandon->nom }}</strong>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    <div class="row g-3">
-                        {{-- Compte bancaire --}}
-                        <div class="col-md-4">
-                            <label for="abandonCompteId" class="form-label">
-                                Compte bancaire <span class="text-danger">*</span>
-                            </label>
-                            <select id="abandonCompteId"
-                                    wire:model="compteId"
-                                    class="form-select @error('compteId') is-invalid @enderror">
-                                <option value="">— Sélectionner —</option>
-                                @foreach ($comptesBancaires as $compte)
-                                    <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
-                                @endforeach
-                            </select>
-                            @error('compteId')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        {{-- Mode de règlement --}}
-                        <div class="col-md-4">
-                            <label for="abandonModePaiement" class="form-label">
-                                Mode de règlement <span class="text-danger">*</span>
-                            </label>
-                            <select id="abandonModePaiement"
-                                    wire:model="modePaiement"
-                                    class="form-select @error('modePaiement') is-invalid @enderror">
-                                @foreach ($modesPaiement as $mode)
-                                    <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
-                                @endforeach
-                            </select>
-                            @error('modePaiement')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        {{-- Date de comptabilisation (Transaction Dépense) --}}
-                        <div class="col-md-4">
-                            <label for="abandonDateComptabilisation" class="form-label">
-                                Date de comptabilisation <span class="text-danger">*</span>
-                            </label>
-                            <div class="input-group">
-                                <input type="date"
-                                       id="abandonDateComptabilisation"
-                                       wire:model="dateComptabilisation"
-                                       class="form-control @error('dateComptabilisation') is-invalid @enderror">
-                                <button type="button"
-                                        class="btn btn-outline-secondary"
-                                        wire:click="setDateToday">
-                                    Aujourd'hui
-                                </button>
-                                @error('dateComptabilisation')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-
-                        {{-- Date du don (Transaction Don/Recette) --}}
-                        <div class="col-md-4">
-                            <label for="abandonDateDon" class="form-label">
-                                Date du don <span class="text-danger">*</span>
-                            </label>
-                            <div class="input-group">
-                                <input type="date"
-                                       id="abandonDateDon"
-                                       wire:model="dateDon"
-                                       class="form-control @error('dateDon') is-invalid @enderror">
-                                <button type="button"
-                                        class="btn btn-outline-secondary"
-                                        wire:click="setDateDonToday">
-                                    Aujourd'hui
-                                </button>
-                                @error('dateDon')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button"
-                            class="btn btn-outline-secondary"
-                            wire:click="$set('showAbandonForm', false)">
-                        Annuler
-                    </button>
-                    <button type="button"
-                            class="btn btn-primary"
-                            wire:click="constaterAbandon"
-                            wire:loading.attr="disabled">
-                        <span wire:loading wire:target="constaterAbandon" class="spinner-border spinner-border-sm me-1"></span>
-                        <i class="bi bi-gift me-1"></i>Constater l'abandon
-                    </button>
-                </div>
-            </div>
-        </div>
     </div>
 
     {{-- Modal Rejet Bootstrap --}}

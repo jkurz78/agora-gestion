@@ -16,7 +16,7 @@ use Livewire\Livewire;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function abandonEncartMakeAdmin(Association $association): User
+function abandonBandeauMakeAdmin(Association $association): User
 {
     $user = User::factory()->create();
     $user->associations()->attach($association->id, [
@@ -28,7 +28,7 @@ function abandonEncartMakeAdmin(Association $association): User
     return $user;
 }
 
-function abandonEncartBootTenant(Association $association): void
+function abandonBandeauBootTenant(Association $association): void
 {
     TenantContext::clear();
     TenantContext::boot($association);
@@ -37,19 +37,18 @@ function abandonEncartBootTenant(Association $association): void
 
 // ── 1. NDF avec abandon_creance_propose + sous-cat désignée ──────────────────
 
-it('affiche encart abandon avec sous-cat désignée et bouton actif', function (): void {
+it('affiche bandeau alert-info avec nom de sous-cat si sous-cat désignée', function (): void {
     $association = Association::factory()->create();
-    abandonEncartBootTenant($association);
+    abandonBandeauBootTenant($association);
 
-    $admin = abandonEncartMakeAdmin($association);
+    $admin = abandonBandeauMakeAdmin($association);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
-    // Sous-catégorie avec usage AbandonCreance
     $catRecette = Categorie::factory()->create([
         'association_id' => $association->id,
         'type' => TypeCategorie::Recette->value,
     ]);
-    $scAbandon = SousCategorie::factory()->pourAbandonCreance()->create([
+    SousCategorie::factory()->pourAbandonCreance()->create([
         'association_id' => $association->id,
         'categorie_id' => $catRecette->id,
         'nom' => 'Abandon créance test',
@@ -65,21 +64,21 @@ it('affiche encart abandon avec sous-cat désignée et bouton actif', function (
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
-        ->assertSee('Don par abandon de créance proposé')
+        ->assertSee('Proposition de don par abandon de créance')
+        ->assertSee('Sous-catégorie désignée')
         ->assertSee('Abandon créance test')
-        ->assertSeeHtml('wire:click="openAbandonForm"')
-        ->assertDontSeeHtml('wire:click="openAbandonForm" disabled')
-        ->assertSeeHtml("Valider sans constater l'abandon")
+        ->assertDontSeeHtml('wire:click="openAbandonForm"')
+        ->assertDontSeeHtml("Valider sans constater l'abandon")
         ->assertOk();
 });
 
-// ── 2. NDF avec abandon_creance_propose + PAS de sous-cat → warning + bouton désactivé
+// ── 2. NDF avec abandon_creance_propose + PAS de sous-cat → warning + lien Usages
 
-it('affiche encart abandon avec warning et bouton désactivé si pas de sous-cat', function (): void {
+it('affiche bandeau alert-info avec warning si pas de sous-cat désignée', function (): void {
     $association = Association::factory()->create();
-    abandonEncartBootTenant($association);
+    abandonBandeauBootTenant($association);
 
-    $admin = abandonEncartMakeAdmin($association);
+    $admin = abandonBandeauMakeAdmin($association);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
     $ndf = NoteDeFrais::factory()->soumise()->create([
@@ -91,21 +90,20 @@ it('affiche encart abandon avec warning et bouton désactivé si pas de sous-cat
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
-        ->assertSee('Don par abandon de créance proposé')
-        ->assertSeeHtml('disabled')
+        ->assertSee('Proposition de don par abandon de créance')
         ->assertSee('Aucune sous-catégorie')
         ->assertSeeHtml(route('parametres.comptabilite.usages'))
-        ->assertSeeHtml("Valider sans constater l'abandon")
+        ->assertDontSeeHtml("Valider sans constater l'abandon")
         ->assertOk();
 });
 
-// ── 3. NDF sans abandon_creance_propose → encart absent, flux normal inchangé ──
+// ── 3. NDF sans abandon_creance_propose → bandeau absent, flux normal inchangé ──
 
-it('ne montre pas l\'encart abandon pour une NDF sans intention', function (): void {
+it('ne montre pas le bandeau abandon pour une NDF sans intention', function (): void {
     $association = Association::factory()->create();
-    abandonEncartBootTenant($association);
+    abandonBandeauBootTenant($association);
 
-    $admin = abandonEncartMakeAdmin($association);
+    $admin = abandonBandeauMakeAdmin($association);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
 
     $ndf = NoteDeFrais::factory()->soumise()->create([
@@ -117,7 +115,7 @@ it('ne montre pas l\'encart abandon pour une NDF sans intention', function (): v
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
-        ->assertDontSee('Don par abandon de créance proposé')
+        ->assertDontSee('Proposition de don par abandon de créance')
         ->assertDontSeeHtml("Valider sans constater l'abandon")
         ->assertSee('Valider')
         ->assertSee('Rejeter')
@@ -128,7 +126,7 @@ it('ne montre pas l\'encart abandon pour une NDF sans intention', function (): v
 
 it('retourne 403 pour un gestionnaire essayant d\'accéder à une NDF abandon', function (): void {
     $association = Association::factory()->create();
-    abandonEncartBootTenant($association);
+    abandonBandeauBootTenant($association);
 
     $gestionnaire = User::factory()->create();
     $gestionnaire->associations()->attach($association->id, [

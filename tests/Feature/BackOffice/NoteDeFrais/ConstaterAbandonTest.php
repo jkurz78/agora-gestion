@@ -109,9 +109,9 @@ it('initialise dateDon à la date de la NDF au mount', function (): void {
         ->assertSet('dateDon', '2026-03-10');
 });
 
-// ── 2. openAbandonForm() → showAbandonForm = true ────────────────────────────
+// ── 2. choixValidation par défaut = 'normal' ─────────────────────────────────
 
-it('openAbandonForm passe showAbandonForm à true', function (): void {
+it('choixValidation est normal par défaut', function (): void {
     $association = Association::factory()->create();
     constaterAbandonBootTenant($association);
     $admin = constaterAbandonMakeAdmin($association);
@@ -125,9 +125,7 @@ it('openAbandonForm passe showAbandonForm à true', function (): void {
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
-        ->assertSet('showAbandonForm', false)
-        ->call('openAbandonForm')
-        ->assertSet('showAbandonForm', true);
+        ->assertSet('choixValidation', 'normal');
 });
 
 // ── 3. setDateDonToday() → dateDon = today ───────────────────────────────────
@@ -151,9 +149,9 @@ it('setDateDonToday passe dateDon à aujourd\'hui', function (): void {
         ->assertSet('dateDon', today()->format('Y-m-d'));
 });
 
-// ── 4. constaterAbandon happy path — 2 Transactions créées + statut NDF mis à jour
+// ── 4. confirmValidation avec choix=abandon — happy path ─────────────────────
 
-it('constaterAbandon crée 2 Transactions réglées et passe la NDF en DonParAbandonCreances', function (): void {
+it('confirmValidation avec choix=abandon crée 2 Transactions et passe la NDF en DonParAbandonCreances', function (): void {
     $association = Association::factory()->create();
     constaterAbandonBootTenant($association);
     $admin = constaterAbandonMakeAdmin($association);
@@ -167,11 +165,12 @@ it('constaterAbandon crée 2 Transactions réglées et passe la NDF en DonParAba
     $countBefore = Transaction::count();
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+        ->set('choixValidation', 'abandon')
         ->set('compteId', $compte->id)
         ->set('modePaiement', 'virement')
         ->set('dateComptabilisation', '2026-03-10')
         ->set('dateDon', '2026-03-10')
-        ->call('constaterAbandon');
+        ->call('confirmValidation');
 
     // 2 nouvelles Transactions
     expect(Transaction::count())->toBe($countBefore + 2);
@@ -197,7 +196,7 @@ it('constaterAbandon crée 2 Transactions réglées et passe la NDF en DonParAba
 
 // ── 5. dateDon modifiée → Transaction Don avec la bonne date ─────────────────
 
-it('constaterAbandon utilise la dateDon modifiée pour la Transaction Don', function (): void {
+it('confirmValidation avec choix=abandon utilise la dateDon modifiée', function (): void {
     $association = Association::factory()->create();
     constaterAbandonBootTenant($association);
     $admin = constaterAbandonMakeAdmin($association);
@@ -209,11 +208,12 @@ it('constaterAbandon utilise la dateDon modifiée pour la Transaction Don', func
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+        ->set('choixValidation', 'abandon')
         ->set('compteId', $compte->id)
         ->set('modePaiement', 'virement')
         ->set('dateComptabilisation', '2026-03-10')
         ->set('dateDon', '2026-04-05')
-        ->call('constaterAbandon');
+        ->call('confirmValidation');
 
     $ndf->refresh();
     $txDon = Transaction::find($ndf->don_transaction_id);
@@ -221,9 +221,9 @@ it('constaterAbandon utilise la dateDon modifiée pour la Transaction Don', func
     expect($txDon->date->format('Y-m-d'))->toBe('2026-04-05');
 });
 
-// ── 6. Succès → flash success + redirect vers la page show ───────────────────
+// ── 6. Succès abandon → modal fermé + NDF mise à jour ────────────────────────
 
-it('constaterAbandon flash success et redirige vers comptabilite.ndf.show', function (): void {
+it('confirmValidation avec choix=abandon ferme le miniForm et passe la NDF en DonParAbandonCreances', function (): void {
     $association = Association::factory()->create();
     constaterAbandonBootTenant($association);
     $admin = constaterAbandonMakeAdmin($association);
@@ -235,17 +235,75 @@ it('constaterAbandon flash success et redirige vers comptabilite.ndf.show', func
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+        ->set('showMiniForm', true)
+        ->set('choixValidation', 'abandon')
         ->set('compteId', $compte->id)
         ->set('modePaiement', 'virement')
         ->set('dateComptabilisation', '2026-03-10')
         ->set('dateDon', '2026-03-10')
-        ->call('constaterAbandon')
-        ->assertRedirect(route('comptabilite.ndf.show', $ndf));
+        ->call('confirmValidation')
+        ->assertSet('showMiniForm', false)
+        ->assertHasNoErrors();
+
+    $ndf->refresh();
+    expect($ndf->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::DonParAbandonCreances->value);
 });
 
-// ── 7. Échec service (pas de sous-cat AbandonCreance) → flash error, NDF Soumise
+// ── 7. Succès normal → modal fermé + NDF Validée ─────────────────────────────
 
-it('constaterAbandon flash error et NDF reste Soumise si aucune sous-cat AbandonCreance', function (): void {
+it('confirmValidation avec choix=normal valide normalement et ferme le miniForm', function (): void {
+    Storage::fake('local');
+
+    $association = Association::factory()->create();
+    constaterAbandonBootTenant($association);
+    $admin = constaterAbandonMakeAdmin($association);
+
+    $compte = CompteBancaire::factory()->create([
+        'association_id' => $association->id,
+        'actif_recettes_depenses' => true,
+        'est_systeme' => false,
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    $ndf = NoteDeFrais::factory()->soumise()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+        'abandon_creance_propose' => true,
+        'date' => '2026-03-10',
+    ]);
+
+    $scDepense = SousCategorie::factory()->create(['association_id' => $association->id]);
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'sous_categorie_id' => $scDepense->id,
+        'montant' => '50.00',
+        'piece_jointe_path' => null,
+    ]);
+
+    $this->actingAs($admin);
+
+    $countBefore = Transaction::count();
+
+    Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+        ->set('showMiniForm', true)
+        ->set('choixValidation', 'normal')
+        ->set('compteId', $compte->id)
+        ->set('modePaiement', 'virement')
+        ->set('dateComptabilisation', '2026-03-10')
+        ->call('confirmValidation')
+        ->assertSet('showMiniForm', false)
+        ->assertHasNoErrors();
+
+    // Une seule Transaction (flux normal)
+    expect(Transaction::count())->toBe($countBefore + 1);
+
+    $ndf->refresh();
+    expect($ndf->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Validee->value);
+});
+
+// ── 8. Échec service — pas de sous-cat AbandonCreance → flash error, NDF Soumise
+
+it('confirmValidation avec choix=abandon flash error si aucune sous-cat AbandonCreance', function (): void {
     Storage::fake('local');
 
     $association = Association::factory()->create();
@@ -279,11 +337,12 @@ it('constaterAbandon flash error et NDF reste Soumise si aucune sous-cat Abandon
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+        ->set('choixValidation', 'abandon')
         ->set('compteId', $compte->id)
         ->set('modePaiement', 'virement')
         ->set('dateComptabilisation', '2026-03-10')
         ->set('dateDon', '2026-03-10')
-        ->call('constaterAbandon');
+        ->call('confirmValidation');
 
     // NDF reste Soumise
     $ndf->refresh();
@@ -293,9 +352,75 @@ it('constaterAbandon flash error et NDF reste Soumise si aucune sous-cat Abandon
     expect(Transaction::count())->toBe($countBefore);
 });
 
-// ── 8. Validation front — champs requis ──────────────────────────────────────
+// ── 9. Validation front — choix=abandon + dateDon manquant → erreur dateDon ──
 
-it('constaterAbandon retourne des erreurs de validation si champs requis manquants', function (): void {
+it('confirmValidation avec choix=abandon exige dateDon', function (): void {
+    $association = Association::factory()->create();
+    constaterAbandonBootTenant($association);
+    $admin = constaterAbandonMakeAdmin($association);
+
+    $setup = constaterAbandonSetupHappyPath($association);
+    $ndf = $setup['ndf'];
+    $compte = $setup['compte'];
+
+    $this->actingAs($admin);
+
+    Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+        ->set('choixValidation', 'abandon')
+        ->set('compteId', $compte->id)
+        ->set('modePaiement', 'virement')
+        ->set('dateComptabilisation', '2026-03-10')
+        ->set('dateDon', '')
+        ->call('confirmValidation')
+        ->assertHasErrors(['dateDon']);
+});
+
+// ── 10. Validation front — choix=normal → dateDon non requis ─────────────────
+
+it('confirmValidation avec choix=normal ignore dateDon vide', function (): void {
+    Storage::fake('local');
+
+    $association = Association::factory()->create();
+    constaterAbandonBootTenant($association);
+    $admin = constaterAbandonMakeAdmin($association);
+
+    $compte = CompteBancaire::factory()->create([
+        'association_id' => $association->id,
+        'actif_recettes_depenses' => true,
+        'est_systeme' => false,
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    $ndf = NoteDeFrais::factory()->soumise()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+        'abandon_creance_propose' => true,
+        'date' => '2026-03-10',
+    ]);
+
+    $sc = SousCategorie::factory()->create(['association_id' => $association->id]);
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'sous_categorie_id' => $sc->id,
+        'montant' => '40.00',
+        'piece_jointe_path' => null,
+    ]);
+
+    $this->actingAs($admin);
+
+    Livewire::test(Show::class, ['noteDeFrais' => $ndf])
+        ->set('choixValidation', 'normal')
+        ->set('compteId', $compte->id)
+        ->set('modePaiement', 'virement')
+        ->set('dateComptabilisation', '2026-03-10')
+        ->set('dateDon', '')
+        ->call('confirmValidation')
+        ->assertHasNoErrors(['dateDon']);
+});
+
+// ── 11. abandon_creance_propose=false → pas de radio dans le miniForm ─────────
+
+it('miniForm sans abandon ne contient pas le choix abandon', function (): void {
     $association = Association::factory()->create();
     constaterAbandonBootTenant($association);
     $admin = constaterAbandonMakeAdmin($association);
@@ -304,20 +429,19 @@ it('constaterAbandon retourne des erreurs de validation si champs requis manquan
     $ndf = NoteDeFrais::factory()->soumise()->create([
         'association_id' => $association->id,
         'tiers_id' => $tiers->id,
+        'abandon_creance_propose' => false,
     ]);
 
     $this->actingAs($admin);
 
     Livewire::test(Show::class, ['noteDeFrais' => $ndf])
-        ->set('compteId', null)
-        ->set('modePaiement', '')
-        ->set('dateComptabilisation', '')
-        ->set('dateDon', '')
-        ->call('constaterAbandon')
-        ->assertHasErrors(['compteId', 'modePaiement', 'dateComptabilisation', 'dateDon']);
+        ->set('showMiniForm', true)
+        ->assertDontSee('Comment traiter la proposition du tiers')
+        ->assertDontSeeHtml('id="choix-abandon"')
+        ->assertOk();
 });
 
-// ── 9. Policy : Gestionnaire → 403 ───────────────────────────────────────────
+// ── 12. Policy : Gestionnaire → 403 ──────────────────────────────────────────
 
 it('retourne 403 pour un gestionnaire accédant à la page show NDF', function (): void {
     $association = Association::factory()->create();
@@ -342,7 +466,7 @@ it('retourne 403 pour un gestionnaire accédant à la page show NDF', function (
         ->assertForbidden();
 });
 
-// ── 10. Isolation tenant — NDF asso B → 404 ──────────────────────────────────
+// ── 13. Isolation tenant — NDF asso B → 404 ──────────────────────────────────
 
 it('retourne 404 quand la NDF appartient à une autre association', function (): void {
     $assocA = Association::factory()->create();
