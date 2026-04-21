@@ -42,6 +42,7 @@ public/proto-*.html
 .claude/worktrees/
 .claude/launch.json
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 .env.swp
 
 # Scripts d'ops (spécifiques à l'infrastructure)

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Onboarding;
 
 use App\Enums\TypeCategorie;
+use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
+use App\Models\UsageSousCategorie;
 use Illuminate\Support\Facades\DB;
 
 final class DefaultChartOfAccountsService
@@ -31,14 +33,22 @@ final class DefaultChartOfAccountsService
                 $categoriesCreated++;
 
                 foreach ($cat['sous'] as $sc) {
-                    SousCategorie::create(array_merge([
+                    $usages = $sc['usages'] ?? [];
+                    unset($sc['usages']);
+
+                    $sousCategorie = SousCategorie::create(array_merge([
                         'association_id' => $association->id,
                         'categorie_id' => $categorie->id,
-                        'pour_dons' => false,
-                        'pour_cotisations' => false,
-                        'pour_inscriptions' => false,
                     ], $sc));
                     $sousCategoriesCreated++;
+
+                    foreach ($usages as $usage) {
+                        UsageSousCategorie::create([
+                            'association_id' => $association->id,
+                            'sous_categorie_id' => $sousCategorie->id,
+                            'usage' => $usage->value,
+                        ]);
+                    }
                 }
             }
         });
@@ -79,7 +89,7 @@ final class DefaultChartOfAccountsService
                     ['nom' => 'Supervision',              'code_cerfa' => '611C'],
                     ['nom' => 'Sessions inter-ateliers',  'code_cerfa' => '611D'],
                     ['nom' => 'Honoraires juridiques',    'code_cerfa' => '622'],
-                    ['nom' => 'Frais de déplacements',    'code_cerfa' => '625A'],
+                    ['nom' => 'Frais de déplacements',    'code_cerfa' => '625A', 'usages' => [UsageComptable::FraisKilometriques]],
                     ['nom' => 'Repas / Restauration',     'code_cerfa' => '625B'],
                     ['nom' => 'Locations de logiciels',   'code_cerfa' => '628A'],
                     ['nom' => 'Hébergement internet',     'code_cerfa' => '628B'],
@@ -97,8 +107,8 @@ final class DefaultChartOfAccountsService
                 'nom' => '70 - Ventes et prestations',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Formations',              'code_cerfa' => '706A', 'pour_inscriptions' => true],
-                    ['nom' => 'Parcours thérapeutiques', 'code_cerfa' => '706B', 'pour_inscriptions' => true],
+                    ['nom' => 'Formations',              'code_cerfa' => '706A', 'usages' => [UsageComptable::Inscription]],
+                    ['nom' => 'Parcours thérapeutiques', 'code_cerfa' => '706B', 'usages' => [UsageComptable::Inscription]],
                     ['nom' => 'Ventes de produits',      'code_cerfa' => '707'],
                 ],
             ],
@@ -113,8 +123,8 @@ final class DefaultChartOfAccountsService
                 'nom' => '75 - Cotisations et dons',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Cotisations', 'code_cerfa' => '751', 'pour_cotisations' => true],
-                    ['nom' => 'Dons manuels', 'code_cerfa' => '754', 'pour_dons' => true],
+                    ['nom' => 'Cotisations', 'code_cerfa' => '751', 'usages' => [UsageComptable::Cotisation]],
+                    ['nom' => 'Dons manuels', 'code_cerfa' => '754', 'usages' => [UsageComptable::Don]],
                     ['nom' => 'Mécénat',     'code_cerfa' => '756'],
                 ],
             ],
@@ -129,7 +139,7 @@ final class DefaultChartOfAccountsService
                 'nom' => '77 - Produits exceptionnels',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771'],
+                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771', 'usages' => [UsageComptable::Don, UsageComptable::AbandonCreance]],
                 ],
             ],
         ];

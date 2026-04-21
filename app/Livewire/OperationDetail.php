@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\UsageComptable;
 use App\Models\Operation;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -34,11 +35,11 @@ final class OperationDetail extends Component
             ->sum('montant');
         $totalRecettes = (float) $operation->transactionLignes()
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
-            ->whereDoesntHave('sousCategorie', fn ($q) => $q->where('pour_dons', true))
+            ->whereDoesntHave('sousCategorie', fn ($q) => $q->whereHas('usages', fn ($u) => $u->where('usage', UsageComptable::Don->value)))
             ->sum('montant');
         $totalDons = (float) $operation->transactionLignes()
             ->whereHas('transaction', fn ($q) => $q->where('type', 'recette'))
-            ->whereHas('sousCategorie', fn ($q) => $q->where('pour_dons', true))
+            ->whereHas('sousCategorie', fn ($q) => $q->whereHas('usages', fn ($u) => $u->where('usage', UsageComptable::Don->value)))
             ->sum('montant');
         $solde = ($totalRecettes + $totalDons) - $totalDepenses;
 

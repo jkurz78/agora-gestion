@@ -104,7 +104,7 @@ it('filters by clients', function () {
 
 it('filters by donateurs tous exercices', function () {
     $cat = Categorie::create(['association_id' => $this->association->id, 'nom' => 'Recettes', 'type' => 'recette']);
-    $sc = SousCategorie::create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Dons', 'pour_dons' => true]);
+    $sc = SousCategorie::factory()->pourDons()->create(['association_id' => $this->association->id, 'categorie_id' => $cat->id, 'nom' => 'Dons']);
 
     $donateur = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Donateur', 'email' => 'd@e.com']);
     $tx = Transaction::factory()->create(['association_id' => $this->association->id, 'tiers_id' => $donateur->id, 'type' => 'recette', 'date' => '2025-10-15']);

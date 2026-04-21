@@ -24,17 +24,15 @@ beforeEach(function () {
     $this->compte = CompteBancaire::factory()->create();
 
     $categorie = Categorie::factory()->create(['type' => 'recette']);
-    $this->scInscription = SousCategorie::create([
+    $this->scInscription = SousCategorie::factory()->pourInscriptions()->create([
         'categorie_id' => $categorie->id,
         'nom' => 'Inscription stage',
         'code_cerfa' => '706',
-        'pour_inscriptions' => true,
     ]);
-    $this->scDon = SousCategorie::create([
+    $this->scDon = SousCategorie::factory()->pourDons()->create([
         'categorie_id' => $categorie->id,
         'nom' => 'Don manuel',
         'code_cerfa' => '754',
-        'pour_dons' => true,
     ]);
 });
 

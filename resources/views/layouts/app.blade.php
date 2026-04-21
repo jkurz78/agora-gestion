@@ -107,6 +107,37 @@
             border-color: rgba(255, 255, 255, 0.7);
             color: #fff;
         }
+
+        /* Tooltip CSS-only instantané — bulle noire, pas de délai, pas de JS. */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #212529;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: .75rem;
+            white-space: nowrap;
+            z-index: 2100;
+            pointer-events: none;
+        }
+        [data-tooltip]:hover::before {
+            content: "";
+            position: absolute;
+            bottom: calc(100% + 2px);
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent;
+            border-top-color: #212529;
+            z-index: 2100;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -232,6 +263,19 @@
                             @endif
                         </ul>
                     </li>
+
+                    {{-- Notes de frais --}}
+                    @if(($canSeeNdf ?? false) && Route::has('comptabilite.ndf.index'))
+                        <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('comptabilite.ndf.*') ? 'active' : '' }}"
+                               href="{{ route('comptabilite.ndf.index') }}">
+                                <i class="bi bi-receipt-cutoff"></i> Notes de frais
+                                @if(($ndfPendingCount ?? 0) > 0)
+                                    <span class="badge bg-warning text-dark">{{ $ndfPendingCount }}</span>
+                                @endif
+                            </a>
+                        </li>
+                    @endif
 
                     {{-- Budget --}}
                     @if (Route::has('comptabilite.budget'))

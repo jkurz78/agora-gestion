@@ -25,6 +25,7 @@ final class TransactionLigne extends Model
         'seance',
         'montant',
         'notes',
+        'piece_jointe_path',
         'helloasso_item_id',
     ];
 

@@ -54,6 +54,12 @@
                     </button>
                 @endforeach
             @endif
+            <div class="form-check form-check-inline ms-1 mb-0">
+                <input class="form-check-input" type="checkbox" id="filterNdfPageTitle" wire:model.live="filterNdfUniquement">
+                <label class="form-check-label small" for="filterNdfPageTitle">
+                    <i class="bi bi-receipt"></i> Issues d'une NDF
+                </label>
+            </div>
             <div class="d-flex gap-1 ms-auto flex-wrap">
                 @if($showImport && ! $exerciceCloture)
                     <livewire:import-csv type="depense" />
@@ -137,6 +143,12 @@
                     </button>
                 @endforeach
             @endif
+            <div class="form-check form-check-inline ms-1 mb-0">
+                <input class="form-check-input" type="checkbox" id="filterNdfStandard" wire:model.live="filterNdfUniquement">
+                <label class="form-check-label small" for="filterNdfStandard">
+                    <i class="bi bi-receipt"></i> Issues d'une NDF
+                </label>
+            </div>
 
             <div class="ms-auto">
                 @if($sousCategorieFilter)
@@ -531,6 +543,13 @@
                                 <i class="bi bi-paperclip"></i>
                             </a>
                         @endif
+                        @if(isset($ndfByTransactionId[(int)$tx->id]))
+                            <span class="badge bg-info-subtle text-info ms-1"
+                                  title="Note de frais #{{ $ndfByTransactionId[(int)$tx->id]->id }}"
+                                  data-bs-toggle="tooltip">
+                                <i class="bi bi-receipt"></i> NDF
+                            </span>
+                        @endif
                     </td>
                     <td class="small text-muted">
                         @if((int)$tx->nb_lignes > 1)
@@ -635,7 +654,15 @@
                                                 </td>
                                                 <td class="text-center text-muted">{{ $ligne['seance'] ?? '' }}</td>
                                                 <td class="text-end fw-semibold">{{ number_format($ligne['montant'], 2, ',', ' ') }} €</td>
-                                                <td class="text-muted">{{ $ligne['notes'] ?? '' }}</td>
+                                                <td class="text-muted">
+                                                    {{ $ligne['notes'] ?? '' }}
+                                                    @if(! empty($ligne['piece_jointe_path']) && isset($ligne['id']) && isset($detail['transaction_id']))
+                                                        <a href="{{ route('comptabilite.transactions.piece-jointe-ligne', ['transaction' => $detail['transaction_id'], 'ligne' => $ligne['id']]) }}"
+                                                           target="_blank" class="text-muted ms-1" title="Justificatif de ligne" @click.stop>
+                                                            <i class="bi bi-paperclip"></i>
+                                                        </a>
+                                                    @endif
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>

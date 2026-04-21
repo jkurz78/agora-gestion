@@ -2,28 +2,27 @@
 
 declare(strict_types=1);
 
+use App\Enums\UsageComptable;
 use App\Models\SousCategorie;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
-it('sous_categories table has pour_inscriptions column', function () {
-    expect(Schema::hasColumn('sous_categories', 'pour_inscriptions'))->toBeTrue();
+it('sous_categories table has no pour_inscriptions column (dropped)', function () {
+    expect(Schema::hasColumn('sous_categories', 'pour_inscriptions'))->toBeFalse();
 });
 
-it('pour_inscriptions defaults to false', function () {
+it('sous_categories factory creates without usage by default', function () {
     $sc = SousCategorie::factory()->create();
-
     $sc->refresh();
 
-    expect($sc->pour_inscriptions)->toBeFalse();
+    expect($sc->hasUsage(UsageComptable::Inscription))->toBeFalse();
 });
 
-it('can set pour_inscriptions to true', function () {
+it('factory pourInscriptions creates pivot row', function () {
     $sc = SousCategorie::factory()->pourInscriptions()->create();
-
     $sc->refresh();
 
-    expect($sc->pour_inscriptions)->toBeTrue();
+    expect($sc->hasUsage(UsageComptable::Inscription))->toBeTrue();
 });

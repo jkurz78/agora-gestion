@@ -30,8 +30,8 @@ beforeEach(function () {
     $this->actingAs($user);
 
     $this->compte = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
-    $this->scDon = SousCategorie::factory()->create(['pour_dons' => true, 'nom' => 'Don']);
-    $this->scCot = SousCategorie::factory()->create(['pour_cotisations' => true, 'nom' => 'Cotisation']);
+    $this->scDon = SousCategorie::factory()->pourDons()->create(['nom' => 'Don']);
+    $this->scCot = SousCategorie::factory()->pourCotisations()->create(['nom' => 'Cotisation']);
 
     $this->parametres = HelloAssoParametres::create([
         'association_id' => $this->association->id,
@@ -209,7 +209,7 @@ it('is idempotent — re-importing same order updates instead of duplicating', f
 });
 
 it('resolves operation from form mapping for Registration items', function () {
-    $scInscr = SousCategorie::factory()->create(['pour_inscriptions' => true, 'nom' => 'Inscription']);
+    $scInscr = SousCategorie::factory()->pourInscriptions()->create(['nom' => 'Inscription']);
     $this->parametres->update(['sous_categorie_inscription_id' => $scInscr->id]);
 
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scInscr->id]);
@@ -257,7 +257,7 @@ it('resolves operation from form mapping for Registration items', function () {
 });
 
 it('reports error for Registration item without mapped operation', function () {
-    $scInscr = SousCategorie::factory()->create(['pour_inscriptions' => true, 'nom' => 'Inscription']);
+    $scInscr = SousCategorie::factory()->pourInscriptions()->create(['nom' => 'Inscription']);
     $this->parametres->update(['sous_categorie_inscription_id' => $scInscr->id]);
     // No form mapping created
 
@@ -445,7 +445,7 @@ it('does not create participant for Donation items', function () {
 });
 
 it('does not duplicate participant on re-sync', function () {
-    $scInscr = SousCategorie::factory()->create(['pour_inscriptions' => true, 'nom' => 'Inscription']);
+    $scInscr = SousCategorie::factory()->pourInscriptions()->create(['nom' => 'Inscription']);
     $this->parametres->update(['sous_categorie_inscription_id' => $scInscr->id]);
 
     $operation = Operation::factory()->create(['nom' => 'Stage']);

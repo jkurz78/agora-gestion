@@ -20,9 +20,8 @@ beforeEach(function () {
     session(['current_association_id' => $this->association->id]);
     $this->actingAs($this->user);
 
-    $this->cotSc = SousCategorie::factory()->create([
+    $this->cotSc = SousCategorie::factory()->pourCotisations()->create([
         'association_id' => $this->association->id,
-        'pour_cotisations' => true,
     ]);
 });
 

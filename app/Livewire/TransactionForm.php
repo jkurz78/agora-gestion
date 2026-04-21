@@ -9,11 +9,13 @@ use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutOperation;
+use App\Enums\UsageComptable;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
 use App\Models\IncomingDocument;
+use App\Models\NoteDeFrais;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -22,10 +24,12 @@ use App\Models\TransactionLigneAffectation;
 use App\Services\ExerciceService;
 use App\Services\InvoiceOcrService;
 use App\Services\TransactionService;
+use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -67,6 +71,8 @@ final class TransactionForm extends Component
 
     /** @var TemporaryUploadedFile|null */
     public $pieceJointe = null;
+
+    public ?NoteDeFrais $linkedNdf = null;
 
     public ?string $existingPieceJointeNom = null;
 
@@ -119,7 +125,7 @@ final class TransactionForm extends Component
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
-            'incomingDocumentId', 'incomingDocumentPreviewUrl']);
+            'incomingDocumentId', 'incomingDocumentPreviewUrl', 'linkedNdf']);
         $this->type = $type;
         $this->isLocked = false;
         $this->resetValidation();
@@ -199,6 +205,11 @@ final class TransactionForm extends Component
             'seance' => '',
             'montant' => '',
             'notes' => '',
+            'piece_jointe_path' => null,
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+            'piece_jointe_existing_url' => null,
+            'piece_jointe_filename' => null,
         ];
     }
 
@@ -331,7 +342,7 @@ final class TransactionForm extends Component
         $this->affectations = [];
         $this->ventilationHasAffectations = false;
 
-        $transaction = Transaction::with('lignes')->findOrFail($id);
+        $transaction = Transaction::with(['lignes', 'noteDeFrais'])->findOrFail($id);
 
         $this->transactionId = $transaction->id;
         $this->type = $transaction->type->value;
@@ -350,11 +361,21 @@ final class TransactionForm extends Component
             'seance' => (string) ($ligne->seance ?? ''),
             'montant' => (string) $ligne->montant,
             'notes' => (string) ($ligne->notes ?? ''),
+            'piece_jointe_path' => $ligne->piece_jointe_path,
+            'piece_jointe_upload' => null,
+            'piece_jointe_remove' => false,
+            'piece_jointe_existing_url' => $ligne->piece_jointe_path
+                ? route('comptabilite.transactions.piece-jointe-ligne', ['transaction' => $id, 'ligne' => $ligne->id])
+                : null,
+            'piece_jointe_filename' => $ligne->piece_jointe_path
+                ? basename($ligne->piece_jointe_path)
+                : null,
         ])->toArray();
 
         $this->existingPieceJointeNom = $transaction->piece_jointe_nom;
         $this->existingPieceJointeUrl = $transaction->pieceJointeUrl();
         $this->pieceJointe = null;
+        $this->linkedNdf = $transaction->noteDeFrais;
 
         $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByRemise();
         $this->isLockedByFacture = $transaction->isLockedByFacture();
@@ -370,7 +391,7 @@ final class TransactionForm extends Component
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
-            'incomingDocumentId', 'incomingDocumentPreviewUrl',
+            'incomingDocumentId', 'incomingDocumentPreviewUrl', 'linkedNdf',
         ]);
         $this->resetValidation();
     }
@@ -422,6 +443,20 @@ final class TransactionForm extends Component
             ]);
         }
 
+        // Validation des PJ de lignes
+        $lignesPjRules = [];
+        $lignesPjMessages = [];
+        foreach ($this->lignes as $index => $ligne) {
+            if (($ligne['piece_jointe_upload'] ?? null) !== null) {
+                $lignesPjRules["lignes.{$index}.piece_jointe_upload"] = ['file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'];
+                $lignesPjMessages["lignes.{$index}.piece_jointe_upload.mimes"] = 'Le justificatif de la ligne '.($index + 1).' doit être un fichier PDF, JPG ou PNG.';
+                $lignesPjMessages["lignes.{$index}.piece_jointe_upload.max"] = 'Le justificatif de la ligne '.($index + 1).' ne doit pas dépasser 10 Mo.';
+            }
+        }
+        if (! empty($lignesPjRules)) {
+            $this->validate($lignesPjRules, $lignesPjMessages);
+        }
+
         $data = [
             'type' => $this->type,
             'date' => $this->date,
@@ -443,7 +478,7 @@ final class TransactionForm extends Component
             'notes' => $l['notes'] ?: null,
         ])->toArray();
 
-        $inscriptionIds = SousCategorie::where('pour_inscriptions', true)->pluck('id')->toArray();
+        $inscriptionIds = SousCategorie::forUsage(UsageComptable::Inscription)->pluck('id')->toArray();
         foreach ($this->lignes as $index => $ligne) {
             if (in_array((int) ($ligne['sous_categorie_id'] ?? 0), $inscriptionIds, true)
                 && empty($ligne['operation_id'])) {
@@ -454,6 +489,18 @@ final class TransactionForm extends Component
         }
 
         $service = app(TransactionService::class);
+
+        // Capturer les anciens paths PJ par index AVANT l'update (le service forceDelete les lignes)
+        $anciensPieceJointePaths = [];
+        if ($this->transactionId) {
+            $existingLignes = Transaction::findOrFail($this->transactionId)->lignes()->get()->values();
+            foreach ($this->lignes as $index => $ligneData) {
+                $existingLigne = $existingLignes->get($index);
+                if ($existingLigne !== null) {
+                    $anciensPieceJointePaths[$index] = $existingLigne->piece_jointe_path;
+                }
+            }
+        }
 
         $createdTransaction = null;
         try {
@@ -482,6 +529,52 @@ final class TransactionForm extends Component
             $tx = $createdTransaction ?? Transaction::find($this->transactionId);
             if ($tx !== null) {
                 $this->finalizeIncomingDocumentCleanup($tx, $service);
+            }
+        }
+
+        // Sauvegarder les PJ de lignes
+        $tx = $createdTransaction ?? Transaction::with('lignes')->find($this->transactionId);
+        if ($tx !== null) {
+            $tx->load('lignes');
+            $lignesModels = $tx->lignes->values();
+            foreach ($this->lignes as $index => $ligneData) {
+                $ligneModel = $lignesModels->get($index);
+                if ($ligneModel === null) {
+                    continue;
+                }
+
+                // Path de l'ancienne ligne (capturé avant l'update qui forceDelete)
+                $ancienPath = $anciensPieceJointePaths[$index] ?? $ligneModel->piece_jointe_path;
+
+                if (! empty($ligneData['piece_jointe_remove'])) {
+                    // Supprimer l'ancien fichier (peut être sur l'ancien ou nouveau modèle)
+                    if ($ancienPath !== null && Storage::disk('local')->exists($ancienPath)) {
+                        Storage::disk('local')->delete($ancienPath);
+                    }
+                    $ligneModel->update(['piece_jointe_path' => null]);
+                } elseif (($ligneData['piece_jointe_upload'] ?? null) instanceof TemporaryUploadedFile) {
+                    $upload = $ligneData['piece_jointe_upload'];
+                    $ext = $upload->getClientOriginalExtension();
+                    $slug = Str::slug($ligneData['notes'] ?? $ligneData['libelle'] ?? 'justif') ?: 'justif';
+                    $n = $index + 1;
+                    $path = sprintf(
+                        'associations/%d/transactions/%d/ligne-%d-%s.%s',
+                        (int) TenantContext::currentId(),
+                        (int) $tx->id,
+                        $n,
+                        $slug,
+                        $ext
+                    );
+                    // Supprimer ancien si présent
+                    if ($ancienPath !== null && Storage::disk('local')->exists($ancienPath)) {
+                        Storage::disk('local')->delete($ancienPath);
+                    }
+                    $upload->storeAs(dirname($path), basename($path), 'local');
+                    $ligneModel->update(['piece_jointe_path' => $path]);
+                } elseif ($ancienPath !== null && $ligneModel->piece_jointe_path === null) {
+                    // Pas d'upload, pas de suppression demandée — restaurer le path existant sur la nouvelle ligne
+                    $ligneModel->update(['piece_jointe_path' => $ancienPath]);
+                }
             }
         }
 
@@ -655,6 +748,11 @@ final class TransactionForm extends Component
                     'seance' => $ligne->seance !== null ? (string) $ligne->seance : '',
                     'montant' => (string) $ligne->montant,
                     'notes' => $ligne->description ?? '',
+                    'piece_jointe_path' => null,
+                    'piece_jointe_upload' => null,
+                    'piece_jointe_remove' => false,
+                    'piece_jointe_existing_url' => null,
+                    'piece_jointe_filename' => null,
                 ];
             }
         }
@@ -692,12 +790,16 @@ final class TransactionForm extends Component
 
     public function render(): View
     {
-        $allowedFilters = ['pour_dons', 'pour_cotisations', 'pour_inscriptions'];
-        $scFilter = in_array($this->sousCategorieFilter, $allowedFilters, true) ? $this->sousCategorieFilter : null;
+        $flagToUsage = [
+            'pour_dons' => UsageComptable::Don,
+            'pour_cotisations' => UsageComptable::Cotisation,
+            'pour_inscriptions' => UsageComptable::Inscription,
+        ];
+        $scUsage = $flagToUsage[$this->sousCategorieFilter] ?? null;
 
         $sousCategories = SousCategorie::with('categorie')
             ->when($this->type !== '', fn ($q) => $q->whereHas('categorie', fn ($q2) => $q2->where('type', $this->type)))
-            ->when($scFilter, fn ($q) => $q->where($scFilter, true))
+            ->when($scUsage !== null, fn ($q) => $q->forUsage($scUsage))
             ->orderBy('nom')
             ->get();
 

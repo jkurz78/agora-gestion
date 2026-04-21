@@ -9,6 +9,7 @@ use App\Enums\StatutReglement;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\CompteBancaire;
+use App\Models\NoteDeFrais;
 use App\Models\Transaction;
 use App\Models\VirementInterne;
 use App\Services\ExerciceService;
@@ -45,7 +46,7 @@ final class TransactionUniverselle extends Component
     public bool $showImport = false;      // affiche les boutons import CSV dans le header
 
     #[Locked]
-    public ?string $sousCategorieFilter = null; // filtre sous-catégorie (pour_dons, pour_cotisations, pour_inscriptions)
+    public ?string $sousCategorieFilter = null; // filtre sous-catégorie par usage (dons, cotisations, inscriptions)
 
     // === Filtres libres (manipulables par l'utilisateur) ===
     /** @var array<string> */
@@ -68,6 +69,8 @@ final class TransactionUniverselle extends Component
     public string $filterStatut = ''; // '' | 'en_attente' | 'recu' | 'pointe'
 
     public ?int $filterCompteId = null; // libre seulement si compteId prop est null
+
+    public bool $filterNdfUniquement = false;
 
     // === Expansion de lignes ===
     /** @var array<string, mixed> */
@@ -103,6 +106,12 @@ final class TransactionUniverselle extends Component
         $range = $exerciceService->dateRange($ex);
         $this->filterDateDebut = $range['start']->toDateString();
         $this->filterDateFin = $range['end']->toDateString();
+
+        // Auto-ouverture du form d'édition via query string ?edit={id}
+        $editId = (int) request()->query('edit');
+        if ($editId > 0) {
+            $this->dispatch('edit-transaction', id: $editId);
+        }
     }
 
     // Presets date
@@ -200,6 +209,11 @@ final class TransactionUniverselle extends Component
         $this->resetPage();
     }
 
+    public function updatedFilterNdfUniquement(): void
+    {
+        $this->resetPage();
+    }
+
     public function sortBy(string $column): void
     {
         $allowed = ['id', 'date', 'numero_piece', 'reference', 'tiers', 'libelle',
@@ -258,18 +272,21 @@ final class TransactionUniverselle extends Component
 
         return [
             'lignes' => $tx->lignes->map(fn ($l) => [
+                'id' => $l->id,
                 'sous_categorie' => $l->sousCategorie?->nom,
                 'operation' => $l->operation?->nom,
                 'operation_id' => $l->operation_id,
                 'seance' => $l->seance,
                 'montant' => (float) $l->montant,
                 'notes' => $l->notes,
+                'piece_jointe_path' => $l->piece_jointe_path,
             ])->toArray(),
             'factures' => $tx->factures->map(fn ($f) => [
                 'id' => $f->id,
                 'numero' => $f->numero ?? 'brouillon',
                 'statut' => $f->statut->value,
             ])->toArray(),
+            'transaction_id' => $id,
         ];
     }
 
@@ -375,6 +392,7 @@ final class TransactionUniverselle extends Component
             sortDirection: $sortDirection,
             perPage: $this->effectivePerPage(),
             page: $this->getPage(),
+            ndfUniquement: $this->filterNdfUniquement,
         );
 
         $rows = collect($result['paginator']->items());
@@ -384,6 +402,22 @@ final class TransactionUniverselle extends Component
                 $solde += (float) $row->montant;
                 $row->solde_courant = $solde;
             }
+        }
+
+        // Chargement des NDF liées (indicateur) pour les transactions de la page courante
+        $txIds = $rows
+            ->filter(fn ($row) => in_array($row->source_type, ['depense', 'recette'], true))
+            ->pluck('id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->toArray();
+        $ndfByTransactionId = [];
+        if (! empty($txIds)) {
+            NoteDeFrais::whereIn('transaction_id', $txIds)
+                ->get(['id', 'transaction_id', 'libelle'])
+                ->each(function (NoteDeFrais $ndf) use (&$ndfByTransactionId) {
+                    $ndfByTransactionId[(int) $ndf->transaction_id] = $ndf;
+                });
         }
 
         return view('livewire.transaction-universelle', [
@@ -396,6 +430,7 @@ final class TransactionUniverselle extends Component
             'sousCategorieFilter' => $this->sousCategorieFilter,
             'showCompteCol' => $this->compteId === null,
             'showTiersCol' => $this->tiersId === null,
+            'ndfByTransactionId' => $ndfByTransactionId,
         ]);
     }
 }

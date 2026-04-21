@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Database\Seeders;
 
 use App\Enums\TypeCategorie;
+use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
+use App\Models\UsageSousCategorie;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -26,8 +28,8 @@ class CategoriesSeeder extends Seeder
                 'nom' => '70 - Ventes et prestations',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Formations',              'code_cerfa' => '706A', 'pour_inscriptions' => true],
-                    ['nom' => 'Parcours thérapeutiques', 'code_cerfa' => '706B', 'pour_inscriptions' => true],
+                    ['nom' => 'Formations',              'code_cerfa' => '706A', 'usages' => [UsageComptable::Inscription]],
+                    ['nom' => 'Parcours thérapeutiques', 'code_cerfa' => '706B', 'usages' => [UsageComptable::Inscription]],
                     ['nom' => 'Ventes de produits',      'code_cerfa' => '707'],
                 ],
             ],
@@ -42,9 +44,9 @@ class CategoriesSeeder extends Seeder
                 'nom' => '75 - Cotisations et dons',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Cotisations',  'code_cerfa' => '751', 'pour_cotisations' => true],
-                    ['nom' => 'Dons manuels', 'code_cerfa' => '754', 'pour_dons' => true],
-                    ['nom' => 'Mécénat',      'code_cerfa' => '756', 'pour_dons' => true],
+                    ['nom' => 'Cotisations',  'code_cerfa' => '751', 'usages' => [UsageComptable::Cotisation]],
+                    ['nom' => 'Dons manuels', 'code_cerfa' => '754', 'usages' => [UsageComptable::Don]],
+                    ['nom' => 'Mécénat',      'code_cerfa' => '756', 'usages' => [UsageComptable::Don]],
                 ],
             ],
             [
@@ -58,7 +60,7 @@ class CategoriesSeeder extends Seeder
                 'nom' => '77 - Produits exceptionnels',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771', 'pour_dons' => true],
+                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771', 'usages' => [UsageComptable::Don, UsageComptable::AbandonCreance]],
                 ],
             ],
 
@@ -90,7 +92,7 @@ class CategoriesSeeder extends Seeder
                     ['nom' => 'Supervision',              'code_cerfa' => '611C'],
                     ['nom' => 'Sessions inter-ateliers',  'code_cerfa' => '611D'],
                     ['nom' => 'Honoraires juridiques',    'code_cerfa' => '622'],
-                    ['nom' => 'Frais de déplacements',    'code_cerfa' => '625A'],
+                    ['nom' => 'Frais de déplacements',    'code_cerfa' => '625A', 'usages' => [UsageComptable::FraisKilometriques]],
                     ['nom' => 'Repas / Restauration',     'code_cerfa' => '625B'],
                     ['nom' => 'Locations de logiciels',   'code_cerfa' => '628A'],
                     ['nom' => 'Hébergement internet',     'code_cerfa' => '628B'],
@@ -121,7 +123,18 @@ class CategoriesSeeder extends Seeder
             ]);
 
             foreach ($item['sous'] as $sous) {
-                $categorie->sousCategories()->create(array_merge(['association_id' => $associationId], $sous));
+                $usages = $sous['usages'] ?? [];
+                unset($sous['usages']);
+
+                $sc = $categorie->sousCategories()->create(array_merge(['association_id' => $associationId], $sous));
+
+                foreach ($usages as $usage) {
+                    UsageSousCategorie::create([
+                        'association_id' => $associationId,
+                        'sous_categorie_id' => $sc->id,
+                        'usage' => $usage->value,
+                    ]);
+                }
             }
         }
     }
