@@ -63,4 +63,13 @@ class SousCategorieFactory extends Factory
             'usage' => UsageComptable::FraisKilometriques->value,
         ]));
     }
+
+    public function pourAbandonCreance(): static
+    {
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+            'association_id' => $sc->association_id,
+            'sous_categorie_id' => $sc->id,
+            'usage' => UsageComptable::AbandonCreance->value,
+        ]));
+    }
 }
