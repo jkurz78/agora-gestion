@@ -110,4 +110,9 @@ final class Association extends Model
             ? $this->storagePath('branding/'.basename($this->cachet_signature_path))
             : null;
     }
+
+    public function sousCategoriesFor(\App\Enums\UsageComptable $usage): \Illuminate\Database\Eloquent\Collection
+    {
+        return \App\Models\SousCategorie::forUsage($usage)->where('association_id', $this->id)->orderBy('nom')->get();
+    }
 }
