@@ -35,14 +35,14 @@ it('form view: contient le label abandon de créance', function () {
 it('form view: contient wire:model="abandonCreanceProposed" dans le HTML rendu', function () {
     $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle")
         ->assertStatus(200)
-        ->assertSeeText('Don par abandon de créance');
+        ->assertSee('wire:model="abandonCreanceProposed"', false);
 });
 
 // ---------------------------------------------------------------------------
-// Test 3 (bonus) : Livewire round-trip — set abandonCreanceProposed=true
+// Test 3 : la propriété abandonCreanceProposed est muable (assignation directe)
 // ---------------------------------------------------------------------------
 
-it('form livewire: set abandonCreanceProposed=true est bien à true', function () {
+it('form component: la propriété abandonCreanceProposed accepte la valeur true', function () {
     $component = new Form;
     $component->mount($this->asso);
     $component->abandonCreanceProposed = true;
