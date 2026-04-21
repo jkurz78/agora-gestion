@@ -161,7 +161,7 @@ it('comptable from A cannot access piece-jointe of NDF from B', function (): voi
     // Create NDF + ligne with PJ in B
     isoBootTenant($assocB);
     $ndfB = isoMakeSoumise($assocB);
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     $path = "associations/{$assocB->id}/notes-de-frais/{$ndfB->id}/ligne-1.pdf";
     Storage::disk('local')->put($path, 'fake-pdf');
     $ligneB = NoteDeFraisLigne::factory()->create([

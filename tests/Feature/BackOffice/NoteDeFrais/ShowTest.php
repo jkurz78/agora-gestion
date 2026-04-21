@@ -55,7 +55,7 @@ it('shows header, lines and Valider/Rejeter buttons for a Soumise NDF', function
         'libelle' => 'Frais déplacement test',
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -235,7 +235,7 @@ it('confirmValidation happy path creates transaction and sets NDF to Validee', f
         'date' => '2025-10-15',
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -340,7 +340,7 @@ it('confirmValidation with closed exercice flashes error and NDF stays Soumise',
         'date' => '2024-01-15', // in exercice 2023-2024
     ]);
 
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -451,7 +451,7 @@ it('piece-jointe route returns 200 for an authorized admin with a valid PJ', fun
     $path = "associations/{$association->id}/notes-de-frais/{$ndf->id}/ligne-1.pdf";
     Storage::disk('local')->put($path, 'fake-pdf-content');
 
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -486,7 +486,7 @@ it('piece-jointe returns 404 if the ligne belongs to a different NDF', function 
     $path = "associations/{$association->id}/notes-de-frais/{$ndf2->id}/ligne-1.pdf";
     Storage::disk('local')->put($path, 'fake-pdf-content');
 
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     $ligne = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf2->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -517,7 +517,7 @@ it('piece-jointe returns 404 when the NDF belongs to another association', funct
         'association_id' => $assocB->id,
         'tiers_id' => $tiersB->id,
     ]);
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     $ligneB = NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndfB->id,
         'sous_categorie_id' => $sousCategorie->id,

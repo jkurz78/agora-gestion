@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\UsageComptable;
 use App\Livewire\SousCategorieList;
 use App\Models\Association;
 use App\Models\Categorie;
@@ -25,40 +26,43 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-it('crée une sous-catégorie avec flag pour_frais_kilometriques coché', function () {
+it('crée une sous-catégorie via modal (sans flag kilométrique)', function () {
     Livewire::test(SousCategorieList::class)
         ->call('openCreate')
         ->set('categorie_id', (string) $this->cat->id)
         ->set('nom', 'Déplacements')
-        ->set('pour_frais_kilometriques', true)
         ->call('save');
 
     $sc = SousCategorie::where('nom', 'Déplacements')->first();
     expect($sc)->not->toBeNull();
-    expect($sc->pour_frais_kilometriques)->toBeTrue();
+    // Usage pivot is managed separately (not via the modal form in this slice)
+    expect($sc->hasUsage(UsageComptable::FraisKilometriques))->toBeFalse();
 });
 
-it('édite une sous-catégorie et précharge le flag pour_frais_kilometriques', function () {
-    $sc = SousCategorie::create([
+it('édite une sous-catégorie et précharge les champs nom/code_cerfa', function () {
+    $sc = SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $this->asso->id,
         'categorie_id' => $this->cat->id,
         'nom' => 'Déplacements',
-        'pour_frais_kilometriques' => true,
     ]);
 
     Livewire::test(SousCategorieList::class)
         ->call('openEdit', $sc->id)
-        ->assertSet('pour_frais_kilometriques', true);
+        ->assertSet('nom', 'Déplacements')
+        ->assertSet('showModal', true);
+
+    expect($sc->fresh()->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
 });
 
-it('affiche la colonne Frais kilométriques dans le tableau', function () {
-    SousCategorie::create([
+it('affiche la liste des sous-catégories (vérifie le rendu sans erreur)', function () {
+    SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $this->asso->id,
         'categorie_id' => $this->cat->id,
         'nom' => 'Déplacements',
-        'pour_frais_kilometriques' => true,
     ]);
 
+    // The component renders without error and shows the add button
     Livewire::test(SousCategorieList::class)
-        ->assertSee('Frais kilométriques');
+        ->assertStatus(200)
+        ->assertSee('Ajouter une sous-catégorie');
 });
