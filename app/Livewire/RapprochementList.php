@@ -41,7 +41,7 @@ final class RapprochementList extends Component
 
     public function mount(): void
     {
-        $premier = CompteBancaire::where('est_systeme', false)->orderBy('nom')->first();
+        $premier = CompteBancaire::orderBy('nom')->first();
         $this->compte_id = $premier?->id;
     }
 
@@ -157,7 +157,7 @@ final class RapprochementList extends Component
 
     public function render(): View
     {
-        $comptes = CompteBancaire::where('est_systeme', false)->orderBy('nom')->get();
+        $comptes = CompteBancaire::orderBy('nom')->get();
         $rapprochements = collect();
         $aEnCours = false;
         $soldeOuverture = null;
