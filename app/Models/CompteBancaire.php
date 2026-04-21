@@ -49,4 +49,15 @@ final class CompteBancaire extends TenantModel
     {
         return $this->transactions()->where('type', 'recette');
     }
+
+    /**
+     * Comptes sélectionnables en saisie manuelle (création/édition
+     * de transactions, factures, remises, virements).
+     * Exclut les comptes archivés et ceux alimentés par intégration externe.
+     */
+    public function scopeSaisieManuelle(\Illuminate\Database\Eloquent\Builder $q): \Illuminate\Database\Eloquent\Builder
+    {
+        return $q->where('actif_recettes_depenses', true)
+            ->where('saisie_automatisee', false);
+    }
 }
