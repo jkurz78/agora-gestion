@@ -38,12 +38,16 @@ final class Index extends Component
             ->orderByDesc('date');
 
         return match ($this->onglet) {
-            'validees' => $query->where('statut', StatutNoteDeFrais::Validee->value)->get(),
+            'validees' => $query->whereIn('statut', [
+                StatutNoteDeFrais::Validee->value,
+                StatutNoteDeFrais::DonParAbandonCreances->value,
+            ])->get(),
             'rejetees' => $query->where('statut', StatutNoteDeFrais::Rejetee->value)->get(),
             'toutes' => $query->whereIn('statut', [
                 StatutNoteDeFrais::Soumise->value,
                 StatutNoteDeFrais::Validee->value,
                 StatutNoteDeFrais::Rejetee->value,
+                StatutNoteDeFrais::DonParAbandonCreances->value,
             ])->get(),
             default => $query->where('statut', StatutNoteDeFrais::Soumise->value)->get(),
         };

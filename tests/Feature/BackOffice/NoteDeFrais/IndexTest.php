@@ -212,6 +212,110 @@ it('shows Soumise + Validee + Rejetee on the toutes tab (not Brouillon)', functi
         ->assertDontSee('NDF brouillon invisible');
 });
 
+// ── Onglet validees — DonParAbandonCreances ───────────────────────────────────
+
+it('shows DonParAbandonCreances NDF on the validees tab', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+
+    NoteDeFrais::factory()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+        'statut' => StatutNoteDeFrais::DonParAbandonCreances->value,
+        'libelle' => 'NDF abandon visible validees',
+        'validee_at' => now(),
+    ]);
+
+    NoteDeFrais::factory()->soumise()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+        'libelle' => 'NDF soumise invisible validees',
+    ]);
+
+    $this->actingAs($admin);
+
+    Livewire::test(Index::class)
+        ->set('onglet', 'validees')
+        ->assertSee('NDF abandon visible validees')
+        ->assertDontSee('NDF soumise invisible validees');
+});
+
+it('shows DonParAbandonCreances NDF on the toutes tab', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+
+    NoteDeFrais::factory()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+        'statut' => StatutNoteDeFrais::DonParAbandonCreances->value,
+        'libelle' => 'NDF abandon visible toutes',
+        'validee_at' => now(),
+    ]);
+
+    $this->actingAs($admin);
+
+    Livewire::test(Index::class)
+        ->set('onglet', 'toutes')
+        ->assertSee('NDF abandon visible toutes');
+});
+
+it('does not show DonParAbandonCreances NDF on the a_traiter tab', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+
+    NoteDeFrais::factory()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+        'statut' => StatutNoteDeFrais::DonParAbandonCreances->value,
+        'libelle' => 'NDF abandon invisible a_traiter',
+        'validee_at' => now(),
+    ]);
+
+    $this->actingAs($admin);
+
+    Livewire::test(Index::class)
+        ->assertDontSee('NDF abandon invisible a_traiter');
+});
+
+it('does not show DonParAbandonCreances NDF on the rejetees tab', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = ndfIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+
+    NoteDeFrais::factory()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+        'statut' => StatutNoteDeFrais::DonParAbandonCreances->value,
+        'libelle' => 'NDF abandon invisible rejetees',
+        'validee_at' => now(),
+    ]);
+
+    $this->actingAs($admin);
+
+    Livewire::test(Index::class)
+        ->set('onglet', 'rejetees')
+        ->assertDontSee('NDF abandon invisible rejetees');
+});
+
 // ── Brouillons jamais visibles ────────────────────────────────────────────────
 
 it('never shows Brouillon NDF in back-office even on toutes tab', function (): void {
