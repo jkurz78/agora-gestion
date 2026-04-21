@@ -181,12 +181,14 @@ it('Jean soumet une NDF avec abandon, le comptable constate, Jean voit le statut
 
     Livewire::test(BackOfficeShow::class, ['noteDeFrais' => $ndf])
         ->assertSet('dateDon', $dateNdf)
+        ->set('choixValidation', 'abandon')
         ->set('compteId', $compte->id)
         ->set('modePaiement', 'virement')
         ->set('dateComptabilisation', $dateNdf)
         ->set('dateDon', $dateNdf)
-        ->call('constaterAbandon')
-        ->assertRedirect(route('comptabilite.ndf.show', $ndf));
+        ->call('confirmValidation')
+        ->assertSet('showMiniForm', false)
+        ->assertHasNoErrors();
 
     // ── Assertions DB post-abandon ──────────────────────────────────────────
 
