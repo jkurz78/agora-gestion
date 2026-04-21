@@ -1,5 +1,5 @@
 <div class="container py-4">
-    <h1 class="h3 mb-4">Usages comptables</h1>
+    <h1 class="h3 mb-4">Comptabilité</h1>
     <p class="text-muted mb-4">Configure les sous-catégories utilisées pour chaque cas d'usage comptable.</p>
 
     {{-- Card : Frais kilométriques --}}
