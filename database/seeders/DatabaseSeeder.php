@@ -74,6 +74,7 @@ class DatabaseSeeder extends Seeder
             'iban' => null,
             'solde_initial' => 0.00,
             'date_solde_initial' => '2025-09-01',
+            'saisie_automatisee' => true,
         ]);
 
         $this->call(CategoriesSeeder::class);
