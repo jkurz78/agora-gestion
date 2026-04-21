@@ -32,10 +32,10 @@ beforeEach(function () {
 
 it('renders 4 usage cards', function () {
     Livewire::test(UsagesComptables::class)
-        ->assertSee('Indemnités kilométriques')
-        ->assertSee('Cotisations')
-        ->assertSee('Inscriptions')
-        ->assertSee('Dons');
+        ->assertSee('Comptabilisation des indemnités kilométriques')
+        ->assertSee('Comptabilisation des adhésions')
+        ->assertSee('Comptabilisation des participations aux opérations')
+        ->assertSee('Comptabilisation des Dons');
 });
 
 it('toggleDon persists through service', function () {

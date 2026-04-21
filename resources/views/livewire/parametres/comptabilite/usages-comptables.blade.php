@@ -5,7 +5,7 @@
     {{-- Card : Frais kilométriques --}}
     <div class="card mb-3">
         <div class="card-header text-white" style="background:#3d5473;">
-            <strong>Indemnités kilométriques</strong>
+            <strong>Comptabilisation des indemnités kilométriques</strong>
             <small class="ms-2">La sous-catégorie utilisée quand un tiers déclare des kilomètres en note de frais.</small>
         </div>
         <div class="card-body">
@@ -26,7 +26,7 @@
     {{-- Card : Cotisations --}}
     <div class="card mb-3">
         <div class="card-header text-white" style="background:#3d5473;">
-            <strong>Cotisations</strong>
+            <strong>Comptabilisation des adhésions</strong>
             <small class="ms-2">Sous-catégories utilisées pour les cotisations des membres.</small>
         </div>
         <div class="card-body">
@@ -48,8 +48,8 @@
     {{-- Card : Inscriptions --}}
     <div class="card mb-3">
         <div class="card-header text-white" style="background:#3d5473;">
-            <strong>Inscriptions</strong>
-            <small class="ms-2">Sous-catégories utilisées pour les inscriptions/formations.</small>
+            <strong>Comptabilisation des participations aux opérations</strong>
+            <small class="ms-2">Sous-catégories utilisées pour les règlement des opérations.</small>
         </div>
         <div class="card-body">
             @foreach($sousCatsRecette as $sc)
@@ -70,8 +70,8 @@
     {{-- Card : Dons + sub-mono AbandonCreance --}}
     <div class="card mb-3">
         <div class="card-header text-white" style="background:#3d5473;">
-            <strong>Dons</strong>
-            <small class="ms-2">Sous-catégories utilisées pour les dons manuels.</small>
+            <strong>Comptabilisation des Dons</strong>
+            <small class="ms-2">Sous-catégories utilisées pour les dons.</small>
         </div>
         <div class="card-body">
             @foreach($sousCatsRecette as $sc)
@@ -89,7 +89,7 @@
 
             @if(count($this->abandonCreanceCandidates) > 0)
                 <hr class="my-3">
-                <label class="form-label"><strong>Abandon de créance</strong> <small class="text-muted">(sous-cat désignée pour les reçus fiscaux CERFA)</small></label>
+                <label class="form-label"><strong>Abandon de créance</strong> <small class="text-muted">(sous-cat désignée pour le renoncement au règlement de notes de frais)</small></label>
                 <div>
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="abandonCreance" value="" id="abandon_none"
