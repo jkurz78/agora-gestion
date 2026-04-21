@@ -329,3 +329,94 @@ Le comptable conserve la description fiscale nécessaire à sa validation, la ca
 - Champ `civilite` : l'accueil affiche "Bienvenue {prénom} {nom}" ; sera ajusté quand le champ sera disponible.
 - Cleanup OTP expirés : lazy-delete au `verify`, pas de job dédié — à prévoir si la table grossit.
 - Sous-domaines par asso (v3.1) : préparé via le préfixe `/portail/{slug}`.
+
+## Abandon de créance
+
+Statut : livré 2026-04-21, branche feat/portail-tiers-slice1-auth-otp.
+
+Specs complètes : [`docs/specs/2026-04-21-ndf-abandon-creance.md`](specs/2026-04-21-ndf-abandon-creance.md).
+
+### Flux utilisateur
+
+```
+Tiers — portail (soumission NDF)
+  └─ coche "Je renonce au remboursement et propose un don par abandon de créance"
+       │  abandon_creance_propose = true persisté sur la NDF
+       ▼
+  Page Show (NDF Soumise)
+  └─ bandeau "Don par abandon de créance proposé — en attente de traitement"
+
+Comptable — back-office (NDF avec intention d'abandon)
+  └─ encart conditionnel sur la page Show :
+       ├─ "Valider et constater l'abandon"  (désactivé si aucune sous-cat AbandonCreance configurée)
+       └─ "Valider sans constater l'abandon"  (flux normal — intention ignorée)
+
+Modale "Constater l'abandon"
+  └─ compte bancaire + mode paiement + date comptabilisation (défaut : date NDF, bouton Aujourd'hui)
+     + date du don (défaut : date NDF, bouton Aujourd'hui séparé)
+       │
+       ▼  Submit → NoteDeFraisValidationService::validerAvecAbandonCreance()
+       ├─ DB::transaction {
+       │    lockForUpdate sur NDF (anti-double-validation)
+       │    Transaction Dépense  (lignes NDF, tiers=émetteur, statut_reglement=Recu, date=dateComptabilisation)
+       │    Transaction Don/Recette  (ligne unique sous-cat AbandonCreance, tiers=émetteur,
+       │                             statut_reglement=Recu, date=dateDon,
+       │                             libellé "Don par abandon de créance — NDF #{id}")
+       │    ndf.update(statut=DonParAbandonCreances, transaction_id, don_transaction_id)
+       │    log comptabilite.ndf.abandon_creance_constate
+       │  }
+
+Tiers — portail (NDF traitée)
+  └─ page Show : "Don par abandon de créance — acté le {date}" + montant du don
+```
+
+### Prérequis de configuration
+
+L'admin doit avoir désigné une sous-catégorie avec l'usage `AbandonCreance` dans
+**Paramètres → Comptabilité → Usages**.
+
+Le preset seed `771 Abandon de créance` est pré-configuré avec les usages `Don` + `AbandonCreance`.
+Sans cette configuration, le bouton "Valider et constater l'abandon" reste désactivé et un message
+indique qu'aucune sous-catégorie n'est désignée.
+
+### Garanties
+
+| Garantie | Mécanisme |
+|---|---|
+| Atomicité | `DB::transaction` imbriquée — si la création du don échoue, la dépense est rollback |
+| Isolation tenant | Garde explicite `$ndf->association_id === TenantContext::currentId()` au début de `valider()` et `validerAvecAbandonCreance()` |
+| Anti-double-validation | `lockForUpdate` sur la NDF avant toute modification |
+| Tout ou rien | Abandon sur la NDF complète — pas de partiel ligne par ligne |
+| Pas de pollution "à régler" | Les 2 transactions créées ont `statut_reglement = Recu` ; les listes "à régler" filtrent sur `EnAttente` |
+
+Sentinelle de non-affichage dans les listes :
+`tests/Feature/Comptabilite/ListesARegler/AbandonCreanceNonAffichageTest.php`.
+
+### Statut NDF
+
+`StatutNoteDeFrais::DonParAbandonCreances` — cas terminal distinct de `Validee`.
+Le libellé affiché est "Don par abandon de créance".
+
+### Logs structurés
+
+| Clé | Déclencheur | Contexte |
+|---|---|---|
+| `comptabilite.ndf.abandon_creance_constate` | `validerAvecAbandonCreance()` | `ndf_id`, `transaction_id`, `don_transaction_id`, `montant_total` |
+
+### Hors scope (slices futures)
+
+- Génération PDF CERFA d'abandon de créance (hook prêt via `don_transaction_id`).
+- Notifications email de validation.
+- Abandon partiel ligne par ligne.
+- Réversibilité d'un abandon constaté.
+
+### Fichiers clés
+
+| Rôle | Fichier |
+|---|---|
+| Service (méthodes `valider` + `validerAvecAbandonCreance`) | `app/Services/NoteDeFrais/NoteDeFraisValidationService.php` |
+| Enum statut (case `DonParAbandonCreances`) | `app/Enums/StatutNoteDeFrais.php` |
+| Migration (colonnes `abandon_creance_propose`, `don_transaction_id`) | `database/migrations/2026_04_21_201442_add_abandon_creance_columns_to_notes_de_frais.php` |
+| Portail Form (propriété + checkbox) | `app/Livewire/Portail/NoteDeFrais/Form.php` + `resources/views/livewire/portail/note-de-frais/form.blade.php` |
+| Portail Show (bandeau statut) | `resources/views/livewire/portail/note-de-frais/show.blade.php` |
+| Back-office Show (encart + modale + action) | `app/Livewire/BackOffice/NoteDeFrais/Show.php` + `resources/views/livewire/back-office/note-de-frais/show.blade.php` |
