@@ -70,6 +70,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::view('/smtp', 'parametres.smtp')->name('smtp');
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
+        Route::get('/comptabilite/usages', \App\Livewire\Parametres\Comptabilite\UsagesComptables::class)
+            ->name('comptabilite.usages');
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 

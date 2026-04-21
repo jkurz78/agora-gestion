@@ -155,7 +155,8 @@
 
                 {{-- Note de renvoi vers l'écran Usages --}}
                 <p class="small text-muted mt-3 mb-0">
-                    Les usages comptables (Dons, Cotisations, Inscriptions, Frais km, Abandon de créance) se configurent dans Paramètres → Comptabilité → Usages.
+                    Les usages comptables (Dons, Cotisations, Inscriptions, Frais km, Abandon de créance) se configurent dans
+                    <a href="{{ route('parametres.comptabilite.usages') }}">Paramètres → Comptabilité → Usages</a>.
                 </p>
 
                 {{-- Actions --}}

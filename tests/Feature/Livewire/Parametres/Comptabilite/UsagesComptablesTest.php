@@ -103,3 +103,16 @@ it('denies non-admin users', function () {
     $this->actingAs($otherUser);
     Livewire::test(UsagesComptables::class)->assertForbidden();
 });
+
+it('route is reachable for admin', function () {
+    session(['current_association_id' => $this->asso->id]);
+    $this->get(route('parametres.comptabilite.usages'))->assertOk();
+});
+
+it('route denies non-admin', function () {
+    $other = User::factory()->create();
+    $other->associations()->attach($this->asso->id, ['role' => RoleAssociation::Consultation->value, 'joined_at' => now()]);
+    $this->actingAs($other);
+    session(['current_association_id' => $this->asso->id]);
+    $this->get(route('parametres.comptabilite.usages'))->assertForbidden();
+});
