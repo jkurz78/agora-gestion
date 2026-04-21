@@ -22,6 +22,9 @@
                 @case('payee')
                     <span class="badge bg-success fs-6">{{ $statut->label() }}</span>
                     @break
+                @case('don_par_abandon_de_creances')
+                    <span class="badge bg-info fs-6">{{ $statut->label() }}</span>
+                    @break
             @endswitch
         </div>
     </div>
@@ -34,6 +37,23 @@
         <div class="alert alert-danger mb-3">
             <strong><i class="bi bi-x-octagon me-1"></i>Motif de rejet :</strong>
             {{ $ndf->motif_rejet }}
+        </div>
+    @endif
+
+    @if ($statut->value === 'don_par_abandon_de_creances' && $ndf->donTransaction)
+        <div class="alert alert-success mb-3">
+            <p class="mb-1">
+                <i class="bi bi-gift me-1"></i>
+                <strong>Don par abandon de créance — acté le {{ $ndf->donTransaction->date->format('d/m/Y') }}</strong>
+            </p>
+            <p class="mb-0">
+                Montant du don : {{ number_format((float) $ndf->donTransaction->montant_total, 2, ',', ' ') }} €
+            </p>
+        </div>
+    @elseif ($statut->value === 'soumise' && $ndf->abandon_creance_propose)
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            Don par abandon de créance proposé — en attente de traitement
         </div>
     @endif
 
