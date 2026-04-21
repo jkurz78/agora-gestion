@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\Espace;
 use App\Enums\RoleAssociation;
+use App\Enums\UsageComptable;
 use App\Mail\FormulaireInvitation;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
@@ -468,7 +469,7 @@ final class ParticipantTable extends Component
         $exercice = app(ExerciceService::class)->current();
 
         return TransactionLigne::query()
-            ->whereHas('sousCategorie', fn ($q) => $q->where('pour_cotisations', true))
+            ->whereHas('sousCategorie', fn ($q) => $q->whereHas('usages', fn ($u) => $u->where('usage', UsageComptable::Cotisation->value)))
             ->whereHas('transaction', fn ($q) => $q
                 ->where('tiers_id', $participant->tiers_id)
                 ->forExercice($exercice))

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\UsageComptable;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
+use App\Models\UsageSousCategorie;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -31,18 +33,32 @@ class SousCategorieFactory extends Factory
 
     public function pourDons(): static
     {
-        return $this->state(['pour_dons' => true]);
+        return $this->state(['pour_dons' => true])
+            ->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+                'association_id' => $sc->association_id,
+                'sous_categorie_id' => $sc->id,
+                'usage' => UsageComptable::Don->value,
+            ]));
     }
 
     public function pourCotisations(): static
     {
-        return $this->state(['pour_cotisations' => true]);
+        return $this->state(['pour_cotisations' => true])
+            ->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+                'association_id' => $sc->association_id,
+                'sous_categorie_id' => $sc->id,
+                'usage' => UsageComptable::Cotisation->value,
+            ]));
     }
 
     public function pourInscriptions(): static
     {
         return $this->state(fn (array $attributes) => [
             'pour_inscriptions' => true,
-        ]);
+        ])->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+            'association_id' => $sc->association_id,
+            'sous_categorie_id' => $sc->id,
+            'usage' => UsageComptable::Inscription->value,
+        ]));
     }
 }

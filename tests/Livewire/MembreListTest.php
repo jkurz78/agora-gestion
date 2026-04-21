@@ -19,7 +19,7 @@ beforeEach(function (): void {
     TenantContext::boot($this->association);
     session(['current_association_id' => $this->association->id]);
     session(['exercice_actif' => 2025]);
-    $this->cotSc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'pour_cotisations' => true]);
+    $this->cotSc = SousCategorie::factory()->pourCotisations()->create(['association_id' => $this->association->id]);
 });
 
 afterEach(function (): void {

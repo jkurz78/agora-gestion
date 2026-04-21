@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\UsageComptable;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
@@ -38,7 +39,7 @@ final class GestionDashboard extends Component
             ->get();
 
         // Dernières adhésions (cotisations)
-        $cotSousCategorieIds = SousCategorie::where('pour_cotisations', true)->pluck('id');
+        $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
         $dernieresAdhesions = Transaction::where('type', 'recette')
             ->forExercice($exercice)
             ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $cotSousCategorieIds))
@@ -48,7 +49,7 @@ final class GestionDashboard extends Component
             ->get();
 
         // Derniers dons
-        $donSousCategorieIds = SousCategorie::where('pour_dons', true)->pluck('id');
+        $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
         $derniersDons = Transaction::where('type', 'recette')
             ->forExercice($exercice)
             ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $donSousCategorieIds))

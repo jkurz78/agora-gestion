@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\UsageComptable;
 use App\Livewire\Concerns\WithPerPage;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
@@ -38,7 +39,7 @@ final class AdherentList extends Component
     public function render(): View
     {
         $exercice = app(ExerciceService::class)->current();
-        $cotSousCategorieIds = SousCategorie::where('pour_cotisations', true)->pluck('id');
+        $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
 
         $query = Tiers::query();
 
