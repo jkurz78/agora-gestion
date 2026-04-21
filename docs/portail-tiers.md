@@ -401,7 +401,7 @@ Le libellé affiché est "Don par abandon de créance".
 
 | Clé | Déclencheur | Contexte |
 |---|---|---|
-| `comptabilite.ndf.abandon_creance_constate` | `validerAvecAbandonCreance()` | `ndf_id`, `transaction_id`, `don_transaction_id`, `montant_total` |
+| `comptabilite.ndf.abandon-creance-constate` | `validerAvecAbandonCreance()` | `ndf_id`, `transaction_id`, `don_transaction_id`, `montant_total` |
 
 ### Hors scope (slices futures)
 
