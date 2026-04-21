@@ -67,6 +67,8 @@ final class TransactionForm extends Component
 
     public bool $isLockedByFacture = false;
 
+    public bool $isLockedByHelloAsso = false;
+
     public ?string $sousCategorieFilter = null;
 
     /** @var TemporaryUploadedFile|null */
@@ -128,6 +130,7 @@ final class TransactionForm extends Component
             'incomingDocumentId', 'incomingDocumentPreviewUrl', 'linkedNdf']);
         $this->type = $type;
         $this->isLocked = false;
+        $this->isLockedByHelloAsso = false;
         $this->resetValidation();
         $this->showForm = true;
         $this->date = app(ExerciceService::class)->defaultDate();
@@ -379,6 +382,7 @@ final class TransactionForm extends Component
 
         $this->isLocked = $transaction->isLockedByRapprochement() || $transaction->isLockedByRemise();
         $this->isLockedByFacture = $transaction->isLockedByFacture();
+        $this->isLockedByHelloAsso = $transaction->helloasso_order_id !== null;
         $this->showForm = true;
     }
 
@@ -386,7 +390,7 @@ final class TransactionForm extends Component
     {
         $this->reset([
             'transactionId', 'type', 'date', 'libelle', 'mode_paiement',
-            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture',
+            'tiers_id', 'reference', 'compte_id', 'notes', 'lignes', 'showForm', 'isLocked', 'isLockedByFacture', 'isLockedByHelloAsso',
             'ventilationLigneId', 'ventilationLigneSousCategorie', 'ventilationLigneMontant', 'affectations',
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
@@ -400,6 +404,37 @@ final class TransactionForm extends Component
     {
         if (! $this->canEdit) {
             return;
+        }
+
+        if ($this->isLockedByHelloAsso && $this->transactionId !== null) {
+            $source = Transaction::findOrFail($this->transactionId);
+
+            $lockedFields = [
+                'compte_id' => $source->compte_id,
+                'date' => $source->date->format('Y-m-d'),
+                'mode_paiement' => $source->mode_paiement?->value ?? '',
+                'tiers_id' => $source->tiers_id,
+            ];
+
+            $hasDrift = false;
+            foreach ($lockedFields as $prop => $originalValue) {
+                if ((string) $this->{$prop} !== (string) $originalValue) {
+                    $this->addError($prop, 'Champ verrouillé pour les transactions HelloAsso — modifiez uniquement les notes, la ventilation ou la pièce jointe.');
+                    $hasDrift = true;
+                }
+            }
+
+            // Montant total via somme des lignes
+            $sourceTotal = round((float) $source->lignes()->sum('montant'), 2);
+            $currentTotal = round(collect($this->lignes)->sum(fn ($l) => (float) ($l['montant'] ?? 0)), 2);
+            if (abs($sourceTotal - $currentTotal) > 0.001) {
+                $this->addError('lignes', 'Montant verrouillé pour les transactions HelloAsso.');
+                $hasDrift = true;
+            }
+
+            if ($hasDrift) {
+                return;
+            }
         }
 
         $exerciceService = app(ExerciceService::class);
