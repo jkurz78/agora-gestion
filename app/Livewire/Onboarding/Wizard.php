@@ -323,7 +323,6 @@ final class Wizard extends Component
             'solde_initial' => $this->banqueSoldeInitial,
             'date_solde_initial' => $this->banqueDateSoldeInitial,
             'actif_recettes_depenses' => true,
-            'est_systeme' => false,
         ];
 
         $existingId = $this->state['compte_principal_id'] ?? null;

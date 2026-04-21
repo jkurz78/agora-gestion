@@ -40,11 +40,6 @@ final class CompteBancaireController extends Controller
 
     public function update(UpdateCompteBancaireRequest $request, CompteBancaire $comptesBancaire): RedirectResponse
     {
-        if ($comptesBancaire->est_systeme) {
-            return redirect()->route('banques.comptes.index')
-                ->with('error', 'Les comptes système ne peuvent pas être modifiés.');
-        }
-
         $comptesBancaire->update($request->validated());
 
         return redirect()->route('banques.comptes.index')
@@ -53,11 +48,6 @@ final class CompteBancaireController extends Controller
 
     public function destroy(CompteBancaire $comptesBancaire): RedirectResponse
     {
-        if ($comptesBancaire->est_systeme) {
-            return redirect()->route('banques.comptes.index')
-                ->with('error', 'Les comptes système ne peuvent pas être supprimés.');
-        }
-
         // Vérifier les transactions actives et archivées (soft-deleted)
         $actives = $comptesBancaire->transactions()->count()
             + VirementInterne::where('compte_source_id', $comptesBancaire->id)
