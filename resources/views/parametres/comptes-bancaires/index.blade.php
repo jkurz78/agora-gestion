@@ -81,9 +81,6 @@
                 <tr>
                     <td>
                         {{ $compte->nom }}
-                        @if ($compte->est_systeme)
-                            <span class="badge bg-secondary ms-1" style="font-size:.65rem">Système</span>
-                        @endif
                     </td>
                     <td>{{ $compte->iban ?? '—' }}</td>
                     <td>{{ $compte->bic ?? '—' }}</td>
@@ -103,30 +100,28 @@
                            data-bs-toggle="tooltip" title="Voir les transactions">
                             <i class="bi bi-list-ul"></i>
                         </a>
-                        @if (! $compte->est_systeme)
-                            <button type="button" class="btn btn-sm btn-outline-primary"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#editCompteModal"
-                                    data-update-url="{{ route('banques.comptes.update', $compte) }}"
-                                    data-nom="{{ $compte->nom }}"
-                                    data-iban="{{ $compte->iban ?? '' }}"
-                                    data-bic="{{ $compte->bic ?? '' }}"
-                                    data-domiciliation="{{ $compte->domiciliation ?? '' }}"
-                                    data-solde="{{ $compte->solde_initial }}"
-                                    data-date="{{ $compte->date_solde_initial->format('Y-m-d') }}"
-                                    data-actif-rd="{{ $compte->actif_recettes_depenses ? '1' : '0' }}"
-                                        onclick="fillEditModal(this)">
-                                <i class="bi bi-pencil"></i>
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#editCompteModal"
+                                data-update-url="{{ route('banques.comptes.update', $compte) }}"
+                                data-nom="{{ $compte->nom }}"
+                                data-iban="{{ $compte->iban ?? '' }}"
+                                data-bic="{{ $compte->bic ?? '' }}"
+                                data-domiciliation="{{ $compte->domiciliation ?? '' }}"
+                                data-solde="{{ $compte->solde_initial }}"
+                                data-date="{{ $compte->date_solde_initial->format('Y-m-d') }}"
+                                data-actif-rd="{{ $compte->actif_recettes_depenses ? '1' : '0' }}"
+                                    onclick="fillEditModal(this)">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <form action="{{ route('banques.comptes.destroy', $compte) }}" method="POST" class="d-inline"
+                              onsubmit="return confirm('Supprimer ce compte bancaire ?')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-trash"></i>
                             </button>
-                            <form action="{{ route('banques.comptes.destroy', $compte) }}" method="POST" class="d-inline"
-                                  onsubmit="return confirm('Supprimer ce compte bancaire ?')">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
-                        @endif
+                        </form>
                     </td>
                 </tr>
             @empty

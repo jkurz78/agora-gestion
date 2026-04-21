@@ -57,7 +57,7 @@ return new class extends Migration
 
             $offenders = array_filter($blockers, fn ($n) => $n > 0);
             if (! empty($offenders)) {
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     'Migration refonte_comptes_bancaires_saisie abortée : FK résiduelles sur comptes legacy — '
                     .json_encode($offenders, JSON_UNESCAPED_UNICODE)
                 );
