@@ -169,3 +169,29 @@ it('the allowSlugChange flag is set so the observer lets the update through', fu
 
     expect($this->asso->fresh()->slug)->toBe('flag-was-set');
 });
+
+// --- Vue : rendu ---
+
+it('vue par défaut affiche le bouton Modifier et pas la modale ouverte', function () {
+    Livewire::actingAs($this->superAdmin)
+        ->test(AssociationDetail::class, ['association' => $this->asso])
+        ->assertSee('Modifier')
+        ->assertDontSee('Modifier le slug');
+});
+
+it('après openSlugEditor la vue contient le titre de la modale et l\'input bindé', function () {
+    Livewire::actingAs($this->superAdmin)
+        ->test(AssociationDetail::class, ['association' => $this->asso])
+        ->call('openSlugEditor')
+        ->assertSee('Modifier le slug')
+        ->assertSeeHtml('wire:model="newSlug"');
+});
+
+it('flash succès affiché après un saveSlug réussi', function () {
+    Livewire::actingAs($this->superAdmin)
+        ->test(AssociationDetail::class, ['association' => $this->asso])
+        ->call('openSlugEditor')
+        ->set('newSlug', 'slug-flash-test')
+        ->call('saveSlug')
+        ->assertSee('Slug mis à jour.');
+});
