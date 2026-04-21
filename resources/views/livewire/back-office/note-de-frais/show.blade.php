@@ -324,6 +324,143 @@
         </a>
     </div>
 
+    {{-- Modal Abandon de créance Bootstrap --}}
+    <div class="modal fade {{ $showAbandonForm ? 'show d-block' : '' }}"
+         id="abandonModal"
+         tabindex="-1"
+         role="dialog"
+         aria-labelledby="abandonModalLabel"
+         aria-modal="true"
+         style="{{ $showAbandonForm ? 'background:rgba(0,0,0,.5)' : '' }}">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header" style="background-color:#3d5473;color:#fff;">
+                    <h5 class="modal-title" id="abandonModalLabel">
+                        <i class="bi bi-gift me-2"></i>Constater l'abandon de créance
+                    </h5>
+                    <button type="button"
+                            class="btn-close btn-close-white"
+                            wire:click="$set('showAbandonForm', false)"
+                            aria-label="Fermer"></button>
+                </div>
+                <div class="modal-body">
+                    {{-- Récap --}}
+                    <div class="alert alert-info py-2 mb-3">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <span class="text-muted small">Montant total :</span>
+                                <strong>{{ number_format((float) $ndf->lignes->sum('montant'), 2, ',', ' ') }} €</strong>
+                            </div>
+                            <div class="col-md-4">
+                                <span class="text-muted small">Tiers :</span>
+                                <strong>{{ $ndf->tiers?->prenom }} {{ $ndf->tiers?->nom }}</strong>
+                            </div>
+                            @if ($sousCatAbandon)
+                                <div class="col-md-4">
+                                    <span class="text-muted small">Sous-catégorie :</span>
+                                    <strong>{{ $sousCatAbandon->nom }}</strong>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        {{-- Compte bancaire --}}
+                        <div class="col-md-4">
+                            <label for="abandonCompteId" class="form-label">
+                                Compte bancaire <span class="text-danger">*</span>
+                            </label>
+                            <select id="abandonCompteId"
+                                    wire:model="compteId"
+                                    class="form-select @error('compteId') is-invalid @enderror">
+                                <option value="">— Sélectionner —</option>
+                                @foreach ($comptesBancaires as $compte)
+                                    <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
+                                @endforeach
+                            </select>
+                            @error('compteId')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        {{-- Mode de règlement --}}
+                        <div class="col-md-4">
+                            <label for="abandonModePaiement" class="form-label">
+                                Mode de règlement <span class="text-danger">*</span>
+                            </label>
+                            <select id="abandonModePaiement"
+                                    wire:model="modePaiement"
+                                    class="form-select @error('modePaiement') is-invalid @enderror">
+                                @foreach ($modesPaiement as $mode)
+                                    <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
+                                @endforeach
+                            </select>
+                            @error('modePaiement')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        {{-- Date de comptabilisation (Transaction Dépense) --}}
+                        <div class="col-md-4">
+                            <label for="abandonDateComptabilisation" class="form-label">
+                                Date de comptabilisation <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="date"
+                                       id="abandonDateComptabilisation"
+                                       wire:model="dateComptabilisation"
+                                       class="form-control @error('dateComptabilisation') is-invalid @enderror">
+                                <button type="button"
+                                        class="btn btn-outline-secondary"
+                                        wire:click="setDateToday">
+                                    Aujourd'hui
+                                </button>
+                                @error('dateComptabilisation')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+
+                        {{-- Date du don (Transaction Don/Recette) --}}
+                        <div class="col-md-4">
+                            <label for="abandonDateDon" class="form-label">
+                                Date du don <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="date"
+                                       id="abandonDateDon"
+                                       wire:model="dateDon"
+                                       class="form-control @error('dateDon') is-invalid @enderror">
+                                <button type="button"
+                                        class="btn btn-outline-secondary"
+                                        wire:click="setDateDonToday">
+                                    Aujourd'hui
+                                </button>
+                                @error('dateDon')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            wire:click="$set('showAbandonForm', false)">
+                        Annuler
+                    </button>
+                    <button type="button"
+                            class="btn btn-primary"
+                            wire:click="constaterAbandon"
+                            wire:loading.attr="disabled">
+                        <span wire:loading wire:target="constaterAbandon" class="spinner-border spinner-border-sm me-1"></span>
+                        <i class="bi bi-gift me-1"></i>Constater l'abandon
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Modal Rejet Bootstrap --}}
     <div class="modal fade {{ $showRejectModal ? 'show d-block' : '' }}"
          id="rejectModal"
