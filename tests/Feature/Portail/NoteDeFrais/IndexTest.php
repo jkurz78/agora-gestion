@@ -154,3 +154,33 @@ it('index: accès non authentifié redirige vers login', function () {
     $this->get("/portail/{$this->asso->slug}/notes-de-frais")
         ->assertRedirect("/portail/{$this->asso->slug}/login");
 });
+
+// ---------------------------------------------------------------------------
+// Test 8 : NDF avec plusieurs lignes n'est PAS dupliquée dans la liste
+// ---------------------------------------------------------------------------
+
+it('index: une NDF avec 2 lignes (standard + km) n\'apparaît qu\'une seule fois', function () {
+    $ndf = NoteDeFrais::factory()->create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+        'libelle' => 'NDF unique test duplication',
+    ]);
+
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'montant' => 25.00,
+    ]);
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'type' => 'kilometrique',
+        'sous_categorie_id' => null,
+        'montant' => 50.00,
+    ]);
+
+    $html = $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+        ->assertStatus(200)
+        ->getContent();
+
+    $occurrences = substr_count($html, 'NDF unique test duplication');
+    expect($occurrences)->toBe(1);
+});
