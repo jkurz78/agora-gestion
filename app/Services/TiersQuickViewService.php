@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
+use App\Enums\UsageComptable;
 use App\Models\Facture;
 use App\Models\Participant;
 use App\Models\Tiers;
@@ -149,8 +150,14 @@ final class TiersQuickViewService
             ->whereBetween('tx.date', [$dateDebut, $dateFin])
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
-            ->where('sc.pour_dons', false)
-            ->where('sc.pour_cotisations', false)
+            ->whereNotExists(function ($q): void {
+                $q->from('usages_sous_categories as usc')
+                    ->whereColumn('usc.sous_categorie_id', 'sc.id')
+                    ->whereIn('usc.usage', [
+                        UsageComptable::Don->value,
+                        UsageComptable::Cotisation->value,
+                    ]);
+            })
             ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
             ->first();
 
@@ -180,7 +187,11 @@ final class TiersQuickViewService
             ->whereBetween('tx.date', [$dateDebut, $dateFin])
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
-            ->where('sc.pour_dons', true)
+            ->whereExists(function ($q): void {
+                $q->from('usages_sous_categories as usc')
+                    ->whereColumn('usc.sous_categorie_id', 'sc.id')
+                    ->where('usc.usage', UsageComptable::Don->value);
+            })
             ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
             ->first();
 
@@ -210,7 +221,11 @@ final class TiersQuickViewService
             ->whereBetween('tx.date', [$dateDebut, $dateFin])
             ->whereNull('tx.deleted_at')
             ->whereNull('tl.deleted_at')
-            ->where('sc.pour_cotisations', true)
+            ->whereExists(function ($q): void {
+                $q->from('usages_sous_categories as usc')
+                    ->whereColumn('usc.sous_categorie_id', 'sc.id')
+                    ->where('usc.usage', UsageComptable::Cotisation->value);
+            })
             ->selectRaw('COUNT(DISTINCT tx.id) as count, SUM(tl.montant) as total')
             ->first();
 
