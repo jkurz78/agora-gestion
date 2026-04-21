@@ -25,7 +25,7 @@ beforeEach(function () {
 
     $this->compteHA = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
     $this->compteCourant = CompteBancaire::factory()->create(['nom' => 'Compte courant']);
-    $this->scDon = SousCategorie::factory()->create(['pour_dons' => true, 'nom' => 'Don']);
+    $this->scDon = SousCategorie::factory()->pourDons()->create(['nom' => 'Don']);
 
     $this->parametres = HelloAssoParametres::create([
         'association_id' => $this->association->id,

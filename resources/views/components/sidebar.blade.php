@@ -71,11 +71,11 @@
 }
 </style>
 
-@props(['logoAsset', 'nomAsso', 'exerciceCloture', 'exerciceLabel'])
+@props(['logoAsset', 'nomAsso', 'exerciceCloture', 'exerciceLabel', 'canSeeNdf' => false, 'ndfPendingCount' => 0])
 
 @php
 $activeGroup = match(true) {
-    request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*') => 'comptabilite',
+    request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*') => 'comptabilite',
     request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
         'banques.comptes.*', 'banques.remises*') => 'banques',
     request()->routeIs('tiers.*') => 'tiers',
@@ -133,6 +133,19 @@ $activeGroup = match(true) {
                                     <i class="bi bi-collection me-1"></i> Toutes les transactions
                                 </a>
                             </li>
+
+                            @if($canSeeNdf && Route::has('comptabilite.ndf.index'))
+                            <li class="nav-item">
+                                <a href="{{ route('comptabilite.ndf.index') }}"
+                                   class="nav-link d-flex align-items-center justify-content-between
+                                          {{ request()->routeIs('comptabilite.ndf.*') ? 'active' : '' }}">
+                                    <span><i class="bi bi-receipt-cutoff me-1"></i> Notes de frais</span>
+                                    @if($ndfPendingCount > 0)
+                                        <span class="badge bg-warning text-dark ms-1">{{ $ndfPendingCount }}</span>
+                                    @endif
+                                </a>
+                            </li>
+                            @endif
 
                             @if (Route::has('comptabilite.budget'))
                             <li class="nav-item">
@@ -549,6 +562,15 @@ $activeGroup = match(true) {
                                 <a href="{{ route('parametres.sous-categories.index') }}"
                                    class="nav-link {{ request()->routeIs('parametres.sous-categories.*') ? 'active' : '' }}">
                                     <i class="bi bi-tag me-1"></i> Sous-catégories
+                                </a>
+                            </li>
+                            @endif
+
+                            @if (Route::has('parametres.comptabilite.usages'))
+                            <li class="nav-item">
+                                <a href="{{ route('parametres.comptabilite.usages') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.comptabilite.usages') ? 'active' : '' }}">
+                                    <i class="bi bi-sliders me-2"></i> Comptabilité
                                 </a>
                             </li>
                             @endif

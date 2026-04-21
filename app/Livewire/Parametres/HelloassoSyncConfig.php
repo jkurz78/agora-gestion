@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Parametres;
 
+use App\Enums\UsageComptable;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
 use App\Models\SousCategorie;
@@ -63,9 +64,9 @@ final class HelloassoSyncConfig extends Component
     {
         return view('livewire.parametres.helloasso-sync-config', [
             'comptes' => CompteBancaire::where('est_systeme', false)->orderBy('nom')->get(),
-            'sousCategoriesDon' => SousCategorie::where('pour_dons', true)->orderBy('nom')->get(),
-            'sousCategoriesCotisation' => SousCategorie::where('pour_cotisations', true)->orderBy('nom')->get(),
-            'sousCategoriesInscription' => SousCategorie::where('pour_inscriptions', true)->orderBy('nom')->get(),
+            'sousCategoriesDon' => SousCategorie::forUsage(UsageComptable::Don)->orderBy('nom')->get(),
+            'sousCategoriesCotisation' => SousCategorie::forUsage(UsageComptable::Cotisation)->orderBy('nom')->get(),
+            'sousCategoriesInscription' => SousCategorie::forUsage(UsageComptable::Inscription)->orderBy('nom')->get(),
         ]);
     }
 }

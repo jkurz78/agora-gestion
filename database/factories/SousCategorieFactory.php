@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\UsageComptable;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
+use App\Models\UsageSousCategorie;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -23,26 +25,51 @@ class SousCategorieFactory extends Factory
             'categorie_id' => Categorie::factory(),
             'nom' => fake()->words(2, true),
             'code_cerfa' => fake()->optional(0.3)->numerify('####'),
-            'pour_dons' => false,
-            'pour_cotisations' => false,
-            'pour_inscriptions' => false,
         ];
     }
 
     public function pourDons(): static
     {
-        return $this->state(['pour_dons' => true]);
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+            'association_id' => $sc->association_id,
+            'sous_categorie_id' => $sc->id,
+            'usage' => UsageComptable::Don->value,
+        ]));
     }
 
     public function pourCotisations(): static
     {
-        return $this->state(['pour_cotisations' => true]);
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+            'association_id' => $sc->association_id,
+            'sous_categorie_id' => $sc->id,
+            'usage' => UsageComptable::Cotisation->value,
+        ]));
     }
 
     public function pourInscriptions(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'pour_inscriptions' => true,
-        ]);
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+            'association_id' => $sc->association_id,
+            'sous_categorie_id' => $sc->id,
+            'usage' => UsageComptable::Inscription->value,
+        ]));
+    }
+
+    public function pourFraisKilometriques(): static
+    {
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+            'association_id' => $sc->association_id,
+            'sous_categorie_id' => $sc->id,
+            'usage' => UsageComptable::FraisKilometriques->value,
+        ]));
+    }
+
+    public function pourAbandonCreance(): static
+    {
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+            'association_id' => $sc->association_id,
+            'sous_categorie_id' => $sc->id,
+            'usage' => UsageComptable::AbandonCreance->value,
+        ]));
     }
 }

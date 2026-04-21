@@ -74,6 +74,37 @@
         .main-content > header {
             z-index: 1020;
         }
+
+        /* Tooltip CSS-only instantané — bulle noire, pas de délai, pas de JS. */
+        [data-tooltip] {
+            position: relative;
+        }
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #212529;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: .75rem;
+            white-space: nowrap;
+            z-index: 2100;
+            pointer-events: none;
+        }
+        [data-tooltip]:hover::before {
+            content: "";
+            position: absolute;
+            bottom: calc(100% + 2px);
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent;
+            border-top-color: #212529;
+            z-index: 2100;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -93,6 +124,8 @@
                     :nom-asso="$nomAsso"
                     :exercice-cloture="$exerciceCloture"
                     :exercice-label="$exerciceLabel"
+                    :can-see-ndf="$canSeeNdf ?? false"
+                    :ndf-pending-count="$ndfPendingCount ?? 0"
                 />
             </div>
         </div>
@@ -113,7 +146,7 @@
                 {{-- Breadcrumb --}}
                 @php
                     $breadcrumbGroup = match(true) {
-                        request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*') => 'Comptabilité',
+                        request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*') => 'Comptabilité',
                         request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
                             'banques.comptes.*', 'banques.remises*') => 'Banques',
                         request()->routeIs('tiers.*') => 'Tiers',
@@ -160,6 +193,17 @@
                            title="{{ $incomingDocumentsCount }} document(s) en attente">
                             <i class="bi bi-inbox"></i>
                             <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $incomingDocumentsCount }}</span>
+                        </a>
+                    @endif
+
+                    {{-- NDF en attente --}}
+                    @if(($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
+                        <a href="{{ route('comptabilite.ndf.index') }}"
+                           class="text-decoration-none d-flex align-items-center gap-1"
+                           style="color: rgba(255,255,255,.9);"
+                           title="{{ $ndfPendingCount }} note(s) de frais à traiter">
+                            <i class="bi bi-receipt-cutoff"></i>
+                            <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $ndfPendingCount }}</span>
                         </a>
                     @endif
 

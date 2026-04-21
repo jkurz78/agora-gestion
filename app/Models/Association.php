@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\UsageComptable;
 use App\Traits\TenantStorage;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -109,5 +111,10 @@ final class Association extends Model
         return $this->cachet_signature_path
             ? $this->storagePath('branding/'.basename($this->cachet_signature_path))
             : null;
+    }
+
+    public function sousCategoriesFor(UsageComptable $usage): Collection
+    {
+        return SousCategorie::forUsage($usage)->where('association_id', $this->id)->orderBy('nom')->get();
     }
 }

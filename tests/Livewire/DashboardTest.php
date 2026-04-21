@@ -67,7 +67,7 @@ it('displays solde general', function () {
 });
 
 it('shows dernieres adhesions', function () {
-    $cotSc = SousCategorie::factory()->create(['association_id' => $this->association->id, 'pour_cotisations' => true]);
+    $cotSc = SousCategorie::factory()->pourCotisations()->create(['association_id' => $this->association->id]);
 
     $tx = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,

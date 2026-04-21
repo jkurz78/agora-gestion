@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\StatutOperation;
+use App\Enums\UsageComptable;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\BudgetLine;
 use App\Models\CompteBancaire;
@@ -60,7 +61,7 @@ final class Dashboard extends Component
             ->get();
 
         // Derniers dons — transactions ayant au moins une ligne avec sous-cat pour_dons
-        $donSousCategorieIds = SousCategorie::where('pour_dons', true)->pluck('id');
+        $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
         $derniersDons = Transaction::where('type', 'recette')
             ->forExercice($exercice)
             ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $donSousCategorieIds))
@@ -70,7 +71,7 @@ final class Dashboard extends Component
             ->get();
 
         // Dernières adhésions (cotisations)
-        $cotSousCategorieIds = SousCategorie::where('pour_cotisations', true)->pluck('id');
+        $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
         $dernieresAdhesions = Transaction::where('type', 'recette')
             ->forExercice($exercice)
             ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $cotSousCategorieIds))

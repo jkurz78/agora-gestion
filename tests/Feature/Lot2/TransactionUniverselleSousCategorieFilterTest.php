@@ -15,7 +15,7 @@ uses(RefreshDatabase::class);
 it('filters transactions by sous-categorie pour_dons flag', function () {
     $compte = CompteBancaire::factory()->create();
     $scDon = SousCategorie::factory()->pourDons()->create();
-    $scAutre = SousCategorie::factory()->create(['pour_dons' => false, 'pour_cotisations' => false]);
+    $scAutre = SousCategorie::factory()->create();
 
     $today = now()->toDateString();
 
@@ -54,7 +54,7 @@ it('filters transactions by sous-categorie pour_dons flag', function () {
 it('filters transactions by sous-categorie pour_cotisations flag', function () {
     $compte = CompteBancaire::factory()->create();
     $scCot = SousCategorie::factory()->pourCotisations()->create();
-    $scAutre = SousCategorie::factory()->create(['pour_dons' => false, 'pour_cotisations' => false]);
+    $scAutre = SousCategorie::factory()->create();
 
     $today = now()->toDateString();
 

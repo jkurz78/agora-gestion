@@ -192,7 +192,7 @@ describe('recettes', function (): void {
     });
 
     test('présente avec count et total pour recettes ordinaires', function (): void {
-        $sc = SousCategorie::factory()->create(['pour_dons' => false, 'pour_cotisations' => false]);
+        $sc = SousCategorie::factory()->create();
         makeRecette($this->tiers->id, 60.00, '2025-10-01', $sc);
         makeRecette($this->tiers->id, 40.00, '2025-11-01', $sc);
 
@@ -205,7 +205,7 @@ describe('recettes', function (): void {
 
     test('exclut les recettes classifiées comme dons', function (): void {
         $scDon = SousCategorie::factory()->pourDons()->create();
-        $scNormal = SousCategorie::factory()->create(['pour_dons' => false, 'pour_cotisations' => false]);
+        $scNormal = SousCategorie::factory()->create();
         makeRecette($this->tiers->id, 50.00, '2025-10-01', $scDon);
         makeRecette($this->tiers->id, 30.00, '2025-11-01', $scNormal);
 
@@ -217,7 +217,7 @@ describe('recettes', function (): void {
 
     test('exclut les recettes classifiées comme cotisations', function (): void {
         $scCot = SousCategorie::factory()->pourCotisations()->create();
-        $scNormal = SousCategorie::factory()->create(['pour_dons' => false, 'pour_cotisations' => false]);
+        $scNormal = SousCategorie::factory()->create();
         makeRecette($this->tiers->id, 120.00, '2025-10-01', $scCot);
         makeRecette($this->tiers->id, 80.00, '2025-11-01', $scNormal);
 
@@ -239,7 +239,7 @@ describe('recettes', function (): void {
     });
 
     test('exclut les recettes en dehors de l\'exercice', function (): void {
-        $sc = SousCategorie::factory()->create(['pour_dons' => false, 'pour_cotisations' => false]);
+        $sc = SousCategorie::factory()->create();
         makeRecette($this->tiers->id, 100.00, '2024-03-01', $sc); // exercice 2023
         makeRecette($this->tiers->id, 50.00, '2025-10-01', $sc); // exercice 2025 ✓
 

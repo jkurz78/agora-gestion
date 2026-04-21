@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AttestationPresencePdfController;
+use App\Http\Controllers\BackOffice\NoteDeFraisPieceJointeController;
 use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
@@ -33,12 +34,16 @@ use App\Http\Controllers\SwitchAssociationController;
 use App\Http\Controllers\TenantAssetController;
 use App\Http\Controllers\TiersExportController;
 use App\Http\Controllers\TiersTemplateController;
+use App\Http\Controllers\TransactionLignePieceJointeController;
 use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\EnsureTwoFactor;
 use App\Http\Middleware\VerifyTenantAsset;
 use App\Livewire\Auth\AssociationSelector;
+use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
+use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
+use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -66,6 +71,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::view('/smtp', 'parametres.smtp')->name('smtp');
         Route::resource('categories', CategorieController::class)->except(['show']);
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
+        Route::get('/comptabilite/usages', UsagesComptables::class)
+            ->name('comptabilite.usages');
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
@@ -172,6 +179,10 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
             ->name('transactions.import.template');
         Route::view('/budget', 'budget.index')->name('budget');
         Route::get('/budget/export', BudgetExportController::class)->name('budget.export');
+        Route::get('/notes-de-frais', NdfIndex::class)->name('ndf.index');
+        Route::get('/notes-de-frais/{noteDeFrais}', NdfShow::class)->name('ndf.show');
+        Route::get('/notes-de-frais/{noteDeFrais}/lignes/{ligne}/piece-jointe', NoteDeFraisPieceJointeController::class)->name('ndf.piece-jointe');
+        Route::get('/transactions/{transaction}/lignes/{ligne}/piece-jointe', TransactionLignePieceJointeController::class)->name('transactions.piece-jointe-ligne');
     });
 
 // ── Banques ──

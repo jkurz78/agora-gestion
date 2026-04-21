@@ -23,6 +23,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\DocumentPrevisionnelService;
 use App\Services\NumeroPieceService;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -305,7 +306,7 @@ final class ReglementTable extends Component
             return;
         }
 
-        $date = \Carbon\Carbon::parse($this->comptabiliserDate);
+        $date = Carbon::parse($this->comptabiliserDate);
 
         DB::transaction(function () use ($reglements, $seance, $operation, $sousCategorieId, $date): void {
             foreach ($reglements as $reglement) {

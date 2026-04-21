@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Enums\Espace;
 use App\Enums\RoleAssociation;
+use App\Enums\UsageComptable;
 use App\Helpers\EmailLogo;
 use App\Mail\CommunicationTiersMail;
 use App\Models\CampagneEmail;
@@ -175,7 +176,7 @@ final class CommunicationTiers extends Component
         }
 
         if ($this->filtreDonateurs !== null && $this->filtreDonateurs !== '') {
-            $donSousCategorieIds = SousCategorie::where('pour_dons', true)->pluck('id');
+            $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
             $ex = $this->filtreDonateurs === 'exercice' ? $exercice : null;
 
             $filters[] = function (Builder $q) use ($donSousCategorieIds, $ex): void {
@@ -192,7 +193,7 @@ final class CommunicationTiers extends Component
         }
 
         if ($this->filtreAdherents !== null && $this->filtreAdherents !== '') {
-            $cotSousCategorieIds = SousCategorie::where('pour_cotisations', true)->pluck('id');
+            $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
             $ex = $this->filtreAdherents === 'exercice' ? $exercice : null;
 
             $filters[] = function (Builder $q) use ($cotSousCategorieIds, $ex): void {
