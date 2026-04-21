@@ -124,11 +124,10 @@ it('resolveSousCategorieId retourne l\'id unique si exactement une flaggée', fu
     TenantContext::boot($asso);
 
     $cat = Categorie::factory()->create(['association_id' => $asso->id]);
-    $sc = SousCategorie::create([
+    $sc = SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $asso->id,
         'categorie_id' => $cat->id,
         'nom' => 'Déplacements',
-        'pour_frais_kilometriques' => true,
     ]);
 
     expect($this->strategy->resolveSousCategorieId(null))->toBe($sc->id);
@@ -139,17 +138,15 @@ it('resolveSousCategorieId retourne null si plusieurs flaggées', function () {
     TenantContext::boot($asso);
 
     $cat = Categorie::factory()->create(['association_id' => $asso->id]);
-    SousCategorie::create([
+    SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $asso->id,
         'categorie_id' => $cat->id,
         'nom' => 'Déplacements bénévoles',
-        'pour_frais_kilometriques' => true,
     ]);
-    SousCategorie::create([
+    SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $asso->id,
         'categorie_id' => $cat->id,
         'nom' => 'Déplacements salariés',
-        'pour_frais_kilometriques' => true,
     ]);
 
     expect($this->strategy->resolveSousCategorieId(null))->toBeNull();

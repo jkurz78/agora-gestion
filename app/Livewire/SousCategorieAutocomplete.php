@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\UsageComptable;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
 use Illuminate\Database\Eloquent\Collection;
@@ -18,7 +19,7 @@ final class SousCategorieAutocomplete extends Component
 
     public string $filtre = 'tous'; // 'depense' | 'recette' | 'tous'
 
-    public ?string $sousCategorieFlag = null; // 'pour_dons' | 'pour_cotisations' | 'pour_inscriptions'
+    public ?string $sousCategorieFlag = null; // 'pour_dons' | 'pour_cotisations' | 'pour_inscriptions' — external string API, converted internally to UsageComptable
 
     public string $search = '';
 
@@ -68,8 +69,12 @@ final class SousCategorieAutocomplete extends Component
 
     public function doSearch(): void
     {
-        $allowedFlags = ['pour_dons', 'pour_cotisations', 'pour_inscriptions'];
-        $flag = in_array($this->sousCategorieFlag, $allowedFlags, true) ? $this->sousCategorieFlag : null;
+        $flagToUsage = [
+            'pour_dons' => UsageComptable::Don,
+            'pour_cotisations' => UsageComptable::Cotisation,
+            'pour_inscriptions' => UsageComptable::Inscription,
+        ];
+        $usage = isset($flagToUsage[$this->sousCategorieFlag]) ? $flagToUsage[$this->sousCategorieFlag] : null;
 
         $query = SousCategorie::with('categorie')
             ->whereHas('categorie', function ($q): void {
@@ -77,7 +82,7 @@ final class SousCategorieAutocomplete extends Component
                     $q->where('type', $this->filtre);
                 }
             })
-            ->when($flag, fn ($q) => $q->where($flag, true));
+            ->when($usage, fn ($q) => $q->forUsage($usage));
 
         if ($this->search !== '') {
             $query->where(function ($q): void {

@@ -61,4 +61,13 @@ class SousCategorieFactory extends Factory
             'usage' => UsageComptable::Inscription->value,
         ]));
     }
+
+    public function pourFraisKilometriques(): static
+    {
+        return $this->afterCreating(fn (SousCategorie $sc) => UsageSousCategorie::firstOrCreate([
+            'association_id' => $sc->association_id,
+            'sous_categorie_id' => $sc->id,
+            'usage' => UsageComptable::FraisKilometriques->value,
+        ]));
+    }
 }
