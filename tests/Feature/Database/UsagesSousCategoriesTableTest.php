@@ -2,6 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Enums\TypeCategorie;
+use App\Models\Association;
+use App\Models\Categorie;
+use App\Models\SousCategorie;
+use App\Tenant\TenantContext;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 it('creates the usages_sous_categories table with correct columns and unique index', function () {
@@ -12,18 +19,18 @@ it('creates the usages_sous_categories table with correct columns and unique ind
 });
 
 it('enforces unique (association_id, sous_categorie_id, usage)', function () {
-    $asso = \App\Models\Association::factory()->create();
-    \App\Tenant\TenantContext::boot($asso);
-    $cat = \App\Models\Categorie::factory()->for($asso, 'association')->create(['type' => \App\Enums\TypeCategorie::Recette]);
-    $sc = \App\Models\SousCategorie::factory()->for($asso, 'association')->for($cat)->create();
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+    $cat = Categorie::factory()->for($asso, 'association')->create(['type' => TypeCategorie::Recette]);
+    $sc = SousCategorie::factory()->for($asso, 'association')->for($cat)->create();
 
-    \Illuminate\Support\Facades\DB::table('usages_sous_categories')->insert([
+    DB::table('usages_sous_categories')->insert([
         'association_id' => $asso->id, 'sous_categorie_id' => $sc->id, 'usage' => 'don',
         'created_at' => now(), 'updated_at' => now(),
     ]);
 
-    expect(fn () => \Illuminate\Support\Facades\DB::table('usages_sous_categories')->insert([
+    expect(fn () => DB::table('usages_sous_categories')->insert([
         'association_id' => $asso->id, 'sous_categorie_id' => $sc->id, 'usage' => 'don',
         'created_at' => now(), 'updated_at' => now(),
-    ]))->toThrow(\Illuminate\Database\QueryException::class);
+    ]))->toThrow(QueryException::class);
 });

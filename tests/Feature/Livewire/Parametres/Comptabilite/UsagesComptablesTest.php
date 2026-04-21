@@ -7,9 +7,11 @@ use App\Enums\TypeCategorie;
 use App\Enums\UsageComptable;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Models\Association;
+use App\Models\AssociationUser;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
 use App\Models\User;
+use App\Services\UsagesComptablesService;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
 
@@ -17,7 +19,7 @@ beforeEach(function () {
     $this->asso = Association::factory()->create();
     TenantContext::boot($this->asso);
     $this->admin = User::factory()->create();
-    \App\Models\AssociationUser::create([
+    AssociationUser::create([
         'user_id' => $this->admin->id,
         'association_id' => $this->asso->id,
         'role' => RoleAssociation::Admin->value,
@@ -60,7 +62,7 @@ it('setFraisKilometriques switches mono link', function () {
 it('abandonCreanceCandidates lists only Dons', function () {
     $scDon = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Don A']);
     $scAutre = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create(['nom' => 'Autre']);
-    app(\App\Services\UsagesComptablesService::class)->toggleDon($scDon->id, true);
+    app(UsagesComptablesService::class)->toggleDon($scDon->id, true);
 
     $comp = Livewire::test(UsagesComptables::class);
     $candidates = collect($comp->instance()->abandonCreanceCandidates);
@@ -70,7 +72,7 @@ it('abandonCreanceCandidates lists only Dons', function () {
 
 it('toggleDon false cascades AbandonCreance', function () {
     $sc = SousCategorie::factory()->for($this->asso, 'association')->for($this->catR)->create();
-    $svc = app(\App\Services\UsagesComptablesService::class);
+    $svc = app(UsagesComptablesService::class);
     $svc->toggleDon($sc->id, true);
     $svc->setAbandonCreance($sc->id);
 

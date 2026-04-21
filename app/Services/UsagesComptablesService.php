@@ -49,7 +49,7 @@ final class UsagesComptablesService
     }
 
     /**
-     * @param array<string, mixed> $attrs
+     * @param  array<string, mixed>  $attrs
      */
     public function createAndFlag(array $attrs, UsageComptable $usage): SousCategorie
     {

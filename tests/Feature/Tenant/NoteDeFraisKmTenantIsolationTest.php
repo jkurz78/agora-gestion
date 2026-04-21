@@ -12,6 +12,7 @@ use App\Models\NoteDeFraisLigne;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     TenantContext::clear();
@@ -60,7 +61,7 @@ it('une ligne km de asso A est invisible de asso B', function () {
 
     // SousCategorie scopée tenant → usage km invisible depuis assoB
     $visibleScIds = SousCategorie::pluck('id');
-    expect(\Illuminate\Support\Facades\DB::table('usages_sous_categories')
+    expect(DB::table('usages_sous_categories')
         ->whereIn('sous_categorie_id', $visibleScIds)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->count())->toBe(0);
@@ -88,7 +89,7 @@ it('le pivot frais_kilometriques est scope-locked au tenant', function () {
 
     // En contexte B : aucune sous-cat avec usage km
     $visibleScIdsB = SousCategorie::pluck('id');
-    $countB = \Illuminate\Support\Facades\DB::table('usages_sous_categories')
+    $countB = DB::table('usages_sous_categories')
         ->whereIn('sous_categorie_id', $visibleScIdsB)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->count();
@@ -97,7 +98,7 @@ it('le pivot frais_kilometriques est scope-locked au tenant', function () {
     // En contexte A : 1 sous-cat avec usage km
     TenantContext::boot($assoA);
     $visibleScIdsA = SousCategorie::pluck('id');
-    $countA = \Illuminate\Support\Facades\DB::table('usages_sous_categories')
+    $countA = DB::table('usages_sous_categories')
         ->whereIn('sous_categorie_id', $visibleScIdsA)
         ->where('usage', UsageComptable::FraisKilometriques->value)
         ->count();

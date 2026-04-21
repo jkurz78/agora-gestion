@@ -18,12 +18,17 @@ use Livewire\Component;
 final class UsagesComptables extends Component
 {
     public ?int $fraisKmSelectedId = null;
+
     public ?int $abandonCreanceSelectedId = null;
 
     public bool $inlineOpen = false;
+
     public ?string $inlineUsage = null;
+
     public ?int $inlineCategorieId = null;
+
     public string $inlineNom = '';
+
     public ?string $inlineCodeCerfa = null;
 
     public function mount(): void

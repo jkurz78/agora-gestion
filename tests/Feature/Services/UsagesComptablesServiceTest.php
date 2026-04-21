@@ -9,6 +9,7 @@ use App\Models\Categorie;
 use App\Models\SousCategorie;
 use App\Services\UsagesComptablesService;
 use App\Tenant\TenantContext;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 beforeEach(function () {
     $this->asso = Association::factory()->create();
@@ -97,5 +98,5 @@ it('is tenant-scoped', function () {
     $sc2 = SousCategorie::factory()->for($asso2, 'association')->for($catR2)->create();
 
     TenantContext::boot($this->asso);
-    expect(fn () => $this->service->toggleDon($sc2->id, true))->toThrow(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+    expect(fn () => $this->service->toggleDon($sc2->id, true))->toThrow(ModelNotFoundException::class);
 });

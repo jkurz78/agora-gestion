@@ -11,7 +11,7 @@ use App\Tenant\TenantContext;
 it('seeds 625A with FraisKilometriques and 771 with Don+AbandonCreance', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
-    (new DefaultChartOfAccountsService())->applyTo($asso);
+    (new DefaultChartOfAccountsService)->applyTo($asso);
 
     $km = SousCategorie::where('code_cerfa', '625A')->firstOrFail();
     expect($km->hasUsage(UsageComptable::FraisKilometriques))->toBeTrue();
