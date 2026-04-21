@@ -311,10 +311,52 @@ it('les deux transactions ont le meme tiers_id que la NDF', function (): void {
 });
 
 // ---------------------------------------------------------------------------
-// 10. Isolation tenant
+// 10. Isolation tenant — validerAvecAbandonCreance
 // ---------------------------------------------------------------------------
 
-it('une NDF de asso A est non traitable depuis asso B (isolation tenant)', function (): void {
+it('une NDF de asso A est non traitable depuis asso B (isolation tenant - abandon)', function (): void {
+    // NDF créée dans le contexte asso A (depuis beforeEach)
+    $ndf = makeNdfSoumise($this->asso, $this->tiers, $this->scDepense);
+
+    // Basculer vers asso B et lui configurer SA PROPRE sous-cat AbandonCreance
+    // (pour prouver que la garde lève AVANT la résolution de sous-cat, même quand B est bien configuré)
+    $assoB = Association::factory()->create();
+
+    $catRecetteB = Categorie::factory()->create([
+        'association_id' => $assoB->id,
+        'type' => TypeCategorie::Recette->value,
+    ]);
+    SousCategorie::factory()->pourAbandonCreance()->create([
+        'association_id' => $assoB->id,
+        'categorie_id' => $catRecetteB->id,
+        'nom' => 'Abandon creance B',
+    ]);
+
+    TenantContext::boot($assoB);
+
+    // La NDF de A est invisible depuis B via le scope global
+    expect(NoteDeFrais::query()->count())->toBe(0);
+
+    // Charger la NDF de A en contournant le scope global (simule un objet déjà en mémoire)
+    $ndfHors = NoteDeFrais::withoutGlobalScopes()->find($ndf->id);
+
+    // Tenter de valider la NDF de A depuis le contexte B → garde tenant explicite
+    expect(fn () => $this->service->validerAvecAbandonCreance($ndfHors, $this->data, '2025-10-20'))
+        ->toThrow(DomainException::class, 'Cette NDF appartient à un autre tenant.');
+
+    // Aucune transaction créée (rollback)
+    expect(Transaction::count())->toBe(0);
+
+    // NDF A reste Soumise
+    $ndf->refresh();
+    expect($ndf->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Soumise->value);
+});
+
+// ---------------------------------------------------------------------------
+// 10b. Isolation tenant — valider() (chemin non-abandon)
+// ---------------------------------------------------------------------------
+
+it('une NDF de asso A est non traitable depuis asso B (isolation tenant - valider)', function (): void {
     // NDF créée dans le contexte asso A (depuis beforeEach)
     $ndf = makeNdfSoumise($this->asso, $this->tiers, $this->scDepense);
 
@@ -322,13 +364,26 @@ it('une NDF de asso A est non traitable depuis asso B (isolation tenant)', funct
     $assoB = Association::factory()->create();
     TenantContext::boot($assoB);
 
-    // La NDF de A est invisible depuis B
-    expect(NoteDeFrais::query()->count())->toBe(0);
+    // Charger la NDF de A en contournant le scope global
+    $ndfHors = NoteDeFrais::withoutGlobalScopes()->find($ndf->id);
 
-    // Tenter de valider la NDF de A depuis le contexte B → échoue
-    // (asso B n'a pas de sous-cat AbandonCreance → DomainException)
-    expect(fn () => $this->service->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20'))
-        ->toThrow(Exception::class);
+    $compteB = CompteBancaire::factory()->create(['association_id' => $assoB->id]);
+    $dataB = new ValidationData(
+        compte_id: (int) $compteB->id,
+        mode_paiement: ModePaiement::Virement,
+        date: '2025-10-15',
+    );
+
+    // Tenter de valider la NDF de A depuis le contexte B → garde tenant explicite
+    expect(fn () => $this->service->valider($ndfHors, $dataB))
+        ->toThrow(DomainException::class, 'Cette NDF appartient à un autre tenant.');
+
+    // Aucune transaction créée
+    expect(Transaction::count())->toBe(0);
+
+    // NDF A reste Soumise
+    $ndf->refresh();
+    expect($ndf->getRawOriginal('statut'))->toBe(StatutNoteDeFrais::Soumise->value);
 });
 
 // ---------------------------------------------------------------------------

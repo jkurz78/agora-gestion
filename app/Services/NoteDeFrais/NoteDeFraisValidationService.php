@@ -84,6 +84,11 @@ final class NoteDeFraisValidationService
     public function valider(NoteDeFrais $ndf, ValidationData $data): Transaction
     {
         return DB::transaction(function () use ($ndf, $data): Transaction {
+            // Garde tenant explicite — fail-fast avant d'acquérir le verrou DB
+            if ((int) $ndf->association_id !== (int) TenantContext::currentId()) {
+                throw new DomainException('Cette NDF appartient à un autre tenant.');
+            }
+
             // Lock pessimiste sur la ligne ciblée pour éviter la double-validation concurrente
             NoteDeFrais::whereKey($ndf->id)->lockForUpdate()->firstOrFail();
             $ndf->refresh();
@@ -134,6 +139,11 @@ final class NoteDeFraisValidationService
         string $dateDon,
     ): Transaction {
         return DB::transaction(function () use ($ndf, $data, $dateDon): Transaction {
+            // Garde tenant explicite — fail-fast avant d'acquérir le verrou DB
+            if ((int) $ndf->association_id !== (int) TenantContext::currentId()) {
+                throw new DomainException('Cette NDF appartient à un autre tenant.');
+            }
+
             // Lock pessimiste sur la ligne ciblée
             NoteDeFrais::whereKey($ndf->id)->lockForUpdate()->firstOrFail();
             $ndf->refresh();
@@ -204,6 +214,7 @@ final class NoteDeFraisValidationService
                 'transaction_don_id' => (int) $txDon->id,
                 'montant' => $montantTotal,
                 'date_don' => $dateDon,
+                'valide_par' => auth()->id(),
             ]);
 
             return $txDon;
