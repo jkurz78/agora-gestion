@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutNoteDeFrais;
+use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\NoteDeFrais;
@@ -27,11 +28,10 @@ it('une ligne km de asso A est invisible de asso B', function () {
     TenantContext::boot($assoA);
     $tiersA = Tiers::factory()->create(['association_id' => $assoA->id]);
     $catA = Categorie::factory()->create(['association_id' => $assoA->id]);
-    $scA = SousCategorie::create([
+    $scA = SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $assoA->id,
         'categorie_id' => $catA->id,
         'nom' => 'Déplacements',
-        'pour_frais_kilometriques' => true,
     ]);
     $ndfA = NoteDeFrais::create([
         'association_id' => $assoA->id,
@@ -55,41 +55,51 @@ it('une ligne km de asso A est invisible de asso B', function () {
     expect(NoteDeFrais::query()->count())->toBe(0);
 
     // NoteDeFraisLigne n'a pas d'association_id propre : l'isolation est transitive via la FK note_de_frais_id.
-    // En contexte assoB, NoteDeFrais::count() === 0, donc aucune ligne ne peut être atteinte via les NDF visibles.
-    // On le vérifie en passant par la relation : lignes dont la NDF est visible = 0.
     $visibleNdfIds = NoteDeFrais::query()->pluck('id');
     expect(NoteDeFraisLigne::whereIn('note_de_frais_id', $visibleNdfIds)->count())->toBe(0);
 
-    // SousCategorie scopée tenant → flag km invisible depuis assoB
-    expect(SousCategorie::where('pour_frais_kilometriques', true)->count())->toBe(0);
+    // SousCategorie scopée tenant → usage km invisible depuis assoB
+    $visibleScIds = SousCategorie::pluck('id');
+    expect(\Illuminate\Support\Facades\DB::table('usages_sous_categories')
+        ->whereIn('sous_categorie_id', $visibleScIds)
+        ->where('usage', UsageComptable::FraisKilometriques->value)
+        ->count())->toBe(0);
 });
 
-it('le flag pour_frais_kilometriques est scope-locked au tenant', function () {
+it('le pivot frais_kilometriques est scope-locked au tenant', function () {
     $assoA = Association::factory()->create();
     $assoB = Association::factory()->create();
 
     TenantContext::boot($assoA);
     $catA = Categorie::factory()->create(['association_id' => $assoA->id]);
-    SousCategorie::create([
+    SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $assoA->id,
         'categorie_id' => $catA->id,
         'nom' => 'Déplacements A',
-        'pour_frais_kilometriques' => true,
     ]);
 
     TenantContext::boot($assoB);
     $catB = Categorie::factory()->create(['association_id' => $assoB->id]);
-    SousCategorie::create([
+    SousCategorie::factory()->create([
         'association_id' => $assoB->id,
         'categorie_id' => $catB->id,
         'nom' => 'Bureau B',
-        'pour_frais_kilometriques' => false,
     ]);
 
-    // En contexte B : aucune sous-cat flaggée
-    expect(SousCategorie::where('pour_frais_kilometriques', true)->count())->toBe(0);
+    // En contexte B : aucune sous-cat avec usage km
+    $visibleScIdsB = SousCategorie::pluck('id');
+    $countB = \Illuminate\Support\Facades\DB::table('usages_sous_categories')
+        ->whereIn('sous_categorie_id', $visibleScIdsB)
+        ->where('usage', UsageComptable::FraisKilometriques->value)
+        ->count();
+    expect($countB)->toBe(0);
 
-    // En contexte A : 1 flaggée
+    // En contexte A : 1 sous-cat avec usage km
     TenantContext::boot($assoA);
-    expect(SousCategorie::where('pour_frais_kilometriques', true)->count())->toBe(1);
+    $visibleScIdsA = SousCategorie::pluck('id');
+    $countA = \Illuminate\Support\Facades\DB::table('usages_sous_categories')
+        ->whereIn('sous_categorie_id', $visibleScIdsA)
+        ->where('usage', UsageComptable::FraisKilometriques->value)
+        ->count();
+    expect($countA)->toBe(1);
 });

@@ -38,18 +38,6 @@
                     <th class="sortable" data-col="0" style="cursor:pointer;user-select:none">Catégorie <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th class="sortable" data-col="1" style="cursor:pointer;user-select:none">Nom <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
                     <th class="sortable" data-col="2" style="cursor:pointer;user-select:none">Code CERFA <i class="bi bi-arrow-down-up" style="font-size:.7rem"></i></th>
-                    <th class="text-center filterable-flag" data-flag="pour_dons" style="cursor:pointer;user-select:none">
-                        Dons <span class="badge bg-secondary flag-badge" style="font-size:.65rem">tous</span>
-                    </th>
-                    <th class="text-center filterable-flag" data-flag="pour_cotisations" style="cursor:pointer;user-select:none">
-                        Cotisations <span class="badge bg-secondary flag-badge" style="font-size:.65rem">tous</span>
-                    </th>
-                    <th class="text-center filterable-flag" data-flag="pour_inscriptions" style="cursor:pointer;user-select:none">
-                        Inscriptions <span class="badge bg-secondary flag-badge" style="font-size:.65rem">tous</span>
-                    </th>
-                    <th class="text-center filterable-flag" data-flag="pour_frais_kilometriques" style="cursor:pointer;user-select:none">
-                        Frais kilométriques <span class="badge bg-secondary flag-badge" style="font-size:.65rem">tous</span>
-                    </th>
                     <th style="width:100px" class="text-center">Actions</th>
                 </tr>
             </thead>
@@ -57,11 +45,7 @@
                 @forelse ($sousCategories as $sc)
                     <tr wire:key="sc-{{ $sc->id }}"
                         data-type="{{ $sc->categorie->type->value }}"
-                        data-categorie="{{ $sc->categorie_id }}"
-                        data-pour_dons="{{ $sc->pour_dons ? '1' : '0' }}"
-                        data-pour_cotisations="{{ $sc->pour_cotisations ? '1' : '0' }}"
-                        data-pour_inscriptions="{{ $sc->pour_inscriptions ? '1' : '0' }}"
-                        data-pour_frais_kilometriques="{{ $sc->pour_frais_kilometriques ? '1' : '0' }}">
+                        data-categorie="{{ $sc->categorie_id }}">
                         {{-- Catégorie (non éditable inline) --}}
                         <td>{{ $sc->categorie->nom }}</td>
 
@@ -103,46 +87,6 @@
                             </template>
                         </td>
 
-                        {{-- Dons toggle --}}
-                        <td class="text-center">
-                            <button wire:click="toggleFlag({{ $sc->id }}, 'pour_dons')"
-                                    class="btn btn-sm {{ $sc->pour_dons ? 'btn-success' : 'btn-outline-secondary' }}"
-                                    style="padding:.15rem .4rem;font-size:.7rem"
-                                    title="{{ $sc->pour_dons ? 'Désactiver pour les dons' : 'Activer pour les dons' }}">
-                                {{ $sc->pour_dons ? '✓' : '–' }}
-                            </button>
-                        </td>
-
-                        {{-- Cotisations toggle --}}
-                        <td class="text-center">
-                            <button wire:click="toggleFlag({{ $sc->id }}, 'pour_cotisations')"
-                                    class="btn btn-sm {{ $sc->pour_cotisations ? 'btn-success' : 'btn-outline-secondary' }}"
-                                    style="padding:.15rem .4rem;font-size:.7rem"
-                                    title="{{ $sc->pour_cotisations ? 'Désactiver pour les cotisations' : 'Activer pour les cotisations' }}">
-                                {{ $sc->pour_cotisations ? '✓' : '–' }}
-                            </button>
-                        </td>
-
-                        {{-- Inscriptions toggle --}}
-                        <td class="text-center">
-                            <button wire:click="toggleFlag({{ $sc->id }}, 'pour_inscriptions')"
-                                    class="btn btn-sm {{ $sc->pour_inscriptions ? 'btn-success' : 'btn-outline-secondary' }}"
-                                    style="padding:.15rem .4rem;font-size:.7rem"
-                                    title="{{ $sc->pour_inscriptions ? 'Désactiver pour les inscriptions' : 'Activer pour les inscriptions' }}">
-                                {{ $sc->pour_inscriptions ? '✓' : '–' }}
-                            </button>
-                        </td>
-
-                        {{-- Frais kilométriques toggle --}}
-                        <td class="text-center">
-                            <button wire:click="toggleFlag({{ $sc->id }}, 'pour_frais_kilometriques')"
-                                    class="btn btn-sm {{ $sc->pour_frais_kilometriques ? 'btn-success' : 'btn-outline-secondary' }}"
-                                    style="padding:.15rem .4rem;font-size:.7rem"
-                                    title="{{ $sc->pour_frais_kilometriques ? 'Désactiver pour les frais kilométriques' : 'Activer pour les frais kilométriques' }}">
-                                {{ $sc->pour_frais_kilometriques ? '✓' : '–' }}
-                            </button>
-                        </td>
-
                         {{-- Actions --}}
                         <td class="text-center">
                             <div class="d-flex gap-1 justify-content-center">
@@ -164,7 +108,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-muted">Aucune sous-catégorie enregistrée.</td>
+                        <td colspan="4" class="text-muted">Aucune sous-catégorie enregistrée.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -206,26 +150,6 @@
                         <label class="form-label small">Code CERFA</label>
                         <input type="text" wire:model="code_cerfa" class="form-control form-control-sm @error('code_cerfa') is-invalid @enderror" maxlength="10">
                         @error('code_cerfa') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                    </div>
-                </div>
-
-                {{-- Flags --}}
-                <div class="mb-3 d-flex flex-wrap gap-4">
-                    <div class="form-check">
-                        <input type="checkbox" wire:model="pour_dons" class="form-check-input" id="modalPourDons">
-                        <label class="form-check-label" for="modalPourDons">Dons</label>
-                    </div>
-                    <div class="form-check">
-                        <input type="checkbox" wire:model="pour_cotisations" class="form-check-input" id="modalPourCotisations">
-                        <label class="form-check-label" for="modalPourCotisations">Cotisations</label>
-                    </div>
-                    <div class="form-check">
-                        <input type="checkbox" wire:model="pour_inscriptions" class="form-check-input" id="modalPourInscriptions">
-                        <label class="form-check-label" for="modalPourInscriptions">Inscriptions</label>
-                    </div>
-                    <div class="form-check">
-                        <input type="checkbox" wire:model="pour_frais_kilometriques" class="form-check-input" id="modalPourFraisKilometriques">
-                        <label class="form-check-label" for="modalPourFraisKilometriques">Frais kilométriques</label>
                     </div>
                 </div>
 
@@ -291,8 +215,6 @@
             });
 
             // ── Filtering ────────────────────────────────────────
-            var flagFilters = {};
-
             function filterSousCategories() {
                 var typeVal = document.querySelector('input[name="scTypeFilter"]:checked')?.value || 'all';
                 var catVal = document.getElementById('scCatFilter')?.value || '';
@@ -301,14 +223,7 @@
                     var typeOk = typeVal === 'all' || row.dataset.type === typeVal;
                     var catOk = catVal === '' || row.dataset.categorie === catVal;
 
-                    var flagsOk = true;
-                    Object.keys(flagFilters).forEach(function (flag) {
-                        if (flagFilters[flag]) {
-                            flagsOk = flagsOk && row.dataset[flag] === '1';
-                        }
-                    });
-
-                    row.style.display = (typeOk && catOk && flagsOk) ? '' : 'none';
+                    row.style.display = (typeOk && catOk) ? '' : 'none';
                 });
             }
 
@@ -320,27 +235,6 @@
             // Category filter
             var catFilter = document.getElementById('scCatFilter');
             if (catFilter) catFilter.addEventListener('change', filterSousCategories);
-
-            // Flag filters (click on header badge)
-            document.querySelectorAll('.filterable-flag').forEach(function (th) {
-                th.addEventListener('click', function () {
-                    var flag = this.dataset.flag;
-                    flagFilters[flag] = !flagFilters[flag];
-
-                    var badge = this.querySelector('.flag-badge');
-                    if (flagFilters[flag]) {
-                        badge.textContent = '✓ filtré';
-                        badge.className = 'badge bg-success flag-badge';
-                        badge.style.fontSize = '.65rem';
-                    } else {
-                        badge.textContent = 'tous';
-                        badge.className = 'badge bg-secondary flag-badge';
-                        badge.style.fontSize = '.65rem';
-                    }
-
-                    filterSousCategories();
-                });
-            });
 
             // ── Re-apply sort after Livewire morph ───────────────
             function reApplySort() {

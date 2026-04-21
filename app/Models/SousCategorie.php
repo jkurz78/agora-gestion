@@ -21,20 +21,12 @@ final class SousCategorie extends TenantModel
         'categorie_id',
         'nom',
         'code_cerfa',
-        'pour_dons',
-        'pour_cotisations',
-        'pour_inscriptions',
-        'pour_frais_kilometriques',
     ];
 
     protected function casts(): array
     {
         return [
             'categorie_id' => 'integer',
-            'pour_dons' => 'boolean',
-            'pour_cotisations' => 'boolean',
-            'pour_inscriptions' => 'boolean',
-            'pour_frais_kilometriques' => 'boolean',
         ];
     }
 

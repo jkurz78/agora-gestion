@@ -30,11 +30,10 @@ beforeEach(function () {
         'association_id' => $this->asso->id,
         'type' => TypeCategorie::Depense->value,
     ]);
-    $this->sc = SousCategorie::create([
+    $this->sc = SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $this->asso->id,
         'categorie_id' => $this->cat->id,
         'nom' => 'Déplacements',
-        'pour_frais_kilometriques' => true,
     ]);
 
     $this->compte = CompteBancaire::factory()->create(['association_id' => $this->asso->id]);

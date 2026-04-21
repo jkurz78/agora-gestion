@@ -151,7 +151,7 @@ it('compteDeResultatOperations filtre par opérations et exclut les cotisations'
     TransactionLigne::factory()->create(['transaction_id' => $depense->id, 'sous_categorie_id' => $sc->id, 'operation_id' => null, 'montant' => 200.00]);
 
     // Cotisation via transaction (doit être exclue car sans operation_id)
-    $scCot = SousCategorie::factory()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions', 'pour_cotisations' => true]);
+    $scCot = SousCategorie::factory()->pourCotisations()->create(['categorie_id' => $this->recetteCat->id, 'nom' => 'Adhésions']);
     $recette = Transaction::factory()->asRecette()->create(['date' => '2025-10-01', 'montant_total' => 500.00, 'saisi_par' => $this->user->id]);
     $recette->lignes()->forceDelete();
     TransactionLigne::factory()->create(['transaction_id' => $recette->id, 'sous_categorie_id' => $scCot->id, 'montant' => 500.00]);

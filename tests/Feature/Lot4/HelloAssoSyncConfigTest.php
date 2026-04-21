@@ -30,8 +30,7 @@ it('renders the component', function () {
 
 it('saves sync config', function () {
     $compte = CompteBancaire::factory()->create(['nom' => 'HA']);
-    $scDon = SousCategorie::where('pour_dons', true)->first()
-        ?? SousCategorie::factory()->create(['pour_dons' => true]);
+    $scDon = SousCategorie::factory()->pourDons()->create();
 
     Livewire::test(HelloassoSyncConfig::class)
         ->set('compteHelloassoId', $compte->id)

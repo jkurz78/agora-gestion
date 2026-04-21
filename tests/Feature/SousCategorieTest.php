@@ -39,9 +39,6 @@ it('can create a sous-categorie via modal', function () {
         ->set('categorie_id', (string) $this->categorie->id)
         ->set('nom', 'Électricité')
         ->set('code_cerfa', '1234')
-        ->set('pour_dons', false)
-        ->set('pour_cotisations', false)
-        ->set('pour_inscriptions', false)
         ->call('save')
         ->assertSet('showModal', false);
 
@@ -124,32 +121,6 @@ it('can update a sous-categorie via modal', function () {
         'nom' => 'Nom modifié',
         'code_cerfa' => '9999',
     ]);
-});
-
-it('can toggle a flag', function () {
-    $sc = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-        'pour_dons' => false,
-    ]);
-
-    Livewire::test(SousCategorieList::class)
-        ->call('toggleFlag', $sc->id, 'pour_dons');
-
-    expect($sc->fresh()->pour_dons)->toBeTrue();
-});
-
-it('rejects invalid flag names', function () {
-    $sc = SousCategorie::factory()->create([
-        'categorie_id' => $this->categorie->id,
-        'association_id' => $this->association->id,
-        'pour_dons' => false,
-    ]);
-
-    Livewire::test(SousCategorieList::class)
-        ->call('toggleFlag', $sc->id, 'invalid_flag');
-
-    expect($sc->fresh()->pour_dons)->toBeFalse();
 });
 
 it('can update a field inline', function () {

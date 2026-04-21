@@ -139,11 +139,10 @@ it('étape 2 km valide CV + km + bareme + libellé', function () {
 
 it('confirme la ligne km et l\'ajoute au tableau des lignes', function () {
     $cat = Categorie::factory()->create(['association_id' => $this->asso->id]);
-    SousCategorie::create([
+    SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $this->asso->id,
         'categorie_id' => $cat->id,
         'nom' => 'Déplacements',
-        'pour_frais_kilometriques' => true,
     ]);
 
     $component = makeKmForm($this->asso);

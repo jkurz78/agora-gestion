@@ -43,7 +43,7 @@ it('creates a Transaction of type Depense when validating a soumise NDF', functi
         'tiers_id' => $tiers->id,
         'libelle' => 'Frais déplacement Paris',
     ]);
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -68,8 +68,8 @@ it('creates a Transaction of type Depense when validating a soumise NDF', functi
 it('creates one TransactionLigne per NDF ligne with correct values', function (): void {
     $tiers = Tiers::factory()->create();
     $ndf = NoteDeFrais::factory()->soumise()->create(['tiers_id' => $tiers->id]);
-    $sousCategorie1 = SousCategorie::factory()->create(['pour_inscriptions' => false]);
-    $sousCategorie2 = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie1 = SousCategorie::factory()->create();
+    $sousCategorie2 = SousCategorie::factory()->create();
 
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
@@ -107,7 +107,7 @@ it('creates one TransactionLigne per NDF ligne with correct values', function ()
 
 it('sets montant_total to sum of all NDF lignes', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -128,7 +128,7 @@ it('sets montant_total to sum of all NDF lignes', function (): void {
 
 it('updates NDF to Validee with transaction_id and validee_at', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -150,7 +150,7 @@ it('updates NDF to Validee with transaction_id and validee_at', function (): voi
 
 it('copies PJ from NDF ligne to transaction ligne path', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
 
     // Create a fake source file
     $assocId = TenantContext::currentId();
@@ -182,7 +182,7 @@ it('copies PJ from NDF ligne to transaction ligne path', function (): void {
 
 it('copies multiple PJs with correct 1-based index in path', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     $assocId = TenantContext::currentId();
 
     $source1 = "associations/{$assocId}/notes-de-frais/{$ndf->id}/ligne-1.pdf";
@@ -215,7 +215,7 @@ it('copies multiple PJs with correct 1-based index in path', function (): void {
 
 it('leaves piece_jointe_path null on transaction ligne when NDF ligne has no PJ', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -250,7 +250,7 @@ it('throws DomainException when NDF is already Validee', function (): void {
 it('throws ExerciceCloturedException when date falls in closed exercice', function (): void {
     $assocId = TenantContext::currentId();
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -281,7 +281,7 @@ it('throws ExerciceCloturedException when date falls in closed exercice', functi
 
 it('rolls back entirely when source PJ file is missing', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     $assocId = TenantContext::currentId();
 
     // Reference a source that does NOT exist in Storage::fake
@@ -314,7 +314,7 @@ it('rolls back entirely when source PJ file is missing', function (): void {
 
 it('emits comptabilite.ndf.validated log with correct context', function (): void {
     $ndf = NoteDeFrais::factory()->soumise()->create();
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
     NoteDeFraisLigne::factory()->create([
         'note_de_frais_id' => $ndf->id,
         'sous_categorie_id' => $sousCategorie->id,
@@ -346,7 +346,7 @@ it('emits comptabilite.ndf.validated log with correct context', function (): voi
 // ---------------------------------------------------------------------------
 
 it('validates the targeted NDF without touching the other NDF in the same tenant', function (): void {
-    $sousCategorie = SousCategorie::factory()->create(['pour_inscriptions' => false]);
+    $sousCategorie = SousCategorie::factory()->create();
 
     $ndf1 = NoteDeFrais::factory()->soumise()->create();
     NoteDeFraisLigne::factory()->create([
