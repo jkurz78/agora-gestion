@@ -14,6 +14,7 @@ use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
+use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -133,6 +134,85 @@ it('cree deux transactions (depense + don) reglees pour un abandon de creance', 
     // Montants cohérents des deux côtés
     expect((float) $txDepense->montant_total)->toBe(150.0);
     expect((float) $txDon->montant_total)->toBe(150.0);
+});
+
+// ---------------------------------------------------------------------------
+// 1b. Le Don clone les lignes de la Dépense (operation, seance, notes, montant)
+//     seule la sous-catégorie diffère → pointe sur AbandonCreance
+// ---------------------------------------------------------------------------
+
+it('clone les lignes de la Depense vers le Don (operation, seance, notes, montant)', function (): void {
+    // Setup : une opération + deux séances
+    $operation = Operation::factory()->create(['association_id' => $this->asso->id]);
+
+    $ndf = NoteDeFrais::factory()->soumise()->create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+        'date' => '2025-10-01',
+        'libelle' => 'Frais mission avec opération',
+    ]);
+
+    // 2 lignes avec opération + séances distinctes
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'type' => NoteDeFraisLigneType::Standard->value,
+        'sous_categorie_id' => $this->scDepense->id,
+        'operation_id' => $operation->id,
+        'seance' => 1,
+        'libelle' => 'Transport',
+        'montant' => 42.0,
+        'piece_jointe_path' => null,
+    ]);
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'type' => NoteDeFraisLigneType::Standard->value,
+        'sous_categorie_id' => $this->scDepense->id,
+        'operation_id' => $operation->id,
+        'seance' => 2,
+        'libelle' => 'Hébergement',
+        'montant' => 58.0,
+        'piece_jointe_path' => null,
+    ]);
+
+    $txDon = $this->service->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
+
+    $ndf->refresh();
+    $txDepense = Transaction::find($ndf->transaction_id);
+
+    $lignesDepense = $txDepense->lignes()->orderBy('id')->get();
+    $lignesDon = $txDon->lignes()->orderBy('id')->get();
+
+    expect($lignesDon)->toHaveCount($lignesDepense->count());
+
+    foreach ($lignesDepense as $i => $ligneDepense) {
+        $ligneDon = $lignesDon[$i];
+
+        // Champs clonés identiquement
+        expect((int) $ligneDon->operation_id)->toBe((int) $ligneDepense->operation_id);
+        expect($ligneDon->seance)->toBe($ligneDepense->seance);
+        expect($ligneDon->notes)->toBe($ligneDepense->notes);
+        expect((float) $ligneDon->montant)->toBe((float) $ligneDepense->montant);
+
+        // Sous-catégorie pointe vers AbandonCreance (pas la sous-cat Dépense d'origine)
+        expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scAbandon->id);
+        expect((int) $ligneDon->sous_categorie_id)->not->toBe((int) $ligneDepense->sous_categorie_id);
+    }
+});
+
+// ---------------------------------------------------------------------------
+// 1c. La Transaction Don hérite du compte bancaire de la Dépense
+// ---------------------------------------------------------------------------
+
+it('met le Don sur le meme compte que la Depense', function (): void {
+    $ndf = makeNdfSoumise($this->asso, $this->tiers, $this->scDepense);
+
+    $txDon = $this->service->validerAvecAbandonCreance($ndf, $this->data, '2025-10-20');
+
+    $ndf->refresh();
+    $txDepense = Transaction::find($ndf->transaction_id);
+
+    expect((int) $txDon->compte_id)->toBe((int) $this->compte->id);
+    expect((int) $txDon->compte_id)->toBe((int) $txDepense->compte_id);
 });
 
 // ---------------------------------------------------------------------------

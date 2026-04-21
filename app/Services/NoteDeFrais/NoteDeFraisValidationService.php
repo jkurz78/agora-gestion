@@ -189,13 +189,15 @@ final class NoteDeFraisValidationService
                 'association_id' => TenantContext::currentId(),
             ];
 
-            $txDonLignes = [
-                [
-                    'sous_categorie_id' => $sousCatAbandon->id,
-                    'notes' => sprintf('Don par abandon de créance — NDF #%d', (int) $ndf->id),
-                    'montant' => $montantTotal,
-                ],
-            ];
+            // Le Don clone les lignes de la Dépense : mêmes opération, séance, notes, montant.
+            // Seule la sous-catégorie diffère (pointe vers la sous-cat AbandonCreance).
+            $txDonLignes = $txDepense->lignes->map(fn ($ligne) => [
+                'sous_categorie_id' => (int) $sousCatAbandon->id,
+                'operation_id' => $ligne->operation_id,
+                'seance' => $ligne->seance,
+                'notes' => $ligne->notes,
+                'montant' => (float) $ligne->montant,
+            ])->all();
 
             $txDon = $this->transactionService->create($txDonData, $txDonLignes);
 
