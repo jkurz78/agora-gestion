@@ -61,7 +61,7 @@
                         data-pour_dons="{{ $sc->pour_dons ? '1' : '0' }}"
                         data-pour_cotisations="{{ $sc->pour_cotisations ? '1' : '0' }}"
                         data-pour_inscriptions="{{ $sc->pour_inscriptions ? '1' : '0' }}"
-                        data-pour_frais_kilometriques="{{ $sc->pour_frais_kilometriques ? '1' : '0' }}"
+                        data-pour_frais_kilometriques="{{ $sc->pour_frais_kilometriques ? '1' : '0' }}">
                         {{-- Catégorie (non éditable inline) --}}
                         <td>{{ $sc->categorie->nom }}</td>
 
