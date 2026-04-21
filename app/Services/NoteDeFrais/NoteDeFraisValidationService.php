@@ -184,7 +184,7 @@ final class NoteDeFraisValidationService
                 'montant_total' => $montantTotal,
                 'mode_paiement' => $data->mode_paiement->value,
                 'tiers_id' => $ndf->tiers_id,
-                'compte_id' => null, // pas de mouvement bancaire réel
+                'compte_id' => $data->compte_id, // même compte que la dépense — les deux écritures se neutralisent sur ce compte
                 'statut_reglement' => StatutReglement::Recu->value,
                 'association_id' => TenantContext::currentId(),
             ];
