@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\NoteDeFrais\LigneTypes;
 
 use App\Enums\NoteDeFraisLigneType;
+use App\Enums\UsageComptable;
 use App\Models\SousCategorie;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -81,7 +82,7 @@ final class KilometriqueLigneType implements LigneTypeInterface
 
     public function resolveSousCategorieId(?int $requestedId): ?int
     {
-        $flagged = SousCategorie::where('pour_frais_kilometriques', true)->pluck('id');
+        $flagged = SousCategorie::forUsage(UsageComptable::FraisKilometriques)->pluck('id');
 
         if ($flagged->count() === 1) {
             return (int) $flagged->first();

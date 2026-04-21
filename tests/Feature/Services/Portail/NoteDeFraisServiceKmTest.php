@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\NoteDeFraisLigneType;
+use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\Categorie;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Models\UsageSousCategorie;
 use App\Services\Portail\NoteDeFrais\NoteDeFraisService;
 use App\Tenant\TenantContext;
 
@@ -17,11 +19,10 @@ beforeEach(function () {
     $this->tiers = Tiers::factory()->create(['association_id' => $this->asso->id]);
 
     $this->cat = Categorie::factory()->create(['association_id' => $this->asso->id]);
-    $this->scKm = SousCategorie::create([
+    $this->scKm = SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $this->asso->id,
         'categorie_id' => $this->cat->id,
         'nom' => 'Déplacements',
-        'pour_frais_kilometriques' => true,
     ]);
 
     $this->service = app(NoteDeFraisService::class);
@@ -89,7 +90,9 @@ it('sauvegarde une ligne standard sans metadata', function () {
 });
 
 it('laisse sous_categorie_id à null pour ligne km si aucune sous-cat flaggée', function () {
-    $this->scKm->update(['pour_frais_kilometriques' => false]);
+    UsageSousCategorie::where('sous_categorie_id', $this->scKm->id)
+        ->where('usage', UsageComptable::FraisKilometriques->value)
+        ->delete();
 
     $ndf = $this->service->saveDraft($this->tiers, [
         'date' => '2026-04-20',
@@ -115,11 +118,10 @@ it('laisse sous_categorie_id à null pour ligne km si aucune sous-cat flaggée',
 });
 
 it('laisse sous_categorie_id à null pour ligne km si deux sous-cat flaggées', function () {
-    SousCategorie::create([
+    SousCategorie::factory()->pourFraisKilometriques()->create([
         'association_id' => $this->asso->id,
         'categorie_id' => $this->cat->id,
         'nom' => 'Déplacements bis',
-        'pour_frais_kilometriques' => true,
     ]);
 
     $ndf = $this->service->saveDraft($this->tiers, [
