@@ -566,6 +566,15 @@ $activeGroup = match(true) {
                             </li>
                             @endif
 
+                            @if (Route::has('parametres.comptabilite.usages'))
+                            <li class="nav-item">
+                                <a href="{{ route('parametres.comptabilite.usages') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.comptabilite.usages') ? 'active' : '' }}">
+                                    <i class="bi bi-sliders me-2"></i> Usages
+                                </a>
+                            </li>
+                            @endif
+
                             @if (Route::has('parametres.utilisateurs.index'))
                             <li class="nav-item">
                                 <a href="{{ route('parametres.utilisateurs.index') }}"

@@ -127,6 +127,6 @@ final class UsagesComptables extends Component
             'sousCatsDon' => SousCategorie::forUsage(UsageComptable::Don)->pluck('id'),
             'sousCatsCotisation' => SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id'),
             'sousCatsInscription' => SousCategorie::forUsage(UsageComptable::Inscription)->pluck('id'),
-        ]);
+        ])->layout('layouts.app-sidebar', ['title' => 'Usages comptables']);
     }
 }
