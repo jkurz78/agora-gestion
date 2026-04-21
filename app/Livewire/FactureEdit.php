@@ -219,7 +219,7 @@ final class FactureEdit extends Component
 
         $totalLignes = $lignes->where('type', TypeLigneFacture::Montant)->sum('montant');
 
-        $comptesBancaires = CompteBancaire::where('est_systeme', false)
+        $comptesBancaires = CompteBancaire::saisieManuelle()
             ->orderBy('nom')
             ->get();
 

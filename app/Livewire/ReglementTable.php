@@ -248,8 +248,7 @@ final class ReglementTable extends Component
         }
 
         $this->comptabiliserSeanceId = $seanceId;
-        $this->comptabiliserCompteId = CompteBancaire::where('est_systeme', false)
-            ->where('actif_recettes_depenses', true)
+        $this->comptabiliserCompteId = CompteBancaire::saisieManuelle()
             ->value('id');
         $seance = Seance::find($seanceId);
         $this->comptabiliserDate = $seance?->date?->format('Y-m-d') ?? now()->format('Y-m-d');
@@ -414,8 +413,7 @@ final class ReglementTable extends Component
         }
 
         // Available accounts for comptabilisation
-        $comptesBancaires = CompteBancaire::where('est_systeme', false)
-            ->where('actif_recettes_depenses', true)
+        $comptesBancaires = CompteBancaire::saisieManuelle()
             ->get();
 
         return view('livewire.reglement-table', [
