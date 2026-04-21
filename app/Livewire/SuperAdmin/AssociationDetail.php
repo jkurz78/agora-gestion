@@ -8,6 +8,7 @@ use App\Models\Association;
 use App\Models\SuperAdminAccessLog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 final class AssociationDetail extends Component
@@ -15,6 +16,10 @@ final class AssociationDetail extends Component
     public Association $association;
 
     public string $tab = 'info';
+
+    public bool $editingSlug = false;
+
+    public string $newSlug = '';
 
     public function mount(Association $association): void
     {
@@ -66,13 +71,67 @@ final class AssociationDetail extends Component
         });
     }
 
-    private function logTransition(string $action): void
+    public function openSlugEditor(): void
+    {
+        $this->editingSlug = true;
+        $this->newSlug = $this->association->slug ?? '';
+    }
+
+    public function cancelSlugEdit(): void
+    {
+        $this->editingSlug = false;
+        $this->newSlug = '';
+        $this->resetErrorBag();
+    }
+
+    public function saveSlug(): void
+    {
+        abort_unless(auth()->user()?->isSuperAdmin(), 403);
+
+        $this->validate(
+            [
+                'newSlug' => [
+                    'required',
+                    'string',
+                    'regex:/^[a-z0-9-]+$/',
+                    'max:80',
+                    Rule::unique('association', 'slug')->ignore($this->association->id),
+                ],
+            ],
+            [
+                'newSlug.required' => 'Le slug est obligatoire.',
+                'newSlug.string' => 'Le slug doit être une chaîne de caractères.',
+                'newSlug.regex' => 'Le slug ne peut contenir que des lettres minuscules, des chiffres et des tirets.',
+                'newSlug.max' => 'Le slug ne peut pas dépasser 80 caractères.',
+                'newSlug.unique' => 'Ce slug est déjà utilisé par une autre association.',
+            ],
+        );
+
+        if ($this->newSlug === $this->association->slug) {
+            $this->editingSlug = false;
+
+            return;
+        }
+
+        DB::transaction(function () {
+            $oldSlug = $this->association->slug;
+            $this->association->allowSlugChange = true;
+            $this->association->update(['slug' => $this->newSlug]);
+            $this->logTransition('update_slug', ['old_slug' => $oldSlug, 'new_slug' => $this->newSlug]);
+        });
+
+        $this->editingSlug = false;
+        $this->newSlug = '';
+        session()->flash('super-admin.success', 'Slug mis à jour.');
+    }
+
+    private function logTransition(string $action, ?array $payload = null): void
     {
         SuperAdminAccessLog::create([
             'user_id' => auth()->id(),
             'association_id' => $this->association->id,
             'action' => $action,
-            'payload' => ['new_statut' => $this->association->statut],
+            'payload' => $payload ?? ['new_statut' => $this->association->statut],
             'created_at' => now(),
         ]);
     }
