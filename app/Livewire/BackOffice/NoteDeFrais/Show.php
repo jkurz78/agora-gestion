@@ -6,9 +6,11 @@ namespace App\Livewire\BackOffice\NoteDeFrais;
 
 use App\Enums\ModePaiement;
 use App\Enums\StatutNoteDeFrais;
+use App\Enums\UsageComptable;
 use App\Exceptions\ExerciceCloturedException;
 use App\Models\CompteBancaire;
 use App\Models\NoteDeFrais;
+use App\Models\SousCategorie;
 use App\Services\NoteDeFrais\NoteDeFraisValidationService;
 use App\Services\NoteDeFrais\ValidationData;
 use DomainException;
@@ -24,6 +26,8 @@ final class Show extends Component
     public bool $showMiniForm = false;
 
     public bool $showRejectModal = false;
+
+    public bool $showAbandonForm = false;
 
     public ?int $compteId = null;
 
@@ -43,6 +47,11 @@ final class Show extends Component
     public function openMiniForm(): void
     {
         $this->showMiniForm = true;
+    }
+
+    public function openAbandonForm(): void
+    {
+        $this->showAbandonForm = true;
     }
 
     public function setDateToday(): void
@@ -148,9 +157,16 @@ final class Show extends Component
             ->get();
     }
 
+    private function sousCatAbandon(): ?SousCategorie
+    {
+        return $this->ndf->association
+            ->sousCategoriesFor(UsageComptable::AbandonCreance)
+            ->first();
+    }
+
     public function render(): View
     {
-        $this->ndf->loadMissing(['tiers', 'lignes', 'transaction']);
+        $this->ndf->loadMissing(['tiers', 'lignes', 'transaction', 'association']);
 
         return view('livewire.back-office.note-de-frais.show', [
             'comptesBancaires' => $this->comptesBancaires(),
@@ -158,6 +174,7 @@ final class Show extends Component
             'statutSoumise' => StatutNoteDeFrais::Soumise,
             'statutValidee' => StatutNoteDeFrais::Validee,
             'statutRejetee' => StatutNoteDeFrais::Rejetee,
+            'sousCatAbandon' => $this->sousCatAbandon(),
         ])->layout('layouts.app-sidebar', ['title' => 'Note de frais — Détail']);
     }
 }
