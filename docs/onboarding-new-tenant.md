@@ -122,6 +122,29 @@ Pour quitter : cliquer sur **"Quitter le mode support"** dans la bannière (`POS
 
 ---
 
+## Corriger le slug d'une association
+
+Le slug est immuable par défaut (protégé par `ImmutableSlugObserver`). Pour le corriger depuis l'UI super-admin :
+
+1. Naviguer vers `/super-admin/associations/{slug}`.
+2. Cliquer sur **"Modifier"** à côté du slug affiché dans la section Identité.
+3. Saisir le nouveau slug (format `^[a-z0-9-]+$`, 80 caractères max, doit être unique).
+4. Valider.
+
+Effets :
+- L'URL du portail tiers change immédiatement : `/portail/{nouveau-slug}/...`.
+- Les magic-links OTP déjà envoyés pointent vers l'ancien slug et ne fonctionnent plus. Les tiers concernés doivent redemander un OTP.
+- Les justificatifs et documents stockés ne sont pas affectés (chemins basés sur l'ID numérique).
+- L'action est tracée dans `super_admin_access_log` avec l'ancien et le nouveau slug.
+
+Alternative en CLI (si l'UI n'est pas accessible) :
+
+```bash
+php artisan tinker --execute="\$a = App\Models\Association::find(1); \$a->allowSlugChange = true; \$a->update(['slug' => 'nouveau-slug']);"
+```
+
+---
+
 ## Archiver un tenant
 
 1. Naviguer vers `/super-admin/associations/{slug}`.
