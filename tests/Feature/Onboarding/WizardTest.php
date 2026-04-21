@@ -213,7 +213,6 @@ it('saves step 3 compte bancaire and advances to step 4', function () {
     expect($compte->bic)->toBe('BDFEFRPPCCT');
     expect((float) $compte->solde_initial)->toBe(1500.50);
     expect($compte->actif_recettes_depenses)->toBeTrue();
-    expect($compte->est_systeme)->toBeFalse();
     expect($this->association->fresh()->wizard_current_step)->toBe(4);
 });
 

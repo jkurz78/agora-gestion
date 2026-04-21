@@ -23,7 +23,6 @@ beforeEach(function () {
 
     $this->compte = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
-        'est_systeme' => false,
     ]);
     $this->rapprochement = RapprochementBancaire::factory()->create([
         'association_id' => $this->association->id,
