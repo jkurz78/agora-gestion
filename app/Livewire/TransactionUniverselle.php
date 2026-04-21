@@ -46,7 +46,7 @@ final class TransactionUniverselle extends Component
     public bool $showImport = false;      // affiche les boutons import CSV dans le header
 
     #[Locked]
-    public ?string $sousCategorieFilter = null; // filtre sous-catégorie (pour_dons, pour_cotisations, pour_inscriptions)
+    public ?string $sousCategorieFilter = null; // filtre sous-catégorie par usage (dons, cotisations, inscriptions)
 
     // === Filtres libres (manipulables par l'utilisateur) ===
     /** @var array<string> */

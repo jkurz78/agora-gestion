@@ -9,6 +9,7 @@ use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutOperation;
+use App\Enums\UsageComptable;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\RespectsExerciceCloture;
@@ -477,7 +478,7 @@ final class TransactionForm extends Component
             'notes' => $l['notes'] ?: null,
         ])->toArray();
 
-        $inscriptionIds = SousCategorie::where('pour_inscriptions', true)->pluck('id')->toArray();
+        $inscriptionIds = SousCategorie::forUsage(UsageComptable::Inscription)->pluck('id')->toArray();
         foreach ($this->lignes as $index => $ligne) {
             if (in_array((int) ($ligne['sous_categorie_id'] ?? 0), $inscriptionIds, true)
                 && empty($ligne['operation_id'])) {
@@ -789,12 +790,16 @@ final class TransactionForm extends Component
 
     public function render(): View
     {
-        $allowedFilters = ['pour_dons', 'pour_cotisations', 'pour_inscriptions'];
-        $scFilter = in_array($this->sousCategorieFilter, $allowedFilters, true) ? $this->sousCategorieFilter : null;
+        $flagToUsage = [
+            'pour_dons' => UsageComptable::Don,
+            'pour_cotisations' => UsageComptable::Cotisation,
+            'pour_inscriptions' => UsageComptable::Inscription,
+        ];
+        $scUsage = $flagToUsage[$this->sousCategorieFilter] ?? null;
 
         $sousCategories = SousCategorie::with('categorie')
             ->when($this->type !== '', fn ($q) => $q->whereHas('categorie', fn ($q2) => $q2->where('type', $this->type)))
-            ->when($scFilter, fn ($q) => $q->where($scFilter, true))
+            ->when($scUsage !== null, fn ($q) => $q->forUsage($scUsage))
             ->orderBy('nom')
             ->get();
 

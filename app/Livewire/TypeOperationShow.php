@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
+use App\Enums\UsageComptable;
 use App\Mail\TestEmail;
 use App\Models\EmailTemplate;
 use App\Models\SousCategorie;
@@ -617,7 +618,7 @@ final class TypeOperationShow extends Component
 
     public function render(): View
     {
-        $sousCategories = SousCategorie::where('pour_inscriptions', true)
+        $sousCategories = SousCategorie::forUsage(UsageComptable::Inscription)
             ->with('categorie')
             ->orderBy('nom')
             ->get();

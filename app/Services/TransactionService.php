@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\UsageComptable;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -297,7 +298,7 @@ final class TransactionService
 
     private function validateInscriptionRequiresOperation(array $lignes): void
     {
-        $inscriptionSousCategorieIds = SousCategorie::where('pour_inscriptions', true)
+        $inscriptionSousCategorieIds = SousCategorie::forUsage(UsageComptable::Inscription)
             ->pluck('id')
             ->toArray();
 
