@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\UsageComptable;
 use App\Traits\TenantStorage;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -111,8 +113,8 @@ final class Association extends Model
             : null;
     }
 
-    public function sousCategoriesFor(\App\Enums\UsageComptable $usage): \Illuminate\Database\Eloquent\Collection
+    public function sousCategoriesFor(UsageComptable $usage): Collection
     {
-        return \App\Models\SousCategorie::forUsage($usage)->where('association_id', $this->id)->orderBy('nom')->get();
+        return SousCategorie::forUsage($usage)->where('association_id', $this->id)->orderBy('nom')->get();
     }
 }

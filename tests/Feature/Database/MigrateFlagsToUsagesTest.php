@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use App\Enums\UsageComptable;
+use App\Models\Association;
+use App\Services\Onboarding\DefaultChartOfAccountsService;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 
 it('DefaultChartOfAccountsService crée des pivot rows pour dons et cotisations', function () {
-    $asso = \App\Models\Association::factory()->create();
-    \App\Tenant\TenantContext::boot($asso);
-    (new \App\Services\Onboarding\DefaultChartOfAccountsService())->applyTo($asso);
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+    (new DefaultChartOfAccountsService)->applyTo($asso);
 
     // Vérifier que les usages attendus ont été créés via pivot
     $donCount = DB::table('usages_sous_categories')
