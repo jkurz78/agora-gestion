@@ -1,8 +1,23 @@
 <div>
+    {{-- Flash success --}}
+    @if (session('super-admin.success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ session('super-admin.success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+        </div>
+    @endif
+
     <div class="d-flex justify-content-between align-items-baseline mb-3">
         <div>
             <h2 class="mb-0">{{ $association->nom }}</h2>
-            <code class="text-muted">{{ $association->slug }}</code>
+            <span class="d-inline-flex align-items-center gap-2">
+                <code class="text-muted">{{ $association->slug }}</code>
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        wire:click="openSlugEditor">
+                    Modifier
+                </button>
+            </span>
         </div>
         <a href="{{ route('super-admin.associations.index') }}" class="btn btn-link">← Retour à la liste</a>
     </div>
@@ -65,6 +80,62 @@
                     @endforelse
                 </tbody>
             </table>
+        </div>
+    @endif
+
+    {{-- Modale modification du slug --}}
+    @if ($editingSlug)
+        <div class="modal fade show d-block"
+             id="slugEditModal"
+             tabindex="-1"
+             role="dialog"
+             aria-labelledby="slugEditModalLabel"
+             aria-modal="true"
+             style="background:rgba(0,0,0,.5)">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="slugEditModalLabel">Modifier le slug</h5>
+                        <button type="button"
+                                class="btn-close"
+                                wire:click="cancelSlugEdit"
+                                aria-label="Fermer"></button>
+                    </div>
+                    <form wire:submit.prevent="saveSlug">
+                        <div class="modal-body">
+                            <div class="alert alert-warning">
+                                ⚠ Changer le slug modifie l'URL du portail (/portail/{slug}/...). Les magic-links OTP déjà envoyés ne fonctionneront plus. Les justificatifs stockés ne sont pas affectés (chemins par ID numérique).
+                            </div>
+                            <div class="mb-3">
+                                <label for="newSlugInput" class="form-label">Nouveau slug</label>
+                                <input type="text"
+                                       id="newSlugInput"
+                                       wire:model="newSlug"
+                                       class="form-control @error('newSlug') is-invalid @enderror"
+                                       placeholder="ex: mon-association">
+                                @error('newSlug')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                                <div class="form-text">Format : lettres minuscules, chiffres, tirets uniquement, 80 caractères max.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    wire:click="cancelSlugEdit"
+                                    data-bs-dismiss="modal">
+                                Annuler
+                            </button>
+                            <button type="submit"
+                                    class="btn btn-primary"
+                                    wire:loading.attr="disabled">
+                                <span wire:loading wire:target="saveSlug" class="spinner-border spinner-border-sm me-1"></span>
+                                Enregistrer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     @endif
 </div>
