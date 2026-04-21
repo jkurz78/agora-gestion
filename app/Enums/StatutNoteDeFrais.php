@@ -11,6 +11,7 @@ enum StatutNoteDeFrais: string
     case Rejetee = 'rejetee';
     case Validee = 'validee';
     case Payee = 'payee';
+    case DonParAbandonCreances = 'don_par_abandon_de_creances';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum StatutNoteDeFrais: string
             self::Rejetee => 'Rejetée',
             self::Validee => 'Validée',
             self::Payee => 'Payée',
+            self::DonParAbandonCreances => 'Don par abandon de créance',
         };
     }
 }

@@ -86,10 +86,10 @@ it('migration: table notes_de_frais_lignes exists with expected columns', functi
 // 3. Enum StatutNoteDeFrais
 // ---------------------------------------------------------------------------
 
-it('enum: StatutNoteDeFrais has 5 cases', function () {
+it('enum: StatutNoteDeFrais has 6 cases', function () {
     $cases = StatutNoteDeFrais::cases();
 
-    expect($cases)->toHaveCount(5);
+    expect($cases)->toHaveCount(6);
 
     $values = array_map(fn ($c) => $c->value, $cases);
 
@@ -97,7 +97,8 @@ it('enum: StatutNoteDeFrais has 5 cases', function () {
         ->toContain('soumise')
         ->toContain('rejetee')
         ->toContain('validee')
-        ->toContain('payee');
+        ->toContain('payee')
+        ->toContain('don_par_abandon_de_creances');
 });
 
 it('enum: StatutNoteDeFrais::label() returns French labels', function () {
