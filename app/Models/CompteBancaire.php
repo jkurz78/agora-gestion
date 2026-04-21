@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -55,7 +56,7 @@ final class CompteBancaire extends TenantModel
      * de transactions, factures, remises, virements).
      * Exclut les comptes archivés et ceux alimentés par intégration externe.
      */
-    public function scopeSaisieManuelle(\Illuminate\Database\Eloquent\Builder $q): \Illuminate\Database\Eloquent\Builder
+    public function scopeSaisieManuelle(Builder $q): Builder
     {
         return $q->where('actif_recettes_depenses', true)
             ->where('saisie_automatisee', false);
