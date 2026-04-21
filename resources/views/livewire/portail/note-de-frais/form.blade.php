@@ -125,6 +125,25 @@
         </div>
     </div>
 
+    {{-- Don par abandon de créance --}}
+    <div class="card mb-3 border-success">
+        <div class="card-body">
+            <h6 class="card-title mb-2">
+                <i class="bi bi-heart me-1 text-success"></i>Don par abandon de créance
+            </h6>
+            <p class="text-muted small mb-2">Je renonce au remboursement et propose ce montant comme don par abandon de créance (reçu fiscal CERFA).</p>
+            <div class="form-check">
+                <input type="checkbox"
+                       id="abandonCreanceProposed"
+                       wire:model="abandonCreanceProposed"
+                       class="form-check-input">
+                <label class="form-check-label" for="abandonCreanceProposed">
+                    Je renonce au remboursement et propose un don par abandon de créance
+                </label>
+            </div>
+        </div>
+    </div>
+
     {{-- Actions --}}
     <div class="d-flex justify-content-between align-items-center">
         <a href="{{ route('portail.ndf.index', ['association' => $association->slug]) }}"
