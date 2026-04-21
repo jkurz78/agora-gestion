@@ -199,3 +199,32 @@ it('submit: refuse une NDF déjà soumise (DomainException)', function () {
     expect(fn () => submitService()->submit($ndf))
         ->toThrow(DomainException::class);
 });
+
+// ---------------------------------------------------------------------------
+// 9. Ligne km sans sous_categorie_id → soumission autorisée
+// ---------------------------------------------------------------------------
+
+it('submit: autorise la soumission d\'une ligne km sans sous_categorie_id (cas 0 flag flaggée)', function () {
+    $tiers = Tiers::factory()->create();
+    $ndf = NoteDeFrais::factory()->brouillon()->create([
+        'tiers_id' => $tiers->id,
+        'date' => now()->subDay()->format('Y-m-d'),
+        'libelle' => 'Déplacement kilométrique',
+    ]);
+
+    // Ligne km sans sous_categorie_id ni metadata — le comptable tranchera
+    NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'type' => 'kilometrique',
+        'sous_categorie_id' => null,
+        'montant' => 50.00,
+        'piece_jointe_path' => 'associations/1/notes-de-frais/1/carte-grise.pdf',
+    ]);
+
+    submitService()->submit($ndf);
+
+    $ndf->refresh();
+
+    expect($ndf->statut)->toBe(StatutNoteDeFrais::Soumise)
+        ->and($ndf->submitted_at)->not->toBeNull();
+});

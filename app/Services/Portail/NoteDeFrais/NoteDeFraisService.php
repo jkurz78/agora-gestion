@@ -159,7 +159,6 @@ final class NoteDeFraisService
                 'date' => ['required', 'date', 'before_or_equal:today'],
                 'libelle' => ['required', 'string', 'min:1'],
                 'lignes' => ['required', 'array', 'min:1'],
-                'lignes.*.sous_categorie_id' => ['required'],
                 'lignes.*.montant' => ['required', 'numeric', 'gt:0'],
                 'lignes.*.piece_jointe_path' => ['required', 'string', 'min:1'],
             ],
@@ -170,13 +169,22 @@ final class NoteDeFraisService
                 'libelle.min' => 'Le libellé est obligatoire.',
                 'lignes.required' => 'Au moins une ligne est requise.',
                 'lignes.min' => 'Au moins une ligne est requise.',
-                'lignes.*.sous_categorie_id.required' => 'La sous-catégorie est obligatoire.',
                 'lignes.*.montant.gt' => 'Le montant doit être supérieur à zéro.',
                 'lignes.*.montant.required' => 'Le montant est obligatoire.',
                 'lignes.*.piece_jointe_path.required' => 'Un justificatif est obligatoire pour chaque ligne.',
                 'lignes.*.piece_jointe_path.min' => 'Un justificatif est obligatoire pour chaque ligne.',
             ]
         );
+
+        // La sous-catégorie est obligatoire uniquement pour les lignes de type standard.
+        // Pour les lignes kilométriques, elle peut être null (le comptable tranchera).
+        $validator->after(function ($v) use ($lignes): void {
+            foreach ($lignes as $index => $ligne) {
+                if ($ligne->type === NoteDeFraisLigneType::Standard && empty($ligne->sous_categorie_id)) {
+                    $v->errors()->add("lignes.{$index}.sous_categorie_id", 'La sous-catégorie est obligatoire.');
+                }
+            }
+        });
 
         if ($validator->fails()) {
             throw new ValidationException($validator);
