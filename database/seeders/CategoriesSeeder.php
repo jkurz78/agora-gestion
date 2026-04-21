@@ -60,7 +60,7 @@ class CategoriesSeeder extends Seeder
                 'nom' => '77 - Produits exceptionnels',
                 'type' => TypeCategorie::Recette,
                 'sous' => [
-                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771', 'usages' => [UsageComptable::Don]],
+                    ['nom' => 'Abandon de créance', 'code_cerfa' => '771', 'usages' => [UsageComptable::Don, UsageComptable::AbandonCreance]],
                 ],
             ],
 
@@ -92,7 +92,7 @@ class CategoriesSeeder extends Seeder
                     ['nom' => 'Supervision',              'code_cerfa' => '611C'],
                     ['nom' => 'Sessions inter-ateliers',  'code_cerfa' => '611D'],
                     ['nom' => 'Honoraires juridiques',    'code_cerfa' => '622'],
-                    ['nom' => 'Frais de déplacements',    'code_cerfa' => '625A'],
+                    ['nom' => 'Frais de déplacements',    'code_cerfa' => '625A', 'usages' => [UsageComptable::FraisKilometriques]],
                     ['nom' => 'Repas / Restauration',     'code_cerfa' => '625B'],
                     ['nom' => 'Locations de logiciels',   'code_cerfa' => '628A'],
                     ['nom' => 'Hébergement internet',     'code_cerfa' => '628B'],

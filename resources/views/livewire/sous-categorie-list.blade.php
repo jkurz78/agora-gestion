@@ -153,6 +153,11 @@
                     </div>
                 </div>
 
+                {{-- Note de renvoi vers l'écran Usages --}}
+                <p class="small text-muted mt-3 mb-0">
+                    Les usages comptables (Dons, Cotisations, Inscriptions, Frais km, Abandon de créance) se configurent dans Paramètres → Comptabilité → Usages.
+                </p>
+
                 {{-- Actions --}}
                 <div class="d-flex gap-2 justify-content-end mt-4">
                     <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="$set('showModal', false)">Annuler</button>
