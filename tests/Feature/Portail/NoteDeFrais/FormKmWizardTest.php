@@ -171,7 +171,7 @@ it('affiche les deux boutons "Ajouter"', function () {
 
     $response->assertStatus(200);
     $response->assertSee('Ajouter une ligne de dépense');
-    $response->assertSee('Ajouter un déplacement');
+    $response->assertSee('Ajouter une indemnité kilométrique');
 });
 
 it('affiche badge Km et sous-ligne d\'infos pour une ligne kilometrique existante', function () {
