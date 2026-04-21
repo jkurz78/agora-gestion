@@ -37,6 +37,8 @@ final class Form extends Component
     /** Stocké comme int pour survivre à la rehydratation Livewire sans TenantContext. */
     public ?int $noteDeFraisId = null;
 
+    public bool $abandonCreanceProposed = false;
+
     public ?string $dateInput = null;
 
     public ?string $libelle = null;
@@ -76,6 +78,7 @@ final class Form extends Component
             Gate::forUser(Auth::guard('tiers-portail')->user())->authorize('update', $noteDeFrais);
 
             $this->noteDeFraisId = $noteDeFrais->id;
+            $this->abandonCreanceProposed = (bool) $noteDeFrais->abandon_creance_propose;
             $this->dateInput = $noteDeFrais->date?->format('Y-m-d');
             $this->libelle = $noteDeFrais->libelle;
             $this->lignes = $noteDeFrais->lignes->map(fn (NoteDeFraisLigne $l) => [
@@ -436,6 +439,7 @@ final class Form extends Component
         $data = [
             'date' => $this->dateInput ?? now()->format('Y-m-d'),
             'libelle' => $this->libelle ?? '',
+            'abandon_creance_propose' => $this->abandonCreanceProposed,
             'lignes' => $lignesData,
         ];
 
