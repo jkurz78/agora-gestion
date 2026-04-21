@@ -35,20 +35,24 @@ return new class extends Migration
                 ->update(['saisie_automatisee' => true]);
         }
 
+        // Lookup by name: the prior migration (2026_04_19_130013) already set
+        // est_systeme=false on these accounts, so we cannot filter on est_systeme=true.
         $legacyIds = DB::table('comptes_bancaires')
-            ->where('est_systeme', true)
+            ->whereIn('nom', ['Créances à recevoir', 'Remises en banque'])
             ->pluck('id')
             ->all();
 
         if (! empty($legacyIds)) {
             $blockers = [
                 'transactions' => DB::table('transactions')->whereIn('compte_id', $legacyIds)->count(),
-                'remises_bancaires' => DB::table('remises_bancaires')->whereIn('compte_bancaire_id', $legacyIds)->count(),
-                'rapprochements_bancaires' => DB::table('rapprochements_bancaires')->whereIn('compte_bancaire_id', $legacyIds)->count(),
+                'remises_bancaires' => DB::table('remises_bancaires')->whereIn('compte_cible_id', $legacyIds)->count(),
+                'rapprochements_bancaires' => DB::table('rapprochements_bancaires')->whereIn('compte_id', $legacyIds)->count(),
                 'virements_source' => DB::table('virements_internes')->whereIn('compte_source_id', $legacyIds)->count(),
                 'virements_destination' => DB::table('virements_internes')->whereIn('compte_destination_id', $legacyIds)->count(),
                 'helloasso_compte' => DB::table('helloasso_parametres')->whereIn('compte_helloasso_id', $legacyIds)->count(),
                 'helloasso_versement' => DB::table('helloasso_parametres')->whereIn('compte_versement_id', $legacyIds)->count(),
+                'factures' => DB::table('factures')->whereIn('compte_bancaire_id', $legacyIds)->count(),
+                'associations_facture_compte' => DB::table('association')->whereIn('facture_compte_bancaire_id', $legacyIds)->count(),
             ];
 
             $offenders = array_filter($blockers, fn ($n) => $n > 0);
