@@ -111,7 +111,7 @@ final class UsagesComptables extends Component
 
     public function getAbandonCreanceCandidatesProperty(): array
     {
-        return SousCategorie::forUsage(UsageComptable::Don)->orderBy('nom')->get()->all();
+        return SousCategorie::with('categorie')->forUsage(UsageComptable::Don)->orderBy('nom')->get()->all();
     }
 
     public function getInlineCategoriesEligiblesProperty(): array
@@ -127,8 +127,8 @@ final class UsagesComptables extends Component
     public function render(): View
     {
         return view('livewire.parametres.comptabilite.usages-comptables', [
-            'sousCatsDepense' => SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Depense))->orderBy('nom')->get(),
-            'sousCatsRecette' => SousCategorie::whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Recette))->orderBy('nom')->get(),
+            'sousCatsDepense' => SousCategorie::with('categorie')->whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Depense))->join('categories', 'categories.id', '=', 'sous_categories.categorie_id')->orderBy('categories.nom')->orderBy('sous_categories.nom')->select('sous_categories.*')->get(),
+            'sousCatsRecette' => SousCategorie::with('categorie')->whereHas('categorie', fn ($q) => $q->where('type', TypeCategorie::Recette))->join('categories', 'categories.id', '=', 'sous_categories.categorie_id')->orderBy('categories.nom')->orderBy('sous_categories.nom')->select('sous_categories.*')->get(),
             'sousCatsDon' => SousCategorie::forUsage(UsageComptable::Don)->pluck('id'),
             'sousCatsCotisation' => SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id'),
             'sousCatsInscription' => SousCategorie::forUsage(UsageComptable::Inscription)->pluck('id'),
