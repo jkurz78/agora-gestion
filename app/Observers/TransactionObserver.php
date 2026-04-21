@@ -12,16 +12,33 @@ use Illuminate\Support\Facades\Log;
 final class TransactionObserver
 {
     /**
-     * Cache the linked NDF before deletion so that the DB-level nullOnDelete
-     * constraint on notes_de_frais.transaction_id does not prevent us from
-     * finding it after the physical row is removed.
+     * Cache the linked NDF before deletion so that DB-level nullOnDelete
+     * constraints on notes_de_frais.transaction_id / don_transaction_id do not
+     * prevent us from finding it after the physical row is removed.
+     *
+     * We also resolve the "sister" transaction (the other half of an abandon de
+     * créance pair) so we can soft-delete it together with the one being removed.
      */
     public function deleting(Transaction $transaction): void
     {
-        $ndf = NoteDeFrais::where('transaction_id', $transaction->id)->first();
+        $ndf = NoteDeFrais::where('transaction_id', $transaction->id)
+            ->orWhere('don_transaction_id', $transaction->id)
+            ->first();
 
         if ($ndf !== null) {
             $transaction->setRelation('pendingNdfRevert', $ndf);
+
+            // Identify the sister transaction (the other FK in the abandon pair).
+            $sisterId = ((int) $ndf->transaction_id === (int) $transaction->id)
+                ? $ndf->don_transaction_id
+                : $ndf->transaction_id;
+
+            if ($sisterId !== null) {
+                $sister = Transaction::find($sisterId);
+                if ($sister !== null) {
+                    $transaction->setRelation('pendingSisterTransaction', $sister);
+                }
+            }
         }
     }
 
@@ -52,8 +69,16 @@ final class TransactionObserver
         $ndf->update([
             'statut' => StatutNoteDeFrais::Soumise->value,
             'transaction_id' => null,
+            'don_transaction_id' => null,
             'validee_at' => null,
         ]);
+
+        // Soft-delete the sister transaction if it still exists (abandon de créance pair).
+        if ($transaction->relationLoaded('pendingSisterTransaction')) {
+            /** @var Transaction $sister */
+            $sister = $transaction->getRelation('pendingSisterTransaction');
+            $sister->delete();
+        }
 
         Log::info('comptabilite.ndf.reverted_to_submitted', [
             'ndf_id' => $ndf->id,
