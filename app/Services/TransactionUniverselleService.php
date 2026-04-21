@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\UsageComptable;
 use App\Models\CompteBancaire;
 use App\Tenant\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -97,11 +98,13 @@ final class TransactionUniverselleService
         ?string $sousCategorieFilter = null,
         bool $ndfUniquement = false,
     ): Builder {
-        // Whitelist sous-catégorie filter to prevent SQL injection (column name interpolation)
-        $allowedFilters = ['pour_dons', 'pour_cotisations', 'pour_inscriptions'];
-        if ($sousCategorieFilter !== null && ! in_array($sousCategorieFilter, $allowedFilters, true)) {
-            $sousCategorieFilter = null;
-        }
+        // Map external string filter to UsageComptable (preserves external API, eliminates column interpolation)
+        $flagToUsage = [
+            'pour_dons' => UsageComptable::Don,
+            'pour_cotisations' => UsageComptable::Cotisation,
+            'pour_inscriptions' => UsageComptable::Inscription,
+        ];
+        $usageFilter = $flagToUsage[$sousCategorieFilter] ?? null;
 
         $include = [
             'depense' => $types === null || in_array('depense', $types, true),
@@ -111,12 +114,12 @@ final class TransactionUniverselleService
 
         $queries = [];
         if ($include['depense']) {
-            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
+            $queries[] = $this->brancheDepense($compteId, $tiersId, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
         }
         if ($include['recette']) {
-            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin, $sousCategorieFilter, $ndfUniquement);
+            $queries[] = $this->brancheRecette($compteId, $tiersId, $dateDebut, $dateFin, $usageFilter, $ndfUniquement);
         }
-        if ($include['virement'] && $sousCategorieFilter === null && ! $ndfUniquement) {
+        if ($include['virement'] && $usageFilter === null && ! $ndfUniquement) {
             $queries[] = $this->brancheVirementSortant($compteId, $tiersId, $dateDebut, $dateFin);
             $queries[] = $this->brancheVirementEntrant($compteId, $tiersId, $dateDebut, $dateFin);
         }
@@ -146,7 +149,7 @@ final class TransactionUniverselleService
         ?int $tiersId,
         ?string $dateDebut,
         ?string $dateFin,
-        ?string $sousCategorieFilter = null,
+        ?UsageComptable $usageFilter = null,
         bool $ndfUniquement = false,
     ): Builder {
         return DB::table('transactions as tx')
@@ -186,12 +189,12 @@ final class TransactionUniverselleService
             ->when($tiersId !== null, fn ($q) => $q->where('tx.tiers_id', $tiersId))
             ->when($dateDebut, fn ($q) => $q->where('tx.date', '>=', $dateDebut))
             ->when($dateFin, fn ($q) => $q->where('tx.date', '<=', $dateFin))
-            ->when($sousCategorieFilter, fn ($q) => $q->whereExists(function ($sub) use ($sousCategorieFilter) {
+            ->when($usageFilter !== null, fn ($q) => $q->whereExists(function ($sub) use ($usageFilter) {
                 $sub->select(DB::raw(1))
                     ->from('transaction_lignes as tl_filter')
-                    ->join('sous_categories as sc_filter', 'sc_filter.id', '=', 'tl_filter.sous_categorie_id')
+                    ->join('usages_sous_categories as usc_filter', 'usc_filter.sous_categorie_id', '=', 'tl_filter.sous_categorie_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
-                    ->where("sc_filter.{$sousCategorieFilter}", true);
+                    ->where('usc_filter.usage', $usageFilter->value);
             }))
             ->when($ndfUniquement, fn ($q) => $q->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
@@ -206,7 +209,7 @@ final class TransactionUniverselleService
         ?int $tiersId,
         ?string $dateDebut,
         ?string $dateFin,
-        ?string $sousCategorieFilter = null,
+        ?UsageComptable $usageFilter = null,
         bool $ndfUniquement = false,
     ): Builder {
         return DB::table('transactions as tx')
@@ -246,12 +249,12 @@ final class TransactionUniverselleService
             ->when($tiersId !== null, fn ($q) => $q->where('tx.tiers_id', $tiersId))
             ->when($dateDebut, fn ($q) => $q->where('tx.date', '>=', $dateDebut))
             ->when($dateFin, fn ($q) => $q->where('tx.date', '<=', $dateFin))
-            ->when($sousCategorieFilter, fn ($q) => $q->whereExists(function ($sub) use ($sousCategorieFilter) {
+            ->when($usageFilter !== null, fn ($q) => $q->whereExists(function ($sub) use ($usageFilter) {
                 $sub->select(DB::raw(1))
                     ->from('transaction_lignes as tl_filter')
-                    ->join('sous_categories as sc_filter', 'sc_filter.id', '=', 'tl_filter.sous_categorie_id')
+                    ->join('usages_sous_categories as usc_filter', 'usc_filter.sous_categorie_id', '=', 'tl_filter.sous_categorie_id')
                     ->whereColumn('tl_filter.transaction_id', 'tx.id')
-                    ->where("sc_filter.{$sousCategorieFilter}", true);
+                    ->where('usc_filter.usage', $usageFilter->value);
             }))
             ->when($ndfUniquement, fn ($q) => $q->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
