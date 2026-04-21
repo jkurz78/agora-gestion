@@ -13,7 +13,7 @@
                 <select class="form-select" style="max-width:480px" wire:model.live="fraisKmSelectedId" wire:change="saveFraisKilometriques">
                     <option value="">— Aucune —</option>
                     @foreach($sousCatsDepense as $sc)
-                        <option value="{{ $sc->id }}">{{ $sc->nom }} ({{ $sc->code_cerfa ?? '—' }})</option>
+                        <option value="{{ $sc->id }}">{{ $sc->categorie->nom }} / {{ $sc->nom }} ({{ $sc->code_cerfa ?? '—' }})</option>
                     @endforeach
                 </select>
                 <button type="button" class="btn btn-outline-secondary" wire:click="openInline('{{ \App\Enums\UsageComptable::FraisKilometriques->value }}')">
@@ -36,7 +36,7 @@
                     <input class="form-check-input" type="checkbox" id="coti_{{ $sc->id }}"
                         @checked($checked)
                         wire:click="toggleCotisation({{ $sc->id }}, {{ $checked ? 'false' : 'true' }})">
-                    <label class="form-check-label" for="coti_{{ $sc->id }}">{{ $sc->nom }} <small class="text-muted">({{ $sc->code_cerfa ?? '—' }})</small></label>
+                    <label class="form-check-label" for="coti_{{ $sc->id }}">{{ $sc->categorie->nom }} / {{ $sc->nom }} <small class="text-muted">({{ $sc->code_cerfa ?? '—' }})</small></label>
                 </div>
             @endforeach
             <button type="button" class="btn btn-outline-secondary mt-2" wire:click="openInline('{{ \App\Enums\UsageComptable::Cotisation->value }}')">
@@ -58,7 +58,7 @@
                     <input class="form-check-input" type="checkbox" id="inscr_{{ $sc->id }}"
                         @checked($checked)
                         wire:click="toggleInscription({{ $sc->id }}, {{ $checked ? 'false' : 'true' }})">
-                    <label class="form-check-label" for="inscr_{{ $sc->id }}">{{ $sc->nom }} <small class="text-muted">({{ $sc->code_cerfa ?? '—' }})</small></label>
+                    <label class="form-check-label" for="inscr_{{ $sc->id }}">{{ $sc->categorie->nom }} / {{ $sc->nom }} <small class="text-muted">({{ $sc->code_cerfa ?? '—' }})</small></label>
                 </div>
             @endforeach
             <button type="button" class="btn btn-outline-secondary mt-2" wire:click="openInline('{{ \App\Enums\UsageComptable::Inscription->value }}')">
@@ -80,7 +80,7 @@
                     <input class="form-check-input" type="checkbox" id="don_{{ $sc->id }}"
                         @checked($checked)
                         wire:click="toggleDon({{ $sc->id }}, {{ $checked ? 'false' : 'true' }})">
-                    <label class="form-check-label" for="don_{{ $sc->id }}">{{ $sc->nom }} <small class="text-muted">({{ $sc->code_cerfa ?? '—' }})</small></label>
+                    <label class="form-check-label" for="don_{{ $sc->id }}">{{ $sc->categorie->nom }} / {{ $sc->nom }} <small class="text-muted">({{ $sc->code_cerfa ?? '—' }})</small></label>
                 </div>
             @endforeach
             <button type="button" class="btn btn-outline-secondary mt-2" wire:click="openInline('{{ \App\Enums\UsageComptable::Don->value }}')">
@@ -100,7 +100,7 @@
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="abandonCreance" value="{{ $cand->id }}" id="abandon_{{ $cand->id }}"
                                 wire:model.live="abandonCreanceSelectedId" wire:change="saveAbandonCreance">
-                            <label class="form-check-label" for="abandon_{{ $cand->id }}">{{ $cand->nom }}</label>
+                            <label class="form-check-label" for="abandon_{{ $cand->id }}">{{ $cand->categorie->nom }} / {{ $cand->nom }}</label>
                         </div>
                     @endforeach
                 </div>
