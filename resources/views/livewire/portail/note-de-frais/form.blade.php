@@ -111,7 +111,7 @@
             <i class="bi bi-plus-lg me-1"></i>Ajouter une ligne de dépense
         </button>
         <button type="button" wire:click="openKilometriqueWizard" class="btn btn-outline-primary" @if($wizardStep > 0) disabled @endif>
-            <i class="bi bi-car-front me-1"></i>Ajouter un déplacement
+            <i class="bi bi-car-front me-1"></i>Ajouter une indemnité kilométrique
         </button>
     </div>
 
@@ -180,7 +180,7 @@
                     <h5 class="modal-title">
                         @if ($wizardType === 'kilometrique')
                             <i class="bi bi-car-front me-1"></i>
-                            Nouveau déplacement
+                            Nouvelle indemnité kilométrique
                             @if ($wizardStep > 0)
                                 — étape {{ $wizardStep }}/2
                             @endif
@@ -359,7 +359,7 @@
                                 <div class="col-md-6">
                                     <label for="km-operation" class="form-label">Opération (facultatif)</label>
                                     <select id="km-operation"
-                                            wire:model="draftLigne.operation_id"
+                                            wire:model.live="draftLigne.operation_id"
                                             class="form-select">
                                         <option value="">—</option>
                                         @foreach ($operations as $op)
@@ -367,6 +367,20 @@
                                         @endforeach
                                     </select>
                                 </div>
+
+                                @if (! empty($draftLigne['operation_id']) && $selectedOperation?->nombre_seances)
+                                    <div class="col-md-6">
+                                        <label for="km-seance" class="form-label">Séance <span class="text-muted small">(optionnel)</span></label>
+                                        <select id="km-seance"
+                                                wire:model.live="draftLigne.seance"
+                                                class="form-select">
+                                            <option value="">— aucune —</option>
+                                            @for ($s = 1; $s <= $selectedOperation->nombre_seances; $s++)
+                                                <option value="{{ $s }}">Séance {{ $s }}</option>
+                                            @endfor
+                                        </select>
+                                    </div>
+                                @endif
 
                                 <div class="col-md-6 d-flex align-items-end justify-content-end">
                                     <div class="text-end">
@@ -448,7 +462,7 @@
                             <button type="button"
                                     class="btn btn-primary"
                                     wire:click="wizardConfirm">
-                                <i class="bi bi-plus-lg me-1"></i>Ajouter le déplacement
+                                <i class="bi bi-plus-lg me-1"></i>Ajouter l'indemnité
                             </button>
                         @endif
                     @endif
