@@ -361,6 +361,7 @@ final class Form extends Component
 
         $data = $this->buildData();
         $ndf = $service->saveDraft($tiers, $data);
+        $this->noteDeFraisId = (int) $ndf->id;
 
         // Second pass: store uploaded justificatifs
         $this->storeJustificatifs($ndf);

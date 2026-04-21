@@ -217,6 +217,55 @@ it('removeLigne: fonctionne sur une NDF existante chargée par noteDeFraisId', f
 // Test 8 : deleteNdf sur NDF chargée par noteDeFraisId
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Test 9 : Pas de doublon NDF si submit échoue puis est retenté
+// ---------------------------------------------------------------------------
+
+it('submit: ne crée pas de doublon si submit échoue puis est retenté', function () {
+    $assoId = (int) $this->asso->id;
+    TenantContext::boot($this->asso);
+    Auth::guard('tiers-portail')->login($this->tiers);
+
+    $component = new Form;
+    $component->mount($this->asso);
+
+    // Prépare une ligne standard sans sous_categorie_id pour forcer l'échec du submit
+    // (la validation métier exige sous_categorie_id sur les lignes standard)
+    $component->lignes = [[
+        'id' => null,
+        'type' => 'standard',
+        'sous_categorie_id' => null,
+        'operation_id' => null,
+        'seance' => null,
+        'libelle' => 'Repas client',
+        'montant' => '42.50',
+        'piece_jointe_path' => "associations/{$assoId}/notes-de-frais/1/ligne-1.pdf",
+        'justif' => null,
+        'cv_fiscaux' => null,
+        'distance_km' => null,
+        'bareme_eur_km' => null,
+    ]];
+    $component->libelle = 'NDF non-doublon';
+    $component->dateInput = now()->subDay()->format('Y-m-d');
+
+    // Premier submit → échoue (sous_categorie_id manquant)
+    $component->submit();
+
+    expect($component->getErrorBag()->has('submit'))->toBeTrue();
+
+    // Un seul NDF doit exister en DB (créé par le premier saveDraft)
+    expect(NoteDeFrais::count())->toBe(1);
+
+    // Second submit → échoue toujours (même raison) mais NE crée pas de doublon
+    $component->submit();
+
+    expect(NoteDeFrais::count())->toBe(1);
+});
+
+// ---------------------------------------------------------------------------
+// Test 10 : deleteNdf sur NDF chargée par noteDeFraisId
+// ---------------------------------------------------------------------------
+
 it('deleteNdf: supprime la NDF récupérée via noteDeFraisId', function () {
     $ndf = NoteDeFrais::factory()->brouillon()->create([
         'association_id' => $this->asso->id,
