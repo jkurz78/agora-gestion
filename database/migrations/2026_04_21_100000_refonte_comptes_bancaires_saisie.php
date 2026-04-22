@@ -49,12 +49,32 @@ return new class extends Migration
             ->all();
 
         if (! empty($legacyIds)) {
+            // Hard-delete des lignes déjà soft-deleted pointant vers les comptes legacy.
+            // Elles sont déjà considérées supprimées par l'app — on les purge physiquement
+            // pour libérer les FK RESTRICT (virements_internes notamment).
+            DB::table('transactions')
+                ->whereIn('compte_id', $legacyIds)
+                ->whereNotNull('deleted_at')
+                ->delete();
+            DB::table('virements_internes')
+                ->where(function ($q) use ($legacyIds) {
+                    $q->whereIn('compte_source_id', $legacyIds)
+                        ->orWhereIn('compte_destination_id', $legacyIds);
+                })
+                ->whereNotNull('deleted_at')
+                ->delete();
+            DB::table('remises_bancaires')
+                ->whereIn('compte_cible_id', $legacyIds)
+                ->whereNotNull('deleted_at')
+                ->delete();
+
+            // FK guard : ne compte QUE les lignes actives (non soft-deleted).
             $blockers = [
-                'transactions' => DB::table('transactions')->whereIn('compte_id', $legacyIds)->count(),
-                'remises_bancaires' => DB::table('remises_bancaires')->whereIn('compte_cible_id', $legacyIds)->count(),
+                'transactions' => DB::table('transactions')->whereIn('compte_id', $legacyIds)->whereNull('deleted_at')->count(),
+                'remises_bancaires' => DB::table('remises_bancaires')->whereIn('compte_cible_id', $legacyIds)->whereNull('deleted_at')->count(),
                 'rapprochements_bancaires' => DB::table('rapprochements_bancaires')->whereIn('compte_id', $legacyIds)->count(),
-                'virements_source' => DB::table('virements_internes')->whereIn('compte_source_id', $legacyIds)->count(),
-                'virements_destination' => DB::table('virements_internes')->whereIn('compte_destination_id', $legacyIds)->count(),
+                'virements_source' => DB::table('virements_internes')->whereIn('compte_source_id', $legacyIds)->whereNull('deleted_at')->count(),
+                'virements_destination' => DB::table('virements_internes')->whereIn('compte_destination_id', $legacyIds)->whereNull('deleted_at')->count(),
                 'helloasso_compte' => DB::table('helloasso_parametres')->whereIn('compte_helloasso_id', $legacyIds)->count(),
                 'helloasso_versement' => DB::table('helloasso_parametres')->whereIn('compte_versement_id', $legacyIds)->count(),
                 'factures' => DB::table('factures')->whereIn('compte_bancaire_id', $legacyIds)->count(),
@@ -69,6 +89,8 @@ return new class extends Migration
                 );
             }
 
+            // DELETE des comptes legacy. La FK transactions.compte_id est nullOnDelete —
+            // les soft-deleted éventuels restants auront compte_id NULL automatiquement.
             DB::table('comptes_bancaires')->whereIn('id', $legacyIds)->delete();
         }
 
