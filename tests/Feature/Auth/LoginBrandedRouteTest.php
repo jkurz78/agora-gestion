@@ -61,3 +61,13 @@ test('GET /dashboard/login returns 404 when no association has slug dashboard', 
 
     $response->assertStatus(404);
 });
+
+test('GET /svs/login logo src uses portail.logo endpoint not /tenant-assets/', function () {
+    $response = $this->get('/svs/login');
+
+    $response->assertStatus(200);
+    // The guest layout must NOT use the auth-protected /tenant-assets/ route for the logo.
+    $response->assertDontSee('/tenant-assets/', false);
+    // It must instead point to the public portail.logo endpoint.
+    $response->assertSee('/svs/portail/logo', false);
+});

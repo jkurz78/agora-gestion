@@ -1,10 +1,13 @@
 @php
-    // $association is null on public/guest routes (no TenantContext booted).
+    // $association is null on public/guest routes without TenantContext (e.g. neutral /login).
     // Show product branding when no tenant is resolved.
-    $nomAsso       = $association?->nom ?? 'AgoraGestion';
-    $logoFullPath  = $association?->brandingLogoFullPath();
-    $logoAsset     = ($logoFullPath && \Illuminate\Support\Facades\Storage::disk('local')->exists($logoFullPath))
-        ? \App\Support\TenantAsset::url($logoFullPath)
+    $nomAsso = $association?->nom ?? 'AgoraGestion';
+
+    // Use the public portail.logo endpoint (no auth required) so the logo loads
+    // on the login screen BEFORE the user authenticates. The controller falls
+    // back to the product logo if no branding is set on the asso.
+    $logoAsset = $association !== null
+        ? route('portail.logo', ['association' => $association->slug])
         : asset('images/agora-gestion.svg');
 @endphp
 <!DOCTYPE html>

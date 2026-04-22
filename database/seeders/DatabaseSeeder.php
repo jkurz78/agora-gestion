@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\RoleSysteme;
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
@@ -42,6 +43,7 @@ class DatabaseSeeder extends Seeder
             'nom' => 'Marie Dupont',
             'email' => 'admin@monasso.fr',
             'peut_voir_donnees_sensibles' => true,
+            'role_systeme' => RoleSysteme::SuperAdmin,
         ]);
         $admin->associations()->syncWithoutDetaching([
             1 => ['role' => 'admin', 'joined_at' => now()],
