@@ -103,10 +103,20 @@ jobs:
           chmod 0400 ~/.ssh/id_ed25519
 
       - name: Deploy
+        id: deploy
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
             ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
             "bash ~/bin/deploy.sh"
+
+      - name: Tail deploy.log on failure
+        if: failure() && steps.deploy.outcome == 'failure'
+        run: |
+          echo "=== Dernières 100 lignes de deploy.log ==="
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
+            ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
+            'LOG=$(find ~/public_html -maxdepth 4 -name deploy.log -printf "%T@ %p\n" 2>/dev/null | sort -rn | head -1 | cut -d" " -f2); if [ -n "$LOG" ]; then echo "Fichier: $LOG"; tail -n 100 "$LOG"; else echo "Aucun deploy.log trouvé sous ~/public_html"; fi' \
+            || echo "Impossible d'exécuter le tail distant"
 
       - name: Clean up SSH key
         if: always()
