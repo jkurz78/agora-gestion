@@ -77,9 +77,9 @@ class AuthenticatedSessionController extends Controller
             return redirect($this->safeIntended(route('dashboard')));
         }
 
-        // Standard (non-branded) login: send 2FA email if applicable.
-        $this->maybeGenerateTwoFactorCode($user, $request);
-
+        // Standard (non-branded) login: check asso membership BEFORE sending
+        // any 2FA email — prevents leaking credential validity to users with
+        // no active association (they would otherwise receive a 2FA email).
         $assos = $user->associations()->wherePivotNull('revoked_at')->get();
 
         if ($assos->count() === 0) {
@@ -88,6 +88,9 @@ class AuthenticatedSessionController extends Controller
             return redirect()->route('login')
                 ->withErrors(['email' => 'Compte non rattaché à une association.']);
         }
+
+        // 2FA only after we've confirmed the user has at least one active asso.
+        $this->maybeGenerateTwoFactorCode($user, $request);
 
         // Tenter d'auto-sélectionner derniere_association_id si encore valide
         if ($user->derniere_association_id !== null) {

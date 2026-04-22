@@ -52,7 +52,7 @@ test('scenario 1: user belonging to SVS can login via /svs/login and lands on da
 
     $this->assertAuthenticated();
     $response->assertRedirect(route('dashboard'));
-    expect(session('current_association_id'))->toBe($this->svs->id);
+    expect((int) session('current_association_id'))->toBe((int) $this->svs->id);
 });
 
 test('scenario 2: user not belonging to SVS is rejected on /svs/login with French error, session not authenticated', function () {
@@ -89,7 +89,7 @@ test('scenario 4: multi-asso user logging in via /svs/login gets SVS context eve
 
     $this->assertAuthenticated();
     $response->assertRedirect(route('dashboard'));
-    expect(session('current_association_id'))->toBe($this->svs->id);
+    expect((int) session('current_association_id'))->toBe((int) $this->svs->id);
     // derniere_association_id must be updated to SVS as well
     $this->multi->refresh();
     expect($this->multi->derniere_association_id)->toBe($this->svs->id);
