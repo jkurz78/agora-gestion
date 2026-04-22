@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\RoleSysteme;
+use App\Enums\TwoFactorMethod;
 use App\Livewire\SuperAdmin\AssociationCreateForm;
 use App\Livewire\SuperAdmin\AssociationDetail;
 use App\Mail\TwoFactorCodeMail;
@@ -257,8 +258,8 @@ it('scénario 4b : POST /svs/login avec creds d\'un user d\'une autre asso n\'en
     // d'une tentative de login sur une asso à laquelle elle n'appartient pas.
     $marie = User::factory()->create([
         'email' => 'marie@exemple.fr',
-        'two_factor_secret' => null,
-        'two_factor_method' => null,
+        'two_factor_method' => TwoFactorMethod::Email,
+        'two_factor_confirmed_at' => now(),
     ]);
     $marie->associations()->attach($exemple->id, ['role' => 'membre', 'joined_at' => now()]);
     $marie->update(['derniere_association_id' => $exemple->id]);

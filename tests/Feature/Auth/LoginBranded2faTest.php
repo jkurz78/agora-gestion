@@ -58,6 +58,33 @@ test('rejected branded login does NOT trigger 2FA email', function () {
     $response->assertSessionHasErrors(['email' => "Cet email n'est pas rattaché à l'association SVS."]);
 });
 
+test('standard /login with 2FA enabled and NO association does NOT trigger 2FA email and shows error', function () {
+    Mail::fake();
+
+    // marie@orphan.fr has 2FA enabled but belongs to no association
+    $orphan = User::factory()->create([
+        'email' => 'marie@orphan.fr',
+        'two_factor_method' => TwoFactorMethod::Email,
+        'two_factor_confirmed_at' => now(),
+    ]);
+    // No associations attached
+
+    $response = $this->from('/login')->post('/login', [
+        'email' => 'marie@orphan.fr',
+        'password' => 'password',
+    ]);
+
+    // No 2FA email must be sent — the guard must fire first
+    Mail::assertNotSent(TwoFactorCodeMail::class);
+
+    // User must not be authenticated
+    $this->assertGuest();
+
+    // Must redirect to /login with the "no association" error
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHasErrors(['email' => 'Compte non rattaché à une association.']);
+});
+
 test('accepted branded login with 2FA triggers TwoFactorCodeMail for the legitimate user', function () {
     Mail::fake();
 

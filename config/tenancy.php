@@ -82,6 +82,17 @@ return [
         // Support
         'help',
         'support',
+
+        // Auth sub-routes (cannot be association slugs)
+        'password',
+        'verify-email',
+        'confirm-password',
+        'forgot-password',
+        'reset-password',
+        'two-factor',
+
+        // Health / infra
+        'up',
     ],
 
 ];
