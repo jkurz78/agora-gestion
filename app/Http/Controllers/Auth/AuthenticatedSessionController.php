@@ -6,6 +6,7 @@ use App\Enums\TwoFactorMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\Association;
+use App\Models\User;
 use App\Services\TwoFactorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,16 +34,9 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
-        if ($user->hasTwoFactorEnabled() && $user->two_factor_method === TwoFactorMethod::Email) {
-            $twoFactorService = app(TwoFactorService::class);
-            if (! $twoFactorService->isTrustedBrowser($request, $user)) {
-                $twoFactorService->generateEmailCode($user);
-                $request->session()->put('two_factor_code_sent', true);
-            }
-        }
-
         // Branded route /{slug}/login: enforce that the authenticated user belongs
-        // to the route's association. If not, logout and redirect back with an error.
+        // to the route's association BEFORE sending any 2FA email. If not, logout
+        // and redirect back with an error (prevents 2FA email spam to innocent users).
         // When the check passes, force the slug's association as the active tenant,
         // bypassing derniere_association_id (scenario 4: multi-asso user).
         //
@@ -77,10 +71,16 @@ class AuthenticatedSessionController extends Controller
             $request->session()->put('current_association_id', $routeAssociation->id);
             $user->update(['derniere_association_id' => $routeAssociation->id]);
 
+            // Trigger 2FA only for a verified member (code generated after membership check).
+            $this->maybeGenerateTwoFactorCode($user, $request);
+
             return redirect($this->safeIntended(route('dashboard')));
         }
 
-        $assos = $user->associations()->whereNull('association_user.revoked_at')->get();
+        // Standard (non-branded) login: send 2FA email if applicable.
+        $this->maybeGenerateTwoFactorCode($user, $request);
+
+        $assos = $user->associations()->wherePivotNull('revoked_at')->get();
 
         if ($assos->count() === 0) {
             auth()->logout();
@@ -108,6 +108,27 @@ class AuthenticatedSessionController extends Controller
         }
 
         return redirect()->route('association-selector');
+    }
+
+    /**
+     * Generate and send a 2FA email code if the user has email-based 2FA enabled
+     * and is not on a trusted browser. Sets the session flag used by the challenge
+     * middleware. Extracted to avoid duplicating this logic between the slug-first
+     * path and the standard login path.
+     */
+    private function maybeGenerateTwoFactorCode(
+        User $user,
+        Request $request,
+    ): void {
+        if (! $user->hasTwoFactorEnabled() || $user->two_factor_method !== TwoFactorMethod::Email) {
+            return;
+        }
+
+        $twoFactorService = app(TwoFactorService::class);
+        if (! $twoFactorService->isTrustedBrowser($request, $user)) {
+            $twoFactorService->generateEmailCode($user);
+            $request->session()->put('two_factor_code_sent', true);
+        }
     }
 
     /**
