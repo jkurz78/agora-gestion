@@ -6,6 +6,7 @@ namespace App\Livewire\SuperAdmin;
 
 use App\Models\Association;
 use App\Models\SuperAdminAccessLog;
+use App\Rules\ReservedSlug;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -96,6 +97,7 @@ final class AssociationDetail extends Component
                     'regex:/^[a-z0-9-]+$/',
                     'max:80',
                     Rule::unique('association', 'slug')->ignore($this->association->id),
+                    new ReservedSlug,
                 ],
             ],
             [
