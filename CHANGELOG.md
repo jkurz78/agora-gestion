@@ -5,7 +5,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
-## [v4.2.0] — 2026-04-21
+## [v4.1.2] — 2026-04-22
 ### Changements majeurs
 - **Refonte du modèle `comptes_bancaires`** — suppression de la notion bancale `est_systeme`, introduction du flag orthogonal `saisie_automatisee` pour les comptes alimentés par intégration externe (HelloAsso aujourd'hui, Stripe/SumUp demain)
 - **Compte HelloAsso non sélectionnable** dans les formulaires de saisie manuelle (transactions, factures, remises, virements)
