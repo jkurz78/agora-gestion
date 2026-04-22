@@ -36,19 +36,21 @@
                     <label class="form-label fw-semibold">Compte HelloAsso (réception)</label>
                     <select wire:model="compteHelloassoId" class="form-select form-select-sm">
                         <option value="">— Sélectionner —</option>
-                        @foreach($comptes as $c)
+                        @foreach($comptesHelloasso as $c)
                             <option value="{{ $c->id }}">{{ $c->nom }}</option>
                         @endforeach
                     </select>
+                    <small class="text-muted">Seuls les comptes marqués <em>saisie automatisée</em> sont proposés.</small>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Compte de versement (destination)</label>
                     <select wire:model="compteVersementId" class="form-select form-select-sm">
                         <option value="">— Sélectionner —</option>
-                        @foreach($comptes as $c)
+                        @foreach($comptesVersement as $c)
                             <option value="{{ $c->id }}">{{ $c->nom }}</option>
                         @endforeach
                     </select>
+                    <small class="text-muted">Compte bancaire réel où HelloAsso reverse périodiquement les fonds.</small>
                 </div>
             </div>
 
