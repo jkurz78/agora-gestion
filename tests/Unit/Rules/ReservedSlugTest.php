@@ -81,18 +81,12 @@ it('rejects slug with surrounding spaces "  login  " (trim)', function () {
 // Full blacklist — every reserved slug must be rejected
 // ──────────────────────────────────────────────
 
-$blacklist = [
-    'login', 'logout', 'dashboard', 'membres', 'operations', 'depenses',
-    'recettes', 'dons', 'budget', 'rapprochement', 'rapports', 'exercices',
-    'parametres', 'facturation', 'banques', 'tiers', 'comptabilite',
-    'profile', 'admin', 'super-admin', 'portail', 'formulaire', 't',
-    'email', 'tenant-assets', 'api', 'webhook', 'webhooks', 'storage',
-    'livewire', 'vendor', 'sanctum', 'oauth', 'inbound-mail', 'horizon',
-    'telescope', 'onboarding', 'association-selector', 'switch-association',
-    'app', 'www', 'public', 'assets', 'help', 'support',
-];
+dataset('reserved_slugs', function () {
+    /** @var array{reserved_slugs: list<string>} $tenancy */
+    $tenancy = require dirname(__DIR__, 3).'/config/tenancy.php';
 
-dataset('reserved_slugs', $blacklist);
+    return array_map(fn (string $slug) => [$slug], $tenancy['reserved_slugs']);
+});
 
 it('rejects every slug in the blacklist', function (string $slug) {
     expect(validateSlug($slug))->toBe('Slug réservé');
