@@ -15,11 +15,11 @@ beforeEach(fn () => TenantContext::clear());
 it('boote le TenantContext avec l\'association du slug', function () {
     $asso = Association::factory()->create();
 
-    $request = Request::create("/portail/{$asso->slug}/login", 'GET');
+    $request = Request::create("/{$asso->slug}/portail/login", 'GET');
     // Bind route parameter manually
     $request->setRouteResolver(function () use ($asso) {
-        $route = new Route('GET', '/portail/{association:slug}/login', []);
-        $route->bind(Request::create("/portail/{$asso->slug}/login"));
+        $route = new Route('GET', '/{association:slug}/portail/login', []);
+        $route->bind(Request::create("/{$asso->slug}/portail/login"));
         $route->setParameter('association', $asso);
 
         return $route;
@@ -49,10 +49,10 @@ it('passe silencieusement quand le paramètre association est absent (cas /livew
 });
 
 it('abort 404 si le slug ne correspond à aucune Association', function () {
-    $request = Request::create('/portail/inexistant/login', 'GET');
+    $request = Request::create('/inexistant/portail/login', 'GET');
     $request->setRouteResolver(function () {
-        $route = new Route('GET', '/portail/{association:slug}/login', []);
-        $route->bind(Request::create('/portail/inexistant/login'));
+        $route = new Route('GET', '/{association:slug}/portail/login', []);
+        $route->bind(Request::create('/inexistant/portail/login'));
         $route->setParameter('association', 'inexistant');
 
         return $route;

@@ -22,7 +22,7 @@ beforeEach(function () {
 // ---------------------------------------------------------------------------
 
 it('index: tiers sans NDF voit le message vide et le bouton créer', function () {
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertSeeText('Aucune note de frais pour le moment.')
         ->assertSee('Nouvelle note de frais');
@@ -39,7 +39,7 @@ it('index: 3 NDF du tiers sont toutes affichées', function () {
         'libelle' => 'Frais test',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertSee('Frais test');
 });
@@ -56,7 +56,7 @@ it('index: NDF d\'un autre tiers de la même asso est invisible', function () {
         'libelle' => 'NDF autre tiers',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertDontSeeText('NDF autre tiers');
 });
@@ -71,7 +71,7 @@ it('index: badge statut brouillon affiché', function () {
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertSeeText('Brouillon');
 });
@@ -82,7 +82,7 @@ it('index: badge statut soumise affiché', function () {
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertSeeText('Soumise');
 });
@@ -97,7 +97,7 @@ it('index: bouton Modifier visible sur brouillon', function () {
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertSee("notes-de-frais/{$ndf->id}/edit")
         ->assertSeeText('Modifier');
@@ -109,7 +109,7 @@ it('index: bouton Modifier visible sur NDF soumise', function () {
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertSee("notes-de-frais/{$ndf->id}/edit")
         ->assertSeeText('Modifier');
@@ -121,7 +121,7 @@ it('index: bouton Consulter visible sur NDF validée', function () {
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertSeeText('Consulter');
 });
@@ -139,7 +139,7 @@ it('index: total affiché est la somme des montants des lignes', function () {
     NoteDeFraisLigne::factory()->create(['note_de_frais_id' => $ndf->id, 'montant' => 25.00]);
     NoteDeFraisLigne::factory()->create(['note_de_frais_id' => $ndf->id, 'montant' => 15.50]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertSee('40,50');
 });
@@ -151,8 +151,8 @@ it('index: total affiché est la somme des montants des lignes', function () {
 it('index: accès non authentifié redirige vers login', function () {
     Auth::guard('tiers-portail')->logout();
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
-        ->assertRedirect("/portail/{$this->asso->slug}/login");
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
+        ->assertRedirect("/{$this->asso->slug}/portail/login");
 });
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ it('index: une NDF avec 2 lignes (standard + km) n\'apparaît qu\'une seule fois
         'montant' => 50.00,
     ]);
 
-    $html = $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $html = $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->getContent();
 

@@ -220,7 +220,7 @@ it('Jean soumet une NDF avec abandon, le comptable constate, Jean voit le statut
     TenantContext::clear();
     TenantContext::boot($asso);
 
-    $this->get("/portail/{$asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSee('Don par abandon de créance — acté le')
         ->assertSee('120');

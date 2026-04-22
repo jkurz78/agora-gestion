@@ -34,7 +34,7 @@ it('form edit: brouillon existant pré-remplit le formulaire', function () {
         'date' => '2026-04-10',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}/edit")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}/edit")
         ->assertStatus(200)
         ->assertSee('Modifier la note de frais')
         ->assertSee('Frais Paris Mars');
@@ -51,7 +51,7 @@ it('form edit: NDF soumise est éditable (200)', function () {
         'libelle' => 'Frais soumis éditables',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}/edit")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}/edit")
         ->assertStatus(200)
         ->assertSee('Modifier la note de frais');
 });
@@ -67,7 +67,7 @@ it('form edit: NDF d\'un autre tiers retourne 403', function () {
         'tiers_id' => $autreTiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}/edit")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}/edit")
         ->assertStatus(403);
 });
 

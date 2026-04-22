@@ -31,7 +31,7 @@ it('show: NDF soumise avec abandon_creance_propose=true affiche le bandeau propo
         'abandon_creance_propose' => true,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSee('Don par abandon de créance proposé — en attente de traitement');
 });
@@ -55,7 +55,7 @@ it('show: NDF DonParAbandonCreances affiche le bandeau acté avec date et montan
         'abandon_creance_propose' => true,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSee('Don par abandon de créance — acté le 15/04/2026')
         ->assertSee('120,50');
@@ -73,7 +73,7 @@ it('show: NDF brouillon sans abandon_creance_propose n\'affiche pas de bandeau a
         'abandon_creance_propose' => false,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertDontSee('Don par abandon de créance');
 });
@@ -89,7 +89,7 @@ it('show: NDF rejetée avec abandon_creance_propose=true n\'affiche pas le bande
         'abandon_creance_propose' => true,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertDontSee('Don par abandon de créance proposé — en attente de traitement');
 });

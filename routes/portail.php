@@ -17,7 +17,8 @@ use App\Livewire\Portail\NoteDeFrais\Show;
 use App\Livewire\Portail\OtpVerify;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('portail/{association:slug}')
+Route::prefix('{association:slug}/portail')
+    ->where(['association' => '[A-Za-z0-9-]+'])
     ->middleware(['web', BootTenantFromSlug::class])
     ->name('portail.')
     ->group(function () {
