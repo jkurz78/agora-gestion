@@ -839,7 +839,7 @@ final class TransactionForm extends Component
             ->get();
 
         return view('livewire.transaction-form', [
-            'comptes' => CompteBancaire::where('actif_recettes_depenses', true)->orderBy('nom')->get(),
+            'comptes' => CompteBancaire::saisieManuelle()->orderBy('nom')->get(),
             'sousCategories' => $sousCategories,
             'operations' => Operation::with('typeOperation')
                 ->forExercice(app(ExerciceService::class)->current())

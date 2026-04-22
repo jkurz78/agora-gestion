@@ -471,7 +471,7 @@ final class AnimateurManager extends Component
         $matrixData = $this->buildMatrixData($seances);
 
         $comptes = $this->showModal
-            ? CompteBancaire::where('actif_recettes_depenses', true)
+            ? CompteBancaire::saisieManuelle()
                 ->orderBy('nom')
                 ->get(['id', 'nom'])
             : collect();

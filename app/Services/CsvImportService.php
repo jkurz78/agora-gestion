@@ -72,7 +72,7 @@ final class CsvImportService
             ->get()
             ->keyBy(fn ($sc) => Str::lower(trim($sc->nom)));
 
-        $comptes = CompteBancaire::where('actif_recettes_depenses', true)
+        $comptes = CompteBancaire::saisieManuelle()
             ->get()
             ->keyBy(fn ($c) => Str::lower(trim($c->nom)));
 
