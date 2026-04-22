@@ -37,7 +37,7 @@ beforeEach(function () {
 // ---------------------------------------------------------------------------
 
 it('form create: page create affichée sans ligne par défaut', function () {
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/nouvelle")
         ->assertStatus(200)
         ->assertSee('Nouvelle note de frais')
         ->assertSee('Ajouter une ligne de dépense');
@@ -154,7 +154,7 @@ it('form create: total calculé = somme des montants des lignes', function () {
 // ---------------------------------------------------------------------------
 
 it('form create: page affichée avec le bouton Ajouter une ligne de dépense', function () {
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/nouvelle")
         ->assertStatus(200)
         ->assertSee('Ajouter une ligne de dépense');
 });

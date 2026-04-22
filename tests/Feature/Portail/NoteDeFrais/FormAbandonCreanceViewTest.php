@@ -23,7 +23,7 @@ beforeEach(function () {
 // ---------------------------------------------------------------------------
 
 it('form view: contient le label abandon de créance', function () {
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/nouvelle")
         ->assertStatus(200)
         ->assertSee('Je renonce au remboursement et propose un don par abandon de créance');
 });
@@ -33,7 +33,7 @@ it('form view: contient le label abandon de créance', function () {
 // ---------------------------------------------------------------------------
 
 it('form view: contient wire:model="abandonCreanceProposed" dans le HTML rendu', function () {
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/nouvelle")
         ->assertStatus(200)
         ->assertSee('wire:model="abandonCreanceProposed"', false);
 });

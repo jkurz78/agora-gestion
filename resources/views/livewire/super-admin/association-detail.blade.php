@@ -104,7 +104,7 @@
                     <form wire:submit.prevent="saveSlug">
                         <div class="modal-body">
                             <div class="alert alert-warning">
-                                ⚠ Changer le slug modifie l'URL du portail (/portail/{slug}/...). Les magic-links OTP déjà envoyés ne fonctionneront plus. Les justificatifs stockés ne sont pas affectés (chemins par ID numérique).
+                                ⚠ Changer le slug modifie l'URL du portail (/{slug}/portail/...). Les magic-links OTP déjà envoyés ne fonctionneront plus. Les justificatifs stockés ne sont pas affectés (chemins par ID numérique).
                             </div>
                             <div class="mb-3">
                                 <label for="newSlugInput" class="form-label">Nouveau slug</label>

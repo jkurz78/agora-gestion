@@ -166,7 +166,7 @@ it('confirme la ligne km et l\'ajoute au tableau des lignes', function () {
 });
 
 it('affiche les deux boutons "Ajouter"', function () {
-    $response = $this->get("/portail/{$this->asso->slug}/notes-de-frais/nouvelle");
+    $response = $this->get("/{$this->asso->slug}/portail/notes-de-frais/nouvelle");
 
     $response->assertStatus(200);
     $response->assertSee('Ajouter une ligne de dépense');
