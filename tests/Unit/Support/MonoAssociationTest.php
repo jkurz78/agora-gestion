@@ -59,14 +59,16 @@ it('returns updated result after flush when a second association is added', func
     expect(MonoAssociation::isActive())->toBeFalse();
 });
 
-it('keeps returning the memoized value when a second association is added without flush', function () {
+it('flushes the cache automatically when a second association is created (via AssociationObserver)', function () {
     Association::factory()->create();
 
     // Prime the cache → true.
     expect(MonoAssociation::isActive())->toBeTrue();
 
+    // Eloquent Association::create() triggers AssociationObserver::created(),
+    // which calls MonoAssociation::flush() automatically. Next call reflects
+    // the new count without needing a manual flush.
     Association::factory()->create();
 
-    // No flush → still returns the cached true.
-    expect(MonoAssociation::isActive())->toBeTrue();
+    expect(MonoAssociation::isActive())->toBeFalse();
 });
