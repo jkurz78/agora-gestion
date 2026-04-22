@@ -3,32 +3,38 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Support\MonoAssociation;
 use App\Tenant\TenantContext;
 
 /**
  * Verify that /login displays product branding (AgoraGestion) and never
  * leaks an association-specific name or tenant-asset logo URL.
  *
- * The global Pest.php beforeEach already creates one association and boots
- * TenantContext. The guest layout is a public route — no tenant is booted —
- * so it must show product branding only.
- *
- * Bug reproduced: before the fix, Association::first() would return a real
- * asso and display its name in the <h2> instead of "AgoraGestion". We seed
- * an asso named "SVS" as the FIRST record (by clearing then re-creating) to
- * guarantee Association::first() returns it.
+ * In mono-association mode (1 asso in DB), /login auto-brands itself (Step 10).
+ * Neutral branding only applies in multi-association mode (2+ asso).
+ * This test seeds 2 associations to exercise the multi-association code path.
  */
 beforeEach(function () {
     // Wipe the default asso created by the global bootstrap and re-create
-    // "SVS" as the only — and therefore first — association in the DB.
-    // This guarantees Association::first() === SVS (the bug case).
+    // two associations to force multi-association mode — neutral branding applies.
     Association::query()->forceDelete();
+    MonoAssociation::flush();
     TenantContext::clear();
 
+    // Two associations → multi mode → /login must show product branding.
     Association::factory()->create([
         'nom' => 'SVS',
         'slug' => 'svs-test',
     ]);
+    Association::factory()->create([
+        'nom' => 'Autre',
+        'slug' => 'autre-test',
+    ]);
+});
+
+afterEach(function () {
+    MonoAssociation::flush();
+    TenantContext::clear();
 });
 
 test('/login returns 200', function () {
