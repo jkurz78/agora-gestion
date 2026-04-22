@@ -119,7 +119,7 @@ final class TransactionCompteList extends Component
 
     public function render(): mixed
     {
-        $comptes = CompteBancaire::where('est_systeme', false)->orderBy('nom')->get();
+        $comptes = CompteBancaire::orderBy('nom')->get();
 
         if ($this->compteId === null) {
             return view('livewire.transaction-compte-list', [

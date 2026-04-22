@@ -108,7 +108,7 @@ final class Dashboard extends Component
 
         // Comptes bancaires avec soldes courants
         $soldeService = app(SoldeService::class);
-        $comptesAvecSolde = CompteBancaire::where('est_systeme', false)->orderBy('nom')->get()
+        $comptesAvecSolde = CompteBancaire::orderBy('nom')->get()
             ->map(fn (CompteBancaire $c) => [
                 'compte' => $c,
                 'solde' => $soldeService->solde($c),

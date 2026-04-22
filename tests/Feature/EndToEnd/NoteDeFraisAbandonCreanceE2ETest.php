@@ -103,7 +103,6 @@ function e2eCreateCompte(Association $asso): CompteBancaire
     return CompteBancaire::factory()->create([
         'association_id' => $asso->id,
         'actif_recettes_depenses' => true,
-        'est_systeme' => false,
     ]);
 }
 

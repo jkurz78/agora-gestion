@@ -112,13 +112,21 @@
                             <i class="bi bi-lock"></i> Cette transaction est liée à une facture validée. Seuls le libellé et les notes peuvent être modifiés.
                         </div>
                     @endif
+                    @if ($isLockedByHelloAsso)
+                        <div class="alert alert-info d-flex align-items-center" role="alert">
+                            <i class="bi bi-cloud-download me-2"></i>
+                            <div>
+                                Transaction synchronisée depuis <strong>HelloAsso</strong> — les champs compte, date, montant, mode de paiement et tiers sont verrouillés. Vous pouvez modifier le libellé, les notes, la ventilation (catégories/séances) et la pièce jointe.
+                            </div>
+                        </div>
+                    @endif
                     <div class="row g-3 mb-4">
                         <div class="col-md-2">
                             <label for="date" class="form-label">
                                 Date <span class="text-danger">*</span>
-                                @if ($isLocked) <i class="bi bi-lock text-warning" title="Champ verrouillé par un rapprochement"></i> @endif
+                                @if ($isLocked || $isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $exerciceCloture" />
+                            <x-date-input name="date" wire:model="date" :value="$date" :disabled="$isLocked || $isLockedByHelloAsso || $exerciceCloture" />
                             @error('date') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
@@ -136,15 +144,23 @@
                             @error('libelle') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Tiers</label>
-                            <livewire:tiers-autocomplete wire:model="tiers_id" filtre="{{ $type === 'depense' ? 'depenses' : 'recettes' }}" :defaultSearch="$ocrTiersNom ?? ''" :key="'transaction-tiers-'.($transactionId ?? 'new').'-'.($tiers_id ?? '0').'-'.($ocrTiersNom ?? '')" />
+                            <label class="form-label">
+                                Tiers
+                                @if ($isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                            </label>
+                            @if ($isLockedByHelloAsso)
+                                <input type="text" value="{{ \App\Models\Tiers::find($tiers_id)?->displayName() ?? '—' }}"
+                                       class="form-control bg-light" disabled>
+                            @else
+                                <livewire:tiers-autocomplete wire:model="tiers_id" filtre="{{ $type === 'depense' ? 'depenses' : 'recettes' }}" :defaultSearch="$ocrTiersNom ?? ''" :key="'transaction-tiers-'.($transactionId ?? 'new').'-'.($tiers_id ?? '0').'-'.($ocrTiersNom ?? '')" />
+                            @endif
                             @error('tiers_id') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
                         </div>
                         <div class="col-md-2">
                             <label for="mode_paiement" class="form-label">Mode paiement <span class="text-danger">*</span></label>
                             <select wire:model="mode_paiement" id="mode_paiement"
                                     class="form-select @error('mode_paiement') is-invalid @enderror"
-                                    {{ $exerciceCloture ? 'disabled' : '' }}>
+                                    {{ $exerciceCloture || $isLockedByHelloAsso ? 'disabled' : '' }}>
                                 <option value="">-- Choisir --</option>
                                 @foreach ($modesPaiement as $mode)
                                     <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
@@ -155,9 +171,9 @@
                         <div class="col-md-3">
                             <label for="compte_id" class="form-label">
                                 Compte bancaire
-                                @if ($isLocked || $isLockedByFacture) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
+                                @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
-                            @if ($isLocked || $isLockedByFacture)
+                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso)
                                 <input type="text" value="{{ \App\Models\CompteBancaire::find($compte_id)?->nom ?? '—' }}"
                                        class="form-control bg-light" disabled>
                             @else
@@ -165,9 +181,7 @@
                                         {{ $exerciceCloture ? 'disabled' : '' }}>
                                     <option value="">-- Aucun --</option>
                                     @foreach ($comptes as $compte)
-                                        @if (! $compte->est_systeme || $type === 'recette')
-                                            <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
-                                        @endif
+                                        <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
                                     @endforeach
                                 </select>
                             @endif
@@ -175,7 +189,7 @@
                         <div class="{{ $ocrMode ? 'col-md-2' : 'col-md-2' }}">
                             <label class="form-label">
                                 Montant total
-                                @if ($isLocked) <i class="bi bi-lock text-warning" title="Champ verrouillé par un rapprochement"></i> @endif
+                                @if ($isLocked || $isLockedByHelloAsso) <i class="bi bi-lock text-warning" title="Champ verrouillé"></i> @endif
                             </label>
                             <div class="form-control bg-light fw-bold text-end">
                                 {{ number_format($this->montantTotal, 2, ',', ' ') }} €
@@ -310,7 +324,7 @@
                                             @endif
                                         </td>
                                         <td>
-                                            @if ($isLocked || $isLockedByFacture)
+                                            @if ($isLocked || $isLockedByFacture || $isLockedByHelloAsso)
                                                 <span class="form-control-plaintext">{{ number_format((float) ($ligne['montant'] ?? 0), 2, ',', ' ') }} €</span>
                                             @else
                                                 <input type="number" wire:model.live="lignes.{{ $index }}.montant"
@@ -397,7 +411,7 @@
                                             @error("lignes.{$index}.piece_jointe_upload") <div class="text-danger small">{{ $message }}</div> @enderror
                                         </td>
                                         <td class="text-center">
-                                            @if (! $isLocked && ! $isLockedByFacture && ! $exerciceCloture)
+                                            @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $exerciceCloture)
                                                 <button type="button" wire:click="removeLigne({{ $index }})"
                                                         class="btn btn-sm btn-outline-danger">
                                                     <i class="bi bi-trash"></i>
@@ -527,7 +541,7 @@
                     @endif
 
                     <div class="d-flex gap-2">
-                        @if (! $isLocked && ! $isLockedByFacture && ! $exerciceCloture && $this->canEdit)
+                        @if (! $isLocked && ! $isLockedByFacture && ! $isLockedByHelloAsso && ! $exerciceCloture && $this->canEdit)
                             <button type="button" wire:click="addLigne" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-plus-lg"></i> Ajouter une ligne
                             </button>

@@ -27,7 +27,7 @@ it('compteDeResultat returns empty sections when no data exists for exercice', f
 });
 
 it('fluxTresorerie returns structure with zero balances when no data', function () {
-    CompteBancaire::factory()->create(['est_systeme' => false]);
+    CompteBancaire::factory()->create();
 
     $result = $this->service->fluxTresorerie(2099);
 
@@ -36,7 +36,7 @@ it('fluxTresorerie returns structure with zero balances when no data', function 
 });
 
 it('compteDeResultat handles negative transaction amounts correctly', function () {
-    $compte = CompteBancaire::factory()->create(['est_systeme' => false]);
+    $compte = CompteBancaire::factory()->create();
     $cat = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
     $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id]);
 
@@ -95,7 +95,7 @@ it('toCsv handles empty rows', function () {
 });
 
 it('compteDeResultat exercice boundaries are correct (sept-aug)', function () {
-    $compte = CompteBancaire::factory()->create(['est_systeme' => false]);
+    $compte = CompteBancaire::factory()->create();
     $cat = Categorie::factory()->create(['type' => TypeCategorie::Depense]);
     $sc = SousCategorie::factory()->create(['categorie_id' => $cat->id]);
 

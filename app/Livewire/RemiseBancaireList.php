@@ -76,7 +76,7 @@ final class RemiseBancaireList extends Component
             ->orderByDesc('numero')
             ->paginate(20);
 
-        $comptes = CompteBancaire::where('est_systeme', false)
+        $comptes = CompteBancaire::saisieManuelle()
             ->orderBy('nom')
             ->get();
 

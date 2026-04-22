@@ -64,7 +64,6 @@ function constaterAbandonSetupHappyPath(Association $association, string $ndfDat
     $compte = CompteBancaire::factory()->create([
         'association_id' => $association->id,
         'actif_recettes_depenses' => true,
-        'est_systeme' => false,
     ]);
 
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
@@ -261,7 +260,6 @@ it('confirmValidation avec choix=normal valide normalement et ferme le miniForm'
     $compte = CompteBancaire::factory()->create([
         'association_id' => $association->id,
         'actif_recettes_depenses' => true,
-        'est_systeme' => false,
     ]);
 
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
@@ -313,7 +311,6 @@ it('confirmValidation avec choix=abandon flash error si aucune sous-cat AbandonC
     $compte = CompteBancaire::factory()->create([
         'association_id' => $association->id,
         'actif_recettes_depenses' => true,
-        'est_systeme' => false,
     ]);
 
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
@@ -387,7 +384,6 @@ it('confirmValidation avec choix=normal ignore dateDon vide', function (): void 
     $compte = CompteBancaire::factory()->create([
         'association_id' => $association->id,
         'actif_recettes_depenses' => true,
-        'est_systeme' => false,
     ]);
 
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);

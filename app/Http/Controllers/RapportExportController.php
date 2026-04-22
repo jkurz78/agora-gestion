@@ -440,12 +440,6 @@ final class RapportExportController extends Controller
         $sheet2->setCellValue('B'.$row, $data['rapprochement']['depenses_non_pointees']);
         $row++;
 
-        foreach ($data['rapprochement']['comptes_systeme'] as $cs) {
-            $sheet2->setCellValue('A'.$row, $cs['nom'].' ('.$cs['nb_ecritures'].' écr.)');
-            $sheet2->setCellValue('B'.$row, -$cs['solde']);
-            $row++;
-        }
-
         $sheet2->setCellValue('A'.$row, 'Solde bancaire réel');
         $sheet2->setCellValue('B'.$row, $data['rapprochement']['solde_reel']);
         $sheet2->getStyle('A'.$row.':B'.$row)->getFont()->setBold(true);

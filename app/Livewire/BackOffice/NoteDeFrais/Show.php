@@ -174,8 +174,7 @@ final class Show extends Component
     /** @return Collection<int, CompteBancaire> */
     private function comptesBancaires(): Collection
     {
-        return CompteBancaire::where('actif_recettes_depenses', true)
-            ->where('est_systeme', false)
+        return CompteBancaire::saisieManuelle()
             ->orderBy('nom')
             ->get();
     }

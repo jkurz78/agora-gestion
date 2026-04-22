@@ -343,7 +343,7 @@ it('comptabilise une séance à la date saisie (défaut = date de la séance)', 
     $sousCategorie = SousCategorie::factory()->create();
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sousCategorie->id]);
     $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-    $compte = CompteBancaire::factory()->create(['est_systeme' => false, 'actif_recettes_depenses' => true]);
+    $compte = CompteBancaire::factory()->create(['actif_recettes_depenses' => true]);
 
     $seance = Seance::create([
         'operation_id' => $operation->id,
@@ -376,7 +376,7 @@ it('le bouton Aujourd\'hui remplace la date par celle du jour et est utilisée �
     $sousCategorie = SousCategorie::factory()->create();
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $sousCategorie->id]);
     $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
-    $compte = CompteBancaire::factory()->create(['est_systeme' => false, 'actif_recettes_depenses' => true]);
+    $compte = CompteBancaire::factory()->create(['actif_recettes_depenses' => true]);
 
     $seance = Seance::create([
         'operation_id' => $operation->id,
