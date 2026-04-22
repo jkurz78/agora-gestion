@@ -375,4 +375,8 @@ Route::middleware(['auth', 'super-admin'])
             ->name('support.exit');
     });
 
+// Portail slug-less routes — must be registered BEFORE auth.php's
+// {association:slug}/login to avoid collision on /portail/login.
+require __DIR__.'/portail-mono.php';
+
 require __DIR__.'/auth.php';

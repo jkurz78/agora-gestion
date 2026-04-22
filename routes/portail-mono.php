@@ -2,12 +2,23 @@
 
 declare(strict_types=1);
 
+/**
+ * Portail slug-less routes — mono-association mode only.
+ *
+ * Registered BEFORE auth.php so that `portail/login` is matched before
+ * the `{association:slug}/login` route in auth.php can grab it.
+ *
+ * Route names: portail.mono.*
+ * Active only when MonoAssociation::isActive() === true (RequireMono middleware).
+ */
+
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
+use App\Http\Middleware\MonoAssociationResolver;
 use App\Http\Middleware\Portail\Authenticate;
-use App\Http\Middleware\Portail\BootTenantFromSlug;
 use App\Http\Middleware\Portail\EnforceSessionLifetime;
 use App\Http\Middleware\Portail\EnsureTiersChosen;
+use App\Http\Middleware\RequireMono;
 use App\Livewire\Portail\ChooseTiers;
 use App\Livewire\Portail\Home;
 use App\Livewire\Portail\Login;
@@ -17,21 +28,20 @@ use App\Livewire\Portail\NoteDeFrais\Show;
 use App\Livewire\Portail\OtpVerify;
 use Illuminate\Support\Facades\Route;
 
-// Slug-first (toujours valide, noms portail.*)
-Route::prefix('{association:slug}/portail')
-    ->where(['association' => '[A-Za-z0-9-]+'])
-    ->middleware(['web', BootTenantFromSlug::class])
-    ->name('portail.')
-    ->group(function () {
+Route::prefix('portail')
+    ->middleware([MonoAssociationResolver::class, RequireMono::class])
+    ->name('portail.mono.')
+    ->group(function (): void {
         Route::get('/logo', LogoController::class)->name('logo');
         Route::get('/login', Login::class)->name('login');
         Route::get('/otp', OtpVerify::class)->name('otp');
         Route::get('/choisir', ChooseTiers::class)->name('choisir');
-        Route::middleware([EnsureTiersChosen::class, EnforceSessionLifetime::class, Authenticate::class])->group(function () {
+
+        Route::middleware([EnsureTiersChosen::class, EnforceSessionLifetime::class, Authenticate::class])->group(function (): void {
             Route::get('/', Home::class)->name('home');
             Route::post('/logout', LogoutController::class)->name('logout');
 
-            Route::prefix('notes-de-frais')->name('ndf.')->group(function () {
+            Route::prefix('notes-de-frais')->name('ndf.')->group(function (): void {
                 Route::get('/', Index::class)->name('index');
                 Route::get('/nouvelle', Form::class)->name('create');
                 Route::get('/{noteDeFrais}/edit', Form::class)->name('edit');
