@@ -20,7 +20,10 @@ final class UserController extends Controller
     public function index(): View
     {
         return view('parametres.utilisateurs.index', [
-            'utilisateurs' => User::orderBy('nom')->get(),
+            'utilisateurs' => User::whereHas('associations', function ($q) {
+                $q->where('association.id', CurrentAssociation::id())
+                    ->whereNull('association_user.revoked_at');
+            })->orderBy('nom')->get(),
         ]);
     }
 

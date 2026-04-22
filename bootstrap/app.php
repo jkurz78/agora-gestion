@@ -10,6 +10,7 @@ use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Auth\Middleware\Authorize;
+use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -49,6 +50,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // TenantContext doit être booté AVANT SubstituteBindings, sinon
         // le route-model binding sur un TenantModel (ex. Transaction) échoue
         // avec `WHERE 1 = 0` et renvoie un 404 avant d'atteindre le controller.
+        //
+        // RedirectIfAuthenticated (guest) doit être AVANT BootTenantFromSlug
+        // afin qu'un user déjà authentifié visitant /{slug}/login soit redirigé
+        // vers /dashboard SANS que BootTenantFromSlug ait eu le temps de basculer
+        // le TenantContext vers l'asso du slug (protection contre le tenant-switch silencieux).
         $middleware->priority([
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
@@ -56,6 +62,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ShareErrorsFromSession::class,
             ValidateCsrfToken::class,
             ResolveTenant::class,
+            RedirectIfAuthenticated::class,
             BootTenantFromSlug::class,
             BootTenantConfig::class,
             Authenticate::class,

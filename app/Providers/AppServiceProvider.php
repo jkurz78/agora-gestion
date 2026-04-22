@@ -12,6 +12,7 @@ use App\Models\AssociationUser;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
+use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\TransactionObserver;
 use App\Policies\NoteDeFraisPolicy;
@@ -33,6 +34,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
 
+        Association::observe(AssociationObserver::class);
         Association::observe(ImmutableSlugObserver::class);
         Transaction::observe(TransactionObserver::class);
 

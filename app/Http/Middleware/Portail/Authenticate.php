@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware\Portail;
 
 use App\Models\Association;
+use App\Support\PortailRoute;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,9 +18,8 @@ final class Authenticate
         if (! Auth::guard('tiers-portail')->check()) {
             /** @var Association|string $association */
             $association = $request->route('association');
-            $slug = $association instanceof Association ? $association->slug : (string) $association;
 
-            return redirect()->route('portail.login', ['association' => $slug]);
+            return redirect(PortailRoute::to('login', $association));
         }
 
         return $next($request);

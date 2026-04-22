@@ -72,7 +72,7 @@ it('[intrusion-ndf] NDF de asso A invisible depuis la liste portail de asso B', 
     $response = $this->withSession([
         $sessionKey => $marieB->id,
         'portail.last_activity_at' => now()->timestamp,
-    ])->get("/portail/{$assoB->slug}/notes-de-frais");
+    ])->get("/{$assoB->slug}/portail/notes-de-frais");
 
     $response->assertStatus(200)
         ->assertDontSeeText('NDF confidentielle asso A');
@@ -103,7 +103,7 @@ it('[intrusion-ndf] accès direct NDF asso A depuis portail asso B → 404', fun
     $response = $this->withSession([
         $sessionKey => $marieB->id,
         'portail.last_activity_at' => now()->timestamp,
-    ])->get("/portail/{$assoB->slug}/notes-de-frais/{$ndfA->id}");
+    ])->get("/{$assoB->slug}/portail/notes-de-frais/{$ndfA->id}");
 
     // TenantScope fail-closed : la NDF n'est pas visible dans le contexte assoB
     // → model binding échoue → 404
@@ -137,12 +137,12 @@ it('[intrusion-ndf] NDF d\'un autre Tiers même asso → 403 sur show et edit', 
 
     // Marie tente d'afficher la NDF de Paul → 403
     $this->withSession($session)
-        ->get("/portail/{$asso->slug}/notes-de-frais/{$ndfPaul->id}")
+        ->get("/{$asso->slug}/portail/notes-de-frais/{$ndfPaul->id}")
         ->assertStatus(403);
 
     // Marie tente d'éditer la NDF de Paul → 403
     $this->withSession($session)
-        ->get("/portail/{$asso->slug}/notes-de-frais/{$ndfPaul->id}/edit")
+        ->get("/{$asso->slug}/portail/notes-de-frais/{$ndfPaul->id}/edit")
         ->assertStatus(403);
 });
 

@@ -152,8 +152,8 @@ it('[intrusion] session authentifiée sur asso A redirige vers login de asso B',
         $sessionKey => $tiersA->id,
         'portail.last_activity_at' => now()->timestamp,
     ])
-        ->get("/portail/{$assoB->slug}/")
-        ->assertRedirect("/portail/{$assoB->slug}/login");
+        ->get("/{$assoB->slug}/portail/")
+        ->assertRedirect("/{$assoB->slug}/portail/login");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

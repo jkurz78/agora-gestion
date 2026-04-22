@@ -13,19 +13,19 @@ beforeEach(function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 1 : GET /portail/{slug}/ non-auth → redirect login
+// Test 1 : GET /{slug}/portail/ non-auth → redirect login
 // ─────────────────────────────────────────────────────────────────────────────
-it('GET /portail/{slug}/ sans authentification redirige vers portail.login', function () {
+it('GET /{slug}/portail/ sans authentification redirige vers portail.login', function () {
     $asso = Association::factory()->create();
 
-    $this->get("/portail/{$asso->slug}/")
-        ->assertRedirect("/portail/{$asso->slug}/login");
+    $this->get("/{$asso->slug}/portail/")
+        ->assertRedirect("/{$asso->slug}/portail/login");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 2 : GET /portail/{slug}/ authentifié → 200 + contenu attendu
+// Test 2 : GET /{slug}/portail/ authentifié → 200 + contenu attendu
 // ─────────────────────────────────────────────────────────────────────────────
-it('GET /portail/{slug}/ authentifié affiche nom asso, bienvenue et placeholder', function () {
+it('GET /{slug}/portail/ authentifié affiche nom asso, bienvenue et placeholder', function () {
     $asso = Association::factory()->create(['nom' => 'Les Amis du Quartier']);
     TenantContext::boot($asso);
 
@@ -37,7 +37,7 @@ it('GET /portail/{slug}/ authentifié affiche nom asso, bienvenue et placeholder
 
     Auth::guard('tiers-portail')->login($tiers);
 
-    $this->get("/portail/{$asso->slug}/")
+    $this->get("/{$asso->slug}/portail/")
         ->assertStatus(200)
         ->assertSeeText('Les Amis du Quartier')
         ->assertSeeText('Marie')
@@ -47,9 +47,9 @@ it('GET /portail/{slug}/ authentifié affiche nom asso, bienvenue et placeholder
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 3 : POST /portail/{slug}/logout → purge session + redirect login
+// Test 3 : POST /{slug}/portail/logout → purge session + redirect login
 // ─────────────────────────────────────────────────────────────────────────────
-it('POST /portail/{slug}/logout détruit la session et redirige vers portail.login', function () {
+it('POST /{slug}/portail/logout détruit la session et redirige vers portail.login', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
@@ -61,8 +61,8 @@ it('POST /portail/{slug}/logout détruit la session et redirige vers portail.log
 
     expect(Auth::guard('tiers-portail')->check())->toBeTrue();
 
-    $this->post("/portail/{$asso->slug}/logout")
-        ->assertRedirect("/portail/{$asso->slug}/login");
+    $this->post("/{$asso->slug}/portail/logout")
+        ->assertRedirect("/{$asso->slug}/portail/login");
 
     expect(Auth::guard('tiers-portail')->check())->toBeFalse();
     expect(session('portail.last_activity_at'))->toBeNull();
@@ -88,8 +88,8 @@ it('session portail expire après 61 minutes d\'inactivité', function () {
     // Advance time by 61 minutes — session should be expired
     Carbon::setTestNow($reference->copy()->addMinutes(61));
 
-    $this->get("/portail/{$asso->slug}/")
-        ->assertRedirect("/portail/{$asso->slug}/login");
+    $this->get("/{$asso->slug}/portail/")
+        ->assertRedirect("/{$asso->slug}/portail/login");
 
     Carbon::setTestNow();
 });
@@ -114,7 +114,7 @@ it('session portail reste active après 59 minutes d\'inactivité', function () 
     // Advance time by 59 minutes — session should still be active
     Carbon::setTestNow($reference->copy()->addMinutes(59));
 
-    $this->get("/portail/{$asso->slug}/")
+    $this->get("/{$asso->slug}/portail/")
         ->assertStatus(200);
 
     Carbon::setTestNow();
