@@ -1,7 +1,7 @@
 @php
-    // $association injected by LayoutAssociationComposerProvider (Association::first() fallback — public route, no tenant boot)
-    // TODO(S7): replace with CurrentAssociation::tryGet() once public routes resolve tenant from URL/subdomain.
-    $nomAsso       = $association?->nom ?? 'Mon Association';
+    // $association is null on public/guest routes (no TenantContext booted).
+    // Show product branding when no tenant is resolved.
+    $nomAsso       = $association?->nom ?? 'AgoraGestion';
     $logoFullPath  = $association?->brandingLogoFullPath();
     $logoAsset     = ($logoFullPath && \Illuminate\Support\Facades\Storage::disk('local')->exists($logoFullPath))
         ? \App\Support\TenantAsset::url($logoFullPath)
