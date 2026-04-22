@@ -44,20 +44,22 @@ it('page title is updated', function () {
     $response->assertSee('Mon Association', false);
 });
 
-it('login page shows logo and new app name', function () {
+it('login page shows product logo and app name', function () {
     TenantContext::clear();
     auth()->logout();
     $response = $this->get('/login');
 
-    $response->assertSee('Mon Association');
+    // /login is a public route with no tenant context: product branding only.
+    $response->assertDontSee('Mon Association');
     $response->assertSee('images/agora-gestion.svg', false);
     $response->assertSee('AgoraGestion', false);
 });
 
-it('login page title is updated', function () {
+it('login page title shows product name', function () {
     TenantContext::clear();
     auth()->logout();
     $response = $this->get('/login');
 
-    $response->assertSee('Mon Association Gestion et comptabilité - Connexion', false);
+    // Product branding: "AgoraGestion Gestion et comptabilité - Connexion"
+    $response->assertSee('AgoraGestion Gestion et comptabilité - Connexion', false);
 });
