@@ -62,6 +62,16 @@ test('GET /dashboard/login returns 404 when no association has slug dashboard', 
     $response->assertStatus(404);
 });
 
+test('GET /svs/login form action POSTs to /svs/login not to generic /login', function () {
+    $response = $this->get('/svs/login');
+
+    $response->assertStatus(200);
+    // The form must POST to the branded URL so that the slug-aware AuthenticatedSessionController
+    // validates email↔association membership. A generic /login action bypasses that guard.
+    $response->assertSee('action="'.url('/svs/login').'"', false);
+    $response->assertDontSee('action="'.url('/login').'"', false);
+});
+
 test('GET /svs/login logo src uses portail.logo endpoint not /tenant-assets/', function () {
     $response = $this->get('/svs/login');
 
