@@ -169,17 +169,6 @@ test('montantTotal sums linked transactions montant_total', function (): void {
     expect($remise->montantTotal())->toBe(50.50);
 });
 
-test('CompteBancaire est_systeme defaults to false', function (): void {
-    $compte = CompteBancaire::factory()->create();
-    expect($compte->est_systeme)->toBeFalse();
-});
-
-test('CompteBancaire est_systeme can be set to true', function (): void {
-    $compte = CompteBancaire::factory()->create(['est_systeme' => true]);
-    $compte->refresh();
-    expect($compte->est_systeme)->toBeTrue();
-});
-
 test('Transaction has remise relation', function (): void {
     $compte = CompteBancaire::factory()->create();
     $user = User::factory()->create();

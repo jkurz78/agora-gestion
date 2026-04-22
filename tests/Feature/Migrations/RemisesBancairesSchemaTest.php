@@ -27,10 +27,6 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-it('comptes_bancaires table has est_systeme column', function () {
-    expect(Schema::hasColumn('comptes_bancaires', 'est_systeme'))->toBeTrue();
-});
-
 it('remises_bancaires table has all expected columns', function () {
     $columns = [
         'id', 'numero', 'date', 'mode_paiement',

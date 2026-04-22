@@ -5,6 +5,23 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [v4.1.2] — 2026-04-22
+### Changements majeurs
+- **Refonte du modèle `comptes_bancaires`** — suppression de la notion bancale `est_systeme`, introduction du flag orthogonal `saisie_automatisee` pour les comptes alimentés par intégration externe (HelloAsso aujourd'hui, Stripe/SumUp demain)
+- **Compte HelloAsso non sélectionnable** dans les formulaires de saisie manuelle (transactions, factures, remises, virements)
+- **Transactions HelloAsso existantes** — champs source (compte, date, montant, mode de paiement, tiers) verrouillés en édition ; seuls libellé, notes, ventilation et pièce jointe restent modifiables. Bandeau d'information dans le formulaire.
+
+### Suppressions
+- Comptes legacy « Créances à recevoir » et « Remises en banque » supprimés définitivement (audit prod vérifié : zéro transaction liée)
+- Colonne `comptes_bancaires.est_systeme` droppée
+- Section « Comptes système » du rapport Flux de trésorerie (builder + vues + PDF + export Excel)
+
+### Technique
+- Nouveau scope Eloquent `CompteBancaire::saisieManuelle()` — source de vérité unique pour les sélecteurs de saisie (`actif_recettes_depenses=true AND saisie_automatisee=false`)
+- Migration atomique `2026_04_21_100000_refonte_comptes_bancaires_saisie` avec garde FK bloquante (9 tables vérifiées)
+- Guards serveur + readonly UI sur `TransactionForm` pour l'édition des transactions HelloAsso
+- Suite de tests : 2385 tests verts, 0 failed
+
 ## [v3.0.3] — 2026-04-14
 ### Améliorations
 - **Facturation — Enregistrer règlement** — bouton fonctionnel sur la fiche facture : coche les transactions sélectionnées comme « reçues » (statut_reglement = recu). Filtre corrigé pour utiliser statut_reglement plutôt que les colonnes supprimées date_reglement/reference_reglement. Suppression du garde-fou est_systeme devenu obsolète en v3.

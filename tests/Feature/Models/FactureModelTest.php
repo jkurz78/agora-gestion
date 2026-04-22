@@ -171,10 +171,10 @@ test('facture transactions relation via pivot', function (): void {
     expect($facture->transactions)->toHaveCount(2);
 });
 
-test('montantRegle returns 0 when transactions are on système account', function (): void {
+test('montantRegle returns 0 when transaction has statut_reglement en_attente', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
-    $compteSysteme = CompteBancaire::factory()->create(['est_systeme' => true]);
+    $compte = CompteBancaire::factory()->create();
 
     $facture = Facture::create([
         'date' => now()->toDateString(),
@@ -187,7 +187,8 @@ test('montantRegle returns 0 when transactions are on système account', functio
 
     $transaction = Transaction::factory()->create([
         'montant_total' => 200.00,
-        'compte_id' => $compteSysteme->id,
+        'compte_id' => $compte->id,
+        'statut_reglement' => 'en_attente',
     ]);
 
     $facture->transactions()->attach($transaction->id);
@@ -195,11 +196,10 @@ test('montantRegle returns 0 when transactions are on système account', functio
     expect($facture->montantRegle())->toBe(0.0);
 });
 
-test('montantRegle returns sum for transactions on non-système accounts', function (): void {
+test('montantRegle returns sum only for transactions with statut_reglement recu', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
-    $compteReel = CompteBancaire::factory()->create(['est_systeme' => false]);
-    $compteSysteme = CompteBancaire::factory()->create(['est_systeme' => true]);
+    $compte = CompteBancaire::factory()->create();
 
     $facture = Facture::create([
         'date' => now()->toDateString(),
@@ -214,21 +214,21 @@ test('montantRegle returns sum for transactions on non-système accounts', funct
     $txVirement = Transaction::factory()->create([
         'montant_total' => 100.00,
         'mode_paiement' => 'virement',
-        'compte_id' => $compteReel->id,
+        'compte_id' => $compte->id,
         'statut_reglement' => 'recu',
     ]);
     // Chèque statut_reglement=recu → réglé
     $txCheque = Transaction::factory()->create([
         'montant_total' => 100.00,
         'mode_paiement' => 'cheque',
-        'compte_id' => $compteReel->id,
+        'compte_id' => $compte->id,
         'statut_reglement' => 'recu',
     ]);
     // Chèque statut_reglement=en_attente → non réglé
     $txAttente = Transaction::factory()->create([
         'montant_total' => 100.00,
         'mode_paiement' => 'cheque',
-        'compte_id' => $compteSysteme->id,
+        'compte_id' => $compte->id,
         'statut_reglement' => 'en_attente',
     ]);
 
@@ -238,11 +238,11 @@ test('montantRegle returns sum for transactions on non-système accounts', funct
     expect($facture->montantRegle())->toBe(200.0);
 });
 
-test('montantRegle considers remise transactions on système account as paid', function (): void {
+test('montantRegle considers remise transactions with statut_reglement recu as paid', function (): void {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();
-    $compteSysteme = CompteBancaire::factory()->create(['est_systeme' => true, 'nom' => 'Compte système test']);
-    $compteReel = CompteBancaire::factory()->create(['est_systeme' => false]);
+    $compteSysteme = CompteBancaire::factory()->create(['nom' => 'Compte transit test']);
+    $compteReel = CompteBancaire::factory()->create();
 
     $remise = RemiseBancaire::create([
         'numero' => 99,

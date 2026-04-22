@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -22,7 +23,7 @@ final class CompteBancaire extends TenantModel
         'solde_initial',
         'date_solde_initial',
         'actif_recettes_depenses',
-        'est_systeme',
+        'saisie_automatisee',
     ];
 
     protected function casts(): array
@@ -31,7 +32,7 @@ final class CompteBancaire extends TenantModel
             'solde_initial' => 'decimal:2',
             'date_solde_initial' => 'date',
             'actif_recettes_depenses' => 'boolean',
-            'est_systeme' => 'boolean',
+            'saisie_automatisee' => 'boolean',
         ];
     }
 
@@ -48,5 +49,16 @@ final class CompteBancaire extends TenantModel
     public function recettes(): HasMany
     {
         return $this->transactions()->where('type', 'recette');
+    }
+
+    /**
+     * Comptes sélectionnables en saisie manuelle (création/édition
+     * de transactions, factures, remises, virements).
+     * Exclut les comptes archivés et ceux alimentés par intégration externe.
+     */
+    public function scopeSaisieManuelle(Builder $q): Builder
+    {
+        return $q->where('actif_recettes_depenses', true)
+            ->where('saisie_automatisee', false);
     }
 }

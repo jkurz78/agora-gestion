@@ -242,7 +242,7 @@ final class AssociationForm extends Component
             }
         }
 
-        $comptesBancaires = CompteBancaire::where('est_systeme', false)->orderBy('nom')->get();
+        $comptesBancaires = CompteBancaire::saisieManuelle()->orderBy('nom')->get();
 
         return view('livewire.parametres.association-form', [
             'logoUrl' => $logoUrl,

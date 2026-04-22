@@ -101,18 +101,6 @@
                     <td class="text-right">{{ $fmt($e['montant']) }}</td>
                 </tr>
             @endforeach
-            @foreach ($rapprochement['comptes_systeme'] as $cs)
-                <tr class="ft-rappr">
-                    <td style="padding-left:24px;">− {{ $cs['nom'] }} ({{ $cs['nb_ecritures'] }} écr.)</td>
-                    <td class="text-right">{{ $fmt($cs['solde']) }}</td>
-                </tr>
-                @foreach ($cs['ecritures'] as $e)
-                    <tr class="ft-rappr-detail">
-                        <td>{{ $e['date'] }} · {{ $e['tiers'] }} · {{ $e['libelle'] }}</td>
-                        <td class="text-right">{{ $fmt($e['montant']) }}</td>
-                    </tr>
-                @endforeach
-            @endforeach
             <tr class="ft-rappr-result">
                 <td>= Solde bancaire réel</td>
                 <td class="text-right">{{ $fmt($rapprochement['solde_reel']) }}</td>
