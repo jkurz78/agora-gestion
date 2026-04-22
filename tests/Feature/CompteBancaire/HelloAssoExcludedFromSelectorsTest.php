@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Livewire\TransactionForm;
 use App\Livewire\TransactionUniverselle;
 use App\Livewire\VirementInterneForm;
 use App\Models\Association;
@@ -43,8 +44,22 @@ it('saisieManuelle scope excludes HelloAsso and includes normal account', functi
         ->and($noms)->not->toContain('HelloAsso test');
 });
 
-it('TransactionUniverselle selector does not list HelloAsso', function () {
+it('TransactionUniverselle column filter lists ALL accounts including HelloAsso', function () {
+    // Le sélecteur de filtre de la colonne "Compte" est un outil de
+    // consultation — il doit inclure tous les comptes (dont HelloAsso)
+    // pour permettre de filtrer sur les transactions HelloAsso.
     $html = Livewire::test(TransactionUniverselle::class)->html();
+
+    expect($html)->toContain('Compte courant test')
+        ->and($html)->toContain('HelloAsso test');
+});
+
+it('TransactionForm creation selector excludes HelloAsso', function () {
+    // Le sélecteur de compte dans le formulaire de création/édition
+    // de transaction doit exclure HelloAsso (saisie automatisée).
+    $html = Livewire::test(TransactionForm::class)
+        ->call('showNewForm', 'depense')
+        ->html();
 
     expect($html)->toContain('Compte courant test')
         ->and($html)->not->toContain('HelloAsso test');
