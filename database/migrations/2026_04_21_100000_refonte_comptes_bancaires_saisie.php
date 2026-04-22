@@ -18,11 +18,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('comptes_bancaires', function (Blueprint $table) {
-            $table->boolean('saisie_automatisee')
-                ->default(false)
-                ->after('actif_recettes_depenses');
-        });
+        // Idempotent : si la colonne existe déjà (tentative précédente partielle),
+        // on reprend à l'étape suivante.
+        if (! Schema::hasColumn('comptes_bancaires', 'saisie_automatisee')) {
+            Schema::table('comptes_bancaires', function (Blueprint $table) {
+                $table->boolean('saisie_automatisee')
+                    ->default(false)
+                    ->after('actif_recettes_depenses');
+            });
+        }
 
         $helloassoCompteIds = DB::table('helloasso_parametres')
             ->whereNotNull('compte_helloasso_id')
@@ -37,6 +41,8 @@ return new class extends Migration
 
         // Lookup by name: the prior migration (2026_04_19_130013) already set
         // est_systeme=false on these accounts, so we cannot filter on est_systeme=true.
+        // Idempotent : si les comptes legacy ont déjà été supprimés, le result est vide et
+        // toutes les étapes suivantes sont no-op.
         $legacyIds = DB::table('comptes_bancaires')
             ->whereIn('nom', ['Créances à recevoir', 'Remises en banque'])
             ->pluck('id')
@@ -66,9 +72,13 @@ return new class extends Migration
             DB::table('comptes_bancaires')->whereIn('id', $legacyIds)->delete();
         }
 
-        Schema::table('comptes_bancaires', function (Blueprint $table) {
-            $table->dropColumn('est_systeme');
-        });
+        // Idempotent : si la colonne a déjà été droppée (tentative précédente partielle
+        // qui aurait passé ce bloc), on skippe.
+        if (Schema::hasColumn('comptes_bancaires', 'est_systeme')) {
+            Schema::table('comptes_bancaires', function (Blueprint $table) {
+                $table->dropColumn('est_systeme');
+            });
+        }
     }
 
     public function down(): void
