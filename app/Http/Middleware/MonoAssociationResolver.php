@@ -27,6 +27,16 @@ final class MonoAssociationResolver
 
         if ($association !== null) {
             TenantContext::boot($association);
+
+            // Bind the association as a route parameter so that:
+            // - Livewire mount(Association $association) resolves via route model binding
+            // - Controller __invoke(Association $association) resolves correctly
+            // - portail.layouts.app uses $portailAssociation (shared by BootTenantFromSlug)
+            if ($request->route() !== null) {
+                $request->route()->setParameter('association', $association);
+            }
+
+            view()->share('portailAssociation', $association);
         }
 
         return $next($request);
