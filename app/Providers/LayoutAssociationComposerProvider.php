@@ -22,5 +22,18 @@ final class LayoutAssociationComposerProvider extends ServiceProvider
         View::composer('layouts.guest', function ($view): void {
             $view->with('association', CurrentAssociation::tryGet());
         });
+
+        // Portail layout: inject association from TenantContext at render time.
+        // TenantContext is booted by BootTenantFromSlug (slug-first) or
+        // MonoAssociationResolver (mono). Resolving here via View Composer is more
+        // robust than view()->share() in middleware, which can be lost across
+        // Livewire 4 render cycles.
+        View::composer('portail.layouts.app', function ($view): void {
+            $association = CurrentAssociation::tryGet();
+
+            if ($association !== null) {
+                $view->with('portailAssociation', $association);
+            }
+        });
     }
 }

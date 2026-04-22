@@ -31,12 +31,10 @@ final class MonoAssociationResolver
             // Bind the association as a route parameter so that:
             // - Livewire mount(Association $association) resolves via route model binding
             // - Controller __invoke(Association $association) resolves correctly
-            // - portail.layouts.app uses $portailAssociation (shared by BootTenantFromSlug)
+            // - portail.layouts.app receives $portailAssociation via View Composer
             if ($request->route() !== null) {
                 $request->route()->setParameter('association', $association);
             }
-
-            view()->share('portailAssociation', $association);
         }
 
         return $next($request);
