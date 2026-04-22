@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Enums\TwoFactorMethod;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\Association;
 use App\Services\TwoFactorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,6 +39,45 @@ class AuthenticatedSessionController extends Controller
                 $twoFactorService->generateEmailCode($user);
                 $request->session()->put('two_factor_code_sent', true);
             }
+        }
+
+        // Branded route /{slug}/login: enforce that the authenticated user belongs
+        // to the route's association. If not, logout and redirect back with an error.
+        // When the check passes, force the slug's association as the active tenant,
+        // bypassing derniere_association_id (scenario 4: multi-asso user).
+        //
+        // Note: $request->route('association') may be an Association model (when
+        // SubstituteBindings has resolved it) or a raw slug string (when the middleware
+        // priority puts BootTenantFromSlug before SubstituteBindings). We handle both.
+        $routeParam = $request->route('association');
+
+        $routeAssociation = match (true) {
+            $routeParam instanceof Association => $routeParam,
+            is_string($routeParam) && $routeParam !== '' => Association::where('slug', $routeParam)->first(),
+            default => null,
+        };
+
+        if ($routeAssociation !== null) {
+            $belongs = $user->associations()
+                ->wherePivotNull('revoked_at')
+                ->where('association.id', $routeAssociation->id)
+                ->exists();
+
+            if (! $belongs) {
+                auth()->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return back()->withErrors([
+                    'email' => "Cet email n'est pas rattaché à l'association {$routeAssociation->nom}.",
+                ])->withInput($request->only('email'));
+            }
+
+            // Force the slug's association as the active tenant, regardless of derniere_association_id.
+            $request->session()->put('current_association_id', $routeAssociation->id);
+            $user->update(['derniere_association_id' => $routeAssociation->id]);
+
+            return redirect($this->safeIntended(route('dashboard')));
         }
 
         $assos = $user->associations()->whereNull('association_user.revoked_at')->get();
