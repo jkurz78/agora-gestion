@@ -63,7 +63,11 @@ final class HelloassoSyncConfig extends Component
     public function render(): View
     {
         return view('livewire.parametres.helloasso-sync-config', [
-            'comptes' => CompteBancaire::where('actif_recettes_depenses', true)->orderBy('nom')->get(),
+            'comptesHelloasso' => CompteBancaire::where('actif_recettes_depenses', true)
+                ->where('saisie_automatisee', true)
+                ->orderBy('nom')
+                ->get(),
+            'comptesVersement' => CompteBancaire::saisieManuelle()->orderBy('nom')->get(),
             'sousCategoriesDon' => SousCategorie::forUsage(UsageComptable::Don)->orderBy('nom')->get(),
             'sousCategoriesCotisation' => SousCategorie::forUsage(UsageComptable::Cotisation)->orderBy('nom')->get(),
             'sousCategoriesInscription' => SousCategorie::forUsage(UsageComptable::Inscription)->orderBy('nom')->get(),
