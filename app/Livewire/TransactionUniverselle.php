@@ -424,7 +424,7 @@ final class TransactionUniverselle extends Component
             'rows' => $rows,
             'paginator' => $result['paginator'],
             'showSolde' => $showSolde,
-            'comptes' => $this->compteId === null ? CompteBancaire::saisieManuelle()->orderBy('nom')->get() : collect(),
+            'comptes' => $this->compteId === null ? CompteBancaire::orderBy('nom')->get() : collect(),
             'modesPaiement' => ModePaiement::cases(),
             'availableTypes' => $this->lockedTypes ?? ['depense', 'recette', 'virement'],
             'sousCategorieFilter' => $this->sousCategorieFilter,
