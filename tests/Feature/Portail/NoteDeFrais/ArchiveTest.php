@@ -216,7 +216,7 @@ it('index: onglet Actives affiche seulement les NDF non archivées', function ()
         'libelle' => 'NDF archivée',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais?onglet=actives")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais?onglet=actives")
         ->assertStatus(200)
         ->assertSeeText('NDF active')
         ->assertDontSeeText('NDF archivée');
@@ -239,7 +239,7 @@ it('index: onglet Archivées affiche seulement les NDF archivées', function () 
         'libelle' => 'NDF archivée',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais?onglet=archivees")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais?onglet=archivees")
         ->assertStatus(200)
         ->assertDontSeeText('NDF active')
         ->assertSeeText('NDF archivée');
@@ -262,7 +262,7 @@ it('index: onglet Toutes affiche actives et archivées', function () {
         'libelle' => 'NDF archivée unique',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais?onglet=toutes")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais?onglet=toutes")
         ->assertStatus(200)
         ->assertSeeText('NDF active unique')
         ->assertSeeText('NDF archivée unique');
@@ -277,7 +277,7 @@ it('show: bouton Archiver visible sur NDF Payée non archivée', function () {
 
     expect($ndf->statut)->toBe(StatutNoteDeFrais::Payee);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSeeText('Archiver');
 });
@@ -292,7 +292,7 @@ it('show: bouton Archiver visible sur NDF Rejetée non archivée', function () {
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSeeText('Archiver');
 });
@@ -307,7 +307,7 @@ it('show: bouton Archiver invisible sur NDF Brouillon', function () {
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertDontSee('modalArchiver');
 });
@@ -318,7 +318,7 @@ it('show: bouton Archiver invisible sur NDF Soumise', function () {
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertDontSee('modalArchiver');
 });
@@ -330,7 +330,7 @@ it('show: bouton Archiver invisible sur NDF Validée (non payée)', function () 
         'transaction_id' => null,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertDontSee('modalArchiver');
 });
@@ -345,7 +345,7 @@ it('show: NDF archivée est en lecture seule — aucun bouton Modifier/Supprimer
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSee('Archivée')
         ->assertDontSee('Modifier')

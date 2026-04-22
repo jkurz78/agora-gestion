@@ -14,13 +14,13 @@ beforeEach(function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 1 : GET /portail/{slug}/choisir sans session pending → redirect login
+// Test 1 : GET /{slug}/portail/choisir sans session pending → redirect login
 // ─────────────────────────────────────────────────────────────────────────────
-it('GET /portail/{slug}/choisir sans session pending redirige vers portail.login', function () {
+it('GET /{slug}/portail/choisir sans session pending redirige vers portail.login', function () {
     $asso = Association::factory()->create();
 
-    $this->get("/portail/{$asso->slug}/choisir")
-        ->assertRedirect("/portail/{$asso->slug}/login");
+    $this->get("/{$asso->slug}/portail/choisir")
+        ->assertRedirect("/{$asso->slug}/portail/login");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ it('action choose($id) avec id hors liste pending retourne 403', function () {
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 5 : Middleware EnsureTiersChosen sur / — avec pending → redirect choisir
 // ─────────────────────────────────────────────────────────────────────────────
-it('GET /portail/{slug}/ avec pending choice et non-authentifié redirige vers portail.choisir', function () {
+it('GET /{slug}/portail/ avec pending choice et non-authentifié redirige vers portail.choisir', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
@@ -111,23 +111,23 @@ it('GET /portail/{slug}/ avec pending choice et non-authentifié redirige vers p
     $service = new AuthSessionService;
     $service->markPendingTiers([(int) $tiers1->id, (int) $tiers2->id]);
 
-    $this->get("/portail/{$asso->slug}/")
-        ->assertRedirect("/portail/{$asso->slug}/choisir");
+    $this->get("/{$asso->slug}/portail/")
+        ->assertRedirect("/{$asso->slug}/portail/choisir");
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 5b : Middleware EnsureTiersChosen — sans pending → pass-through
 // ─────────────────────────────────────────────────────────────────────────────
-it('GET /portail/{slug}/ sans pending ni authentification passe le middleware EnsureTiersChosen', function () {
+it('GET /{slug}/portail/ sans pending ni authentification passe le middleware EnsureTiersChosen', function () {
     $asso = Association::factory()->create();
 
     // Pas de session pending, pas d'authentification
     // EnsureTiersChosen doit laisser passer (le middleware Authenticate du Step 13 s'en chargera)
-    $response = $this->get("/portail/{$asso->slug}/");
+    $response = $this->get("/{$asso->slug}/portail/");
 
     // Le middleware EnsureTiersChosen ne doit pas rediriger vers /choisir
     $this->assertNotEquals(
-        "/portail/{$asso->slug}/choisir",
+        "/{$asso->slug}/portail/choisir",
         $response->headers->get('Location')
     );
 });

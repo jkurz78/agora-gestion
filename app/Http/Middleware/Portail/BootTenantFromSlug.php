@@ -43,7 +43,6 @@ final class BootTenantFromSlug
         }
 
         TenantContext::boot($association);
-        view()->share('portailAssociation', $association);
 
         return $next($request);
     }

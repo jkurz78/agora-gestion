@@ -192,7 +192,7 @@ it('rejected workflow: Show affiche boutons Modifier et Supprimer pour NDF Rejet
         'libelle' => 'NDF rejetée affichage',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSeeText('Rejetée')
         ->assertSee('Modifier')
@@ -210,7 +210,7 @@ it('rejected workflow: Index affiche bouton Modifier sur NDF Rejetée', function
         'libelle' => 'NDF rejetée liste',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais")
         ->assertStatus(200)
         ->assertSee("notes-de-frais/{$ndf->id}/edit")
         ->assertSeeText('Modifier');

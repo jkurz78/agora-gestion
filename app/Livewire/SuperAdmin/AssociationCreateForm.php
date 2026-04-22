@@ -9,28 +9,34 @@ use App\Mail\SuperAdminInvitationMail;
 use App\Models\Association;
 use App\Models\SuperAdminAccessLog;
 use App\Models\User;
+use App\Rules\ReservedSlug;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 final class AssociationCreateForm extends Component
 {
-    #[Validate('required|string|min:2|max:255')]
     public string $nom = '';
 
-    #[Validate('required|string|regex:/^[a-z0-9-]+$/|max:64|unique:association,slug')]
     public string $slug = '';
 
-    #[Validate('required|email|unique:users,email')]
     public string $email_admin = '';
 
-    #[Validate('required|string|min:2|max:255')]
     public string $nom_admin = '';
+
+    protected function rules(): array
+    {
+        return [
+            'nom' => ['required', 'string', 'min:2', 'max:255'],
+            'slug' => ['required', 'string', 'regex:/^[a-z0-9-]+$/', 'max:64', 'unique:association,slug', new ReservedSlug],
+            'email_admin' => ['required', 'email', 'unique:users,email'],
+            'nom_admin' => ['required', 'string', 'min:2', 'max:255'],
+        ];
+    }
 
     public function submit(): void
     {

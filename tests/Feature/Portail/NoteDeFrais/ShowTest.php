@@ -32,7 +32,7 @@ it('show: brouillon du tiers affiché avec bouton Supprimer', function () {
         'libelle' => 'Frais brouillon test',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSeeText('Brouillon')
         ->assertSee('Supprimer');
@@ -49,7 +49,7 @@ it('show: NDF soumise affichée avec boutons Modifier et Supprimer', function ()
         'libelle' => 'Frais soumise',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSeeText('Soumise')
         ->assertSee('Modifier')
@@ -68,7 +68,7 @@ it('show: NDF rejetée affiche le motif de rejet', function () {
         'motif_rejet' => 'Justificatif illisible',
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSeeText('Rejetée')
         ->assertSee('Motif de rejet');
@@ -84,7 +84,7 @@ it('show: NDF validée affiche statut validée', function () {
         'tiers_id' => $this->tiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(200)
         ->assertSeeText('Validée');
 });
@@ -100,7 +100,7 @@ it('show: NDF d\'un autre tiers retourne 403', function () {
         'tiers_id' => $autreTiers->id,
     ]);
 
-    $this->get("/portail/{$this->asso->slug}/notes-de-frais/{$ndf->id}")
+    $this->get("/{$this->asso->slug}/portail/notes-de-frais/{$ndf->id}")
         ->assertStatus(403);
 });
 
