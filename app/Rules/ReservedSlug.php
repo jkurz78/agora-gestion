@@ -9,6 +9,8 @@ use Illuminate\Contracts\Validation\ValidationRule;
 
 final class ReservedSlug implements ValidationRule
 {
+    private const MESSAGE = 'Slug réservé';
+
     /**
      * Run the validation rule.
      *
@@ -24,7 +26,7 @@ final class ReservedSlug implements ValidationRule
         $reserved = config('tenancy.reserved_slugs', []);
 
         if (in_array($normalized, $reserved, strict: true)) {
-            $fail('Slug réservé');
+            $fail(self::MESSAGE);
         }
     }
 }
