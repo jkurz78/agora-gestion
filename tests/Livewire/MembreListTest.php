@@ -94,8 +94,19 @@ it('filtre tous retourne tous les tiers avec au moins une cotisation', function 
 });
 
 it('filtre par recherche texte sur le nom', function (): void {
-    $martin = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Martin']);
-    $dupont = Tiers::factory()->create(['association_id' => $this->association->id, 'nom' => 'Dupont']);
+    // Prénoms fixes pour éviter la flakiness fr_FR : fake()->firstName() peut
+    // retourner "Martine" (contient "Martin") et faire matcher la recherche
+    // sur le prenom de l'autre tiers.
+    $martin = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Martin',
+        'prenom' => 'Alice',
+    ]);
+    $dupont = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Dupont',
+        'prenom' => 'Bernard',
+    ]);
 
     createCotisation($martin, 2025, $this->cotSc->id);
     createCotisation($dupont, 2025, $this->cotSc->id);
