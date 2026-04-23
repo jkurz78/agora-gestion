@@ -44,7 +44,12 @@ function e2eCreateAsso(): Association
  */
 function e2eCreateJean(Association $asso): Tiers
 {
-    $jean = Tiers::factory()->create(['association_id' => $asso->id]);
+    // pour_depenses=true requis par le middleware EnsurePourDepenses qui garde
+    // l'accès aux routes /portail/notes-de-frais.
+    $jean = Tiers::factory()->create([
+        'association_id' => $asso->id,
+        'pour_depenses' => true,
+    ]);
     Auth::guard('tiers-portail')->login($jean);
 
     return $jean;
