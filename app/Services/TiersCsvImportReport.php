@@ -7,7 +7,7 @@ namespace App\Services;
 final class TiersCsvImportReport
 {
     /**
-     * @param  array<int, array{line: int, entreprise: ?string, nom: ?string, prenom: ?string, decision: string}>  $lines
+     * @param  array<int, array{line: int, entreprise: ?string, nom: ?string, prenom: ?string, decision: string, warnings: list<string>}>  $lines
      */
     public function __construct(
         public readonly int $created = 0,
@@ -43,6 +43,9 @@ final class TiersCsvImportReport
                 mb_substr($line['prenom'] ?? '', 0, 10),
                 $line['decision'],
             );
+            foreach ($line['warnings'] ?? [] as $warning) {
+                $text .= sprintf("%-6s | %-20s   %-26s   ⚠ %s\n", '', '', '', $warning);
+            }
         }
 
         return $text;

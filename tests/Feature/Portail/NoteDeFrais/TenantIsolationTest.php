@@ -53,6 +53,7 @@ it('[intrusion-ndf] NDF de asso A invisible depuis la liste portail de asso B', 
     $marieB = Tiers::factory()->create([
         'association_id' => $assoB->id,
         'email' => 'marie@example.org',
+        'pour_depenses' => true,
     ]);
 
     // Marie crée une NDF dans asso A
@@ -93,7 +94,7 @@ it('[intrusion-ndf] accès direct NDF asso A depuis portail asso B → 404', fun
     ]);
 
     TenantContext::boot($assoB);
-    $marieB = Tiers::factory()->create(['association_id' => $assoB->id]);
+    $marieB = Tiers::factory()->create(['association_id' => $assoB->id, 'pour_depenses' => true]);
 
     $sessionKey = 'login_tiers-portail_'.sha1(SessionGuard::class);
 
@@ -117,7 +118,7 @@ it('[intrusion-ndf] NDF d\'un autre Tiers même asso → 403 sur show et edit', 
     $asso = Association::factory()->create();
 
     TenantContext::boot($asso);
-    $marie = Tiers::factory()->create(['association_id' => $asso->id]);
+    $marie = Tiers::factory()->create(['association_id' => $asso->id, 'pour_depenses' => true]);
     $paul = Tiers::factory()->create(['association_id' => $asso->id]);
 
     // Paul crée une NDF

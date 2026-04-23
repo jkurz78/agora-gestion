@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\TypeTransaction;
 use App\Models\Tiers;
 use App\Services\TiersService;
 use Illuminate\View\View;
@@ -46,6 +47,13 @@ final class TiersForm extends Component
     public bool $showDetails = false;
 
     public bool $est_helloasso = false;
+
+    public bool $showDereferenceConfirm = false;
+
+    public string $dereferenceMessage = '';
+
+    /** @var array<string, bool> */
+    public array $pendingDereferenceChanges = [];
 
     public string $context = ''; // 'participant' adapts the form
 
@@ -177,6 +185,96 @@ final class TiersForm extends Component
             return;
         }
 
+        if ($this->tiersId !== null && $this->detectDereferenceIntent()) {
+            return; // Attente de confirmation via saveConfirmed()/cancelDereference()
+        }
+
+        $this->persist($validated);
+    }
+
+    private function detectDereferenceIntent(): bool
+    {
+        $tiers = Tiers::findOrFail($this->tiersId);
+        $changes = [];
+        $messages = [];
+
+        if ($tiers->pour_depenses && ! $this->pour_depenses) {
+            $count = $tiers->transactions()
+                ->where('type', TypeTransaction::Depense)
+                ->count();
+            if ($count > 0) {
+                $changes['pour_depenses_was'] = true;
+                $messages[] = "{$count} transaction(s) de dépense existe(nt). Le tiers restera lié aux transactions historiques mais ne pourra plus être sélectionné pour de nouvelles dépenses.";
+            }
+        }
+
+        if ($tiers->pour_recettes && ! $this->pour_recettes) {
+            $count = $tiers->transactions()
+                ->where('type', TypeTransaction::Recette)
+                ->count();
+            if ($count > 0) {
+                $changes['pour_recettes_was'] = true;
+                $messages[] = "{$count} transaction(s) de recette existe(nt). Le tiers restera lié aux transactions historiques mais ne pourra plus être sélectionné pour de nouvelles recettes.";
+            }
+        }
+
+        if ($changes === []) {
+            return false;
+        }
+
+        $this->pendingDereferenceChanges = $changes;
+        $this->dereferenceMessage = 'Vous allez déréférencer ce tiers. '.implode(' ', $messages).' Confirmer ?';
+        $this->showDereferenceConfirm = true;
+
+        return true;
+    }
+
+    public function saveConfirmed(): void
+    {
+        $validated = $this->validate([
+            'type' => ['required', 'in:entreprise,particulier'],
+            'nom' => $this->type === 'particulier'
+                ? ['required', 'string', 'max:150']
+                : ['nullable', 'string', 'max:150'],
+            'prenom' => ['nullable', 'string', 'max:100'],
+            'entreprise' => $this->type === 'entreprise'
+                ? ['required', 'string', 'max:255']
+                : ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'telephone' => ['nullable', 'string', 'max:30'],
+            'adresse_ligne1' => ['nullable', 'string', 'max:500'],
+            'code_postal' => ['nullable', 'string', 'max:10'],
+            'ville' => ['nullable', 'string', 'max:100'],
+            'pays' => ['nullable', 'string', 'max:100'],
+            'pour_depenses' => ['boolean'],
+            'pour_recettes' => ['boolean'],
+            'email_optout' => ['boolean'],
+        ]);
+
+        $this->showDereferenceConfirm = false;
+        $this->pendingDereferenceChanges = [];
+        $this->dereferenceMessage = '';
+
+        $this->persist($validated);
+    }
+
+    public function cancelDereference(): void
+    {
+        if (($this->pendingDereferenceChanges['pour_depenses_was'] ?? false) === true) {
+            $this->pour_depenses = true;
+        }
+
+        if (($this->pendingDereferenceChanges['pour_recettes_was'] ?? false) === true) {
+            $this->pour_recettes = true;
+        }
+
+        $this->showDereferenceConfirm = false;
+        $this->pendingDereferenceChanges = [];
+        $this->dereferenceMessage = '';
+    }
+
+    private function persist(array $validated): void
+    {
         $service = app(TiersService::class);
 
         if ($this->tiersId) {

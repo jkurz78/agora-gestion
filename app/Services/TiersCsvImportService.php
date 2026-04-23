@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Tiers;
+use App\Support\TiersImportDereferenceGuard;
 use Illuminate\Support\Facades\DB;
 
 final class TiersCsvImportService
@@ -41,12 +42,13 @@ final class TiersCsvImportService
                         'nom' => $row['nom'] ?? null,
                         'prenom' => $row['prenom'] ?? null,
                         'decision' => $row['decision_log'] ?? 'Identique',
+                        'warnings' => [],
                     ];
 
                     continue;
                 }
 
-                match ($status) {
+                $guardWarnings = match ($status) {
                     'new' => $this->handleNew($row, $created),
                     'enrichment' => $this->handleEnrichment($row, $enriched),
                     'conflict_resolved_merge' => $this->handleConflictResolvedMerge($row, $resolvedMerge),
@@ -59,6 +61,7 @@ final class TiersCsvImportService
                     'nom' => $row['nom'] ?? null,
                     'prenom' => $row['prenom'] ?? null,
                     'decision' => $row['decision_log'] ?? $status,
+                    'warnings' => $guardWarnings,
                 ];
             }
 
@@ -72,35 +75,50 @@ final class TiersCsvImportService
         });
     }
 
-    private function handleNew(array $row, int &$counter): void
+    /** @return list<string> */
+    private function handleNew(array $row, int &$counter): array
     {
         $this->tiersService->create($this->buildCreateData($row));
         $counter++;
+
+        return [];
     }
 
-    private function handleEnrichment(array $row, int &$counter): void
+    /** @return list<string> */
+    private function handleEnrichment(array $row, int &$counter): array
     {
         $tiers = Tiers::findOrFail($row['matched_tiers_id']);
         $data = $this->buildEnrichmentData($tiers, $row);
+
+        [$data, $warnings] = TiersImportDereferenceGuard::apply($tiers, $data);
 
         if ($data !== []) {
             $this->tiersService->update($tiers, $data);
         }
 
         $counter++;
+
+        return $warnings;
     }
 
-    private function handleConflictResolvedMerge(array $row, int &$counter): void
+    /** @return list<string> */
+    private function handleConflictResolvedMerge(array $row, int &$counter): array
     {
         $tiers = Tiers::findOrFail($row['matched_tiers_id']);
-        $this->tiersService->update($tiers, $row['merge_data']);
+        [$mergeData, $warnings] = TiersImportDereferenceGuard::apply($tiers, $row['merge_data']);
+        $this->tiersService->update($tiers, $mergeData);
         $counter++;
+
+        return $warnings;
     }
 
-    private function handleConflictResolvedNew(array $row, int &$counter): void
+    /** @return list<string> */
+    private function handleConflictResolvedNew(array $row, int &$counter): array
     {
         $this->tiersService->create($this->buildCreateData($row));
         $counter++;
+
+        return [];
     }
 
     private function buildCreateData(array $row): array

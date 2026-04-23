@@ -156,5 +156,28 @@
         </div>
         </div>
         </div>
+
+        {{-- Modal confirmation déréférencement --}}
+        @if ($showDereferenceConfirm)
+            <div class="modal show d-block" tabindex="-1"
+                 style="background:rgba(0,0,0,.5);z-index:2100" wire:key="dereference-modal">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Confirmer le déréférencement</h5>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-0">{{ $dereferenceMessage }}</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    wire:click="cancelDereference">Annuler</button>
+                            <button type="button" class="btn btn-warning"
+                                    wire:click="saveConfirmed">Confirmer le déréférencement</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
     @endif
 </div>
