@@ -15,10 +15,6 @@ final class MonoAssociationResolver
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (TenantContext::currentId() !== null) {
-            return $next($request);
-        }
-
         if (! MonoAssociation::isActive()) {
             return $next($request);
         }
@@ -26,12 +22,15 @@ final class MonoAssociationResolver
         $association = Association::first();
 
         if ($association !== null) {
+            // Boot (idempotent) and always bind the association route parameter.
+            // Why: a user already authenticated via web has TenantContext booted by
+            // ResolveTenant before this middleware runs. Skipping here left the route
+            // parameter "association" unset, causing Livewire mount(Association) to
+            // fall back to an empty model resolved from the container, which then
+            // clobbered TenantContext through WithPortailTenant and made the portail
+            // layout crash on route('portail.logo') with a null slug.
             TenantContext::boot($association);
 
-            // Bind the association as a route parameter so that:
-            // - Livewire mount(Association $association) resolves via route model binding
-            // - Controller __invoke(Association $association) resolves correctly
-            // - portail.layouts.app receives $portailAssociation via View Composer
             if ($request->route() !== null) {
                 $request->route()->setParameter('association', $association);
             }

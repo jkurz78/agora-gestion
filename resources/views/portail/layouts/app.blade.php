@@ -1,6 +1,6 @@
 @php
     $nomAsso = $portailAssociation->nom;
-    $logoUrl = route('portail.logo', ['association' => $portailAssociation->slug]);
+    $logoUrl = \App\Support\PortailRoute::to('logo', $portailAssociation);
     $contentClass = $contentClass ?? 'col-lg-11 col-xl-10';
 @endphp
 <!DOCTYPE html>

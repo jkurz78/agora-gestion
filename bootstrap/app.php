@@ -11,6 +11,7 @@ use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -23,9 +24,9 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Session\Middleware\StartSession;
-use Illuminate\Session\TokenMismatchException;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -82,7 +83,27 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->render(function (TokenMismatchException $e, Request $request) {
+        // Laravel 11's prepareException() wraps TokenMismatchException into
+        // HttpException(419) *before* renderViaCallbacks runs, so a handler
+        // typed against TokenMismatchException never fires. We hook on
+        // HttpException and filter on the 419 status instead.
+        $exceptions->render(function (HttpException $e, Request $request) {
+            if ($e->getStatusCode() !== 419) {
+                return null;
+            }
+
+            // Idempotent logout: a stale CSRF token on the logout form would
+            // otherwise leave the user silently logged in. Force the session
+            // teardown so the UI state matches their mental model.
+            if ($request->is('logout')) {
+                Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return redirect('/login')
+                    ->with('status', 'Vous avez été déconnecté.');
+            }
+
             return redirect('/')
                 ->with('status', 'Votre session a expiré. Veuillez réessayer.');
         });
