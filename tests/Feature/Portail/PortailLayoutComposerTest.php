@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\User;
 use App\Support\MonoAssociation;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
@@ -50,4 +51,33 @@ it('mode slug-first: affiche l\'asso correspondant au slug, pas une autre', func
         ->assertStatus(200)
         ->assertSeeText('Asso Alpha')
         ->assertDontSeeText('Asso Beta');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 4 : Regression — user web-authentifié visitant /portail en mode mono.
+// ResolveTenant boote TenantContext avant MonoAssociationResolver : le
+// resolver doit quand même injecter le paramètre route, sinon la layout
+// plante sur route('portail.logo') avec un slug null (prod 2026-04-23).
+// ─────────────────────────────────────────────────────────────────────────────
+it('mode mono: user web-auth visitant /portail est redirigé vers /portail/login sans 500', function () {
+    $asso = Association::factory()->create(['nom' => 'Asso Prod', 'slug' => 'asso-prod']);
+    $admin = User::factory()->create(['derniere_association_id' => $asso->id]);
+    $asso->users()->attach($admin->id, ['role' => 'admin']);
+
+    $this->actingAs($admin)
+        ->withSession(['current_association_id' => $asso->id])
+        ->get('/portail')
+        ->assertRedirect('/portail/login');
+});
+
+it('mode mono: /portail/login rend 200 même quand TenantContext était déjà booté par ResolveTenant', function () {
+    $asso = Association::factory()->create(['nom' => 'Asso Prod', 'slug' => 'asso-prod']);
+    $admin = User::factory()->create(['derniere_association_id' => $asso->id]);
+    $asso->users()->attach($admin->id, ['role' => 'admin']);
+
+    $this->actingAs($admin)
+        ->withSession(['current_association_id' => $asso->id])
+        ->get('/portail/login')
+        ->assertStatus(200)
+        ->assertSeeText('Asso Prod');
 });

@@ -19,10 +19,14 @@ beforeEach(function () {
     DB::table('association')->delete();
 
     // Register the test route with the middleware under test.
-    Route::get('/test/mono-resolver', function () {
+    Route::get('/test/mono-resolver', function (\Illuminate\Http\Request $request) {
         $id = TenantContext::currentId();
+        $routeParam = $request->route('association');
+        $paramSignal = $routeParam instanceof Association
+            ? 'param:'.(int) $routeParam->id
+            : 'param:null';
 
-        return $id !== null ? (string) $id : 'null';
+        return ($id !== null ? (string) $id : 'null').'|'.$paramSignal;
     })->middleware(['web', MonoAssociationResolver::class]);
 });
 
@@ -31,49 +35,39 @@ afterEach(function () {
     MonoAssociation::flush();
 });
 
-it('boots TenantContext on Association::first() when mono mode and context not booted', function () {
-    // GIVEN exactly 1 association (mono mode).
+it('boots TenantContext and injects the route parameter when mono mode is active', function () {
+    // GIVEN exactly 1 association (mono mode), no prior context.
     $asso = Association::factory()->create();
 
-    // WHEN a request hits the test route.
     $response = $this->get('/test/mono-resolver');
 
-    // THEN the response contains the association's ID (context was booted).
     $response->assertOk();
-    $response->assertSeeText((string) $asso->id);
+    $response->assertSeeText((string) $asso->id.'|param:'.(int) $asso->id);
 });
 
 it('does not boot TenantContext when two associations exist (multi mode)', function () {
     // GIVEN 2 associations (multi mode).
     Association::factory()->count(2)->create();
 
-    // WHEN a request hits the test route.
     $response = $this->get('/test/mono-resolver');
 
-    // THEN TenantContext was NOT booted (middleware no-op).
+    // THEN middleware is a no-op (both context id and route param unset).
     $response->assertOk();
-    $response->assertSeeText('null');
+    $response->assertSeeText('null|param:null');
 });
 
-it('does not override an already-booted TenantContext', function () {
-    // GIVEN 1 association (mono mode) + a *different* association already booted.
-    $original = Association::factory()->create();
-    $other = Association::factory()->create();
-
-    // Prime MonoAssociation cache with the 2-asso count so isActive() returns false.
-    // But to properly test "already booted" behaviour we need to reset and use 1 asso.
-    // Reset DB to only 1 association, boot context on it, then use that as "already booted".
-    DB::table('association')->delete();
-    MonoAssociation::flush();
-
+it('still injects the route parameter even when TenantContext was already booted', function () {
+    // Regression: when a user is already web-authenticated, ResolveTenant boots
+    // TenantContext before MonoAssociationResolver runs. The resolver used to
+    // early-return, leaving the {association} route parameter unset — which made
+    // Livewire mount(Association) resolve an empty model and crash the portail
+    // layout on route('portail.logo') with a null slug.
     $asso = Association::factory()->create();
-    // Boot on $asso (simulates another middleware/job having booted first).
     TenantContext::boot($asso);
 
-    // WHEN the request fires (MonoAssociationResolver should no-op because currentId() !== null).
     $response = $this->get('/test/mono-resolver');
 
-    // THEN the context still points to the originally booted $asso.
+    // Context still points to $asso AND route parameter is now bound.
     $response->assertOk();
-    $response->assertSeeText((string) $asso->id);
+    $response->assertSeeText((string) $asso->id.'|param:'.(int) $asso->id);
 });
