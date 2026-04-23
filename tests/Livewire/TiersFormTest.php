@@ -3,9 +3,11 @@
 // tests/Livewire/TiersFormTest.php
 declare(strict_types=1);
 
+use App\Enums\TypeTransaction;
 use App\Livewire\TiersForm;
 use App\Models\Association;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -206,4 +208,86 @@ it('switch back to particulier from entreprise leaves fields as-is', function ()
         ->set('type', 'particulier')  // switch retour: updatedType() ne fait rien pour particulier
         ->assertSet('entreprise', 'Jean Martin') // entreprise inchangé
         ->assertSet('nom', '');       // nom reste vide (non restauré, comportement attendu)
+});
+
+// --- Déréférencement ---
+
+it('ouvre le modal de confirmation si décochage pour_depenses avec transactions Depense', function () {
+    $tiers = Tiers::factory()->create(['pour_depenses' => true, 'pour_recettes' => false]);
+    Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+
+    Livewire::test(TiersForm::class)
+        ->call('edit', $tiers->id)
+        ->set('pour_depenses', false)
+        ->set('pour_recettes', true)
+        ->call('save')
+        ->assertSet('showDereferenceConfirm', true)
+        ->assertSee('déréférencer');
+
+    expect($tiers->refresh()->pour_depenses)->toBeTrue();
+});
+
+it('persiste le décochage après confirmation', function () {
+    $tiers = Tiers::factory()->create(['pour_depenses' => true, 'pour_recettes' => true]);
+    Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+
+    Livewire::test(TiersForm::class)
+        ->call('edit', $tiers->id)
+        ->set('pour_depenses', false)
+        ->call('save')
+        ->call('saveConfirmed');
+
+    expect($tiers->refresh()->pour_depenses)->toBeFalse();
+});
+
+it('rollback le décochage sur annulation', function () {
+    $tiers = Tiers::factory()->create(['pour_depenses' => true, 'pour_recettes' => true]);
+    Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+
+    Livewire::test(TiersForm::class)
+        ->call('edit', $tiers->id)
+        ->set('pour_depenses', false)
+        ->call('save')
+        ->call('cancelDereference')
+        ->assertSet('pour_depenses', true)
+        ->assertSet('showDereferenceConfirm', false);
+
+    expect($tiers->refresh()->pour_depenses)->toBeTrue();
+});
+
+it('ne demande pas confirmation si tiers sans transactions', function () {
+    $tiers = Tiers::factory()->create(['pour_depenses' => true, 'pour_recettes' => true]);
+
+    Livewire::test(TiersForm::class)
+        ->call('edit', $tiers->id)
+        ->set('pour_depenses', false)
+        ->call('save')
+        ->assertSet('showDereferenceConfirm', false);
+
+    expect($tiers->refresh()->pour_depenses)->toBeFalse();
+});
+
+it('ne demande pas confirmation sur cochage (activation)', function () {
+    $tiers = Tiers::factory()->create(['pour_depenses' => false, 'pour_recettes' => true]);
+
+    Livewire::test(TiersForm::class)
+        ->call('edit', $tiers->id)
+        ->set('pour_depenses', true)
+        ->call('save')
+        ->assertSet('showDereferenceConfirm', false);
+
+    expect($tiers->refresh()->pour_depenses)->toBeTrue();
+});
+
+it('détecte décochage pour_recettes avec transactions Recette', function () {
+    $tiers = Tiers::factory()->create(['pour_depenses' => true, 'pour_recettes' => true]);
+    Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Recette]);
+
+    Livewire::test(TiersForm::class)
+        ->call('edit', $tiers->id)
+        ->set('pour_recettes', false)
+        ->call('save')
+        ->assertSet('showDereferenceConfirm', true);
+
+    expect($tiers->refresh()->pour_recettes)->toBeTrue();
 });
