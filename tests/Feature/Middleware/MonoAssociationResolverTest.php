@@ -6,6 +6,7 @@ use App\Http\Middleware\MonoAssociationResolver;
 use App\Models\Association;
 use App\Support\MonoAssociation;
 use App\Tenant\TenantContext;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -19,7 +20,7 @@ beforeEach(function () {
     DB::table('association')->delete();
 
     // Register the test route with the middleware under test.
-    Route::get('/test/mono-resolver', function (\Illuminate\Http\Request $request) {
+    Route::get('/test/mono-resolver', function (Request $request) {
         $id = TenantContext::currentId();
         $routeParam = $request->route('association');
         $paramSignal = $routeParam instanceof Association
