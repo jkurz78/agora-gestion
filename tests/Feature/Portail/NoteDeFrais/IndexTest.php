@@ -13,7 +13,7 @@ beforeEach(function () {
     TenantContext::clear();
     $this->asso = Association::factory()->create();
     TenantContext::boot($this->asso);
-    $this->tiers = Tiers::factory()->create(['association_id' => $this->asso->id]);
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->asso->id, 'pour_depenses' => true]);
     Auth::guard('tiers-portail')->login($this->tiers);
 });
 

@@ -33,6 +33,7 @@ it('GET /{slug}/portail/ authentifié affiche nom asso, bienvenue et placeholder
         'association_id' => $asso->id,
         'prenom' => 'Marie',
         'nom' => 'Dupont',
+        'pour_depenses' => true,
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);
