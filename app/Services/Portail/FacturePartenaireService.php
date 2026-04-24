@@ -130,7 +130,11 @@ final class FacturePartenaireService
 
             // Update transaction with the new piece jointe (basename only — matches existing pattern)
             $transaction->piece_jointe_path = $basename;
-            $transaction->piece_jointe_nom = $basename;
+            $transaction->piece_jointe_nom = sprintf(
+                'Facture %s du %s.pdf',
+                $depot->numero_facture,
+                $depot->date_facture->format('d/m/Y'),
+            );
             $transaction->piece_jointe_mime = 'application/pdf';
             $transaction->save();
 
