@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Services\Portail;
 
 use App\Enums\StatutFactureDeposee;
+use App\Events\Portail\FactureDeposeeComptabilisee;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -82,6 +85,66 @@ final class FacturePartenaireService
             Log::info('portail.facture-partenaire.oubliee', [
                 'depot_id' => $depotId,
                 'tiers_id' => $tiers->id,
+            ]);
+        });
+    }
+
+    /**
+     * Comptabilise un dépôt de facture partenaire en le liant à une Transaction.
+     *
+     * - Déplace le PDF de factures-deposees/ vers transactions/{id}/.
+     * - Renseigne piece_jointe_path/nom/mime sur la Transaction.
+     * - Passe le dépôt au statut Traitee.
+     * - Émet l'event FactureDeposeeComptabilisee.
+     *
+     * Guards :
+     *  – cross-tenant  : DomainException si association_id différent.
+     *  – statut depot  : DomainException si pas Soumise.
+     *  – piece jointe  : DomainException si transaction a déjà une pièce jointe.
+     */
+    public function comptabiliser(FacturePartenaireDeposee $depot, Transaction $transaction): void
+    {
+        // Guard: same-tenant
+        if ((int) $depot->association_id !== (int) $transaction->association_id) {
+            throw new \DomainException('Le dépôt et la transaction n\'appartiennent pas à la même association.');
+        }
+
+        // Guard: depot must be Soumise
+        if ($depot->statut !== StatutFactureDeposee::Soumise) {
+            throw new \DomainException('Seul un dépôt au statut « soumise » peut être comptabilisé.');
+        }
+
+        // Guard: transaction must not already have a piece jointe
+        if ($transaction->hasPieceJointe()) {
+            throw new \DomainException('La transaction possède déjà une pièce jointe ; comptabilisation refusée.');
+        }
+
+        DB::transaction(function () use ($depot, $transaction): void {
+            $basename = basename($depot->pdf_path);
+            $newFullPath = $transaction->storagePath('transactions/'.$transaction->id.'/'.$basename);
+
+            $moved = Storage::disk('local')->move($depot->pdf_path, $newFullPath);
+            if (! $moved) {
+                throw new \RuntimeException("Échec du déplacement du PDF vers {$newFullPath}.");
+            }
+
+            // Update transaction with the new piece jointe (basename only — matches existing pattern)
+            $transaction->piece_jointe_path = $basename;
+            $transaction->piece_jointe_nom = $basename;
+            $transaction->piece_jointe_mime = 'application/pdf';
+            $transaction->save();
+
+            // Update depot
+            $depot->statut = StatutFactureDeposee::Traitee;
+            $depot->transaction_id = $transaction->id;
+            $depot->traitee_at = now();
+            $depot->save();
+
+            Event::dispatch(new FactureDeposeeComptabilisee($depot));
+
+            Log::info('portail.facture-partenaire.comptabilisee', [
+                'depot_id' => $depot->id,
+                'transaction_id' => $transaction->id,
             ]);
         });
     }
