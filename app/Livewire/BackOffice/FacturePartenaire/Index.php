@@ -85,8 +85,6 @@ final class Index extends Component
 
     public function confirmerRejet(): void
     {
-        $this->authorize('treat', FacturePartenaireDeposee::class);
-
         $this->validate([
             'motifRejet' => ['required', 'string', 'min:1', 'max:1000'],
         ], [
@@ -102,6 +100,8 @@ final class Index extends Component
         if ($depot === null) {
             abort(404);
         }
+
+        $this->authorize('treat', $depot);
 
         try {
             app(FacturePartenaireService::class)->rejeter($depot, $this->motifRejet);
