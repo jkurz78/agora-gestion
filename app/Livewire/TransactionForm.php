@@ -638,6 +638,11 @@ final class TransactionForm extends Component
                     $this->finalizeFactureDeposeeCleanup($tx);
                 } catch (\DomainException $e) {
                     session()->flash('error', 'Erreur de comptabilisation : '.$e->getMessage());
+
+                    // La Transaction a été créée, mais la comptabilisation du dépôt a échoué.
+                    // On garde le form ouvert (pas de resetForm) pour que l'utilisateur puisse retenter
+                    // ou corriger. factureDeposeeId reste renseigné.
+                    return;
                 }
             }
         }
