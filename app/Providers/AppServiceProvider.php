@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Console\Commands\VersionStampCommand;
 use App\Enums\RoleAssociation;
+use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutNoteDeFrais;
 use App\Models\Association;
 use App\Models\AssociationUser;
@@ -51,6 +52,7 @@ final class AppServiceProvider extends ServiceProvider
 
             $canSeeNdf = false;
             $ndfPendingCount = 0;
+            $facturesPartenairesPendingCount = 0;
 
             if (Auth::check() && TenantContext::hasBooted()) {
                 $assocUser = AssociationUser::where('user_id', (int) Auth::id())
@@ -66,6 +68,7 @@ final class AppServiceProvider extends ServiceProvider
                     if (in_array($role, [RoleAssociation::Admin, RoleAssociation::Comptable], true)) {
                         $canSeeNdf = true;
                         $ndfPendingCount = NoteDeFrais::where('statut', StatutNoteDeFrais::Soumise->value)->count();
+                        $facturesPartenairesPendingCount = FacturePartenaireDeposee::where('statut', StatutFactureDeposee::Soumise->value)->count();
                     }
                 }
             }
@@ -76,6 +79,7 @@ final class AppServiceProvider extends ServiceProvider
                 'canSeeNdf' => $canSeeNdf,
                 'ndfPendingCount' => $ndfPendingCount,
                 'canSeeFacturesPartenaires' => $canSeeFacturesPartenaires,
+                'facturesPartenairesPendingCount' => $facturesPartenairesPendingCount,
             ]);
         });
     }

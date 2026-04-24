@@ -9,6 +9,7 @@ use App\Models\FacturePartenaireDeposee;
 use App\Services\Portail\FacturePartenaireService;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -26,6 +27,13 @@ final class Index extends Component
     public function mount(): void
     {
         $this->authorize('treat', FacturePartenaireDeposee::class);
+    }
+
+    #[On('transaction-saved')]
+    public function onTransactionSaved(): void
+    {
+        // No-op: Livewire re-renders the component automatically after any listener,
+        // so the depot list refreshes without requiring a manual page reload.
     }
 
     public function render(): View

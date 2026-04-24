@@ -558,7 +558,7 @@
                     </div>
                 </form>
 
-                @if ($ocrMode && ($pieceJointe || $existingPieceJointeNom))
+                @if ($ocrMode && ($pieceJointe || $existingPieceJointeNom || $factureDeposeeId || $incomingDocumentId))
                     <hr class="my-3">
                     <div style="height:40vh" x-data="{ pUrl: @js($incomingDocumentPreviewUrl) || sessionStorage.getItem('pj-ocr-preview-url') }">
                         <template x-if="pUrl">

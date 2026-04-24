@@ -71,7 +71,7 @@
 }
 </style>
 
-@props(['logoAsset', 'nomAsso', 'exerciceCloture', 'exerciceLabel', 'canSeeNdf' => false, 'ndfPendingCount' => 0, 'canSeeFacturesPartenaires' => false])
+@props(['logoAsset', 'nomAsso', 'exerciceCloture', 'exerciceLabel', 'canSeeNdf' => false, 'ndfPendingCount' => 0, 'canSeeFacturesPartenaires' => false, 'facturesPartenairesPendingCount' => 0])
 
 @php
 $activeGroup = match(true) {
@@ -150,8 +150,12 @@ $activeGroup = match(true) {
                             @if($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index'))
                             <li class="nav-item">
                                 <a href="{{ route('back-office.factures-partenaires.index') }}"
-                                   class="nav-link {{ request()->routeIs('back-office.factures-partenaires.*') ? 'active' : '' }}">
-                                    <i class="bi bi-file-earmark-text me-1"></i> Factures à comptabiliser
+                                   class="nav-link d-flex align-items-center justify-content-between
+                                          {{ request()->routeIs('back-office.factures-partenaires.*') ? 'active' : '' }}">
+                                    <span><i class="bi bi-file-earmark-text me-1"></i> Factures à comptabiliser</span>
+                                    @if($facturesPartenairesPendingCount > 0)
+                                        <span class="badge bg-warning text-dark ms-1">{{ $facturesPartenairesPendingCount }}</span>
+                                    @endif
                                 </a>
                             </li>
                             @endif

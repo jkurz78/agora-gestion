@@ -160,7 +160,7 @@ it('renseigne piece_jointe_nom sur la transaction avec numero et date de la fact
     $expectedNom = sprintf(
         'Facture %s du %s.pdf',
         $depot->numero_facture,
-        $depot->date_facture->format('d/m/Y'),
+        $depot->date_facture->format('d-m-Y'),
     );
 
     $transaction = Transaction::factory()->create([
@@ -175,6 +175,26 @@ it('renseigne piece_jointe_nom sur la transaction avec numero et date de la fact
 
     $transaction->refresh();
     expect($transaction->piece_jointe_nom)->toBe($expectedNom);
+});
+
+it('piece_jointe_nom ne contient ni / ni \\ (Symfony filename guard)', function () {
+    $tiers = Tiers::factory()->pourDepenses()->create();
+    $depot = makeDepotWithFile((int) $tiers->association_id, (int) $tiers->id);
+
+    $transaction = Transaction::factory()->create([
+        'association_id' => $tiers->association_id,
+        'tiers_id' => $tiers->id,
+        'piece_jointe_path' => null,
+        'piece_jointe_nom' => null,
+        'piece_jointe_mime' => null,
+    ]);
+
+    (new FacturePartenaireService)->comptabiliser($depot, $transaction);
+
+    $transaction->refresh();
+    expect($transaction->piece_jointe_nom)
+        ->not->toContain('/')
+        ->not->toContain('\\');
 });
 
 it('renseigne piece_jointe_mime = application/pdf sur la transaction', function () {

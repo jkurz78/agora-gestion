@@ -171,7 +171,7 @@ final class FacturePartenaireService
             $transaction->piece_jointe_nom = sprintf(
                 'Facture %s du %s.pdf',
                 $depot->numero_facture,
-                $depot->date_facture->format('d/m/Y'),
+                $depot->date_facture->format('d-m-Y'),
             );
             $transaction->piece_jointe_mime = 'application/pdf';
             $transaction->save();
