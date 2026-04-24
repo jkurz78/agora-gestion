@@ -14,6 +14,7 @@ use App\Http\Middleware\Portail\EnsureTiersChosen;
 use App\Livewire\Portail\ChooseTiers;
 use App\Livewire\Portail\FacturePartenaire\AtraiterIndex;
 use App\Livewire\Portail\FacturePartenaire\Depot;
+use App\Livewire\Portail\HistoriqueDepenses\Index as HistoriqueDepensesIndex;
 use App\Livewire\Portail\Home;
 use App\Livewire\Portail\Login;
 use App\Livewire\Portail\NoteDeFrais\Form;
@@ -52,6 +53,7 @@ Route::prefix('{association:slug}/portail')
             });
 
             Route::prefix('historique')->middleware(EnsurePourDepenses::class)->name('historique.')->group(function () {
+                Route::get('/', HistoriqueDepensesIndex::class)->name('index');
                 Route::get('/{transaction}/pdf', TransactionPdfController::class)
                     ->middleware('signed')
                     ->name('pdf');
