@@ -42,6 +42,7 @@ use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\EnsureTwoFactor;
 use App\Http\Middleware\VerifyTenantAsset;
 use App\Livewire\Auth\AssociationSelector;
+use App\Livewire\BackOffice\FacturePartenaire\Index as FpIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
@@ -189,6 +190,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
 // ── Back-office (routes sans préfixe de nom) ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->group(function (): void {
+        Route::get('/factures-partenaires/a-comptabiliser', FpIndex::class)
+            ->name('back-office.factures-partenaires.index');
         Route::get('/factures-partenaires/a-comptabiliser/{depot}/pdf', FacturePartenaireDepotPdfController::class)
             ->middleware(['signed', 'can:treat,depot'])
             ->name('back-office.factures-partenaires.pdf');
