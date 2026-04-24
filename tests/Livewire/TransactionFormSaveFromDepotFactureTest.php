@@ -237,6 +237,61 @@ it('DomainException de comptabiliser() => flash error — SKIPPED: FactureParten
     expect(true)->toBeTrue(); // placeholder pour ne pas laisser le test vide
 })->skip('FacturePartenaireService est final : non mockable via Mockery sans runkit/uopz');
 
+it('flash erreur système si le déplacement du PDF échoue pendant la comptabilisation', function (): void {
+    // Arrange : dépôt Soumise avec PDF sur disque (via helper makeDepot)
+    $depot = makeDepot(['tiers_id' => $this->tiers->id]);
+    $pdfPath = $depot->pdf_path;
+
+    // Pré-remplir le formulaire via dispatch puis set sur l'instance
+    // Note : on passe par instance()->save() (pas ->call('save')) pour que les
+    // session()->flash() du composant soient visibles dans la session du test.
+    $test = Livewire::actingAs($this->user)
+        ->test(TransactionForm::class);
+
+    $test->instance()->openFormFromDepotFacture($depot->id);
+
+    $instance = $test->instance();
+    $instance->mode_paiement = 'virement';
+    $instance->compte_id = $this->compte->id;
+    $instance->lignes = [[
+        'id' => null,
+        'sous_categorie_id' => (string) $this->sousCategorie->id,
+        'operation_id' => '',
+        'seance' => '',
+        'montant' => '100.00',
+        'notes' => '',
+        'piece_jointe_path' => null,
+        'piece_jointe_upload' => null,
+        'piece_jointe_remove' => false,
+        'piece_jointe_existing_url' => null,
+        'piece_jointe_filename' => null,
+    ]];
+
+    // Act : supprimer le PDF source juste avant save → Storage::move() renverra false
+    Storage::disk('local')->delete($pdfPath);
+
+    $instance->save();
+
+    // Assert session flash d'erreur système
+    expect((string) session()->get('error'))
+        ->toContain('Erreur système');
+
+    // Transaction créée (orpheline) — TransactionService::create() s'est exécuté avant l'échec
+    expect(Transaction::count())->toBe(1);
+
+    // Dépôt inchangé (comptabiliser() a échoué dans son DB::transaction interne)
+    $depot->refresh();
+    expect($depot->statut)->toBe(StatutFactureDeposee::Soumise);
+    expect($depot->transaction_id)->toBeNull();
+
+    // Event non émis
+    Event::assertNotDispatched(FactureDeposeeComptabilisee::class);
+
+    // Form NON reset (pour que l'utilisateur puisse alerter l'admin)
+    expect($instance->showForm)->toBeTrue();
+    expect($instance->factureDeposeeId)->toBe($depot->id);
+});
+
 it('retryOcr() en mode dépôt : re-appelle analyzeFromPath avec le même contexte', function () {
     $this->association->update(['anthropic_api_key' => 'sk-ant-fake']);
 

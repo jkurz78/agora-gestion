@@ -31,6 +31,7 @@ use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -642,6 +643,17 @@ final class TransactionForm extends Component
                     // La Transaction a été créée, mais la comptabilisation du dépôt a échoué.
                     // On garde le form ouvert (pas de resetForm) pour que l'utilisateur puisse retenter
                     // ou corriger. factureDeposeeId reste renseigné.
+                    return;
+                } catch (\RuntimeException $e) {
+                    // Erreur système (déplacement disque, etc.). La Transaction est créée mais orpheline.
+                    // Loguer pour investigation ; le comptable ne peut rien faire sans intervention admin.
+                    Log::error('portail.facture-partenaire.comptabilisation-echec', [
+                        'depot_id' => $this->factureDeposeeId,
+                        'transaction_id' => (int) $tx->id,
+                        'exception' => $e->getMessage(),
+                    ]);
+                    session()->flash('error', 'Erreur système lors de la comptabilisation. La transaction a été créée mais non rattachée ; contactez l\'administrateur.');
+
                     return;
                 }
             }
