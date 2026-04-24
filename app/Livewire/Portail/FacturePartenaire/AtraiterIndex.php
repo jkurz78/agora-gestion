@@ -40,9 +40,16 @@ final class AtraiterIndex extends Component
         $tiers = Auth::guard('tiers-portail')->user();
 
         $depots = FacturePartenaireDeposee::where('tiers_id', $tiers->id)
-            ->where('statut', StatutFactureDeposee::Soumise)
-            ->orderByDesc('date_facture')
+            ->whereIn('statut', [
+                StatutFactureDeposee::Soumise,
+                StatutFactureDeposee::Rejetee,
+            ])
             ->get()
+            ->sortBy(fn (FacturePartenaireDeposee $d) => [
+                $d->statut === StatutFactureDeposee::Rejetee ? 0 : 1,
+                -$d->created_at->timestamp,
+            ])
+            ->values()
             ->map(function (FacturePartenaireDeposee $depot) {
                 $depot->pdf_url = URL::signedRoute('portail.factures.pdf', [
                     'association' => $this->association->slug,
