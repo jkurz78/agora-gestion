@@ -153,10 +153,15 @@ it('renseigne piece_jointe_path sur la transaction avec le basename du fichier',
     expect($transaction->piece_jointe_path)->toBe($basename);
 });
 
-it('renseigne piece_jointe_nom sur la transaction', function () {
+it('renseigne piece_jointe_nom sur la transaction avec numero et date de la facture', function () {
     $tiers = Tiers::factory()->pourDepenses()->create();
     $depot = makeDepotWithFile((int) $tiers->association_id, (int) $tiers->id);
-    $basename = basename($depot->pdf_path);
+
+    $expectedNom = sprintf(
+        'Facture %s du %s.pdf',
+        $depot->numero_facture,
+        $depot->date_facture->format('d/m/Y'),
+    );
 
     $transaction = Transaction::factory()->create([
         'association_id' => $tiers->association_id,
@@ -169,7 +174,7 @@ it('renseigne piece_jointe_nom sur la transaction', function () {
     (new FacturePartenaireService)->comptabiliser($depot, $transaction);
 
     $transaction->refresh();
-    expect($transaction->piece_jointe_nom)->toBe($basename);
+    expect($transaction->piece_jointe_nom)->toBe($expectedNom);
 });
 
 it('renseigne piece_jointe_mime = application/pdf sur la transaction', function () {
@@ -285,6 +290,29 @@ it('lève DomainException si le dépôt est déjà au statut Traitee', function 
         'tiers_id' => $tiers->id,
         'pdf_path' => $pdfPath,
     ]);
+
+    $transaction = Transaction::factory()->create([
+        'association_id' => $tiers->association_id,
+        'tiers_id' => $tiers->id,
+        'piece_jointe_path' => null,
+        'piece_jointe_nom' => null,
+        'piece_jointe_mime' => null,
+    ]);
+
+    expect(fn () => (new FacturePartenaireService)->comptabiliser($depot, $transaction))
+        ->toThrow(DomainException::class);
+});
+
+// ---------------------------------------------------------------------------
+// 6b. Guard depot Rejetee
+// ---------------------------------------------------------------------------
+it('lève DomainException si le dépôt est au statut Rejetee', function () {
+    $tiers = Tiers::factory()->pourDepenses()->create();
+    $depot = makeDepotWithFile((int) $tiers->association_id, (int) $tiers->id);
+
+    // Override statut to Rejetee without going through service logic
+    $depot->statut = StatutFactureDeposee::Rejetee;
+    $depot->save();
 
     $transaction = Transaction::factory()->create([
         'association_id' => $tiers->association_id,
