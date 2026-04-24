@@ -6,6 +6,7 @@ use App\Enums\StatutFactureDeposee;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\Tiers;
 use App\Services\Portail\FacturePartenaireService;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -171,4 +172,22 @@ it('accepte date_facture en tant qu\'objet Carbon', function () {
 
     expect($depot->date_facture->format('Y-m-d'))->toBe('2026-03-15');
     Storage::disk('local')->assertExists($depot->pdf_path);
+});
+
+it('rolls back the record when PDF storage fails', function () {
+    $tiers = Tiers::factory()->pourDepenses()->create();
+    $pdf = UploadedFile::fake()->create('facture.pdf', 512, 'application/pdf');
+
+    $failingDisk = Mockery::mock(Filesystem::class);
+    $failingDisk->shouldReceive('putFileAs')->andReturn(false);
+    Storage::set('local', $failingDisk);
+
+    $service = new FacturePartenaireService;
+
+    expect(fn () => $service->submit($tiers, [
+        'date_facture' => '2026-03-15',
+        'numero_facture' => 'FACT-2026-001',
+    ], $pdf))->toThrow(RuntimeException::class);
+
+    expect(FacturePartenaireDeposee::count())->toBe(0);
 });

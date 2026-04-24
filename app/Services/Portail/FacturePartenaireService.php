@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Portail;
 
+use App\Enums\StatutFactureDeposee;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\Tiers;
 use Illuminate\Http\UploadedFile;
@@ -23,7 +24,10 @@ final class FacturePartenaireService
 
             $pdfPath = $this->buildPdfPath($tiers, $numero, $date);
 
-            Storage::disk('local')->putFileAs(dirname($pdfPath), $pdf, basename($pdfPath));
+            $stored = Storage::disk('local')->putFileAs(dirname($pdfPath), $pdf, basename($pdfPath));
+            if ($stored === false) {
+                throw new \RuntimeException("Échec de l'écriture du fichier PDF : {$pdfPath}");
+            }
 
             $depot = FacturePartenaireDeposee::create([
                 'association_id' => $tiers->association_id,
@@ -32,7 +36,7 @@ final class FacturePartenaireService
                 'numero_facture' => $numero,
                 'pdf_path' => $pdfPath,
                 'pdf_taille' => $pdf->getSize(),
-                'statut' => 'soumise',
+                'statut' => StatutFactureDeposee::Soumise,
             ]);
 
             Log::info('portail.facture-partenaire.deposee', [
