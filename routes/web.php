@@ -186,11 +186,13 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/transactions/{transaction}/lignes/{ligne}/piece-jointe', TransactionLignePieceJointeController::class)->name('transactions.piece-jointe-ligne');
     });
 
-// ── Back-office Factures Partenaires ──
+// ── Back-office (routes sans préfixe de nom) ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
-    ->get('/factures-partenaires/a-comptabiliser/{depot}/pdf', FacturePartenaireDepotPdfController::class)
-    ->middleware(['signed', 'can:treat,depot'])
-    ->name('back-office.factures-partenaires.pdf');
+    ->group(function (): void {
+        Route::get('/factures-partenaires/a-comptabiliser/{depot}/pdf', FacturePartenaireDepotPdfController::class)
+            ->middleware(['signed', 'can:treat,depot'])
+            ->name('back-office.factures-partenaires.pdf');
+    });
 
 // ── Banques ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])

@@ -57,10 +57,15 @@ it('[pdf-bo] Admin authentifié avec URL signée valide obtient le PDF → 200',
         'depot' => $depot->id,
     ]);
 
-    $this->actingAs($this->adminUser)
-        ->get($signedUrl)
-        ->assertStatus(200)
+    $response = $this->actingAs($this->adminUser)->get($signedUrl);
+
+    $response->assertStatus(200)
         ->assertHeader('Content-Type', 'application/pdf');
+
+    expect($response->headers->get('Content-Disposition'))
+        ->toStartWith('inline')
+        ->toContain('Facture ')
+        ->toContain($depot->numero_facture);
 });
 
 it('[pdf-bo] Comptable authentifié avec URL signée valide obtient le PDF → 200', function () {
@@ -186,4 +191,22 @@ it('[pdf-bo] Gestionnaire → 403 (policy::treat refuse)', function () {
     $this->actingAs($gestionnaire)
         ->get($signedUrl)
         ->assertStatus(403);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 5 : Fichier PDF absent du disque → 404
+// ---------------------------------------------------------------------------
+
+it('[pdf-bo] renvoie 404 si le fichier PDF est absent du disque', function (): void {
+    // Storage::fake() is empty — no file is stored
+    $depot = FacturePartenaireDeposee::factory()->create([
+        'association_id' => $this->asso->id,
+        'tiers_id' => $this->tiers->id,
+        'pdf_path' => 'associations/'.$this->asso->id.'/factures-deposees/2026/04/missing.pdf',
+        'numero_facture' => 'FACT-MISSING',
+    ]);
+
+    $url = URL::signedRoute('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
+
+    $this->actingAs($this->adminUser)->get($url)->assertNotFound();
 });
