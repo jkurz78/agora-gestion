@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutFactureDeposee;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\Tiers;
 use App\Services\Portail\FacturePartenaireService;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -46,26 +49,29 @@ it('supprime le fichier PDF du disk local', function () {
     Storage::disk('local')->assertMissing($pdfPath);
 });
 
-it('supprime le fichier après le record (Option A)', function () {
-    // Vérifie que la suppression BDD arrive AVANT la suppression fichier
-    // (Option A choisie : si fichier orphelin reste, c'est un problème mineur
-    // vs Option B où un enregistrement orphelin BDD serait plus grave)
+it('laisse le fichier intact si la suppression BDD échoue', function () {
+    // Setup: create a real depot + file
     $tiers = Tiers::factory()->pourDepenses()->create();
-    $pdfPath = 'associations/1/factures-deposees/2026/03/2026-03-15-fact-001-xyz789.pdf';
+    $pdfPath = "associations/{$tiers->association_id}/factures-deposees/2026/03/2026-03-15-fact-001-abc123.pdf";
     Storage::disk('local')->put($pdfPath, 'pdf-content');
-
-    $depot = FacturePartenaireDeposee::factory()->soumise()->create([
+    $depot = FacturePartenaireDeposee::factory()->create([
         'tiers_id' => $tiers->id,
         'association_id' => $tiers->association_id,
         'pdf_path' => $pdfPath,
+        'statut' => StatutFactureDeposee::Soumise,
     ]);
 
-    $service = new FacturePartenaireService;
-    $service->oublier($depot, $tiers);
+    // Force DB delete to throw
+    DB::shouldReceive('transaction')->andReturnUsing(function ($callback) {
+        throw new QueryException('mysql', 'DELETE', [], new Exception('simulated'));
+    });
 
-    // Both record and file must be gone
-    expect(FacturePartenaireDeposee::withoutGlobalScopes()->find($depot->id))->toBeNull();
-    Storage::disk('local')->assertMissing($pdfPath);
+    expect(fn () => (new FacturePartenaireService)->oublier($depot, $tiers))
+        ->toThrow(QueryException::class);
+
+    // Both record and file must remain
+    expect(FacturePartenaireDeposee::withoutGlobalScopes()->find($depot->id))->not->toBeNull();
+    Storage::disk('local')->assertExists($pdfPath);
 });
 
 it('refuse si tiers_id ne correspond pas au tiers passé', function () {
