@@ -23,6 +23,7 @@
                         <th>Date facture</th>
                         <th>Numéro</th>
                         <th>Déposée le</th>
+                        <th>Statut</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -35,6 +36,16 @@
                             <td>{{ $depot->numero_facture }}</td>
                             <td data-sort="{{ $depot->created_at?->format('Y-m-d') }}">
                                 {{ $depot->created_at?->format('d/m/Y') }}
+                            </td>
+                            <td>
+                                @if ($depot->statut === \App\Enums\StatutFactureDeposee::Rejetee)
+                                    <span class="badge bg-danger">Rejetée</span>
+                                    @if ($depot->motif_rejet)
+                                        <div class="small text-muted mt-1">{{ $depot->motif_rejet }}</div>
+                                    @endif
+                                @else
+                                    <span class="badge bg-secondary">En attente de traitement</span>
+                                @endif
                             </td>
                             <td class="text-end">
                                 <div class="d-flex gap-1 justify-content-end">
