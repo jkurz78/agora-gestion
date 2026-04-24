@@ -9,12 +9,14 @@ use App\Enums\RoleAssociation;
 use App\Enums\StatutNoteDeFrais;
 use App\Models\Association;
 use App\Models\AssociationUser;
+use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
 use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\TransactionObserver;
+use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
@@ -32,6 +34,7 @@ final class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(FacturePartenaireDeposee::class, FacturePartenaireDeposeePolicy::class);
         Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
 
         Association::observe(AssociationObserver::class);
