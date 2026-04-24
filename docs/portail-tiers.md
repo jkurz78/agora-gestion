@@ -323,6 +323,136 @@ Le comptable conserve la description fiscale nécessaire à sa validation, la ca
 
 **Architecture extensible** : `App\Services\NoteDeFrais\LigneTypes\LigneTypeInterface` + `LigneTypeRegistry` préparent l'ajout futur de types normés (repas, hébergement) — chaque nouveau type ajoute un case à l'enum `NoteDeFraisLigneType` + une classe strategy, sans migration.
 
+## Factures partenaires (Slice 4, livré 2026-04-23)
+
+Statut : livré 2026-04-23, branche feat/portail-factures-partenaires.
+
+Specs complètes : [`docs/specs/2026-04-23-portail-factures-partenaires.md`](specs/2026-04-23-portail-factures-partenaires.md).
+
+### Pourquoi un écran dédié, distinct des NDF
+
+Les **Notes de frais** couvrent les remboursements de frais avancés par un bénévole
+(transport, fournitures, repas). Le bénévole connaît la nature de ses dépenses et
+peut les catégoriser lui-même.
+
+Les **Factures partenaires** couvrent une prestation facturée par un prestataire
+externe à l'association. Le partenaire ne maîtrise pas la lecture comptable de
+l'asso : il dépose un PDF, une date et un numéro — c'est tout. La richesse comptable
+(compte, sous-catégorie, mode de paiement) est délégée au comptable.
+
+Les deux fonctionnalités partagent la même garde d'authentification OTP mais opèrent
+sur des modèles et des flux distincts.
+
+### Flux utilisateur (partenaire)
+
+#### Écran 1 — Vos factures à traiter
+
+Accessible via `/portail/{slug}/factures`.
+
+- La liste affiche les dépôts du Tiers connecté dont le statut est `soumise` ou `rejetee`.
+- Le bouton "Déposer une facture" ouvre le composant `Depot` (même page, via `$screen`).
+- Le formulaire de dépôt demande : **date de la facture**, **numéro de facture**, **fichier PDF** (PDF uniquement, 10 Mo max).
+- Après dépôt, la facture apparaît en statut **Soumise** dans la liste.
+- Un dépôt en statut `soumise` peut être **supprimé** par le partenaire via modale Bootstrap (oubli total). La suppression est un hard delete : l'enregistrement et le fichier PDF sont effacés définitivement. Il n'y a aucune trace résiduelle — comme si le dépôt n'avait jamais eu lieu.
+- Une facture en statut `traitee` ne peut plus être supprimée.
+
+#### Écran 2 — Historique de vos dépenses
+
+Accessible via `/portail/{slug}/historique`.
+
+- Affiche toutes les **Transactions de dépense** de l'asso liées au Tiers connecté.
+- Colonnes : date, référence, montant, statut de règlement (En attente / Réglée), lien PDF si une pièce jointe est disponible.
+- Les données sont projetées via `TransactionDepensePubliqueResource` (whitelist stricte — seuls les champs nécessaires sont exposés).
+- **Les Transactions issues d'une Note de frais sont exclues** (`whereDoesntHave('noteDeFrais')`) pour éviter tout doublon avec l'écran "Vos notes de frais".
+
+### Architecture technique
+
+#### Modèle
+
+`App\Models\FacturePartenaireDeposee` — étend `TenantModel` (scope global fail-closed
+sur `association_id`). Pas de `SoftDeletes` : un dépôt supprimé est oublié sans trace.
+
+Trois statuts :
+
+| Statut | Signification |
+|---|---|
+| `soumise` | Dépôt reçu, non encore traité par le comptable |
+| `traitee` | Comptabilisé (Transaction créée) |
+| `rejetee` | Rejeté par le comptable (motif disponible) |
+
+#### Service
+
+`App\Services\Portail\FacturePartenaireService` expose trois méthodes :
+
+- `submit(Tiers, FactureDepotData)` — valide, stocke le fichier, persiste le modèle en statut `soumise`. Émet `FactureDeposeeComptabilisee` lors de la comptabilisation (voir ci-dessous).
+- `oublier(FacturePartenaireDeposee)` — vérifie que le Tiers connecté est bien le déposant et que la facture est en statut `soumise`, supprime le fichier physique puis hard-delete l'enregistrement.
+- `comptabiliser(FacturePartenaireDeposee, ComptabilisationData)` — crée la Transaction via `TransactionService`, met à jour le statut à `traitee`, émet `App\Events\Portail\FactureDeposeeComptabilisee`. Méthode testée unitairement, sans interface admin dans cette itération (voir §Back-office hors MVP ci-dessous).
+
+#### Stockage
+
+```
+storage/app/associations/{id}/factures-deposees/{Y}/{m}/{file}.pdf
+```
+
+Disque `local` (privé). Le fichier n'est jamais servi directement par le web server ;
+toute consultation passe par une **route signée** qui délègue à `Storage::response()`.
+
+#### Routes portail
+
+```
+GET  /portail/{slug}/factures
+     └─ AtraiterIndex — liste + formulaire Depot (via $screen)
+
+GET  /portail/{slug}/historique
+     └─ HistoriqueDepenses\Index — Transactions de dépense (hors NDF)
+
+GET  /portail/{slug}/factures/{facture}/pdf
+     └─ route signée → Storage::response (lecture seule, vérifie Tiers courant)
+```
+
+#### Composants Livewire
+
+- `App\Livewire\Portail\FacturePartenaire\AtraiterIndex` — liste des dépôts en attente + toggle vers le sous-composant `Depot`.
+- `App\Livewire\Portail\FacturePartenaire\Depot` — formulaire de dépôt (date, numéro, PDF).
+- `App\Livewire\Portail\HistoriqueDepenses\Index` — liste paginée des Transactions de dépense via `TransactionDepensePubliqueResource`.
+
+#### Resource publique
+
+`App\Http\Resources\Portail\TransactionDepensePubliqueResource` — whitelist stricte :
+`date`, `reference`, `montant`, `statut_reglement`, `pdf_url` (signed URL ou `null`).
+Aucun champ comptable interne (compte, sous-catégorie, libellé interne) n'est exposé.
+
+#### Événement
+
+`App\Events\Portail\FactureDeposeeComptabilisee` — émis par `comptabiliser()` lors du
+passage en statut `traitee`. Non exploité dans ce MVP ; prévu pour déclencher une
+notification email au partenaire dans une slice ultérieure.
+
+#### Invariants multi-tenant
+
+- `TenantScope` fail-closed sur `FacturePartenaireDeposee` et `Transaction` — un partenaire d'une asso A ne peut pas voir les données d'une asso B.
+- `oublier()` vérifie explicitement `facture->tiers_id === auth()->id()` avant de supprimer.
+- Stockage scopé par `associations/{id}/` (ID numérique immuable).
+
+### Back-office hors MVP
+
+La méthode `FacturePartenaireService::comptabiliser()` est testée unitairement et
+prête à l'emploi. Aucun écran comptable côté admin n'est livré dans cette itération.
+
+La vision cible (agrégateur "Pièces à traiter" unifiant NDF soumises et factures
+partenaires soumises) est décrite dans
+[`docs/specs/2026-04-23-portail-factures-partenaires.md`](specs/2026-04-23-portail-factures-partenaires.md)
+section "Vision back-office".
+
+### Hors scope MVP
+
+- Rejet UI côté admin (statut `rejetee` existe, interface manquante).
+- Notifications email au partenaire (dépôt reçu, traité, rejeté).
+- Multi-PDF par dépôt (un seul fichier par enregistrement).
+- Factur-X / validation structurelle du PDF.
+- Détection de doublons (même numéro, même tiers, même mois).
+- Écran back-office "Pièces à traiter" (agrégateur NDF + factures).
+
 ## Dette technique
 
 - Champ `archived` sur `Tiers` : scénarios "Tiers archivé" skippés (décision Q1). Le service traite un Tiers archivé comme email inconnu ; à activer quand le champ `archived` sera ajouté au modèle.
