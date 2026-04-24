@@ -73,13 +73,14 @@ final class FacturePartenaireService
 
         DB::transaction(function () use ($depot, $tiers): void {
             $pdfPath = $depot->pdf_path; // capture before delete
+            $depotId = $depot->id;       // capture before delete
 
             $depot->delete(); // hard delete (no SoftDeletes on this model)
 
             Storage::disk('local')->delete($pdfPath); // best-effort; silent if file absent
 
             Log::info('portail.facture-partenaire.oubliee', [
-                'depot_id' => $depot->id,
+                'depot_id' => $depotId,
                 'tiers_id' => $tiers->id,
             ]);
         });
