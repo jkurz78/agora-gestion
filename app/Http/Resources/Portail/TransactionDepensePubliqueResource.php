@@ -23,7 +23,8 @@ final class TransactionDepensePubliqueResource extends JsonResource
     {
         return [
             'date_piece' => $this->resource->date->format('Y-m-d'),
-            'reference' => $this->resource->numero_piece ?? $this->resource->libelle,
+            'notre_ref' => $this->resource->numero_piece ?? $this->resource->libelle,
+            'ref' => $this->resource->reference,
             'montant_ttc' => (float) $this->resource->montant_total,
             'statut_reglement' => $this->resource->statut_reglement->isEncaisse() ? 'Réglée' : 'En attente',
             'pdf_url' => $this->buildPdfUrl(),
