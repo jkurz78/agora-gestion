@@ -65,13 +65,17 @@ it('traitee_at is null when not set', function () {
     expect($fresh->traitee_at)->toBeNull();
 });
 
-it('casts statut to StatutFactureDeposee enum', function () {
-    $record = FacturePartenaireDeposee::factory()->create(['statut' => 'soumise']);
+it('casts statut to StatutFactureDeposee enum', function (string $raw, StatutFactureDeposee $expected) {
+    $record = FacturePartenaireDeposee::factory()->create(['statut' => $raw]);
     $fresh = FacturePartenaireDeposee::withoutGlobalScopes()->find($record->id);
 
     expect($fresh->statut)->toBeInstanceOf(StatutFactureDeposee::class);
-    expect($fresh->statut)->toBe(StatutFactureDeposee::Soumise);
-});
+    expect($fresh->statut)->toBe($expected);
+})->with([
+    'soumise' => ['soumise',  StatutFactureDeposee::Soumise],
+    'traitee' => ['traitee',  StatutFactureDeposee::Traitee],
+    'rejetee' => ['rejetee',  StatutFactureDeposee::Rejetee],
+]);
 
 it('statut defaults to Soumise on creation', function () {
     $record = FacturePartenaireDeposee::factory()->create();
