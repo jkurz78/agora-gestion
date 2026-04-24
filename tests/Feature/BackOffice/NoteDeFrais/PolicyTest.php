@@ -136,3 +136,20 @@ it('denies unauthenticated access (null user)', function (): void {
 
     expect($result)->toBeFalse();
 });
+
+// ── Test 9 : Revoked membership → false ──────────────────────────────────────
+
+it('denies User whose membership has been revoked', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+
+    $user = User::factory()->create();
+    $user->associations()->attach($association->id, [
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now()->subMonth(),
+        'revoked_at' => now(),
+    ]);
+
+    expect($user->can('treat', NoteDeFrais::class))->toBeFalse();
+});

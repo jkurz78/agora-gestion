@@ -79,6 +79,7 @@ final class NoteDeFraisPolicy
 
         $pivot = AssociationUser::where('user_id', (int) $user->id)
             ->where('association_id', (int) $tenantId)
+            ->whereNull('revoked_at')
             ->first();
 
         if ($pivot === null) {
