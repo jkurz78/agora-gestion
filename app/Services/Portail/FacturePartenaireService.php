@@ -119,8 +119,9 @@ final class FacturePartenaireService
 
             Event::dispatch(new FactureDeposeeRejetee($depot));
 
-            Log::info('facture_partenaire.rejetee', [
+            Log::info('portail.facture-partenaire.rejetee', [
                 'depot_id' => $depot->id,
+                'tiers_id' => $depot->tiers_id,
                 'motif' => $depot->motif_rejet,
             ]);
         });
