@@ -70,9 +70,12 @@ final class AppServiceProvider extends ServiceProvider
                 }
             }
 
+            $canSeeFacturesPartenaires = $canSeeNdf; // même règle d'accès (Admin/Comptable)
+
             $view->with([
                 'canSeeNdf' => $canSeeNdf,
                 'ndfPendingCount' => $ndfPendingCount,
+                'canSeeFacturesPartenaires' => $canSeeFacturesPartenaires,
             ]);
         });
     }

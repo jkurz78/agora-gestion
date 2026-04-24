@@ -126,6 +126,7 @@
                     :exercice-label="$exerciceLabel"
                     :can-see-ndf="$canSeeNdf ?? false"
                     :ndf-pending-count="$ndfPendingCount ?? 0"
+                    :can-see-factures-partenaires="$canSeeFacturesPartenaires ?? false"
                 />
             </div>
         </div>
