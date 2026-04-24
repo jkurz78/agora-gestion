@@ -88,20 +88,22 @@ it('conserve le fichier PDF sur le disk après rejet', function () {
 // ---------------------------------------------------------------------------
 // 5. Log émis avec la bonne clé et le contexte attendu
 // ---------------------------------------------------------------------------
-it('émet le log facture_partenaire.rejetee avec depot_id et motif', function () {
+it('émet le log portail.facture-partenaire.rejetee avec depot_id, tiers_id et motif', function () {
     Log::spy();
 
     $tiers = Tiers::factory()->pourDepenses()->create();
     $depot = makeDepotSoumiseAvecFichier((int) $tiers->association_id, (int) $tiers->id);
     $depotId = $depot->id;
+    $tiersId = $tiers->id;
 
     (new FacturePartenaireService)->rejeter($depot, 'Pièce jointe incorrecte');
 
     Log::shouldHaveReceived('info')
         ->once()
-        ->withArgs(function (string $key, array $context) use ($depotId): bool {
-            return $key === 'facture_partenaire.rejetee'
+        ->withArgs(function (string $key, array $context) use ($depotId, $tiersId): bool {
+            return $key === 'portail.facture-partenaire.rejetee'
                 && (int) $context['depot_id'] === (int) $depotId
+                && (int) $context['tiers_id'] === (int) $tiersId
                 && isset($context['motif']);
         });
 });
