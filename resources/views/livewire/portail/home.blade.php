@@ -43,6 +43,34 @@
                         </div>
                     </a>
                 </div>
+
+                <div class="col-12">
+                    <a href="{{ \App\Support\PortailRoute::to('factures.index', $association) }}"
+                       class="card text-decoration-none text-dark h-100">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <i class="bi bi-file-earmark-pdf fs-2 text-primary"></i>
+                            <div>
+                                <h5 class="card-title mb-0">Vos factures à traiter</h5>
+                                <p class="card-text text-muted small mb-0">Déposer vos factures et suivre leur traitement</p>
+                            </div>
+                            <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="col-12">
+                    <a href="{{ \App\Support\PortailRoute::to('historique.index', $association) }}"
+                       class="card text-decoration-none text-dark h-100">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <i class="bi bi-clock-history fs-2 text-primary"></i>
+                            <div>
+                                <h5 class="card-title mb-0">Historique de vos dépenses</h5>
+                                <p class="card-text text-muted small mb-0">Suivi des règlements de l'association</p>
+                            </div>
+                            <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                        </div>
+                    </a>
+                </div>
             </div>
         </section>
     @endif
