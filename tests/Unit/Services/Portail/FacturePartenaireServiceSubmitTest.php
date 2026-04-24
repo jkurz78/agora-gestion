@@ -93,7 +93,10 @@ it('le path inclut le slug du numéro et l\'année/mois de la date facture', fun
 
 it('le nom de fichier généré ne contient pas le nom uploadé original', function () {
     $tiers = Tiers::factory()->pourDepenses()->create();
-    $pdf = UploadedFile::fake()->create('secret.pdf', 512, 'application/pdf');
+    // Use a distinctive filename whose tokens are absent from all other path components
+    // (association id, date, numero slug) so the assertion is meaningful: it would
+    // fail if the implementation leaked the original filename into the stored path.
+    $pdf = UploadedFile::fake()->create('original-uploaded-name.pdf', 512, 'application/pdf');
 
     $service = new FacturePartenaireService;
     $depot = $service->submit($tiers, [
@@ -101,7 +104,7 @@ it('le nom de fichier généré ne contient pas le nom uploadé original', funct
         'numero_facture' => 'FACT-2026-001',
     ], $pdf);
 
-    expect(Str::contains($depot->pdf_path, 'secret'))->toBeFalse();
+    expect(Str::contains($depot->pdf_path, 'original-uploaded-name'))->toBeFalse();
 });
 
 it('le path respecte le format complet associations/{id}/factures-deposees/{Y}/{m}/{Y-m-d}-{slug}-{rand6}.pdf', function () {
