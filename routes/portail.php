@@ -12,6 +12,8 @@ use App\Http\Middleware\Portail\EnforceSessionLifetime;
 use App\Http\Middleware\Portail\EnsurePourDepenses;
 use App\Http\Middleware\Portail\EnsureTiersChosen;
 use App\Livewire\Portail\ChooseTiers;
+use App\Livewire\Portail\FacturePartenaire\AtraiterIndex;
+use App\Livewire\Portail\FacturePartenaire\Depot;
 use App\Livewire\Portail\Home;
 use App\Livewire\Portail\Login;
 use App\Livewire\Portail\NoteDeFrais\Form;
@@ -42,6 +44,8 @@ Route::prefix('{association:slug}/portail')
             });
 
             Route::prefix('factures')->middleware(EnsurePourDepenses::class)->name('factures.')->group(function () {
+                Route::get('/', AtraiterIndex::class)->name('index');
+                Route::get('/depot', Depot::class)->name('create');
                 Route::get('/{depot}/pdf', FacturePartenaireDeposeePdfController::class)
                     ->middleware('signed')
                     ->name('pdf');
