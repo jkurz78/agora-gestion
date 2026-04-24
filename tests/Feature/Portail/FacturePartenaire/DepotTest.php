@@ -10,6 +10,7 @@ use App\Tenant\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
     TenantContext::clear();
@@ -45,7 +46,7 @@ it('depot: validation sans PDF retourne erreur', function () {
     $component->numero_facture = 'FACT-001';
     $component->pdf = null;
 
-    expect(fn () => $component->submit())->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => $component->submit())->toThrow(ValidationException::class);
 });
 
 // ---------------------------------------------------------------------------
@@ -61,7 +62,7 @@ it('depot: validation sans date retourne erreur', function () {
     $component->numero_facture = 'FACT-001';
     $component->pdf = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
 
-    expect(fn () => $component->submit())->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => $component->submit())->toThrow(ValidationException::class);
 });
 
 // ---------------------------------------------------------------------------
@@ -77,7 +78,7 @@ it('depot: validation avec date future retourne erreur', function () {
     $component->numero_facture = 'FACT-001';
     $component->pdf = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
 
-    expect(fn () => $component->submit())->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => $component->submit())->toThrow(ValidationException::class);
 });
 
 // ---------------------------------------------------------------------------
@@ -93,7 +94,7 @@ it('depot: validation sans numéro retourne erreur', function () {
     $component->numero_facture = null;
     $component->pdf = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
 
-    expect(fn () => $component->submit())->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => $component->submit())->toThrow(ValidationException::class);
 });
 
 // ---------------------------------------------------------------------------
@@ -109,7 +110,7 @@ it('depot: validation avec numéro > 50 caractères retourne erreur', function (
     $component->numero_facture = str_repeat('A', 51);
     $component->pdf = UploadedFile::fake()->create('facture.pdf', 100, 'application/pdf');
 
-    expect(fn () => $component->submit())->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => $component->submit())->toThrow(ValidationException::class);
 });
 
 // ---------------------------------------------------------------------------
@@ -125,7 +126,7 @@ it('depot: validation avec fichier non-PDF retourne erreur', function () {
     $component->numero_facture = 'FACT-001';
     $component->pdf = UploadedFile::fake()->create('image.jpg', 100, 'image/jpeg');
 
-    expect(fn () => $component->submit())->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => $component->submit())->toThrow(ValidationException::class);
 });
 
 // ---------------------------------------------------------------------------
@@ -141,7 +142,7 @@ it('depot: validation avec PDF > 10 Mo retourne erreur', function () {
     $component->numero_facture = 'FACT-001';
     $component->pdf = UploadedFile::fake()->create('gros.pdf', 10241, 'application/pdf');
 
-    expect(fn () => $component->submit())->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => $component->submit())->toThrow(ValidationException::class);
 });
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\StatutFactureDeposee;
 use App\Livewire\Portail\FacturePartenaire\AtraiterIndex;
 use App\Models\Association;
 use App\Models\FacturePartenaireDeposee;
@@ -118,7 +117,7 @@ it('atraiter-index: oublier lève DomainException si le dépôt appartient à un
     $component = new AtraiterIndex;
     $component->mount($this->asso);
 
-    expect(fn () => $component->oublier((int) $depot->id))->toThrow(\DomainException::class);
+    expect(fn () => $component->oublier((int) $depot->id))->toThrow(DomainException::class);
 });
 
 // ---------------------------------------------------------------------------
