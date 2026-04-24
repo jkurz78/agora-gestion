@@ -356,6 +356,19 @@ Accessible via `/portail/{slug}/factures`.
 - Un dépôt en statut `soumise` peut être **supprimé** par le partenaire via modale Bootstrap (oubli total). La suppression est un hard delete : l'enregistrement et le fichier PDF sont effacés définitivement. Il n'y a aucune trace résiduelle — comme si le dépôt n'avait jamais eu lieu.
 - Une facture en statut `traitee` ne peut plus être supprimée.
 
+##### Dépôts rejetés côté portail
+
+Un dépôt rejeté par le comptable reste visible dans la boîte "Vos factures à traiter"
+avec un badge **Rejetée** et le motif communiqué par le comptable. Le partenaire peut
+alors :
+
+- **Supprimer** le dépôt rejeté (hard delete — même comportement qu'un dépôt soumis
+  supprimé : l'enregistrement et le fichier PDF sont effacés définitivement).
+- **Déposer une nouvelle facture** corrigée en cliquant "Déposer une facture" comme
+  à l'habitude.
+
+Le rejet n'envoie **pas** de notification email au partenaire (hors scope MVP).
+
 #### Écran 2 — Historique de vos dépenses
 
 Accessible via `/portail/{slug}/historique`.
