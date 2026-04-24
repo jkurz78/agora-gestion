@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
+use App\Http\Controllers\Portail\TransactionPdfController;
 use App\Http\Middleware\Portail\Authenticate;
 use App\Http\Middleware\Portail\BootTenantFromSlug;
 use App\Http\Middleware\Portail\EnforceSessionLifetime;
@@ -37,6 +39,18 @@ Route::prefix('{association:slug}/portail')
                 Route::get('/nouvelle', Form::class)->name('create');
                 Route::get('/{noteDeFrais}/edit', Form::class)->name('edit');
                 Route::get('/{noteDeFrais}', Show::class)->name('show');
+            });
+
+            Route::prefix('factures')->middleware(EnsurePourDepenses::class)->name('factures.')->group(function () {
+                Route::get('/{depot}/pdf', FacturePartenaireDeposeePdfController::class)
+                    ->middleware('signed')
+                    ->name('pdf');
+            });
+
+            Route::prefix('historique')->middleware(EnsurePourDepenses::class)->name('historique.')->group(function () {
+                Route::get('/{transaction}/pdf', TransactionPdfController::class)
+                    ->middleware('signed')
+                    ->name('pdf');
             });
         });
     });
