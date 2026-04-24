@@ -12,8 +12,10 @@ declare(strict_types=1);
  * Active only when MonoAssociation::isActive() === true (RequireMono middleware).
  */
 
+use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
+use App\Http\Controllers\Portail\TransactionPdfController;
 use App\Http\Middleware\MonoAssociationResolver;
 use App\Http\Middleware\Portail\Authenticate;
 use App\Http\Middleware\Portail\EnforceSessionLifetime;
@@ -47,6 +49,18 @@ Route::prefix('portail')
                 Route::get('/nouvelle', Form::class)->name('create');
                 Route::get('/{noteDeFrais}/edit', Form::class)->name('edit');
                 Route::get('/{noteDeFrais}', Show::class)->name('show');
+            });
+
+            Route::prefix('factures')->middleware(EnsurePourDepenses::class)->name('factures.')->group(function (): void {
+                Route::get('/{depot}/pdf', FacturePartenaireDeposeePdfController::class)
+                    ->middleware('signed')
+                    ->name('pdf');
+            });
+
+            Route::prefix('historique')->middleware(EnsurePourDepenses::class)->name('historique.')->group(function (): void {
+                Route::get('/{transaction}/pdf', TransactionPdfController::class)
+                    ->middleware('signed')
+                    ->name('pdf');
             });
         });
     });
