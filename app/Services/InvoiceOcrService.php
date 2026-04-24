@@ -190,6 +190,7 @@ PROMPT;
      * attendues sont fournies. Retourne une chaîne vide si aucune clé reconnue n'est présente.
      *
      * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int, reference_attendue?: string, date_attendue?: string}  $context
+     * @return string Empty string if $context contains no recognized key.
      */
     private function buildContextBlock(array $context): string
     {
