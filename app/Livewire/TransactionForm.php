@@ -253,12 +253,7 @@ final class TransactionForm extends Component
             return;
         }
 
-        $depot->loadMissing('tiers');
-        $context = [
-            'tiers_attendu' => (string) ($depot->tiers?->displayName() ?? ''),
-            'reference_attendue' => (string) $depot->numero_facture,
-            'date_attendue' => $depot->date_facture->format('Y-m-d'),
-        ];
+        $context = $this->buildDepotOcrContext($depot);
 
         $this->runOcrAnalysis(fn ($svc) => $svc->analyzeFromPath($diskPath, 'application/pdf', $context));
     }
@@ -765,12 +760,7 @@ final class TransactionForm extends Component
 
                 return;
             }
-            $depot->loadMissing('tiers');
-            $context = [
-                'tiers_attendu' => (string) ($depot->tiers?->displayName() ?? ''),
-                'reference_attendue' => (string) $depot->numero_facture,
-                'date_attendue' => $depot->date_facture->format('Y-m-d'),
-            ];
+            $context = $this->buildDepotOcrContext($depot);
             $this->runOcrAnalysis(fn ($svc) => $svc->analyzeFromPath($diskPath, 'application/pdf', $context));
 
             return;
@@ -858,6 +848,20 @@ final class TransactionForm extends Component
         }
 
         app(FacturePartenaireService::class)->comptabiliser($depot, $tx);
+    }
+
+    /**
+     * @return array{tiers_attendu: string, reference_attendue: string, date_attendue: string}
+     */
+    private function buildDepotOcrContext(FacturePartenaireDeposee $depot): array
+    {
+        $depot->loadMissing('tiers');
+
+        return [
+            'tiers_attendu' => (string) ($depot->tiers?->displayName() ?? ''),
+            'reference_attendue' => (string) $depot->numero_facture,
+            'date_attendue' => $depot->date_facture->format('Y-m-d'),
+        ];
     }
 
     /**
