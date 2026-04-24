@@ -397,11 +397,15 @@ it('comptabiliser on a Traitee depot flashes an error and does not dispatch', fu
 
     $this->actingAs($admin);
 
+    // Verify flash error via direct instance call (session() visible this way)
     $test = Livewire::test(Index::class);
     $test->instance()->comptabiliser($depot->id);
-
-    expect($test->instance())->not->toBeNull(); // component alive
     expect(session('error'))->not->toBeNull();
+
+    // Verify no event dispatched via Livewire fluent harness
+    Livewire::test(Index::class)
+        ->call('comptabiliser', $depot->id)
+        ->assertNotDispatched('open-transaction-form-from-depot-facture');
 });
 
 // ── Test 16 : Comptabiliser — statut Rejetee → flash error, pas de dispatch ──
@@ -421,10 +425,15 @@ it('comptabiliser on a Rejetee depot flashes an error and does not dispatch', fu
 
     $this->actingAs($admin);
 
+    // Verify flash error via direct instance call (session() visible this way)
     $test = Livewire::test(Index::class);
     $test->instance()->comptabiliser($depot->id);
-
     expect(session('error'))->not->toBeNull();
+
+    // Verify no event dispatched via Livewire fluent harness
+    Livewire::test(Index::class)
+        ->call('comptabiliser', $depot->id)
+        ->assertNotDispatched('open-transaction-form-from-depot-facture');
 });
 
 // ── Test 17 : Rejeter — flux complet ─────────────────────────────────────────
