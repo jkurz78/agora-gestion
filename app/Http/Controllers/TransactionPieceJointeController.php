@@ -28,6 +28,9 @@ final class TransactionPieceJointeController extends Controller
             $downloadName = $transaction->numero_piece.' - '.$downloadName;
         }
 
+        // Sanitize for Symfony Content-Disposition (refuse / and \)
+        $downloadName = str_replace(['/', '\\'], '-', $downloadName);
+
         return Storage::disk('local')->response(
             $fullPath,
             $downloadName,
