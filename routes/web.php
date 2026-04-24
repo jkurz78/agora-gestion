@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AttestationPresencePdfController;
+use App\Http\Controllers\BackOffice\FacturePartenaireDepotPdfController;
 use App\Http\Controllers\BackOffice\NoteDeFraisPieceJointeController;
 use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
@@ -184,6 +185,12 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/notes-de-frais/{noteDeFrais}/lignes/{ligne}/piece-jointe', NoteDeFraisPieceJointeController::class)->name('ndf.piece-jointe');
         Route::get('/transactions/{transaction}/lignes/{ligne}/piece-jointe', TransactionLignePieceJointeController::class)->name('transactions.piece-jointe-ligne');
     });
+
+// ── Back-office Factures Partenaires ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->get('/factures-partenaires/a-comptabiliser/{depot}/pdf', FacturePartenaireDepotPdfController::class)
+    ->middleware(['signed', 'can:treat,depot'])
+    ->name('back-office.factures-partenaires.pdf');
 
 // ── Banques ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
