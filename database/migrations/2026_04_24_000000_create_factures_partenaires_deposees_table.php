@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create('factures_partenaires_deposees', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('association_id')->constrained('association')->cascadeOnDelete();
-            $table->foreignId('tiers_id')->constrained('tiers')->cascadeOnDelete();
+            $table->foreignId('association_id')->constrained('association');
+            $table->foreignId('tiers_id')->constrained('tiers');
             $table->date('date_facture');
             $table->string('numero_facture', 50);
             $table->string('pdf_path');
@@ -24,9 +24,7 @@ return new class extends Migration
             $table->timestamp('traitee_at')->nullable();
             $table->timestamps();
 
-            // liste portail : par déposant et statut
             $table->index(['association_id', 'tiers_id', 'statut']);
-            // back-office futur : par statut chronologique
             $table->index(['association_id', 'statut', 'created_at']);
         });
     }

@@ -33,6 +33,7 @@ final class FacturePartenaireDeposee extends TenantModel
             'date_facture' => 'date',
             'traitee_at' => 'datetime',
             'statut' => StatutFactureDeposee::class,
+            'pdf_taille' => 'integer',
         ];
     }
 
