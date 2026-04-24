@@ -8,12 +8,14 @@ use App\DTOs\InvoiceOcrResult;
 use App\Enums\Espace;
 use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
+use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutOperation;
 use App\Enums\UsageComptable;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
+use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
 use App\Models\Operation;
@@ -29,6 +31,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -92,6 +95,8 @@ final class TransactionForm extends Component
 
     public ?int $incomingDocumentId = null;
 
+    public ?int $factureDeposeeId = null;
+
     public ?string $incomingDocumentPreviewUrl = null;
 
     /** @var array<string> */
@@ -127,7 +132,7 @@ final class TransactionForm extends Component
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
-            'incomingDocumentId', 'incomingDocumentPreviewUrl', 'linkedNdf']);
+            'incomingDocumentId', 'factureDeposeeId', 'incomingDocumentPreviewUrl', 'linkedNdf']);
         $this->type = $type;
         $this->isLocked = false;
         $this->isLockedByHelloAsso = false;
@@ -197,6 +202,63 @@ final class TransactionForm extends Component
         }
 
         $this->runOcrAnalysis(fn ($svc) => $svc->analyzeFromPath($diskPath, 'application/pdf'));
+    }
+
+    #[On('open-transaction-form-from-depot-facture')]
+    public function openFormFromDepotFacture(int $depotId): void
+    {
+        if (! $this->canEdit) {
+            session()->flash('error', 'Vous n\'avez pas les droits pour créer une dépense.');
+
+            return;
+        }
+
+        $depot = FacturePartenaireDeposee::find($depotId);
+        if ($depot === null) {
+            session()->flash('error', 'Dépôt introuvable.');
+
+            return;
+        }
+
+        if ($depot->statut !== StatutFactureDeposee::Soumise) {
+            session()->flash('error', 'Ce dépôt n\'est plus traitable (déjà traité ou rejeté).');
+
+            return;
+        }
+
+        $diskPath = Storage::disk('local')->path($depot->pdf_path);
+        if (! file_exists($diskPath)) {
+            session()->flash('error', 'Fichier PDF introuvable sur le disque.');
+
+            return;
+        }
+
+        $this->showNewForm('depense');
+        $this->ocrMode = true;
+        $this->ocrWaitingForFile = false;
+        $this->factureDeposeeId = $depot->id;
+        $this->tiers_id = $depot->tiers_id;
+        $this->date = $depot->date_facture->format('Y-m-d');
+        $this->reference = $depot->numero_facture;
+
+        // URL signée back-office pour l'iframe de prévisualisation PDF.
+        $this->incomingDocumentPreviewUrl = URL::signedRoute(
+            'back-office.factures-partenaires.pdf',
+            ['depot' => $depot->id],
+        );
+
+        if (! InvoiceOcrService::isConfigured()) {
+            return;
+        }
+
+        $depot->loadMissing('tiers');
+        $context = [
+            'tiers_attendu' => (string) ($depot->tiers?->displayName() ?? ''),
+            'reference_attendue' => (string) $depot->numero_facture,
+            'date_attendue' => $depot->date_facture->format('Y-m-d'),
+        ];
+
+        $this->runOcrAnalysis(fn ($svc) => $svc->analyzeFromPath($diskPath, 'application/pdf', $context));
     }
 
     public function addLigne(): void
@@ -395,7 +457,7 @@ final class TransactionForm extends Component
             'ventilationHasAffectations',
             'pieceJointe', 'existingPieceJointeNom', 'existingPieceJointeUrl',
             'ocrMode', 'ocrWaitingForFile', 'ocrAnalyzing', 'ocrError', 'ocrWarnings', 'ocrTiersNom',
-            'incomingDocumentId', 'incomingDocumentPreviewUrl', 'linkedNdf',
+            'incomingDocumentId', 'factureDeposeeId', 'incomingDocumentPreviewUrl', 'linkedNdf',
         ]);
         $this->resetValidation();
     }
