@@ -25,6 +25,7 @@ use App\Models\TransactionLigne;
 use App\Models\TransactionLigneAffectation;
 use App\Services\ExerciceService;
 use App\Services\InvoiceOcrService;
+use App\Services\Portail\FacturePartenaireService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
@@ -629,6 +630,18 @@ final class TransactionForm extends Component
             }
         }
 
+        // Sauvegarder depuis un FacturePartenaireDeposee (flux portail back-office)
+        if ($this->factureDeposeeId !== null && $this->type === 'depense') {
+            $tx = $createdTransaction ?? Transaction::find($this->transactionId);
+            if ($tx !== null) {
+                try {
+                    $this->finalizeFactureDeposeeCleanup($tx);
+                } catch (\DomainException $e) {
+                    session()->flash('error', 'Erreur de comptabilisation : '.$e->getMessage());
+                }
+            }
+        }
+
         // Sauvegarder les PJ de lignes
         $tx = $createdTransaction ?? Transaction::with('lignes')->find($this->transactionId);
         if ($tx !== null) {
@@ -716,6 +729,36 @@ final class TransactionForm extends Component
 
     public function retryOcr(): void
     {
+        // Mode dépôt de facture partenaire
+        if ($this->factureDeposeeId !== null) {
+            $depot = FacturePartenaireDeposee::find($this->factureDeposeeId);
+            if ($depot === null) {
+                $this->ocrError = 'Le dépôt a été supprimé.';
+
+                return;
+            }
+            $diskPath = Storage::disk('local')->path($depot->pdf_path);
+            if (! file_exists($diskPath)) {
+                $this->ocrError = 'Fichier introuvable sur le disque.';
+
+                return;
+            }
+            if (! InvoiceOcrService::isConfigured()) {
+                $this->ocrError = 'Service OCR non configuré.';
+
+                return;
+            }
+            $depot->loadMissing('tiers');
+            $context = [
+                'tiers_attendu' => (string) ($depot->tiers?->displayName() ?? ''),
+                'reference_attendue' => (string) $depot->numero_facture,
+                'date_attendue' => $depot->date_facture->format('Y-m-d'),
+            ];
+            $this->runOcrAnalysis(fn ($svc) => $svc->analyzeFromPath($diskPath, 'application/pdf', $context));
+
+            return;
+        }
+
         // Mode inbox : relancer depuis le fichier disque
         if ($this->incomingDocumentId !== null) {
             $doc = IncomingDocument::find($this->incomingDocumentId);
@@ -782,6 +825,22 @@ final class TransactionForm extends Component
         $doc->delete();
 
         Storage::disk('local')->delete($fullPath);
+    }
+
+    private function finalizeFactureDeposeeCleanup(Transaction $tx): void
+    {
+        if ($this->factureDeposeeId === null) {
+            return;
+        }
+
+        $depot = FacturePartenaireDeposee::find($this->factureDeposeeId);
+        if ($depot === null) {
+            session()->flash('warning', 'Dépôt introuvable pendant la finalisation ; la transaction a été créée sans rattachement.');
+
+            return;
+        }
+
+        app(FacturePartenaireService::class)->comptabiliser($depot, $tx);
     }
 
     /**
