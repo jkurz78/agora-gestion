@@ -24,8 +24,8 @@ return new class extends Migration
             $table->timestamp('traitee_at')->nullable();
             $table->timestamps();
 
-            $table->index(['association_id', 'tiers_id', 'statut']);
-            $table->index(['association_id', 'statut', 'created_at']);
+            $table->index(['association_id', 'tiers_id', 'statut'], 'fpd_asso_tiers_statut_idx');
+            $table->index(['association_id', 'statut', 'created_at'], 'fpd_asso_statut_created_idx');
         });
     }
 
