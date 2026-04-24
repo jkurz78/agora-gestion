@@ -36,7 +36,6 @@ final class TransactionDepensePubliqueResource extends JsonResource
             return null;
         }
 
-        // TODO: route portail.historique.pdf created in Step 6
         return URL::signedRoute('portail.historique.pdf', [
             'association' => $this->associationSlug,
             'transaction' => $this->resource->id,
