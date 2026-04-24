@@ -6,6 +6,7 @@ namespace App\Services\Portail;
 
 use App\Enums\StatutFactureDeposee;
 use App\Events\Portail\FactureDeposeeComptabilisee;
+use App\Events\Portail\FactureDeposeeRejetee;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -62,7 +63,7 @@ final class FacturePartenaireService
      *
      * Guards :
      *  – cross-tiers   : DomainException si $depot->tiers_id ≠ $tiers->id.
-     *  – statut        : DomainException si statut ≠ Soumise (déjà traité/rejeté).
+     *  – statut        : DomainException si statut ∉ {Soumise, Rejetee} (déjà traité).
      */
     public function oublier(FacturePartenaireDeposee $depot, Tiers $tiers): void
     {
@@ -70,8 +71,9 @@ final class FacturePartenaireService
             throw new \DomainException('Ce dépôt n\'appartient pas au tiers fourni.');
         }
 
-        if ($depot->statut !== StatutFactureDeposee::Soumise) {
-            throw new \DomainException('Seul un dépôt au statut « soumise » peut être supprimé.');
+        $statutsAutorisés = [StatutFactureDeposee::Soumise, StatutFactureDeposee::Rejetee];
+        if (! in_array($depot->statut, $statutsAutorisés, strict: true)) {
+            throw new \DomainException('Seul un dépôt au statut « soumise » ou « rejetée » peut être supprimé.');
         }
 
         DB::transaction(function () use ($depot, $tiers): void {
@@ -85,6 +87,41 @@ final class FacturePartenaireService
             Log::info('portail.facture-partenaire.oubliee', [
                 'depot_id' => $depotId,
                 'tiers_id' => $tiers->id,
+            ]);
+        });
+    }
+
+    /**
+     * Rejette un dépôt de facture partenaire en renseignant le motif de rejet.
+     *
+     * - Le PDF est conservé sur le disk (piste d'audit + redépôt potentiel).
+     * - Le statut passe à Rejetee ; motif_rejet est renseigné.
+     * - Émet l'event FactureDeposeeRejetee.
+     *
+     * Guards :
+     *  – motif         : DomainException si motif vide (après trim).
+     *  – statut depot  : DomainException si pas Soumise (déjà traité ou déjà rejeté).
+     */
+    public function rejeter(FacturePartenaireDeposee $depot, string $motif): void
+    {
+        if (trim($motif) === '') {
+            throw new \DomainException('Le motif de rejet ne peut pas être vide.');
+        }
+
+        if ($depot->statut !== StatutFactureDeposee::Soumise) {
+            throw new \DomainException('Seul un dépôt au statut « soumise » peut être rejeté.');
+        }
+
+        DB::transaction(function () use ($depot, $motif): void {
+            $depot->statut = StatutFactureDeposee::Rejetee;
+            $depot->motif_rejet = trim($motif);
+            $depot->save();
+
+            Event::dispatch(new FactureDeposeeRejetee($depot));
+
+            Log::info('facture_partenaire.rejetee', [
+                'depot_id' => $depot->id,
+                'motif' => $depot->motif_rejet,
             ]);
         });
     }

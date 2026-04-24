@@ -154,7 +154,7 @@ it('laisse le record intact si statut Traitee refusé', function () {
     Storage::disk('local')->assertExists($pdfPath);
 });
 
-it('refuse si statut est Rejetee', function () {
+it('supprime le record BDD si statut est Rejetee', function () {
     $tiers = Tiers::factory()->pourDepenses()->create();
     $pdfPath = 'associations/1/factures-deposees/2026/03/2026-03-15-fact-001-abc123.pdf';
     Storage::disk('local')->put($pdfPath, 'pdf-content');
@@ -166,12 +166,12 @@ it('refuse si statut est Rejetee', function () {
     ]);
 
     $service = new FacturePartenaireService;
+    $service->oublier($depot, $tiers);
 
-    expect(fn () => $service->oublier($depot, $tiers))
-        ->toThrow(DomainException::class);
+    expect(FacturePartenaireDeposee::find($depot->id))->toBeNull();
 });
 
-it('laisse le record intact si statut Rejetee refusé', function () {
+it('supprime le fichier PDF si statut est Rejetee', function () {
     $tiers = Tiers::factory()->pourDepenses()->create();
     $pdfPath = 'associations/1/factures-deposees/2026/03/2026-03-15-fact-001-abc123.pdf';
     Storage::disk('local')->put($pdfPath, 'pdf-content');
@@ -183,14 +183,27 @@ it('laisse le record intact si statut Rejetee refusé', function () {
     ]);
 
     $service = new FacturePartenaireService;
+    $service->oublier($depot, $tiers);
 
-    try {
-        $service->oublier($depot, $tiers);
-    } catch (DomainException) {
-    }
+    Storage::disk('local')->assertMissing($pdfPath);
+});
 
-    expect(FacturePartenaireDeposee::withoutGlobalScopes()->find($depot->id))->not->toBeNull();
-    Storage::disk('local')->assertExists($pdfPath);
+it('refuse oublier() si le tiers ne correspond pas et statut Rejetee', function () {
+    $tiersProprio = Tiers::factory()->pourDepenses()->create();
+    $tiersAutre = Tiers::factory()->pourDepenses()->create();
+    $pdfPath = 'associations/1/factures-deposees/2026/03/2026-03-15-fact-001-abc123.pdf';
+    Storage::disk('local')->put($pdfPath, 'pdf-content');
+
+    $depot = FacturePartenaireDeposee::factory()->rejetee()->create([
+        'tiers_id' => $tiersProprio->id,
+        'association_id' => $tiersProprio->association_id,
+        'pdf_path' => $pdfPath,
+    ]);
+
+    $service = new FacturePartenaireService;
+
+    expect(fn () => $service->oublier($depot, $tiersAutre))
+        ->toThrow(DomainException::class);
 });
 
 it('ne lève pas d\'exception si le fichier PDF est déjà absent du disk', function () {
