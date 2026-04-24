@@ -5,6 +5,20 @@
         </h1>
     </div>
 
+    {{-- Flash messages --}}
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     {{-- Onglets --}}
     <ul class="nav nav-tabs mb-3" role="tablist">
         <li class="nav-item" role="presentation">
@@ -59,6 +73,7 @@
                     @foreach ($depots as $depot)
                         @php
                             $statut = $depot->statut;
+                            $estSoumise = $statut === \App\Enums\StatutFactureDeposee::Soumise;
                         @endphp
                         <tr>
                             <td data-sort="{{ $depot->date_facture?->format('Y-m-d') }}">
@@ -99,11 +114,15 @@
                                    target="_blank">
                                     <i class="bi bi-file-pdf me-1"></i>Voir PDF
                                 </a>
-                                @if ($statut === \App\Enums\StatutFactureDeposee::Soumise)
-                                    <button class="btn btn-outline-success btn-sm" disabled title="Fonctionnalité à venir">
+                                @if ($estSoumise)
+                                    <button class="btn btn-outline-success btn-sm"
+                                            wire:click="comptabiliser({{ $depot->id }})"
+                                            title="Comptabiliser ce dépôt">
                                         <i class="bi bi-check-circle me-1"></i>Comptabiliser
                                     </button>
-                                    <button class="btn btn-outline-danger btn-sm" disabled title="Fonctionnalité à venir">
+                                    <button class="btn btn-outline-danger btn-sm"
+                                            wire:click="ouvrirRejet({{ $depot->id }})"
+                                            title="Rejeter ce dépôt">
                                         <i class="bi bi-x-circle me-1"></i>Rejeter
                                     </button>
                                 @endif
@@ -113,5 +132,36 @@
                 </tbody>
             </table>
         </div>
+    @endif
+
+    {{-- Modale de rejet --}}
+    <div class="modal fade @if($showRejectModal) show d-block @endif" tabindex="-1"
+         style="@if($showRejectModal) display:block; @endif">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Rejeter le dépôt</h5>
+                    <button type="button" class="btn-close" wire:click="fermerRejet"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="motifRejet" class="form-label">Motif (obligatoire)</label>
+                    <textarea id="motifRejet"
+                              class="form-control @error('motifRejet') is-invalid @enderror"
+                              wire:model="motifRejet"
+                              rows="4"
+                              maxlength="1000"></textarea>
+                    @error('motifRejet')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" wire:click="fermerRejet">Annuler</button>
+                    <button type="button" class="btn btn-danger" wire:click="confirmerRejet">Confirmer le rejet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @if($showRejectModal)
+        <div class="modal-backdrop fade show"></div>
     @endif
 </div>

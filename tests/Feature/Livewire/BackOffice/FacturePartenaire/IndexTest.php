@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\RoleAssociation;
+use App\Enums\StatutFactureDeposee;
 use App\Livewire\BackOffice\FacturePartenaire\Index;
 use App\Models\Association;
 use App\Models\FacturePartenaireDeposee;
@@ -321,4 +322,260 @@ it('persists onglet in query string via Url attribute', function (): void {
         ->set('onglet', 'traitees');
 
     expect($component->get('onglet'))->toBe('traitees');
+});
+
+// ── Test 13 : Comptabiliser — dépôt Soumise dispatche l'event ────────────────
+
+it('comptabiliser dispatches open-transaction-form-from-depot-facture for a Soumise depot', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = fpIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    $depot = FacturePartenaireDeposee::factory()->soumise()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $this->actingAs($admin);
+
+    Livewire::test(Index::class)
+        ->call('comptabiliser', $depot->id)
+        ->assertDispatched('open-transaction-form-from-depot-facture', depotId: $depot->id);
+});
+
+// ── Test 14 : Comptabiliser — cross-tenant → 404 ─────────────────────────────
+
+it('comptabiliser on a depot from another tenant throws 404', function (): void {
+    $assocA = Association::factory()->create();
+    $assocB = Association::factory()->create();
+
+    TenantContext::clear();
+    TenantContext::boot($assocA);
+    session(['current_association_id' => $assocA->id]);
+
+    $admin = fpIndexMakeUserWithRole($assocA, RoleAssociation::Admin);
+
+    // Create depot for tenant B
+    TenantContext::clear();
+    TenantContext::boot($assocB);
+    $tiersB = Tiers::factory()->create(['association_id' => $assocB->id]);
+    $depotB = FacturePartenaireDeposee::factory()->soumise()->create([
+        'association_id' => $assocB->id,
+        'tiers_id' => $tiersB->id,
+    ]);
+    $depotBId = $depotB->id;
+
+    // Switch back to tenant A
+    TenantContext::clear();
+    TenantContext::boot($assocA);
+    session(['current_association_id' => $assocA->id]);
+
+    $this->actingAs($admin);
+
+    Livewire::test(Index::class)
+        ->call('comptabiliser', $depotBId)
+        ->assertStatus(404);
+});
+
+// ── Test 15 : Comptabiliser — statut Traitee → flash error, pas de dispatch ──
+
+it('comptabiliser on a Traitee depot flashes an error and does not dispatch', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = fpIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    $depot = FacturePartenaireDeposee::factory()->traitee()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $this->actingAs($admin);
+
+    $test = Livewire::test(Index::class);
+    $test->instance()->comptabiliser($depot->id);
+
+    expect($test->instance())->not->toBeNull(); // component alive
+    expect(session('error'))->not->toBeNull();
+});
+
+// ── Test 16 : Comptabiliser — statut Rejetee → flash error, pas de dispatch ──
+
+it('comptabiliser on a Rejetee depot flashes an error and does not dispatch', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = fpIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    $depot = FacturePartenaireDeposee::factory()->rejetee()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $this->actingAs($admin);
+
+    $test = Livewire::test(Index::class);
+    $test->instance()->comptabiliser($depot->id);
+
+    expect(session('error'))->not->toBeNull();
+});
+
+// ── Test 17 : Rejeter — flux complet ─────────────────────────────────────────
+
+it('rejeter full flow: ouvrirRejet opens modal, confirmerRejet rejects depot', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = fpIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    $depot = FacturePartenaireDeposee::factory()->soumise()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $this->actingAs($admin);
+
+    $component = Livewire::test(Index::class)
+        ->call('ouvrirRejet', $depot->id);
+
+    expect($component->get('showRejectModal'))->toBeTrue();
+    expect($component->get('depotIdToReject'))->toBe($depot->id);
+    expect($component->get('motifRejet'))->toBe('');
+
+    $component->instance()->motifRejet = 'PDF illisible';
+    $component->instance()->confirmerRejet();
+
+    expect(session('success'))->not->toBeNull();
+    expect($component->instance()->showRejectModal)->toBeFalse();
+    expect($component->instance()->depotIdToReject)->toBeNull();
+    expect($component->instance()->motifRejet)->toBe('');
+
+    $depot->refresh();
+    expect($depot->statut)->toBe(StatutFactureDeposee::Rejetee);
+    expect($depot->motif_rejet)->toBe('PDF illisible');
+});
+
+// ── Test 18 : Rejeter — motif vide → validation error ────────────────────────
+
+it('confirmerRejet with empty motif returns a validation error', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = fpIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    $depot = FacturePartenaireDeposee::factory()->soumise()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $this->actingAs($admin);
+
+    $component = Livewire::test(Index::class)
+        ->call('ouvrirRejet', $depot->id)
+        ->set('motifRejet', '')
+        ->call('confirmerRejet')
+        ->assertHasErrors(['motifRejet']);
+
+    // Modal still open
+    expect($component->get('showRejectModal'))->toBeTrue();
+
+    // Depot still Soumise
+    $depot->refresh();
+    expect($depot->statut)->toBe(StatutFactureDeposee::Soumise);
+});
+
+// ── Test 19 : Rejeter — cross-tenant → 404 ───────────────────────────────────
+
+it('ouvrirRejet on a depot from another tenant throws 404', function (): void {
+    $assocA = Association::factory()->create();
+    $assocB = Association::factory()->create();
+
+    TenantContext::clear();
+    TenantContext::boot($assocA);
+    session(['current_association_id' => $assocA->id]);
+
+    $admin = fpIndexMakeUserWithRole($assocA, RoleAssociation::Admin);
+
+    // Create depot for tenant B
+    TenantContext::clear();
+    TenantContext::boot($assocB);
+    $tiersB = Tiers::factory()->create(['association_id' => $assocB->id]);
+    $depotB = FacturePartenaireDeposee::factory()->soumise()->create([
+        'association_id' => $assocB->id,
+        'tiers_id' => $tiersB->id,
+    ]);
+    $depotBId = $depotB->id;
+
+    // Switch back to tenant A
+    TenantContext::clear();
+    TenantContext::boot($assocA);
+    session(['current_association_id' => $assocA->id]);
+
+    $this->actingAs($admin);
+
+    Livewire::test(Index::class)
+        ->call('ouvrirRejet', $depotBId)
+        ->assertStatus(404);
+});
+
+// ── Test 20 : Rejeter — statut ≠ Soumise → flash error, modale pas ouverte ───
+
+it('ouvrirRejet on a Traitee depot flashes error and does not open modal', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = fpIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    $depot = FacturePartenaireDeposee::factory()->traitee()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $this->actingAs($admin);
+
+    $test = Livewire::test(Index::class);
+    $test->instance()->ouvrirRejet($depot->id);
+
+    expect(session('error'))->not->toBeNull();
+    expect($test->instance()->showRejectModal)->toBeFalse();
+});
+
+// ── Test 21 : Fermer rejet ────────────────────────────────────────────────────
+
+it('fermerRejet resets modal state', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = fpIndexMakeUserWithRole($association, RoleAssociation::Admin);
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    $depot = FacturePartenaireDeposee::factory()->soumise()->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $this->actingAs($admin);
+
+    $component = Livewire::test(Index::class)
+        ->call('ouvrirRejet', $depot->id)
+        ->set('motifRejet', 'test')
+        ->call('fermerRejet');
+
+    expect($component->get('showRejectModal'))->toBeFalse();
+    expect($component->get('depotIdToReject'))->toBeNull();
+    expect($component->get('motifRejet'))->toBe('');
 });
