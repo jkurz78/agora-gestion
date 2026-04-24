@@ -21,10 +21,10 @@ it('toArray retourne exactement les 5 clés attendues — pas plus', function ()
 
     $result = $resource->toArray(Request::create('/'));
 
-    expect(array_keys($result))->toBe(['date_piece', 'reference', 'montant_ttc', 'statut_reglement', 'pdf_url']);
+    expect(array_keys($result))->toBe(['date_piece', 'notre_ref', 'ref', 'montant_ttc', 'statut_reglement', 'pdf_url']);
 });
 
-it('reference utilise numero_piece quand renseigné', function () {
+it('notre_ref utilise numero_piece quand renseigné', function () {
     $transaction = Transaction::factory()->asDepense()->create([
         'numero_piece' => 'FAC-2026-042',
         'libelle' => 'Achat matériel',
@@ -36,10 +36,10 @@ it('reference utilise numero_piece quand renseigné', function () {
 
     $result = $resource->toArray(Request::create('/'));
 
-    expect($result['reference'])->toBe('FAC-2026-042');
+    expect($result['notre_ref'])->toBe('FAC-2026-042');
 });
 
-it('reference utilise libelle quand numero_piece est null', function () {
+it('notre_ref utilise libelle quand numero_piece est null', function () {
     $transaction = Transaction::factory()->asDepense()->create([
         'numero_piece' => null,
         'libelle' => 'Facture eau',
@@ -51,7 +51,35 @@ it('reference utilise libelle quand numero_piece est null', function () {
 
     $result = $resource->toArray(Request::create('/'));
 
-    expect($result['reference'])->toBe('Facture eau');
+    expect($result['notre_ref'])->toBe('Facture eau');
+});
+
+it('ref expose la référence du tiers (Transaction.reference)', function () {
+    $transaction = Transaction::factory()->asDepense()->create([
+        'reference' => 'TIERS-INV-2026-007',
+        'piece_jointe_path' => null,
+    ]);
+
+    $resource = new TransactionDepensePubliqueResource($transaction);
+    $resource->withAssociationSlug('mon-asso');
+
+    $result = $resource->toArray(Request::create('/'));
+
+    expect($result['ref'])->toBe('TIERS-INV-2026-007');
+});
+
+it('ref est null si Transaction.reference est null', function () {
+    $transaction = Transaction::factory()->asDepense()->create([
+        'reference' => null,
+        'piece_jointe_path' => null,
+    ]);
+
+    $resource = new TransactionDepensePubliqueResource($transaction);
+    $resource->withAssociationSlug('mon-asso');
+
+    $result = $resource->toArray(Request::create('/'));
+
+    expect($result['ref'])->toBeNull();
 });
 
 it('date_piece est au format Y-m-d', function () {
@@ -160,7 +188,7 @@ it('toArray ne fait pas fuiter de champs internes (notes, lignes, analytique…)
 
     $result = $resource->toArray(Request::create('/'));
 
-    expect(array_keys($result))->toBe(['date_piece', 'reference', 'montant_ttc', 'statut_reglement', 'pdf_url']);
+    expect(array_keys($result))->toBe(['date_piece', 'notre_ref', 'ref', 'montant_ttc', 'statut_reglement', 'pdf_url']);
 });
 
 it('montant_ttc est un float', function () {

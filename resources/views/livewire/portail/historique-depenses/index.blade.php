@@ -13,7 +13,8 @@
                 <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                     <tr>
                         <th>Date</th>
-                        <th>Référence</th>
+                        <th>Notre réf</th>
+                        <th>Réf</th>
                         <th class="text-end">Montant (€)</th>
                         <th>Statut</th>
                         <th class="text-center">PDF</th>
@@ -25,7 +26,8 @@
                             <td data-sort="{{ $item['date_piece'] }}">
                                 {{ \Carbon\Carbon::parse($item['date_piece'])->format('d/m/Y') }}
                             </td>
-                            <td>{{ $item['reference'] }}</td>
+                            <td>{{ $item['notre_ref'] }}</td>
+                            <td>{{ $item['ref'] }}</td>
                             <td class="text-end" data-sort="{{ number_format($item['montant_ttc'], 2, '.', '') }}">
                                 {{ number_format($item['montant_ttc'], 2, ',', ' ') }} €
                             </td>
