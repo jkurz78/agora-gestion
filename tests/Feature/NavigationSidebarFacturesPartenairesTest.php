@@ -36,7 +36,7 @@ it('affiche le lien Factures à comptabiliser pour un Admin', function (): void 
     $response = $this->actingAs($admin)->get(route('comptabilite.transactions'));
 
     $response->assertOk();
-    $response->assertSee('Boîte de réception');
+    $response->assertSee('Réception');
     $response->assertSee('Factures');
     $response->assertSeeHtml(route('back-office.factures-partenaires.index'));
 });
@@ -52,7 +52,7 @@ it('affiche le lien Factures à comptabiliser pour un Comptable', function (): v
     $response = $this->actingAs($comptable)->get(route('comptabilite.transactions'));
 
     $response->assertOk();
-    $response->assertSee('Boîte de réception');
+    $response->assertSee('Réception');
     $response->assertSee('Factures');
     $response->assertSeeHtml(route('back-office.factures-partenaires.index'));
 });
@@ -94,7 +94,7 @@ it('n\'affiche pas le badge quand aucune facture Soumise', function (): void {
     $response->assertDontSee('badge bg-warning text-dark ms-1">1', false);
 });
 
-it('affiche le badge agrégé sur "Boîte de réception" quand NDF + Factures ont des items en attente', function (): void {
+it('affiche le badge agrégé sur "Réception" quand NDF + Factures ont des items en attente', function (): void {
     $association = Association::factory()->create();
     TenantContext::clear();
     TenantContext::boot($association);
@@ -112,8 +112,8 @@ it('affiche le badge agrégé sur "Boîte de réception" quand NDF + Factures on
     $response = $this->actingAs($admin)->get(route('comptabilite.transactions'));
 
     $response->assertOk();
-    // The aggregated badge on "Boîte de réception" shows total pending count (3 factures)
-    $response->assertSeeInOrder(['Boîte de réception', '3']);
+    // The aggregated badge on "Réception" shows total pending count (3 factures)
+    $response->assertSeeInOrder(['Réception', '3']);
     // Individual badge on Factures item also present
     $response->assertSeeHtml('<span class="badge bg-warning text-dark ms-1">3</span>');
 });
