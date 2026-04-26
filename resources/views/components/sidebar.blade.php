@@ -134,6 +134,14 @@ $activeGroup = match(true) {
                                 </a>
                             </li>
 
+                            @if(($canSeeNdf && Route::has('comptabilite.ndf.index')) || ($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index')))
+                            <li class="nav-item">
+                                <h6 class="sidebar-heading px-3 mt-3 mb-1 text-muted text-uppercase small">
+                                    <i class="bi bi-inbox me-1"></i> Boîte de réception
+                                </h6>
+                            </li>
+                            @endif
+
                             @if($canSeeNdf && Route::has('comptabilite.ndf.index'))
                             <li class="nav-item">
                                 <a href="{{ route('comptabilite.ndf.index') }}"
@@ -152,7 +160,7 @@ $activeGroup = match(true) {
                                 <a href="{{ route('back-office.factures-partenaires.index') }}"
                                    class="nav-link d-flex align-items-center justify-content-between
                                           {{ request()->routeIs('back-office.factures-partenaires.*') ? 'active' : '' }}">
-                                    <span><i class="bi bi-file-earmark-text me-1"></i> Factures à comptabiliser</span>
+                                    <span><i class="bi bi-file-earmark-text me-1"></i> Factures</span>
                                     @if($facturesPartenairesPendingCount > 0)
                                         <span class="badge bg-warning text-dark ms-1">{{ $facturesPartenairesPendingCount }}</span>
                                     @endif
