@@ -2,14 +2,19 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
+use App\Http\Controllers\Portail\TransactionPdfController;
 use App\Http\Middleware\Portail\Authenticate;
 use App\Http\Middleware\Portail\BootTenantFromSlug;
 use App\Http\Middleware\Portail\EnforceSessionLifetime;
 use App\Http\Middleware\Portail\EnsurePourDepenses;
 use App\Http\Middleware\Portail\EnsureTiersChosen;
 use App\Livewire\Portail\ChooseTiers;
+use App\Livewire\Portail\FacturePartenaire\AtraiterIndex;
+use App\Livewire\Portail\FacturePartenaire\Depot;
+use App\Livewire\Portail\HistoriqueDepenses\Index as HistoriqueDepensesIndex;
 use App\Livewire\Portail\Home;
 use App\Livewire\Portail\Login;
 use App\Livewire\Portail\NoteDeFrais\Form;
@@ -37,6 +42,21 @@ Route::prefix('{association:slug}/portail')
                 Route::get('/nouvelle', Form::class)->name('create');
                 Route::get('/{noteDeFrais}/edit', Form::class)->name('edit');
                 Route::get('/{noteDeFrais}', Show::class)->name('show');
+            });
+
+            Route::prefix('factures')->middleware(EnsurePourDepenses::class)->name('factures.')->group(function () {
+                Route::get('/', AtraiterIndex::class)->name('index');
+                Route::get('/depot', Depot::class)->name('create');
+                Route::get('/{depot}/pdf', FacturePartenaireDeposeePdfController::class)
+                    ->middleware('signed')
+                    ->name('pdf');
+            });
+
+            Route::prefix('historique')->middleware(EnsurePourDepenses::class)->name('historique.')->group(function () {
+                Route::get('/', HistoriqueDepensesIndex::class)->name('index');
+                Route::get('/{transaction}/pdf', TransactionPdfController::class)
+                    ->middleware('signed')
+                    ->name('pdf');
             });
         });
     });

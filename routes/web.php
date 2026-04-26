@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AttestationPresencePdfController;
+use App\Http\Controllers\BackOffice\FacturePartenaireDepotPdfController;
 use App\Http\Controllers\BackOffice\NoteDeFraisPieceJointeController;
 use App\Http\Controllers\BudgetExportController;
 use App\Http\Controllers\CategorieController;
@@ -41,6 +42,7 @@ use App\Http\Middleware\CheckEspaceAccess;
 use App\Http\Middleware\EnsureTwoFactor;
 use App\Http\Middleware\VerifyTenantAsset;
 use App\Livewire\Auth\AssociationSelector;
+use App\Livewire\BackOffice\FacturePartenaire\Index as FpIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
@@ -183,6 +185,16 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/notes-de-frais/{noteDeFrais}', NdfShow::class)->name('ndf.show');
         Route::get('/notes-de-frais/{noteDeFrais}/lignes/{ligne}/piece-jointe', NoteDeFraisPieceJointeController::class)->name('ndf.piece-jointe');
         Route::get('/transactions/{transaction}/lignes/{ligne}/piece-jointe', TransactionLignePieceJointeController::class)->name('transactions.piece-jointe-ligne');
+    });
+
+// ── Back-office (routes sans préfixe de nom) ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->group(function (): void {
+        Route::get('/factures-partenaires/a-comptabiliser', FpIndex::class)
+            ->name('back-office.factures-partenaires.index');
+        Route::get('/factures-partenaires/a-comptabiliser/{depot}/pdf', FacturePartenaireDepotPdfController::class)
+            ->middleware(['can:treat,depot'])
+            ->name('back-office.factures-partenaires.pdf');
     });
 
 // ── Banques ──

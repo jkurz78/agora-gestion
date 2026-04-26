@@ -36,20 +36,21 @@
     color: #722281;
     background: rgba(114,34,129,.05);
 }
-/* Remplace le chevron Bootstrap par +/- */
+/* Chevron qui rotate 90° à l'ouverture (cohérent avec sous-menu Réception) */
 .sidebar .accordion-button::after {
-    content: '+';
+    content: '\203A'; /* › */
     background-image: none !important;
     width: auto;
     height: auto;
-    font-size: .9rem;
+    font-size: 1.1rem;
+    line-height: 1;
     font-weight: 700;
-    color: #999;
-    transform: none !important;
-    transition: none;
+    color: #bbb;
+    transform: rotate(0deg) !important;
+    transition: transform .2s, color .2s;
 }
 .sidebar .accordion-button:not(.collapsed)::after {
-    content: '\2212'; /* signe moins */
+    transform: rotate(90deg) !important;
     color: #722281;
 }
 
@@ -69,9 +70,38 @@
     color: #722281;
     font-weight: 600;
 }
+
+/* Sous-groupe collapsible "Réception" */
+.sidebar .sidebar-inbox-toggle {
+    padding: .3rem 1rem .3rem 2.5rem;
+    font-size: .85rem;
+    font-weight: 700;
+    color: #555;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 0;
+}
+.sidebar .sidebar-inbox-toggle:hover {
+    color: #722281;
+    background: rgba(114,34,129,.04);
+}
+.sidebar .sidebar-inbox-toggle .inbox-chevron {
+    font-size: .65rem;
+    transition: transform .2s;
+    color: #bbb;
+}
+.sidebar .sidebar-inbox-toggle[aria-expanded="false"] .inbox-chevron {
+    transform: rotate(-90deg);
+}
+/* Items nested inside the inbox sub-group get extra indent */
+.sidebar .inbox-nav .nav-link {
+    padding-left: 3.25rem;
+}
 </style>
 
-@props(['logoAsset', 'nomAsso', 'exerciceCloture', 'exerciceLabel', 'canSeeNdf' => false, 'ndfPendingCount' => 0])
+@props(['logoAsset', 'nomAsso', 'exerciceCloture', 'exerciceLabel', 'canSeeNdf' => false, 'ndfPendingCount' => 0, 'canSeeFacturesPartenaires' => false, 'facturesPartenairesPendingCount' => 0])
 
 @php
 $activeGroup = match(true) {
@@ -134,16 +164,53 @@ $activeGroup = match(true) {
                                 </a>
                             </li>
 
-                            @if($canSeeNdf && Route::has('comptabilite.ndf.index'))
-                            <li class="nav-item">
-                                <a href="{{ route('comptabilite.ndf.index') }}"
-                                   class="nav-link d-flex align-items-center justify-content-between
-                                          {{ request()->routeIs('comptabilite.ndf.*') ? 'active' : '' }}">
-                                    <span><i class="bi bi-receipt-cutoff me-1"></i> Notes de frais</span>
-                                    @if($ndfPendingCount > 0)
-                                        <span class="badge bg-warning text-dark ms-1">{{ $ndfPendingCount }}</span>
-                                    @endif
+                            @if(($canSeeNdf && Route::has('comptabilite.ndf.index')) || ($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index')))
+                            @php $inboxPendingTotal = ($ndfPendingCount ?? 0) + ($facturesPartenairesPendingCount ?? 0); @endphp
+                            <li class="nav-item mt-2">
+                                <a class="sidebar-inbox-toggle"
+                                   data-bs-toggle="collapse"
+                                   href="#sidebar-inbox-comptabilite"
+                                   role="button"
+                                   aria-expanded="true"
+                                   aria-controls="sidebar-inbox-comptabilite">
+                                    <span><i class="bi bi-inbox me-1"></i> Réception
+                                        @if($inboxPendingTotal > 0)
+                                            <span class="badge bg-warning text-dark ms-1">{{ $inboxPendingTotal }}</span>
+                                        @endif
+                                    </span>
+                                    <i class="bi bi-chevron-down inbox-chevron"></i>
                                 </a>
+                                <div class="collapse show" id="sidebar-inbox-comptabilite">
+                                    <ul class="nav flex-column inbox-nav">
+
+                                        @if($canSeeNdf && Route::has('comptabilite.ndf.index'))
+                                        <li class="nav-item">
+                                            <a href="{{ route('comptabilite.ndf.index') }}"
+                                               class="nav-link d-flex align-items-center justify-content-between
+                                                      {{ request()->routeIs('comptabilite.ndf.*') ? 'active' : '' }}">
+                                                <span><i class="bi bi-receipt-cutoff me-1"></i> Notes de frais</span>
+                                                @if($ndfPendingCount > 0)
+                                                    <span class="badge bg-warning text-dark ms-1">{{ $ndfPendingCount }}</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                        @endif
+
+                                        @if($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index'))
+                                        <li class="nav-item">
+                                            <a href="{{ route('back-office.factures-partenaires.index') }}"
+                                               class="nav-link d-flex align-items-center justify-content-between
+                                                      {{ request()->routeIs('back-office.factures-partenaires.*') ? 'active' : '' }}">
+                                                <span><i class="bi bi-file-earmark-text me-1"></i> Factures</span>
+                                                @if($facturesPartenairesPendingCount > 0)
+                                                    <span class="badge bg-warning text-dark ms-1">{{ $facturesPartenairesPendingCount }}</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                        @endif
+
+                                    </ul>
+                                </div>
                             </li>
                             @endif
 

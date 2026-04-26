@@ -58,3 +58,8 @@ public/proto-*.html
 /tmp/
 /sql/create_admin.php
 /memory/
+
+# Pitch deck (artefacts marketing locaux)
+/pitch_deck.md
+/agora-gestion-pitch-*.pdf
+/agora-gestion-pitch-*.pptx

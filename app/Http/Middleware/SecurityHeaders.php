@@ -14,7 +14,7 @@ final class SecurityHeaders
     {
         $response = $next($request);
 
-        $response->headers->set('X-Frame-Options', 'DENY');
+        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('X-Permitted-Cross-Domain-Policies', 'none');
