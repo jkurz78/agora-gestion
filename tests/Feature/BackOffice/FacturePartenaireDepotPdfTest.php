@@ -9,7 +9,6 @@ use App\Models\Tiers;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 
 beforeEach(function () {
     TenantContext::clear();
@@ -38,10 +37,10 @@ afterEach(function () {
 });
 
 // ---------------------------------------------------------------------------
-// Scénario 1 : Comptable authentifié + URL signée valide → 200 + application/pdf
+// Scénario 1 : Admin authentifié → 200 + application/pdf
 // ---------------------------------------------------------------------------
 
-it('[pdf-bo] Admin authentifié avec URL signée valide obtient le PDF → 200', function () {
+it('[pdf-bo] Admin authentifié obtient le PDF → 200', function () {
     $pdfPath = "associations/{$this->asso->id}/factures-deposees/2026/04/fact-001.pdf";
 
     $depot = FacturePartenaireDeposee::factory()->create([
@@ -53,11 +52,9 @@ it('[pdf-bo] Admin authentifié avec URL signée valide obtient le PDF → 200',
 
     Storage::disk('local')->put($pdfPath, '%PDF-1.4 fake content');
 
-    $signedUrl = URL::signedRoute('back-office.factures-partenaires.pdf', [
-        'depot' => $depot->id,
-    ]);
+    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
 
-    $response = $this->actingAs($this->adminUser)->get($signedUrl);
+    $response = $this->actingAs($this->adminUser)->get($url);
 
     $response->assertStatus(200)
         ->assertHeader('Content-Type', 'application/pdf');
@@ -68,7 +65,7 @@ it('[pdf-bo] Admin authentifié avec URL signée valide obtient le PDF → 200',
         ->toContain($depot->numero_facture);
 });
 
-it('[pdf-bo] Comptable authentifié avec URL signée valide obtient le PDF → 200', function () {
+it('[pdf-bo] Comptable authentifié obtient le PDF → 200', function () {
     $comptable = User::factory()->create();
     $comptable->associations()->attach($this->asso->id, [
         'role' => RoleAssociation::Comptable->value,
@@ -86,21 +83,19 @@ it('[pdf-bo] Comptable authentifié avec URL signée valide obtient le PDF → 2
 
     Storage::disk('local')->put($pdfPath, '%PDF-1.4 fake content');
 
-    $signedUrl = URL::signedRoute('back-office.factures-partenaires.pdf', [
-        'depot' => $depot->id,
-    ]);
+    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
 
     $this->actingAs($comptable)
-        ->get($signedUrl)
+        ->get($url)
         ->assertStatus(200)
         ->assertHeader('Content-Type', 'application/pdf');
 });
 
 // ---------------------------------------------------------------------------
-// Scénario 2 : URL signée expirée → 403 (middleware signed)
+// Scénario 2 : Non authentifié → redirect vers login
 // ---------------------------------------------------------------------------
 
-it('[pdf-bo] URL signée expirée → 403', function () {
+it('[pdf-bo] Utilisateur non authentifié → redirigé vers login', function () {
     $pdfPath = "associations/{$this->asso->id}/factures-deposees/2026/04/fact-003.pdf";
 
     $depot = FacturePartenaireDeposee::factory()->create([
@@ -110,17 +105,9 @@ it('[pdf-bo] URL signée expirée → 403', function () {
         'numero_facture' => 'FACT-003',
     ]);
 
-    Storage::disk('local')->put($pdfPath, '%PDF-1.4 fake content');
+    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
 
-    $expiredUrl = URL::temporarySignedRoute(
-        'back-office.factures-partenaires.pdf',
-        now()->subMinute(),
-        ['depot' => $depot->id]
-    );
-
-    $this->actingAs($this->adminUser)
-        ->get($expiredUrl)
-        ->assertStatus(403);
+    $this->get($url)->assertRedirect(route('login'));
 });
 
 // ---------------------------------------------------------------------------
@@ -151,14 +138,11 @@ it('[pdf-bo] Admin tenant X accède à dépôt tenant Y → 404 (TenantScope fai
         'joined_at' => now(),
     ]);
 
-    // Sign the URL with assoB context — depot ID belongs to assoA
-    $signedUrl = URL::signedRoute('back-office.factures-partenaires.pdf', [
-        'depot' => $depot->id,
-    ]);
+    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
 
     // TenantScope on asso B cannot find depot from asso A → 404
     $this->actingAs($userB)
-        ->get($signedUrl)
+        ->get($url)
         ->assertStatus(404);
 });
 
@@ -184,12 +168,10 @@ it('[pdf-bo] Gestionnaire → 403 (policy::treat refuse)', function () {
 
     Storage::disk('local')->put($pdfPath, '%PDF-1.4 fake content');
 
-    $signedUrl = URL::signedRoute('back-office.factures-partenaires.pdf', [
-        'depot' => $depot->id,
-    ]);
+    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
 
     $this->actingAs($gestionnaire)
-        ->get($signedUrl)
+        ->get($url)
         ->assertStatus(403);
 });
 
@@ -206,7 +188,7 @@ it('[pdf-bo] renvoie 404 si le fichier PDF est absent du disque', function (): v
         'numero_facture' => 'FACT-MISSING',
     ]);
 
-    $url = URL::signedRoute('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
+    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
 
     $this->actingAs($this->adminUser)->get($url)->assertNotFound();
 });

@@ -64,7 +64,7 @@ it('dispatch open-transaction-form-from-depot-facture pré-remplit le formulaire
         ->assertSet('ocrWaitingForFile', false);
 });
 
-it('dispatch pré-remplit l\'URL de preview PDF signée', function () {
+it('dispatch pré-remplit l\'URL de preview PDF (plain route, pas de signature)', function () {
     $depot = createDepot();
 
     $component = Livewire::test(TransactionForm::class)
@@ -74,9 +74,9 @@ it('dispatch pré-remplit l\'URL de preview PDF signée', function () {
 
     expect($url)
         ->toStartWith('http')
-        ->toContain('factures-partenaires')
-        ->toContain('pdf')
-        ->toContain('signature=');
+        ->toContain('/factures-partenaires/a-comptabiliser/')
+        ->toContain('/pdf')
+        ->not->toContain('signature=');
 });
 
 it('scope tenant — un depotId d\'un autre tenant est refusé', function () {

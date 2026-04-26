@@ -11,7 +11,6 @@ use App\Models\Tiers;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use Livewire\Livewire;
 
 // ---------------------------------------------------------------------------
@@ -84,18 +83,18 @@ it('cross-tenant — la liste back-office masque les dépôts d\'une autre asso'
 });
 
 // ---------------------------------------------------------------------------
-// Cas 2 — PDF : URL signée construite pour un dépôt de Y → 404
+// Cas 2 — PDF : URL pour un dépôt de Y → 404 (TenantScope fail-closed)
 // ---------------------------------------------------------------------------
 
-it('cross-tenant — URL signée pour un dépôt de l\'asso Y renvoie 404 depuis le tenant X', function () {
-    // L'URL signée pointe sur le dépôt de assoY mais la requête est faite
+it('cross-tenant — URL pour un dépôt de l\'asso Y renvoie 404 depuis le tenant X', function () {
+    // L'URL pointe sur le dépôt de assoY mais la requête est faite
     // dans le contexte du tenant X → TenantScope exclut le dépôt → 404.
-    $signedUrl = URL::signedRoute('back-office.factures-partenaires.pdf', [
+    $url = route('back-office.factures-partenaires.pdf', [
         'depot' => $this->depotY->id,
     ]);
 
     $this->actingAs($this->comptableX)
-        ->get($signedUrl)
+        ->get($url)
         ->assertStatus(404);
 });
 

@@ -193,7 +193,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/factures-partenaires/a-comptabiliser', FpIndex::class)
             ->name('back-office.factures-partenaires.index');
         Route::get('/factures-partenaires/a-comptabiliser/{depot}/pdf', FacturePartenaireDepotPdfController::class)
-            ->middleware(['signed', 'can:treat,depot'])
+            ->middleware(['can:treat,depot'])
             ->name('back-office.factures-partenaires.pdf');
     });
 
