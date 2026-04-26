@@ -69,6 +69,37 @@
     color: #722281;
     font-weight: 600;
 }
+
+/* Sous-groupe collapsible "Boîte de réception" */
+.sidebar .sidebar-inbox-toggle {
+    padding: .3rem 1rem .3rem 2.5rem;
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #888;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 0;
+}
+.sidebar .sidebar-inbox-toggle:hover {
+    color: #722281;
+    background: rgba(114,34,129,.04);
+}
+.sidebar .sidebar-inbox-toggle .inbox-chevron {
+    font-size: .65rem;
+    transition: transform .2s;
+    color: #bbb;
+}
+.sidebar .sidebar-inbox-toggle[aria-expanded="false"] .inbox-chevron {
+    transform: rotate(-90deg);
+}
+/* Items nested inside the inbox sub-group get extra indent */
+.sidebar .inbox-nav .nav-link {
+    padding-left: 3.25rem;
+}
 </style>
 
 @props(['logoAsset', 'nomAsso', 'exerciceCloture', 'exerciceLabel', 'canSeeNdf' => false, 'ndfPendingCount' => 0, 'canSeeFacturesPartenaires' => false, 'facturesPartenairesPendingCount' => 0])
@@ -135,36 +166,52 @@ $activeGroup = match(true) {
                             </li>
 
                             @if(($canSeeNdf && Route::has('comptabilite.ndf.index')) || ($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index')))
-                            <li class="nav-item">
-                                <h6 class="sidebar-heading px-3 mt-3 mb-1 text-muted text-uppercase small">
-                                    <i class="bi bi-inbox me-1"></i> Boîte de réception
-                                </h6>
-                            </li>
-                            @endif
-
-                            @if($canSeeNdf && Route::has('comptabilite.ndf.index'))
-                            <li class="nav-item">
-                                <a href="{{ route('comptabilite.ndf.index') }}"
-                                   class="nav-link d-flex align-items-center justify-content-between
-                                          {{ request()->routeIs('comptabilite.ndf.*') ? 'active' : '' }}">
-                                    <span><i class="bi bi-receipt-cutoff me-1"></i> Notes de frais</span>
-                                    @if($ndfPendingCount > 0)
-                                        <span class="badge bg-warning text-dark ms-1">{{ $ndfPendingCount }}</span>
-                                    @endif
+                            @php $inboxPendingTotal = ($ndfPendingCount ?? 0) + ($facturesPartenairesPendingCount ?? 0); @endphp
+                            <li class="nav-item mt-2">
+                                <a class="sidebar-inbox-toggle"
+                                   data-bs-toggle="collapse"
+                                   href="#sidebar-inbox-comptabilite"
+                                   role="button"
+                                   aria-expanded="true"
+                                   aria-controls="sidebar-inbox-comptabilite">
+                                    <span><i class="bi bi-inbox me-1"></i> Boîte de réception
+                                        @if($inboxPendingTotal > 0)
+                                            <span class="badge bg-warning text-dark ms-1">{{ $inboxPendingTotal }}</span>
+                                        @endif
+                                    </span>
+                                    <i class="bi bi-chevron-down inbox-chevron"></i>
                                 </a>
-                            </li>
-                            @endif
+                                <div class="collapse show" id="sidebar-inbox-comptabilite">
+                                    <ul class="nav flex-column inbox-nav">
 
-                            @if($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index'))
-                            <li class="nav-item">
-                                <a href="{{ route('back-office.factures-partenaires.index') }}"
-                                   class="nav-link d-flex align-items-center justify-content-between
-                                          {{ request()->routeIs('back-office.factures-partenaires.*') ? 'active' : '' }}">
-                                    <span><i class="bi bi-file-earmark-text me-1"></i> Factures</span>
-                                    @if($facturesPartenairesPendingCount > 0)
-                                        <span class="badge bg-warning text-dark ms-1">{{ $facturesPartenairesPendingCount }}</span>
-                                    @endif
-                                </a>
+                                        @if($canSeeNdf && Route::has('comptabilite.ndf.index'))
+                                        <li class="nav-item">
+                                            <a href="{{ route('comptabilite.ndf.index') }}"
+                                               class="nav-link d-flex align-items-center justify-content-between
+                                                      {{ request()->routeIs('comptabilite.ndf.*') ? 'active' : '' }}">
+                                                <span><i class="bi bi-receipt-cutoff me-1"></i> Notes de frais</span>
+                                                @if($ndfPendingCount > 0)
+                                                    <span class="badge bg-warning text-dark ms-1">{{ $ndfPendingCount }}</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                        @endif
+
+                                        @if($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index'))
+                                        <li class="nav-item">
+                                            <a href="{{ route('back-office.factures-partenaires.index') }}"
+                                               class="nav-link d-flex align-items-center justify-content-between
+                                                      {{ request()->routeIs('back-office.factures-partenaires.*') ? 'active' : '' }}">
+                                                <span><i class="bi bi-file-earmark-text me-1"></i> Factures</span>
+                                                @if($facturesPartenairesPendingCount > 0)
+                                                    <span class="badge bg-warning text-dark ms-1">{{ $facturesPartenairesPendingCount }}</span>
+                                                @endif
+                                            </a>
+                                        </li>
+                                        @endif
+
+                                    </ul>
+                                </div>
                             </li>
                             @endif
 

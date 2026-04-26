@@ -94,6 +94,30 @@ it('n\'affiche pas le badge quand aucune facture Soumise', function (): void {
     $response->assertDontSee('badge bg-warning text-dark ms-1">1', false);
 });
 
+it('affiche le badge agrégé sur "Boîte de réception" quand NDF + Factures ont des items en attente', function (): void {
+    $association = Association::factory()->create();
+    TenantContext::clear();
+    TenantContext::boot($association);
+    session(['current_association_id' => $association->id]);
+
+    $admin = navFpMakeUserWithRole($association, RoleAssociation::Admin);
+
+    // Create 3 pending factures partenaires (Soumise)
+    $tiers = Tiers::factory()->create(['association_id' => $association->id]);
+    FacturePartenaireDeposee::factory()->soumise()->count(3)->create([
+        'association_id' => $association->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('comptabilite.transactions'));
+
+    $response->assertOk();
+    // The aggregated badge on "Boîte de réception" shows total pending count (3 factures)
+    $response->assertSeeInOrder(['Boîte de réception', '3']);
+    // Individual badge on Factures item also present
+    $response->assertSeeHtml('<span class="badge bg-warning text-dark ms-1">3</span>');
+});
+
 it('n\'affiche pas le lien Factures à comptabiliser pour un Gestionnaire', function (): void {
     $association = Association::factory()->create();
     TenantContext::clear();
