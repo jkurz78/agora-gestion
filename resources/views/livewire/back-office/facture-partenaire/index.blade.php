@@ -53,7 +53,19 @@
 
     @if ($depots->isEmpty())
         <div class="alert alert-info">
-            Aucun dépôt dans cet onglet.
+            @switch($onglet)
+                @case('a_traiter')
+                    Aucune facture en attente de traitement.
+                    @break
+                @case('traitees')
+                    Aucune facture comptabilisée.
+                    @break
+                @case('rejetees')
+                    Aucune facture rejetée.
+                    @break
+                @default
+                    Aucun dépôt enregistré.
+            @endswitch
         </div>
     @else
         <div class="table-responsive">
