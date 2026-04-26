@@ -32,8 +32,7 @@ final class Index extends Component
     #[On('transaction-saved')]
     public function onTransactionSaved(): void
     {
-        // No-op: Livewire re-renders the component automatically after any listener,
-        // so the depot list refreshes without requiring a manual page reload.
+        $this->redirect(route('back-office.factures-partenaires.index'), navigate: true);
     }
 
     public function render(): View
@@ -121,6 +120,7 @@ final class Index extends Component
 
         session()->flash('success', 'Le dépôt a été rejeté.');
         $this->fermerRejet();
+        $this->redirect(route('back-office.factures-partenaires.index'), navigate: true);
     }
 
     /** @return Collection<int, FacturePartenaireDeposee> */

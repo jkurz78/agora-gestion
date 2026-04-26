@@ -438,7 +438,7 @@ it('comptabiliser on a Rejetee depot flashes an error and does not dispatch', fu
 
 // ── Test 17 : Rejeter — flux complet ─────────────────────────────────────────
 
-it('rejeter full flow: ouvrirRejet opens modal, confirmerRejet rejects depot', function (): void {
+it('rejeter full flow: ouvrirRejet opens modal, confirmerRejet rejects depot and redirects', function (): void {
     $association = Association::factory()->create();
     TenantContext::clear();
     TenantContext::boot($association);
@@ -460,13 +460,12 @@ it('rejeter full flow: ouvrirRejet opens modal, confirmerRejet rejects depot', f
     expect($component->get('depotIdToReject'))->toBe($depot->id);
     expect($component->get('motifRejet'))->toBe('');
 
-    $component->instance()->motifRejet = 'PDF illisible';
-    $component->instance()->confirmerRejet();
+    $component
+        ->set('motifRejet', 'PDF illisible')
+        ->call('confirmerRejet')
+        ->assertRedirect(route('back-office.factures-partenaires.index'));
 
     expect(session('success'))->not->toBeNull();
-    expect($component->instance()->showRejectModal)->toBeFalse();
-    expect($component->instance()->depotIdToReject)->toBeNull();
-    expect($component->instance()->motifRejet)->toBe('');
 
     $depot->refresh();
     expect($depot->statut)->toBe(StatutFactureDeposee::Rejetee);
@@ -589,9 +588,9 @@ it('fermerRejet resets modal state', function (): void {
     expect($component->get('motifRejet'))->toBe('');
 });
 
-// ── Test 22 : transaction-saved event rafraîchit la liste ────────────────────
+// ── Test 22 : transaction-saved event déclenche un redirect (rafraîchit la sidebar) ──────
 
-it('re-renders and hides a newly-Traitee depot after transaction-saved event', function (): void {
+it('dispatches a redirect after transaction-saved so the sidebar badge refreshes', function (): void {
     $association = Association::factory()->create();
     TenantContext::clear();
     TenantContext::boot($association);
@@ -599,7 +598,7 @@ it('re-renders and hides a newly-Traitee depot after transaction-saved event', f
 
     $admin = fpIndexMakeUserWithRole($association, RoleAssociation::Admin);
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
-    $depot = FacturePartenaireDeposee::factory()->soumise()->create([
+    FacturePartenaireDeposee::factory()->soumise()->create([
         'association_id' => $association->id,
         'tiers_id' => $tiers->id,
         'numero_facture' => 'FACT-TO-COMPTABILISE',
@@ -607,13 +606,8 @@ it('re-renders and hides a newly-Traitee depot after transaction-saved event', f
 
     $this->actingAs($admin);
 
-    $component = Livewire::test(Index::class)
-        ->assertSee('FACT-TO-COMPTABILISE');
-
-    // Simulate comptabilisation: flip depot to Traitee in DB
-    $depot->update(['statut' => StatutFactureDeposee::Traitee->value]);
-
-    // Dispatch the browser event emitted by TransactionForm::save()
-    $component->dispatch('transaction-saved')
-        ->assertDontSee('FACT-TO-COMPTABILISE');
+    Livewire::test(Index::class)
+        ->assertSee('FACT-TO-COMPTABILISE')
+        ->dispatch('transaction-saved')
+        ->assertRedirect(route('back-office.factures-partenaires.index'));
 });
