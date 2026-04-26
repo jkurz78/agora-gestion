@@ -36,7 +36,8 @@ it('affiche le lien Factures à comptabiliser pour un Admin', function (): void 
     $response = $this->actingAs($admin)->get(route('comptabilite.transactions'));
 
     $response->assertOk();
-    $response->assertSee('Factures à comptabiliser');
+    $response->assertSee('Boîte de réception');
+    $response->assertSee('Factures');
     $response->assertSeeHtml(route('back-office.factures-partenaires.index'));
 });
 
@@ -51,7 +52,8 @@ it('affiche le lien Factures à comptabiliser pour un Comptable', function (): v
     $response = $this->actingAs($comptable)->get(route('comptabilite.transactions'));
 
     $response->assertOk();
-    $response->assertSee('Factures à comptabiliser');
+    $response->assertSee('Boîte de réception');
+    $response->assertSee('Factures');
     $response->assertSeeHtml(route('back-office.factures-partenaires.index'));
 });
 
@@ -72,7 +74,7 @@ it('affiche le badge compteur quand des factures Soumise existent', function ():
     $response = $this->actingAs($admin)->get(route('comptabilite.transactions'));
 
     $response->assertOk();
-    $response->assertSee('Factures à comptabiliser');
+    $response->assertSee('Factures');
     // Badge with count 1
     $response->assertSeeHtml('<span class="badge bg-warning text-dark ms-1">1</span>');
 });
@@ -103,5 +105,5 @@ it('n\'affiche pas le lien Factures à comptabiliser pour un Gestionnaire', func
     $response = $this->actingAs($gestionnaire)->get(route('comptabilite.transactions'));
 
     $response->assertOk();
-    $response->assertDontSee('Factures à comptabiliser');
+    $response->assertDontSeeHtml(route('back-office.factures-partenaires.index'));
 });
