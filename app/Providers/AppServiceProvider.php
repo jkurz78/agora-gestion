@@ -6,15 +6,18 @@ namespace App\Providers;
 
 use App\Console\Commands\VersionStampCommand;
 use App\Enums\RoleAssociation;
+use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutNoteDeFrais;
 use App\Models\Association;
 use App\Models\AssociationUser;
+use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
 use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\TransactionObserver;
+use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
@@ -32,6 +35,7 @@ final class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(FacturePartenaireDeposee::class, FacturePartenaireDeposeePolicy::class);
         Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
 
         Association::observe(AssociationObserver::class);
@@ -48,6 +52,7 @@ final class AppServiceProvider extends ServiceProvider
 
             $canSeeNdf = false;
             $ndfPendingCount = 0;
+            $facturesPartenairesPendingCount = 0;
 
             if (Auth::check() && TenantContext::hasBooted()) {
                 $assocUser = AssociationUser::where('user_id', (int) Auth::id())
@@ -63,13 +68,18 @@ final class AppServiceProvider extends ServiceProvider
                     if (in_array($role, [RoleAssociation::Admin, RoleAssociation::Comptable], true)) {
                         $canSeeNdf = true;
                         $ndfPendingCount = NoteDeFrais::where('statut', StatutNoteDeFrais::Soumise->value)->count();
+                        $facturesPartenairesPendingCount = FacturePartenaireDeposee::where('statut', StatutFactureDeposee::Soumise->value)->count();
                     }
                 }
             }
 
+            $canSeeFacturesPartenaires = $canSeeNdf; // même règle d'accès (Admin/Comptable)
+
             $view->with([
                 'canSeeNdf' => $canSeeNdf,
                 'ndfPendingCount' => $ndfPendingCount,
+                'canSeeFacturesPartenaires' => $canSeeFacturesPartenaires,
+                'facturesPartenairesPendingCount' => $facturesPartenairesPendingCount,
             ]);
         });
     }

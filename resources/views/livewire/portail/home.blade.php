@@ -28,7 +28,7 @@
 
     @if ($tiers->pour_depenses)
         <section class="mb-4">
-            <h2 class="h5 text-uppercase text-muted mb-3">Partenaires, bénévoles</h2>
+            <h2 class="h5 text-uppercase text-muted mb-3">Notes de frais</h2>
             <div class="row g-3 mb-0">
                 <div class="col-12">
                     <a href="{{ \App\Support\PortailRoute::to('ndf.index', $association) }}"
@@ -38,6 +38,39 @@
                             <div>
                                 <h5 class="card-title mb-0">Vos notes de frais</h5>
                                 <p class="card-text text-muted small mb-0">Saisir et suivre vos remboursements de frais</p>
+                            </div>
+                            <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-4">
+            <h2 class="h5 text-uppercase text-muted mb-3">Vos factures</h2>
+            <div class="row g-3 mb-0">
+                <div class="col-12">
+                    <a href="{{ \App\Support\PortailRoute::to('factures.index', $association) }}"
+                       class="card text-decoration-none text-dark h-100">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <i class="bi bi-inbox fs-2 text-primary"></i>
+                            <div>
+                                <h5 class="card-title mb-0">Boîte de dépôt</h5>
+                                <p class="card-text text-muted small mb-0">Nouvelle facture et en attente de traitement</p>
+                            </div>
+                            <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="col-12">
+                    <a href="{{ \App\Support\PortailRoute::to('historique.index', $association) }}"
+                       class="card text-decoration-none text-dark h-100">
+                        <div class="card-body d-flex align-items-center gap-3">
+                            <i class="bi bi-clock-history fs-2 text-primary"></i>
+                            <div>
+                                <h5 class="card-title mb-0">Historique et règlement</h5>
+                                <p class="card-text text-muted small mb-0">Suivi comptable et historique</p>
                             </div>
                             <i class="bi bi-chevron-right ms-auto text-muted"></i>
                         </div>

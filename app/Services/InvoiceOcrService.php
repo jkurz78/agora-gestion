@@ -30,7 +30,7 @@ final class InvoiceOcrService
     }
 
     /**
-     * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int}|null  $context
+     * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int, reference_attendue?: string, date_attendue?: string}|null  $context
      */
     public function analyze(UploadedFile $file, ?array $context = null): InvoiceOcrResult
     {
@@ -48,7 +48,7 @@ final class InvoiceOcrService
     }
 
     /**
-     * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int}|null  $context
+     * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int, reference_attendue?: string, date_attendue?: string}|null  $context
      */
     public function analyzeFromPath(string $path, string $mime, ?array $context = null): InvoiceOcrResult
     {
@@ -70,7 +70,7 @@ final class InvoiceOcrService
     }
 
     /**
-     * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int}|null  $context
+     * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int, reference_attendue?: string, date_attendue?: string}|null  $context
      */
     private function performAnalysis(string $apiKey, string $base64, string $mime, ?array $context): InvoiceOcrResult
     {
@@ -173,34 +173,71 @@ OPERATIONS EN COURS :
 PROMPT;
 
         if ($context !== null) {
-            $ctxParts = [];
-            if (isset($context['tiers_attendu'])) {
-                $ctxParts[] = "Tiers attendu : {$context['tiers_attendu']}";
-            }
-            if (isset($context['operation_attendue'])) {
-                $ctxParts[] = "Opération attendue : {$context['operation_attendue']}";
-            }
-            if (isset($context['seance_attendue'])) {
-                $ctxParts[] = "Séance attendue : {$context['seance_attendue']}";
-            }
-            $ctxStr = implode("\n", $ctxParts);
+            $ctxBlock = $this->buildContextBlock($context);
 
-            $prompt .= <<<PROMPT
+            if ($ctxBlock !== '') {
+                $prompt .= $ctxBlock;
+            }
+        }
+
+        $prompt .= "\n\nRéponds UNIQUEMENT avec le JSON, sans commentaire ni bloc markdown.";
+
+        return $prompt;
+    }
+
+    /**
+     * Construit le bloc "CONTEXTE ENCADRANT" injecté dans le prompt lorsque des valeurs
+     * attendues sont fournies. Retourne une chaîne vide si aucune clé reconnue n'est présente.
+     *
+     * @param  array{tiers_attendu?: string, operation_attendue?: string, seance_attendue?: int, reference_attendue?: string, date_attendue?: string}  $context
+     * @return string Empty string if $context contains no recognized key.
+     */
+    private function buildContextBlock(array $context): string
+    {
+        $ctxParts = [];
+        $warningExamples = [];
+
+        if (isset($context['tiers_attendu'])) {
+            $ctxParts[] = "Tiers attendu : {$context['tiers_attendu']}";
+            $warningExamples[] = '"Le tiers sur la facture (X) ne correspond pas au tiers sélectionné (Y)"';
+        }
+
+        if (isset($context['operation_attendue'])) {
+            $ctxParts[] = "Opération attendue : {$context['operation_attendue']}";
+            $warningExamples[] = '"L\'opération détectée (X) ne correspond pas à l\'opération sélectionnée (Y)"';
+        }
+
+        if (isset($context['seance_attendue'])) {
+            $ctxParts[] = "Séance attendue : {$context['seance_attendue']}";
+            $warningExamples[] = '"La séance détectée (N) ne correspond pas à la séance sélectionnée (M)"';
+        }
+
+        if (isset($context['reference_attendue'])) {
+            $ctxParts[] = "Numéro de facture attendu : {$context['reference_attendue']}";
+            $warningExamples[] = '"Le numéro extrait (X) ne correspond pas au numéro déposé (Y)"';
+        }
+
+        if (isset($context['date_attendue'])) {
+            $ctxParts[] = "Date de facture attendue : {$context['date_attendue']}";
+            $warningExamples[] = '"La date extraite (X) ne correspond pas à la date déposée (Y)"';
+        }
+
+        if ($ctxParts === []) {
+            return '';
+        }
+
+        $ctxStr = implode("\n", $ctxParts);
+        $examplesStr = implode("\n- ", $warningExamples);
+
+        return <<<BLOCK
 
 
 CONTEXTE ENCADRANT (valeurs attendues) :
 {$ctxStr}
 
 Compare les informations extraites de la facture avec ce contexte. Si une valeur ne correspond pas, ajoute un warning dans le champ "warnings". Exemples :
-- "Le tiers sur la facture (X) ne correspond pas au tiers sélectionné (Y)"
-- "L'opération détectée (X) ne correspond pas à l'opération sélectionnée (Y)"
-- "La séance détectée (N) ne correspond pas à la séance sélectionnée (M)"
-PROMPT;
-        }
-
-        $prompt .= "\n\nRéponds UNIQUEMENT avec le JSON, sans commentaire ni bloc markdown.";
-
-        return $prompt;
+- {$examplesStr}
+BLOCK;
     }
 
     private function parseResult(array $data): InvoiceOcrResult

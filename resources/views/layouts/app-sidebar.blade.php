@@ -126,6 +126,8 @@
                     :exercice-label="$exerciceLabel"
                     :can-see-ndf="$canSeeNdf ?? false"
                     :ndf-pending-count="$ndfPendingCount ?? 0"
+                    :can-see-factures-partenaires="$canSeeFacturesPartenaires ?? false"
+                    :factures-partenaires-pending-count="$facturesPartenairesPendingCount ?? 0"
                 />
             </div>
         </div>
@@ -204,6 +206,17 @@
                            title="{{ $ndfPendingCount }} note(s) de frais à traiter">
                             <i class="bi bi-receipt-cutoff"></i>
                             <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $ndfPendingCount }}</span>
+                        </a>
+                    @endif
+
+                    {{-- Factures partenaires en attente --}}
+                    @if(($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0)
+                        <a href="{{ route('back-office.factures-partenaires.index') }}"
+                           class="text-decoration-none d-flex align-items-center gap-1"
+                           style="color: rgba(255,255,255,.9);"
+                           title="{{ $facturesPartenairesPendingCount }} facture(s) en attente de traitement">
+                            <i class="bi bi-file-earmark-text"></i>
+                            <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $facturesPartenairesPendingCount }}</span>
                         </a>
                     @endif
 

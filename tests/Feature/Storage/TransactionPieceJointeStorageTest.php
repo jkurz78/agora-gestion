@@ -156,6 +156,26 @@ it('download via TransactionPieceJointeController sert le bon contenu depuis le 
     expect($response->headers->get('Content-Disposition'))->toContain('ma-facture.pdf');
 });
 
+it('sanitize le filename contenant des slashes avant la réponse inline (données legacy)', function () {
+    $tx = Transaction::factory()->create([
+        'piece_jointe_path' => 'justificatif.pdf',
+        'piece_jointe_nom' => 'Facture F-2026-0042 du 24/04/2026.pdf',  // slash legacy
+        'piece_jointe_mime' => 'application/pdf',
+    ]);
+
+    $fullPath = "associations/{$this->aid}/transactions/{$tx->id}/justificatif.pdf";
+    Storage::disk('local')->put($fullPath, 'PDF CONTENT');
+
+    $response = $this->get(route('transactions.piece-jointe', $tx));
+
+    $response->assertOk();
+    $contentDisposition = $response->headers->get('Content-Disposition');
+    expect($contentDisposition)
+        ->not->toContain('/')
+        ->and($contentDisposition)
+        ->not->toContain('\\');
+});
+
 it('download retourne 404 si le fichier est absent du disque', function () {
     $tx = Transaction::factory()->create([
         'piece_jointe_path' => 'justificatif.pdf',

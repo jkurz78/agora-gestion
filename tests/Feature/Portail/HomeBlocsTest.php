@@ -66,3 +66,23 @@ it('affiche le message neutre si aucun flag', function () {
         ->assertStatus(200)
         ->assertSeeText('Aucun espace activé');
 });
+
+it('tiers pour_depenses voit les sections Notes de frais et Vos factures', function () {
+    loginTiers(['pour_depenses' => true, 'pour_recettes' => false]);
+
+    $this->get('/portail/')
+        ->assertStatus(200)
+        ->assertSeeText('Vos notes de frais')
+        ->assertSeeText('Boîte de dépôt')
+        ->assertSeeText('Historique et règlement');
+});
+
+it('tiers pour_recettes seul (sans pour_depenses) ne voit aucune carte facture/NDF', function () {
+    loginTiers(['pour_depenses' => false, 'pour_recettes' => true]);
+
+    $this->get('/portail/')
+        ->assertStatus(200)
+        ->assertDontSeeText('Vos notes de frais')
+        ->assertDontSeeText('Boîte de dépôt')
+        ->assertDontSeeText('Historique et règlement');
+});
