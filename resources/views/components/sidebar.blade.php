@@ -36,20 +36,21 @@
     color: #722281;
     background: rgba(114,34,129,.05);
 }
-/* Remplace le chevron Bootstrap par +/- */
+/* Chevron qui rotate 90° à l'ouverture (cohérent avec sous-menu Réception) */
 .sidebar .accordion-button::after {
-    content: '+';
+    content: '\203A'; /* › */
     background-image: none !important;
     width: auto;
     height: auto;
-    font-size: .9rem;
+    font-size: 1.1rem;
+    line-height: 1;
     font-weight: 700;
-    color: #999;
-    transform: none !important;
-    transition: none;
+    color: #bbb;
+    transform: rotate(0deg) !important;
+    transition: transform .2s, color .2s;
 }
 .sidebar .accordion-button:not(.collapsed)::after {
-    content: '\2212'; /* signe moins */
+    transform: rotate(90deg) !important;
     color: #722281;
 }
 
@@ -70,7 +71,7 @@
     font-weight: 600;
 }
 
-/* Sous-groupe collapsible "Boîte de réception" */
+/* Sous-groupe collapsible "Réception" */
 .sidebar .sidebar-inbox-toggle {
     padding: .3rem 1rem .3rem 2.5rem;
     font-size: .85rem;
@@ -172,7 +173,7 @@ $activeGroup = match(true) {
                                    role="button"
                                    aria-expanded="true"
                                    aria-controls="sidebar-inbox-comptabilite">
-                                    <span><i class="bi bi-inbox me-1"></i> Boîte de réception
+                                    <span><i class="bi bi-inbox me-1"></i> Réception
                                         @if($inboxPendingTotal > 0)
                                             <span class="badge bg-warning text-dark ms-1">{{ $inboxPendingTotal }}</span>
                                         @endif
