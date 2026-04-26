@@ -109,7 +109,7 @@
                                 @endswitch
                             </td>
                             <td class="text-end text-nowrap">
-                                <a href="{{ URL::signedRoute('back-office.factures-partenaires.pdf', ['depot' => $depot]) }}"
+                                <a href="{{ route('back-office.factures-partenaires.pdf', ['depot' => $depot]) }}"
                                    class="btn btn-outline-secondary btn-sm"
                                    target="_blank">
                                     <i class="bi bi-file-pdf me-1"></i>Voir PDF

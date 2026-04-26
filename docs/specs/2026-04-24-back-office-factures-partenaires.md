@@ -382,3 +382,13 @@ Entrée "Factures à comptabiliser" dans le groupe **Comptabilité** (cohérent 
 1. `/agentic-dev-team:plan` sur cette spec → plan TDD incrémental.
 2. `/agentic-dev-team:build` → exécution Subagent-Driven (Sonnet).
 3. Post-merge : décision agrégateur "Pièces à traiter" activée par friction utilisateur ressentie, spec dédiée à ce moment-là.
+
+---
+
+## Note — Route PDF back-office non signée (iframe compatibility)
+
+La route `back-office.factures-partenaires.pdf` n'utilise **pas** de middleware `signed` ni `URL::signedRoute()`. Raisons :
+
+- Le pattern existant `IncomingDocumentsController::download` (route `facturation.documents-en-attente.download`) fonctionne avec un plain `route()` — même niveau de sécurité.
+- Auth (`auth`, `verified`, `EnsureTwoFactor`) + policy `can:treat,depot` + `TenantScope` fail-closed couvrent l'accès.
+- Les signed URLs causent des problèmes de rendu dans certaines configurations de navigateur quand la route est chargée dans un `<iframe>` (le navigateur refuse de suivre la chaîne de redirection signed → "localhost refused to connect").

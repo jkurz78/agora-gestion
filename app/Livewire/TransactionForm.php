@@ -33,7 +33,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -243,8 +242,8 @@ final class TransactionForm extends Component
         $this->date = $depot->date_facture->format('Y-m-d');
         $this->reference = $depot->numero_facture;
 
-        // URL signée back-office pour l'iframe de prévisualisation PDF.
-        $this->incomingDocumentPreviewUrl = URL::signedRoute(
+        // URL plain route pour l'iframe de prévisualisation PDF (auth + policy suffisent, signed cause des problèmes iframe).
+        $this->incomingDocumentPreviewUrl = route(
             'back-office.factures-partenaires.pdf',
             ['depot' => $depot->id],
         );
