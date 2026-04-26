@@ -73,11 +73,9 @@
 /* Sous-groupe collapsible "Boîte de réception" */
 .sidebar .sidebar-inbox-toggle {
     padding: .3rem 1rem .3rem 2.5rem;
-    font-size: .75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .03em;
-    color: #888;
+    font-size: .85rem;
+    font-weight: 700;
+    color: #555;
     text-decoration: none;
     display: flex;
     align-items: center;
