@@ -1,4 +1,4 @@
-<div>
+<div style="font-size:.85rem;">
     {{-- Flash messages --}}
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
