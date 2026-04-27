@@ -36,7 +36,7 @@ afterEach(function () {
 it('renders the facture list component', function () {
     Livewire::test(FactureList::class)
         ->assertStatus(200)
-        ->assertSee('Créer facture');
+        ->assertSee('Nouvelle facture');
 });
 
 it('displays existing factures with correct data', function () {
@@ -108,12 +108,18 @@ it('shows correct badges for each statut', function () {
         ->assertSee('Annulée');
 });
 
-it('creates a new brouillon and redirects to edit', function () {
+it('creer() without arguments opens the modal and does not redirect', function () {
+    Livewire::test(FactureList::class)
+        ->call('creer')
+        ->assertSet('showCreerModal', true)
+        ->assertNoRedirect();
+});
+
+it('creer($tiersId) with valid tiers creates the facture and redirects to edit', function () {
     $tiers = Tiers::factory()->pourRecettes()->create(['association_id' => $this->association->id]);
 
     Livewire::test(FactureList::class)
-        ->set('newFactureTiersId', $tiers->id)
-        ->call('creer')
+        ->call('creer', $tiers->id)
         ->assertRedirect();
 
     expect(Facture::count())->toBe(1);
@@ -122,6 +128,12 @@ it('creates a new brouillon and redirects to edit', function () {
     expect($facture->statut)->toBe(StatutFacture::Brouillon);
     expect($facture->tiers_id)->toBe($tiers->id);
     expect($facture->numero)->toBeNull();
+});
+
+it('creer($invalidId) with non-existent tiers fails validation', function () {
+    Livewire::test(FactureList::class)
+        ->call('creer', 999999)
+        ->assertHasErrors(['newFactureTiersId']);
 });
 
 it('deletes a brouillon facture', function () {

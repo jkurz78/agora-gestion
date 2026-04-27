@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\StatutDevis;
 use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
 use App\Models\Facture;
 use App\Models\Participant;
 use App\Models\Tiers;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 
 final class TiersQuickViewService
@@ -61,6 +63,11 @@ final class TiersQuickViewService
         $factures = $this->getFactures($tiers, $exercice);
         if ($factures !== null) {
             $summary['factures'] = $factures;
+        }
+
+        $devisLibres = $this->getDevisLibres($tiers);
+        if ($devisLibres !== null) {
+            $summary['devis_libres'] = $devisLibres;
         }
 
         return $summary;
@@ -382,6 +389,47 @@ final class TiersQuickViewService
             'count' => $count,
             'total' => $total,
             'impayees' => $impayees,
+        ];
+    }
+
+    /**
+     * Retourne un bloc "Devis libres" pour la vue 360° du tiers :
+     * count par statut (tous les 5 statuts), total des devis acceptés.
+     * Utilise une seule query agrégée (groupBy statut) — ≤ 1 query.
+     *
+     * @return array<string, mixed>|null null si aucun devis pour ce tiers
+     */
+    private function getDevisLibres(Tiers $tiers): ?array
+    {
+        $associationId = TenantContext::currentId();
+
+        $rows = DB::table('devis')
+            ->where('tiers_id', (int) $tiers->id)
+            ->where('association_id', (int) $associationId)
+            ->whereNull('deleted_at')
+            ->selectRaw('statut, COUNT(*) as cnt, SUM(CASE WHEN statut = ? THEN montant_total ELSE 0 END) as total_acceptes', [StatutDevis::Accepte->value])
+            ->groupBy('statut')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        // Initialise all 5 statuts at 0
+        $counts = array_fill_keys(
+            array_map(fn (StatutDevis $s): string => $s->value, StatutDevis::cases()),
+            0,
+        );
+        $totalAcceptes = 0.0;
+
+        foreach ($rows as $row) {
+            $counts[$row->statut] = (int) $row->cnt;
+            $totalAcceptes += (float) $row->total_acceptes;
+        }
+
+        return [
+            'counts' => $counts,
+            'total_acceptes' => $totalAcceptes,
         ];
     }
 }

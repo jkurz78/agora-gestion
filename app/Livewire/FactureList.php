@@ -28,6 +28,8 @@ final class FactureList extends Component
 
     public ?int $newFactureTiersId = null;
 
+    public bool $showCreerModal = false;
+
     public function getCanEditProperty(): bool
     {
         return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
@@ -43,11 +45,20 @@ final class FactureList extends Component
         $this->resetPage();
     }
 
-    public function creer(): void
+    public function creer(?int $tiersId = null): mixed
     {
         if (! $this->canEdit) {
-            return;
+            return null;
         }
+
+        if ($tiersId === null) {
+            $this->showCreerModal = true;
+            $this->resetValidation('newFactureTiersId');
+
+            return null;
+        }
+
+        $this->newFactureTiersId = $tiersId;
 
         $this->validate([
             'newFactureTiersId' => ['required', 'exists:tiers,id'],
@@ -55,7 +66,7 @@ final class FactureList extends Component
 
         $facture = app(FactureService::class)->creer($this->newFactureTiersId);
 
-        $this->redirect(route('facturation.factures.edit', $facture));
+        return $this->redirect(route('facturation.factures.edit', $facture));
     }
 
     public function supprimer(int $id): void

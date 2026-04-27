@@ -69,7 +69,8 @@
                         || isset($summary['cotisations'])
                         || isset($summary['participations'])
                         || isset($summary['referent'])
-                        || isset($summary['factures']);
+                        || isset($summary['factures'])
+                        || isset($summary['devis_libres']);
                     // cotisations shown in header, factures in flux line — but still count for "has activity"
                 @endphp
 
@@ -205,6 +206,46 @@
                     @endisset
 
                     {{-- Factures moved to flux financiers line --}}
+
+                    {{-- Devis libres --}}
+                    @isset($summary['devis_libres'])
+                        @php
+                            $dl = $summary['devis_libres'];
+                            $dlStatuts = [
+                                'brouillon' => ['label' => 'Brouillon', 'badge' => 'secondary'],
+                                'envoye'    => ['label' => 'Envoyé',    'badge' => 'primary'],
+                                'accepte'   => ['label' => 'Accepté',   'badge' => 'success'],
+                                'refuse'    => ['label' => 'Refusé',    'badge' => 'danger'],
+                                'annule'    => ['label' => 'Annulé',    'badge' => 'dark'],
+                            ];
+                        @endphp
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
+                                <div class="d-flex align-items-center gap-1">
+                                    <i class="bi bi-file-earmark-text small text-warning"></i>
+                                    <span class="fw-semibold small">Devis libres</span>
+                                </div>
+                                <a href="{{ route('devis-libres.index', ['filtreTiersId' => $tiers->id]) }}"
+                                   class="small text-decoration-none" style="color:#722281;font-size:.65rem" target="_blank">
+                                    Voir tous →
+                                </a>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 ms-3">
+                                @foreach($dlStatuts as $statut => $meta)
+                                    @if(($dl['counts'][$statut] ?? 0) > 0)
+                                        <span class="badge bg-{{ $meta['badge'] }}" style="font-size:.65rem">
+                                            {{ $dl['counts'][$statut] }} {{ $meta['label'] }}
+                                        </span>
+                                    @endif
+                                @endforeach
+                            </div>
+                            @if((float)($dl['total_acceptes'] ?? 0) > 0)
+                                <div class="ms-3 mt-1 small text-muted">
+                                    Total accepté : <strong>{{ number_format((float)$dl['total_acceptes'], 2, ',', ' ') }} €</strong>
+                                </div>
+                            @endif
+                        </div>
+                    @endisset
 
                 @endif
             </div>
