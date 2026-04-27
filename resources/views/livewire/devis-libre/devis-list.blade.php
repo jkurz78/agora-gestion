@@ -12,9 +12,8 @@
         </div>
     @endif
 
-    {{-- Titre + bouton Nouveau devis --}}
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <h4 class="mb-0">Devis</h4>
+    {{-- Bouton Nouveau devis --}}
+    <div class="d-flex justify-content-end mb-3">
         <button wire:click="creerDevis" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg"></i> Nouveau devis
         </button>

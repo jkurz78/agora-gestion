@@ -15,32 +15,32 @@
 
     {{-- En-tête contextuel --}}
     <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-        <div>
-            <h4 class="mb-0">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="fw-semibold">
                 @if ($devis->numero)
                     {{ $devis->numero }}
                 @else
                     <span class="text-muted">Devis brouillon</span>
                 @endif
-                @if ($devis->statut === \App\Enums\StatutDevis::Brouillon)
-                    <span class="badge bg-secondary ms-2" style="font-size:.75rem"><i class="bi bi-pencil"></i> Brouillon</span>
-                @elseif ($devis->statut === \App\Enums\StatutDevis::Envoye)
-                    <span class="badge bg-primary ms-2" style="font-size:.75rem"><i class="bi bi-send"></i> Envoyé</span>
-                    @if ($this->estExpire())
-                        <span class="badge bg-warning text-dark ms-1" style="font-size:.75rem"><i class="bi bi-clock-history"></i> Expiré</span>
-                    @endif
-                @elseif ($devis->statut === \App\Enums\StatutDevis::Accepte)
-                    <span class="badge bg-success ms-2" style="font-size:.75rem"><i class="bi bi-check-circle"></i> Accepté</span>
-                @elseif ($devis->statut === \App\Enums\StatutDevis::Refuse)
-                    <span class="badge bg-danger ms-2" style="font-size:.75rem"><i class="bi bi-x-circle"></i> Refusé</span>
-                @elseif ($devis->statut === \App\Enums\StatutDevis::Annule)
-                    <span class="badge bg-dark ms-2" style="font-size:.75rem"><i class="bi bi-slash-circle"></i> Annulé</span>
+            </span>
+            @if ($devis->statut === \App\Enums\StatutDevis::Brouillon)
+                <span class="badge bg-secondary" style="font-size:.75rem"><i class="bi bi-pencil"></i> Brouillon</span>
+            @elseif ($devis->statut === \App\Enums\StatutDevis::Envoye)
+                <span class="badge bg-primary" style="font-size:.75rem"><i class="bi bi-send"></i> Envoyé</span>
+                @if ($this->estExpire())
+                    <span class="badge bg-warning text-dark" style="font-size:.75rem"><i class="bi bi-clock-history"></i> Expiré</span>
                 @endif
-            </h4>
-            <p class="text-muted mb-0 small">
+            @elseif ($devis->statut === \App\Enums\StatutDevis::Accepte)
+                <span class="badge bg-success" style="font-size:.75rem"><i class="bi bi-check-circle"></i> Accepté</span>
+            @elseif ($devis->statut === \App\Enums\StatutDevis::Refuse)
+                <span class="badge bg-danger" style="font-size:.75rem"><i class="bi bi-x-circle"></i> Refusé</span>
+            @elseif ($devis->statut === \App\Enums\StatutDevis::Annule)
+                <span class="badge bg-dark" style="font-size:.75rem"><i class="bi bi-slash-circle"></i> Annulé</span>
+            @endif
+            <span class="text-muted small ms-2">
                 Tiers : <strong>{{ $devis->tiers?->displayName() }}</strong>
                 — Exercice {{ $devis->exercice }}
-            </p>
+            </span>
         </div>
         <a href="{{ route('devis-libres.index') }}" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour à la liste
