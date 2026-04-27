@@ -200,7 +200,7 @@
                     <div class="dropdown">
                         <a href="#" class="text-decoration-none d-flex align-items-center gap-1 dropdown-toggle"
                            style="color: rgba(255,255,255,.9);"
-                           data-bs-toggle="dropdown"
+                           role="button" data-bs-toggle="dropdown"
                            aria-expanded="false"
                            title="Boîte de réception : {{ $cumulCount }} pièce(s) en attente">
                             <i class="bi bi-inbox"></i>

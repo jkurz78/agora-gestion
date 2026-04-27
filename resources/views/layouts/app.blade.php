@@ -468,7 +468,7 @@
                     @if($hasVisibleSource)
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle d-flex align-items-center gap-1"
-                           href="#" data-bs-toggle="dropdown" aria-expanded="false"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
                            title="Boîte de réception : {{ $cumulCount }} pièce(s) en attente">
                             <i class="bi bi-inbox"></i>
                             <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $cumulCount }}</span>
