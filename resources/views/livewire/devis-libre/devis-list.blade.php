@@ -12,13 +12,6 @@
         </div>
     @endif
 
-    {{-- Bouton Nouveau devis --}}
-    <div class="d-flex justify-content-end mb-3">
-        <button wire:click="creerDevis" class="btn btn-primary btn-sm">
-            <i class="bi bi-plus-lg"></i> Nouveau devis
-        </button>
-    </div>
-
     {{-- Modale sélection tiers pour créer un devis --}}
     <div class="modal fade {{ $showCreerModal ? 'show d-block' : '' }}"
          tabindex="-1"
@@ -94,6 +87,11 @@
                    class="form-control"
                    placeholder="Numéro ou libellé…">
         </div>
+
+        {{-- Bouton Nouveau devis --}}
+        <button wire:click="creerDevis" class="btn btn-primary btn-sm ms-auto text-nowrap">
+            <i class="bi bi-plus-lg"></i> Nouveau devis
+        </button>
     </div>
 
     {{-- Table --}}
