@@ -443,21 +443,21 @@ $activeGroup = match(true) {
                     <div class="accordion-body p-0">
                         <ul class="nav flex-column">
 
+                            @if (Route::has('devis-libres.index'))
+                            <li class="nav-item">
+                                <a href="{{ route('devis-libres.index') }}"
+                                   class="nav-link {{ request()->routeIs('devis-libres*') ? 'active' : '' }}">
+                                    <i class="bi bi-file-earmark-text me-1"></i> Devis
+                                </a>
+                            </li>
+                            @endif
+
                             <li class="nav-item">
                                 <a href="{{ route('facturation.factures') }}"
                                    class="nav-link {{ request()->routeIs('facturation.factures*') ? 'active' : '' }}">
                                     <i class="bi bi-receipt me-1"></i> Factures
                                 </a>
                             </li>
-
-                            @if (Route::has('devis-libres.index'))
-                            <li class="nav-item">
-                                <a href="{{ route('devis-libres.index') }}"
-                                   class="nav-link {{ request()->routeIs('devis-libres*') ? 'active' : '' }}">
-                                    <i class="bi bi-file-earmark-text me-1"></i> Devis libres
-                                </a>
-                            </li>
-                            @endif
 
                         </ul>
                     </div>
