@@ -124,8 +124,7 @@
                                 @endif
                             </td>
                             <td>
-                                {{-- TODO(step-11): lien vers devis-libres.show une fois DevisEdit implémenté --}}
-                                <a href="#" class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true">
+                                <a href="{{ route('devis-libres.show', $d) }}" class="btn btn-sm btn-outline-secondary">
                                     <i class="bi bi-eye"></i>
                                 </a>
                             </td>
