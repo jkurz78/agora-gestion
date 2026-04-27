@@ -6,6 +6,7 @@ namespace App\Livewire\DevisLibre;
 
 use App\Enums\StatutDevis;
 use App\Models\Devis;
+use App\Services\DevisService;
 use App\Services\ExerciceService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -25,6 +26,12 @@ final class DevisList extends Component
     public ?int $filtreExercice = null;
 
     public string $search = '';
+
+    /** Whether the "choose a tiers" modal is open. */
+    public bool $showCreerModal = false;
+
+    /** tiers_id chosen in the modal before creation. */
+    public ?int $nouveauTiersId = null;
 
     public function mount(): void
     {
@@ -62,9 +69,22 @@ final class DevisList extends Component
             && $devis->date_validite->lt(today());
     }
 
-    public function creerDevis(): void
+    /**
+     * Create a new devis for the given tiers and redirect to its edit page.
+     *
+     * If no tiers_id is provided, open the tiers-selection modal instead.
+     */
+    public function creerDevis(?int $tiersId = null): mixed
     {
-        $this->dispatch('creer-devis');
+        if ($tiersId === null) {
+            $this->showCreerModal = true;
+
+            return null;
+        }
+
+        $devis = app(DevisService::class)->creer($tiersId);
+
+        return $this->redirect(route('devis-libres.show', $devis));
     }
 
     public function render(): View

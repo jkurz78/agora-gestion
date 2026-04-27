@@ -20,6 +20,49 @@
         </button>
     </div>
 
+    {{-- Modale sélection tiers pour créer un devis --}}
+    <div class="modal fade {{ $showCreerModal ? 'show d-block' : '' }}"
+         tabindex="-1"
+         role="dialog"
+         id="creerDevisModal"
+         aria-labelledby="creerDevisModalLabel"
+         @if($showCreerModal) aria-modal="true" style="background:rgba(0,0,0,.4);" @else aria-hidden="true" @endif>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="creerDevisModalLabel">
+                        <i class="bi bi-file-earmark-plus me-1"></i> Nouveau devis
+                    </h5>
+                    <button type="button" class="btn-close" wire:click="$set('showCreerModal', false)"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="modalNouveauTiersId" class="form-label fw-semibold">
+                        Tiers <span class="text-danger">*</span>
+                    </label>
+                    <select id="modalNouveauTiersId"
+                            wire:model="nouveauTiersId"
+                            class="form-select">
+                        <option value="">— Choisir un tiers —</option>
+                        @foreach (\App\Models\Tiers::orderBy('nom')->get() as $t)
+                            <option value="{{ $t->id }}">{{ $t->displayName() }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm"
+                            wire:click="$set('showCreerModal', false)">
+                        Annuler
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm"
+                            wire:click="creerDevis({{ $nouveauTiersId ?? 'null' }})"
+                            @if(!$nouveauTiersId) disabled @endif>
+                        <i class="bi bi-check-lg"></i> Créer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Filtres --}}
     <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
         {{-- Filtre statut --}}

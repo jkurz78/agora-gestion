@@ -291,10 +291,30 @@ it('paginates at 50 per page', function () {
     expect($devis)->toHaveCount(50);
 });
 
-// ── Action creerDevis ────────────────────────────────────────────────────────
+// ── Action creerDevis (wired, Option A) ─────────────────────────────────────
 
-it('dispatches creer-devis event when creerDevis is called', function () {
+it('creerDevis with a tiers_id creates a brouillon devis and redirects', function () {
+    Livewire::test(DevisList::class)
+        ->call('creerDevis', $this->tiers->id)
+        ->assertRedirect(route('devis-libres.show', Devis::latest('id')->first()));
+});
+
+it('creerDevis creates exactly one devis for the given tiers', function () {
+    $countBefore = Devis::count();
+
+    Livewire::test(DevisList::class)
+        ->call('creerDevis', $this->tiers->id);
+
+    expect(Devis::count())->toBe($countBefore + 1);
+
+    $devis = Devis::latest('id')->first();
+    expect($devis->statut)->toBe(StatutDevis::Brouillon)
+        ->and((int) $devis->tiers_id)->toBe((int) $this->tiers->id)
+        ->and((int) $devis->association_id)->toBe((int) $this->association->id);
+});
+
+it('creerDevis without tiers_id opens the tiers selection modal', function () {
     Livewire::test(DevisList::class)
         ->call('creerDevis')
-        ->assertDispatched('creer-devis');
+        ->assertSet('showCreerModal', true);
 });
