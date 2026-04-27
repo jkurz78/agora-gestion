@@ -134,7 +134,7 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 
 **Complexity**: standard
 **RED**:
-- Test duplication depuis `accepté|refusé|annulé|expiré|envoyé|brouillon` → nouveau brouillon
+- Test duplication depuis tout statut (`brouillon|envoyé|accepté|refusé|annulé`), y compris un devis `envoyé` avec `date_validite` passée (cas "expiré" — badge informatif, pas valeur d'enum) → nouveau brouillon
 - Test lignes recopiées (libellé, prix unitaire, quantité, sous-cat, ordre)
 - Test nouveau devis : pas de numéro, `date_emission = aujourd'hui`, `date_validite` recalculée
 - Test isolation : aucun lien retour vers l'original (pas de FK `parent_id`)
@@ -151,9 +151,9 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 **Complexity**: standard
 **RED**:
 - Test `genererPdf` retourne path stockage `storage/app/associations/{id}/devis-libres/{devis_id}/devis-{numero|brouillon}.pdf`
-- Test PDF brouillon contient mention "BROUILLON" + pas de numéro
-- Test PDF envoyé+ contient numéro, dates, tiers, lignes, total, mentions association
-- Test refus PDF si aucune ligne avec montant > 0
+- Test : assertion sur le HTML rendu (avant conversion DomPDF) — `view('pdf.devis-libre', …)->render()` contient la chaîne "BROUILLON" pour brouillon, et n'affiche aucun numéro de référence
+- Test : HTML rendu pour `envoyé+` contient `numero`, `date_emission`, `date_validite`, nom du tiers, lignes (libellés et montants), `montant_total`, mentions association
+- Test refus PDF si aucune ligne avec montant > 0 (`RuntimeException`)
 
 **GREEN**:
 - Gabarit Blade `resources/views/pdf/devis-libre.blade.php` (footer unifié `PdfFooterRenderer`)
@@ -167,7 +167,8 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 
 **Complexity**: standard
 **RED**:
-- Test `envoyerEmail` exige statut ≠ `brouillon` (sinon `RuntimeException`) et ≥ 1 ligne avec montant > 0
+- Test `envoyerEmail` exige statut ≠ `brouillon`, sinon `RuntimeException`
+- Test `envoyerEmail` exige ≥ 1 ligne avec montant > 0, sinon `RuntimeException`
 - Test email envoyé à l'adresse du tiers avec PDF en PJ
 - Test entrée créée dans `email_logs` (`tiers_id`, `subject`, `attachment_path`)
 - Test `Mail::fake()` côté Pest
@@ -187,7 +188,7 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 - Test rendu liste : devis du tenant courant uniquement
 - Test filtres statut, tiers, exercice ; filtre par défaut "non annulés"
 - Test badge "expiré" affiché si `statut = envoyé` et `date_validite < today`
-- Test bouton "Nouveau devis" → ouvre formulaire/modale
+- Test action `creerDevis()` (ou redirection `/devis-libres/{id}`) modifie l'état observable du composant (livewire `assertRedirect` ou property toggle) — pas d'assertion visuelle
 
 **GREEN**:
 - `App\Livewire\DevisLibre\DevisList` + view Blade
@@ -221,7 +222,7 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 **Complexity**: standard
 **RED**:
 - Test `TiersQuickViewService::getSummary()` inclut bloc "Devis libres" : count par statut + total des `accepté`
-- Test ≤ 2 queries supplémentaires (pas de N+1)
+- Test ≤ 2 queries supplémentaires (pas de N+1) — assertion via `DB::enableQueryLog()` + `expect(DB::getQueryLog())->toHaveCount(≤ 2 supplémentaires par rapport au baseline)`
 - Test rendu vue 360° affiche le bloc avec lien vers `/devis-libres?tiers_id=…`
 
 **GREEN**:
