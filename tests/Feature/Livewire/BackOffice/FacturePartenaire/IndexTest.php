@@ -37,7 +37,7 @@ it('returns 200 for an Admin (comptable pivot)', function (): void {
     $admin = fpIndexMakeUserWithRole($association, RoleAssociation::Admin);
 
     $this->actingAs($admin)
-        ->get(route('back-office.factures-partenaires.index'))
+        ->get(route('comptabilite.factures-fournisseurs.index'))
         ->assertOk();
 });
 
@@ -52,7 +52,7 @@ it('returns 200 for a Comptable', function (): void {
     $comptable = fpIndexMakeUserWithRole($association, RoleAssociation::Comptable);
 
     $this->actingAs($comptable)
-        ->get(route('back-office.factures-partenaires.index'))
+        ->get(route('comptabilite.factures-fournisseurs.index'))
         ->assertOk();
 });
 
@@ -67,14 +67,14 @@ it('returns 403 for a Gestionnaire (non-comptable)', function (): void {
     $gestionnaire = fpIndexMakeUserWithRole($association, RoleAssociation::Gestionnaire);
 
     $this->actingAs($gestionnaire)
-        ->get(route('back-office.factures-partenaires.index'))
+        ->get(route('comptabilite.factures-fournisseurs.index'))
         ->assertForbidden();
 });
 
 // ── Test 4 : Guest → redirect login ──────────────────────────────────────────
 
 it('redirects to login when not authenticated', function (): void {
-    $this->get(route('back-office.factures-partenaires.index'))
+    $this->get(route('comptabilite.factures-fournisseurs.index'))
         ->assertRedirect(route('login'));
 });
 
@@ -463,7 +463,7 @@ it('rejeter full flow: ouvrirRejet opens modal, confirmerRejet rejects depot and
     $component
         ->set('motifRejet', 'PDF illisible')
         ->call('confirmerRejet')
-        ->assertRedirect(route('back-office.factures-partenaires.index'));
+        ->assertRedirect(route('comptabilite.factures-fournisseurs.index'));
 
     expect(session('success'))->not->toBeNull();
 
@@ -609,5 +609,5 @@ it('dispatches a redirect after transaction-saved so the sidebar badge refreshes
     Livewire::test(Index::class)
         ->assertSee('FACT-TO-COMPTABILISE')
         ->dispatch('transaction-saved')
-        ->assertRedirect(route('back-office.factures-partenaires.index'));
+        ->assertRedirect(route('comptabilite.factures-fournisseurs.index'));
 });

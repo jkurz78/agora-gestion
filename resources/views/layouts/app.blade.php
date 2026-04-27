@@ -456,15 +456,54 @@
 
                 {{-- Dropdown Paramètres (poussé à droite) --}}
                 <ul class="navbar-nav ms-auto me-3 align-items-end">
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('facturation.documents-en-attente') ? 'active' : '' }}"
-                           href="{{ route('facturation.documents-en-attente') }}">
-                            <i class="bi bi-inbox"></i> Documents
-                            @if(($incomingDocumentsCount ?? 0) > 0)
-                                <span class="badge bg-warning text-dark">{{ $incomingDocumentsCount }}</span>
-                            @endif
+                    {{-- Boîte de réception (dropdown unifié) --}}
+                    @php
+                        $cumulCount = ($incomingDocumentsCount ?? 0)
+                            + (($canSeeNdf ?? false) ? ($ndfPendingCount ?? 0) : 0)
+                            + (($canSeeFacturesPartenaires ?? false) ? ($facturesPartenairesPendingCount ?? 0) : 0);
+                        $hasVisibleSource = ($incomingDocumentsCount ?? 0) > 0
+                            || (($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
+                            || (($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0);
+                    @endphp
+                    @if($hasVisibleSource)
+                    <li class="nav-item dropdown" style="font-size:.8rem;">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-1"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
+                           title="Boîte de réception : {{ $cumulCount }} pièce(s) en attente">
+                            <i class="bi bi-inbox"></i>
+                            <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $cumulCount }}</span>
                         </a>
+                        <ul class="dropdown-menu dropdown-menu-end" style="--bs-dropdown-font-size:.8rem;">
+                            @if(($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center justify-content-between"
+                                       href="{{ route('comptabilite.ndf.index') }}">
+                                        <span><i class="bi bi-receipt-cutoff me-2"></i> Notes de frais</span>
+                                        <span class="badge bg-warning text-dark ms-3">{{ $ndfPendingCount }}</span>
+                                    </a>
+                                </li>
+                            @endif
+                            @if(($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0)
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center justify-content-between"
+                                       href="{{ route('comptabilite.factures-fournisseurs.index') }}">
+                                        <span><i class="bi bi-file-earmark-text me-2"></i> Factures fournisseurs</span>
+                                        <span class="badge bg-warning text-dark ms-3">{{ $facturesPartenairesPendingCount }}</span>
+                                    </a>
+                                </li>
+                            @endif
+                            @if(($incomingDocumentsCount ?? 0) > 0)
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center justify-content-between"
+                                       href="{{ route('facturation.documents-en-attente') }}">
+                                        <span><i class="bi bi-envelope-paper me-2"></i> Documents reçus</span>
+                                        <span class="badge bg-warning text-dark ms-3">{{ $incomingDocumentsCount }}</span>
+                                    </a>
+                                </li>
+                            @endif
+                        </ul>
                     </li>
+                    @endif
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle {{ request()->routeIs('parametres.*') || request()->routeIs('operations.*') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">

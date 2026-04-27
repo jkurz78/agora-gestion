@@ -32,7 +32,7 @@ final class Index extends Component
     #[On('transaction-saved')]
     public function onTransactionSaved(): void
     {
-        $this->redirect(route('back-office.factures-partenaires.index'), navigate: true);
+        $this->redirect(route('comptabilite.factures-fournisseurs.index'), navigate: true);
     }
 
     public function render(): View
@@ -42,7 +42,7 @@ final class Index extends Component
         return view('livewire.back-office.facture-partenaire.index', [
             'depots' => $depots,
             'onglet' => $this->onglet,
-        ])->layout('layouts.app-sidebar', ['title' => 'Factures à comptabiliser']);
+        ])->layout('layouts.app-sidebar', ['title' => 'Factures fournisseurs']);
     }
 
     public function comptabiliser(int $depotId): void
@@ -120,7 +120,7 @@ final class Index extends Component
 
         session()->flash('success', 'Le dépôt a été rejeté.');
         $this->fermerRejet();
-        $this->redirect(route('back-office.factures-partenaires.index'), navigate: true);
+        $this->redirect(route('comptabilite.factures-fournisseurs.index'), navigate: true);
     }
 
     /** @return Collection<int, FacturePartenaireDeposee> */

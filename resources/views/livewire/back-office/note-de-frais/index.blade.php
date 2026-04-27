@@ -1,10 +1,4 @@
-<div>
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 class="h4 mb-0">
-            <i class="bi bi-receipt me-2"></i>Notes de frais
-        </h1>
-    </div>
-
+<div style="font-size:.85rem;">
     {{-- Onglets --}}
     <ul class="nav nav-tabs mb-3" role="tablist">
         <li class="nav-item" role="presentation">
