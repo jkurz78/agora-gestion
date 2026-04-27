@@ -1,4 +1,4 @@
-<div>
+<div style="font-size:.85rem;">
     @php
         $totalChargesPrevu = 0;
         $totalChargesRealise = 0;
