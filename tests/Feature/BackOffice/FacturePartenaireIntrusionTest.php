@@ -89,7 +89,7 @@ it('cross-tenant — la liste back-office masque les dépôts d\'une autre asso'
 it('cross-tenant — URL pour un dépôt de l\'asso Y renvoie 404 depuis le tenant X', function () {
     // L'URL pointe sur le dépôt de assoY mais la requête est faite
     // dans le contexte du tenant X → TenantScope exclut le dépôt → 404.
-    $url = route('comptabilite.factures-fournisseurs.depot-pdf', [
+    $url = route('comptabilite.factures-fournisseurs.pdf', [
         'depot' => $this->depotY->id,
     ]);
 
