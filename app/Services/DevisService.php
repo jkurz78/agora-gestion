@@ -8,9 +8,11 @@ use App\Enums\StatutDevis;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Support\CurrentAssociation;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
 final class DevisService
@@ -446,6 +448,72 @@ final class DevisService
 
             return $nouveau;
         });
+    }
+
+    /**
+     * Génère un PDF pour le devis et le persiste sur le disque local.
+     *
+     * Guard : le devis doit avoir au moins une ligne avec montant > 0, sinon
+     * RuntimeException.
+     *
+     * Le filigrane "BROUILLON" est affiché par défaut quand le statut est Brouillon.
+     * Le paramètre $brouillonWatermark permet de forcer ou supprimer le filigrane
+     * indépendamment du statut (utile pour les tests ou les exports manuels).
+     *
+     * Path de stockage : associations/{associationId}/devis-libres/{devisId}/devis-{filename}.pdf
+     * Retourne le chemin relatif au disque 'local'.
+     *
+     * @throws RuntimeException si aucune ligne avec montant > 0
+     */
+    public function genererPdf(Devis $devis, ?bool $brouillonWatermark = null): string
+    {
+        $devis->load(['lignes', 'tiers']);
+
+        $hasMontant = $devis->lignes->contains(fn (DevisLigne $l) => (float) $l->montant > 0.0);
+
+        if (! $hasMontant) {
+            throw new RuntimeException(
+                'Le devis doit avoir au moins une ligne avec un montant pour générer un PDF.'
+            );
+        }
+
+        $watermark = $brouillonWatermark ?? ($devis->statut === StatutDevis::Brouillon);
+
+        $association = CurrentAssociation::get();
+
+        // Charge le logo en base64 pour l'en-tête
+        $headerLogoBase64 = null;
+        $headerLogoMime = null;
+        $logoFullPath = $association?->brandingLogoFullPath();
+        if ($logoFullPath && Storage::disk('local')->exists($logoFullPath)) {
+            $logoContent = Storage::disk('local')->get($logoFullPath);
+            if ($logoContent) {
+                $ext = strtolower(pathinfo($logoFullPath, PATHINFO_EXTENSION));
+                $headerLogoMime = in_array($ext, ['jpg', 'jpeg'], true) ? 'image/jpeg' : 'image/png';
+                $headerLogoBase64 = base64_encode($logoContent);
+            }
+        }
+
+        $pdf = Pdf::loadView('pdf.devis-libre', [
+            'devis' => $devis,
+            'lignes' => $devis->lignes,
+            'association' => $association,
+            'brouillonWatermark' => $watermark,
+            'headerLogoBase64' => $headerLogoBase64,
+            'headerLogoMime' => $headerLogoMime,
+        ])->setPaper('a4', 'portrait');
+
+        // Nom de fichier : numéro ou brouillon-{id}
+        $filename = $devis->numero !== null
+            ? str_replace('/', '-', $devis->numero)
+            : 'brouillon-'.$devis->id;
+
+        $associationId = (int) $devis->association_id;
+        $path = 'associations/'.$associationId.'/devis-libres/'.$devis->id.'/devis-'.$filename.'.pdf';
+
+        Storage::disk('local')->put($path, $pdf->output());
+
+        return $path;
     }
 
     /**
