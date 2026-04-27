@@ -326,3 +326,33 @@ it('creerDevis without tiers_id opens the tiers selection modal', function () {
         ->call('creerDevis')
         ->assertSet('showCreerModal', true);
 });
+
+// ── Action icon : pencil pour brouillon, eye pour les autres ─────────────────
+
+it('shows pencil icon for brouillon devis in the action column', function () {
+    Devis::factory()->create([
+        'association_id' => $this->association->id,
+        'tiers_id' => $this->tiers->id,
+        'statut' => StatutDevis::Brouillon,
+        'libelle' => 'Test pencil',
+        'exercice' => $this->exercice,
+    ]);
+
+    Livewire::test(DevisList::class)
+        ->assertSeeHtml('bi-pencil');
+});
+
+it('shows eye icon for non-brouillon devis in the action column', function () {
+    Devis::factory()->create([
+        'association_id' => $this->association->id,
+        'tiers_id' => $this->tiers->id,
+        'statut' => StatutDevis::Envoye,
+        'numero' => 'D-2026-099',
+        'libelle' => 'Test eye',
+        'exercice' => $this->exercice,
+    ]);
+
+    Livewire::test(DevisList::class)
+        ->set('filtreStatut', 'envoye')
+        ->assertSeeHtml('bi-eye');
+});

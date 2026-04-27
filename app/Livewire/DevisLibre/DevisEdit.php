@@ -11,10 +11,9 @@ use App\Models\SousCategorie;
 use App\Services\DevisService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\View\ComponentSlot;
 use Livewire\Component;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class DevisEdit extends Component
 {
@@ -38,6 +37,10 @@ final class DevisEdit extends Component
 
     public ?int $nouvelleLigneSousCategorieId = null;
 
+    // ── New ligne texte form ──────────────────────────────────────────────────
+
+    public string $nouveauLigneTexte = '';
+
     // ── Cached queries (loaded once in mount) ─────────────────────────────────
 
     /** @var Collection<int, SousCategorie> */
@@ -59,7 +62,10 @@ final class DevisEdit extends Component
         $this->libelle = (string) ($devis->libelle ?? '');
         $this->dateEmission = $devis->date_emission->format('Y-m-d');
         $this->dateValidite = $devis->date_validite->format('Y-m-d');
-        $this->sousCategoriesDisponibles = SousCategorie::orderBy('nom')->get();
+        $this->sousCategoriesDisponibles = SousCategorie::whereHas(
+            'categorie',
+            fn ($q) => $q->where('type', 'recette')
+        )->orderBy('nom')->get();
     }
 
     // ── Computed helpers ──────────────────────────────────────────────────────
@@ -156,6 +162,42 @@ final class DevisEdit extends Component
         }
     }
 
+    public function ajouterLigneTexte(): void
+    {
+        if ($this->estVerrouille()) {
+            session()->flash('error', 'Ce devis est verrouillé et ne peut pas être modifié.');
+
+            return;
+        }
+
+        if (trim($this->nouveauLigneTexte) === '') {
+            session()->flash('error', 'Le texte de la ligne est requis.');
+
+            return;
+        }
+
+        try {
+            app(DevisService::class)->ajouterLigneTexte($this->devis, $this->nouveauLigneTexte);
+
+            $this->nouveauLigneTexte = '';
+
+            $this->devis->refresh();
+            session()->flash('success', 'Ligne texte ajoutée.');
+        } catch (RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function moveUp(int $ligneId): void
+    {
+        $this->deplacerLigne($ligneId, 'up');
+    }
+
+    public function moveDown(int $ligneId): void
+    {
+        $this->deplacerLigne($ligneId, 'down');
+    }
+
     public function modifierLigneLibelle(int $ligneId, string $libelle): void
     {
         $this->modifierLigne($ligneId, ['libelle' => $libelle]);
@@ -242,23 +284,6 @@ final class DevisEdit extends Component
         }
     }
 
-    // ── PDF ───────────────────────────────────────────────────────────────────
-
-    public function telechargerPdf(): ?StreamedResponse
-    {
-        try {
-            $path = app(DevisService::class)->genererPdf($this->devis);
-
-            $filename = basename($path);
-
-            return Storage::disk('local')->download($path, $filename);
-        } catch (RuntimeException $e) {
-            session()->flash('error', $e->getMessage());
-
-            return null;
-        }
-    }
-
     // ── Email modal ───────────────────────────────────────────────────────────
 
     public function ouvrirModaleEmail(): void
@@ -299,7 +324,7 @@ final class DevisEdit extends Component
             'sousCategoriesDisponibles' => $this->sousCategoriesDisponibles,
         ])->layout('layouts.app-sidebar', [
             'title' => $this->devis->numero ?? 'Brouillon de devis',
-            'breadcrumbParent' => new \Illuminate\View\ComponentSlot('Liste des devis', ['url' => route('devis-libres.index')]),
+            'breadcrumbParent' => new ComponentSlot('Liste des devis', ['url' => route('devis-libres.index')]),
         ]);
     }
 
@@ -322,6 +347,22 @@ final class DevisEdit extends Component
             $this->devis->refresh();
             $message = is_callable($successMessage) ? $successMessage() : $successMessage;
             session()->flash('success', $message);
+        } catch (RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    private function deplacerLigne(int $ligneId, string $direction): void
+    {
+        if ($this->estVerrouille()) {
+            session()->flash('error', 'Ce devis est verrouillé et ne peut pas être modifié.');
+
+            return;
+        }
+
+        try {
+            app(DevisService::class)->majOrdre($this->devis, $ligneId, $direction);
+            $this->devis->refresh();
         } catch (RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }

@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 use App\Enums\StatutDevis;
+use App\Enums\TypeLigneDevis;
 use App\Livewire\DevisLibre\DevisEdit;
 use App\Models\Association;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\Tiers;
 use App\Models\User;
-use App\Services\DevisService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Exceptions\ComponentNotFoundException;
@@ -50,9 +50,10 @@ it('mounts a brouillon devis and renders the form', function () {
 });
 
 it('renders action buttons for brouillon', function () {
+    // "Valider" replaced "Envoyer"; "Dupliquer" is hidden for Brouillon (shown only for locked statuts)
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
-        ->assertSeeHtml('Envoyer')
-        ->assertSeeHtml('Dupliquer');
+        ->assertSeeHtml('Valider')
+        ->assertDontSeeHtml('bi-copy'); // Dupliquer icon not shown for Brouillon
 });
 
 // ── Add line ────────────────────────────────────────────────────────────────
@@ -191,11 +192,11 @@ it('marquerEnvoye transitions brouillon non-vide to envoye with numero', functio
 
 // ── Envoyer button disabled if vide ─────────────────────────────────────────
 
-it('shows Envoyer button as disabled when devis has no lignes with montant > 0', function () {
-    // devis is empty (no lignes) — Envoyer button must have disabled attribute
+it('shows Valider button as disabled when devis has no lignes with montant > 0', function () {
+    // devis is empty (no lignes) — Valider button must have disabled attribute
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
         ->assertSeeHtml('disabled')   // The button is rendered with disabled attribute
-        ->assertSeeHtml('Envoyer');   // The button text is visible
+        ->assertSeeHtml('Valider');   // The button text is visible
 });
 
 it('peutEtreEnvoye returns false for empty devis', function () {
@@ -407,9 +408,50 @@ it('dupliquer creates a new brouillon and redirects to its show route', function
     expect($nouveau->lignes->first()->libelle)->toBe('Ligne originale');
 });
 
-// ── PDF download ──────────────────────────────────────────────────────────────
+// ── Ligne texte ───────────────────────────────────────────────────────────────
 
-it('telechargerPdf returns a file download response for a devis with lignes', function () {
+it('ajouterLigneTexte creates a texte ligne without affecting montant_total', function () {
+    $before = (float) $this->devis->montant_total;
+
+    Livewire::test(DevisEdit::class, ['devis' => $this->devis])
+        ->set('nouveauLigneTexte', 'Section A — Introduction')
+        ->call('ajouterLigneTexte')
+        ->assertHasNoErrors();
+
+    $this->devis->refresh();
+    expect($this->devis->lignes)->toHaveCount(1);
+    expect($this->devis->lignes->first()->libelle)->toBe('Section A — Introduction');
+    expect($this->devis->lignes->first()->type)->toBe(TypeLigneDevis::Texte);
+    expect((float) $this->devis->montant_total)->toBe($before);
+});
+
+it('ajouterLigneTexte resets the nouveauLigneTexte field after success', function () {
+    Livewire::test(DevisEdit::class, ['devis' => $this->devis])
+        ->set('nouveauLigneTexte', 'Section titre')
+        ->call('ajouterLigneTexte')
+        ->assertSet('nouveauLigneTexte', '');
+});
+
+// ── Dupliquer button visibility ────────────────────────────────────────────────
+
+it('hides Dupliquer button when statut is Brouillon', function () {
+    // Brouillon: Dupliquer button is not rendered
+    Livewire::test(DevisEdit::class, ['devis' => $this->devis])
+        ->assertDontSeeHtml('Dupliquer');
+});
+
+it('shows Dupliquer button when statut is Envoye', function () {
+    $this->devis->statut = StatutDevis::Envoye;
+    $this->devis->numero = 'D-2026-020';
+    $this->devis->save();
+
+    Livewire::test(DevisEdit::class, ['devis' => $this->devis])
+        ->assertSeeHtml('Dupliquer');
+});
+
+// ── PDF link ──────────────────────────────────────────────────────────────────
+
+it('shows PDF link when devis has lignes with montant > 0', function () {
     DevisLigne::factory()->create([
         'devis_id' => $this->devis->id,
         'libelle' => 'Prestation PDF',
@@ -420,19 +462,17 @@ it('telechargerPdf returns a file download response for a devis with lignes', fu
     ]);
     $this->devis->update(['montant_total' => 300]);
 
-    // telechargerPdf calls DevisService::genererPdf and returns a StreamedResponse
+    // PDF button is now an <a> link opening in a new tab
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
-        ->call('telechargerPdf')
-        ->assertHasNoErrors();
+        ->assertSeeHtml('devis-libres/'.$this->devis->id.'/pdf')
+        ->assertSeeHtml('target="_blank"');
 });
 
-it('telechargerPdf sets error when devis is empty', function () {
-    // No lignes — service will throw RuntimeException
-    // Component should catch it, flash a session error, and re-render without crashing
+it('shows PDF button as disabled when devis has no lignes', function () {
+    // No lignes — PDF link not rendered, disabled button shown instead
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
-        ->call('telechargerPdf')
-        ->assertHasNoErrors() // No validation errors (exception is caught internally)
-        ->assertSee('doit avoir au moins une ligne'); // Error message visible in re-render
+        ->assertSeeHtml('Exporter PDF')
+        ->assertSeeHtml('disabled');
 });
 
 // ── Email modal ───────────────────────────────────────────────────────────────

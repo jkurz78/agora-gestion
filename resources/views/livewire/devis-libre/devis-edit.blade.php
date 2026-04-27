@@ -101,13 +101,6 @@
                                    @disabled($this->estVerrouille())
                                    @if($this->estVerrouille()) title="Ce devis est verrouillé" @endif>
                         </div>
-                        @if (! $this->estVerrouille())
-                            <div class="col-12">
-                                <button wire:click="sauvegarder" class="btn btn-sm btn-primary">
-                                    <i class="bi bi-save"></i> Enregistrer l'en-tête
-                                </button>
-                            </div>
-                        @endif
                     </div>
                 </div>
             </div>
@@ -125,10 +118,14 @@
                             </div>
                         </div>
                     @else
+                        @php $lignesCount = $lignes->count(); @endphp
                         <div class="table-responsive">
                             <table class="table table-striped align-middle mb-0">
                                 <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                                     <tr>
+                                        @if (! $this->estVerrouille())
+                                            <th style="width:60px;"></th>
+                                        @endif
                                         <th>Libellé</th>
                                         <th class="text-end" style="width:110px;">P.U.</th>
                                         <th class="text-end" style="width:80px;">Qté</th>
@@ -139,46 +136,84 @@
                                     </tr>
                                 </thead>
                                 <tbody style="color:#555">
-                                    @foreach ($lignes as $ligne)
+                                    @foreach ($lignes as $idx => $ligne)
+                                        @php
+                                            $isTexte = $ligne->type === \App\Enums\TypeLigneDevis::Texte;
+                                            $isFirst = $idx === 0;
+                                            $isLast  = $idx === $lignesCount - 1;
+                                        @endphp
                                         <tr wire:key="ligne-{{ $ligne->id }}">
-                                            <td>
-                                                <input type="text"
-                                                       class="form-control form-control-sm"
-                                                       value="{{ $ligne->libelle }}"
-                                                       @if ($this->estVerrouille())
-                                                           disabled
-                                                           title="Ce devis est verrouillé"
-                                                       @else
-                                                           wire:blur="modifierLigneLibelle({{ $ligne->id }}, $event.target.value)"
-                                                       @endif>
-                                            </td>
-                                            <td class="text-end">
-                                                <input type="number"
-                                                       class="form-control form-control-sm text-end"
-                                                       value="{{ number_format((float) $ligne->prix_unitaire, 2, '.', '') }}"
-                                                       step="0.01"
-                                                       @if ($this->estVerrouille())
-                                                           disabled
-                                                           title="Ce devis est verrouillé"
-                                                       @else
-                                                           wire:blur="modifierLignePrixUnitaire({{ $ligne->id }}, $event.target.value)"
-                                                       @endif>
-                                            </td>
-                                            <td class="text-end">
-                                                <input type="number"
-                                                       class="form-control form-control-sm text-end"
-                                                       value="{{ number_format((float) $ligne->quantite, 3, '.', '') }}"
-                                                       step="0.001"
-                                                       @if ($this->estVerrouille())
-                                                           disabled
-                                                           title="Ce devis est verrouillé"
-                                                       @else
-                                                           wire:blur="modifierLigneQuantite({{ $ligne->id }}, $event.target.value)"
-                                                       @endif>
-                                            </td>
-                                            <td class="text-end small fw-semibold text-nowrap" data-sort="{{ $ligne->montant }}">
-                                                {{ number_format((float) $ligne->montant, 2, ',', "\u{202F}") }}&nbsp;&euro;
-                                            </td>
+                                            @if (! $this->estVerrouille())
+                                                <td class="text-center p-1">
+                                                    <div class="d-flex flex-column gap-1">
+                                                        <button wire:click="moveUp({{ $ligne->id }})"
+                                                                class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                                title="Monter"
+                                                                @disabled($isFirst)>
+                                                            <i class="bi bi-chevron-up" style="font-size:.7rem"></i>
+                                                        </button>
+                                                        <button wire:click="moveDown({{ $ligne->id }})"
+                                                                class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                                title="Descendre"
+                                                                @disabled($isLast)>
+                                                            <i class="bi bi-chevron-down" style="font-size:.7rem"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            @endif
+                                            @if ($isTexte)
+                                                <td colspan="{{ $this->estVerrouille() ? 3 : 3 }}" class="fst-italic text-muted small py-2">
+                                                    <input type="text"
+                                                           class="form-control form-control-sm fst-italic"
+                                                           value="{{ $ligne->libelle }}"
+                                                           @if ($this->estVerrouille())
+                                                               disabled
+                                                               title="Ce devis est verrouillé"
+                                                           @else
+                                                               wire:blur="modifierLigneLibelle({{ $ligne->id }}, $event.target.value)"
+                                                           @endif>
+                                                </td>
+                                                <td class="text-end small text-muted">—</td>
+                                            @else
+                                                <td>
+                                                    <input type="text"
+                                                           class="form-control form-control-sm"
+                                                           value="{{ $ligne->libelle }}"
+                                                           @if ($this->estVerrouille())
+                                                               disabled
+                                                               title="Ce devis est verrouillé"
+                                                           @else
+                                                               wire:blur="modifierLigneLibelle({{ $ligne->id }}, $event.target.value)"
+                                                           @endif>
+                                                </td>
+                                                <td class="text-end">
+                                                    <input type="number"
+                                                           class="form-control form-control-sm text-end"
+                                                           value="{{ number_format((float) $ligne->prix_unitaire, 2, '.', '') }}"
+                                                           step="0.01"
+                                                           @if ($this->estVerrouille())
+                                                               disabled
+                                                               title="Ce devis est verrouillé"
+                                                           @else
+                                                               wire:blur="modifierLignePrixUnitaire({{ $ligne->id }}, $event.target.value)"
+                                                           @endif>
+                                                </td>
+                                                <td class="text-end">
+                                                    <input type="number"
+                                                           class="form-control form-control-sm text-end"
+                                                           value="{{ number_format((float) $ligne->quantite, 3, '.', '') }}"
+                                                           step="0.001"
+                                                           @if ($this->estVerrouille())
+                                                               disabled
+                                                               title="Ce devis est verrouillé"
+                                                           @else
+                                                               wire:blur="modifierLigneQuantite({{ $ligne->id }}, $event.target.value)"
+                                                           @endif>
+                                                </td>
+                                                <td class="text-end small fw-semibold text-nowrap" data-sort="{{ $ligne->montant }}">
+                                                    {{ number_format((float) $ligne->montant, 2, ',', "\u{202F}") }}&nbsp;&euro;
+                                                </td>
+                                            @endif
                                             @if (! $this->estVerrouille())
                                                 <td class="text-center">
                                                     <button wire:click="supprimerLigne({{ $ligne->id }})"
@@ -194,7 +229,7 @@
                                 </tbody>
                                 <tfoot>
                                     <tr class="table-light fw-bold">
-                                        <td colspan="{{ $this->estVerrouille() ? 4 : 3 }}" class="text-end">Total</td>
+                                        <td colspan="{{ $this->estVerrouille() ? 4 : 4 }}" class="text-end">Total</td>
                                         <td class="text-end text-nowrap" data-sort="{{ $devis->montant_total }}">
                                             {{ number_format((float) $devis->montant_total, 2, ',', "\u{202F}") }}&nbsp;&euro;
                                         </td>
@@ -207,7 +242,7 @@
                         </div>
                     @endif
 
-                    {{-- Formulaire d'ajout de ligne --}}
+                    {{-- Formulaire d'ajout de ligne montant --}}
                     @if (! $this->estVerrouille())
                         <div class="p-3 border-top">
                             <h6 class="small fw-semibold text-muted mb-2">Ajouter une ligne</h6>
@@ -250,6 +285,27 @@
                                             class="btn btn-sm btn-primary w-100"
                                             title="Ajouter la ligne">
                                         <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Formulaire d'ajout de ligne texte --}}
+                        <div class="p-3 border-top bg-light">
+                            <h6 class="small fw-semibold text-muted mb-2">Ajouter une ligne texte (commentaire / titre de section)</h6>
+                            <div class="row g-2 align-items-end">
+                                <div class="col">
+                                    <input type="text"
+                                           class="form-control form-control-sm fst-italic"
+                                           placeholder="Ex : Section A — Prestations de formation..."
+                                           wire:model="nouveauLigneTexte"
+                                           wire:keydown.enter="ajouterLigneTexte">
+                                </div>
+                                <div class="col-auto">
+                                    <button wire:click="ajouterLigneTexte"
+                                            class="btn btn-sm btn-outline-secondary"
+                                            title="Ajouter une ligne texte">
+                                        <i class="bi bi-text-left"></i> Ajouter ligne texte
                                     </button>
                                 </div>
                             </div>
@@ -298,15 +354,23 @@
                 </div>
                 <div class="card-body d-grid gap-2">
 
-                    {{-- Envoyer (brouillon seulement) --}}
+                    {{-- Enregistrer (brouillon / envoyé seulement) --}}
+                    @if (! $this->estVerrouille())
+                        <button wire:click="sauvegarder" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Enregistrer
+                        </button>
+                        <hr class="my-1">
+                    @endif
+
+                    {{-- Valider (brouillon seulement — remplace "Envoyer") --}}
                     @if ($devis->statut === \App\Enums\StatutDevis::Brouillon)
                         @php $peutEnvoyer = $this->peutEtreEnvoye(); @endphp
                         <button wire:click="marquerEnvoye"
-                                wire:confirm="Émettre ce devis ? Un numéro lui sera attribué."
+                                wire:confirm="Valider ce devis ? Un numéro lui sera attribué."
                                 class="btn btn-success"
                                 @disabled(! $peutEnvoyer)
-                                title="{{ $peutEnvoyer ? 'Émettre le devis' : 'Ajoutez au moins une ligne avec un montant avant d\'émettre le devis.' }}">
-                            <i class="bi bi-send"></i> Envoyer
+                                title="{{ $peutEnvoyer ? 'Valider le devis' : 'Ajoutez au moins une ligne avec un montant avant de valider le devis.' }}">
+                            <i class="bi bi-send"></i> Valider
                         </button>
                     @endif
 
@@ -336,32 +400,41 @@
 
                     <hr class="my-1">
 
-                    {{-- PDF --}}
+                    {{-- PDF — ouvre dans un nouvel onglet --}}
                     @php $peutPdf = $this->peutEtreEnvoye(); @endphp
-                    <button wire:click="telechargerPdf"
-                            class="btn btn-outline-secondary"
-                            @disabled(! $peutPdf)
-                            title="{{ $peutPdf ? 'Exporter en PDF' : 'Ajoutez au moins une ligne avec un montant pour générer un PDF.' }}">
-                        <i class="bi bi-file-earmark-pdf"></i> Exporter PDF
-                    </button>
+                    @if ($peutPdf)
+                        <a href="{{ route('devis-libres.pdf', $devis) }}"
+                           target="_blank"
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-file-earmark-pdf"></i> Exporter PDF
+                        </a>
+                    @else
+                        <button class="btn btn-outline-secondary"
+                                disabled
+                                title="Ajoutez au moins une ligne avec un montant pour générer un PDF.">
+                            <i class="bi bi-file-earmark-pdf"></i> Exporter PDF
+                        </button>
+                    @endif
 
                     {{-- Email (envoyé/accepté/refusé uniquement — pas brouillon) --}}
                     @php $peutEmail = ($devis->statut !== \App\Enums\StatutDevis::Brouillon) && $peutPdf; @endphp
                     <button wire:click="ouvrirModaleEmail"
                             class="btn btn-outline-primary"
                             @disabled(! $peutEmail)
-                            title="{{ $peutEmail ? 'Envoyer par email' : 'Le devis doit être envoyé et avoir au moins une ligne pour être transmis par email.' }}">
+                            title="{{ $peutEmail ? 'Envoyer par email' : 'Le devis doit être validé et avoir au moins une ligne pour être transmis par email.' }}">
                         <i class="bi bi-envelope"></i> Envoyer par email
                     </button>
 
                     <hr class="my-1">
 
-                    {{-- Dupliquer (toujours disponible) --}}
-                    <button wire:click="dupliquer"
-                            wire:confirm="Dupliquer ce devis ? Un nouveau brouillon sera créé."
-                            class="btn btn-outline-info">
-                        <i class="bi bi-copy"></i> Dupliquer
-                    </button>
+                    {{-- Dupliquer (masqué en brouillon, disponible pour les autres statuts) --}}
+                    @if ($devis->statut !== \App\Enums\StatutDevis::Brouillon)
+                        <button wire:click="dupliquer"
+                                wire:confirm="Dupliquer ce devis ? Un nouveau brouillon sera créé."
+                                class="btn btn-outline-info">
+                            <i class="bi bi-copy"></i> Dupliquer
+                        </button>
+                    @endif
                 </div>
             </div>
 
