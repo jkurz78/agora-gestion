@@ -91,5 +91,10 @@ class DatabaseSeeder extends Seeder
         if (! Exercice::where('annee', $annee)->exists()) {
             $exerciceService->creerExercice($annee, User::first());
         }
+
+        // Dev/staging only — demo devis libres
+        if (! app()->isProduction()) {
+            $this->call(DevisLibreSeeder::class);
+        }
     }
 }
