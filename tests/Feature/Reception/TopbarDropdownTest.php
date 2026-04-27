@@ -192,21 +192,10 @@ it('(c) Gestionnaire : badge = mails uniquement, items NDF et Factures fournisse
 
     // Les items NDF et Factures fournisseurs sont absents du topbar
     // (les routes NDF/FP ne doivent PAS apparaître dans la topbar pour un Gestionnaire)
-    $ndfRoute = route('comptabilite.ndf.index');
-    $fpRoute = route('comptabilite.factures-fournisseurs.index');
-
-    // On extrait la partie topbar (entre les 2 marques d'ancrage) pour être précis
-    // On compte les occurrences de ces routes dans tout le HTML
-    // Pour un Gestionnaire : 0 occurrence dans la topbar (la sidebar ne les affiche pas non plus)
-    expect(substr_count($html, $fpRoute))->toBe(0);
-    // NDF peut apparaître dans la sidebar nav pour le role comptable, mais pas pour gestionnaire
-    // On vérifie que le href NDF n'est pas dans le dropdown topbar
-    // En cherchant la structure du dropdown topbar
-    $dropdownPattern = '/class="dropdown"[^>]*>.*?class="dropdown-menu dropdown-menu-end"/s';
-    preg_match($dropdownPattern, $html, $matches);
-    if ($matches) {
-        expect($matches[0])->not->toContain($ndfRoute);
-    }
+    // La sidebar ne rend pas non plus ces routes pour le rôle Gestionnaire, donc
+    // l'assertion en pleine page est sûre : 0 occurrence dans tout le HTML rendu.
+    $response->assertDontSee(route('comptabilite.ndf.index'));
+    $response->assertDontSee(route('comptabilite.factures-fournisseurs.index'));
 })->group('topbar-dropdown');
 
 // ── (d) Tous les compteurs = 0 → trigger absent ───────────────────────────────
