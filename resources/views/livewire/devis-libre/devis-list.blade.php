@@ -35,17 +35,13 @@
                     <button type="button" class="btn-close" wire:click="$set('showCreerModal', false)"></button>
                 </div>
                 <div class="modal-body">
-                    <label for="modalNouveauTiersId" class="form-label fw-semibold">
+                    <label class="form-label fw-semibold">
                         Tiers <span class="text-danger">*</span>
                     </label>
-                    <select id="modalNouveauTiersId"
-                            wire:model="nouveauTiersId"
-                            class="form-select">
-                        <option value="">— Choisir un tiers —</option>
-                        @foreach ($tiers as $t)
-                            <option value="{{ $t->id }}">{{ $t->displayName() }}</option>
-                        @endforeach
-                    </select>
+                    <livewire:tiers-autocomplete
+                        wire:model.live="nouveauTiersId"
+                        filtre="tous"
+                        :key="'devis-create-tiers-'.($showCreerModal ? '1' : '0')" />
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm"
@@ -74,27 +70,30 @@
             <option value="annule">Annulé</option>
         </select>
 
-        {{-- Filtre tiers --}}
-        <select wire:model.live="filtreTiersId" class="form-select form-select-sm" style="max-width:220px;">
-            <option value="">Tous les tiers</option>
-            @foreach ($tiers as $t)
-                <option value="{{ $t->id }}">{{ $t->displayName() }}</option>
+        {{-- Filtre exercice --}}
+        <select wire:model.live="filtreExercice" class="form-select form-select-sm" style="max-width:160px;">
+            <option value="">Tous les exercices</option>
+            @foreach ($exerciceYears as $year)
+                <option value="{{ $year }}">Exercice {{ $exerciceService->label($year) }}</option>
             @endforeach
         </select>
 
-        {{-- Filtre exercice --}}
-        <input type="number"
-               wire:model.live="filtreExercice"
-               class="form-control form-control-sm"
-               style="max-width:100px;"
-               placeholder="Exercice">
+        {{-- Filtre tiers (autocomplete) --}}
+        <div style="min-width:240px">
+            <livewire:tiers-autocomplete
+                wire:model.live="filtreTiersId"
+                filtre="tous"
+                :key="'devis-filter-tiers'" />
+        </div>
 
-        {{-- Recherche --}}
-        <input type="text"
-               wire:model.live.debounce.300ms="search"
-               class="form-control form-control-sm"
-               style="max-width:220px;"
-               placeholder="Rechercher…">
+        {{-- Recherche full-text (numéro ou libellé) --}}
+        <div class="input-group input-group-sm" style="max-width:240px;">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text"
+                   wire:model.live.debounce.300ms="search"
+                   class="form-control"
+                   placeholder="Numéro ou libellé…">
+        </div>
     </div>
 
     {{-- Table --}}
