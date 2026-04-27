@@ -466,14 +466,14 @@
                             || (($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0);
                     @endphp
                     @if($hasVisibleSource)
-                    <li class="nav-item dropdown" style="font-size:.8rem; --bs-dropdown-font-size:.8rem;">
+                    <li class="nav-item dropdown" style="font-size:.8rem;">
                         <a class="nav-link dropdown-toggle d-flex align-items-center gap-1"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"
                            title="Boîte de réception : {{ $cumulCount }} pièce(s) en attente">
                             <i class="bi bi-inbox"></i>
                             <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $cumulCount }}</span>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
+                        <ul class="dropdown-menu dropdown-menu-end" style="--bs-dropdown-font-size:.8rem;">
                             @if(($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
                                 <li>
                                     <a class="dropdown-item d-flex align-items-center justify-content-between"

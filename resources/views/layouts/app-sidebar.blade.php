@@ -197,7 +197,7 @@
                             || (($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0);
                     @endphp
                     @if($hasVisibleSource)
-                    <div class="dropdown" style="font-size:.8rem; --bs-dropdown-font-size:.8rem;">
+                    <div class="dropdown" style="font-size:.8rem;">
                         <a href="#" class="text-decoration-none d-flex align-items-center gap-1 dropdown-toggle"
                            style="color: rgba(255,255,255,.9);"
                            role="button" data-bs-toggle="dropdown"
@@ -206,7 +206,7 @@
                             <i class="bi bi-inbox"></i>
                             <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $cumulCount }}</span>
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
+                        <ul class="dropdown-menu dropdown-menu-end" style="--bs-dropdown-font-size:.8rem;">
                             @if(($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
                                 <li>
                                     <a class="dropdown-item d-flex align-items-center justify-content-between"
