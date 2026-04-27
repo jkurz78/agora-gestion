@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\CategorieEmail;
 use App\Enums\StatutDevis;
+use App\Mail\DevisLibreMail;
 use App\Models\Devis;
 use App\Models\DevisLigne;
+use App\Models\EmailLog;
 use App\Support\CurrentAssociation;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -514,6 +519,56 @@ final class DevisService
         Storage::disk('local')->put($path, $pdf->output());
 
         return $path;
+    }
+
+    /**
+     * Envoie le devis par email au tiers avec le PDF en pièce jointe.
+     *
+     * Guards :
+     * - statut doit être ≠ Brouillon, sinon RuntimeException
+     * - au moins une ligne avec montant > 0 doit exister, sinon RuntimeException
+     * - le tiers doit avoir une adresse email, sinon RuntimeException
+     *
+     * Génère le PDF via genererPdf(), envoie le mail via Mail::to()->send(),
+     * puis logue l'événement dans email_logs.
+     *
+     * @throws RuntimeException
+     */
+    public function envoyerEmail(Devis $devis, string $sujet, string $corps): void
+    {
+        if ($devis->statut === StatutDevis::Brouillon) {
+            throw new RuntimeException('Un devis brouillon ne peut pas être envoyé par email.');
+        }
+
+        $devis->load(['lignes', 'tiers']);
+
+        $hasMontant = $devis->lignes->contains(fn (DevisLigne $l) => (float) $l->montant > 0.0);
+        if (! $hasMontant) {
+            throw new RuntimeException('Le devis doit avoir au moins une ligne avec un montant.');
+        }
+
+        $email = $devis->tiers?->email;
+        if (empty($email)) {
+            throw new RuntimeException('Le tiers n\'a pas d\'adresse email.');
+        }
+
+        $pdfPath = $this->genererPdf($devis);
+
+        $mailable = new DevisLibreMail($devis, $sujet, $corps, $pdfPath);
+
+        Mail::to($email)->send($mailable);
+
+        EmailLog::create([
+            'tiers_id' => (int) $devis->tiers_id,
+            'categorie' => CategorieEmail::Document->value,
+            'destinataire_email' => $email,
+            'destinataire_nom' => $devis->tiers?->displayName(),
+            'objet' => $sujet,
+            'corps_html' => $corps,
+            'attachment_path' => $pdfPath,
+            'statut' => 'envoye',
+            'envoye_par' => Auth::id(),
+        ]);
     }
 
     /**
