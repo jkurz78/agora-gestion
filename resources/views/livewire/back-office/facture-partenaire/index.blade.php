@@ -1,10 +1,4 @@
 <div>
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 class="h4 mb-0">
-            <i class="bi bi-file-earmark-check me-2"></i>Factures à comptabiliser
-        </h1>
-    </div>
-
     {{-- Flash messages --}}
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">

@@ -148,7 +148,7 @@
                 {{-- Breadcrumb --}}
                 @php
                     $breadcrumbGroup = match(true) {
-                        request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*') => 'Comptabilité',
+                        request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*', 'comptabilite.factures-fournisseurs.*') => 'Comptabilité',
                         request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
                             'banques.comptes.*', 'banques.remises*') => 'Banques',
                         request()->routeIs('tiers.*') => 'Tiers',

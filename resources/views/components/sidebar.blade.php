@@ -183,13 +183,16 @@ $activeGroup = match(true) {
                             </li>
 
                             @if(($canSeeNdf && Route::has('comptabilite.ndf.index')) || ($canSeeFacturesPartenaires && Route::has('comptabilite.factures-fournisseurs.index')))
-                            @php $inboxPendingTotal = ($ndfPendingCount ?? 0) + ($facturesPartenairesPendingCount ?? 0); @endphp
+                            @php
+                                $inboxPendingTotal = ($ndfPendingCount ?? 0) + ($facturesPartenairesPendingCount ?? 0);
+                                $inboxOpen = request()->routeIs('comptabilite.ndf.*', 'comptabilite.factures-fournisseurs.*');
+                            @endphp
                             <li class="nav-item mt-2">
                                 <a class="sidebar-inbox-toggle"
                                    data-bs-toggle="collapse"
                                    href="#sidebar-inbox-comptabilite"
                                    role="button"
-                                   aria-expanded="true"
+                                   aria-expanded="{{ $inboxOpen ? 'true' : 'false' }}"
                                    aria-controls="sidebar-inbox-comptabilite">
                                     <span><i class="bi bi-inbox me-1"></i> Réception
                                         @if($inboxPendingTotal > 0)
@@ -198,7 +201,7 @@ $activeGroup = match(true) {
                                     </span>
                                     <i class="bi bi-chevron-down inbox-chevron"></i>
                                 </a>
-                                <div class="collapse show" id="sidebar-inbox-comptabilite">
+                                <div class="collapse {{ $inboxOpen ? 'show' : '' }}" id="sidebar-inbox-comptabilite">
                                     <ul class="nav flex-column inbox-nav">
 
                                         @if($canSeeNdf && Route::has('comptabilite.ndf.index'))

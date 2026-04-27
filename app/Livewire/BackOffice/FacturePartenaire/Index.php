@@ -42,7 +42,7 @@ final class Index extends Component
         return view('livewire.back-office.facture-partenaire.index', [
             'depots' => $depots,
             'onglet' => $this->onglet,
-        ])->layout('layouts.app-sidebar', ['title' => 'Factures à comptabiliser']);
+        ])->layout('layouts.app-sidebar', ['title' => 'Factures fournisseurs']);
     }
 
     public function comptabiliser(int $depotId): void
