@@ -327,14 +327,14 @@ it('creerDevis without tiers_id opens the tiers selection modal', function () {
         ->assertSet('showCreerModal', true);
 });
 
-// ── Action icon : pencil pour brouillon, eye pour les autres ─────────────────
+// ── Action icon : pencil pour les modifiables, eye pour les verrouillés ──────
 
 it('shows pencil icon for brouillon devis in the action column', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'statut' => StatutDevis::Brouillon,
-        'libelle' => 'Test pencil',
+        'libelle' => 'Test pencil brouillon',
         'exercice' => $this->exercice,
     ]);
 
@@ -342,17 +342,32 @@ it('shows pencil icon for brouillon devis in the action column', function () {
         ->assertSeeHtml('bi-pencil');
 });
 
-it('shows eye icon for non-brouillon devis in the action column', function () {
+it('shows pencil icon for valide devis (still modifiable, edit rebascules to brouillon)', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'statut' => StatutDevis::Valide,
         'numero' => 'D-2026-099',
-        'libelle' => 'Test eye',
+        'libelle' => 'Test pencil valide',
         'exercice' => $this->exercice,
     ]);
 
     Livewire::test(DevisList::class)
         ->set('filtreStatut', 'valide')
+        ->assertSeeHtml('bi-pencil');
+});
+
+it('shows eye icon for verrouillé devis (accepte / refuse / annule)', function () {
+    Devis::factory()->create([
+        'association_id' => $this->association->id,
+        'tiers_id' => $this->tiers->id,
+        'statut' => StatutDevis::Accepte,
+        'numero' => 'D-2026-098',
+        'libelle' => 'Test eye accepte',
+        'exercice' => $this->exercice,
+    ]);
+
+    Livewire::test(DevisList::class)
+        ->set('filtreStatut', 'accepte')
         ->assertSeeHtml('bi-eye');
 });

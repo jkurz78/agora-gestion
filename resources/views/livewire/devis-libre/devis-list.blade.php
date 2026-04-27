@@ -165,7 +165,7 @@
                                 @endif
                             </td>
                             <td>
-                                @if ($d->statut === \App\Enums\StatutDevis::Brouillon)
+                                @if ($d->statut->peutEtreModifie())
                                     <a href="{{ route('devis-libres.show', $d) }}"
                                        class="btn btn-sm btn-outline-secondary"
                                        title="Modifier">
