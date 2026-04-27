@@ -9,7 +9,7 @@
 
 ## 1. Intent Description
 
-**Quoi.** Un gestionnaire ou comptable peut créer un devis « depuis une page blanche » pour n'importe quel `Tiers`, sans le rattacher à une `Operation` ni à des `Participants`. Le devis se compose d'un en-tête (référence, date d'émission, tiers, libellé, date de validité) et de lignes libres (libellé, prix unitaire, quantité, montant calculé, sous-catégorie optionnelle). Il peut être édité, exporté en PDF, envoyé par email au tiers, et son cycle de vie est tracé via 5 statuts : `brouillon → envoyé → accepté | refusé | expiré`, avec la possibilité d'`annuler` à tout moment. L'acceptation et le refus enregistrent qui a marqué le statut et quand. L'expiration est purement informative (badge si date de validité dépassée), sans transition automatique en S1. Le devis apparaît dans l'historique et la vue 360° du tiers.
+**Quoi.** Un gestionnaire ou comptable peut créer un devis « depuis une page blanche » pour n'importe quel `Tiers`, sans le rattacher à une `Operation` ni à des `Participants`. Le devis se compose d'un en-tête (référence, date d'émission, tiers, libellé, date de validité) et de lignes libres (libellé, prix unitaire, quantité, montant calculé, sous-catégorie optionnelle). Il peut être édité, exporté en PDF, envoyé par email au tiers, et son cycle de vie est tracé via 5 statuts : `brouillon → validé → accepté | refusé | expiré`, avec la possibilité d'`annuler` à tout moment. L'acceptation et le refus enregistrent qui a marqué le statut et quand. L'expiration est purement informative (badge si date de validité dépassée), sans transition automatique en S1. Le devis apparaît dans l'historique et la vue 360° du tiers.
 
 **Pourquoi.** Le module devis actuel (`DocumentPrevisionnel` v2.4.2) est cloué à `(Operation, Participant, Seances, Reglements)` ; il ne couvre que les devis liés au cœur de métier formation/séances. Pour répondre à des prestations ou ventes exceptionnelles à des entreprises (ex. mission ponctuelle, vente de produits hors catalogue), il faut pouvoir émettre un devis sans pré-créer une Operation fictive, sans certitude que l'affaire aboutisse. Aujourd'hui le contournement coûte cher (Operation + Participants synthétiques) et pollue les données métier. Un devis libre, autonome, résout ce blocage et prépare le terrain pour un futur chemin de comptabilisation (Slice 2, hors scope ici).
 
@@ -60,20 +60,20 @@ Fonctionnalité: Devis libre
 
   Scénario: Émettre le devis lui attribue un numéro
     Étant donné un devis brouillon non vide pour "ACME SARL"
-    Quand je le marque "envoyé"
-    Alors son statut est "envoyé"
+    Quand je le marque "validé"
+    Alors son statut est "validé"
     Et il reçoit un numéro de la forme "D-2026-NNN" séquentiel pour l'exercice courant
     Et ce numéro reste figé pour la suite de sa vie
 
-  Scénario: Marquer un devis envoyé comme accepté
-    Étant donné un devis "envoyé" "D-2026-007"
+  Scénario: Marquer un devis validé comme accepté
+    Étant donné un devis "validé" "D-2026-007"
     Quand je le marque "accepté"
     Alors son statut est "accepté"
     Et l'utilisateur "moi" est tracé comme ayant marqué l'acceptation
     Et la date d'acceptation est "aujourd'hui"
 
-  Scénario: Marquer un devis envoyé comme refusé
-    Étant donné un devis "envoyé" "D-2026-008"
+  Scénario: Marquer un devis validé comme refusé
+    Étant donné un devis "validé" "D-2026-008"
     Quand je le marque "refusé"
     Alors son statut est "refusé"
     Et l'utilisateur "moi" et la date sont tracés
@@ -87,7 +87,7 @@ Fonctionnalité: Devis libre
     Exemples:
       | statut_initial |
       | brouillon      |
-      | envoyé         |
+      | validé         |
       | accepté        |
       | refusé         |
 
@@ -99,8 +99,8 @@ Fonctionnalité: Devis libre
     Alors le devis reste au statut "brouillon"
     Et le montant total est recalculé
 
-  Scénario: Modifier un devis envoyé le repasse en brouillon
-    Étant donné un devis "envoyé" "D-2026-009"
+  Scénario: Modifier un devis validé le repasse en brouillon
+    Étant donné un devis "validé" "D-2026-009"
     Quand je modifie l'une de ses lignes
     Alors son statut redevient "brouillon"
     Et il conserve son numéro "D-2026-009"
@@ -120,7 +120,7 @@ Fonctionnalité: Devis libre
 
   Scénario: Impossible d'émettre un devis vide
     Étant donné un devis "brouillon" sans aucune ligne avec un montant > 0
-    Quand je tente de le marquer "envoyé"
+    Quand je tente de le marquer "validé"
     Alors la transition est refusée
     Et un message indique qu'au moins une ligne avec montant est requise
 
@@ -132,16 +132,16 @@ Fonctionnalité: Devis libre
   # ─── Validité (informative) ───────────────────────────────────────────
 
   Scénario: Badge expiré quand la date de validité est dépassée
-    Étant donné un devis "envoyé" "D-2026-010" avec date de validité "2026-04-01"
+    Étant donné un devis "validé" "D-2026-010" avec date de validité "2026-04-01"
     Et que la date du jour est "2026-04-15"
     Quand j'affiche la liste ou la fiche du devis
     Alors un badge "expiré" est visible
-    Mais son statut reste "envoyé"
+    Mais son statut reste "validé"
 
   # ─── Sortie : PDF et email ────────────────────────────────────────────
 
   Scénario: Exporter un devis en PDF
-    Étant donné un devis "envoyé" "D-2026-011"
+    Étant donné un devis "validé" "D-2026-011"
     Quand je demande l'export PDF
     Alors un fichier PDF est généré contenant numéro, date d'émission, date de validité,
          tiers, lignes, montant total, mentions de l'association
@@ -154,7 +154,7 @@ Fonctionnalité: Devis libre
     Et il n'affiche aucun numéro de référence
 
   Scénario: Envoyer un devis par email au tiers
-    Étant donné un devis "envoyé" "D-2026-012"
+    Étant donné un devis "validé" "D-2026-012"
     Et que "ACME SARL" a une adresse email
     Quand je l'envoie par email avec un message
     Alors un email est envoyé à l'adresse du tiers avec le PDF en pièce jointe
@@ -177,19 +177,19 @@ Fonctionnalité: Devis libre
       | refusé  |
       | annulé  |
       | expiré  |
-      | envoyé  |
+      | validé  |
 
   # ─── Vue 360° tiers ───────────────────────────────────────────────────
 
   Scénario: Le devis apparaît dans la vue 360° du tiers
-    Étant donné un devis "envoyé" "D-2026-013" pour "ACME SARL"
+    Étant donné un devis "validé" "D-2026-013" pour "ACME SARL"
     Quand j'ouvre la vue 360° de "ACME SARL"
     Alors le devis apparaît dans son historique avec son numéro, sa date, son montant et son statut
 
   # ─── Multi-tenant ─────────────────────────────────────────────────────
 
   Scénario: Un devis n'est pas visible depuis une autre association
-    Étant donné un devis "envoyé" "D-2026-014" dans "Asso A"
+    Étant donné un devis "validé" "D-2026-014" dans "Asso A"
     Quand je me connecte sur "Asso B"
     Alors le devis n'apparaît dans aucune liste, aucune recherche, aucune vue 360°
 ```
@@ -206,12 +206,12 @@ Fonctionnalité: Devis libre
 |---|---|---|
 | `id` | bigint PK | |
 | `association_id` | FK | scope `TenantModel` (fail-closed) |
-| `numero` | string nullable | `D-{exercice}-NNN`, NULL tant que `brouillon`, attribué une fois à la 1re transition `→ envoyé`, immuable ensuite |
+| `numero` | string nullable | `D-{exercice}-NNN`, NULL tant que `brouillon`, attribué une fois à la 1re transition `→ validé`, immuable ensuite |
 | `tiers_id` | FK `tiers` | requis |
 | `date_emission` | date | requis ; détermine l'`exercice` du numéro |
 | `date_validite` | date | requis ; défaut = `date_emission + association.devis_validite_jours` |
 | `libelle` | string nullable | en-tête optionnel |
-| `statut` | enum `StatutDevis` | `brouillon \| envoyé \| accepté \| refusé \| annulé` |
+| `statut` | enum `StatutDevis` | `brouillon \| validé \| accepté \| refusé \| annulé` |
 | `montant_total` | decimal(12,2) | dénormalisé |
 | `exercice` | int | figé à `date_emission` |
 | `accepte_par_user_id` | FK users nullable | trace `accepté` |
@@ -238,7 +238,7 @@ Index : `(association_id, statut)`, `(association_id, tiers_id)`, unique partiel
 | `montant` | decimal(12,2) | dénormalisé = `prix_unitaire × quantite` |
 | `sous_categorie_id` | FK `sous_categories` nullable | optionnel S1 |
 
-**Enum `StatutDevis`** : `Brouillon, Envoye, Accepte, Refuse, Annule` + helpers `peutEtreModifie()`, `peutEtreDuplique()`, `peutPasserEnvoye()`.
+**Enum `StatutDevis`** : `Brouillon, Valide, Accepte, Refuse, Annule` + helpers `peutEtreModifie()`, `peutEtreDuplique()`, `peutPasserEnvoye()`.
 
 **Champ Association** : ajout `devis_validite_jours INT DEFAULT 30`. Mentions et conditions PDF : réutilisent celles de la facture, pas de nouveau champ S1.
 
@@ -249,9 +249,9 @@ Index : `(association_id, statut)`, `(association_id, tiers_id)`, unique partiel
 | Méthode | Rôle |
 |---|---|
 | `creer(int $tiersId, ?Carbon $date = null): Devis` | brouillon + `date_validite` calculée |
-| `ajouterLigne / modifierLigne / supprimerLigne` | + recalcul `montant_total` ; si statut `envoyé` → repasse en `brouillon` (numéro conservé) |
-| `marquerEnvoye(Devis): void` | guard ≥1 ligne montant > 0 ; attribution numéro |
-| `marquerAccepte / marquerRefuse(Devis): void` | guard `statut == envoyé` ; trace user + date |
+| `ajouterLigne / modifierLigne / supprimerLigne` | + recalcul `montant_total` ; si statut `validé` → repasse en `brouillon` (numéro conservé) |
+| `marquerValide(Devis): void` | guard ≥1 ligne montant > 0 ; attribution numéro |
+| `marquerAccepte / marquerRefuse(Devis): void` | guard `statut == validé` ; trace user + date |
 | `annuler(Devis): void` | guard `statut != annulé` ; trace |
 | `dupliquer(Devis): Devis` | nouveau brouillon, lignes recopiées, dates recalculées |
 | `genererPdf(Devis, bool $brouillonWatermark): string` | retourne path stockage |
@@ -282,7 +282,7 @@ UX cohérente avec `FactureEdit` (lignes inline, footer total, modale Bootstrap 
 | `TiersQuickViewService::getSummary()` | nouveau bloc "Devis libres" : count par statut, total des `accepté` |
 | Historique tiers | section "Devis libres" listant `numero, date, montant, statut` |
 | Sidebar | entrée "Devis libres" sous le groupe `Facturation` |
-| Logger | `Log::info('devis.envoye', …)` etc. — `LogContext` ajoute auto `association_id` + `user_id` |
+| Logger | `Log::info('devis.valide', …)` etc. — `LogContext` ajoute auto `association_id` + `user_id` |
 | Multi-tenant | `Devis extends TenantModel` ; `DevisLigne` parent-scoped |
 | Stockage PDF | `storage/app/associations/{id}/devis-libres/{devis_id}/devis-{numero}.pdf` |
 | Cache, jobs | aucun en S1 |

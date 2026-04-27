@@ -7,25 +7,25 @@ namespace App\Enums;
 enum StatutDevis: string
 {
     case Brouillon = 'brouillon';
-    case Envoye = 'envoye';
+    case Valide = 'valide';
     case Accepte = 'accepte';
     case Refuse = 'refuse';
     case Annule = 'annule';
 
     /**
      * Un devis peut être modifié (lignes ajoutées/éditées/supprimées)
-     * uniquement en statut brouillon ou envoyé.
+     * uniquement en statut brouillon ou validé.
      */
     public function peutEtreModifie(): bool
     {
         return match ($this) {
-            self::Brouillon, self::Envoye => true,
+            self::Brouillon, self::Valide => true,
             default => false,
         };
     }
 
     /**
-     * La transition vers "envoyé" n'est possible que depuis "brouillon".
+     * La transition vers "validé" n'est possible que depuis "brouillon".
      */
     public function peutPasserEnvoye(): bool
     {
@@ -55,7 +55,7 @@ enum StatutDevis: string
     {
         return match ($this) {
             self::Brouillon => 'Brouillon',
-            self::Envoye => 'Envoyé',
+            self::Valide => 'Validé',
             self::Accepte => 'Accepté',
             self::Refuse => 'Refusé',
             self::Annule => 'Annulé',

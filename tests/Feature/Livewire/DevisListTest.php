@@ -111,7 +111,7 @@ it('shows only annule devis when filtreStatut is annule', function () {
 
 // ── Filtre statut spécifique ─────────────────────────────────────────────────
 
-it('shows only envoye devis when filtreStatut is envoye', function () {
+it('shows only valide devis when filtreStatut is valide', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
@@ -123,15 +123,15 @@ it('shows only envoye devis when filtreStatut is envoye', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
-        'statut' => StatutDevis::Envoye,
+        'statut' => StatutDevis::Valide,
         'numero' => 'D-2026-001',
-        'libelle' => 'Devis envoyé',
+        'libelle' => 'Devis validé',
         'exercice' => $this->exercice,
     ]);
 
     Livewire::test(DevisList::class)
-        ->set('filtreStatut', 'envoye')
-        ->assertSee('Devis envoyé')
+        ->set('filtreStatut', 'valide')
+        ->assertSee('Devis validé')
         ->assertDontSee('Un brouillon');
 });
 
@@ -218,7 +218,7 @@ it('filters by search on numero', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
-        'statut' => StatutDevis::Envoye,
+        'statut' => StatutDevis::Valide,
         'numero' => 'D-2026-042',
         'libelle' => 'Devis quarante-deux',
         'exercice' => $this->exercice,
@@ -227,7 +227,7 @@ it('filters by search on numero', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
-        'statut' => StatutDevis::Envoye,
+        'statut' => StatutDevis::Valide,
         'numero' => 'D-2026-007',
         'libelle' => 'Devis sept',
         'exercice' => $this->exercice,
@@ -247,7 +247,7 @@ it('shows badge expire for envoye devis with past date_validite', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
-        'statut' => StatutDevis::Envoye,
+        'statut' => StatutDevis::Valide,
         'numero' => 'D-2026-010',
         'libelle' => 'Devis expiré',
         'date_validite' => Carbon::now()->subDays(5)->toDateString(), // 2026-05-10 < 2026-05-15
@@ -255,7 +255,7 @@ it('shows badge expire for envoye devis with past date_validite', function () {
     ]);
 
     Livewire::test(DevisList::class)
-        ->set('filtreStatut', 'envoye')
+        ->set('filtreStatut', 'valide')
         ->assertSee('Expiré');
 
     Carbon::setTestNow();
@@ -267,7 +267,7 @@ it('does not show badge expire for envoye devis with future date_validite', func
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
-        'statut' => StatutDevis::Envoye,
+        'statut' => StatutDevis::Valide,
         'numero' => 'D-2026-011',
         'libelle' => 'Devis pas expiré',
         'date_validite' => Carbon::now()->addDays(10)->toDateString(), // 2026-05-25 > 2026-05-15
@@ -275,7 +275,7 @@ it('does not show badge expire for envoye devis with future date_validite', func
     ]);
 
     Livewire::test(DevisList::class)
-        ->set('filtreStatut', 'envoye')
+        ->set('filtreStatut', 'valide')
         ->assertDontSee('Expiré');
 
     Carbon::setTestNow();
@@ -346,13 +346,13 @@ it('shows eye icon for non-brouillon devis in the action column', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
-        'statut' => StatutDevis::Envoye,
+        'statut' => StatutDevis::Valide,
         'numero' => 'D-2026-099',
         'libelle' => 'Test eye',
         'exercice' => $this->exercice,
     ]);
 
     Livewire::test(DevisList::class)
-        ->set('filtreStatut', 'envoye')
+        ->set('filtreStatut', 'valide')
         ->assertSeeHtml('bi-eye');
 });

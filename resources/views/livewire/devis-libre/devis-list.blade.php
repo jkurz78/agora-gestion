@@ -64,7 +64,7 @@
         <select wire:model.live="filtreStatut" class="form-select form-select-sm" style="max-width:200px;">
             <option value="">Tous (sauf annulés)</option>
             <option value="brouillon">Brouillon</option>
-            <option value="envoye">Envoyé</option>
+            <option value="valide">Validé</option>
             <option value="accepte">Accepté</option>
             <option value="refuse">Refusé</option>
             <option value="annule">Annulé</option>
@@ -141,9 +141,9 @@
                                     <span class="badge bg-secondary" style="font-size:.7rem">
                                         <i class="bi bi-pencil"></i> Brouillon
                                     </span>
-                                @elseif ($d->statut === \App\Enums\StatutDevis::Envoye)
+                                @elseif ($d->statut === \App\Enums\StatutDevis::Valide)
                                     <span class="badge bg-primary" style="font-size:.7rem">
-                                        <i class="bi bi-send"></i> Envoyé
+                                        <i class="bi bi-patch-check"></i> Validé
                                     </span>
                                     @if ($expired)
                                         <span class="badge bg-warning text-dark ms-1" style="font-size:.7rem">

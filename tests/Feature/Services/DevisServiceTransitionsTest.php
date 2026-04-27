@@ -32,8 +32,8 @@ afterEach(function () {
 // ─── marquerAccepte ────────────────────────────────────────────────────────────
 
 describe('marquerAccepte()', function () {
-    it('passe le statut à Accepte depuis Envoye et trace utilisateur + datetime', function () {
-        $devis = Devis::factory()->envoye()->create();
+    it('passe le statut à Accepte depuis Valide et trace utilisateur + datetime', function () {
+        $devis = Devis::factory()->valide()->create();
 
         $before = now()->subSecond();
         $this->service->marquerAccepte($devis);
@@ -48,7 +48,7 @@ describe('marquerAccepte()', function () {
     });
 
     it('synchronise l\'instance appelante après transition', function () {
-        $devis = Devis::factory()->envoye()->create();
+        $devis = Devis::factory()->valide()->create();
 
         $this->service->marquerAccepte($devis);
 
@@ -60,36 +60,36 @@ describe('marquerAccepte()', function () {
         $devis = Devis::factory()->brouillon()->create();
 
         expect(fn () => $this->service->marquerAccepte($devis))
-            ->toThrow(RuntimeException::class, 'Seul un devis envoyé peut être marqué accepté.');
+            ->toThrow(RuntimeException::class, 'Seul un devis validé peut être marqué accepté.');
     });
 
     it('refuse si statut est déjà Accepte', function () {
         $devis = Devis::factory()->accepte()->create();
 
         expect(fn () => $this->service->marquerAccepte($devis))
-            ->toThrow(RuntimeException::class, 'Seul un devis envoyé peut être marqué accepté.');
+            ->toThrow(RuntimeException::class, 'Seul un devis validé peut être marqué accepté.');
     });
 
     it('refuse si statut est Refuse', function () {
         $devis = Devis::factory()->refuse()->create();
 
         expect(fn () => $this->service->marquerAccepte($devis))
-            ->toThrow(RuntimeException::class, 'Seul un devis envoyé peut être marqué accepté.');
+            ->toThrow(RuntimeException::class, 'Seul un devis validé peut être marqué accepté.');
     });
 
     it('refuse si statut est Annule', function () {
         $devis = Devis::factory()->annule()->create();
 
         expect(fn () => $this->service->marquerAccepte($devis))
-            ->toThrow(RuntimeException::class, 'Seul un devis envoyé peut être marqué accepté.');
+            ->toThrow(RuntimeException::class, 'Seul un devis validé peut être marqué accepté.');
     });
 });
 
 // ─── marquerRefuse ─────────────────────────────────────────────────────────────
 
 describe('marquerRefuse()', function () {
-    it('passe le statut à Refuse depuis Envoye et trace utilisateur + datetime', function () {
-        $devis = Devis::factory()->envoye()->create();
+    it('passe le statut à Refuse depuis Valide et trace utilisateur + datetime', function () {
+        $devis = Devis::factory()->valide()->create();
 
         $before = now()->subSecond();
         $this->service->marquerRefuse($devis);
@@ -104,7 +104,7 @@ describe('marquerRefuse()', function () {
     });
 
     it('synchronise l\'instance appelante après transition', function () {
-        $devis = Devis::factory()->envoye()->create();
+        $devis = Devis::factory()->valide()->create();
 
         $this->service->marquerRefuse($devis);
 
@@ -115,28 +115,28 @@ describe('marquerRefuse()', function () {
         $devis = Devis::factory()->brouillon()->create();
 
         expect(fn () => $this->service->marquerRefuse($devis))
-            ->toThrow(RuntimeException::class, 'Seul un devis envoyé peut être marqué refusé.');
+            ->toThrow(RuntimeException::class, 'Seul un devis validé peut être marqué refusé.');
     });
 
     it('refuse si statut est Accepte', function () {
         $devis = Devis::factory()->accepte()->create();
 
         expect(fn () => $this->service->marquerRefuse($devis))
-            ->toThrow(RuntimeException::class, 'Seul un devis envoyé peut être marqué refusé.');
+            ->toThrow(RuntimeException::class, 'Seul un devis validé peut être marqué refusé.');
     });
 
     it('refuse si statut est déjà Refuse', function () {
         $devis = Devis::factory()->refuse()->create();
 
         expect(fn () => $this->service->marquerRefuse($devis))
-            ->toThrow(RuntimeException::class, 'Seul un devis envoyé peut être marqué refusé.');
+            ->toThrow(RuntimeException::class, 'Seul un devis validé peut être marqué refusé.');
     });
 
     it('refuse si statut est Annule', function () {
         $devis = Devis::factory()->annule()->create();
 
         expect(fn () => $this->service->marquerRefuse($devis))
-            ->toThrow(RuntimeException::class, 'Seul un devis envoyé peut être marqué refusé.');
+            ->toThrow(RuntimeException::class, 'Seul un devis validé peut être marqué refusé.');
     });
 });
 
@@ -158,8 +158,8 @@ describe('annuler()', function () {
             ->and($devis->annule_le->between($before, $after))->toBeTrue();
     });
 
-    it('passe le statut à Annule depuis Envoye et trace', function () {
-        $devis = Devis::factory()->envoye()->create();
+    it('passe le statut à Annule depuis Valide et trace', function () {
+        $devis = Devis::factory()->valide()->create();
 
         $this->service->annuler($devis);
 
@@ -209,7 +209,7 @@ describe('annuler()', function () {
 
 describe('verrouillage après transitions terminales', function () {
     it('interdit ajouterLigne après marquerAccepte', function () {
-        $devis = Devis::factory()->envoye()->create();
+        $devis = Devis::factory()->valide()->create();
         $this->service->marquerAccepte($devis);
 
         expect(fn () => $this->service->ajouterLigne($devis, [
@@ -220,7 +220,7 @@ describe('verrouillage après transitions terminales', function () {
     });
 
     it('interdit ajouterLigne après marquerRefuse', function () {
-        $devis = Devis::factory()->envoye()->create();
+        $devis = Devis::factory()->valide()->create();
         $this->service->marquerRefuse($devis);
 
         expect(fn () => $this->service->ajouterLigne($devis, [

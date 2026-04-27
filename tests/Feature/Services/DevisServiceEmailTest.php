@@ -47,9 +47,9 @@ afterEach(function () {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function devisEnvoyeAvecLigne(Tiers $tiers): Devis
+function devisValideAvecLigne(Tiers $tiers): Devis
 {
-    $devis = Devis::factory()->envoye()->create([
+    $devis = Devis::factory()->valide()->create([
         'tiers_id' => $tiers->id,
         'montant_total' => 1200.00,
     ]);
@@ -89,7 +89,7 @@ it('envoyerEmail refuse un devis brouillon avec RuntimeException', function () {
 // ─── Guard 2 : aucune ligne avec montant ──────────────────────────────────────
 
 it('envoyerEmail refuse si aucune ligne avec montant > 0', function () {
-    $devis = Devis::factory()->envoye()->create([
+    $devis = Devis::factory()->valide()->create([
         'tiers_id' => $this->tiers->id,
         'montant_total' => 0.00,
     ]);
@@ -107,7 +107,7 @@ it('envoyerEmail refuse si le tiers n\'a pas d\'email', function () {
         'email' => null,
     ]);
 
-    $devis = Devis::factory()->envoye()->create([
+    $devis = Devis::factory()->valide()->create([
         'tiers_id' => $tiersSansEmail->id,
         'montant_total' => 500.00,
     ]);
@@ -128,7 +128,7 @@ it('envoyerEmail refuse si le tiers n\'a pas d\'email', function () {
 // ─── Happy path : email envoyé au tiers ───────────────────────────────────────
 
 it('envoyerEmail envoie DevisLibreMail à l\'adresse du tiers', function () {
-    $devis = devisEnvoyeAvecLigne($this->tiers);
+    $devis = devisValideAvecLigne($this->tiers);
 
     $this->service->envoyerEmail($devis, 'Votre devis D-2026-001', '<p>Bonjour, veuillez trouver votre devis.</p>');
 
@@ -138,7 +138,7 @@ it('envoyerEmail envoie DevisLibreMail à l\'adresse du tiers', function () {
 // ─── Mailable porte la bonne pièce jointe ─────────────────────────────────────
 
 it('envoyerEmail joint un fichier PDF nommé d\'après le numéro du devis', function () {
-    $devis = devisEnvoyeAvecLigne($this->tiers);
+    $devis = devisValideAvecLigne($this->tiers);
 
     $this->service->envoyerEmail($devis, 'Votre devis', '<p>Corps</p>');
 
@@ -162,7 +162,7 @@ it('envoyerEmail joint un fichier PDF nommé d\'après le numéro du devis', fun
 // ─── Log email_logs créé ──────────────────────────────────────────────────────
 
 it('envoyerEmail crée une entrée email_logs avec tiers_id, sujet et attachment_path', function () {
-    $devis = devisEnvoyeAvecLigne($this->tiers);
+    $devis = devisValideAvecLigne($this->tiers);
 
     $sujet = 'Votre devis D-2026-005';
 

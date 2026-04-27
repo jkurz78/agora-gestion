@@ -169,7 +169,7 @@ it('supprimerLigne removes the ligne', function () {
 
 // ── Mark envoyé ─────────────────────────────────────────────────────────────
 
-it('marquerEnvoye transitions brouillon non-vide to envoye with numero', function () {
+it('marquerValide transitions brouillon non-vide to valide with numero', function () {
     DevisLigne::factory()->create([
         'devis_id' => $this->devis->id,
         'libelle' => 'Ligne',
@@ -181,11 +181,11 @@ it('marquerEnvoye transitions brouillon non-vide to envoye with numero', functio
     $this->devis->update(['montant_total' => 200]);
 
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
-        ->call('marquerEnvoye')
+        ->call('marquerValide')
         ->assertHasNoErrors();
 
     $this->devis->refresh();
-    expect($this->devis->statut)->toBe(StatutDevis::Envoye);
+    expect($this->devis->statut)->toBe(StatutDevis::Valide);
     expect($this->devis->numero)->not->toBeNull();
     expect($this->devis->numero)->toStartWith('D-');
 });
@@ -222,7 +222,7 @@ it('peutEtreEnvoye returns true for devis with at least one ligne montant > 0', 
 // ── Marquer accepté ─────────────────────────────────────────────────────────
 
 it('marquerAccepte transitions envoye to accepte with traces', function () {
-    $this->devis->statut = StatutDevis::Envoye;
+    $this->devis->statut = StatutDevis::Valide;
     $this->devis->numero = 'D-2026-001';
     $this->devis->montant_total = 200;
     $this->devis->save();
@@ -249,7 +249,7 @@ it('marquerAccepte transitions envoye to accepte with traces', function () {
 // ── Marquer refusé ─────────────────────────────────────────────────────────
 
 it('marquerRefuse transitions envoye to refuse with traces', function () {
-    $this->devis->statut = StatutDevis::Envoye;
+    $this->devis->statut = StatutDevis::Valide;
     $this->devis->numero = 'D-2026-002';
     $this->devis->montant_total = 150;
     $this->devis->save();
@@ -286,7 +286,7 @@ it('annuler transitions brouillon to annule', function () {
 });
 
 it('annuler transitions envoye to annule', function () {
-    $this->devis->statut = StatutDevis::Envoye;
+    $this->devis->statut = StatutDevis::Valide;
     $this->devis->numero = 'D-2026-003';
     $this->devis->save();
 
@@ -440,8 +440,8 @@ it('hides Dupliquer button when statut is Brouillon', function () {
         ->assertDontSeeHtml('Dupliquer');
 });
 
-it('shows Dupliquer button when statut is Envoye', function () {
-    $this->devis->statut = StatutDevis::Envoye;
+it('shows Dupliquer button when statut is Valide', function () {
+    $this->devis->statut = StatutDevis::Valide;
     $this->devis->numero = 'D-2026-020';
     $this->devis->save();
 
@@ -485,7 +485,7 @@ it('ouvrirModaleEmail sets showEnvoyerEmailModal to true', function () {
 
 it('envoyerEmail calls service and closes modal', function () {
     // Devis must be in envoye statut and have lignes for email to work
-    $this->devis->statut = StatutDevis::Envoye;
+    $this->devis->statut = StatutDevis::Valide;
     $this->devis->numero = 'D-2026-007';
     $this->devis->montant_total = 500;
     $this->devis->save();

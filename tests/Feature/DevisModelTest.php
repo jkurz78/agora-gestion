@@ -17,8 +17,8 @@ it('StatutDevis::Brouillon->peutEtreModifie() returns true', function (): void {
     expect(StatutDevis::Brouillon->peutEtreModifie())->toBeTrue();
 });
 
-it('StatutDevis::Envoye->peutEtreModifie() returns true', function (): void {
-    expect(StatutDevis::Envoye->peutEtreModifie())->toBeTrue();
+it('StatutDevis::Valide->peutEtreModifie() returns true', function (): void {
+    expect(StatutDevis::Valide->peutEtreModifie())->toBeTrue();
 });
 
 it('StatutDevis::Accepte->peutEtreModifie() returns false', function (): void {
@@ -37,8 +37,8 @@ it('StatutDevis::Brouillon->peutPasserEnvoye() returns true', function (): void 
     expect(StatutDevis::Brouillon->peutPasserEnvoye())->toBeTrue();
 });
 
-it('StatutDevis::Envoye->peutPasserEnvoye() returns false', function (): void {
-    expect(StatutDevis::Envoye->peutPasserEnvoye())->toBeFalse();
+it('StatutDevis::Valide->peutPasserEnvoye() returns false', function (): void {
+    expect(StatutDevis::Valide->peutPasserEnvoye())->toBeFalse();
 });
 
 it('StatutDevis::all cases peutEtreDuplique() returns true', function (): void {
@@ -52,7 +52,7 @@ it('StatutDevis::Annule->peutEtreAnnule() returns false', function (): void {
 });
 
 it('StatutDevis non-Annule cases peutEtreAnnule() returns true', function (): void {
-    $cases = [StatutDevis::Brouillon, StatutDevis::Envoye, StatutDevis::Accepte, StatutDevis::Refuse];
+    $cases = [StatutDevis::Brouillon, StatutDevis::Valide, StatutDevis::Accepte, StatutDevis::Refuse];
     foreach ($cases as $case) {
         expect($case->peutEtreAnnule())->toBeTrue("Expected {$case->value} to be cancelable");
     }
@@ -60,7 +60,7 @@ it('StatutDevis non-Annule cases peutEtreAnnule() returns true', function (): vo
 
 it('StatutDevis::label() returns French labels', function (): void {
     expect(StatutDevis::Brouillon->label())->toBe('Brouillon')
-        ->and(StatutDevis::Envoye->label())->toBe('Envoyé')
+        ->and(StatutDevis::Valide->label())->toBe('Validé')
         ->and(StatutDevis::Accepte->label())->toBe('Accepté')
         ->and(StatutDevis::Refuse->label())->toBe('Refusé')
         ->and(StatutDevis::Annule->label())->toBe('Annulé');

@@ -32,9 +32,9 @@ afterEach(function () {
 
 // ─── Guards : statut ──────────────────────────────────────────────────────────
 
-describe('marquerEnvoye() — guards statut', function () {
-    it('refuse si statut est Envoye', function () {
-        $devis = Devis::factory()->envoye()->create();
+describe('marquerValide() — guards statut', function () {
+    it('refuse si statut est Valide', function () {
+        $devis = Devis::factory()->valide()->create();
         DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'montant' => 100.00,
@@ -42,7 +42,7 @@ describe('marquerEnvoye() — guards statut', function () {
         ]);
         $devis->update(['montant_total' => 100.00]);
 
-        expect(fn () => $this->service->marquerEnvoye($devis))
+        expect(fn () => $this->service->marquerValide($devis))
             ->toThrow(RuntimeException::class);
     });
 
@@ -55,7 +55,7 @@ describe('marquerEnvoye() — guards statut', function () {
         ]);
         $devis->update(['montant_total' => 100.00]);
 
-        expect(fn () => $this->service->marquerEnvoye($devis))
+        expect(fn () => $this->service->marquerValide($devis))
             ->toThrow(RuntimeException::class);
     });
 
@@ -68,7 +68,7 @@ describe('marquerEnvoye() — guards statut', function () {
         ]);
         $devis->update(['montant_total' => 100.00]);
 
-        expect(fn () => $this->service->marquerEnvoye($devis))
+        expect(fn () => $this->service->marquerValide($devis))
             ->toThrow(RuntimeException::class);
     });
 
@@ -81,18 +81,18 @@ describe('marquerEnvoye() — guards statut', function () {
         ]);
         $devis->update(['montant_total' => 100.00]);
 
-        expect(fn () => $this->service->marquerEnvoye($devis))
+        expect(fn () => $this->service->marquerValide($devis))
             ->toThrow(RuntimeException::class);
     });
 });
 
 // ─── Guards : lignes / montant ────────────────────────────────────────────────
 
-describe('marquerEnvoye() — guards lignes', function () {
+describe('marquerValide() — guards lignes', function () {
     it('refuse si le devis n\'a aucune ligne', function () {
         $devis = Devis::factory()->brouillon()->create();
 
-        expect(fn () => $this->service->marquerEnvoye($devis))
+        expect(fn () => $this->service->marquerValide($devis))
             ->toThrow(RuntimeException::class, 'Au moins une ligne avec un montant est requise pour émettre le devis.');
     });
 
@@ -107,7 +107,7 @@ describe('marquerEnvoye() — guards lignes', function () {
         ]);
         $devis->update(['montant_total' => 0.00]);
 
-        expect(fn () => $this->service->marquerEnvoye($devis))
+        expect(fn () => $this->service->marquerValide($devis))
             ->toThrow(RuntimeException::class, 'Au moins une ligne avec un montant est requise pour émettre le devis.');
     });
 
@@ -130,17 +130,17 @@ describe('marquerEnvoye() — guards lignes', function () {
         $devis->update(['montant_total' => 500.00]);
 
         // Should not throw
-        $this->service->marquerEnvoye($devis);
+        $this->service->marquerValide($devis);
 
         $devis->refresh();
-        expect($devis->statut)->toBe(StatutDevis::Envoye);
+        expect($devis->statut)->toBe(StatutDevis::Valide);
     });
 });
 
 // ─── Happy path : numérotation ────────────────────────────────────────────────
 
-describe('marquerEnvoye() — happy path', function () {
-    it('passe le statut à Envoye et attribue D-{exercice}-001 pour le premier devis', function () {
+describe('marquerValide() — happy path', function () {
+    it('passe le statut à Valide et attribue D-{exercice}-001 pour le premier devis', function () {
         $devis = Devis::factory()->brouillon()->create(['exercice' => 2026]);
         DevisLigne::factory()->create([
             'devis_id' => $devis->id,
@@ -151,10 +151,10 @@ describe('marquerEnvoye() — happy path', function () {
         ]);
         $devis->update(['montant_total' => 100.00]);
 
-        $this->service->marquerEnvoye($devis);
+        $this->service->marquerValide($devis);
 
         $devis->refresh();
-        expect($devis->statut)->toBe(StatutDevis::Envoye)
+        expect($devis->statut)->toBe(StatutDevis::Valide)
             ->and($devis->numero)->toBe('D-2026-001');
     });
 
@@ -171,7 +171,7 @@ describe('marquerEnvoye() — happy path', function () {
             ]);
             $devis->update(['montant_total' => 50.00]);
 
-            $this->service->marquerEnvoye($devis);
+            $this->service->marquerValide($devis);
             $devis->refresh();
             $numeros[] = $devis->numero;
         }
@@ -184,7 +184,7 @@ describe('marquerEnvoye() — happy path', function () {
         for ($i = 1; $i <= 99; $i++) {
             Devis::factory()->create([
                 'exercice' => 2026,
-                'statut' => StatutDevis::Envoye,
+                'statut' => StatutDevis::Valide,
                 'numero' => sprintf('D-2026-%03d', $i),
             ]);
         }
@@ -199,7 +199,7 @@ describe('marquerEnvoye() — happy path', function () {
         ]);
         $devis->update(['montant_total' => 10.00]);
 
-        $this->service->marquerEnvoye($devis);
+        $this->service->marquerValide($devis);
 
         $devis->refresh();
         expect($devis->numero)->toBe('D-2026-100');
@@ -210,7 +210,7 @@ describe('marquerEnvoye() — happy path', function () {
         for ($i = 1; $i <= 999; $i++) {
             Devis::factory()->create([
                 'exercice' => 2025,
-                'statut' => StatutDevis::Envoye,
+                'statut' => StatutDevis::Valide,
                 'numero' => sprintf('D-2025-%03d', $i),
             ]);
         }
@@ -225,7 +225,7 @@ describe('marquerEnvoye() — happy path', function () {
         ]);
         $devis->update(['montant_total' => 10.00]);
 
-        $this->service->marquerEnvoye($devis);
+        $this->service->marquerValide($devis);
 
         $devis->refresh();
         expect($devis->numero)->toBe('D-2025-1000');
@@ -234,7 +234,7 @@ describe('marquerEnvoye() — happy path', function () {
 
 // ─── Immuabilité du numéro ────────────────────────────────────────────────────
 
-describe('marquerEnvoye() — immuabilité du numéro', function () {
+describe('marquerValide() — immuabilité du numéro', function () {
     it('conserve le numéro déjà attribué si le devis est re-passé en brouillon manuellement', function () {
         // Simule un devis qui a déjà reçu un numéro (Step 6 introduit le vrai rebascule).
         // On positionne manuellement statut=Brouillon avec un numéro déjà attribué.
@@ -252,18 +252,18 @@ describe('marquerEnvoye() — immuabilité du numéro', function () {
         ]);
         $devis->update(['montant_total' => 100.00]);
 
-        $this->service->marquerEnvoye($devis);
+        $this->service->marquerValide($devis);
 
         $devis->refresh();
         // Le numéro existant doit être conservé — pas de réattribution
         expect($devis->numero)->toBe('D-2026-042')
-            ->and($devis->statut)->toBe(StatutDevis::Envoye);
+            ->and($devis->statut)->toBe(StatutDevis::Valide);
     });
 });
 
 // ─── Isolation par exercice ───────────────────────────────────────────────────
 
-describe('marquerEnvoye() — isolation par exercice', function () {
+describe('marquerValide() — isolation par exercice', function () {
     it('repart à 001 pour chaque exercice indépendamment', function () {
         $devis2026 = Devis::factory()->brouillon()->create(['exercice' => 2026]);
         DevisLigne::factory()->create([
@@ -274,7 +274,7 @@ describe('marquerEnvoye() — isolation par exercice', function () {
             'ordre' => 1,
         ]);
         $devis2026->update(['montant_total' => 100.00]);
-        $this->service->marquerEnvoye($devis2026);
+        $this->service->marquerValide($devis2026);
         $devis2026->refresh();
 
         $devis2025 = Devis::factory()->brouillon()->create(['exercice' => 2025]);
@@ -286,7 +286,7 @@ describe('marquerEnvoye() — isolation par exercice', function () {
             'ordre' => 1,
         ]);
         $devis2025->update(['montant_total' => 200.00]);
-        $this->service->marquerEnvoye($devis2025);
+        $this->service->marquerValide($devis2025);
         $devis2025->refresh();
 
         expect($devis2026->numero)->toBe('D-2026-001')
@@ -296,7 +296,7 @@ describe('marquerEnvoye() — isolation par exercice', function () {
 
 // ─── Isolation multi-tenant ───────────────────────────────────────────────────
 
-describe('marquerEnvoye() — isolation multi-tenant', function () {
+describe('marquerValide() — isolation multi-tenant', function () {
     it('repart à 001 pour chaque association indépendamment sur le même exercice', function () {
         $assoBeta = Association::factory()->create(['devis_validite_jours' => 30]);
 
@@ -310,7 +310,7 @@ describe('marquerEnvoye() — isolation multi-tenant', function () {
             'ordre' => 1,
         ]);
         $devisAlpha->update(['montant_total' => 100.00]);
-        $this->service->marquerEnvoye($devisAlpha);
+        $this->service->marquerValide($devisAlpha);
         $devisAlpha->refresh();
 
         // Passer sur l'association beta
@@ -338,7 +338,7 @@ describe('marquerEnvoye() — isolation multi-tenant', function () {
         ]);
         $devisBeta->update(['montant_total' => 200.00]);
 
-        $this->service->marquerEnvoye($devisBeta);
+        $this->service->marquerValide($devisBeta);
         $devisBeta->refresh();
 
         expect($devisAlpha->numero)->toBe('D-2026-001')

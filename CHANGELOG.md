@@ -8,18 +8,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 ## [v4.2.0] — 2026-04-27
 ### Nouveau module : Devis libres (Slice 1)
 - **Devis libre autonome** — création, édition et cycle de vie d'un devis adressé à un `Tiers` quelconque, sans rattachement à une `Operation` ou à des `Participants`
-- **5 statuts tracés** : `brouillon → envoyé → accepté | refusé | annulé` avec utilisateur + date sur chaque transition ; annulation possible depuis tout statut
-- **Numérotation séquence dédiée** `D-{exercice}-NNN` attribuée à la première émission, immuable ensuite, avec lock pessimiste anti-doublon concurrent
+- **5 statuts tracés** : `brouillon → validé → accepté | refusé | annulé` avec utilisateur + date sur chaque transition ; annulation possible depuis tout statut
+- **Numérotation séquence dédiée** `D-{exercice}-NNN` attribuée à la première validation, immuable ensuite, avec lock pessimiste anti-doublon concurrent
 - **Lignes libres** : libellé, prix unitaire, quantité, sous-catégorie optionnelle ; recalcul automatique `montant_total`
-- **Modification d'un envoyé** re-bascule en brouillon (numéro conservé) ; statuts `accepté|refusé|annulé` verrouillent l'édition
-- **Export PDF** : filigrane "BROUILLON" et sans numéro pour brouillon ; numéroté pour `envoyé+` ; footer unifié `PdfFooterRenderer`
+- **Modification d'un validé** re-bascule en brouillon (numéro conservé) ; statuts `accepté|refusé|annulé` verrouillent l'édition
+- **Export PDF** : filigrane "BROUILLON" et sans numéro pour brouillon ; numéroté pour `validé+` ; footer unifié `PdfFooterRenderer`
 - **Envoi email** avec PJ PDF, tracé dans `email_logs` ; refusé pour brouillon ou devis vide
 - **Duplication** depuis tout statut → nouveau brouillon, lignes recopiées, dates recalculées
 - **Vue 360° tiers** : bloc "Devis libres" avec count par statut et total des `accepté`
 - **Sidebar** : entrée "Devis libres" sous le groupe Facturation
 - **Création rapide** : clic "Nouveau devis" → modal de sélection du tiers → création et redirection directe
 - **Isolation multi-tenant** fail-closed (`Devis extends TenantModel`) ; tests d'intrusion dédiés
-- **Seeders dev** : 4 devis libres d'exemples (brouillon, envoyé, accepté, refusé) sur l'asso démo
+- **Seeders dev** : 4 devis libres d'exemples (brouillon, validé, accepté, refusé) sur l'asso démo
 - **Suite Pest** : 0 failed, 0 errored
 
 ### Technique

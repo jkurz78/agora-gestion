@@ -73,8 +73,8 @@ describe('ajouterLigneTexte()', function () {
         expect($texte->ordre)->toBe(2);
     });
 
-    it('repasse en Brouillon quand on ajoute une ligne texte sur un devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create();
+    it('repasse en Brouillon quand on ajoute une ligne texte sur un devis validé', function () {
+        $devis = Devis::factory()->valide()->create();
 
         $this->service->ajouterLigneTexte($devis, 'Commentaire ajouté');
 
@@ -159,8 +159,8 @@ describe('majOrdre()', function () {
             ->and($l2->fresh()->ordre)->toBe(2);
     });
 
-    it('repasse en Brouillon quand on réordonne sur un devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create();
+    it('repasse en Brouillon quand on réordonne sur un devis validé', function () {
+        $devis = Devis::factory()->valide()->create();
 
         $l1 = DevisLigne::factory()->montant()->create(['devis_id' => $devis->id, 'ordre' => 1]);
         $l2 = DevisLigne::factory()->montant()->create(['devis_id' => $devis->id, 'ordre' => 2]);

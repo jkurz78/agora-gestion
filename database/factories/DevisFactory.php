@@ -50,11 +50,11 @@ final class DevisFactory extends Factory
         return $this->state(['statut' => StatutDevis::Brouillon, 'numero' => null]);
     }
 
-    public function envoye(): static
+    public function valide(): static
     {
         $numero = 'D-'.date('Y').'-'.str_pad((string) fake()->numberBetween(1, 999), 3, '0', STR_PAD_LEFT);
 
-        return $this->state(['statut' => StatutDevis::Envoye, 'numero' => $numero]);
+        return $this->state(['statut' => StatutDevis::Valide, 'numero' => $numero]);
     }
 
     public function accepte(): static
