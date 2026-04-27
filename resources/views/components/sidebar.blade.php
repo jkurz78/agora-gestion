@@ -110,7 +110,7 @@ $activeGroup = match(true) {
         'banques.comptes.*', 'banques.remises*') => 'banques',
     request()->routeIs('tiers.*') => 'tiers',
     request()->routeIs('operations.*') => 'operations',
-    request()->routeIs('facturation.factures*', 'facturation.documents-en-attente*') => 'facturation',
+    request()->routeIs('facturation.factures*') => 'facturation',
     request()->routeIs('rapports.*') => 'rapports',
     request()->routeIs('exercices.*') => 'exercices',
     request()->routeIs('parametres.*') => 'parametres',
@@ -130,6 +130,24 @@ $activeGroup = match(true) {
 
     {{-- Navigation accordéon --}}
     <div class="sidebar-nav">
+
+        {{-- ─── BOÎTE DE RÉCEPTION (top-level) ─── --}}
+        @auth
+        <ul class="nav flex-column pt-1 pb-1">
+            <li class="nav-item">
+                <a href="{{ route('facturation.documents-en-attente') }}"
+                   class="nav-link d-flex align-items-center justify-content-between px-3
+                          {{ request()->routeIs('facturation.documents-en-attente*') ? 'active' : '' }}"
+                   style="font-size:.85rem; font-weight:600; padding-top:.45rem; padding-bottom:.45rem;">
+                    <span><i class="bi bi-inbox me-2"></i> Boîte de réception</span>
+                    @if(($incomingDocumentsCount ?? 0) > 0)
+                        <span class="badge bg-warning text-dark ms-1">{{ $incomingDocumentsCount }}</span>
+                    @endif
+                </a>
+            </li>
+        </ul>
+        @endauth
+
         <div class="accordion accordion-flush" id="sidebarAccordion">
 
             {{-- ─── COMPTABILITÉ ─── --}}
@@ -426,17 +444,6 @@ $activeGroup = match(true) {
                                 <a href="{{ route('facturation.factures') }}"
                                    class="nav-link {{ request()->routeIs('facturation.factures*') ? 'active' : '' }}">
                                     <i class="bi bi-receipt me-1"></i> Factures
-                                </a>
-                            </li>
-
-                            <li class="nav-item">
-                                <a href="{{ route('facturation.documents-en-attente') }}"
-                                   class="nav-link d-flex align-items-center justify-content-between
-                                          {{ request()->routeIs('facturation.documents-en-attente*') ? 'active' : '' }}">
-                                    <span><i class="bi bi-inbox me-1"></i> Documents en attente</span>
-                                    @if(($incomingDocumentsCount ?? 0) > 0)
-                                        <span class="badge bg-warning text-dark ms-1">{{ $incomingDocumentsCount }}</span>
-                                    @endif
                                 </a>
                             </li>
 
