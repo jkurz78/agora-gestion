@@ -5,7 +5,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
-## [v4.2.0] — 2026-04-27
+## [v4.1.8] — 2026-04-27
 ### Nouveau module : Devis libres (Slice 1)
 - **Devis libre autonome** — création, édition et cycle de vie d'un devis adressé à un `Tiers` quelconque, sans rattachement à une `Operation` ou à des `Participants`
 - **5 statuts tracés** : `brouillon → validé → accepté | refusé | annulé` avec utilisateur + date sur chaque transition ; annulation possible depuis tout statut
