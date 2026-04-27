@@ -297,7 +297,10 @@ final class DevisEdit extends Component
         return view('livewire.devis-libre.devis-edit', [
             'lignes' => $lignes,
             'sousCategoriesDisponibles' => $this->sousCategoriesDisponibles,
-        ])->layout('layouts.app-sidebar', ['title' => 'Devis']);
+        ])->layout('layouts.app-sidebar', [
+            'title' => $this->devis->numero ?? 'Brouillon de devis',
+            'breadcrumbParent' => new \Illuminate\View\ComponentSlot('Liste des devis', ['url' => route('devis-libres.index')]),
+        ]);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

@@ -129,6 +129,6 @@ final class DevisList extends Component
         return view('livewire.devis-libre.devis-list', [
             'devis' => $devis,
             'tiers' => $tiers,
-        ])->layout('layouts.app-sidebar', ['title' => 'Devis']);
+        ])->layout('layouts.app-sidebar', ['title' => 'Liste des devis']);
     }
 }
