@@ -221,11 +221,10 @@ it('peutEtreEnvoye returns true for devis with at least one ligne montant > 0', 
 // ── Marquer accepté ─────────────────────────────────────────────────────────
 
 it('marquerAccepte transitions envoye to accepte with traces', function () {
-    $this->devis->update([
-        'statut' => StatutDevis::Envoye,
-        'numero' => 'D-2026-001',
-        'montant_total' => 200,
-    ]);
+    $this->devis->statut = StatutDevis::Envoye;
+    $this->devis->numero = 'D-2026-001';
+    $this->devis->montant_total = 200;
+    $this->devis->save();
 
     DevisLigne::factory()->create([
         'devis_id' => $this->devis->id,
@@ -249,11 +248,10 @@ it('marquerAccepte transitions envoye to accepte with traces', function () {
 // ── Marquer refusé ─────────────────────────────────────────────────────────
 
 it('marquerRefuse transitions envoye to refuse with traces', function () {
-    $this->devis->update([
-        'statut' => StatutDevis::Envoye,
-        'numero' => 'D-2026-002',
-        'montant_total' => 150,
-    ]);
+    $this->devis->statut = StatutDevis::Envoye;
+    $this->devis->numero = 'D-2026-002';
+    $this->devis->montant_total = 150;
+    $this->devis->save();
 
     DevisLigne::factory()->create([
         'devis_id' => $this->devis->id,
@@ -287,7 +285,9 @@ it('annuler transitions brouillon to annule', function () {
 });
 
 it('annuler transitions envoye to annule', function () {
-    $this->devis->update(['statut' => StatutDevis::Envoye, 'numero' => 'D-2026-003']);
+    $this->devis->statut = StatutDevis::Envoye;
+    $this->devis->numero = 'D-2026-003';
+    $this->devis->save();
 
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
         ->call('annuler')
@@ -300,12 +300,11 @@ it('annuler transitions envoye to annule', function () {
 // ── Édition on locked statut ─────────────────────────────────────────────────
 
 it('ajouterLigne on accepte sets a session error and does not create ligne', function () {
-    $this->devis->update([
-        'statut' => StatutDevis::Accepte,
-        'numero' => 'D-2026-004',
-        'accepte_par_user_id' => $this->user->id,
-        'accepte_le' => now(),
-    ]);
+    $this->devis->statut = StatutDevis::Accepte;
+    $this->devis->numero = 'D-2026-004';
+    $this->devis->accepte_par_user_id = $this->user->id;
+    $this->devis->accepte_le = now();
+    $this->devis->save();
 
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
         ->set('nouvelleLigneLibelle', 'Nouvelle prestation')
@@ -326,11 +325,10 @@ it('supprimerLigne on annule sets a session error', function () {
         'ordre' => 1,
     ]);
 
-    $this->devis->update([
-        'statut' => StatutDevis::Annule,
-        'annule_par_user_id' => $this->user->id,
-        'annule_le' => now(),
-    ]);
+    $this->devis->statut = StatutDevis::Annule;
+    $this->devis->annule_par_user_id = $this->user->id;
+    $this->devis->annule_le = now();
+    $this->devis->save();
 
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
         ->call('supprimerLigne', $ligne->id);
@@ -347,35 +345,32 @@ it('estVerrouille returns false for brouillon', function () {
 });
 
 it('estVerrouille returns true for accepte', function () {
-    $this->devis->update([
-        'statut' => StatutDevis::Accepte,
-        'numero' => 'D-2026-005',
-        'accepte_par_user_id' => $this->user->id,
-        'accepte_le' => now(),
-    ]);
+    $this->devis->statut = StatutDevis::Accepte;
+    $this->devis->numero = 'D-2026-005';
+    $this->devis->accepte_par_user_id = $this->user->id;
+    $this->devis->accepte_le = now();
+    $this->devis->save();
 
     $component = Livewire::test(DevisEdit::class, ['devis' => $this->devis]);
     expect($component->instance()->estVerrouille())->toBeTrue();
 });
 
 it('estVerrouille returns true for refuse', function () {
-    $this->devis->update([
-        'statut' => StatutDevis::Refuse,
-        'numero' => 'D-2026-006',
-        'refuse_par_user_id' => $this->user->id,
-        'refuse_le' => now(),
-    ]);
+    $this->devis->statut = StatutDevis::Refuse;
+    $this->devis->numero = 'D-2026-006';
+    $this->devis->refuse_par_user_id = $this->user->id;
+    $this->devis->refuse_le = now();
+    $this->devis->save();
 
     $component = Livewire::test(DevisEdit::class, ['devis' => $this->devis]);
     expect($component->instance()->estVerrouille())->toBeTrue();
 });
 
 it('estVerrouille returns true for annule', function () {
-    $this->devis->update([
-        'statut' => StatutDevis::Annule,
-        'annule_par_user_id' => $this->user->id,
-        'annule_le' => now(),
-    ]);
+    $this->devis->statut = StatutDevis::Annule;
+    $this->devis->annule_par_user_id = $this->user->id;
+    $this->devis->annule_le = now();
+    $this->devis->save();
 
     $component = Livewire::test(DevisEdit::class, ['devis' => $this->devis]);
     expect($component->instance()->estVerrouille())->toBeTrue();
@@ -433,12 +428,11 @@ it('telechargerPdf returns a file download response for a devis with lignes', fu
 
 it('telechargerPdf sets error when devis is empty', function () {
     // No lignes — service will throw RuntimeException
+    // Component should catch it, flash a session error, and re-render without crashing
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
-        ->call('telechargerPdf');
-
-    // Component should have caught the exception and flashed an error
-    // (no crash, no unhandled exception)
-    expect(true)->toBeTrue(); // Smoke test: no exception thrown to test harness
+        ->call('telechargerPdf')
+        ->assertHasNoErrors() // No validation errors (exception is caught internally)
+        ->assertSee('doit avoir au moins une ligne'); // Error message visible in re-render
 });
 
 // ── Email modal ───────────────────────────────────────────────────────────────
@@ -451,11 +445,10 @@ it('ouvrirModaleEmail sets showEnvoyerEmailModal to true', function () {
 
 it('envoyerEmail calls service and closes modal', function () {
     // Devis must be in envoye statut and have lignes for email to work
-    $this->devis->update([
-        'statut' => StatutDevis::Envoye,
-        'numero' => 'D-2026-007',
-        'montant_total' => 500,
-    ]);
+    $this->devis->statut = StatutDevis::Envoye;
+    $this->devis->numero = 'D-2026-007';
+    $this->devis->montant_total = 500;
+    $this->devis->save();
 
     // Tiers needs an email
     $this->tiers->update(['email' => 'client@acme.fr']);
@@ -487,7 +480,7 @@ it('returns 404 when mounting a devis from another tenant', function () {
     $autreTiers = Tiers::factory()->create(['association_id' => $autreAsso->id]);
 
     // Create a devis outside the current tenant scope (bypass GlobalScope)
-    $autreDevis = Devis::withoutGlobalScopes()->create([
+    $autreDevis = Devis::factory()->create([
         'association_id' => $autreAsso->id,
         'tiers_id' => $autreTiers->id,
         'statut' => StatutDevis::Brouillon,

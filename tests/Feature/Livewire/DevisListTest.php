@@ -242,35 +242,43 @@ it('filters by search on numero', function () {
 // ── Badge Expiré ────────────────────────────────────────────────────────────
 
 it('shows badge expire for envoye devis with past date_validite', function () {
+    Carbon::setTestNow('2026-05-15');
+
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'statut' => StatutDevis::Envoye,
         'numero' => 'D-2026-010',
         'libelle' => 'Devis expiré',
-        'date_validite' => Carbon::today()->subDays(1),
+        'date_validite' => Carbon::now()->subDays(5)->toDateString(), // 2026-05-10 < 2026-05-15
         'exercice' => $this->exercice,
     ]);
 
     Livewire::test(DevisList::class)
         ->set('filtreStatut', 'envoye')
         ->assertSee('Expiré');
+
+    Carbon::setTestNow();
 });
 
 it('does not show badge expire for envoye devis with future date_validite', function () {
+    Carbon::setTestNow('2026-05-15');
+
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'statut' => StatutDevis::Envoye,
         'numero' => 'D-2026-011',
         'libelle' => 'Devis pas expiré',
-        'date_validite' => Carbon::today()->addDays(10),
+        'date_validite' => Carbon::now()->addDays(10)->toDateString(), // 2026-05-25 > 2026-05-15
         'exercice' => $this->exercice,
     ]);
 
     Livewire::test(DevisList::class)
         ->set('filtreStatut', 'envoye')
         ->assertDontSee('Expiré');
+
+    Carbon::setTestNow();
 });
 
 // ── Pagination ──────────────────────────────────────────────────────────────

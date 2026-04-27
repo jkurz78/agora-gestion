@@ -11,6 +11,7 @@ use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\EmailLog;
 use App\Support\CurrentAssociation;
+use App\Tenant\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -45,16 +46,22 @@ final class DevisService
 
             $exercice = $this->exerciceService->anneeForDate($dateEmission);
 
-            return Devis::create([
+            $devis = new Devis([
                 'tiers_id' => $tiersId,
                 'date_emission' => $dateEmission->toDateString(),
                 'date_validite' => $dateValidite->toDateString(),
                 'statut' => StatutDevis::Brouillon,
                 'montant_total' => 0,
-                'exercice' => $exercice,
-                'numero' => null,
                 'saisi_par_user_id' => auth()->id(),
             ]);
+
+            // Champs non fillable assignés directement avant le premier save()
+            $devis->exercice = $exercice;
+            $devis->numero = null;
+            // association_id injecté par TenantModel à l'instanciation
+            $devis->save();
+
+            return $devis;
         });
     }
 
@@ -79,6 +86,7 @@ final class DevisService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->guardAssociation($locked);
             $this->guardStatutVerrouille($locked);
 
             $prixUnitaire = (float) $data['prix_unitaire'];
@@ -129,6 +137,7 @@ final class DevisService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->guardAssociation($locked);
             $this->guardStatutVerrouille($locked);
 
             $updates = [];
@@ -181,6 +190,7 @@ final class DevisService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->guardAssociation($locked);
             $this->guardStatutVerrouille($locked);
 
             $ligne->delete();
@@ -245,6 +255,8 @@ final class DevisService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->guardAssociation($locked);
+
             // Guard statut — évalué sur la ligne fraîchement verrouillée.
             if (! $locked->statut->peutPasserEnvoye()) {
                 throw new RuntimeException(
@@ -275,10 +287,9 @@ final class DevisService
 
             $numero = $this->attribuerNumero((int) $locked->association_id, (int) $locked->exercice);
 
-            $locked->update([
-                'statut' => StatutDevis::Envoye,
-                'numero' => $numero,
-            ]);
+            $locked->statut = StatutDevis::Envoye;
+            $locked->numero = $numero;
+            $locked->save();
 
             // Synchronise l'instance originale pour que l'appelant voie le nouvel état.
             $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
@@ -309,6 +320,10 @@ final class DevisService
      */
     private function attribuerNumero(int $associationId, int $exercice): string
     {
+        // withoutGlobalScopes est sûr ici : association_id et exercice proviennent
+        // de la ligne verrouillée dans marquerEnvoyeTransaction(), jamais d'une entrée
+        // utilisateur directe. Le guard d'association a déjà été appliqué sur la ligne
+        // parente avant l'appel de cette méthode.
         $last = Devis::withoutGlobalScopes()
             ->where('association_id', $associationId)
             ->where('exercice', $exercice)
@@ -409,6 +424,9 @@ final class DevisService
      */
     public function dupliquer(Devis $source): Devis
     {
+        // Defense-in-depth: vérifie que le devis source appartient à l'association courante.
+        $this->guardAssociation($source);
+
         return DB::transaction(function () use ($source): Devis {
             $association = CurrentAssociation::get();
 
@@ -421,23 +439,20 @@ final class DevisService
 
             $montantTotal = $lignesSource->sum(fn (DevisLigne $l) => (float) $l->montant);
 
-            $nouveau = Devis::create([
+            $nouveau = new Devis([
                 'tiers_id' => $source->tiers_id,
                 'libelle' => $source->libelle,
                 'date_emission' => $dateEmission->toDateString(),
                 'date_validite' => $dateValidite->toDateString(),
                 'statut' => StatutDevis::Brouillon,
                 'montant_total' => $montantTotal,
-                'exercice' => $exercice,
-                'numero' => null,
                 'saisi_par_user_id' => auth()->id(),
-                'accepte_par_user_id' => null,
-                'accepte_le' => null,
-                'refuse_par_user_id' => null,
-                'refuse_le' => null,
-                'annule_par_user_id' => null,
-                'annule_le' => null,
             ]);
+
+            // Champs non fillable assignés directement avant le premier save()
+            $nouveau->exercice = $exercice;
+            $nouveau->numero = null;
+            $nouveau->save();
 
             foreach ($lignesSource as $ligne) {
                 DevisLigne::create([
@@ -472,6 +487,10 @@ final class DevisService
      */
     public function genererPdf(Devis $devis, ?bool $brouillonWatermark = null): string
     {
+        // Defense-in-depth: vérifie que le devis appartient à l'association courante
+        // avant toute génération de contenu ou accès au stockage.
+        $this->guardAssociation($devis);
+
         $devis->load(['lignes', 'tiers']);
 
         $hasMontant = $devis->lignes->contains(fn (DevisLigne $l) => (float) $l->montant > 0.0);
@@ -536,6 +555,9 @@ final class DevisService
      */
     public function envoyerEmail(Devis $devis, string $sujet, string $corps): void
     {
+        // Defense-in-depth: vérifie que le devis appartient à l'association courante.
+        $this->guardAssociation($devis);
+
         if ($devis->statut === StatutDevis::Brouillon) {
             throw new RuntimeException('Un devis brouillon ne peut pas être envoyé par email.');
         }
@@ -572,6 +594,43 @@ final class DevisService
     }
 
     /**
+     * Sauvegarde les champs d'en-tête d'un devis (libelle, date_emission, date_validite, tiers_id).
+     *
+     * Guards (évalués sur la ligne verrouillée) :
+     * - statut doit être modifiable (peutEtreModifie()), sinon RuntimeException
+     *
+     * Seuls les champs libelle, date_emission, date_validite et tiers_id sont modifiables
+     * via cette méthode. Les autres champs d'en-tête (numero, exercice, association_id,
+     * traces) sont gérés exclusivement par les méthodes dédiées.
+     *
+     * @param  array<string, mixed>  $data  Clés acceptées : libelle, date_emission, date_validite, tiers_id
+     *
+     * @throws RuntimeException si le devis est verrouillé
+     */
+    public function sauvegarderEntete(Devis $devis, array $data): void
+    {
+        $this->muterAvecLock($devis, function (Devis $locked) use ($data): void {
+            $this->guardStatutVerrouille($locked);
+
+            if (array_key_exists('libelle', $data)) {
+                $locked->libelle = $data['libelle'] !== '' ? $data['libelle'] : null;
+            }
+
+            if (array_key_exists('date_emission', $data)) {
+                $locked->date_emission = $data['date_emission'];
+            }
+
+            if (array_key_exists('date_validite', $data)) {
+                $locked->date_validite = $data['date_validite'];
+            }
+
+            if (array_key_exists('tiers_id', $data)) {
+                $locked->tiers_id = (int) $data['tiers_id'];
+            }
+        });
+    }
+
+    /**
      * Exécute une mutation dans une transaction avec lockForUpdate sur la ligne du devis.
      *
      * Pattern commun aux transitions marquerAccepte / marquerRefuse / annuler :
@@ -592,6 +651,8 @@ final class DevisService
                 ->whereKey($devis->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            $this->guardAssociation($locked);
 
             $mutation($locked);
 
@@ -642,6 +703,24 @@ final class DevisService
                     $devis->statut->label()
                 )
             );
+        }
+    }
+
+    /**
+     * Vérifie que le devis verrouillé appartient bien à l'association courante (defense-in-depth).
+     *
+     * Appelé systématiquement après chaque withoutGlobalScopes()->lockForUpdate()->firstOrFail()
+     * pour garantir qu'aucune mutation cross-tenant n'est possible, même si le scope global
+     * venait à être contourné.
+     *
+     * Voir docs/multi-tenancy.md — pattern fail-closed.
+     *
+     * @throws RuntimeException si l'association_id du devis ne correspond pas au contexte courant
+     */
+    private function guardAssociation(Devis $locked): void
+    {
+        if ((int) $locked->association_id !== (int) TenantContext::currentId()) {
+            throw new RuntimeException('Accès interdit : ce devis n\'appartient pas à votre association.');
         }
     }
 }

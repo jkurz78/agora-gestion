@@ -6,6 +6,7 @@ namespace App\Livewire\DevisLibre;
 
 use App\Enums\StatutDevis;
 use App\Models\Devis;
+use App\Models\Tiers;
 use App\Services\DevisService;
 use App\Services\ExerciceService;
 use Illuminate\Contracts\View\View;
@@ -123,8 +124,11 @@ final class DevisList extends Component
         /** @var LengthAwarePaginator $devis */
         $devis = $query->paginate(50);
 
+        $tiers = Tiers::orderBy('nom')->get();
+
         return view('livewire.devis-libre.devis-list', [
             'devis' => $devis,
+            'tiers' => $tiers,
         ]);
     }
 }

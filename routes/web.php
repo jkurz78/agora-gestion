@@ -256,7 +256,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     });
 
 // ── Devis libres ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess::class.':comptabilite'])
     ->group(function (): void {
         Route::get('/devis-libres', DevisList::class)->name('devis-libres.index');
         Route::get('/devis-libres/{devis}', DevisEdit::class)->name('devis-libres.show');

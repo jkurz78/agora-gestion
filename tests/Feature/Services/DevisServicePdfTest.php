@@ -132,8 +132,8 @@ it('genererPdf sur un devis envoyé produit un HTML avec numéro, tiers, lignes,
     // Libellé de ligne
     expect($html)->toContain('Mission audit');
 
-    // Montant total formaté
-    expect($html)->toContain('2');
+    // Montant total formaté (2400,00 avec séparateur milliers espace insécable U+00A0)
+    expect($html)->toContain("2\u{00A0}400,00");
 
     // Mentions légales de l'association
     expect($html)->toContain('TVA non applicable');
