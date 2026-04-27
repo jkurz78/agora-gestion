@@ -121,7 +121,7 @@
                                 @endswitch
                             </td>
                             <td class="text-end text-nowrap">
-                                <a href="{{ route('comptabilite.factures-fournisseurs.depot-pdf', ['depot' => $depot]) }}"
+                                <a href="{{ route('comptabilite.factures-fournisseurs.pdf', ['depot' => $depot]) }}"
                                    class="btn btn-outline-secondary btn-sm"
                                    target="_blank">
                                     <i class="bi bi-file-pdf me-1"></i>Voir PDF

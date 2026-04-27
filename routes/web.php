@@ -194,7 +194,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
             ->name('comptabilite.factures-fournisseurs.index');
         Route::get('/comptabilite/factures-fournisseurs/{depot}/pdf', FacturePartenaireDepotPdfController::class)
             ->middleware(['can:treat,depot'])
-            ->name('comptabilite.factures-fournisseurs.depot-pdf');
+            ->name('comptabilite.factures-fournisseurs.pdf');
     });
 
 // ── Redirections 301 (anciennes URLs) ──

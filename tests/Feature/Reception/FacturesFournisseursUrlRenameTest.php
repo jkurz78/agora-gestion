@@ -70,14 +70,14 @@ it('l\'ancien nom back-office.factures-partenaires.index n\'est plus enregistré
 });
 
 // (e) La route PDF fonctionne avec le nouveau nom
-it('route(comptabilite.factures-fournisseurs.depot-pdf) résout le bon chemin', function (): void {
+it('route(comptabilite.factures-fournisseurs.pdf) résout le bon chemin', function (): void {
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
     $depot = FacturePartenaireDeposee::factory()->soumise()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
     ]);
 
-    $url = route('comptabilite.factures-fournisseurs.depot-pdf', ['depot' => $depot->id], false);
+    $url = route('comptabilite.factures-fournisseurs.pdf', ['depot' => $depot->id], false);
 
     expect($url)->toBe('/comptabilite/factures-fournisseurs/'.$depot->id.'/pdf');
 });
