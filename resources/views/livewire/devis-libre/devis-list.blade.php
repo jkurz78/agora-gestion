@@ -14,7 +14,7 @@
 
     {{-- Titre + bouton Nouveau devis --}}
     <div class="d-flex align-items-center justify-content-between mb-3">
-        <h4 class="mb-0">Devis libres</h4>
+        <h4 class="mb-0">Devis</h4>
         <button wire:click="creerDevis" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg"></i> Nouveau devis
         </button>
