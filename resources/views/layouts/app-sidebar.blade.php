@@ -197,7 +197,7 @@
                             || (($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0);
                     @endphp
                     @if($hasVisibleSource)
-                    <div class="dropdown" style="font-size:.8rem;">
+                    <div class="dropdown" style="font-size:.8rem; --bs-dropdown-font-size:.8rem;">
                         <a href="#" class="text-decoration-none d-flex align-items-center gap-1 dropdown-toggle"
                            style="color: rgba(255,255,255,.9);"
                            role="button" data-bs-toggle="dropdown"
