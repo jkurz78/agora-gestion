@@ -27,6 +27,7 @@ final class EmailLog extends Model
         'envoye_par',
         'campagne_id',
         'tracking_token',
+        'attachment_path',
     ];
 
     public function tiers(): BelongsTo

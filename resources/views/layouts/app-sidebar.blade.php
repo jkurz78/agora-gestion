@@ -153,7 +153,7 @@
                             'banques.comptes.*', 'banques.remises*') => 'Banques',
                         request()->routeIs('tiers.*') => 'Tiers',
                         request()->routeIs('operations.*') => 'Opérations',
-                        request()->routeIs('facturation.factures*', 'facturation.documents-en-attente*') => 'Facturation',
+                        request()->routeIs('facturation.factures*', 'facturation.documents-en-attente*', 'devis-libres*') => 'Facturation',
                         request()->routeIs('rapports.*') => 'Rapports',
                         request()->routeIs('exercices.*') => 'Exercices',
                         request()->routeIs('parametres.*') => 'Paramètres',

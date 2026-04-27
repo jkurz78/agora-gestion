@@ -46,6 +46,7 @@ final class Association extends Model
         'wizard_completed_at',
         'wizard_state',
         'wizard_current_step',
+        'devis_validite_jours',
     ];
 
     protected function casts(): array
@@ -70,6 +71,7 @@ final class Association extends Model
             'wizard_completed_at' => 'datetime',
             'wizard_state' => 'array',
             'wizard_current_step' => 'integer',
+            'devis_validite_jours' => 'integer',
         ];
     }
 
