@@ -61,11 +61,11 @@ final class DevisList extends Component
     }
 
     /**
-     * Returns true when the devis is envoyé and its date_validite is in the past.
+     * Returns true when the devis is validé and its date_validite is in the past.
      */
     public function expire(Devis $devis): bool
     {
-        return $devis->statut === StatutDevis::Envoye
+        return $devis->statut === StatutDevis::Valide
             && $devis->date_validite->lt(today());
     }
 

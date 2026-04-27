@@ -25,8 +25,8 @@
             </span>
             @if ($devis->statut === \App\Enums\StatutDevis::Brouillon)
                 <span class="badge bg-secondary" style="font-size:.75rem"><i class="bi bi-pencil"></i> Brouillon</span>
-            @elseif ($devis->statut === \App\Enums\StatutDevis::Envoye)
-                <span class="badge bg-primary" style="font-size:.75rem"><i class="bi bi-send"></i> Envoyé</span>
+            @elseif ($devis->statut === \App\Enums\StatutDevis::Valide)
+                <span class="badge bg-primary" style="font-size:.75rem"><i class="bi bi-patch-check"></i> Validé</span>
                 @if ($this->estExpire())
                     <span class="badge bg-warning text-dark" style="font-size:.75rem"><i class="bi bi-clock-history"></i> Expiré</span>
                 @endif
@@ -362,10 +362,10 @@
                         <hr class="my-1">
                     @endif
 
-                    {{-- Valider (brouillon seulement — remplace "Envoyer") --}}
+                    {{-- Valider (brouillon seulement) --}}
                     @if ($devis->statut === \App\Enums\StatutDevis::Brouillon)
                         @php $peutEnvoyer = $this->peutEtreEnvoye(); @endphp
-                        <button wire:click="marquerEnvoye"
+                        <button wire:click="marquerValide"
                                 wire:confirm="Valider ce devis ? Un numéro lui sera attribué."
                                 class="btn btn-success"
                                 @disabled(! $peutEnvoyer)
@@ -374,8 +374,8 @@
                         </button>
                     @endif
 
-                    {{-- Marquer accepté (envoyé seulement) --}}
-                    @if ($devis->statut === \App\Enums\StatutDevis::Envoye)
+                    {{-- Marquer accepté (validé seulement) --}}
+                    @if ($devis->statut === \App\Enums\StatutDevis::Valide)
                         <button wire:click="marquerAccepte"
                                 wire:confirm="Marquer ce devis comme accepté ?"
                                 class="btn btn-success">
@@ -416,7 +416,7 @@
                         </button>
                     @endif
 
-                    {{-- Email (envoyé/accepté/refusé uniquement — pas brouillon) --}}
+                    {{-- Email (validé/accepté/refusé uniquement — pas brouillon) --}}
                     @php $peutEmail = ($devis->statut !== \App\Enums\StatutDevis::Brouillon) && $peutPdf; @endphp
                     <button wire:click="ouvrirModaleEmail"
                             class="btn btn-outline-primary"

@@ -46,8 +46,8 @@ describe('dupliquer() — statuts sources', function () {
             ->and((int) $nouveau->id)->not->toBe((int) $source->id);
     });
 
-    it('duplique un devis Envoye et retourne un nouveau Brouillon', function () {
-        $source = Devis::factory()->envoye()->create();
+    it('duplique un devis Valide et retourne un nouveau Brouillon', function () {
+        $source = Devis::factory()->valide()->create();
 
         $nouveau = $this->service->dupliquer($source);
 
@@ -78,12 +78,12 @@ describe('dupliquer() — statuts sources', function () {
         expect($nouveau->statut)->toBe(StatutDevis::Brouillon);
     });
 
-    it('duplique un devis Envoye avec date_validite passée (cas "expiré" UI) et retourne un nouveau Brouillon', function () {
-        // Un devis "expiré" est un Envoye dont la date_validite est dans le passé.
-        // Le statut en base reste Envoye — pas de valeur d'enum spécifique.
+    it('duplique un devis Valide avec date_validite passée (cas "expiré" UI) et retourne un nouveau Brouillon', function () {
+        // Un devis "expiré" est un Valide dont la date_validite est dans le passé.
+        // Le statut en base reste Valide — pas de valeur d'enum spécifique.
         Carbon::setTestNow('2026-05-01');
 
-        $source = Devis::factory()->envoye()->create([
+        $source = Devis::factory()->valide()->create([
             'date_validite' => Carbon::parse('2026-04-01'), // date passée
         ]);
 
@@ -121,7 +121,7 @@ describe('dupliquer() — champs du nouveau devis', function () {
     });
 
     it('nouveau devis n\'a pas de numéro (null)', function () {
-        $source = Devis::factory()->envoye()->create();
+        $source = Devis::factory()->valide()->create();
 
         $nouveau = $this->service->dupliquer($source);
 

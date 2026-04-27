@@ -129,8 +129,8 @@ describe('ajouterLigne()', function () {
             ->and((float) $ligne->montant)->toBe(300.00);
     });
 
-    it('repasse en Brouillon quand on ajoute une ligne sur un devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create();
+    it('repasse en Brouillon quand on ajoute une ligne sur un devis validé', function () {
+        $devis = Devis::factory()->valide()->create();
 
         $this->service->ajouterLigne($devis, [
             'libelle' => 'Nouvelle ligne',
@@ -246,8 +246,8 @@ describe('modifierLigne()', function () {
         expect((float) $devis->montant_total)->toBe(350.00);
     });
 
-    it('repasse en Brouillon quand on modifie une ligne sur un devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create();
+    it('repasse en Brouillon quand on modifie une ligne sur un devis validé', function () {
+        $devis = Devis::factory()->valide()->create();
         $ligne = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'prix_unitaire' => 100.00,
@@ -351,8 +351,8 @@ describe('supprimerLigne()', function () {
         expect((float) $devis->montant_total)->toBe(0.00);
     });
 
-    it('repasse en Brouillon quand on supprime une ligne sur un devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create();
+    it('repasse en Brouillon quand on supprime une ligne sur un devis validé', function () {
+        $devis = Devis::factory()->valide()->create();
         $ligne = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'prix_unitaire' => 100.00,

@@ -91,11 +91,11 @@ final class DevisEdit extends Component
     }
 
     /**
-     * Returns true if the devis is Envoye and its date_validite is in the past.
+     * Returns true if the devis is Valide and its date_validite is in the past.
      */
     public function estExpire(): bool
     {
-        return $this->devis->statut === StatutDevis::Envoye
+        return $this->devis->statut === StatutDevis::Valide
             && $this->devis->date_validite->lt(today());
     }
 
@@ -240,11 +240,11 @@ final class DevisEdit extends Component
 
     // ── Transitions de statut ─────────────────────────────────────────────────
 
-    public function marquerEnvoye(): void
+    public function marquerValide(): void
     {
         $this->tenterTransition(
-            fn () => app(DevisService::class)->marquerEnvoye($this->devis),
-            fn () => 'Devis marqué comme envoyé. Numéro attribué : '.$this->devis->numero,
+            fn () => app(DevisService::class)->marquerValide($this->devis),
+            fn () => 'Devis validé. Numéro attribué : '.$this->devis->numero,
         );
     }
 

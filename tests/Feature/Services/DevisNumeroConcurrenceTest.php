@@ -17,7 +17,7 @@ uses(RefreshDatabase::class);
 /**
  * Test de concurrence simplifié : Pest est mono-thread, donc on ne peut pas
  * simuler une vraie contention de lock. On vérifie que 2 appels successifs à
- * marquerEnvoye() sur 2 devis distincts produisent des numéros distincts et
+ * marquerValide() sur 2 devis distincts produisent des numéros distincts et
  * séquentiels, ce qui valide le comportement du lock pessimiste en production.
  *
  * NOTE DÉLIBÉRÉE : Un vrai test de contention (pcntl_fork ou 2 connexions DB)
@@ -68,8 +68,8 @@ describe('DevisNumero — concurrence simulée', function () {
 
         // Les deux appels sont séquentiels (Pest mono-thread) — simule la sérialisation
         // garantie par lockForUpdate() en production.
-        $this->service->marquerEnvoye($devisA);
-        $this->service->marquerEnvoye($devisB);
+        $this->service->marquerValide($devisA);
+        $this->service->marquerValide($devisB);
 
         $devisA->refresh();
         $devisB->refresh();
@@ -96,7 +96,7 @@ describe('DevisNumero — concurrence simulée', function () {
         Devis::factory()->create([
             'association_id' => $this->association->id,
             'exercice' => 2026,
-            'statut' => StatutDevis::Envoye,
+            'statut' => StatutDevis::Valide,
             'numero' => 'D-2026-001',
         ]);
 
@@ -110,11 +110,11 @@ describe('DevisNumero — concurrence simulée', function () {
         ]);
         $devis->update(['montant_total' => 150.00]);
 
-        $this->service->marquerEnvoye($devis);
+        $this->service->marquerValide($devis);
         $devis->refresh();
 
         expect($devis->numero)->toBe('D-2026-002')
-            ->and($devis->statut)->toBe(StatutDevis::Envoye);
+            ->and($devis->statut)->toBe(StatutDevis::Valide);
     });
 
     it('aucun doublon n\'est possible même si les devis sont créés dans n\'importe quel ordre', function () {
@@ -134,7 +134,7 @@ describe('DevisNumero — concurrence simulée', function () {
         }
 
         foreach ($devisList as $d) {
-            $this->service->marquerEnvoye($d);
+            $this->service->marquerValide($d);
         }
 
         $numeros = collect($devisList)->map(fn ($d) => $d->fresh()->numero)->all();

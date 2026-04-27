@@ -83,12 +83,12 @@ it('genererPdf sur un brouillon retourne un path et le HTML contient BROUILLON s
     expect($html)->not->toContain('D-');
 });
 
-// ─── Test 2 : envoyé — numéro, tiers, lignes, total, mentions ───────────────
+// ─── Test 2 : validé — numéro, tiers, lignes, total, mentions ───────────────
 
-it('genererPdf sur un devis envoyé produit un HTML avec numéro, tiers, lignes, total et mentions', function () {
+it('genererPdf sur un devis validé produit un HTML avec numéro, tiers, lignes, total et mentions', function () {
     Carbon::setTestNow('2026-05-01');
 
-    $devis = Devis::factory()->envoye()->create([
+    $devis = Devis::factory()->valide()->create([
         'tiers_id' => $this->tiers->id,
         'numero' => 'D-2026-001',
         'date_emission' => '2026-05-01',
@@ -175,10 +175,10 @@ it('genererPdf refuse si toutes les lignes ont montant = 0', function () {
         ->toThrow(RuntimeException::class, 'Le devis doit avoir au moins une ligne avec un montant pour générer un PDF.');
 });
 
-// ─── Test 5 : brouillonWatermark=true sur Envoyé ajoute le filigrane ─────────
+// ─── Test 5 : brouillonWatermark=true sur Validé ajoute le filigrane ─────────
 
-it('genererPdf avec brouillonWatermark=true sur un devis envoyé produit un HTML avec BROUILLON', function () {
-    $devis = Devis::factory()->envoye()->create([
+it('genererPdf avec brouillonWatermark=true sur un devis validé produit un HTML avec BROUILLON', function () {
+    $devis = Devis::factory()->valide()->create([
         'tiers_id' => $this->tiers->id,
         'numero' => 'D-2026-002',
     ]);
@@ -238,7 +238,7 @@ it('genererPdf avec brouillonWatermark=false sur un brouillon n\'affiche pas BRO
 // ─── Test 7 : convention du path de stockage ──────────────────────────────────
 
 it('genererPdf suit la convention de path associations/{id}/devis-libres/{devis_id}/devis-*.pdf', function () {
-    $devis = Devis::factory()->envoye()->create([
+    $devis = Devis::factory()->valide()->create([
         'tiers_id' => $this->tiers->id,
         'numero' => 'D-2026-003',
     ]);

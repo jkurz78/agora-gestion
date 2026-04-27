@@ -69,7 +69,7 @@ final class DevisService
     /**
      * Ajoute une ligne au devis et recalcule le montant_total.
      *
-     * Si le devis est au statut Envoye, le repasse en Brouillon en conservant
+     * Si le devis est au statut Valide, le repasse en Brouillon en conservant
      * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * Clés acceptées dans $data : libelle (requis), prix_unitaire (requis),
@@ -123,7 +123,7 @@ final class DevisService
      * et sous_categorie_id sont nuls. Elle n'impacte pas le montant_total.
      *
      * Mêmes guards que ajouterLigne : refuse si statut verrouillé (Accepte/Refuse/Annule).
-     * Si le devis est au statut Envoye, le repasse en Brouillon (rebascule).
+     * Si le devis est au statut Valide, le repasse en Brouillon (rebascule).
      *
      * @throws RuntimeException si le devis est verrouillé
      */
@@ -167,7 +167,7 @@ final class DevisService
      * demandée, l'opération est silencieusement ignorée (no-op).
      *
      * Mêmes guards que ajouterLigne : refuse si statut verrouillé.
-     * Si le devis est au statut Envoye, le repasse en Brouillon (rebascule).
+     * Si le devis est au statut Valide, le repasse en Brouillon (rebascule).
      *
      * @param  string  $direction  'up' | 'down'
      *
@@ -217,7 +217,7 @@ final class DevisService
     /**
      * Modifie une ligne existante et recalcule le montant_total du devis parent.
      *
-     * Si le devis est au statut Envoye, le repasse en Brouillon en conservant
+     * Si le devis est au statut Valide, le repasse en Brouillon en conservant
      * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * Seuls les champs fournis dans $data sont mis à jour.
@@ -275,7 +275,7 @@ final class DevisService
     /**
      * Supprime une ligne et recalcule le montant_total du devis parent.
      *
-     * Si le devis est au statut Envoye, le repasse en Brouillon en conservant
+     * Si le devis est au statut Valide, le repasse en Brouillon en conservant
      * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * @throws RuntimeException si le devis est verrouillé (Accepte, Refuse, Annule)
@@ -303,7 +303,7 @@ final class DevisService
     }
 
     /**
-     * Marque le devis comme envoyé et lui attribue un numéro séquentiel.
+     * Marque le devis comme validé et lui attribue un numéro séquentiel.
      *
      * Guards (évalués à l'intérieur de la transaction avec lockForUpdate) :
      * - statut doit être Brouillon (sinon RuntimeException)
@@ -322,10 +322,10 @@ final class DevisService
      *
      * @throws RuntimeException
      */
-    public function marquerEnvoye(Devis $devis): void
+    public function marquerValide(Devis $devis): void
     {
         try {
-            $this->marquerEnvoyeTransaction($devis);
+            $this->marquerValideTransaction($devis);
         } catch (QueryException $e) {
             // Stratégie de retry pour la fenêtre "premier numéro d'un exercice vierge" :
             // Deux transactions concurrentes peuvent simultanément trouver un résultat
@@ -338,14 +338,14 @@ final class DevisService
                 throw $e;
             }
 
-            $this->marquerEnvoyeTransaction($devis);
+            $this->marquerValideTransaction($devis);
         }
     }
 
     /**
-     * Corps transactionnel de marquerEnvoye() — extrait pour permettre le retry.
+     * Corps transactionnel de marquerValide() — extrait pour permettre le retry.
      */
-    private function marquerEnvoyeTransaction(Devis $devis): void
+    private function marquerValideTransaction(Devis $devis): void
     {
         DB::transaction(function () use ($devis): void {
             // Verrouille la ligne du devis pour toute la durée de la transaction.
@@ -379,7 +379,7 @@ final class DevisService
 
             // Si le devis a déjà un numéro (re-bascule après Step 6), on le conserve.
             if ($locked->numero !== null) {
-                $locked->update(['statut' => StatutDevis::Envoye]);
+                $locked->update(['statut' => StatutDevis::Valide]);
                 $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
 
                 return;
@@ -387,7 +387,7 @@ final class DevisService
 
             $numero = $this->attribuerNumero((int) $locked->association_id, (int) $locked->exercice);
 
-            $locked->statut = StatutDevis::Envoye;
+            $locked->statut = StatutDevis::Valide;
             $locked->numero = $numero;
             $locked->save();
 
@@ -443,7 +443,7 @@ final class DevisService
      * Marque le devis comme accepté.
      *
      * Guard (évalué sur la ligne verrouillée) :
-     * - statut doit être Envoye, sinon RuntimeException
+     * - statut doit être Valide, sinon RuntimeException
      *
      * Trace : accepte_par_user_id + accepte_le
      *
@@ -452,8 +452,8 @@ final class DevisService
     public function marquerAccepte(Devis $devis): void
     {
         $this->muterAvecLock($devis, function (Devis $locked): void {
-            if ($locked->statut !== StatutDevis::Envoye) {
-                throw new RuntimeException('Seul un devis envoyé peut être marqué accepté.');
+            if ($locked->statut !== StatutDevis::Valide) {
+                throw new RuntimeException('Seul un devis validé peut être marqué accepté.');
             }
 
             $locked->statut = StatutDevis::Accepte;
@@ -466,7 +466,7 @@ final class DevisService
      * Marque le devis comme refusé.
      *
      * Guard (évalué sur la ligne verrouillée) :
-     * - statut doit être Envoye, sinon RuntimeException
+     * - statut doit être Valide, sinon RuntimeException
      *
      * Trace : refuse_par_user_id + refuse_le
      *
@@ -475,8 +475,8 @@ final class DevisService
     public function marquerRefuse(Devis $devis): void
     {
         $this->muterAvecLock($devis, function (Devis $locked): void {
-            if ($locked->statut !== StatutDevis::Envoye) {
-                throw new RuntimeException('Seul un devis envoyé peut être marqué refusé.');
+            if ($locked->statut !== StatutDevis::Valide) {
+                throw new RuntimeException('Seul un devis validé peut être marqué refusé.');
             }
 
             $locked->statut = StatutDevis::Refuse;
@@ -764,17 +764,17 @@ final class DevisService
     }
 
     /**
-     * Repasse le devis en Brouillon si son statut courant est Envoye.
+     * Repasse le devis en Brouillon si son statut courant est Valide.
      *
      * Le numéro est conservé intact : il sera réutilisé lors du prochain
-     * marquerEnvoye() (qui détecte numero !== null et saute la réattribution).
+     * marquerValide() (qui détecte numero !== null et saute la réattribution).
      *
      * Cette méthode est appelée uniquement depuis les mutations de lignes
      * (ajouterLigne, modifierLigne, supprimerLigne) sur l'instance verrouillée.
      */
     private function rebasculerSiEnvoye(Devis $locked): void
     {
-        if ($locked->statut === StatutDevis::Envoye) {
+        if ($locked->statut === StatutDevis::Valide) {
             $locked->statut = StatutDevis::Brouillon;
             $locked->save();
         }

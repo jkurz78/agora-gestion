@@ -58,13 +58,13 @@ describe('devis_libres dans getSummary', function (): void {
             'montant_total' => '0.00',
         ]);
 
-        // 2 envoyés
-        Devis::factory()->envoye()->create([
+        // 2 validés
+        Devis::factory()->valide()->create([
             'tiers_id' => $this->tiers->id,
             'exercice' => $this->exercice,
             'montant_total' => '500.00',
         ]);
-        Devis::factory()->envoye()->create([
+        Devis::factory()->valide()->create([
             'tiers_id' => $this->tiers->id,
             'exercice' => $this->exercice,
             'montant_total' => '200.00',
@@ -89,7 +89,7 @@ describe('devis_libres dans getSummary', function (): void {
 
         expect($dl['counts'])->toHaveKey(StatutDevis::Brouillon->value)
             ->and($dl['counts'][StatutDevis::Brouillon->value])->toBe(1)
-            ->and($dl['counts'][StatutDevis::Envoye->value])->toBe(2)
+            ->and($dl['counts'][StatutDevis::Valide->value])->toBe(2)
             ->and($dl['counts'][StatutDevis::Accepte->value])->toBe(1)
             ->and($dl['counts'][StatutDevis::Refuse->value])->toBe(1)
             ->and((float) $dl['total_acceptes'])->toBe(1500.00);
@@ -162,7 +162,7 @@ describe('devis_libres dans getSummary', function (): void {
             Devis::factory()->state([
                 'tiers_id' => $this->tiers->id,
                 'exercice' => $this->exercice,
-                'statut' => StatutDevis::Envoye,
+                'statut' => StatutDevis::Valide,
                 'numero' => 'D-'.$this->exercice.'-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
                 'montant_total' => '100.00',
             ])->create();

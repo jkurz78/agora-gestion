@@ -73,13 +73,13 @@ class DevisLibreSeeder extends Seeder
 
         $devis1->update(['montant_total' => '1500.00']);
 
-        // ── Devis 2 : envoyé (numéroté) ─────────────────────────────────────────
+        // ── Devis 2 : validé (numéroté) ─────────────────────────────────────────
         $devis2 = Devis::create([
             'tiers_id' => $tiersB->id,
             'date_emission' => Carbon::today()->subDays(30)->toDateString(),
             'date_validite' => Carbon::today()->addDays(1)->toDateString(),
             'libelle' => 'Formation sécurité incendie',
-            'statut' => StatutDevis::Envoye,
+            'statut' => StatutDevis::Valide,
             'montant_total' => '1200.00',
             'saisi_par_user_id' => $admin?->id,
         ]);

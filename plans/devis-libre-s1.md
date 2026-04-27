@@ -7,16 +7,16 @@
 
 ## Goal
 
-Livrer un module **Devis libre autonome** : permettre la création, l'édition et le suivi du cycle de vie d'un devis adressé à un `Tiers` quelconque, sans rattachement à une `Operation` ou à des `Participants`. Modèle `Devis` indépendant (Option A), 5 statuts traçant qui-quand sur acceptation/refus/annulation, numérotation `D-{exercice}-NNN` séquence dédiée attribuée à l'émission, PDF (avec filigrane "BROUILLON" hors statut envoyé), envoi email, duplication, intégration vue 360° tiers, multi-tenant `TenantModel`. Slices 2 (devis → transaction) et 3 (facture-first) explicitement hors scope.
+Livrer un module **Devis libre autonome** : permettre la création, l'édition et le suivi du cycle de vie d'un devis adressé à un `Tiers` quelconque, sans rattachement à une `Operation` ou à des `Participants`. Modèle `Devis` indépendant (Option A), 5 statuts traçant qui-quand sur acceptation/refus/annulation, numérotation `D-{exercice}-NNN` séquence dédiée attribuée à la validation, PDF (avec filigrane "BROUILLON" hors statut validé), envoi email, duplication, intégration vue 360° tiers, multi-tenant `TenantModel`. Slices 2 (devis → transaction) et 3 (facture-first) explicitement hors scope.
 
 ## Acceptance Criteria
 
 - [ ] Un gestionnaire peut créer un devis brouillon pour n'importe quel `Tiers`, lui ajouter des lignes libres (libellé, prix unitaire, quantité, sous-cat optionnelle) avec recalcul automatique du `montant_total`
-- [ ] La transition `brouillon → envoyé` exige ≥ 1 ligne avec montant > 0 et attribue un numéro `D-{exercice}-NNN` immuable
+- [ ] La transition `brouillon → validé` exige ≥ 1 ligne avec montant > 0 et attribue un numéro `D-{exercice}-NNN` immuable
 - [ ] Acceptation, refus, annulation sont tracés (utilisateur + date) ; annulation possible depuis tout statut
-- [ ] Modifier un devis `envoyé` le re-bascule en `brouillon` en conservant son numéro ; les statuts `accepté|refusé|annulé` sont verrouillés à l'édition
-- [ ] Un devis `envoyé` dont la `date_validite` est dépassée affiche un badge "expiré" mais conserve son statut (pas de transition auto)
-- [ ] Export PDF : numéroté pour `envoyé+`, avec filigrane "BROUILLON" et sans numéro pour `brouillon` ; refusé pour devis vide
+- [ ] Modifier un devis `validé` le re-bascule en `brouillon` en conservant son numéro ; les statuts `accepté|refusé|annulé` sont verrouillés à l'édition
+- [ ] Un devis `validé` dont la `date_validite` est dépassée affiche un badge "expiré" mais conserve son statut (pas de transition auto)
+- [ ] Export PDF : numéroté pour `validé+`, avec filigrane "BROUILLON" et sans numéro pour `brouillon` ; refusé pour devis vide
 - [ ] Envoi par email avec PJ PDF, tracé dans `email_logs` ; refusé pour brouillon ou devis vide
 - [ ] Duplication possible depuis tout statut → nouveau brouillon, lignes recopiées, dates recalculées
 - [ ] Le devis apparaît dans la vue 360° du tiers (bloc dédié)
@@ -81,31 +81,31 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 **Files**: `app/Services/DevisService.php`, `tests/Feature/Services/DevisServiceLignesTest.php`
 **Commit**: `feat(devis-libre): gestion des lignes + recalcul montant total (S1 step 3)`
 
-### Step 4: DevisService::marquerEnvoye + numérotation séquence
+### Step 4: DevisService::marquerValide + numérotation séquence
 
 **Complexity**: complex
 **RED**:
-- Test `marquerEnvoye` exige ≥ 1 ligne avec montant > 0, sinon `RuntimeException`
+- Test `marquerValide` exige ≥ 1 ligne avec montant > 0, sinon `RuntimeException`
 - Test attribution numéro `D-{exercice}-001`, puis `D-{exercice}-002`, etc.
-- Test numéro figé après attribution (ne change pas si re-passé en brouillon puis re-envoyé)
-- Test course concurrente : 2 emissions parallèles → pas de doublon `(association_id, exercice, numero)` (test concurrent en `pcntl_fork` ou via 2 transactions et lock)
+- Test numéro figé après attribution (ne change pas si re-passé en brouillon puis re-validé)
+- Test course concurrente : 2 validations parallèles → pas de doublon `(association_id, exercice, numero)` (test concurrent en `pcntl_fork` ou via 2 transactions et lock)
 - Test format 3 digits min, débordement à 4+ digits
 
 **GREEN**:
-- `marquerEnvoye(Devis): void` avec `DB::transaction` + `lockForUpdate` sur séquence
+- `marquerValide(Devis): void` avec `DB::transaction` + `lockForUpdate` sur séquence
 - Méthode privée d'attribution numéro filtrée par `(association_id, exercice)`
 
 **REFACTOR**: extraire `DevisNumeroService` si la logique dépasse 30 lignes
-**Files**: `app/Services/DevisService.php`, `app/Services/DevisNumeroService.php` (éventuel), `tests/Feature/Services/DevisServiceMarquerEnvoyeTest.php`, `tests/Feature/Services/DevisNumeroConcurrenceTest.php`
-**Commit**: `feat(devis-libre): marquerEnvoye + numérotation séquence avec lock (S1 step 4)`
+**Files**: `app/Services/DevisService.php`, `app/Services/DevisNumeroService.php` (éventuel), `tests/Feature/Services/DevisServiceMarquerValideTest.php`, `tests/Feature/Services/DevisNumeroConcurrenceTest.php`
+**Commit**: `feat(devis-libre): marquerValide + numérotation séquence avec lock (S1 step 4)`
 
 ### Step 5: DevisService — accepté, refusé, annulé (avec traces)
 
 **Complexity**: standard
 **RED**:
-- Test `marquerAccepte` exige `statut = envoyé`, écrit `accepte_par_user_id` + `accepte_le`
+- Test `marquerAccepte` exige `statut = validé`, écrit `accepte_par_user_id` + `accepte_le`
 - Test `marquerRefuse` symétrique
-- Test `annuler` autorisé depuis `brouillon|envoyé|accepté|refusé`, refusé depuis `annulé`, écrit `annule_par_user_id` + `annule_le`
+- Test `annuler` autorisé depuis `brouillon|validé|accepté|refusé`, refusé depuis `annulé`, écrit `annule_par_user_id` + `annule_le`
 - Test verrouillage : après `accepté|refusé|annulé`, modifs de lignes refusées
 
 **GREEN**:
@@ -115,11 +115,11 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 **Files**: `app/Services/DevisService.php`, `tests/Feature/Services/DevisServiceTransitionsTest.php`
 **Commit**: `feat(devis-libre): transitions accepté/refusé/annulé tracées (S1 step 5)`
 
-### Step 6: Modification d'un envoyé re-bascule en brouillon
+### Step 6: Modification d'un validé re-bascule en brouillon
 
 **Complexity**: standard
 **RED**:
-- Test `modifierLigne` sur devis `envoyé` : statut redevient `brouillon`, numéro conservé, `montant_total` recalculé
+- Test `modifierLigne` sur devis `validé` : statut redevient `brouillon`, numéro conservé, `montant_total` recalculé
 - Test `ajouterLigne` / `supprimerLigne` même comportement
 - Test : pas de re-bascule depuis `accepté|refusé|annulé` (verrouillé)
 
@@ -128,13 +128,13 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 
 **REFACTOR**: extraire helper `rebasculer()` privé si répétition
 **Files**: `app/Services/DevisService.php`, `tests/Feature/Services/DevisServiceRebasculerTest.php`
-**Commit**: `feat(devis-libre): modification d'un envoyé le repasse en brouillon (S1 step 6)`
+**Commit**: `feat(devis-libre): modification d'un validé le repasse en brouillon (S1 step 6)`
 
 ### Step 7: DevisService::dupliquer
 
 **Complexity**: standard
 **RED**:
-- Test duplication depuis tout statut (`brouillon|envoyé|accepté|refusé|annulé`), y compris un devis `envoyé` avec `date_validite` passée (cas "expiré" — badge informatif, pas valeur d'enum) → nouveau brouillon
+- Test duplication depuis tout statut (`brouillon|validé|accepté|refusé|annulé`), y compris un devis `validé` avec `date_validite` passée (cas "expiré" — badge informatif, pas valeur d'enum) → nouveau brouillon
 - Test lignes recopiées (libellé, prix unitaire, quantité, sous-cat, ordre)
 - Test nouveau devis : pas de numéro, `date_emission = aujourd'hui`, `date_validite` recalculée
 - Test isolation : aucun lien retour vers l'original (pas de FK `parent_id`)
@@ -152,7 +152,7 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 **RED**:
 - Test `genererPdf` retourne path stockage `storage/app/associations/{id}/devis-libres/{devis_id}/devis-{numero|brouillon}.pdf`
 - Test : assertion sur le HTML rendu (avant conversion DomPDF) — `view('pdf.devis-libre', …)->render()` contient la chaîne "BROUILLON" pour brouillon, et n'affiche aucun numéro de référence
-- Test : HTML rendu pour `envoyé+` contient `numero`, `date_emission`, `date_validite`, nom du tiers, lignes (libellés et montants), `montant_total`, mentions association
+- Test : HTML rendu pour `validé+` contient `numero`, `date_emission`, `date_validite`, nom du tiers, lignes (libellés et montants), `montant_total`, mentions association
 - Test refus PDF si aucune ligne avec montant > 0 (`RuntimeException`)
 
 **GREEN**:
@@ -187,7 +187,7 @@ Livrer un module **Devis libre autonome** : permettre la création, l'édition e
 **RED**:
 - Test rendu liste : devis du tenant courant uniquement
 - Test filtres statut, tiers, exercice ; filtre par défaut "non annulés"
-- Test badge "expiré" affiché si `statut = envoyé` et `date_validite < today`
+- Test badge "expiré" affiché si `statut = validé` et `date_validite < today`
 - Test action `creerDevis()` (ou redirection `/devis-libres/{id}`) modifie l'état observable du composant (livewire `assertRedirect` ou property toggle) — pas d'assertion visuelle
 
 **GREEN**:
@@ -261,7 +261,7 @@ Comme rappel pour `/build` : steps 4 et 11 sont `complex` (numérotation concurr
 - [ ] `./vendor/bin/sail artisan test` : 0 failed, 0 errored
 - [ ] `./vendor/bin/pint` : aucun changement à proposer
 - [ ] `/code-review --changed` passe (security, perf, struct, naming, multi-tenant)
-- [ ] Test manuel UI : créer un devis, ajouter lignes, marquer envoyé, accepter, dupliquer, exporter PDF (brouillon + envoyé), envoyer email
+- [ ] Test manuel UI : créer un devis, ajouter lignes, marquer validé, accepter, dupliquer, exporter PDF (brouillon + validé), envoyer email
 - [ ] CHANGELOG mis à jour, version bumpée
 - [ ] PR créée avec description structurée + référence spec
 

@@ -28,11 +28,11 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-// ─── ajouterLigne sur devis Envoye ────────────────────────────────────────────
+// ─── ajouterLigne sur devis Valide ────────────────────────────────────────────
 
-describe('ajouterLigne() sur devis Envoye — rebascule Brouillon', function () {
+describe('ajouterLigne() sur devis Valide — rebascule Brouillon', function () {
     it('repasse le statut à Brouillon quand on ajoute une ligne sur un devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-001']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-001']);
 
         $this->service->ajouterLigne($devis, [
             'libelle' => 'Nouvelle ligne',
@@ -45,7 +45,7 @@ describe('ajouterLigne() sur devis Envoye — rebascule Brouillon', function () 
     });
 
     it('conserve le numéro existant après rebascule en brouillon via ajouterLigne', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-007']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-007']);
 
         $this->service->ajouterLigne($devis, [
             'libelle' => 'Ligne supplémentaire',
@@ -59,7 +59,7 @@ describe('ajouterLigne() sur devis Envoye — rebascule Brouillon', function () 
     });
 
     it('recalcule montant_total après ajout de ligne sur devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-001']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-001']);
         DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'prix_unitaire' => 100.00,
@@ -81,7 +81,7 @@ describe('ajouterLigne() sur devis Envoye — rebascule Brouillon', function () 
     });
 
     it('synchronise l\'instance appelante après rebascule via ajouterLigne', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-001']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-001']);
 
         $this->service->ajouterLigne($devis, [
             'libelle' => 'Test sync',
@@ -94,11 +94,11 @@ describe('ajouterLigne() sur devis Envoye — rebascule Brouillon', function () 
     });
 });
 
-// ─── modifierLigne sur devis Envoye ───────────────────────────────────────────
+// ─── modifierLigne sur devis Valide ───────────────────────────────────────────
 
-describe('modifierLigne() sur devis Envoye — rebascule Brouillon', function () {
+describe('modifierLigne() sur devis Valide — rebascule Brouillon', function () {
     it('repasse le statut à Brouillon quand on modifie une ligne sur un devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-002']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-002']);
         $ligne = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'prix_unitaire' => 100.00,
@@ -115,7 +115,7 @@ describe('modifierLigne() sur devis Envoye — rebascule Brouillon', function ()
     });
 
     it('conserve le numéro existant après rebascule en brouillon via modifierLigne', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-042']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-042']);
         $ligne = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'prix_unitaire' => 200.00,
@@ -133,7 +133,7 @@ describe('modifierLigne() sur devis Envoye — rebascule Brouillon', function ()
     });
 
     it('recalcule montant_total après modification de ligne sur devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-003']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-003']);
         $ligne = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'prix_unitaire' => 100.00,
@@ -151,11 +151,11 @@ describe('modifierLigne() sur devis Envoye — rebascule Brouillon', function ()
     });
 });
 
-// ─── supprimerLigne sur devis Envoye ─────────────────────────────────────────
+// ─── supprimerLigne sur devis Valide ─────────────────────────────────────────
 
-describe('supprimerLigne() sur devis Envoye — rebascule Brouillon', function () {
+describe('supprimerLigne() sur devis Valide — rebascule Brouillon', function () {
     it('repasse le statut à Brouillon quand on supprime une ligne sur un devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-004']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-004']);
         $l1 = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'prix_unitaire' => 100.00,
@@ -179,7 +179,7 @@ describe('supprimerLigne() sur devis Envoye — rebascule Brouillon', function (
     });
 
     it('conserve le numéro existant après rebascule en brouillon via supprimerLigne', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-005']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-005']);
         $l1 = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'prix_unitaire' => 500.00,
@@ -204,7 +204,7 @@ describe('supprimerLigne() sur devis Envoye — rebascule Brouillon', function (
     });
 
     it('recalcule montant_total après suppression de ligne sur devis envoyé', function () {
-        $devis = Devis::factory()->envoye()->create(['numero' => 'D-2026-006']);
+        $devis = Devis::factory()->valide()->create(['numero' => 'D-2026-006']);
         $l1 = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
             'prix_unitaire' => 400.00,
@@ -315,7 +315,7 @@ describe('numéro immuable sur le cycle envoi → rebascule → re-envoi', funct
         ]);
         $devis->update(['montant_total' => 100.00]);
 
-        $this->service->marquerEnvoye($devis);
+        $this->service->marquerValide($devis);
         $devis->refresh();
         $numeroOriginal = $devis->numero;
         expect($numeroOriginal)->toBe('D-2026-001');
@@ -328,10 +328,10 @@ describe('numéro immuable sur le cycle envoi → rebascule → re-envoi', funct
         expect($devis->statut)->toBe(StatutDevis::Brouillon)
             ->and($devis->numero)->toBe('D-2026-001');
 
-        // 3. Re-émettre → statut Envoye, numéro toujours D-2026-001 (conservé)
-        $this->service->marquerEnvoye($devis);
+        // 3. Re-émettre → statut Valide, numéro toujours D-2026-001 (conservé)
+        $this->service->marquerValide($devis);
         $devis->refresh();
-        expect($devis->statut)->toBe(StatutDevis::Envoye)
+        expect($devis->statut)->toBe(StatutDevis::Valide)
             ->and($devis->numero)->toBe('D-2026-001');
     });
 });

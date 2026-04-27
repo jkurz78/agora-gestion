@@ -37,7 +37,7 @@ beforeEach(function () {
     $this->devisA = Devis::factory()->create([
         'association_id' => $this->assoA->id,
         'tiers_id' => $this->tiersA->id,
-        'statut' => StatutDevis::Envoye,
+        'statut' => StatutDevis::Valide,
         'numero' => 'D-2026-014',
         'libelle' => 'Devis secret asso A',
     ]);
