@@ -6,9 +6,11 @@ namespace App\Services;
 
 use App\Enums\StatutDevis;
 use App\Models\Devis;
+use App\Models\DevisLigne;
 use App\Support\CurrentAssociation;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 final class DevisService
 {
@@ -46,5 +48,131 @@ final class DevisService
                 'saisi_par_user_id' => auth()->id(),
             ]);
         });
+    }
+
+    /**
+     * Ajoute une ligne au devis et recalcule le montant_total.
+     *
+     * Clés acceptées dans $data : libelle (requis), prix_unitaire (requis),
+     * quantite (défaut 1), sous_categorie_id (nullable).
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws RuntimeException si le devis est verrouillé (Accepte, Refuse, Annule)
+     */
+    public function ajouterLigne(Devis $devis, array $data): DevisLigne
+    {
+        return DB::transaction(function () use ($devis, $data): DevisLigne {
+            $this->guardStatutVerrouille($devis);
+
+            $prixUnitaire = (float) $data['prix_unitaire'];
+            $quantite = isset($data['quantite']) ? (float) $data['quantite'] : 1.0;
+            $montant = round($prixUnitaire * $quantite, 2);
+
+            $maxOrdre = $devis->lignes()->max('ordre') ?? 0;
+
+            $ligne = DevisLigne::create([
+                'devis_id' => $devis->id,
+                'ordre' => $maxOrdre + 1,
+                'libelle' => $data['libelle'],
+                'prix_unitaire' => $prixUnitaire,
+                'quantite' => $quantite,
+                'montant' => $montant,
+                'sous_categorie_id' => $data['sous_categorie_id'] ?? null,
+            ]);
+
+            $this->recalculerMontantTotal($devis);
+
+            return $ligne;
+        });
+    }
+
+    /**
+     * Modifie une ligne existante et recalcule le montant_total du devis parent.
+     *
+     * Seuls les champs fournis dans $data sont mis à jour.
+     * Clés acceptées : libelle, prix_unitaire, quantite, sous_categorie_id.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws RuntimeException si le devis est verrouillé (Accepte, Refuse, Annule)
+     */
+    public function modifierLigne(DevisLigne $ligne, array $data): void
+    {
+        DB::transaction(function () use ($ligne, $data): void {
+            $devis = $ligne->devis;
+            $this->guardStatutVerrouille($devis);
+
+            $updates = [];
+
+            if (array_key_exists('libelle', $data)) {
+                $updates['libelle'] = $data['libelle'];
+            }
+
+            if (array_key_exists('sous_categorie_id', $data)) {
+                $updates['sous_categorie_id'] = $data['sous_categorie_id'];
+            }
+
+            if (array_key_exists('prix_unitaire', $data)) {
+                $updates['prix_unitaire'] = (float) $data['prix_unitaire'];
+            }
+
+            if (array_key_exists('quantite', $data)) {
+                $updates['quantite'] = (float) $data['quantite'];
+            }
+
+            // Recompute montant if either price or quantity changed
+            $prixUnitaire = (float) ($updates['prix_unitaire'] ?? $ligne->prix_unitaire);
+            $quantite = (float) ($updates['quantite'] ?? $ligne->quantite);
+            $updates['montant'] = round($prixUnitaire * $quantite, 2);
+
+            $ligne->update($updates);
+
+            $this->recalculerMontantTotal($devis);
+        });
+    }
+
+    /**
+     * Supprime une ligne et recalcule le montant_total du devis parent.
+     *
+     * @throws RuntimeException si le devis est verrouillé (Accepte, Refuse, Annule)
+     */
+    public function supprimerLigne(DevisLigne $ligne): void
+    {
+        DB::transaction(function () use ($ligne): void {
+            $devis = $ligne->devis;
+            $this->guardStatutVerrouille($devis);
+
+            $ligne->delete();
+
+            $this->recalculerMontantTotal($devis);
+        });
+    }
+
+    /**
+     * Recalcule et persiste le montant_total du devis comme somme des lignes.
+     */
+    private function recalculerMontantTotal(Devis $devis): void
+    {
+        $total = $devis->lignes()->sum('montant');
+        $devis->update(['montant_total' => $total]);
+    }
+
+    /**
+     * Refuse la mutation si le devis est dans un statut verrouillé :
+     * Accepte, Refuse ou Annule.
+     *
+     * @throws RuntimeException
+     */
+    private function guardStatutVerrouille(Devis $devis): void
+    {
+        if (! $devis->statut->peutEtreModifie()) {
+            throw new RuntimeException(
+                sprintf(
+                    'Impossible de modifier un devis au statut « %s ».',
+                    $devis->statut->label()
+                )
+            );
+        }
     }
 }
