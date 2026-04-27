@@ -12,6 +12,46 @@
         </div>
     @endif
 
+    {{-- Modale sélection tiers pour créer une facture --}}
+    <div class="modal fade {{ $showCreerModal ? 'show d-block' : '' }}"
+         tabindex="-1"
+         role="dialog"
+         id="creerFactureModal"
+         aria-labelledby="creerFactureModalLabel"
+         @if($showCreerModal) aria-modal="true" style="background:rgba(0,0,0,.4);" @else aria-hidden="true" @endif>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="creerFactureModalLabel">
+                        <i class="bi bi-receipt me-1"></i> Nouvelle facture
+                    </h5>
+                    <button type="button" class="btn-close" wire:click="$set('showCreerModal', false)"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label fw-semibold">
+                        Tiers à facturer <span class="text-danger">*</span>
+                    </label>
+                    <livewire:tiers-autocomplete
+                        wire:model.live="newFactureTiersId"
+                        filtre="recettes"
+                        :key="'facture-create-tiers-'.($showCreerModal ? '1' : '0')" />
+                    @error('newFactureTiersId') <div class="text-danger small mt-1">{{ $message }}</div> @enderror
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm"
+                            wire:click="$set('showCreerModal', false)">
+                        Annuler
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm"
+                            wire:click="creer({{ $newFactureTiersId ?? 'null' }})"
+                            @if(!$newFactureTiersId) disabled @endif>
+                        <i class="bi bi-check-lg"></i> Créer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Filtres + création --}}
     <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
         <select wire:model.live="filterStatut" class="form-select form-select-sm" style="max-width:180px;">
@@ -25,16 +65,9 @@
         <input type="text" wire:model.live.debounce.300ms="filterTiers" class="form-control form-control-sm" style="max-width:220px;" placeholder="Rechercher un tiers…">
 
         @if($this->canEdit)
-            <div class="d-flex gap-2 align-items-center ms-auto">
-                <label class="form-label mb-0 small text-muted text-nowrap">Tiers à facturer</label>
-                <div style="min-width:220px;">
-                    <livewire:tiers-autocomplete wire:model="newFactureTiersId" filtre="recettes" />
-                    @error('newFactureTiersId') <div class="text-danger small">{{ $message }}</div> @enderror
-                </div>
-                <button wire:click="creer" class="btn btn-primary btn-sm text-nowrap">
-                    <i class="bi bi-plus-lg"></i> Créer facture
-                </button>
-            </div>
+            <button wire:click="creer" class="btn btn-primary btn-sm ms-auto text-nowrap">
+                <i class="bi bi-plus-lg"></i> Nouvelle facture
+            </button>
         @endif
     </div>
 
