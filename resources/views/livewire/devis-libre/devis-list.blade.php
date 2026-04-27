@@ -118,7 +118,10 @@
                 <tbody style="color:#555">
                     @foreach ($devis as $d)
                         @php $expired = $this->expire($d); @endphp
-                        <tr wire:key="devis-{{ $d->id }}">
+                        <tr wire:key="devis-{{ $d->id }}"
+                            style="cursor:pointer"
+                            onclick="window.location='{{ route('devis-libres.show', $d) }}'"
+                        >
                             <td class="small" data-sort="{{ $d->numero ?? '' }}">
                                 @if ($d->numero)
                                     {{ $d->numero }}
