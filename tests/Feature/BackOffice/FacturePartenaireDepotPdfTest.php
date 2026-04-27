@@ -52,7 +52,7 @@ it('[pdf-bo] Admin authentifié obtient le PDF → 200', function () {
 
     Storage::disk('local')->put($pdfPath, '%PDF-1.4 fake content');
 
-    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
+    $url = route('comptabilite.factures-fournisseurs.depot-pdf', ['depot' => $depot->id]);
 
     $response = $this->actingAs($this->adminUser)->get($url);
 
@@ -83,7 +83,7 @@ it('[pdf-bo] Comptable authentifié obtient le PDF → 200', function () {
 
     Storage::disk('local')->put($pdfPath, '%PDF-1.4 fake content');
 
-    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
+    $url = route('comptabilite.factures-fournisseurs.depot-pdf', ['depot' => $depot->id]);
 
     $this->actingAs($comptable)
         ->get($url)
@@ -105,7 +105,7 @@ it('[pdf-bo] Utilisateur non authentifié → redirigé vers login', function ()
         'numero_facture' => 'FACT-003',
     ]);
 
-    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
+    $url = route('comptabilite.factures-fournisseurs.depot-pdf', ['depot' => $depot->id]);
 
     $this->get($url)->assertRedirect(route('login'));
 });
@@ -138,7 +138,7 @@ it('[pdf-bo] Admin tenant X accède à dépôt tenant Y → 404 (TenantScope fai
         'joined_at' => now(),
     ]);
 
-    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
+    $url = route('comptabilite.factures-fournisseurs.depot-pdf', ['depot' => $depot->id]);
 
     // TenantScope on asso B cannot find depot from asso A → 404
     $this->actingAs($userB)
@@ -168,7 +168,7 @@ it('[pdf-bo] Gestionnaire → 403 (policy::treat refuse)', function () {
 
     Storage::disk('local')->put($pdfPath, '%PDF-1.4 fake content');
 
-    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
+    $url = route('comptabilite.factures-fournisseurs.depot-pdf', ['depot' => $depot->id]);
 
     $this->actingAs($gestionnaire)
         ->get($url)
@@ -188,7 +188,7 @@ it('[pdf-bo] renvoie 404 si le fichier PDF est absent du disque', function (): v
         'numero_facture' => 'FACT-MISSING',
     ]);
 
-    $url = route('back-office.factures-partenaires.pdf', ['depot' => $depot->id]);
+    $url = route('comptabilite.factures-fournisseurs.depot-pdf', ['depot' => $depot->id]);
 
     $this->actingAs($this->adminUser)->get($url)->assertNotFound();
 });

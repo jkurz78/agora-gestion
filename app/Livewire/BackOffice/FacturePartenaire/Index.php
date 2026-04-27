@@ -32,7 +32,7 @@ final class Index extends Component
     #[On('transaction-saved')]
     public function onTransactionSaved(): void
     {
-        $this->redirect(route('back-office.factures-partenaires.index'), navigate: true);
+        $this->redirect(route('comptabilite.factures-fournisseurs.index'), navigate: true);
     }
 
     public function render(): View
@@ -120,7 +120,7 @@ final class Index extends Component
 
         session()->flash('success', 'Le dépôt a été rejeté.');
         $this->fermerRejet();
-        $this->redirect(route('back-office.factures-partenaires.index'), navigate: true);
+        $this->redirect(route('comptabilite.factures-fournisseurs.index'), navigate: true);
     }
 
     /** @return Collection<int, FacturePartenaireDeposee> */

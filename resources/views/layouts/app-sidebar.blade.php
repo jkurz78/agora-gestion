@@ -211,7 +211,7 @@
 
                     {{-- Factures partenaires en attente --}}
                     @if(($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0)
-                        <a href="{{ route('back-office.factures-partenaires.index') }}"
+                        <a href="{{ route('comptabilite.factures-fournisseurs.index') }}"
                            class="text-decoration-none d-flex align-items-center gap-1"
                            style="color: rgba(255,255,255,.9);"
                            title="{{ $facturesPartenairesPendingCount }} facture(s) en attente de traitement">

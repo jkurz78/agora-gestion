@@ -182,7 +182,7 @@ $activeGroup = match(true) {
                                 </a>
                             </li>
 
-                            @if(($canSeeNdf && Route::has('comptabilite.ndf.index')) || ($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index')))
+                            @if(($canSeeNdf && Route::has('comptabilite.ndf.index')) || ($canSeeFacturesPartenaires && Route::has('comptabilite.factures-fournisseurs.index')))
                             @php $inboxPendingTotal = ($ndfPendingCount ?? 0) + ($facturesPartenairesPendingCount ?? 0); @endphp
                             <li class="nav-item mt-2">
                                 <a class="sidebar-inbox-toggle"
@@ -214,11 +214,11 @@ $activeGroup = match(true) {
                                         </li>
                                         @endif
 
-                                        @if($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index'))
+                                        @if($canSeeFacturesPartenaires && Route::has('comptabilite.factures-fournisseurs.index'))
                                         <li class="nav-item">
-                                            <a href="{{ route('back-office.factures-partenaires.index') }}"
+                                            <a href="{{ route('comptabilite.factures-fournisseurs.index') }}"
                                                class="nav-link d-flex align-items-center justify-content-between
-                                                      {{ request()->routeIs('back-office.factures-partenaires.*') ? 'active' : '' }}">
+                                                      {{ request()->routeIs('comptabilite.factures-fournisseurs.*') ? 'active' : '' }}">
                                                 <span><i class="bi bi-file-earmark-text me-1"></i> Factures</span>
                                                 @if($facturesPartenairesPendingCount > 0)
                                                     <span class="badge bg-warning text-dark ms-1">{{ $facturesPartenairesPendingCount }}</span>
