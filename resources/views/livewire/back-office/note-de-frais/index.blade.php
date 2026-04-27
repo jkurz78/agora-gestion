@@ -1,4 +1,4 @@
-<div>
+<div style="font-size:.85rem;">
     {{-- Onglets --}}
     <ul class="nav nav-tabs mb-3" role="tablist">
         <li class="nav-item" role="presentation">
