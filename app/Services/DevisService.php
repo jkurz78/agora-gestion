@@ -387,6 +387,68 @@ final class DevisService
     }
 
     /**
+     * Duplique un devis depuis tout statut et retourne un nouveau Devis au statut Brouillon.
+     *
+     * Comportement :
+     * - Tout statut est accepté (peutEtreDuplique() est toujours true)
+     * - Nouveau devis : statut Brouillon, pas de numéro, date_emission = today(),
+     *   date_validite = today() + association.devis_validite_jours, exercice recalculé,
+     *   tiers_id et libelle copiés depuis la source, association_id hérité de TenantModel,
+     *   saisi_par_user_id = auth()->id(), aucune trace accepte/refuse/annule
+     * - Lignes recopiées à l'identique (libelle, prix_unitaire, quantite, montant,
+     *   sous_categorie_id, ordre)
+     * - montant_total = somme des montants des lignes copiées
+     * - Aucun lien retour vers le devis source (pas de parent_id)
+     */
+    public function dupliquer(Devis $source): Devis
+    {
+        return DB::transaction(function () use ($source): Devis {
+            $association = CurrentAssociation::get();
+
+            $dateEmission = Carbon::today();
+            $validiteJours = $association->devis_validite_jours ?? 30;
+            $dateValidite = $dateEmission->copy()->addDays($validiteJours);
+            $exercice = $this->exerciceService->anneeForDate($dateEmission);
+
+            $lignesSource = $source->lignes()->orderBy('ordre')->get();
+
+            $montantTotal = $lignesSource->sum(fn (DevisLigne $l) => (float) $l->montant);
+
+            $nouveau = Devis::create([
+                'tiers_id' => $source->tiers_id,
+                'libelle' => $source->libelle,
+                'date_emission' => $dateEmission->toDateString(),
+                'date_validite' => $dateValidite->toDateString(),
+                'statut' => StatutDevis::Brouillon,
+                'montant_total' => $montantTotal,
+                'exercice' => $exercice,
+                'numero' => null,
+                'saisi_par_user_id' => auth()->id(),
+                'accepte_par_user_id' => null,
+                'accepte_le' => null,
+                'refuse_par_user_id' => null,
+                'refuse_le' => null,
+                'annule_par_user_id' => null,
+                'annule_le' => null,
+            ]);
+
+            foreach ($lignesSource as $ligne) {
+                DevisLigne::create([
+                    'devis_id' => $nouveau->id,
+                    'ordre' => $ligne->ordre,
+                    'libelle' => $ligne->libelle,
+                    'prix_unitaire' => $ligne->prix_unitaire,
+                    'quantite' => $ligne->quantite,
+                    'montant' => $ligne->montant,
+                    'sous_categorie_id' => $ligne->sous_categorie_id,
+                ]);
+            }
+
+            return $nouveau;
+        });
+    }
+
+    /**
      * Exécute une mutation dans une transaction avec lockForUpdate sur la ligne du devis.
      *
      * Pattern commun aux transitions marquerAccepte / marquerRefuse / annuler :
