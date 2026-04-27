@@ -2,7 +2,7 @@
 
 **Created**: 2026-04-27
 **Branch**: à créer `feat/devis-libre-s1` depuis `main`
-**Status**: approved
+**Status**: implemented
 **Spec**: [docs/specs/2026-04-27-devis-libre-s1.md](../docs/specs/2026-04-27-devis-libre-s1.md)
 
 ## Goal
