@@ -45,6 +45,7 @@ use App\Livewire\Auth\AssociationSelector;
 use App\Livewire\BackOffice\FacturePartenaire\Index as FpIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
+use App\Livewire\DevisLibre\DevisEdit;
 use App\Livewire\DevisLibre\DevisList;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Models\Association;
@@ -258,8 +259,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->group(function (): void {
         Route::get('/devis-libres', DevisList::class)->name('devis-libres.index');
-        // TODO(step-11): Route::get('/devis-libres/{devis}', DevisEdit::class)->name('devis-libres.show');
-        // TODO(step-11): Route::get('/devis-libres/create', DevisEdit::class)->name('devis-libres.create');
+        Route::get('/devis-libres/{devis}', DevisEdit::class)->name('devis-libres.show');
     });
 
 // ── Facturation ──
