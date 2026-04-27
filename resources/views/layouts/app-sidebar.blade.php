@@ -148,7 +148,7 @@
                 {{-- Breadcrumb --}}
                 @php
                     $breadcrumbGroup = match(true) {
-                        request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*') => 'Comptabilité',
+                        request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*', 'comptabilite.factures-fournisseurs.*') => 'Comptabilité',
                         request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
                             'banques.comptes.*', 'banques.remises*') => 'Banques',
                         request()->routeIs('tiers.*') => 'Tiers',
@@ -187,37 +187,55 @@
                 {{-- Partie droite --}}
                 <div class="d-flex align-items-center gap-3 ms-auto">
 
-                    {{-- Documents en attente --}}
-                    @if(($incomingDocumentsCount ?? 0) > 0)
-                        <a href="{{ route('facturation.documents-en-attente') }}"
-                           class="text-decoration-none d-flex align-items-center gap-1"
+                    {{-- Boîte de réception (dropdown unifié) --}}
+                    @php
+                        $cumulCount = ($incomingDocumentsCount ?? 0)
+                            + (($canSeeNdf ?? false) ? ($ndfPendingCount ?? 0) : 0)
+                            + (($canSeeFacturesPartenaires ?? false) ? ($facturesPartenairesPendingCount ?? 0) : 0);
+                        $hasVisibleSource = ($incomingDocumentsCount ?? 0) > 0
+                            || (($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
+                            || (($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0);
+                    @endphp
+                    @if($hasVisibleSource)
+                    <div class="dropdown" style="font-size:.8rem;">
+                        <a href="#" class="text-decoration-none d-flex align-items-center gap-1 dropdown-toggle"
                            style="color: rgba(255,255,255,.9);"
-                           title="{{ $incomingDocumentsCount }} document(s) en attente">
+                           role="button" data-bs-toggle="dropdown"
+                           aria-expanded="false"
+                           title="Boîte de réception : {{ $cumulCount }} pièce(s) en attente">
                             <i class="bi bi-inbox"></i>
-                            <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $incomingDocumentsCount }}</span>
+                            <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $cumulCount }}</span>
                         </a>
-                    @endif
-
-                    {{-- NDF en attente --}}
-                    @if(($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
-                        <a href="{{ route('comptabilite.ndf.index') }}"
-                           class="text-decoration-none d-flex align-items-center gap-1"
-                           style="color: rgba(255,255,255,.9);"
-                           title="{{ $ndfPendingCount }} note(s) de frais à traiter">
-                            <i class="bi bi-receipt-cutoff"></i>
-                            <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $ndfPendingCount }}</span>
-                        </a>
-                    @endif
-
-                    {{-- Factures partenaires en attente --}}
-                    @if(($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0)
-                        <a href="{{ route('back-office.factures-partenaires.index') }}"
-                           class="text-decoration-none d-flex align-items-center gap-1"
-                           style="color: rgba(255,255,255,.9);"
-                           title="{{ $facturesPartenairesPendingCount }} facture(s) en attente de traitement">
-                            <i class="bi bi-file-earmark-text"></i>
-                            <span class="badge bg-warning text-dark" style="font-size: .65rem;">{{ $facturesPartenairesPendingCount }}</span>
-                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" style="--bs-dropdown-font-size:.8rem;">
+                            @if(($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center justify-content-between"
+                                       href="{{ route('comptabilite.ndf.index') }}">
+                                        <span><i class="bi bi-receipt-cutoff me-2"></i> Notes de frais</span>
+                                        <span class="badge bg-warning text-dark ms-3">{{ $ndfPendingCount }}</span>
+                                    </a>
+                                </li>
+                            @endif
+                            @if(($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0)
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center justify-content-between"
+                                       href="{{ route('comptabilite.factures-fournisseurs.index') }}">
+                                        <span><i class="bi bi-file-earmark-text me-2"></i> Factures fournisseurs</span>
+                                        <span class="badge bg-warning text-dark ms-3">{{ $facturesPartenairesPendingCount }}</span>
+                                    </a>
+                                </li>
+                            @endif
+                            @if(($incomingDocumentsCount ?? 0) > 0)
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center justify-content-between"
+                                       href="{{ route('facturation.documents-en-attente') }}">
+                                        <span><i class="bi bi-envelope-paper me-2"></i> Documents reçus</span>
+                                        <span class="badge bg-warning text-dark ms-3">{{ $incomingDocumentsCount }}</span>
+                                    </a>
+                                </li>
+                            @endif
+                        </ul>
+                    </div>
                     @endif
 
                     {{-- Exercice --}}

@@ -74,7 +74,7 @@ it('dispatch pré-remplit l\'URL de preview PDF (plain route, pas de signature)'
 
     expect($url)
         ->toStartWith('http')
-        ->toContain('/factures-partenaires/a-comptabiliser/')
+        ->toContain('/comptabilite/factures-fournisseurs/')
         ->toContain('/pdf')
         ->not->toContain('signature=');
 });

@@ -110,7 +110,7 @@ $activeGroup = match(true) {
         'banques.comptes.*', 'banques.remises*') => 'banques',
     request()->routeIs('tiers.*') => 'tiers',
     request()->routeIs('operations.*') => 'operations',
-    request()->routeIs('facturation.factures*', 'facturation.documents-en-attente*') => 'facturation',
+    request()->routeIs('facturation.factures*') => 'facturation',
     request()->routeIs('rapports.*') => 'rapports',
     request()->routeIs('exercices.*') => 'exercices',
     request()->routeIs('parametres.*') => 'parametres',
@@ -130,6 +130,24 @@ $activeGroup = match(true) {
 
     {{-- Navigation accordéon --}}
     <div class="sidebar-nav">
+
+        {{-- ─── BOÎTE DE RÉCEPTION (top-level) ─── --}}
+        @auth
+        <ul class="nav flex-column pt-1 pb-1">
+            <li class="nav-item">
+                <a href="{{ route('facturation.documents-en-attente') }}"
+                   class="nav-link d-flex align-items-center justify-content-between px-3
+                          {{ request()->routeIs('facturation.documents-en-attente*') ? 'active' : '' }}"
+                   style="font-size:.85rem; font-weight:600; padding-top:.45rem; padding-bottom:.45rem;">
+                    <span><i class="bi bi-inbox me-2"></i> Boîte de réception</span>
+                    @if(($incomingDocumentsCount ?? 0) > 0)
+                        <span class="badge bg-warning text-dark ms-1">{{ $incomingDocumentsCount }}</span>
+                    @endif
+                </a>
+            </li>
+        </ul>
+        @endauth
+
         <div class="accordion accordion-flush" id="sidebarAccordion">
 
             {{-- ─── COMPTABILITÉ ─── --}}
@@ -164,14 +182,17 @@ $activeGroup = match(true) {
                                 </a>
                             </li>
 
-                            @if(($canSeeNdf && Route::has('comptabilite.ndf.index')) || ($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index')))
-                            @php $inboxPendingTotal = ($ndfPendingCount ?? 0) + ($facturesPartenairesPendingCount ?? 0); @endphp
+                            @if(($canSeeNdf && Route::has('comptabilite.ndf.index')) || ($canSeeFacturesPartenaires && Route::has('comptabilite.factures-fournisseurs.index')))
+                            @php
+                                $inboxPendingTotal = ($ndfPendingCount ?? 0) + ($facturesPartenairesPendingCount ?? 0);
+                                $inboxOpen = request()->routeIs('comptabilite.ndf.*', 'comptabilite.factures-fournisseurs.*');
+                            @endphp
                             <li class="nav-item mt-2">
                                 <a class="sidebar-inbox-toggle"
                                    data-bs-toggle="collapse"
                                    href="#sidebar-inbox-comptabilite"
                                    role="button"
-                                   aria-expanded="true"
+                                   aria-expanded="{{ $inboxOpen ? 'true' : 'false' }}"
                                    aria-controls="sidebar-inbox-comptabilite">
                                     <span><i class="bi bi-inbox me-1"></i> Réception
                                         @if($inboxPendingTotal > 0)
@@ -180,7 +201,7 @@ $activeGroup = match(true) {
                                     </span>
                                     <i class="bi bi-chevron-down inbox-chevron"></i>
                                 </a>
-                                <div class="collapse show" id="sidebar-inbox-comptabilite">
+                                <div class="collapse {{ $inboxOpen ? 'show' : '' }}" id="sidebar-inbox-comptabilite">
                                     <ul class="nav flex-column inbox-nav">
 
                                         @if($canSeeNdf && Route::has('comptabilite.ndf.index'))
@@ -196,11 +217,11 @@ $activeGroup = match(true) {
                                         </li>
                                         @endif
 
-                                        @if($canSeeFacturesPartenaires && Route::has('back-office.factures-partenaires.index'))
+                                        @if($canSeeFacturesPartenaires && Route::has('comptabilite.factures-fournisseurs.index'))
                                         <li class="nav-item">
-                                            <a href="{{ route('back-office.factures-partenaires.index') }}"
+                                            <a href="{{ route('comptabilite.factures-fournisseurs.index') }}"
                                                class="nav-link d-flex align-items-center justify-content-between
-                                                      {{ request()->routeIs('back-office.factures-partenaires.*') ? 'active' : '' }}">
+                                                      {{ request()->routeIs('comptabilite.factures-fournisseurs.*') ? 'active' : '' }}">
                                                 <span><i class="bi bi-file-earmark-text me-1"></i> Factures</span>
                                                 @if($facturesPartenairesPendingCount > 0)
                                                     <span class="badge bg-warning text-dark ms-1">{{ $facturesPartenairesPendingCount }}</span>
@@ -426,17 +447,6 @@ $activeGroup = match(true) {
                                 <a href="{{ route('facturation.factures') }}"
                                    class="nav-link {{ request()->routeIs('facturation.factures*') ? 'active' : '' }}">
                                     <i class="bi bi-receipt me-1"></i> Factures
-                                </a>
-                            </li>
-
-                            <li class="nav-item">
-                                <a href="{{ route('facturation.documents-en-attente') }}"
-                                   class="nav-link d-flex align-items-center justify-content-between
-                                          {{ request()->routeIs('facturation.documents-en-attente*') ? 'active' : '' }}">
-                                    <span><i class="bi bi-inbox me-1"></i> Documents en attente</span>
-                                    @if(($incomingDocumentsCount ?? 0) > 0)
-                                        <span class="badge bg-warning text-dark ms-1">{{ $incomingDocumentsCount }}</span>
-                                    @endif
                                 </a>
                             </li>
 
