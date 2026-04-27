@@ -10,6 +10,7 @@ use App\Models\DevisLigne;
 use App\Models\SousCategorie;
 use App\Services\DevisService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 use RuntimeException;
@@ -37,6 +38,11 @@ final class DevisEdit extends Component
 
     public ?int $nouvelleLigneSousCategorieId = null;
 
+    // ── Cached queries (loaded once in mount) ─────────────────────────────────
+
+    /** @var Collection<int, SousCategorie> */
+    public $sousCategoriesDisponibles;
+
     // ── Email modal ───────────────────────────────────────────────────────────
 
     public bool $showEnvoyerEmailModal = false;
@@ -53,6 +59,7 @@ final class DevisEdit extends Component
         $this->libelle = (string) ($devis->libelle ?? '');
         $this->dateEmission = $devis->date_emission->format('Y-m-d');
         $this->dateValidite = $devis->date_validite->format('Y-m-d');
+        $this->sousCategoriesDisponibles = SousCategorie::orderBy('nom')->get();
     }
 
     // ── Computed helpers ──────────────────────────────────────────────────────
@@ -94,14 +101,23 @@ final class DevisEdit extends Component
             return;
         }
 
-        $this->devis->update([
-            'libelle' => $this->libelle !== '' ? $this->libelle : null,
-            'date_emission' => $this->dateEmission,
-            'date_validite' => $this->dateValidite,
+        $this->validate([
+            'libelle' => 'nullable|string|max:255',
+            'dateEmission' => 'required|date',
+            'dateValidite' => 'required|date|after_or_equal:dateEmission',
         ]);
 
-        $this->devis->refresh();
-        session()->flash('success', 'Devis enregistré.');
+        try {
+            app(DevisService::class)->sauvegarderEntete($this->devis, [
+                'libelle' => $this->libelle,
+                'date_emission' => $this->dateEmission,
+                'date_validite' => $this->dateValidite,
+            ]);
+
+            session()->flash('success', 'Devis enregistré.');
+        } catch (RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
     }
 
     // ── Gestion des lignes ────────────────────────────────────────────────────
@@ -278,11 +294,9 @@ final class DevisEdit extends Component
 
         $lignes = $this->devis->lignes;
 
-        $sousCategoriesDisponibles = SousCategorie::orderBy('libelle')->get();
-
         return view('livewire.devis-libre.devis-edit', [
             'lignes' => $lignes,
-            'sousCategoriesDisponibles' => $sousCategoriesDisponibles,
+            'sousCategoriesDisponibles' => $this->sousCategoriesDisponibles,
         ]);
     }
 

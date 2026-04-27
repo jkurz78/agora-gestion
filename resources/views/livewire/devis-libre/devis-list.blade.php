@@ -43,7 +43,7 @@
                             wire:model="nouveauTiersId"
                             class="form-select">
                         <option value="">— Choisir un tiers —</option>
-                        @foreach (\App\Models\Tiers::orderBy('nom')->get() as $t)
+                        @foreach ($tiers as $t)
                             <option value="{{ $t->id }}">{{ $t->displayName() }}</option>
                         @endforeach
                     </select>
@@ -78,7 +78,7 @@
         {{-- Filtre tiers --}}
         <select wire:model.live="filtreTiersId" class="form-select form-select-sm" style="max-width:220px;">
             <option value="">Tous les tiers</option>
-            @foreach (\App\Models\Tiers::orderBy('nom')->get() as $t)
+            @foreach ($tiers as $t)
                 <option value="{{ $t->id }}">{{ $t->displayName() }}</option>
             @endforeach
         </select>

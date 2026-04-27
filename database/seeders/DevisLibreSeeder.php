@@ -48,9 +48,10 @@ class DevisLibreSeeder extends Seeder
             'libelle' => 'Mission conseil stratégique',
             'statut' => StatutDevis::Brouillon,
             'montant_total' => '0.00',
-            'exercice' => $exercice,
             'saisi_par_user_id' => $admin?->id,
         ]);
+        $devis1->exercice = $exercice;
+        $devis1->save();
 
         DevisLigne::create([
             'devis_id' => $devis1->id,
@@ -75,15 +76,16 @@ class DevisLibreSeeder extends Seeder
         // ── Devis 2 : envoyé (numéroté) ─────────────────────────────────────────
         $devis2 = Devis::create([
             'tiers_id' => $tiersB->id,
-            'numero' => 'D-'.$exercice.'-001',
             'date_emission' => Carbon::today()->subDays(30)->toDateString(),
             'date_validite' => Carbon::today()->addDays(1)->toDateString(),
             'libelle' => 'Formation sécurité incendie',
             'statut' => StatutDevis::Envoye,
             'montant_total' => '1200.00',
-            'exercice' => $exercice,
             'saisi_par_user_id' => $admin?->id,
         ]);
+        $devis2->numero = 'D-'.$exercice.'-001';
+        $devis2->exercice = $exercice;
+        $devis2->save();
 
         DevisLigne::create([
             'devis_id' => $devis2->id,
@@ -97,17 +99,18 @@ class DevisLibreSeeder extends Seeder
         // ── Devis 3 : accepté avec traces ───────────────────────────────────────
         $devis3 = Devis::create([
             'tiers_id' => $tiersC->id,
-            'numero' => 'D-'.$exercice.'-002',
             'date_emission' => Carbon::today()->subDays(45)->toDateString(),
             'date_validite' => Carbon::today()->subDays(15)->toDateString(),
             'libelle' => 'Prestation communication',
             'statut' => StatutDevis::Accepte,
             'montant_total' => '2400.00',
-            'exercice' => $exercice,
             'saisi_par_user_id' => $admin?->id,
-            'accepte_par_user_id' => $admin?->id,
-            'accepte_le' => Carbon::today()->subDays(20),
         ]);
+        $devis3->numero = 'D-'.$exercice.'-002';
+        $devis3->exercice = $exercice;
+        $devis3->accepte_par_user_id = $admin?->id;
+        $devis3->accepte_le = Carbon::today()->subDays(20);
+        $devis3->save();
 
         DevisLigne::create([
             'devis_id' => $devis3->id,
@@ -130,17 +133,18 @@ class DevisLibreSeeder extends Seeder
         // ── Devis 4 : refusé ─────────────────────────────────────────────────────
         $devis4 = Devis::create([
             'tiers_id' => $tiersA->id,
-            'numero' => 'D-'.$exercice.'-003',
             'date_emission' => Carbon::today()->subDays(60)->toDateString(),
             'date_validite' => Carbon::today()->subDays(30)->toDateString(),
             'libelle' => 'Maintenance informatique annuelle',
             'statut' => StatutDevis::Refuse,
             'montant_total' => '3600.00',
-            'exercice' => $exercice,
             'saisi_par_user_id' => $admin?->id,
-            'refuse_par_user_id' => $admin?->id,
-            'refuse_le' => Carbon::today()->subDays(35),
         ]);
+        $devis4->numero = 'D-'.$exercice.'-003';
+        $devis4->exercice = $exercice;
+        $devis4->refuse_par_user_id = $admin?->id;
+        $devis4->refuse_le = Carbon::today()->subDays(35);
+        $devis4->save();
 
         DevisLigne::create([
             'devis_id' => $devis4->id,

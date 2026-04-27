@@ -16,21 +16,12 @@ final class Devis extends TenantModel
     use SoftDeletes;
 
     protected $fillable = [
-        'association_id',
-        'numero',
         'tiers_id',
         'date_emission',
         'date_validite',
         'libelle',
         'statut',
         'montant_total',
-        'exercice',
-        'accepte_par_user_id',
-        'accepte_le',
-        'refuse_par_user_id',
-        'refuse_le',
-        'annule_par_user_id',
-        'annule_le',
         'saisi_par_user_id',
     ];
 

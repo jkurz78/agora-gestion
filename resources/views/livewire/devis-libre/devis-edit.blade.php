@@ -194,7 +194,7 @@
                                 </tbody>
                                 <tfoot>
                                     <tr class="table-light fw-bold">
-                                        <td colspan="{{ $this->estVerrouille() ? 3 : 3 }}" class="text-end">Total</td>
+                                        <td colspan="{{ $this->estVerrouille() ? 4 : 3 }}" class="text-end">Total</td>
                                         <td class="text-end text-nowrap" data-sort="{{ $devis->montant_total }}">
                                             {{ number_format((float) $devis->montant_total, 2, ',', "\u{202F}") }}&nbsp;&euro;
                                         </td>

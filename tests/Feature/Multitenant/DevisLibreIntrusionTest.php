@@ -96,36 +96,69 @@ it('DevisEdit throws ModelNotFoundException when asso B user tries to access ass
 // ── DevisService::genererPdf: scope prevents loading cross-tenant devis ──────
 
 it('DevisService::genererPdf cannot be called on asso A devis from asso B context', function () {
+    // Pre-fetch devisA in asso A's context (scoped)
+    TenantContext::boot($this->assoA);
+    $devisA = Devis::find($this->devisA->id);
+    expect($devisA)->not->toBeNull();
+
+    // Switch to asso B context
+    TenantContext::clear();
     TenantContext::boot($this->assoB);
     session(['current_association_id' => $this->assoB->id]);
     $this->actingAs($this->userB);
 
-    // Attempting to load the devis under asso B scope returns null (fail-closed).
-    $devisUnderB = Devis::find($this->devisA->id);
-    expect($devisUnderB)->toBeNull();
+    // Calling genererPdf with asso A's devis from asso B context must throw:
+    // guardAssociation() checks association_id against TenantContext::currentId()
+    expect(fn () => app(DevisService::class)->genererPdf($devisA))
+        ->toThrow(RuntimeException::class, 'Accès interdit');
 });
 
 // ── DevisService::envoyerEmail: scope prevents cross-tenant email ─────────────
 
 it('DevisService::envoyerEmail cannot reach asso A devis from asso B context', function () {
+    // Pre-fetch devisA in asso A's context (scoped)
+    TenantContext::boot($this->assoA);
+    $devisA = Devis::find($this->devisA->id);
+    expect($devisA)->not->toBeNull();
+
+    // Switch to asso B context
+    TenantContext::clear();
     TenantContext::boot($this->assoB);
     session(['current_association_id' => $this->assoB->id]);
+    $this->actingAs($this->userB);
 
-    // The service would receive a Devis instance belonging to A.
-    // Under B's context Devis::find returns null — the devis simply does not exist.
+    // The scope-level protection: Devis::find() returns null under B's context.
     $devisUnderB = Devis::find($this->devisA->id);
     expect($devisUnderB)->toBeNull();
+
+    // Direct service call with asso A's devis from asso B context must throw:
+    // guardAssociation() in envoyerEmail rejects cross-tenant instances
+    expect(fn () => app(DevisService::class)->envoyerEmail($devisA, 'Sujet', 'Corps'))
+        ->toThrow(RuntimeException::class, 'Accès interdit');
 });
 
 // ── DevisService::dupliquer: scope prevents cross-tenant duplication ──────────
 
 it('DevisService::dupliquer cannot be called on asso A devis from asso B context', function () {
+    // Pre-fetch devisA in asso A's context (scoped)
+    TenantContext::boot($this->assoA);
+    $devisA = Devis::find($this->devisA->id);
+    expect($devisA)->not->toBeNull();
+
+    // Switch to asso B context
+    TenantContext::clear();
     TenantContext::boot($this->assoB);
     session(['current_association_id' => $this->assoB->id]);
+    $this->actingAs($this->userB);
 
-    // Devis from A is invisible under B's scope.
+    // Devis from A is invisible under B's scope via normal queries
     $devisUnderB = Devis::find($this->devisA->id);
     expect($devisUnderB)->toBeNull();
+
+    // Direct service call with asso A's devis from asso B context must throw:
+    // guardAssociation() in dupliquer rejects cross-tenant instances
+    expect(fn () => app(DevisService::class)->dupliquer($devisA))
+        ->toThrow(RuntimeException::class, 'Accès interdit');
 });
 
 // ── Vue 360° (TiersQuickViewService via DevisList filter) ─────────────────────
