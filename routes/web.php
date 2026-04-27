@@ -187,15 +187,18 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/transactions/{transaction}/lignes/{ligne}/piece-jointe', TransactionLignePieceJointeController::class)->name('transactions.piece-jointe-ligne');
     });
 
-// ── Back-office (routes sans préfixe de nom) ──
+// ── Comptabilité — Factures fournisseurs ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->group(function (): void {
-        Route::get('/factures-partenaires/a-comptabiliser', FpIndex::class)
-            ->name('back-office.factures-partenaires.index');
-        Route::get('/factures-partenaires/a-comptabiliser/{depot}/pdf', FacturePartenaireDepotPdfController::class)
+        Route::get('/comptabilite/factures-fournisseurs', FpIndex::class)
+            ->name('comptabilite.factures-fournisseurs.index');
+        Route::get('/comptabilite/factures-fournisseurs/{depot}/pdf', FacturePartenaireDepotPdfController::class)
             ->middleware(['can:treat,depot'])
-            ->name('back-office.factures-partenaires.pdf');
+            ->name('comptabilite.factures-fournisseurs.depot-pdf');
     });
+
+// ── Redirections 301 (anciennes URLs) ──
+Route::permanentRedirect('/factures-partenaires/a-comptabiliser', '/comptabilite/factures-fournisseurs');
 
 // ── Banques ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class])

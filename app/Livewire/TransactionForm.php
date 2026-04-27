@@ -244,7 +244,7 @@ final class TransactionForm extends Component
 
         // URL plain route pour l'iframe de prévisualisation PDF (auth + policy suffisent, signed cause des problèmes iframe).
         $this->incomingDocumentPreviewUrl = route(
-            'back-office.factures-partenaires.pdf',
+            'comptabilite.factures-fournisseurs.depot-pdf',
             ['depot' => $depot->id],
         );
 

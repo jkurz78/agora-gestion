@@ -38,7 +38,7 @@ it('affiche le lien Factures à comptabiliser pour un Admin', function (): void 
     $response->assertOk();
     $response->assertSee('Réception');
     $response->assertSee('Factures');
-    $response->assertSeeHtml(route('back-office.factures-partenaires.index'));
+    $response->assertSeeHtml(route('comptabilite.factures-fournisseurs.index'));
 });
 
 it('affiche le lien Factures à comptabiliser pour un Comptable', function (): void {
@@ -54,7 +54,7 @@ it('affiche le lien Factures à comptabiliser pour un Comptable', function (): v
     $response->assertOk();
     $response->assertSee('Réception');
     $response->assertSee('Factures');
-    $response->assertSeeHtml(route('back-office.factures-partenaires.index'));
+    $response->assertSeeHtml(route('comptabilite.factures-fournisseurs.index'));
 });
 
 it('affiche le badge compteur quand des factures Soumise existent', function (): void {
@@ -129,5 +129,5 @@ it('n\'affiche pas le lien Factures à comptabiliser pour un Gestionnaire', func
     $response = $this->actingAs($gestionnaire)->get(route('comptabilite.transactions'));
 
     $response->assertOk();
-    $response->assertDontSeeHtml(route('back-office.factures-partenaires.index'));
+    $response->assertDontSeeHtml(route('comptabilite.factures-fournisseurs.index'));
 });
