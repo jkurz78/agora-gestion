@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\CategorieEmail;
 use App\Enums\StatutDevis;
+use App\Enums\TypeLigneDevis;
 use App\Mail\DevisLibreMail;
 use App\Models\Devis;
 use App\Models\DevisLigne;
@@ -98,6 +99,7 @@ final class DevisService
             $ligne = DevisLigne::create([
                 'devis_id' => $locked->id,
                 'ordre' => $maxOrdre + 1,
+                'type' => TypeLigneDevis::Montant,
                 'libelle' => $data['libelle'],
                 'prix_unitaire' => $prixUnitaire,
                 'quantite' => $quantite,
@@ -111,6 +113,104 @@ final class DevisService
             $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
 
             return $ligne;
+        });
+    }
+
+    /**
+     * Ajoute une ligne de type texte (commentaire / titre de section) au devis.
+     *
+     * Une ligne texte porte uniquement un libellé ; prix_unitaire, quantite, montant
+     * et sous_categorie_id sont nuls. Elle n'impacte pas le montant_total.
+     *
+     * Mêmes guards que ajouterLigne : refuse si statut verrouillé (Accepte/Refuse/Annule).
+     * Si le devis est au statut Envoye, le repasse en Brouillon (rebascule).
+     *
+     * @throws RuntimeException si le devis est verrouillé
+     */
+    public function ajouterLigneTexte(Devis $devis, string $texte): DevisLigne
+    {
+        return DB::transaction(function () use ($devis, $texte): DevisLigne {
+            $locked = Devis::withoutGlobalScopes()
+                ->whereKey($devis->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->guardAssociation($locked);
+            $this->guardStatutVerrouille($locked);
+
+            $maxOrdre = $locked->lignes()->max('ordre') ?? 0;
+
+            $ligne = DevisLigne::create([
+                'devis_id' => $locked->id,
+                'ordre' => $maxOrdre + 1,
+                'type' => TypeLigneDevis::Texte,
+                'libelle' => $texte,
+                'prix_unitaire' => null,
+                'quantite' => null,
+                'montant' => null,
+                'sous_categorie_id' => null,
+            ]);
+
+            $this->rebasculerSiEnvoye($locked);
+            $this->recalculerMontantTotal($locked);
+
+            $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
+
+            return $ligne;
+        });
+    }
+
+    /**
+     * Échange l'ordre d'une ligne avec son voisin immédiat (haut ou bas).
+     *
+     * Si la ligne est déjà en première ou dernière position dans la direction
+     * demandée, l'opération est silencieusement ignorée (no-op).
+     *
+     * Mêmes guards que ajouterLigne : refuse si statut verrouillé.
+     * Si le devis est au statut Envoye, le repasse en Brouillon (rebascule).
+     *
+     * @param  string  $direction  'up' | 'down'
+     *
+     * @throws RuntimeException si le devis est verrouillé
+     */
+    public function majOrdre(Devis $devis, int $ligneId, string $direction): void
+    {
+        DB::transaction(function () use ($devis, $ligneId, $direction): void {
+            $locked = Devis::withoutGlobalScopes()
+                ->whereKey($devis->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->guardAssociation($locked);
+            $this->guardStatutVerrouille($locked);
+
+            // Charge toutes les lignes triées par ordre pour identifier les voisins
+            $lignes = $locked->lignes()->orderBy('ordre')->get();
+
+            $index = $lignes->search(fn (DevisLigne $l): bool => (int) $l->id === $ligneId);
+
+            if ($index === false) {
+                return; // Ligne introuvable — no-op
+            }
+
+            $targetIndex = $direction === 'up' ? $index - 1 : $index + 1;
+
+            if ($targetIndex < 0 || $targetIndex >= $lignes->count()) {
+                return; // Déjà en bord — no-op
+            }
+
+            $ligne = $lignes->get($index);
+            $voisin = $lignes->get($targetIndex);
+
+            $ordreActuel = (int) $ligne->ordre;
+            $ordreVoisin = (int) $voisin->ordre;
+
+            $ligne->update(['ordre' => $ordreVoisin]);
+            $voisin->update(['ordre' => $ordreActuel]);
+
+            $this->rebasculerSiEnvoye($locked);
+
+            $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
         });
     }
 
@@ -458,6 +558,7 @@ final class DevisService
                 DevisLigne::create([
                     'devis_id' => $nouveau->id,
                     'ordre' => $ligne->ordre,
+                    'type' => $ligne->type ?? TypeLigneDevis::Montant,
                     'libelle' => $ligne->libelle,
                     'prix_unitaire' => $ligne->prix_unitaire,
                     'quantite' => $ligne->quantite,

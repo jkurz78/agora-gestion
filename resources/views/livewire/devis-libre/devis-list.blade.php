@@ -165,9 +165,19 @@
                                 @endif
                             </td>
                             <td>
-                                <a href="{{ route('devis-libres.show', $d) }}" class="btn btn-sm btn-outline-secondary">
-                                    <i class="bi bi-eye"></i>
-                                </a>
+                                @if ($d->statut === \App\Enums\StatutDevis::Brouillon)
+                                    <a href="{{ route('devis-libres.show', $d) }}"
+                                       class="btn btn-sm btn-outline-secondary"
+                                       title="Modifier">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                @else
+                                    <a href="{{ route('devis-libres.show', $d) }}"
+                                       class="btn btn-sm btn-outline-secondary"
+                                       title="Voir">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                @endif
                             </td>
                         </tr>
                     @endforeach

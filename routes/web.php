@@ -8,6 +8,7 @@ use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DevisLibrePdfController;
 use App\Http\Controllers\DocumentPrevisionnelPdfController;
 use App\Http\Controllers\DroitImagePdfController;
 use App\Http\Controllers\EmailOptoutController;
@@ -260,6 +261,7 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
     ->group(function (): void {
         Route::get('/devis-libres', DevisList::class)->name('devis-libres.index');
         Route::get('/devis-libres/{devis}', DevisEdit::class)->name('devis-libres.show');
+        Route::get('/devis-libres/{devis}/pdf', DevisLibrePdfController::class)->name('devis-libres.pdf');
     });
 
 // ── Facturation ──
