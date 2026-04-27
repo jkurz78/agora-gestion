@@ -150,6 +150,89 @@ final class DevisService
     }
 
     /**
+     * Marque le devis comme envoyé et lui attribue un numéro séquentiel.
+     *
+     * Guards :
+     * - statut doit être Brouillon (sinon RuntimeException)
+     * - au moins une ligne avec montant > 0 doit exister (sinon RuntimeException)
+     *
+     * Si le devis possède déjà un numéro (re-bascule depuis un état antérieur),
+     * ce numéro est conservé — pas de réattribution.
+     *
+     * La numérotation est sérialisée via lockForUpdate() sur les lignes de la
+     * même (association_id, exercice) pour éviter les doublons en cas de
+     * concurrence InnoDB.
+     *
+     * @throws RuntimeException
+     */
+    public function marquerEnvoye(Devis $devis): void
+    {
+        if (! $devis->statut->peutPasserEnvoye()) {
+            throw new RuntimeException(
+                sprintf(
+                    'Impossible d\'émettre un devis au statut « %s ».',
+                    $devis->statut->label()
+                )
+            );
+        }
+
+        $aLigneMontantPositif = $devis->lignes()
+            ->where('montant', '>', 0)
+            ->exists();
+
+        if (! $aLigneMontantPositif) {
+            throw new RuntimeException(
+                'Au moins une ligne avec un montant est requise pour émettre le devis.'
+            );
+        }
+
+        DB::transaction(function () use ($devis): void {
+            // Si le devis a déjà un numéro (re-bascule après Step 6), on le conserve.
+            if ($devis->numero !== null) {
+                $devis->update(['statut' => StatutDevis::Envoye]);
+
+                return;
+            }
+
+            $numero = $this->attribuerNumero((int) $devis->association_id, (int) $devis->exercice);
+
+            $devis->update([
+                'statut' => StatutDevis::Envoye,
+                'numero' => $numero,
+            ]);
+        });
+    }
+
+    /**
+     * Calcule et attribue le prochain numéro séquentiel pour (association_id, exercice).
+     *
+     * Utilise lockForUpdate() pour sérialiser les transactions concurrentes sur InnoDB.
+     * Format : D-{exercice}-{NNN} — 3 chiffres minimum, débordement autorisé.
+     *
+     * Décision d'implémentation : on cherche le dernier numéro via MAX(id) dans la
+     * partition (association_id, exercice, numero NOT NULL). L'ordre par id décroissant
+     * est équivalent à l'ordre par numéro car les numéros sont attribués strictement
+     * en séquence dans une transaction sérialisée. On parse le suffixe entier après
+     * le dernier '-' pour extraire le max.
+     */
+    private function attribuerNumero(int $associationId, int $exercice): string
+    {
+        $last = Devis::withoutGlobalScopes()
+            ->where('association_id', $associationId)
+            ->where('exercice', $exercice)
+            ->whereNotNull('numero')
+            ->lockForUpdate()
+            ->orderByDesc('id')
+            ->first(['id', 'numero']);
+
+        $nextSeq = $last !== null
+            ? ((int) substr((string) strrchr($last->numero, '-'), 1)) + 1
+            : 1;
+
+        return sprintf('D-%d-%03d', $exercice, $nextSeq);
+    }
+
+    /**
      * Recalcule et persiste le montant_total du devis comme somme des lignes.
      */
     private function recalculerMontantTotal(Devis $devis): void
