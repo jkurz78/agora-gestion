@@ -283,6 +283,105 @@ final class DevisService
     }
 
     /**
+     * Marque le devis comme accepté.
+     *
+     * Guard (évalué sur la ligne verrouillée) :
+     * - statut doit être Envoye, sinon RuntimeException
+     *
+     * Trace : accepte_par_user_id + accepte_le
+     *
+     * @throws RuntimeException
+     */
+    public function marquerAccepte(Devis $devis): void
+    {
+        $this->muterAvecLock($devis, function (Devis $locked): void {
+            if ($locked->statut !== StatutDevis::Envoye) {
+                throw new RuntimeException('Seul un devis envoyé peut être marqué accepté.');
+            }
+
+            $locked->statut = StatutDevis::Accepte;
+            $locked->accepte_par_user_id = auth()->id();
+            $locked->accepte_le = now();
+        });
+    }
+
+    /**
+     * Marque le devis comme refusé.
+     *
+     * Guard (évalué sur la ligne verrouillée) :
+     * - statut doit être Envoye, sinon RuntimeException
+     *
+     * Trace : refuse_par_user_id + refuse_le
+     *
+     * @throws RuntimeException
+     */
+    public function marquerRefuse(Devis $devis): void
+    {
+        $this->muterAvecLock($devis, function (Devis $locked): void {
+            if ($locked->statut !== StatutDevis::Envoye) {
+                throw new RuntimeException('Seul un devis envoyé peut être marqué refusé.');
+            }
+
+            $locked->statut = StatutDevis::Refuse;
+            $locked->refuse_par_user_id = auth()->id();
+            $locked->refuse_le = now();
+        });
+    }
+
+    /**
+     * Annule le devis depuis tout statut sauf Annule.
+     *
+     * Guard (évalué sur la ligne verrouillée) :
+     * - statut doit passer peutEtreAnnule(), sinon RuntimeException
+     *
+     * Trace : annule_par_user_id + annule_le
+     *
+     * @throws RuntimeException
+     */
+    public function annuler(Devis $devis): void
+    {
+        $this->muterAvecLock($devis, function (Devis $locked): void {
+            if (! $locked->statut->peutEtreAnnule()) {
+                throw new RuntimeException('Le devis est déjà annulé.');
+            }
+
+            $locked->statut = StatutDevis::Annule;
+            $locked->annule_par_user_id = auth()->id();
+            $locked->annule_le = now();
+        });
+    }
+
+    /**
+     * Exécute une mutation dans une transaction avec lockForUpdate sur la ligne du devis.
+     *
+     * Pattern commun aux transitions marquerAccepte / marquerRefuse / annuler :
+     * 1. Démarre une transaction
+     * 2. Re-lit la ligne du devis avec lockForUpdate() (élimine TOCTOU)
+     * 3. Appelle $mutation($locked) — peut lever une RuntimeException pour un guard
+     * 4. Persiste via $locked->save()
+     * 5. Synchronise l'instance appelante ($devis) via setRawAttributes
+     *
+     * @param  callable(Devis): void  $mutation
+     *
+     * @throws RuntimeException propagé depuis $mutation
+     */
+    private function muterAvecLock(Devis $devis, callable $mutation): void
+    {
+        DB::transaction(function () use ($devis, $mutation): void {
+            $locked = Devis::withoutGlobalScopes()
+                ->whereKey($devis->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $mutation($locked);
+
+            $locked->save();
+
+            $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
+        });
+    }
+
+    /**
      * Recalcule et persiste le montant_total du devis comme somme des lignes.
      */
     private function recalculerMontantTotal(Devis $devis): void
