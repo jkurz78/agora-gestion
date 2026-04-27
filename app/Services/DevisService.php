@@ -54,6 +54,9 @@ final class DevisService
     /**
      * Ajoute une ligne au devis et recalcule le montant_total.
      *
+     * Si le devis est au statut Envoye, le repasse en Brouillon en conservant
+     * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
+     *
      * Clés acceptées dans $data : libelle (requis), prix_unitaire (requis),
      * quantite (défaut 1), sous_categorie_id (nullable).
      *
@@ -64,16 +67,21 @@ final class DevisService
     public function ajouterLigne(Devis $devis, array $data): DevisLigne
     {
         return DB::transaction(function () use ($devis, $data): DevisLigne {
-            $this->guardStatutVerrouille($devis);
+            $locked = Devis::withoutGlobalScopes()
+                ->whereKey($devis->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->guardStatutVerrouille($locked);
 
             $prixUnitaire = (float) $data['prix_unitaire'];
             $quantite = isset($data['quantite']) ? (float) $data['quantite'] : 1.0;
             $montant = round($prixUnitaire * $quantite, 2);
 
-            $maxOrdre = $devis->lignes()->max('ordre') ?? 0;
+            $maxOrdre = $locked->lignes()->max('ordre') ?? 0;
 
             $ligne = DevisLigne::create([
-                'devis_id' => $devis->id,
+                'devis_id' => $locked->id,
                 'ordre' => $maxOrdre + 1,
                 'libelle' => $data['libelle'],
                 'prix_unitaire' => $prixUnitaire,
@@ -82,7 +90,10 @@ final class DevisService
                 'sous_categorie_id' => $data['sous_categorie_id'] ?? null,
             ]);
 
-            $this->recalculerMontantTotal($devis);
+            $this->rebasculerSiEnvoye($locked);
+            $this->recalculerMontantTotal($locked);
+
+            $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
 
             return $ligne;
         });
@@ -90,6 +101,9 @@ final class DevisService
 
     /**
      * Modifie une ligne existante et recalcule le montant_total du devis parent.
+     *
+     * Si le devis est au statut Envoye, le repasse en Brouillon en conservant
+     * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * Seuls les champs fournis dans $data sont mis à jour.
      * Clés acceptées : libelle, prix_unitaire, quantite, sous_categorie_id.
@@ -102,7 +116,13 @@ final class DevisService
     {
         DB::transaction(function () use ($ligne, $data): void {
             $devis = $ligne->devis;
-            $this->guardStatutVerrouille($devis);
+
+            $locked = Devis::withoutGlobalScopes()
+                ->whereKey($devis->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->guardStatutVerrouille($locked);
 
             $updates = [];
 
@@ -129,12 +149,18 @@ final class DevisService
 
             $ligne->update($updates);
 
-            $this->recalculerMontantTotal($devis);
+            $this->rebasculerSiEnvoye($locked);
+            $this->recalculerMontantTotal($locked);
+
+            $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
         });
     }
 
     /**
      * Supprime une ligne et recalcule le montant_total du devis parent.
+     *
+     * Si le devis est au statut Envoye, le repasse en Brouillon en conservant
+     * son numéro (rebascule). Le statut résultant est Brouillon dans les deux cas.
      *
      * @throws RuntimeException si le devis est verrouillé (Accepte, Refuse, Annule)
      */
@@ -142,11 +168,20 @@ final class DevisService
     {
         DB::transaction(function () use ($ligne): void {
             $devis = $ligne->devis;
-            $this->guardStatutVerrouille($devis);
+
+            $locked = Devis::withoutGlobalScopes()
+                ->whereKey($devis->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->guardStatutVerrouille($locked);
 
             $ligne->delete();
 
-            $this->recalculerMontantTotal($devis);
+            $this->rebasculerSiEnvoye($locked);
+            $this->recalculerMontantTotal($locked);
+
+            $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
         });
     }
 
@@ -379,6 +414,23 @@ final class DevisService
 
             $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
         });
+    }
+
+    /**
+     * Repasse le devis en Brouillon si son statut courant est Envoye.
+     *
+     * Le numéro est conservé intact : il sera réutilisé lors du prochain
+     * marquerEnvoye() (qui détecte numero !== null et saute la réattribution).
+     *
+     * Cette méthode est appelée uniquement depuis les mutations de lignes
+     * (ajouterLigne, modifierLigne, supprimerLigne) sur l'instance verrouillée.
+     */
+    private function rebasculerSiEnvoye(Devis $locked): void
+    {
+        if ($locked->statut === StatutDevis::Envoye) {
+            $locked->statut = StatutDevis::Brouillon;
+            $locked->save();
+        }
     }
 
     /**

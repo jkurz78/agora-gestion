@@ -129,7 +129,7 @@ describe('ajouterLigne()', function () {
             ->and((float) $ligne->montant)->toBe(300.00);
     });
 
-    it('permet d\'ajouter une ligne sur un devis envoyé (sans rebascule — Step 6)', function () {
+    it('repasse en Brouillon quand on ajoute une ligne sur un devis envoyé', function () {
         $devis = Devis::factory()->envoye()->create();
 
         $this->service->ajouterLigne($devis, [
@@ -138,9 +138,8 @@ describe('ajouterLigne()', function () {
             'quantite' => 1.0,
         ]);
 
-        // Step 6 ajoutera le rebascule. Pour l'instant le statut reste inchangé.
         $devis->refresh();
-        expect($devis->statut)->toBe(StatutDevis::Envoye);
+        expect($devis->statut)->toBe(StatutDevis::Brouillon);
     });
 
     it('refuse d\'ajouter une ligne si statut est Accepte', function () {
@@ -247,7 +246,7 @@ describe('modifierLigne()', function () {
         expect((float) $devis->montant_total)->toBe(350.00);
     });
 
-    it('permet la modification sur un devis envoyé (sans rebascule — Step 6)', function () {
+    it('repasse en Brouillon quand on modifie une ligne sur un devis envoyé', function () {
         $devis = Devis::factory()->envoye()->create();
         $ligne = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
@@ -259,9 +258,8 @@ describe('modifierLigne()', function () {
 
         $this->service->modifierLigne($ligne, ['libelle' => 'Mise à jour']);
 
-        // Step 6 ajoutera le rebascule. Pour l'instant le statut reste inchangé.
         $devis->refresh();
-        expect($devis->statut)->toBe(StatutDevis::Envoye);
+        expect($devis->statut)->toBe(StatutDevis::Brouillon);
     });
 
     it('refuse de modifier une ligne si statut est Accepte', function () {
@@ -353,7 +351,7 @@ describe('supprimerLigne()', function () {
         expect((float) $devis->montant_total)->toBe(0.00);
     });
 
-    it('permet de supprimer une ligne sur un devis envoyé (sans rebascule — Step 6)', function () {
+    it('repasse en Brouillon quand on supprime une ligne sur un devis envoyé', function () {
         $devis = Devis::factory()->envoye()->create();
         $ligne = DevisLigne::factory()->create([
             'devis_id' => $devis->id,
@@ -365,9 +363,8 @@ describe('supprimerLigne()', function () {
 
         $this->service->supprimerLigne($ligne);
 
-        // Step 6 ajoutera le rebascule. Pour l'instant le statut reste inchangé.
         $devis->refresh();
-        expect($devis->statut)->toBe(StatutDevis::Envoye);
+        expect($devis->statut)->toBe(StatutDevis::Brouillon);
     });
 
     it('refuse de supprimer une ligne si statut est Accepte', function () {
