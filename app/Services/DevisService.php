@@ -9,6 +9,7 @@ use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Support\CurrentAssociation;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -152,55 +153,104 @@ final class DevisService
     /**
      * Marque le devis comme envoyé et lui attribue un numéro séquentiel.
      *
-     * Guards :
+     * Guards (évalués à l'intérieur de la transaction avec lockForUpdate) :
      * - statut doit être Brouillon (sinon RuntimeException)
      * - au moins une ligne avec montant > 0 doit exister (sinon RuntimeException)
      *
      * Si le devis possède déjà un numéro (re-bascule depuis un état antérieur),
      * ce numéro est conservé — pas de réattribution.
      *
-     * La numérotation est sérialisée via lockForUpdate() sur les lignes de la
-     * même (association_id, exercice) pour éviter les doublons en cas de
-     * concurrence InnoDB.
+     * Les deux guards sont évalués après avoir verrouillé la ligne avec
+     * lockForUpdate() afin d'éliminer la fenêtre de concurrence entre la
+     * vérification et la mise à jour (TOCTOU).
+     *
+     * En cas de violation de contrainte unique sur le numéro (course au premier
+     * numéro d'un exercice vierge), la transaction est rejouée une fois — le
+     * second passage verra le numéro existant et sérialisera correctement.
      *
      * @throws RuntimeException
      */
     public function marquerEnvoye(Devis $devis): void
     {
-        if (! $devis->statut->peutPasserEnvoye()) {
-            throw new RuntimeException(
-                sprintf(
-                    'Impossible d\'émettre un devis au statut « %s ».',
-                    $devis->statut->label()
-                )
-            );
+        try {
+            $this->marquerEnvoyeTransaction($devis);
+        } catch (QueryException $e) {
+            // Stratégie de retry pour la fenêtre "premier numéro d'un exercice vierge" :
+            // Deux transactions concurrentes peuvent simultanément trouver un résultat
+            // NULL dans attribuerNumero() (aucun numéro existant) et tenter d'écrire
+            // D-{exo}-001. La première commit ; la seconde lève une QueryException sur
+            // la contrainte unique (association_id, exercice, numero). On rejoue une
+            // fois — le second passage verra le numéro existant et obtiendra D-{exo}-002.
+            // Un troisième conflit simultané est théoriquement impossible en pratique.
+            if (! $this->isUniqueConstraintViolation($e)) {
+                throw $e;
+            }
+
+            $this->marquerEnvoyeTransaction($devis);
         }
+    }
 
-        $aLigneMontantPositif = $devis->lignes()
-            ->where('montant', '>', 0)
-            ->exists();
-
-        if (! $aLigneMontantPositif) {
-            throw new RuntimeException(
-                'Au moins une ligne avec un montant est requise pour émettre le devis.'
-            );
-        }
-
+    /**
+     * Corps transactionnel de marquerEnvoye() — extrait pour permettre le retry.
+     */
+    private function marquerEnvoyeTransaction(Devis $devis): void
+    {
         DB::transaction(function () use ($devis): void {
+            // Verrouille la ligne du devis pour toute la durée de la transaction.
+            // Cela élimine la fenêtre TOCTOU entre les guards et l'UPDATE.
+            $locked = Devis::withoutGlobalScopes()
+                ->whereKey($devis->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Guard statut — évalué sur la ligne fraîchement verrouillée.
+            if (! $locked->statut->peutPasserEnvoye()) {
+                throw new RuntimeException(
+                    sprintf(
+                        'Impossible d\'émettre un devis au statut « %s ».',
+                        $locked->statut->label()
+                    )
+                );
+            }
+
+            // Guard lignes — rechargé dans le contexte de la transaction verrouillée.
+            $lignes = $locked->lignes()->get();
+            $hasMontant = $lignes->contains(fn (DevisLigne $l) => (float) $l->montant > 0.0);
+
+            if (! $hasMontant) {
+                throw new RuntimeException(
+                    'Au moins une ligne avec un montant est requise pour émettre le devis.'
+                );
+            }
+
             // Si le devis a déjà un numéro (re-bascule après Step 6), on le conserve.
-            if ($devis->numero !== null) {
-                $devis->update(['statut' => StatutDevis::Envoye]);
+            if ($locked->numero !== null) {
+                $locked->update(['statut' => StatutDevis::Envoye]);
+                $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
 
                 return;
             }
 
-            $numero = $this->attribuerNumero((int) $devis->association_id, (int) $devis->exercice);
+            $numero = $this->attribuerNumero((int) $locked->association_id, (int) $locked->exercice);
 
-            $devis->update([
+            $locked->update([
                 'statut' => StatutDevis::Envoye,
                 'numero' => $numero,
             ]);
+
+            // Synchronise l'instance originale pour que l'appelant voie le nouvel état.
+            $devis->setRawAttributes($locked->fresh()->getAttributes(), true);
         });
+    }
+
+    /**
+     * Détermine si une QueryException est une violation de contrainte unique.
+     * MySQL : code 23000 (SQLSTATE) / errno 1062.
+     */
+    private function isUniqueConstraintViolation(QueryException $e): bool
+    {
+        return $e->getCode() === '23000'
+            || str_contains($e->getMessage(), 'Duplicate entry');
     }
 
     /**

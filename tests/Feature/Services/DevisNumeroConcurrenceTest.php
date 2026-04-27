@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutDevis;
 use App\Models\Association;
 use App\Models\Devis;
 use App\Models\DevisLigne;
@@ -85,6 +86,35 @@ describe('DevisNumero — concurrence simulée', function () {
             'numero' => 'D-2026-001',
             'id' => $devisB->id, // devisB ne doit PAS avoir le numéro 001
         ]);
+    });
+
+    it('attribue D-{exo}-002 quand un numéro 001 existe déjà en base (simule le retry après violation unique)', function () {
+        // Simule la situation post-retry : un premier devis a déjà reçu D-2026-001 via une
+        // transaction concurrente qui a commité avant la nôtre. On vérifie que le service
+        // attribue correctement D-2026-002 au devis suivant, ce qui est ce que ferait le
+        // retry — la seconde tentative verrait le 001 existant et incrémenterait à 002.
+        Devis::factory()->create([
+            'association_id' => $this->association->id,
+            'exercice' => 2026,
+            'statut' => StatutDevis::Envoye,
+            'numero' => 'D-2026-001',
+        ]);
+
+        $devis = Devis::factory()->brouillon()->create(['exercice' => 2026]);
+        DevisLigne::factory()->create([
+            'devis_id' => $devis->id,
+            'prix_unitaire' => 150.00,
+            'quantite' => 1.0,
+            'montant' => 150.00,
+            'ordre' => 1,
+        ]);
+        $devis->update(['montant_total' => 150.00]);
+
+        $this->service->marquerEnvoye($devis);
+        $devis->refresh();
+
+        expect($devis->numero)->toBe('D-2026-002')
+            ->and($devis->statut)->toBe(StatutDevis::Envoye);
     });
 
     it('aucun doublon n\'est possible même si les devis sont créés dans n\'importe quel ordre', function () {
