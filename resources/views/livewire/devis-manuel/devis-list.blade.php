@@ -165,20 +165,13 @@
                                     </span>
                                 @endif
                             </td>
-                            <td>
-                                @if ($d->statut->peutEtreModifie())
-                                    <a href="{{ route('devis-manuels.show', $d) }}"
-                                       class="btn btn-sm btn-outline-secondary"
-                                       title="Modifier">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                @else
-                                    <a href="{{ route('devis-manuels.show', $d) }}"
-                                       class="btn btn-sm btn-outline-secondary"
-                                       title="Voir">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                @endif
+                            <td onclick="event.stopPropagation()">
+                                <a href="{{ route('devis-manuels.pdf', $d) }}"
+                                   target="_blank"
+                                   class="btn btn-sm btn-outline-danger"
+                                   title="Voir le PDF">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
                             </td>
                         </tr>
                     @endforeach
