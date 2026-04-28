@@ -520,6 +520,115 @@ XML;
         });
     }
 
+    /**
+     * Ajoute une ligne libre de type MontantLibre à une facture brouillon.
+     *
+     * $attrs accepte : libelle (requis), prix_unitaire (requis, > 0), quantite (requis, > 0),
+     * sous_categorie_id (optionnel), operation_id (optionnel), seance (optionnel).
+     *
+     * @param  array<string, mixed>  $attrs
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si prix_unitaire / quantite ne sont pas strictement positifs
+     */
+    public function ajouterLigneLibreMontant(Facture $facture, array $attrs): FactureLigne
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        $prixUnitaire = (float) ($attrs['prix_unitaire'] ?? 0);
+        $quantite = (float) ($attrs['quantite'] ?? 0);
+
+        if ($prixUnitaire <= 0 || $quantite <= 0) {
+            throw new \RuntimeException(
+                'Le prix unitaire et la quantité doivent être strictement positifs (les montants négatifs ne sont pas supportés).'
+            );
+        }
+
+        return DB::transaction(function () use ($facture, $attrs, $prixUnitaire, $quantite): FactureLigne {
+            $maxOrdre = (int) FactureLigne::where('facture_id', $facture->id)->max('ordre');
+
+            $montant = round($prixUnitaire * $quantite, 2);
+
+            $ligne = FactureLigne::create([
+                'facture_id' => $facture->id,
+                'type' => TypeLigneFacture::MontantLibre,
+                'libelle' => $attrs['libelle'],
+                'prix_unitaire' => $prixUnitaire,
+                'quantite' => $quantite,
+                'montant' => $montant,
+                'transaction_ligne_id' => null,
+                'sous_categorie_id' => $attrs['sous_categorie_id'] ?? null,
+                'operation_id' => $attrs['operation_id'] ?? null,
+                'seance' => $attrs['seance'] ?? null,
+                'ordre' => $maxOrdre + 1,
+            ]);
+
+            $this->recalculerMontantTotal($facture);
+
+            return $ligne;
+        });
+    }
+
+    /**
+     * Ajoute une ligne d'information de type Texte à une facture brouillon.
+     *
+     * La ligne n'a aucun impact comptable (montant = null). Le total facture est inchangé.
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon ou si le tenant ne correspond pas
+     */
+    public function ajouterLigneLibreTexte(Facture $facture, string $libelle): FactureLigne
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        return DB::transaction(function () use ($facture, $libelle): FactureLigne {
+            $maxOrdre = (int) FactureLigne::where('facture_id', $facture->id)->max('ordre');
+
+            $ligne = FactureLigne::create([
+                'facture_id' => $facture->id,
+                'type' => TypeLigneFacture::Texte,
+                'libelle' => $libelle,
+                'prix_unitaire' => null,
+                'quantite' => null,
+                'montant' => null,
+                'transaction_ligne_id' => null,
+                'sous_categorie_id' => null,
+                'operation_id' => null,
+                'seance' => null,
+                'ordre' => $maxOrdre + 1,
+            ]);
+
+            $this->recalculerMontantTotal($facture);
+
+            return $ligne;
+        });
+    }
+
+    /**
+     * Recalcule et persiste montant_total sur la facture : somme des montants non-null de toutes les lignes.
+     */
+    private function recalculerMontantTotal(Facture $facture): void
+    {
+        $total = (float) FactureLigne::where('facture_id', $facture->id)
+            ->whereNotNull('montant')
+            ->sum('montant');
+
+        $facture->update(['montant_total' => $total]);
+    }
+
+    /**
+     * Guard multi-tenant : vérifie que la facture appartient à l'association courante.
+     *
+     * @throws \RuntimeException si la facture appartient à une autre association
+     */
+    private function assertTenantOwnership(Facture $facture): void
+    {
+        if ((int) $facture->association_id !== (int) TenantContext::currentId()) {
+            throw new \RuntimeException("Accès interdit : cette facture n'appartient pas à votre association.");
+        }
+    }
+
     private function assertBrouillon(Facture $facture): void
     {
         if ($facture->statut !== StatutFacture::Brouillon) {
