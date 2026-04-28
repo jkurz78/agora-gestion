@@ -45,6 +45,7 @@
             font-weight: bold;
         }
         .client-name { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
+        .client-contact { font-size: 10px; color: #555; font-style: italic; margin-bottom: 2px; }
         .client-address { font-size: 10px; color: #555; }
 
         /* Lines table */
@@ -212,6 +213,9 @@
     <div class="client-block">
         <div class="client-label">Client</div>
         <div class="client-name">{{ $facture->tiers->displayName() }}</div>
+        @if ($contact = $facture->tiers->displayContact())
+            <div class="client-contact">Contact&nbsp;: {{ $contact }}</div>
+        @endif
         <div class="client-address">
             @if ($facture->tiers->adresse_ligne1){{ $facture->tiers->adresse_ligne1 }}<br>@endif
             @if ($facture->tiers->code_postal || $facture->tiers->ville){{ $facture->tiers->code_postal }} {{ $facture->tiers->ville }}@endif

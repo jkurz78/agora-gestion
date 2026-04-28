@@ -86,6 +86,24 @@ final class Tiers extends TenantModel implements AuthenticatableContract
     }
 
     /**
+     * Pour un tiers entreprise, renvoie le contact 'Nom Prénom' (ou null si vide).
+     * Pour un tiers particulier, renvoie null (le nom est déjà la ligne principale).
+     * Permet d'afficher 2 lignes sur les documents (devis, facture) :
+     *   ligne 1 : raison sociale via displayName()
+     *   ligne 2 : 'Contact : ' . displayContact()
+     */
+    public function displayContact(): ?string
+    {
+        if ($this->type !== 'entreprise') {
+            return null;
+        }
+
+        $contact = trim(($this->prenom ? $this->prenom.' ' : '').($this->nom ?? ''));
+
+        return $contact !== '' ? $contact : null;
+    }
+
+    /**
      * Return disambiguation suffixes for a collection of tiers.
      * Only homonymes get a non-empty suffix.
      *

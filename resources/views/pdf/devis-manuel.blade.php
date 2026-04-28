@@ -41,6 +41,7 @@
             font-weight: bold;
         }
         .client-name { font-size: 12px; font-weight: bold; margin-bottom: 2px; }
+        .client-contact { font-size: 10px; color: #555; font-style: italic; margin-bottom: 2px; }
         .client-address { font-size: 10px; color: #555; }
 
         .lines-table {
@@ -155,6 +156,9 @@
         <div class="client-label">Destinataire</div>
         @if($devis->tiers)
             <div class="client-name">{{ $devis->tiers->displayName() }}</div>
+            @if($contact = $devis->tiers->displayContact())
+                <div class="client-contact">Contact&nbsp;: {{ $contact }}</div>
+            @endif
             <div class="client-address">
                 @if($devis->tiers->adresse_ligne1){{ $devis->tiers->adresse_ligne1 }}<br>@endif
                 @if($devis->tiers->code_postal || $devis->tiers->ville){{ $devis->tiers->code_postal }} {{ $devis->tiers->ville }}@endif
