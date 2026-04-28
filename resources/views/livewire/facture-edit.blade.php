@@ -8,7 +8,7 @@
                 — <span class="text-info">
                     <i class="bi bi-link-45deg"></i>
                     Issue du devis
-                    <a href="{{ route('devis-libres.show', $facture->devis) }}"
+                    <a href="{{ route('devis-manuels.show', $facture->devis) }}"
                        class="text-info">{{ $facture->devis->numero ?? '#' . $facture->devis_id }}</a>
                 </span>
             @endif
@@ -116,8 +116,8 @@
                                         <tr wire:key="ligne-{{ $ligne->id }}">
                                             <td>
                                                 <div class="d-flex align-items-center gap-2">
-                                                    @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
-                                                        <span class="badge bg-secondary" title="Ligne libre">L</span>
+                                                    @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantManuel)
+                                                        <span class="badge bg-secondary" title="Ligne manuelle">M</span>
                                                     @elseif ($ligne->type === \App\Enums\TypeLigneFacture::Texte)
                                                         <span class="badge bg-light text-dark border" title="Ligne texte">T</span>
                                                     @endif
@@ -126,13 +126,27 @@
                                                            value="{{ $ligne->libelle }}"
                                                            wire:blur="updateLibelle({{ $ligne->id }}, $event.target.value)">
                                                 </div>
-                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantLibre && $ligne->prix_unitaire !== null)
-                                                    <div class="text-muted small mt-1 ps-4">
-                                                        PU {{ number_format((float) $ligne->prix_unitaire, 2, ',', ' ') }} &euro;
-                                                        &times; {{ number_format((float) $ligne->quantite, 3, ',', ' ') }}
+                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantManuel && $ligne->prix_unitaire !== null)
+                                                    <div class="d-flex align-items-center gap-2 mt-1 ps-4">
+                                                        <label class="form-label form-label-sm mb-0 text-muted text-nowrap">PU&nbsp;€</label>
+                                                        <input type="number"
+                                                               class="form-control form-control-sm text-end"
+                                                               style="max-width:100px"
+                                                               step="0.01"
+                                                               min="0.01"
+                                                               value="{{ number_format((float) $ligne->prix_unitaire, 2, '.', '') }}"
+                                                               wire:blur="updatePrixUnitaire({{ $ligne->id }}, $event.target.value)">
+                                                        <label class="form-label form-label-sm mb-0 text-muted text-nowrap">&times;&nbsp;Qté</label>
+                                                        <input type="number"
+                                                               class="form-control form-control-sm text-end"
+                                                               style="max-width:90px"
+                                                               step="0.001"
+                                                               min="0.001"
+                                                               value="{{ number_format((float) $ligne->quantite, 3, '.', '') }}"
+                                                               wire:blur="updateQuantite({{ $ligne->id }}, $event.target.value)">
                                                     </div>
                                                 @endif
-                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
+                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantManuel)
                                                     <div class="row g-2 mt-1 ps-4">
                                                         <div class="col-md-4">
                                                             <select class="form-select form-select-sm @if ($ligne->sous_categorie_id === null) is-invalid @endif"
@@ -168,7 +182,7 @@
                                                 @endif
                                             </td>
                                             <td class="text-end small fw-semibold text-nowrap">
-                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::Montant || $ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
+                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::Montant || $ligne->type === \App\Enums\TypeLigneFacture::MontantManuel)
                                                     {{ number_format((float) $ligne->montant, 2, ',', ' ') }} &euro;
                                                 @else
                                                     <span class="text-muted fst-italic">texte</span>
@@ -189,7 +203,7 @@
                                                 </button>
                                             </td>
                                             <td class="text-center">
-                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::Texte || $ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
+                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::Texte || $ligne->type === \App\Enums\TypeLigneFacture::MontantManuel)
                                                     <button wire:click="supprimerLigneEditable({{ $ligne->id }})"
                                                             wire:confirm="Supprimer cette ligne ?"
                                                             wire:loading.attr="disabled" wire:target="updateLibelle"
@@ -216,18 +230,18 @@
                     {{-- Boutons d'ajout de lignes (brouillon uniquement) --}}
                     @if ($this->canEdit && $facture->statut === \App\Enums\StatutFacture::Brouillon)
                         <div class="p-3 border-top d-flex flex-wrap gap-2">
-                            <button wire:click="ouvrirFormLigneLibreMontant"
+                            <button wire:click="ouvrirFormLigneManuelle"
                                     class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-plus-circle"></i> Ajouter ligne libre
+                                <i class="bi bi-plus-circle"></i> Ajouter ligne facture
                             </button>
-                            <button wire:click="ouvrirFormLigneLibreTexte"
+                            <button wire:click="ouvrirFormLigneTexteManuelle"
                                     class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-text-left"></i> Ajouter ligne texte
                             </button>
                         </div>
 
                         @if ($afficherFormLigneMontant)
-                            @include('livewire.facture-edit.partials.ligne-libre-montant-form')
+                            @include('livewire.facture-edit.partials.ligne-manuelle-montant-form')
                         @endif
 
                         @if ($afficherFormLigneTexte)
@@ -270,8 +284,8 @@
                 </div>
             </div>
 
-            {{-- Conditions de règlement (visible ssi >= 1 ligne MontantLibre) --}}
-            @if ($aLignesMontantLibre)
+            {{-- Conditions de règlement (visible ssi >= 1 ligne MontantManuel) --}}
+            @if ($aLignesMontantManuel)
                 <div class="card mb-4">
                     <div class="card-header">
                         <h5 class="mb-0"><i class="bi bi-bank"></i> Conditions de règlement</h5>
