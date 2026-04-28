@@ -222,25 +222,41 @@
     @php
         $lignes = $facture->lignes->sortBy('ordre');
         $montantIndex = 0;
+        $signAnnulee = ($facture->statut === \App\Enums\StatutFacture::Annulee && ! ($forceOriginalFormat ?? false)) ? '-' : '';
     @endphp
 
     <table class="lines-table">
         <thead>
             <tr>
-                <th style="width: 75%;">D&eacute;signation</th>
+                <th style="width: 50%;">D&eacute;signation</th>
+                <th class="text-end" style="width: 15%;">Prix unitaire</th>
+                <th class="text-end" style="width: 10%;">Quantit&eacute;</th>
                 <th class="text-end" style="width: 25%;">Montant (&euro;)</th>
             </tr>
         </thead>
         <tbody>
             @foreach ($lignes as $ligne)
                 @if ($ligne->type === \App\Enums\TypeLigneFacture::Texte)
+                    {{-- Ligne texte : libellé sur toute la largeur, colonnes monétaires vides --}}
                     <tr class="ligne-texte">
-                        <td colspan="2">{{ $ligne->libelle }}</td>
+                        <td colspan="4">{{ $ligne->libelle }}</td>
                     </tr>
-                @else
+                @elseif ($ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
+                    {{-- Ligne montant libre : libellé + PU + Qté + montant --}}
                     <tr class="{{ $montantIndex % 2 === 1 ? 'row-even' : '' }}">
                         <td>{{ $ligne->libelle }}</td>
-                        <td class="text-end">{{ ($facture->statut === \App\Enums\StatutFacture::Annulee && ! ($forceOriginalFormat ?? false)) ? '-' : '' }}{{ number_format((float) $ligne->montant, 2, ',', "\u{00A0}") }} &euro;</td>
+                        <td class="text-end">{{ number_format((float) $ligne->prix_unitaire, 2, ',', "\u{00A0}") }} &euro;</td>
+                        <td class="text-end">{{ number_format((float) $ligne->quantite, 3, ',', "\u{00A0}") }}</td>
+                        <td class="text-end">{{ $signAnnulee }}{{ number_format((float) $ligne->montant, 2, ',', "\u{00A0}") }} &euro;</td>
+                    </tr>
+                    @php $montantIndex++; @endphp
+                @else
+                    {{-- Ligne montant (ref) : libellé + montant, PU et Qté vides --}}
+                    <tr class="{{ $montantIndex % 2 === 1 ? 'row-even' : '' }}">
+                        <td>{{ $ligne->libelle }}</td>
+                        <td class="text-end"></td>
+                        <td class="text-end"></td>
+                        <td class="text-end">{{ $signAnnulee }}{{ number_format((float) $ligne->montant, 2, ',', "\u{00A0}") }} &euro;</td>
                     </tr>
                     @php $montantIndex++; @endphp
                 @endif
@@ -248,8 +264,8 @@
         </tbody>
         <tfoot>
             <tr>
-                <td>Total</td>
-                <td class="text-end">{{ ($facture->statut === \App\Enums\StatutFacture::Annulee && ! ($forceOriginalFormat ?? false)) ? '-' : '' }}{{ number_format($facture->montantCalcule(), 2, ',', "\u{00A0}") }} &euro;</td>
+                <td colspan="3">Total</td>
+                <td class="text-end">{{ $signAnnulee }}{{ number_format($facture->montantCalcule(), 2, ',', "\u{00A0}") }} &euro;</td>
             </tr>
         </tfoot>
     </table>
@@ -307,6 +323,9 @@
     <div class="footer-section">
         @if ($facture->conditions_reglement)
             <p><strong>Conditions de r&egrave;glement :</strong> {{ $facture->conditions_reglement }}</p>
+        @endif
+        @if ($facture->mode_paiement_prevu !== null)
+            <p><strong>Mode de r&egrave;glement pr&eacute;vu :</strong> {{ $facture->mode_paiement_prevu->label() }}</p>
         @endif
         @if ($facture->mentions_legales)
             <p class="mentions">{{ $facture->mentions_legales }}</p>
