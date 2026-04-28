@@ -65,9 +65,9 @@ final class TiersQuickViewService
             $summary['factures'] = $factures;
         }
 
-        $devisLibres = $this->getDevisLibres($tiers);
-        if ($devisLibres !== null) {
-            $summary['devis_libres'] = $devisLibres;
+        $devisManuels = $this->getDevisManuels($tiers);
+        if ($devisManuels !== null) {
+            $summary['devis_libres'] = $devisManuels;
         }
 
         return $summary;
@@ -393,13 +393,13 @@ final class TiersQuickViewService
     }
 
     /**
-     * Retourne un bloc "Devis libres" pour la vue 360° du tiers :
+     * Retourne un bloc "Devis manuels" pour la vue 360° du tiers :
      * count par statut (tous les 5 statuts), total des devis acceptés.
      * Utilise une seule query agrégée (groupBy statut) — ≤ 1 query.
      *
      * @return array<string, mixed>|null null si aucun devis pour ce tiers
      */
-    private function getDevisLibres(Tiers $tiers): ?array
+    private function getDevisManuels(Tiers $tiers): ?array
     {
         $associationId = TenantContext::currentId();
 

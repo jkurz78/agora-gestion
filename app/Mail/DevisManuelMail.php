@@ -10,7 +10,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 
-final class DevisLibreMail extends Mailable
+final class DevisManuelMail extends Mailable
 {
     public function __construct(
         public readonly Devis $devis,
@@ -26,7 +26,7 @@ final class DevisLibreMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(view: 'emails.devis-libre');
+        return new Content(view: 'emails.devis-manuel');
     }
 
     /** @return array<int, Attachment> */

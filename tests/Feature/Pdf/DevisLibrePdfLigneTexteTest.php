@@ -67,7 +67,7 @@ it('une ligne Texte affiche son libellé mais pas de valeur monétaire dans PU/Q
 
     $devis->load(['lignes', 'tiers']);
 
-    $html = view('pdf.devis-libre', [
+    $html = view('pdf.devis-manuel', [
         'devis' => $devis,
         'lignes' => $devis->lignes,
         'association' => $this->association,

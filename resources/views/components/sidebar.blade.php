@@ -110,7 +110,7 @@ $activeGroup = match(true) {
         'banques.comptes.*', 'banques.remises*') => 'banques',
     request()->routeIs('tiers.*') => 'tiers',
     request()->routeIs('operations.*') => 'operations',
-    request()->routeIs('facturation.factures*', 'devis-libres*') => 'facturation',
+    request()->routeIs('facturation.factures*', 'devis-manuels*') => 'facturation',
     request()->routeIs('rapports.*') => 'rapports',
     request()->routeIs('exercices.*') => 'exercices',
     request()->routeIs('parametres.*') => 'parametres',
@@ -443,10 +443,10 @@ $activeGroup = match(true) {
                     <div class="accordion-body p-0">
                         <ul class="nav flex-column">
 
-                            @if (Route::has('devis-libres.index'))
+                            @if (Route::has('devis-manuels.index'))
                             <li class="nav-item">
-                                <a href="{{ route('devis-libres.index') }}"
-                                   class="nav-link {{ request()->routeIs('devis-libres*') ? 'active' : '' }}">
+                                <a href="{{ route('devis-manuels.index') }}"
+                                   class="nav-link {{ request()->routeIs('devis-manuels*') ? 'active' : '' }}">
                                     <i class="bi bi-file-earmark-text me-1"></i> Devis
                                 </a>
                             </li>

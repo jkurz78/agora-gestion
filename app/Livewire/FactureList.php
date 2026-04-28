@@ -59,10 +59,10 @@ final class FactureList extends Component
         }
 
         // Flow unifié : la facture brouillon créée supporte les 3 types de lignes
-        // (Montant ref, MontantLibre, Texte) côté éditeur. creerLibreVierge() apporte
+        // (Montant ref, MontantManuel, Texte) côté éditeur. creerManuelleVierge() apporte
         // le guard multi-tenant (tiers vérifié appartenir à l'asso courante).
         try {
-            $facture = app(FactureService::class)->creerLibreVierge((int) $tiersId);
+            $facture = app(FactureService::class)->creerManuelleVierge((int) $tiersId);
         } catch (\RuntimeException $e) {
             $this->showCreerModal = false;
             session()->flash('error', $e->getMessage());

@@ -26,7 +26,7 @@ it('FactureLigne::sousCategorie() returns the related SousCategorie', function (
 
     $ligne = FactureLigne::create([
         'facture_id' => $facture->id,
-        'type' => TypeLigneFacture::MontantLibre,
+        'type' => TypeLigneFacture::MontantManuel,
         'libelle' => 'Mission audit',
         'prix_unitaire' => 800.00,
         'quantite' => 3.000,
@@ -57,7 +57,7 @@ it('FactureLigne::operation() returns the related Operation', function (): void 
 
     $ligne = FactureLigne::create([
         'facture_id' => $facture->id,
-        'type' => TypeLigneFacture::MontantLibre,
+        'type' => TypeLigneFacture::MontantManuel,
         'libelle' => 'Prestation',
         'prix_unitaire' => 100.00,
         'quantite' => 1.000,
@@ -87,7 +87,7 @@ it('FactureLigne decimal casts for prix_unitaire and quantite', function (): voi
 
     $ligne = FactureLigne::create([
         'facture_id' => $facture->id,
-        'type' => TypeLigneFacture::MontantLibre,
+        'type' => TypeLigneFacture::MontantManuel,
         'libelle' => 'Ligne test',
         'prix_unitaire' => 123.45,
         'quantite' => 2.500,
@@ -120,7 +120,7 @@ it('FactureLigne integer casts for sous_categorie_id and operation_id', function
 
     $ligne = FactureLigne::create([
         'facture_id' => $facture->id,
-        'type' => TypeLigneFacture::MontantLibre,
+        'type' => TypeLigneFacture::MontantManuel,
         'libelle' => 'Test casts',
         'prix_unitaire' => 50.00,
         'quantite' => 1.000,
@@ -158,7 +158,7 @@ it('FactureLigne new fields are accepted via create()', function (): void {
 
     $ligne = FactureLigne::create([
         'facture_id' => $facture->id,
-        'type' => TypeLigneFacture::MontantLibre,
+        'type' => TypeLigneFacture::MontantManuel,
         'libelle' => 'Mission complète',
         'prix_unitaire' => 200.00,
         'quantite' => 5.000,

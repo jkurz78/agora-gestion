@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Mail\DevisLibreMail;
+use App\Mail\DevisManuelMail;
 use App\Models\Association;
 use App\Models\Devis;
 use App\Models\DevisLigne;
@@ -127,12 +127,12 @@ it('envoyerEmail refuse si le tiers n\'a pas d\'email', function () {
 
 // ─── Happy path : email envoyé au tiers ───────────────────────────────────────
 
-it('envoyerEmail envoie DevisLibreMail à l\'adresse du tiers', function () {
+it('envoyerEmail envoie DevisManuelMail à l\'adresse du tiers', function () {
     $devis = devisValideAvecLigne($this->tiers);
 
     $this->service->envoyerEmail($devis, 'Votre devis D-2026-001', '<p>Bonjour, veuillez trouver votre devis.</p>');
 
-    Mail::assertSent(DevisLibreMail::class, fn (DevisLibreMail $m) => $m->hasTo('acme@example.com'));
+    Mail::assertSent(DevisManuelMail::class, fn (DevisManuelMail $m) => $m->hasTo('acme@example.com'));
 });
 
 // ─── Mailable porte la bonne pièce jointe ─────────────────────────────────────
@@ -142,7 +142,7 @@ it('envoyerEmail joint un fichier PDF nommé d\'après le numéro du devis', fun
 
     $this->service->envoyerEmail($devis, 'Votre devis', '<p>Corps</p>');
 
-    Mail::assertSent(DevisLibreMail::class, function (DevisLibreMail $m): bool {
+    Mail::assertSent(DevisManuelMail::class, function (DevisManuelMail $m): bool {
         $attachments = $m->attachments();
         if (count($attachments) === 0) {
             return false;

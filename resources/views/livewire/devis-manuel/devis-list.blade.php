@@ -118,7 +118,7 @@
                         @php $expired = $this->expire($d); @endphp
                         <tr wire:key="devis-{{ $d->id }}"
                             style="cursor:pointer"
-                            onclick="window.location='{{ route('devis-libres.show', $d) }}'"
+                            onclick="window.location='{{ route('devis-manuels.show', $d) }}'"
                         >
                             <td class="small" data-sort="{{ $d->numero ?? '' }}">
                                 @if ($d->numero)
@@ -167,13 +167,13 @@
                             </td>
                             <td>
                                 @if ($d->statut->peutEtreModifie())
-                                    <a href="{{ route('devis-libres.show', $d) }}"
+                                    <a href="{{ route('devis-manuels.show', $d) }}"
                                        class="btn btn-sm btn-outline-secondary"
                                        title="Modifier">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                 @else
-                                    <a href="{{ route('devis-libres.show', $d) }}"
+                                    <a href="{{ route('devis-manuels.show', $d) }}"
                                        class="btn btn-sm btn-outline-secondary"
                                        title="Voir">
                                         <i class="bi bi-eye"></i>

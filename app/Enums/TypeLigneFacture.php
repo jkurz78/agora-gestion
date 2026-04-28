@@ -7,18 +7,18 @@ namespace App\Enums;
 enum TypeLigneFacture: string
 {
     case Montant = 'montant';
-    case MontantLibre = 'montant_libre';
+    case MontantManuel = 'montant_manuel';
     case Texte = 'texte';
 
-    /** True uniquement pour MontantLibre — génère une TransactionLigne à la validation. */
+    /** True uniquement pour MontantManuel — génère une TransactionLigne à la validation. */
     public function genereTransactionLigne(): bool
     {
-        return $this === self::MontantLibre;
+        return $this === self::MontantManuel;
     }
 
-    /** True pour les lignes ayant un impact comptable (Montant ref et MontantLibre). */
+    /** True pour les lignes ayant un impact comptable (Montant ref et MontantManuel). */
     public function aImpactComptable(): bool
     {
-        return $this === self::Montant || $this === self::MontantLibre;
+        return $this === self::Montant || $this === self::MontantManuel;
     }
 }

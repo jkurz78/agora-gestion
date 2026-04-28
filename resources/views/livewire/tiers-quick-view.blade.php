@@ -207,7 +207,7 @@
 
                     {{-- Factures moved to flux financiers line --}}
 
-                    {{-- Devis libres --}}
+                    {{-- Devis manuels --}}
                     @isset($summary['devis_libres'])
                         @php
                             $dl = $summary['devis_libres'];
@@ -223,9 +223,9 @@
                             <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
                                 <div class="d-flex align-items-center gap-1">
                                     <i class="bi bi-file-earmark-text small text-warning"></i>
-                                    <span class="fw-semibold small">Devis libres</span>
+                                    <span class="fw-semibold small">Devis manuels</span>
                                 </div>
-                                <a href="{{ route('devis-libres.index', ['filtreTiersId' => $tiers->id]) }}"
+                                <a href="{{ route('devis-manuels.index', ['filtreTiersId' => $tiers->id]) }}"
                                    class="small text-decoration-none" style="color:#722281;font-size:.65rem" target="_blank">
                                     Voir tous →
                                 </a>

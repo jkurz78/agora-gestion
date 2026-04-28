@@ -9,7 +9,7 @@ use App\Enums\StatutDevis;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneDevis;
 use App\Enums\TypeLigneFacture;
-use App\Mail\DevisLibreMail;
+use App\Mail\DevisManuelMail;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\EmailLog;
@@ -585,13 +585,13 @@ final class DevisService
      * - association_id du devis doit correspondre à TenantContext::currentId() (multi-tenant)
      *
      * Mapping des lignes :
-     * - DevisLigne type Montant → FactureLigne type MontantLibre
+     * - DevisLigne type Montant → FactureLigne type MontantManuel
      *   (libelle, prix_unitaire, quantite, montant = PU × Qté, sous_categorie_id recopiés)
      * - DevisLigne type Texte → FactureLigne type Texte (libelle seul, reste null)
      *
      * L'ordre des lignes est préservé. Le devis source reste à l'état Accepté.
      * La facture créée est brouillon (pas de numéro). transaction_ligne_id est null partout.
-     * montant_total = somme des montants des lignes MontantLibre.
+     * montant_total = somme des montants des lignes MontantManuel.
      *
      * @throws RuntimeException
      */
@@ -657,7 +657,7 @@ final class DevisService
                 $this->copierLigneDevisVersFacture($ligne, $facture);
             }
 
-            // Recalcule le montant_total : somme des montants non-null (lignes MontantLibre)
+            // Recalcule le montant_total : somme des montants non-null (lignes MontantManuel)
             $montantTotal = (float) FactureLigne::where('facture_id', $facture->id)
                 ->whereNotNull('montant')
                 ->sum('montant');
@@ -680,7 +680,7 @@ final class DevisService
      * Recopie une DevisLigne vers la FactureLigne correspondante.
      *
      * Mapping :
-     * - DevisLigne::Montant → FactureLigne::MontantLibre
+     * - DevisLigne::Montant → FactureLigne::MontantManuel
      * - DevisLigne::Texte   → FactureLigne::Texte
      */
     private function copierLigneDevisVersFacture(DevisLigne $ligne, Facture $facture): FactureLigne
@@ -701,13 +701,13 @@ final class DevisService
             ]);
         }
 
-        // TypeLigneDevis::Montant → TypeLigneFacture::MontantLibre
+        // TypeLigneDevis::Montant → TypeLigneFacture::MontantManuel
         $montant = round((float) $ligne->prix_unitaire * (float) $ligne->quantite, 2);
 
         return FactureLigne::create([
             'facture_id' => $facture->id,
             'ordre' => (int) $ligne->ordre,
-            'type' => TypeLigneFacture::MontantLibre,
+            'type' => TypeLigneFacture::MontantManuel,
             'libelle' => $ligne->libelle,
             'prix_unitaire' => (float) $ligne->prix_unitaire,
             'quantite' => (float) $ligne->quantite,
@@ -729,7 +729,7 @@ final class DevisService
      * Le paramètre $brouillonWatermark permet de forcer ou supprimer le filigrane
      * indépendamment du statut (utile pour les tests ou les exports manuels).
      *
-     * Path de stockage : associations/{associationId}/devis-libres/{devisId}/devis-{filename}.pdf
+     * Path de stockage : associations/{associationId}/devis-manuels/{devisId}/devis-{filename}.pdf
      * Retourne le chemin relatif au disque 'local'.
      *
      * @throws RuntimeException si aucune ligne avec montant > 0
@@ -767,7 +767,7 @@ final class DevisService
             }
         }
 
-        $pdf = Pdf::loadView('pdf.devis-libre', [
+        $pdf = Pdf::loadView('pdf.devis-manuel', [
             'devis' => $devis,
             'lignes' => $devis->lignes,
             'association' => $association,
@@ -782,7 +782,7 @@ final class DevisService
             : 'brouillon-'.$devis->id;
 
         $associationId = (int) $devis->association_id;
-        $path = 'associations/'.$associationId.'/devis-libres/'.$devis->id.'/devis-'.$filename.'.pdf';
+        $path = 'associations/'.$associationId.'/devis-manuels/'.$devis->id.'/devis-'.$filename.'.pdf';
 
         Storage::disk('local')->put($path, $pdf->output());
 
@@ -825,7 +825,7 @@ final class DevisService
 
         $pdfPath = $this->genererPdf($devis);
 
-        $mailable = new DevisLibreMail($devis, $sujet, $corps, $pdfPath);
+        $mailable = new DevisManuelMail($devis, $sujet, $corps, $pdfPath);
 
         Mail::to($email)->send($mailable);
 

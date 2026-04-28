@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Livewire\DevisLibre\DevisEdit;
+use App\Livewire\DevisManuel\DevisEdit;
 use App\Models\Association;
 use App\Models\Devis;
 use App\Models\Facture;
