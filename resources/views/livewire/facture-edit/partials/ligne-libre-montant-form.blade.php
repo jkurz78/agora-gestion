@@ -53,22 +53,26 @@
         <div class="col-md-5">
             <label class="form-label form-label-sm">Opération</label>
             <select class="form-select form-select-sm"
-                    wire:model="nouvelleLigneMontantOperationId">
+                    wire:model.live="nouvelleLigneMontantOperationId">
                 <option value="">— Aucune —</option>
                 @foreach ($operations as $op)
                     <option value="{{ $op->id }}">{{ $op->nom }}</option>
                 @endforeach
             </select>
         </div>
-        <div class="col-md-2">
-            <label class="form-label form-label-sm">Séance</label>
-            <input type="number"
-                   class="form-control form-control-sm"
-                   placeholder="N° séance"
-                   step="1"
-                   min="1"
-                   wire:model="nouvelleLigneMontantSeance">
-        </div>
+        @php $opForm = $nouvelleLigneMontantOperationId !== null && $nouvelleLigneMontantOperationId !== '' ? $operations->firstWhere('id', (int) $nouvelleLigneMontantOperationId) : null; @endphp
+        @if ($opForm !== null && (int) $opForm->nombre_seances > 0)
+            <div class="col-md-2">
+                <label class="form-label form-label-sm">Séance</label>
+                <select class="form-select form-select-sm"
+                        wire:model="nouvelleLigneMontantSeance">
+                    <option value="">— Aucune —</option>
+                    @for ($i = 1; $i <= (int) $opForm->nombre_seances; $i++)
+                        <option value="{{ $i }}">{{ $i }}</option>
+                    @endfor
+                </select>
+            </div>
+        @endif
     </div>
     <div class="d-flex gap-2 mt-2">
         <button wire:click="ajouterLigneLibreMontant"
