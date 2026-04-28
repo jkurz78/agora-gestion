@@ -30,10 +30,6 @@ final class FactureList extends Component
 
     public bool $showCreerModal = false;
 
-    public ?int $newFactureLibreTiersId = null;
-
-    public bool $showCreerLibreModal = false;
-
     public function getCanEditProperty(): bool
     {
         return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
@@ -49,41 +45,6 @@ final class FactureList extends Component
         $this->resetPage();
     }
 
-    public function ouvrirModalLibre(): void
-    {
-        if (! $this->canEdit) {
-            return;
-        }
-
-        $this->showCreerLibreModal = true;
-        $this->newFactureLibreTiersId = null;
-    }
-
-    public function creerFactureLibre(?int $tiersId = null): mixed
-    {
-        if (! $this->canEdit) {
-            return null;
-        }
-
-        if ($tiersId === null) {
-            $this->showCreerLibreModal = true;
-            $this->newFactureLibreTiersId = null;
-
-            return null;
-        }
-
-        try {
-            $facture = app(FactureService::class)->creerLibreVierge($tiersId);
-        } catch (\RuntimeException $e) {
-            $this->showCreerLibreModal = false;
-            session()->flash('error', $e->getMessage());
-
-            return null;
-        }
-
-        return $this->redirect(route('facturation.factures.show', $facture));
-    }
-
     public function creer(?int $tiersId = null): mixed
     {
         if (! $this->canEdit) {
@@ -97,13 +58,17 @@ final class FactureList extends Component
             return null;
         }
 
-        $this->newFactureTiersId = $tiersId;
+        // Flow unifié : la facture brouillon créée supporte les 3 types de lignes
+        // (Montant ref, MontantLibre, Texte) côté éditeur. creerLibreVierge() apporte
+        // le guard multi-tenant (tiers vérifié appartenir à l'asso courante).
+        try {
+            $facture = app(FactureService::class)->creerLibreVierge((int) $tiersId);
+        } catch (\RuntimeException $e) {
+            $this->showCreerModal = false;
+            session()->flash('error', $e->getMessage());
 
-        $this->validate([
-            'newFactureTiersId' => ['required', 'exists:tiers,id'],
-        ]);
-
-        $facture = app(FactureService::class)->creer($this->newFactureTiersId);
+            return null;
+        }
 
         return $this->redirect(route('facturation.factures.edit', $facture));
     }
