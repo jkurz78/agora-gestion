@@ -6,11 +6,15 @@ namespace App\Services;
 
 use App\Enums\CategorieEmail;
 use App\Enums\StatutDevis;
+use App\Enums\StatutFacture;
 use App\Enums\TypeLigneDevis;
+use App\Enums\TypeLigneFacture;
 use App\Mail\DevisLibreMail;
 use App\Models\Devis;
 use App\Models\DevisLigne;
 use App\Models\EmailLog;
+use App\Models\Facture;
+use App\Models\FactureLigne;
 use App\Support\CurrentAssociation;
 use App\Tenant\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -18,6 +22,7 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -569,6 +574,149 @@ final class DevisService
 
             return $nouveau;
         });
+    }
+
+    /**
+     * Transforme un devis accepté en facture brouillon.
+     *
+     * Guards (évalués sur la ligne verrouillée) :
+     * - statut doit être Accepte, sinon RuntimeException (fr)
+     * - aucune facture issue de ce devis ne doit exister (aDejaUneFacture), sinon RuntimeException (fr)
+     * - association_id du devis doit correspondre à TenantContext::currentId() (multi-tenant)
+     *
+     * Mapping des lignes :
+     * - DevisLigne type Montant → FactureLigne type MontantLibre
+     *   (libelle, prix_unitaire, quantite, montant = PU × Qté, sous_categorie_id recopiés)
+     * - DevisLigne type Texte → FactureLigne type Texte (libelle seul, reste null)
+     *
+     * L'ordre des lignes est préservé. Le devis source reste à l'état Accepté.
+     * La facture créée est brouillon (pas de numéro). transaction_ligne_id est null partout.
+     * montant_total = somme des montants des lignes MontantLibre.
+     *
+     * @throws RuntimeException
+     */
+    public function transformerEnFacture(Devis $devis): Facture
+    {
+        // Guard multi-tenant préliminaire (avant lock, defense-in-depth)
+        $this->guardAssociation($devis);
+
+        $facture = DB::transaction(function () use ($devis): Facture {
+            // Re-lit et verrouille la ligne du devis pour toute la durée de la transaction.
+            $locked = Devis::withoutGlobalScopes()
+                ->whereKey($devis->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // Guard multi-tenant sur l'instance verrouillée
+            $this->guardAssociation($locked);
+
+            // Guard statut : seul un devis Accepté peut être transformé
+            if ($locked->statut !== StatutDevis::Accepte) {
+                throw new RuntimeException(
+                    'Seul un devis accepté peut être transformé en facture.'
+                );
+            }
+
+            // Guard idempotence : une facture issue de ce devis existe déjà
+            if ($locked->aDejaUneFacture()) {
+                throw new RuntimeException(
+                    'Une facture issue de ce devis existe déjà.'
+                );
+            }
+
+            $association = CurrentAssociation::get();
+
+            $mentionsLegales = $association->facture_mentions_legales
+                ?? "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé";
+
+            $conditionsReglement = $association->facture_conditions_reglement
+                ?? 'Payable à réception';
+
+            $compteBancaireId = $association->facture_compte_bancaire_id;
+
+            // Création de la facture brouillon avec le lien vers le devis
+            $facture = Facture::create([
+                'numero' => null,
+                'date' => now()->toDateString(),
+                'statut' => StatutFacture::Brouillon,
+                'tiers_id' => (int) $locked->tiers_id,
+                'devis_id' => (int) $locked->id,
+                'mode_paiement_prevu' => null,
+                'compte_bancaire_id' => $compteBancaireId,
+                'conditions_reglement' => $conditionsReglement,
+                'mentions_legales' => $mentionsLegales,
+                'montant_total' => 0,
+                'saisi_par' => auth()->id(),
+                'exercice' => (int) $locked->exercice,
+            ]);
+
+            // Recopie des lignes du devis vers la facture
+            $lignes = $locked->lignes()->orderBy('ordre')->get();
+
+            foreach ($lignes as $ligne) {
+                $this->copierLigneDevisVersFacture($ligne, $facture);
+            }
+
+            // Recalcule le montant_total : somme des montants non-null (lignes MontantLibre)
+            $montantTotal = (float) FactureLigne::where('facture_id', $facture->id)
+                ->whereNotNull('montant')
+                ->sum('montant');
+
+            $facture->update(['montant_total' => $montantTotal]);
+
+            return $facture;
+        });
+
+        // Log après le commit (hors transaction pour éviter rollback du log)
+        Log::info('devis.transforme_en_facture', [
+            'devis_id' => (int) $devis->id,
+            'facture_id' => (int) $facture->id,
+        ]);
+
+        return $facture;
+    }
+
+    /**
+     * Recopie une DevisLigne vers la FactureLigne correspondante.
+     *
+     * Mapping :
+     * - DevisLigne::Montant → FactureLigne::MontantLibre
+     * - DevisLigne::Texte   → FactureLigne::Texte
+     */
+    private function copierLigneDevisVersFacture(DevisLigne $ligne, Facture $facture): FactureLigne
+    {
+        if ($ligne->type === TypeLigneDevis::Texte) {
+            return FactureLigne::create([
+                'facture_id' => $facture->id,
+                'ordre' => (int) $ligne->ordre,
+                'type' => TypeLigneFacture::Texte,
+                'libelle' => $ligne->libelle,
+                'prix_unitaire' => null,
+                'quantite' => null,
+                'montant' => null,
+                'transaction_ligne_id' => null,
+                'sous_categorie_id' => null,
+                'operation_id' => null,
+                'seance' => null,
+            ]);
+        }
+
+        // TypeLigneDevis::Montant → TypeLigneFacture::MontantLibre
+        $montant = round((float) $ligne->prix_unitaire * (float) $ligne->quantite, 2);
+
+        return FactureLigne::create([
+            'facture_id' => $facture->id,
+            'ordre' => (int) $ligne->ordre,
+            'type' => TypeLigneFacture::MontantLibre,
+            'libelle' => $ligne->libelle,
+            'prix_unitaire' => (float) $ligne->prix_unitaire,
+            'quantite' => (float) $ligne->quantite,
+            'montant' => $montant,
+            'transaction_ligne_id' => null,
+            'sous_categorie_id' => $ligne->sous_categorie_id !== null ? (int) $ligne->sous_categorie_id : null,
+            'operation_id' => null,
+            'seance' => null,
+        ]);
     }
 
     /**
