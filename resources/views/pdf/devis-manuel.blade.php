@@ -62,11 +62,11 @@
         .lines-table thead th.text-end { text-align: right; }
         .lines-table tbody td {
             padding: 5px 8px;
-            border-bottom: 1px solid #dee2e6;
             vertical-align: top;
         }
         .lines-table tbody td.text-end { text-align: right; }
-        .lines-table .row-even { background-color: #f9f9f9; }
+        /* essai : pas de zebra-rows, fond blanc uniforme */
+        /* .lines-table .row-even { background-color: #f9f9f9; } */
         .lines-table tfoot tr {
             background-color: #e9ecef;
             font-weight: bold;
