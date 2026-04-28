@@ -73,7 +73,6 @@
         .lines-table tbody td.text-end { text-align: right; }
         .lines-table .row-even { background-color: #f9f9f9; }
         .lines-table .ligne-texte td {
-            font-weight: bold;
             color: #333;
             padding-top: 8px;
         }
