@@ -221,12 +221,16 @@ final class FactureService
             throw new \RuntimeException('Seul un brouillon peut être validé.');
         }
 
-        $montantLignes = $facture->lignes()
-            ->where('type', TypeLigneFacture::Montant)
+        // Compte les lignes ayant un impact comptable (Montant ref OU MontantLibre)
+        $lignesAvecMontant = $facture->lignes()
+            ->whereIn('type', [TypeLigneFacture::Montant->value, TypeLigneFacture::MontantLibre->value])
             ->count();
-        if ($montantLignes === 0) {
+        if ($lignesAvecMontant === 0) {
             throw new \RuntimeException('La facture doit contenir au moins une ligne avec montant.');
         }
+
+        // Guards spécifiques aux factures portant ≥ 1 ligne MontantLibre
+        $this->assertGuardsLignesLibres($facture);
 
         DB::transaction(function () use ($facture) {
             // Check exercice is open inside the transaction
@@ -257,7 +261,7 @@ final class FactureService
             $numero = sprintf('F-%d-%04d', $facture->exercice, $seq);
 
             $montantTotal = (float) $facture->lignes()
-                ->where('type', TypeLigneFacture::Montant)
+                ->whereIn('type', [TypeLigneFacture::Montant->value, TypeLigneFacture::MontantLibre->value])
                 ->sum('montant');
 
             $facture->update([
@@ -615,6 +619,46 @@ XML;
             ->sum('montant');
 
         $facture->update(['montant_total' => $total]);
+    }
+
+    /**
+     * Guards spécifiques aux factures portant ≥ 1 ligne MontantLibre.
+     *
+     * Exécutés AVANT toute mutation et AVANT l'attribution du numéro.
+     *
+     * 1. mode_paiement_prevu doit être non-null.
+     * 2. Chaque ligne MontantLibre doit avoir sous_categorie_id non-null.
+     *
+     * Si la facture ne porte aucune ligne MontantLibre, cette méthode est no-op
+     * (les factures classiques ne sont pas impactées).
+     *
+     * @throws \RuntimeException si un guard échoue
+     */
+    private function assertGuardsLignesLibres(Facture $facture): void
+    {
+        $lignesLibres = $facture->lignes()
+            ->where('type', TypeLigneFacture::MontantLibre->value)
+            ->get();
+
+        if ($lignesLibres->isEmpty()) {
+            return;
+        }
+
+        if ($facture->mode_paiement_prevu === null) {
+            throw new \RuntimeException(
+                'Le mode de règlement prévisionnel est requis pour valider une facture portant des lignes libres.'
+            );
+        }
+
+        $lignesansSousCat = $lignesLibres->filter(
+            fn (FactureLigne $l) => $l->sous_categorie_id === null
+        );
+
+        if ($lignesansSousCat->isNotEmpty()) {
+            throw new \RuntimeException(
+                'La sous-catégorie est requise sur chaque ligne montant pour valider la facture.'
+            );
+        }
     }
 
     /**
