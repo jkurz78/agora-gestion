@@ -351,7 +351,9 @@ final class FactureService
     }
 
     /**
-     * Delete a text line from the facture. Only texte lines can be individually deleted.
+     * Delete a texte or MontantLibre line from the facture.
+     * Lignes de type Montant (liées à une transaction) ne peuvent pas être supprimées ici.
+     * La suppression d'une ligne MontantLibre recalcule montant_total.
      */
     public function supprimerLigne(Facture $facture, int $ligneId): void
     {
@@ -359,11 +361,75 @@ final class FactureService
 
         $ligne = $facture->lignes()->findOrFail($ligneId);
 
-        if ($ligne->type !== TypeLigneFacture::Texte) {
-            throw new \RuntimeException('Seules les lignes de texte peuvent être supprimées individuellement.');
+        if ($ligne->type === TypeLigneFacture::Montant) {
+            throw new \RuntimeException('Les lignes liées à une transaction ne peuvent pas être supprimées individuellement — utilisez « Retirer la transaction ».');
         }
 
         $ligne->delete();
+
+        if ($ligne->type === TypeLigneFacture::MontantLibre) {
+            $this->recalculerMontantTotal($facture);
+        }
+    }
+
+    /**
+     * Mise à jour de la sous-catégorie d'une ligne MontantLibre.
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si la ligne n'est pas de type MontantLibre
+     */
+    public function majSousCategorieLigne(Facture $facture, int $ligneId, ?int $sousCategorieId): void
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        $ligne = $facture->lignes()->findOrFail($ligneId);
+
+        if ($ligne->type !== TypeLigneFacture::MontantLibre) {
+            throw new \RuntimeException('La sous-catégorie ne peut être modifiée que sur une ligne libre montant.');
+        }
+
+        $ligne->update(['sous_categorie_id' => $sousCategorieId]);
+    }
+
+    /**
+     * Mise à jour de l'opération d'une ligne MontantLibre.
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si la ligne n'est pas de type MontantLibre
+     */
+    public function majOperationLigne(Facture $facture, int $ligneId, ?int $operationId): void
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        $ligne = $facture->lignes()->findOrFail($ligneId);
+
+        if ($ligne->type !== TypeLigneFacture::MontantLibre) {
+            throw new \RuntimeException("L'opération ne peut être modifiée que sur une ligne libre montant.");
+        }
+
+        $ligne->update(['operation_id' => $operationId]);
+    }
+
+    /**
+     * Mise à jour du numéro de séance d'une ligne MontantLibre.
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si la ligne n'est pas de type MontantLibre
+     */
+    public function majSeanceLigne(Facture $facture, int $ligneId, ?int $seance): void
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        $ligne = $facture->lignes()->findOrFail($ligneId);
+
+        if ($ligne->type !== TypeLigneFacture::MontantLibre) {
+            throw new \RuntimeException('Le numéro de séance ne peut être modifié que sur une ligne libre montant.');
+        }
+
+        $ligne->update(['seance' => $seance]);
     }
 
     /**

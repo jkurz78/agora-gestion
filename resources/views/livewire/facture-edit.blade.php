@@ -132,6 +132,35 @@
                                                         &times; {{ number_format((float) $ligne->quantite, 3, ',', ' ') }}
                                                     </div>
                                                 @endif
+                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
+                                                    <div class="row g-2 mt-1 ps-4">
+                                                        <div class="col-md-4">
+                                                            <select class="form-select form-select-sm @if ($ligne->sous_categorie_id === null) is-invalid @endif"
+                                                                    wire:change="updateSousCategorie({{ $ligne->id }}, $event.target.value)">
+                                                                <option value="">— Sous-catégorie (requise) —</option>
+                                                                @foreach ($sousCategoriesRecettes as $sc)
+                                                                    <option value="{{ $sc->id }}" @selected((int) $ligne->sous_categorie_id === (int) $sc->id)>{{ $sc->nom }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-4">
+                                                            <select class="form-select form-select-sm"
+                                                                    wire:change="updateOperation({{ $ligne->id }}, $event.target.value)">
+                                                                <option value="">— Opération (optionnel) —</option>
+                                                                @foreach ($operations as $op)
+                                                                    <option value="{{ $op->id }}" @selected((int) $ligne->operation_id === (int) $op->id)>{{ $op->nom }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-md-2">
+                                                            <input type="number"
+                                                                   class="form-control form-control-sm"
+                                                                   placeholder="Séance"
+                                                                   value="{{ $ligne->seance }}"
+                                                                   wire:blur="updateSeance({{ $ligne->id }}, $event.target.value)">
+                                                        </div>
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td class="text-end small fw-semibold text-nowrap">
                                                 @if ($ligne->type === \App\Enums\TypeLigneFacture::Montant || $ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
@@ -155,9 +184,9 @@
                                                 </button>
                                             </td>
                                             <td class="text-center">
-                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::Texte)
-                                                    <button wire:click="deleteTexte({{ $ligne->id }})"
-                                                            wire:confirm="Supprimer cette ligne de texte ?"
+                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::Texte || $ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
+                                                    <button wire:click="supprimerLigneEditable({{ $ligne->id }})"
+                                                            wire:confirm="Supprimer cette ligne ?"
                                                             wire:loading.attr="disabled" wire:target="updateLibelle"
                                                             class="btn btn-sm btn-outline-danger"
                                                             title="Supprimer">
