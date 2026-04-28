@@ -21,6 +21,7 @@ use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 final class FactureService
@@ -214,6 +215,7 @@ final class FactureService
 
     /**
      * Validate a brouillon facture: assign sequential numero, freeze montant_total, set statut to validee.
+     * If the facture carries ≥ 1 MontantLibre line, generates 1 Transaction recette + N TransactionLignes.
      */
     public function valider(Facture $facture): void
     {
@@ -232,20 +234,27 @@ final class FactureService
         // Guards spécifiques aux factures portant ≥ 1 ligne MontantLibre
         $this->assertGuardsLignesLibres($facture);
 
-        DB::transaction(function () use ($facture) {
+        $transactionGeneree = DB::transaction(function () use ($facture): ?Transaction {
+            // Re-lock the facture itself to protect against double-validation race
+            $factureVerrouillee = Facture::lockForUpdate()->find($facture->id);
+
+            if ($factureVerrouillee === null || $factureVerrouillee->statut !== StatutFacture::Brouillon) {
+                throw new \RuntimeException('Seul un brouillon peut être validé.');
+            }
+
             // Check exercice is open inside the transaction
-            $this->exerciceService->assertOuvert($facture->exercice);
+            $this->exerciceService->assertOuvert($factureVerrouillee->exercice);
 
             // Lock ALL factures of this exercice upfront (single lock for both
             // chronological constraint and sequential numbering)
-            $exerciceFactures = Facture::where('exercice', $facture->exercice)
+            $exerciceFactures = Facture::where('exercice', $factureVerrouillee->exercice)
                 ->whereIn('statut', [StatutFacture::Validee, StatutFacture::Annulee])
                 ->lockForUpdate()
                 ->get();
 
             // Chronological constraint
             $lastValidated = $exerciceFactures->sortByDesc('date')->first();
-            if ($lastValidated && $facture->date->lt($lastValidated->date)) {
+            if ($lastValidated && $factureVerrouillee->date->lt($lastValidated->date)) {
                 throw new \RuntimeException(
                     "La date doit être postérieure ou égale au {$lastValidated->date->format('d/m/Y')} (dernière facture validée {$lastValidated->numero})."
                 );
@@ -258,18 +267,34 @@ final class FactureService
                 ->max() ?? 0;
 
             $seq = $maxSeq + 1;
-            $numero = sprintf('F-%d-%04d', $facture->exercice, $seq);
+            $numero = sprintf('F-%d-%04d', $factureVerrouillee->exercice, $seq);
 
-            $montantTotal = (float) $facture->lignes()
+            $montantTotal = (float) $factureVerrouillee->lignes()
                 ->whereIn('type', [TypeLigneFacture::Montant->value, TypeLigneFacture::MontantLibre->value])
                 ->sum('montant');
 
-            $facture->update([
+            $factureVerrouillee->update([
                 'numero' => $numero,
                 'montant_total' => $montantTotal,
                 'statut' => StatutFacture::Validee,
             ]);
+
+            // Sync local instance for libellé generation
+            $facture->numero = $numero;
+            $facture->statut = StatutFacture::Validee;
+
+            // Génère Transaction + TransactionLignes pour les lignes MontantLibre
+            return $this->genererTransactionDepuisLignesLibres($factureVerrouillee);
         });
+
+        // Émet le log après le commit (hors transaction pour éviter le rollback du log)
+        Log::info('facture.valide', [
+            'facture_id' => (int) $facture->id,
+            'transaction_id_generee' => $transactionGeneree !== null ? (int) $transactionGeneree->id : null,
+        ]);
+
+        // Refresh local instance to expose numero/statut attribués
+        $facture->refresh();
     }
 
     /**
@@ -659,6 +684,58 @@ XML;
                 'La sous-catégorie est requise sur chaque ligne montant pour valider la facture.'
             );
         }
+    }
+
+    /**
+     * Génère 1 Transaction recette + N TransactionLignes pour les lignes MontantLibre de la facture.
+     *
+     * Doit être appelée APRÈS attribution du numéro, à l'intérieur d'une DB::transaction.
+     * Retourne null si la facture ne porte aucune ligne MontantLibre.
+     */
+    private function genererTransactionDepuisLignesLibres(Facture $facture): ?Transaction
+    {
+        $lignesLibres = $facture->lignes()
+            ->where('type', TypeLigneFacture::MontantLibre->value)
+            ->get();
+
+        if ($lignesLibres->isEmpty()) {
+            return null;
+        }
+
+        $montantTotal = $lignesLibres->sum(fn (FactureLigne $l) => (float) $l->montant);
+
+        // 1. Crée la Transaction recette entête
+        $transaction = Transaction::create([
+            'association_id' => (int) TenantContext::currentId(),
+            'type' => TypeTransaction::Recette,
+            'tiers_id' => (int) $facture->tiers_id,
+            'date' => now()->toDateString(),
+            'libelle' => "Facture {$facture->numero}",
+            'montant_total' => round($montantTotal, 2),
+            'mode_paiement' => $facture->mode_paiement_prevu?->value,
+            'statut_reglement' => StatutReglement::EnAttente->value,
+            'saisi_par' => auth()->id(),
+        ]);
+
+        // 2. Crée les TransactionLignes + 3. set facture_lignes.transaction_ligne_id
+        foreach ($lignesLibres as $factureLigne) {
+            $transactionLigne = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'sous_categorie_id' => $factureLigne->sous_categorie_id,
+                'operation_id' => $factureLigne->operation_id,
+                'seance' => $factureLigne->seance,
+                'montant' => $factureLigne->montant,
+                'notes' => $factureLigne->libelle,
+            ]);
+
+            // 3. Lie la FactureLigne à sa TransactionLigne
+            $factureLigne->update(['transaction_ligne_id' => $transactionLigne->id]);
+        }
+
+        // 4. Attache la Transaction au pivot facture_transaction
+        $facture->transactions()->attach($transaction->id);
+
+        return $transaction;
     }
 
     /**
