@@ -284,34 +284,6 @@
                 </div>
             </div>
 
-            {{-- Conditions de règlement (visible ssi >= 1 ligne MontantManuel) --}}
-            @if ($aLignesMontantManuel)
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-bank"></i> Conditions de règlement</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-0">
-                            <label for="mode-paiement-prevu" class="form-label">
-                                Mode de paiement prévu
-                                @if ($facture->statut === \App\Enums\StatutFacture::Brouillon)
-                                    <span class="text-danger" title="Requis à la validation">*</span>
-                                @endif
-                            </label>
-                            <select id="mode-paiement-prevu"
-                                    name="modePaiementPrevu"
-                                    class="form-select"
-                                    wire:model.live="modePaiementPrevu"
-                                    {{ $facture->statut !== \App\Enums\StatutFacture::Brouillon ? 'disabled' : '' }}>
-                                <option value="">— Sélectionner —</option>
-                                @foreach ($modesPaiement as $mode)
-                                    <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            @endif
         </div>
 
         <div class="col-lg-4">
@@ -371,6 +343,27 @@
                             @endforeach
                         </select>
                     </div>
+
+                    @if ($aLignesMontantManuel)
+                        <div class="mb-3">
+                            <label for="mode-paiement-prevu" class="form-label">
+                                Mode de paiement prévu
+                                @if ($facture->statut === \App\Enums\StatutFacture::Brouillon)
+                                    <span class="text-danger" title="Requis à la validation">*</span>
+                                @endif
+                            </label>
+                            <select id="mode-paiement-prevu"
+                                    name="modePaiementPrevu"
+                                    class="form-select"
+                                    wire:model.live="modePaiementPrevu"
+                                    {{ $facture->statut !== \App\Enums\StatutFacture::Brouillon ? 'disabled' : '' }}>
+                                <option value="">— Sélectionner —</option>
+                                @foreach ($modesPaiement as $mode)
+                                    <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
 
                     <div class="mb-3">
                         <label for="facture-conditions" class="form-label">Conditions de reglement</label>
