@@ -183,9 +183,15 @@
             @foreach($lignes as $index => $ligne)
                 <tr class="{{ $index % 2 === 1 ? 'row-even' : '' }}">
                     <td>{{ $ligne->libelle }}</td>
-                    <td class="text-end">{{ number_format((float) $ligne->prix_unitaire, 2, ',', "\u{00A0}") }}</td>
-                    <td class="text-end">{{ number_format((float) $ligne->quantite, ($ligne->quantite == floor($ligne->quantite) ? 0 : 2), ',', "\u{00A0}") }}</td>
-                    <td class="text-end">{{ number_format((float) $ligne->montant, 2, ',', "\u{00A0}") }}</td>
+                    @if($ligne->type === \App\Enums\TypeLigneDevis::Texte)
+                        <td class="text-end"></td>
+                        <td class="text-end"></td>
+                        <td class="text-end"></td>
+                    @else
+                        <td class="text-end">{{ number_format((float) $ligne->prix_unitaire, 2, ',', "\u{00A0}") }}</td>
+                        <td class="text-end">{{ number_format((float) $ligne->quantite, ($ligne->quantite == floor($ligne->quantite) ? 0 : 2), ',', "\u{00A0}") }}</td>
+                        <td class="text-end">{{ number_format((float) $ligne->montant, 2, ',', "\u{00A0}") }}</td>
+                    @endif
                 </tr>
             @endforeach
         </tbody>
