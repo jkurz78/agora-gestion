@@ -2,7 +2,7 @@
 
 **Created**: 2026-04-28
 **Branch**: feat/facture-libre-s2 (à créer ; main aujourd'hui)
-**Status**: approved
+**Status**: implemented
 **Spec**: [docs/specs/2026-04-28-facture-libre-s2.md](../docs/specs/2026-04-28-facture-libre-s2.md) — gate ✅ PASS
 
 ## Goal
