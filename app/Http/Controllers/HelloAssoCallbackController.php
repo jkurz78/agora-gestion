@@ -7,14 +7,24 @@ namespace App\Http\Controllers;
 use App\Models\Association;
 use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
+use App\Support\Demo;
 use App\Tenant\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 final class HelloAssoCallbackController extends Controller
 {
     public function __invoke(Request $request, string $token): JsonResponse
     {
+        if (Demo::isActive()) {
+            Log::info('helloasso.webhook.skipped_demo', [
+                'payload_keys' => array_keys($request->all()),
+            ]);
+
+            return response()->json(['status' => 'skipped_demo'], 200);
+        }
+
         $parametres = HelloAssoParametres::all()
             ->first(fn ($p) => hash_equals((string) ($p->callback_token ?? ''), $token));
 
