@@ -276,7 +276,7 @@
                                     <select class="form-select form-select-sm" wire:model="nouvelleLigneSousCategorieId">
                                         <option value="">— Aucune —</option>
                                         @foreach ($sousCategoriesDisponibles as $sc)
-                                            <option value="{{ $sc->id }}">{{ $sc->libelle }}</option>
+                                            <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
                                         @endforeach
                                     </select>
                                 </div>
