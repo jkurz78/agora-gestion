@@ -607,7 +607,7 @@ describe('supprimerLigne()', function () {
         ]);
 
         $this->service->supprimerLigne($this->facture, $ligne->id);
-    })->throws(RuntimeException::class, 'lignes de texte');
+    })->throws(RuntimeException::class, 'Les lignes liées à une transaction ne peuvent pas être supprimées individuellement');
 
     it('throws on non-brouillon facture', function () {
         $facture = Facture::create([

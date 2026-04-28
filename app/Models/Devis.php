@@ -8,6 +8,7 @@ use App\Enums\StatutDevis;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class Devis extends TenantModel
@@ -73,5 +74,15 @@ final class Devis extends TenantModel
     public function saisiParUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'saisi_par_user_id');
+    }
+
+    public function facture(): HasOne
+    {
+        return $this->hasOne(Facture::class, 'devis_id');
+    }
+
+    public function aDejaUneFacture(): bool
+    {
+        return $this->facture()->exists();
     }
 }

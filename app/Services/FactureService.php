@@ -12,13 +12,16 @@ use App\Models\Association;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Seance;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Support\CurrentAssociation;
+use App\Tenant\TenantContext;
 use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 final class FactureService
@@ -51,6 +54,56 @@ final class FactureService
                 'date' => now()->toDateString(),
                 'statut' => StatutFacture::Brouillon,
                 'tiers_id' => $tiersId,
+                'compte_bancaire_id' => $compteBancaireId,
+                'conditions_reglement' => $conditionsReglement,
+                'mentions_legales' => $mentionsLegales,
+                'montant_total' => 0,
+                'saisi_par' => auth()->id(),
+                'exercice' => $exercice,
+            ]);
+        });
+    }
+
+    /**
+     * Crée une facture brouillon vierge sans devis source (facture manuelle directe).
+     *
+     * Aucune ligne n'est créée. Le numéro reste null (statut brouillon).
+     * Le tiers doit appartenir à l'association courante (guard multi-tenant).
+     *
+     * @throws \RuntimeException si le tiers n'appartient pas à l'association courante
+     *                           ou si TenantContext n'est pas booté
+     */
+    public function creerManuelleVierge(int $tiersId): Facture
+    {
+        $exercice = $this->exerciceService->current();
+        $this->exerciceService->assertOuvert($exercice);
+
+        return DB::transaction(function () use ($tiersId, $exercice): Facture {
+            $association = CurrentAssociation::get();
+
+            // Guard multi-tenant : charge le tiers sans scope pour pouvoir
+            // détecter les cross-tenant, puis vérifie l'appartenance.
+            $tiers = Tiers::withoutGlobalScopes()->find($tiersId);
+
+            if ($tiers === null || (int) $tiers->association_id !== (int) TenantContext::currentId()) {
+                throw new \RuntimeException("Accès interdit : ce tiers n'appartient pas à votre association.");
+            }
+
+            $mentionsLegales = $association->facture_mentions_legales
+                ?? "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé";
+
+            $conditionsReglement = $association->facture_conditions_reglement
+                ?? 'Payable à réception';
+
+            $compteBancaireId = $association->facture_compte_bancaire_id;
+
+            return Facture::create([
+                'numero' => null,
+                'date' => now()->toDateString(),
+                'statut' => StatutFacture::Brouillon,
+                'tiers_id' => $tiersId,
+                'devis_id' => null,
+                'mode_paiement_prevu' => null,
                 'compte_bancaire_id' => $compteBancaireId,
                 'conditions_reglement' => $conditionsReglement,
                 'mentions_legales' => $mentionsLegales,
@@ -162,6 +215,7 @@ final class FactureService
 
     /**
      * Validate a brouillon facture: assign sequential numero, freeze montant_total, set statut to validee.
+     * If the facture carries ≥ 1 MontantManuel line, generates 1 Transaction recette + N TransactionLignes.
      */
     public function valider(Facture $facture): void
     {
@@ -169,27 +223,38 @@ final class FactureService
             throw new \RuntimeException('Seul un brouillon peut être validé.');
         }
 
-        $montantLignes = $facture->lignes()
-            ->where('type', TypeLigneFacture::Montant)
+        // Compte les lignes ayant un impact comptable (Montant ref OU MontantManuel)
+        $lignesAvecMontant = $facture->lignes()
+            ->whereIn('type', [TypeLigneFacture::Montant->value, TypeLigneFacture::MontantManuel->value])
             ->count();
-        if ($montantLignes === 0) {
+        if ($lignesAvecMontant === 0) {
             throw new \RuntimeException('La facture doit contenir au moins une ligne avec montant.');
         }
 
-        DB::transaction(function () use ($facture) {
+        // Guards spécifiques aux factures portant ≥ 1 ligne MontantManuel
+        $this->assertGuardsLignesManuelles($facture);
+
+        $transactionGeneree = DB::transaction(function () use ($facture): ?Transaction {
+            // Re-lock the facture itself to protect against double-validation race
+            $factureVerrouillee = Facture::lockForUpdate()->find($facture->id);
+
+            if ($factureVerrouillee === null || $factureVerrouillee->statut !== StatutFacture::Brouillon) {
+                throw new \RuntimeException('Seul un brouillon peut être validé.');
+            }
+
             // Check exercice is open inside the transaction
-            $this->exerciceService->assertOuvert($facture->exercice);
+            $this->exerciceService->assertOuvert($factureVerrouillee->exercice);
 
             // Lock ALL factures of this exercice upfront (single lock for both
             // chronological constraint and sequential numbering)
-            $exerciceFactures = Facture::where('exercice', $facture->exercice)
+            $exerciceFactures = Facture::where('exercice', $factureVerrouillee->exercice)
                 ->whereIn('statut', [StatutFacture::Validee, StatutFacture::Annulee])
                 ->lockForUpdate()
                 ->get();
 
             // Chronological constraint
             $lastValidated = $exerciceFactures->sortByDesc('date')->first();
-            if ($lastValidated && $facture->date->lt($lastValidated->date)) {
+            if ($lastValidated && $factureVerrouillee->date->lt($lastValidated->date)) {
                 throw new \RuntimeException(
                     "La date doit être postérieure ou égale au {$lastValidated->date->format('d/m/Y')} (dernière facture validée {$lastValidated->numero})."
                 );
@@ -202,18 +267,34 @@ final class FactureService
                 ->max() ?? 0;
 
             $seq = $maxSeq + 1;
-            $numero = sprintf('F-%d-%04d', $facture->exercice, $seq);
+            $numero = sprintf('F-%d-%04d', $factureVerrouillee->exercice, $seq);
 
-            $montantTotal = (float) $facture->lignes()
-                ->where('type', TypeLigneFacture::Montant)
+            $montantTotal = (float) $factureVerrouillee->lignes()
+                ->whereIn('type', [TypeLigneFacture::Montant->value, TypeLigneFacture::MontantManuel->value])
                 ->sum('montant');
 
-            $facture->update([
+            $factureVerrouillee->update([
                 'numero' => $numero,
                 'montant_total' => $montantTotal,
                 'statut' => StatutFacture::Validee,
             ]);
+
+            // Sync local instance for libellé generation
+            $facture->numero = $numero;
+            $facture->statut = StatutFacture::Validee;
+
+            // Génère Transaction + TransactionLignes pour les lignes MontantManuel
+            return $this->genererTransactionDepuisLignesManuelles($factureVerrouillee);
         });
+
+        // Émet le log après le commit (hors transaction pour éviter le rollback du log)
+        Log::info('facture.valide', [
+            'facture_id' => (int) $facture->id,
+            'transaction_id_generee' => $transactionGeneree !== null ? (int) $transactionGeneree->id : null,
+        ]);
+
+        // Refresh local instance to expose numero/statut attribués
+        $facture->refresh();
     }
 
     /**
@@ -270,7 +351,9 @@ final class FactureService
     }
 
     /**
-     * Delete a text line from the facture. Only texte lines can be individually deleted.
+     * Delete a texte or MontantManuel line from the facture.
+     * Lignes de type Montant (liées à une transaction) ne peuvent pas être supprimées ici.
+     * La suppression d'une ligne MontantManuel recalcule montant_total.
      */
     public function supprimerLigne(Facture $facture, int $ligneId): void
     {
@@ -278,11 +361,76 @@ final class FactureService
 
         $ligne = $facture->lignes()->findOrFail($ligneId);
 
-        if ($ligne->type !== TypeLigneFacture::Texte) {
-            throw new \RuntimeException('Seules les lignes de texte peuvent être supprimées individuellement.');
+        if ($ligne->type === TypeLigneFacture::Montant) {
+            throw new \RuntimeException('Les lignes liées à une transaction ne peuvent pas être supprimées individuellement — utilisez « Retirer la transaction ».');
         }
 
         $ligne->delete();
+
+        if ($ligne->type === TypeLigneFacture::MontantManuel) {
+            $this->recalculerMontantTotal($facture);
+        }
+    }
+
+    /**
+     * Mise à jour de la sous-catégorie d'une ligne manuelle (MontantManuel).
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si la ligne n'est pas de type MontantManuel
+     */
+    public function majSousCategorieLigne(Facture $facture, int $ligneId, ?int $sousCategorieId): void
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        $ligne = $facture->lignes()->findOrFail($ligneId);
+
+        if ($ligne->type !== TypeLigneFacture::MontantManuel) {
+            throw new \RuntimeException('La sous-catégorie ne peut être modifiée que sur une ligne manuelle.');
+        }
+
+        $ligne->update(['sous_categorie_id' => $sousCategorieId]);
+    }
+
+    /**
+     * Mise à jour de l'opération d'une ligne manuelle (MontantManuel).
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si la ligne n'est pas de type MontantManuel
+     */
+    public function majOperationLigne(Facture $facture, int $ligneId, ?int $operationId): void
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        $ligne = $facture->lignes()->findOrFail($ligneId);
+
+        if ($ligne->type !== TypeLigneFacture::MontantManuel) {
+            throw new \RuntimeException("L'opération ne peut être modifiée que sur une ligne manuelle.");
+        }
+
+        // Changer d'opération invalide la séance (qui réfère à une plage 1..nombre_seances spécifique).
+        $ligne->update(['operation_id' => $operationId, 'seance' => null]);
+    }
+
+    /**
+     * Mise à jour du numéro de séance d'une ligne manuelle (MontantManuel).
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si la ligne n'est pas de type MontantManuel
+     */
+    public function majSeanceLigne(Facture $facture, int $ligneId, ?int $seance): void
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        $ligne = $facture->lignes()->findOrFail($ligneId);
+
+        if ($ligne->type !== TypeLigneFacture::MontantManuel) {
+            throw new \RuntimeException('Le numéro de séance ne peut être modifié que sur une ligne manuelle.');
+        }
+
+        $ligne->update(['seance' => $seance]);
     }
 
     /**
@@ -466,6 +614,265 @@ XML;
                 ]);
             }
         });
+    }
+
+    /**
+     * Ajoute une ligne manuelle de type MontantManuel à une facture brouillon.
+     *
+     * $attrs accepte : libelle (requis), prix_unitaire (requis, > 0), quantite (requis, > 0),
+     * sous_categorie_id (optionnel), operation_id (optionnel), seance (optionnel).
+     *
+     * @param  array<string, mixed>  $attrs
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si prix_unitaire / quantite ne sont pas strictement positifs
+     */
+    public function ajouterLigneManuelle(Facture $facture, array $attrs): FactureLigne
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        $prixUnitaire = (float) ($attrs['prix_unitaire'] ?? 0);
+        $quantite = (float) ($attrs['quantite'] ?? 0);
+
+        if ($prixUnitaire <= 0 || $quantite <= 0) {
+            throw new \RuntimeException(
+                'Le prix unitaire et la quantité doivent être strictement positifs (les montants négatifs ne sont pas supportés).'
+            );
+        }
+
+        return DB::transaction(function () use ($facture, $attrs, $prixUnitaire, $quantite): FactureLigne {
+            $maxOrdre = (int) FactureLigne::where('facture_id', $facture->id)->max('ordre');
+
+            $montant = round($prixUnitaire * $quantite, 2);
+
+            $ligne = FactureLigne::create([
+                'facture_id' => $facture->id,
+                'type' => TypeLigneFacture::MontantManuel,
+                'libelle' => $attrs['libelle'],
+                'prix_unitaire' => $prixUnitaire,
+                'quantite' => $quantite,
+                'montant' => $montant,
+                'transaction_ligne_id' => null,
+                'sous_categorie_id' => $attrs['sous_categorie_id'] ?? null,
+                'operation_id' => $attrs['operation_id'] ?? null,
+                'seance' => $attrs['seance'] ?? null,
+                'ordre' => $maxOrdre + 1,
+            ]);
+
+            $this->recalculerMontantTotal($facture);
+
+            return $ligne;
+        });
+    }
+
+    /**
+     * Ajoute une ligne d'information de type Texte à une facture brouillon (manuelle).
+     *
+     * La ligne n'a aucun impact comptable (montant = null). Le total facture est inchangé.
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon ou si le tenant ne correspond pas
+     */
+    public function ajouterLigneTexteManuelle(Facture $facture, string $libelle): FactureLigne
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        return DB::transaction(function () use ($facture, $libelle): FactureLigne {
+            $maxOrdre = (int) FactureLigne::where('facture_id', $facture->id)->max('ordre');
+
+            $ligne = FactureLigne::create([
+                'facture_id' => $facture->id,
+                'type' => TypeLigneFacture::Texte,
+                'libelle' => $libelle,
+                'prix_unitaire' => null,
+                'quantite' => null,
+                'montant' => null,
+                'transaction_ligne_id' => null,
+                'sous_categorie_id' => null,
+                'operation_id' => null,
+                'seance' => null,
+                'ordre' => $maxOrdre + 1,
+            ]);
+
+            $this->recalculerMontantTotal($facture);
+
+            return $ligne;
+        });
+    }
+
+    /**
+     * Mise à jour du prix unitaire d'une ligne manuelle (MontantManuel).
+     *
+     * Recalcule montant = prix_unitaire × quantite et met à jour montant_total.
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si la ligne n'est pas de type MontantManuel, ou si prix_unitaire ≤ 0
+     */
+    public function majPrixUnitaireLigneManuelle(Facture $facture, int $ligneId, float $prixUnitaire): void
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        if ($prixUnitaire <= 0) {
+            throw new \RuntimeException('Le prix unitaire doit être strictement positif (les montants négatifs ne sont pas supportés).');
+        }
+
+        $ligne = $facture->lignes()->findOrFail($ligneId);
+
+        if ($ligne->type !== TypeLigneFacture::MontantManuel) {
+            throw new \RuntimeException('Le prix unitaire ne peut être modifié que sur une ligne manuelle.');
+        }
+
+        $montant = round($prixUnitaire * (float) $ligne->quantite, 2);
+        $ligne->update(['prix_unitaire' => $prixUnitaire, 'montant' => $montant]);
+
+        $this->recalculerMontantTotal($facture);
+    }
+
+    /**
+     * Mise à jour de la quantité d'une ligne manuelle (MontantManuel).
+     *
+     * Recalcule montant = prix_unitaire × quantite et met à jour montant_total.
+     *
+     * @throws \RuntimeException si la facture n'est pas brouillon, si le tenant ne correspond pas,
+     *                           ou si la ligne n'est pas de type MontantManuel, ou si quantite ≤ 0
+     */
+    public function majQuantiteLigneManuelle(Facture $facture, int $ligneId, float $quantite): void
+    {
+        $this->assertBrouillon($facture);
+        $this->assertTenantOwnership($facture);
+
+        if ($quantite <= 0) {
+            throw new \RuntimeException('La quantité doit être strictement positive (les montants négatifs ne sont pas supportés).');
+        }
+
+        $ligne = $facture->lignes()->findOrFail($ligneId);
+
+        if ($ligne->type !== TypeLigneFacture::MontantManuel) {
+            throw new \RuntimeException('La quantité ne peut être modifiée que sur une ligne manuelle.');
+        }
+
+        $montant = round((float) $ligne->prix_unitaire * $quantite, 2);
+        $ligne->update(['quantite' => $quantite, 'montant' => $montant]);
+
+        $this->recalculerMontantTotal($facture);
+    }
+
+    /**
+     * Recalcule et persiste montant_total sur la facture : somme des montants non-null de toutes les lignes.
+     */
+    private function recalculerMontantTotal(Facture $facture): void
+    {
+        $total = (float) FactureLigne::where('facture_id', $facture->id)
+            ->whereNotNull('montant')
+            ->sum('montant');
+
+        $facture->update(['montant_total' => $total]);
+    }
+
+    /**
+     * Guards spécifiques aux factures portant ≥ 1 ligne MontantManuel.
+     *
+     * Exécutés AVANT toute mutation et AVANT l'attribution du numéro.
+     *
+     * 1. mode_paiement_prevu doit être non-null.
+     * 2. Chaque ligne MontantManuel doit avoir sous_categorie_id non-null.
+     *
+     * Si la facture ne porte aucune ligne MontantManuel, cette méthode est no-op
+     * (les factures classiques ne sont pas impactées).
+     *
+     * @throws \RuntimeException si un guard échoue
+     */
+    private function assertGuardsLignesManuelles(Facture $facture): void
+    {
+        $lignesManuelles = $facture->lignes()
+            ->where('type', TypeLigneFacture::MontantManuel->value)
+            ->get();
+
+        if ($lignesManuelles->isEmpty()) {
+            return;
+        }
+
+        if ($facture->mode_paiement_prevu === null) {
+            throw new \RuntimeException(
+                'Le mode de règlement prévisionnel est requis pour valider une facture portant des lignes manuelles.'
+            );
+        }
+
+        $lignesSansSousCat = $lignesManuelles->filter(
+            fn (FactureLigne $l) => $l->sous_categorie_id === null
+        );
+
+        if ($lignesSansSousCat->isNotEmpty()) {
+            throw new \RuntimeException(
+                'La sous-catégorie est requise sur chaque ligne montant pour valider la facture.'
+            );
+        }
+    }
+
+    /**
+     * Génère 1 Transaction recette + N TransactionLignes pour les lignes MontantManuel de la facture.
+     *
+     * Doit être appelée APRÈS attribution du numéro, à l'intérieur d'une DB::transaction.
+     * Retourne null si la facture ne porte aucune ligne MontantManuel.
+     */
+    private function genererTransactionDepuisLignesManuelles(Facture $facture): ?Transaction
+    {
+        $lignesManuelles = $facture->lignes()
+            ->where('type', TypeLigneFacture::MontantManuel->value)
+            ->get();
+
+        if ($lignesManuelles->isEmpty()) {
+            return null;
+        }
+
+        $montantTotal = $lignesManuelles->sum(fn (FactureLigne $l) => (float) $l->montant);
+
+        // 1. Crée la Transaction recette entête
+        $transaction = Transaction::create([
+            'association_id' => (int) TenantContext::currentId(),
+            'type' => TypeTransaction::Recette,
+            'tiers_id' => (int) $facture->tiers_id,
+            'date' => now()->toDateString(),
+            'libelle' => "Facture {$facture->numero}",
+            'montant_total' => round($montantTotal, 2),
+            'mode_paiement' => $facture->mode_paiement_prevu?->value,
+            'statut_reglement' => StatutReglement::EnAttente->value,
+            'saisi_par' => auth()->id(),
+        ]);
+
+        // 2. Crée les TransactionLignes + 3. set facture_lignes.transaction_ligne_id
+        foreach ($lignesManuelles as $factureLigne) {
+            $transactionLigne = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'sous_categorie_id' => $factureLigne->sous_categorie_id,
+                'operation_id' => $factureLigne->operation_id,
+                'seance' => $factureLigne->seance,
+                'montant' => $factureLigne->montant,
+                'notes' => $factureLigne->libelle,
+            ]);
+
+            // 3. Lie la FactureLigne à sa TransactionLigne
+            $factureLigne->update(['transaction_ligne_id' => $transactionLigne->id]);
+        }
+
+        // 4. Attache la Transaction au pivot facture_transaction
+        $facture->transactions()->attach($transaction->id);
+
+        return $transaction;
+    }
+
+    /**
+     * Guard multi-tenant : vérifie que la facture appartient à l'association courante.
+     *
+     * @throws \RuntimeException si la facture appartient à une autre association
+     */
+    private function assertTenantOwnership(Facture $facture): void
+    {
+        if ((int) $facture->association_id !== (int) TenantContext::currentId()) {
+            throw new \RuntimeException("Accès interdit : cette facture n'appartient pas à votre association.");
+        }
     }
 
     private function assertBrouillon(Facture $facture): void

@@ -42,7 +42,7 @@
                 — Exercice {{ $devis->exercice }}
             </span>
         </div>
-        <a href="{{ route('devis-libres.index') }}" class="btn btn-sm btn-outline-secondary">
+        <a href="{{ route('devis-manuels.index') }}" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour à la liste
         </a>
     </div>
@@ -276,7 +276,7 @@
                                     <select class="form-select form-select-sm" wire:model="nouvelleLigneSousCategorieId">
                                         <option value="">— Aucune —</option>
                                         @foreach ($sousCategoriesDisponibles as $sc)
-                                            <option value="{{ $sc->id }}">{{ $sc->libelle }}</option>
+                                            <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -403,7 +403,7 @@
                     {{-- PDF — ouvre dans un nouvel onglet --}}
                     @php $peutPdf = $this->peutEtreEnvoye(); @endphp
                     @if ($peutPdf)
-                        <a href="{{ route('devis-libres.pdf', $devis) }}"
+                        <a href="{{ route('devis-manuels.pdf', $devis) }}"
                            target="_blank"
                            class="btn btn-outline-secondary">
                             <i class="bi bi-file-earmark-pdf"></i> Exporter PDF
@@ -434,6 +434,24 @@
                                 class="btn btn-outline-info">
                             <i class="bi bi-copy"></i> Dupliquer
                         </button>
+                    @endif
+
+                    {{-- Transformer en facture (uniquement si statut Accepté) --}}
+                    @if ($devis->statut === \App\Enums\StatutDevis::Accepte)
+                        @php $dejaTransforme = $devis->aDejaUneFacture(); @endphp
+                        @if ($dejaTransforme)
+                            <button class="btn btn-outline-success"
+                                    disabled
+                                    title="Une facture issue de ce devis existe déjà">
+                                <i class="bi bi-file-earmark-arrow-up"></i> Transformer en facture
+                            </button>
+                        @else
+                            <button wire:click="transformerEnFacture"
+                                    wire:confirm="Transformer ce devis en facture brouillon ?"
+                                    class="btn btn-outline-success">
+                                <i class="bi bi-file-earmark-arrow-up"></i> Transformer en facture
+                            </button>
+                        @endif
                     @endif
                 </div>
             </div>

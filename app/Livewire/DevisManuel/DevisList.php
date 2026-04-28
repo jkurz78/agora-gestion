@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\DevisLibre;
+namespace App\Livewire\DevisManuel;
 
 use App\Enums\StatutDevis;
 use App\Models\Devis;
@@ -84,7 +84,7 @@ final class DevisList extends Component
 
         $devis = app(DevisService::class)->creer($tiersId);
 
-        return $this->redirect(route('devis-libres.show', $devis));
+        return $this->redirect(route('devis-manuels.show', $devis));
     }
 
     public function render(): View
@@ -127,10 +127,10 @@ final class DevisList extends Component
         $currentYear = now()->year;
         $exerciceYears = range($currentYear + 1, $currentYear - 3);
 
-        return view('livewire.devis-libre.devis-list', [
+        return view('livewire.devis-manuel.devis-list', [
             'devis' => $devis,
             'exerciceYears' => $exerciceYears,
             'exerciceService' => $exerciceService,
-        ])->layout('layouts.app-sidebar', ['title' => 'Liste des devis']);
+        ])->layout('layouts.app-sidebar', ['title' => 'Liste des devis manuels']);
     }
 }

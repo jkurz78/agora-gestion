@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\DevisLibre;
+namespace App\Livewire\DevisManuel;
 
 use App\Enums\StatutDevis;
 use App\Models\Devis;
 use App\Models\DevisLigne;
+use App\Models\Facture;
 use App\Models\SousCategorie;
 use App\Services\DevisService;
 use Illuminate\Contracts\View\View;
@@ -278,9 +279,36 @@ final class DevisEdit extends Component
     {
         try {
             $nouveau = app(DevisService::class)->dupliquer($this->devis);
-            $this->redirect(route('devis-libres.show', $nouveau));
+            $this->redirect(route('devis-manuels.show', $nouveau));
         } catch (RuntimeException $e) {
             session()->flash('error', $e->getMessage());
+        }
+    }
+
+    // ── Transformer en facture ────────────────────────────────────────────────
+
+    public function transformerEnFacture(): mixed
+    {
+        if ($this->devis->statut !== StatutDevis::Accepte) {
+            session()->flash('error', 'Seul un devis accepté peut être transformé en facture.');
+
+            return null;
+        }
+
+        if ($this->devis->aDejaUneFacture()) {
+            session()->flash('error', 'Une facture issue de ce devis existe déjà.');
+
+            return null;
+        }
+
+        try {
+            $facture = app(DevisService::class)->transformerEnFacture($this->devis);
+
+            return $this->redirect(route('facturation.factures.show', $facture), navigate: false);
+        } catch (RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return null;
         }
     }
 
@@ -319,12 +347,12 @@ final class DevisEdit extends Component
 
         $lignes = $this->devis->lignes;
 
-        return view('livewire.devis-libre.devis-edit', [
+        return view('livewire.devis-manuel.devis-edit', [
             'lignes' => $lignes,
             'sousCategoriesDisponibles' => $this->sousCategoriesDisponibles,
         ])->layout('layouts.app-sidebar', [
             'title' => $this->devis->numero ?? 'Brouillon de devis',
-            'breadcrumbParent' => new ComponentSlot('Liste des devis', ['url' => route('devis-libres.index')]),
+            'breadcrumbParent' => new ComponentSlot('Liste des devis', ['url' => route('devis-manuels.index')]),
         ]);
     }
 

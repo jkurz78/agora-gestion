@@ -20,7 +20,7 @@ use Illuminate\Database\Seeder;
  * Requires TenantContext to already be booted (DatabaseSeeder boots it for asso id=1).
  * Not called in production: DatabaseSeeder gates this with app()->environment().
  */
-class DevisLibreSeeder extends Seeder
+class DevisManuelSeeder extends Seeder
 {
     public function run(): void
     {
