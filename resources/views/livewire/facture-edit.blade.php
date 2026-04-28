@@ -4,6 +4,14 @@
         <p class="text-muted mb-0 small">
             Tiers : <strong>{{ $facture->tiers->displayName() }}</strong>
             — Exercice {{ $facture->exercice }}/{{ $facture->exercice + 1 }}
+            @if ($facture->devis_id !== null && $facture->devis !== null)
+                — <span class="text-info">
+                    <i class="bi bi-link-45deg"></i>
+                    Issue du devis
+                    <a href="{{ route('devis-libres.show', $facture->devis) }}"
+                       class="text-info">{{ $facture->devis->numero ?? '#' . $facture->devis_id }}</a>
+                </span>
+            @endif
         </p>
     </div>
 
@@ -107,13 +115,26 @@
                                     @foreach ($lignes as $ligne)
                                         <tr wire:key="ligne-{{ $ligne->id }}">
                                             <td>
-                                                <input type="text"
-                                                       class="form-control form-control-sm"
-                                                       value="{{ $ligne->libelle }}"
-                                                       wire:blur="updateLibelle({{ $ligne->id }}, $event.target.value)">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
+                                                        <span class="badge bg-secondary" title="Ligne libre">L</span>
+                                                    @elseif ($ligne->type === \App\Enums\TypeLigneFacture::Texte)
+                                                        <span class="badge bg-light text-dark border" title="Ligne texte">T</span>
+                                                    @endif
+                                                    <input type="text"
+                                                           class="form-control form-control-sm"
+                                                           value="{{ $ligne->libelle }}"
+                                                           wire:blur="updateLibelle({{ $ligne->id }}, $event.target.value)">
+                                                </div>
+                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::MontantLibre && $ligne->prix_unitaire !== null)
+                                                    <div class="text-muted small mt-1 ps-4">
+                                                        PU {{ number_format((float) $ligne->prix_unitaire, 2, ',', ' ') }} &euro;
+                                                        &times; {{ number_format((float) $ligne->quantite, 3, ',', ' ') }}
+                                                    </div>
+                                                @endif
                                             </td>
                                             <td class="text-end small fw-semibold text-nowrap">
-                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::Montant)
+                                                @if ($ligne->type === \App\Enums\TypeLigneFacture::Montant || $ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
                                                     {{ number_format((float) $ligne->montant, 2, ',', ' ') }} &euro;
                                                 @else
                                                     <span class="text-muted fst-italic">texte</span>
@@ -158,19 +179,27 @@
                         </div>
                     @endif
 
-                    {{-- Ajouter une ligne de texte --}}
-                    <div class="p-3 border-top">
-                        <div class="input-group">
-                            <input type="text"
-                                   class="form-control form-control-sm"
-                                   placeholder="Ajouter une ligne de texte..."
-                                   wire:model="newTexteLibelle"
-                                   wire:keydown.enter="addTexte">
-                            <button wire:click="addTexte" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-plus-lg"></i> Ajouter
+                    {{-- Boutons d'ajout de lignes (brouillon uniquement) --}}
+                    @if ($this->canEdit && $facture->statut === \App\Enums\StatutFacture::Brouillon)
+                        <div class="p-3 border-top d-flex flex-wrap gap-2">
+                            <button wire:click="ouvrirFormLigneLibreMontant"
+                                    class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-plus-circle"></i> Ajouter ligne libre
+                            </button>
+                            <button wire:click="ouvrirFormLigneLibreTexte"
+                                    class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-text-left"></i> Ajouter ligne texte
                             </button>
                         </div>
-                    </div>
+
+                        @if ($afficherFormLigneMontant)
+                            @include('livewire.facture-edit.partials.ligne-libre-montant-form')
+                        @endif
+
+                        @if ($afficherFormLigneTexte)
+                            @include('livewire.facture-edit.partials.ligne-texte-form')
+                        @endif
+                    @endif
                 </div>
             </div>
 
@@ -206,6 +235,35 @@
                     @endif
                 </div>
             </div>
+
+            {{-- Conditions de règlement (visible ssi >= 1 ligne MontantLibre) --}}
+            @if ($aLignesMontantLibre)
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-bank"></i> Conditions de règlement</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-0">
+                            <label for="mode-paiement-prevu" class="form-label">
+                                Mode de paiement prévu
+                                @if ($facture->statut === \App\Enums\StatutFacture::Brouillon)
+                                    <span class="text-danger" title="Requis à la validation">*</span>
+                                @endif
+                            </label>
+                            <select id="mode-paiement-prevu"
+                                    name="modePaiementPrevu"
+                                    class="form-select"
+                                    wire:model.live="modePaiementPrevu"
+                                    {{ $facture->statut !== \App\Enums\StatutFacture::Brouillon ? 'disabled' : '' }}>
+                                <option value="">— Sélectionner —</option>
+                                @foreach ($modesPaiement as $mode)
+                                    <option value="{{ $mode->value }}">{{ $mode->label() }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
 
         <div class="col-lg-4">
