@@ -6,9 +6,9 @@ namespace App\Enums;
 
 enum TypeLigneFacture: string
 {
-    case Montant      = 'montant';
+    case Montant = 'montant';
     case MontantLibre = 'montant_libre';
-    case Texte        = 'texte';
+    case Texte = 'texte';
 
     /** True uniquement pour MontantLibre — génère une TransactionLigne à la validation. */
     public function genereTransactionLigne(): bool
