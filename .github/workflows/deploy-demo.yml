@@ -1,0 +1,178 @@
+# deploy-demo.yml — CI & Deploy for demo.agoragestion.org
+#
+# Triggered on every push to main, in parallel with deploy.yml (production).
+# Reuses the same O2Switch account and GitHub secrets as the production workflow.
+#
+# PRE-REQUISITES (must be met before the first run succeeds):
+#   1. The directory ~/public_html/demo.agoragestion.org/ must exist on the server
+#      and already be a git clone of the repository (git remote = origin, branch main).
+#   2. .env.demo must be present in that directory with APP_ENV=demo and a dedicated
+#      MySQL database. Without it, migrate:fresh will fail on the first run.
+#   3. database/demo/snapshot.yaml must be present in the repository (committed).
+#      demo:reset reads this file to populate the demo database after each deploy.
+#   4. The same SSH key and cPanel credentials used by deploy.yml must already be
+#      stored as GitHub secrets (CPANEL_USERNAME, CPANEL_API_TOKEN, CPANEL_SERVER,
+#      SSH_KEY, HOME_SSH_HOST). No additional secrets are required.
+#
+# DEPLOYMENT SEQUENCE (differs from prod):
+#   prod  → git pull → composer install → config:cache → route:cache → view:cache
+#           → php artisan migrate --force → php artisan up
+#   demo  → git fetch/reset → composer install → config:cache → route:cache → view:cache
+#           → php artisan migrate:fresh --force → php artisan demo:reset → php artisan up
+#
+# NOTE ON FIRST EXECUTION:
+#   The step "Deploy to demo" will fail unless .env.demo is already present on the
+#   server. The runbook (docs/runbook-demo.md) covers this mandatory pre-deployment
+#   step. After the first successful deploy, subsequent pushes are fully automatic.
+
+name: CI & Deploy (demo)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Ghostscript
+        run: sudo apt-get update && sudo apt-get install -y ghostscript
+
+      - name: Allow ImageMagick to read PDFs
+        run: |
+          sudo sed -i 's|<policy domain="coder" rights="none" pattern="PDF" />|<policy domain="coder" rights="read\|write" pattern="PDF" />|' /etc/ImageMagick-6/policy.xml || true
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo, pdo_sqlite, mbstring, xml, dom, curl, zip, intl, bcmath, imagick
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run tests
+        run: php artisan test --no-ansi
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Get runner public IP
+        id: ip
+        run: |
+          for attempt in 1 2 3; do
+            for svc in "https://api.ipify.org" "https://ifconfig.me/ip" "https://icanhazip.com"; do
+              IP=$(curl -sf --max-time 10 "$svc" 2>/dev/null | tr -d '[:space:]')
+              if [[ "$IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "ipv4=$IP" >> "$GITHUB_OUTPUT"
+                echo "Got IP $IP from $svc (attempt $attempt)"
+                exit 0
+              fi
+            done
+            echo "Attempt $attempt failed, waiting 30s..."
+            sleep 30
+          done
+          echo "Failed to get public IP after 3 attempts"
+          exit 1
+
+      - name: Remove all whitelisted IPs
+        run: |
+          curl -sm 45 \
+            -H "Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove_all"
+
+      - name: Whitelist runner IP
+        run: |
+          curl -sm 45 \
+            -H "Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ steps.ip.outputs.ipv4 }}&port=22"
+
+      - name: Verify IP is whitelisted
+        run: |
+          curl -sm 45 \
+            -H "Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/list" \
+            | grep "${{ steps.ip.outputs.ipv4 }}"
+
+      - name: Wait for firewall to apply
+        run: sleep 60
+
+      - name: Test SSH connectivity
+        run: |
+          for i in 1 2 3 4 5; do
+            if nc -z -w 5 ${{ secrets.CPANEL_SERVER }} 22 2>/dev/null; then
+              echo "SSH port reachable on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i: SSH port not yet reachable, waiting 15s..."
+            sleep 15
+          done
+          echo "SSH port still not reachable after 5 attempts"
+          exit 1
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 0400 ~/.ssh/id_ed25519
+
+      - name: Deploy to demo
+        id: deploy
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
+            ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
+            'set -e
+             DEMO_PATH=~/public_html/demo.agoragestion.org
+             cd "$DEMO_PATH"
+             echo "[deploy-demo] git fetch + reset to origin/main"
+             git fetch origin main
+             git reset --hard origin/main
+             echo "[deploy-demo] composer install"
+             composer install --no-dev --optimize-autoloader --no-interaction
+             echo "[deploy-demo] artisan cache"
+             php artisan config:cache
+             php artisan route:cache
+             php artisan view:cache
+             echo "[deploy-demo] migrate:fresh"
+             php artisan migrate:fresh --force
+             echo "[deploy-demo] demo:reset"
+             php artisan demo:reset --snapshot=database/demo/snapshot.yaml
+             echo "[deploy-demo] up"
+             php artisan up
+             echo "[deploy-demo] done"'
+
+      - name: Tail deploy output on failure
+        if: failure() && steps.deploy.outcome == 'failure'
+        run: |
+          echo "=== Dernières 100 lignes de demo-reset.log ==="
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
+            ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
+            'LOG=~/public_html/demo.agoragestion.org/storage/logs/demo-reset.log; if [ -f "$LOG" ]; then echo "Fichier: $LOG"; tail -n 100 "$LOG"; else echo "Aucun demo-reset.log trouvé"; fi' \
+            || echo "Impossible d'exécuter le tail distant"
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -rf ~/.ssh
+
+      - name: Restore whitelist
+        if: always()
+        run: |
+          curl -sm 45 \
+            -H "Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/remove_all"
+          curl -sm 45 \
+            -H "Authorization: cpanel ${{ secrets.CPANEL_USERNAME }}:${{ secrets.CPANEL_API_TOKEN }}" \
+            "https://${{ secrets.CPANEL_SERVER }}:2083/execute/SshWhitelist/add?address=${{ secrets.HOME_SSH_HOST }}&port=22"
