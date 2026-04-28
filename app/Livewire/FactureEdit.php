@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\Espace;
+use App\Enums\ModePaiement;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
+use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Services\FactureService;
 use Illuminate\Contracts\View\View;
@@ -33,6 +35,28 @@ final class FactureEdit extends Component
 
     public string $newTexteLibelle = '';
 
+    // ── Mode paiement prévu (Conditions de règlement) ─────────────────────────
+
+    public ?string $modePaiementPrevu = null;
+
+    // ── Formulaire ajout ligne libre montant ──────────────────────────────────
+
+    public string $nouvelleLigneMontantLibelle = '';
+
+    public string $nouvelleLigneMontantPrixUnitaire = '';
+
+    public string $nouvelleLigneMontantQuantite = '1';
+
+    public ?int $nouvelleLigneMontantSousCategorieId = null;
+
+    public bool $afficherFormLigneMontant = false;
+
+    // ── Formulaire ajout ligne libre texte ────────────────────────────────────
+
+    public string $nouvelleLigneTexteLibelle = '';
+
+    public bool $afficherFormLigneTexte = false;
+
     public function getCanEditProperty(): bool
     {
         return RoleAssociation::tryFrom(Auth::user()->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
@@ -52,6 +76,7 @@ final class FactureEdit extends Component
         $this->conditions_reglement = $facture->conditions_reglement;
         $this->mentions_legales = $facture->mentions_legales;
         $this->notes = $facture->notes;
+        $this->modePaiementPrevu = $facture->mode_paiement_prevu?->value;
     }
 
     public function toggleTransaction(int $transactionId): void
@@ -198,6 +223,108 @@ final class FactureEdit extends Component
         }
     }
 
+    // ── Ligne libre montant ───────────────────────────────────────────────────
+
+    public function ouvrirFormLigneLibreMontant(): void
+    {
+        $this->afficherFormLigneMontant = true;
+        $this->afficherFormLigneTexte = false;
+    }
+
+    public function annulerFormLigneLibre(): void
+    {
+        $this->afficherFormLigneMontant = false;
+        $this->afficherFormLigneTexte = false;
+        $this->resetFormLigneMontant();
+        $this->resetFormLigneTexte();
+    }
+
+    public function ajouterLigneLibreMontant(): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $prixUnitaire = (float) $this->nouvelleLigneMontantPrixUnitaire;
+        $quantite = (float) $this->nouvelleLigneMontantQuantite;
+
+        $this->validate([
+            'nouvelleLigneMontantLibelle' => ['required', 'string', 'max:255'],
+            'nouvelleLigneMontantPrixUnitaire' => ['required', 'numeric', 'gt:0'],
+            'nouvelleLigneMontantQuantite' => ['required', 'numeric', 'gt:0'],
+        ]);
+
+        try {
+            app(FactureService::class)->ajouterLigneLibreMontant($this->facture, [
+                'libelle' => $this->nouvelleLigneMontantLibelle,
+                'prix_unitaire' => $prixUnitaire,
+                'quantite' => $quantite,
+                'sous_categorie_id' => $this->nouvelleLigneMontantSousCategorieId,
+            ]);
+
+            $this->resetFormLigneMontant();
+            $this->afficherFormLigneMontant = false;
+            $this->facture->refresh();
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    // ── Ligne libre texte ─────────────────────────────────────────────────────
+
+    public function ouvrirFormLigneLibreTexte(): void
+    {
+        $this->afficherFormLigneTexte = true;
+        $this->afficherFormLigneMontant = false;
+    }
+
+    public function ajouterLigneLibreTexte(): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $this->validate([
+            'nouvelleLigneTexteLibelle' => ['required', 'string', 'max:255'],
+        ]);
+
+        try {
+            app(FactureService::class)->ajouterLigneLibreTexte($this->facture, $this->nouvelleLigneTexteLibelle);
+            $this->resetFormLigneTexte();
+            $this->afficherFormLigneTexte = false;
+            $this->facture->refresh();
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    // ── Mode paiement prévu ───────────────────────────────────────────────────
+
+    public function updatedModePaiementPrevu(): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $mode = ModePaiement::tryFrom((string) $this->modePaiementPrevu);
+        $this->facture->update(['mode_paiement_prevu' => $mode?->value]);
+    }
+
+    // ── Helpers privés ────────────────────────────────────────────────────────
+
+    private function resetFormLigneMontant(): void
+    {
+        $this->nouvelleLigneMontantLibelle = '';
+        $this->nouvelleLigneMontantPrixUnitaire = '';
+        $this->nouvelleLigneMontantQuantite = '1';
+        $this->nouvelleLigneMontantSousCategorieId = null;
+    }
+
+    private function resetFormLigneTexte(): void
+    {
+        $this->nouvelleLigneTexteLibelle = '';
+    }
+
     public function render(): View
     {
         $selectedIds = $this->facture->transactions()->pluck('transactions.id')->toArray();
@@ -217,11 +344,18 @@ final class FactureEdit extends Component
 
         $lignes = $this->facture->lignes()->get();
 
-        $totalLignes = $lignes->where('type', TypeLigneFacture::Montant)->sum('montant');
+        $totalLignes = $lignes->whereNotNull('montant')->sum('montant');
 
         $comptesBancaires = CompteBancaire::saisieManuelle()
             ->orderBy('nom')
             ->get();
+
+        $sousCategoriesRecettes = SousCategorie::whereHas(
+            'categorie',
+            fn ($q) => $q->where('type', 'recette')
+        )->orderBy('nom')->get();
+
+        $aLignesMontantLibre = $lignes->where('type', TypeLigneFacture::MontantLibre)->isNotEmpty();
 
         return view('livewire.facture-edit', [
             'transactions' => $transactions,
@@ -229,6 +363,9 @@ final class FactureEdit extends Component
             'lignes' => $lignes,
             'totalLignes' => $totalLignes,
             'comptesBancaires' => $comptesBancaires,
+            'sousCategoriesRecettes' => $sousCategoriesRecettes,
+            'aLignesMontantLibre' => $aLignesMontantLibre,
+            'modesPaiement' => ModePaiement::cases(),
         ]);
     }
 }
