@@ -49,6 +49,10 @@ final class FactureEdit extends Component
 
     public ?int $nouvelleLigneMontantSousCategorieId = null;
 
+    public ?int $nouvelleLigneMontantOperationId = null;
+
+    public ?int $nouvelleLigneMontantSeance = null;
+
     public bool $afficherFormLigneMontant = false;
 
     // ── Formulaire ajout ligne libre texte ────────────────────────────────────
@@ -164,12 +168,65 @@ final class FactureEdit extends Component
 
     public function deleteTexte(int $ligneId): void
     {
+        $this->supprimerLigneEditable($ligneId);
+    }
+
+    public function supprimerLigneEditable(int $ligneId): void
+    {
         if (! $this->canEdit) {
             return;
         }
 
         try {
             app(FactureService::class)->supprimerLigne($this->facture, $ligneId);
+            $this->facture->refresh();
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function updateSousCategorie(int $ligneId, ?string $value): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $sousCategorieId = ($value === '' || $value === null) ? null : (int) $value;
+
+        try {
+            app(FactureService::class)->majSousCategorieLigne($this->facture, $ligneId, $sousCategorieId);
+            $this->facture->refresh();
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function updateOperation(int $ligneId, ?string $value): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $operationId = ($value === '' || $value === null) ? null : (int) $value;
+
+        try {
+            app(FactureService::class)->majOperationLigne($this->facture, $ligneId, $operationId);
+            $this->facture->refresh();
+        } catch (\RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+        }
+    }
+
+    public function updateSeance(int $ligneId, ?string $value): void
+    {
+        if (! $this->canEdit) {
+            return;
+        }
+
+        $seance = ($value === '' || $value === null) ? null : (int) $value;
+
+        try {
+            app(FactureService::class)->majSeanceLigne($this->facture, $ligneId, $seance);
             $this->facture->refresh();
         } catch (\RuntimeException $e) {
             session()->flash('error', $e->getMessage());
@@ -260,6 +317,8 @@ final class FactureEdit extends Component
                 'prix_unitaire' => $prixUnitaire,
                 'quantite' => $quantite,
                 'sous_categorie_id' => $this->nouvelleLigneMontantSousCategorieId,
+                'operation_id' => $this->nouvelleLigneMontantOperationId,
+                'seance' => $this->nouvelleLigneMontantSeance !== null ? (int) $this->nouvelleLigneMontantSeance : null,
             ]);
 
             $this->resetFormLigneMontant();
@@ -318,6 +377,8 @@ final class FactureEdit extends Component
         $this->nouvelleLigneMontantPrixUnitaire = '';
         $this->nouvelleLigneMontantQuantite = '1';
         $this->nouvelleLigneMontantSousCategorieId = null;
+        $this->nouvelleLigneMontantOperationId = null;
+        $this->nouvelleLigneMontantSeance = null;
     }
 
     private function resetFormLigneTexte(): void
@@ -355,6 +416,8 @@ final class FactureEdit extends Component
             fn ($q) => $q->where('type', 'recette')
         )->orderBy('nom')->get();
 
+        $operations = \App\Models\Operation::orderBy('nom')->get();
+
         $aLignesMontantLibre = $lignes->where('type', TypeLigneFacture::MontantLibre)->isNotEmpty();
 
         return view('livewire.facture-edit', [
@@ -364,6 +427,7 @@ final class FactureEdit extends Component
             'totalLignes' => $totalLignes,
             'comptesBancaires' => $comptesBancaires,
             'sousCategoriesRecettes' => $sousCategoriesRecettes,
+            'operations' => $operations,
             'aLignesMontantLibre' => $aLignesMontantLibre,
             'modesPaiement' => ModePaiement::cases(),
         ]);

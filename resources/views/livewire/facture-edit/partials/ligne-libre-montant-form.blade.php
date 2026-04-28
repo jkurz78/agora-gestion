@@ -49,6 +49,27 @@
             </select>
         </div>
     </div>
+    <div class="row g-2 mt-1">
+        <div class="col-md-5">
+            <label class="form-label form-label-sm">Opération</label>
+            <select class="form-select form-select-sm"
+                    wire:model="nouvelleLigneMontantOperationId">
+                <option value="">— Aucune —</option>
+                @foreach ($operations as $op)
+                    <option value="{{ $op->id }}">{{ $op->nom }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label form-label-sm">Séance</label>
+            <input type="number"
+                   class="form-control form-control-sm"
+                   placeholder="N° séance"
+                   step="1"
+                   min="1"
+                   wire:model="nouvelleLigneMontantSeance">
+        </div>
+    </div>
     <div class="d-flex gap-2 mt-2">
         <button wire:click="ajouterLigneLibreMontant"
                 class="btn btn-sm btn-primary">
