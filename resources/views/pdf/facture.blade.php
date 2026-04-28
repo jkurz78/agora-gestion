@@ -67,11 +67,10 @@
         .lines-table thead th.text-end { text-align: right; }
         .lines-table tbody td {
             padding: 5px 8px;
-            border-bottom: 1px solid #dee2e6;
             vertical-align: top;
+            background-color: #f9f9f9;
         }
         .lines-table tbody td.text-end { text-align: right; }
-        .lines-table .row-even { background-color: #f9f9f9; }
         .lines-table .ligne-texte td {
             color: #333;
             padding-top: 8px;
