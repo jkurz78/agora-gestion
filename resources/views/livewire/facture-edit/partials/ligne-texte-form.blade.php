@@ -9,17 +9,17 @@
                    class="form-control form-control-sm fst-italic @error('nouvelleLigneTexteLibelle') is-invalid @enderror"
                    placeholder="Ex : Détail de la prestation selon annexe jointe..."
                    wire:model="nouvelleLigneTexteLibelle"
-                   wire:keydown.enter="ajouterLigneLibreTexte">
+                   wire:keydown.enter="ajouterLigneTexteManuelle">
             @error('nouvelleLigneTexteLibelle')
                 <div class="invalid-feedback">{{ $message }}</div>
             @enderror
         </div>
         <div class="col-auto d-flex gap-2">
-            <button wire:click="ajouterLigneLibreTexte"
+            <button wire:click="ajouterLigneTexteManuelle"
                     class="btn btn-sm btn-outline-secondary">
                 <i class="bi bi-plus-lg"></i> Ajouter
             </button>
-            <button wire:click="annulerFormLigneLibre"
+            <button wire:click="annulerFormLigneManuelle"
                     class="btn btn-sm btn-outline-secondary">
                 Annuler
             </button>
