@@ -19,6 +19,10 @@
         }
     "
 >
+    @if(\App\Support\Demo::isActive())
+        <x-demo-readonly-banner />
+    @endif
+
     @if (session('success'))
         <div class="alert alert-success alert-dismissible mb-4">
             {{ session('success') }}
@@ -38,12 +42,14 @@
                 <div class="d-flex gap-4">
                     <div class="form-check">
                         <input class="form-check-input" type="radio" wire:model.live="environnement"
-                               value="production" id="env-prod">
+                               value="production" id="env-prod"
+                               @disabled(\App\Support\Demo::isActive())>
                         <label class="form-check-label" for="env-prod">Production</label>
                     </div>
                     <div class="form-check">
                         <input class="form-check-input" type="radio" wire:model.live="environnement"
-                               value="sandbox" id="env-sandbox">
+                               value="sandbox" id="env-sandbox"
+                               @disabled(\App\Support\Demo::isActive())>
                         <label class="form-check-label" for="env-sandbox">Sandbox</label>
                     </div>
                 </div>
@@ -72,7 +78,8 @@
             <div class="mb-3">
                 <label class="form-label">Client ID</label>
                 <input type="text" class="form-control @error('clientId') is-invalid @enderror"
-                       wire:model="clientId" autocomplete="off">
+                       wire:model="clientId" autocomplete="off"
+                       @disabled(\App\Support\Demo::isActive())>
                 @error('clientId') <div class="invalid-feedback">{{ $message }}</div> @enderror
             </div>
 
@@ -80,7 +87,8 @@
                 <label class="form-label">Client Secret</label>
                 <input type="password" class="form-control @error('clientSecret') is-invalid @enderror"
                        wire:model="clientSecret" autocomplete="new-password"
-                       @if($secretDejaEnregistre) placeholder="••••••••  (déjà enregistré)" @endif>
+                       @if($secretDejaEnregistre) placeholder="••••••••  (déjà enregistré)" @endif
+                       @disabled(\App\Support\Demo::isActive())>
                 <div class="form-text text-muted">
                     Chiffré en base de données.
                     @if($secretDejaEnregistre) Laisser vide pour conserver la valeur actuelle. @endif
@@ -91,7 +99,8 @@
             <div class="mb-4">
                 <label class="form-label">Slug organisation</label>
                 <input type="text" class="form-control @error('organisationSlug') is-invalid @enderror"
-                       wire:model="organisationSlug" placeholder="ex : mon-association">
+                       wire:model="organisationSlug" placeholder="ex : mon-association"
+                       @disabled(\App\Support\Demo::isActive())>
                 <div class="form-text text-muted">
                     Visible dans l'URL : helloasso.com/associations/<em>slug</em>
                 </div>
@@ -99,6 +108,7 @@
             </div>
 
             {{-- 4. Boutons --}}
+            @unless(\App\Support\Demo::isActive())
             <div class="d-flex gap-2 mb-3">
                 <button type="button" class="btn btn-primary" wire:click="sauvegarder"
                         wire:loading.attr="disabled" wire:target="sauvegarder">
@@ -115,6 +125,7 @@
                     </span>
                 </button>
             </div>
+            @endunless
 
             {{-- 5. Résultat du test --}}
             @if ($testResult !== null)
@@ -169,6 +180,7 @@
 </div>
 @endif
 
+    @unless(\App\Support\Demo::isActive())
     {{-- Modale modifications non enregistrées --}}
     <template x-if="showUnsavedModal">
         <div class="modal-backdrop fade show" style="z-index: 1050;"></div>
@@ -195,4 +207,5 @@
             </div>
         </div>
     </template>
+    @endunless
 </div>

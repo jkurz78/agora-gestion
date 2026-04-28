@@ -19,6 +19,10 @@
         }
     "
 >
+    @if(\App\Support\Demo::isActive())
+        <x-demo-readonly-banner />
+    @endif
+
     @if (session('success'))
         <div class="alert alert-success alert-dismissible mb-4">
             {{ session('success') }}
@@ -35,7 +39,7 @@
     <div class="form-check form-switch mb-4">
         <input class="form-check-input" type="checkbox"
                id="smtpEnabled" wire:click="toggleEnabled"
-               @checked($enabled)>
+               @checked($enabled) @disabled(\App\Support\Demo::isActive())>
         <label class="form-check-label" for="smtpEnabled">
             Utiliser cette configuration SMTP
             @if ($enabled)
@@ -50,19 +54,20 @@
         <div class="col-md-7">
             <label class="form-label">Hôte SMTP</label>
             <input type="text" class="form-control @error('smtpHost') is-invalid @enderror"
-                   wire:model="smtpHost" placeholder="mail.monasso.fr" autocomplete="off">
+                   wire:model="smtpHost" placeholder="mail.monasso.fr" autocomplete="off"
+                   @disabled(\App\Support\Demo::isActive())>
             @error('smtpHost') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
         <div class="col-md-2">
             <label class="form-label">Port</label>
             <input type="number" class="form-control @error('smtpPort') is-invalid @enderror"
-                   wire:model="smtpPort">
+                   wire:model="smtpPort" @disabled(\App\Support\Demo::isActive())>
             @error('smtpPort') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
         <div class="col-md-3">
             <label class="form-label">Chiffrement</label>
             <select class="form-select @error('smtpEncryption') is-invalid @enderror"
-                    wire:model="smtpEncryption">
+                    wire:model="smtpEncryption" @disabled(\App\Support\Demo::isActive())>
                 <option value="tls">TLS (587)</option>
                 <option value="ssl">SSL (465)</option>
                 <option value="starttls">STARTTLS</option>
@@ -73,7 +78,8 @@
         <div class="col-md-7">
             <label class="form-label">Utilisateur</label>
             <input type="text" class="form-control @error('smtpUsername') is-invalid @enderror"
-                   wire:model="smtpUsername" placeholder="envoi@monasso.fr" autocomplete="off">
+                   wire:model="smtpUsername" placeholder="envoi@monasso.fr" autocomplete="off"
+                   @disabled(\App\Support\Demo::isActive())>
             @error('smtpUsername') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
         <div class="col-md-5">
@@ -85,7 +91,8 @@
             </label>
             <input type="password" class="form-control @error('smtpPassword') is-invalid @enderror"
                    wire:model="smtpPassword" autocomplete="new-password"
-                   placeholder="{{ $passwordDejaEnregistre ? '●●●●●●●● (laisser vide pour conserver)' : '' }}">
+                   placeholder="{{ $passwordDejaEnregistre ? '●●●●●●●● (laisser vide pour conserver)' : '' }}"
+                   @disabled(\App\Support\Demo::isActive())>
             <div class="form-text text-muted">
                 Chiffré en base de données.
                 @if ($passwordDejaEnregistre) Laisser vide pour conserver la valeur actuelle. @endif
@@ -95,11 +102,12 @@
         <div class="col-md-3">
             <label class="form-label">Timeout (s)</label>
             <input type="number" class="form-control @error('timeout') is-invalid @enderror"
-                   wire:model="timeout" min="5" max="120">
+                   wire:model="timeout" min="5" max="120" @disabled(\App\Support\Demo::isActive())>
             @error('timeout') <div class="invalid-feedback">{{ $message }}</div> @enderror
         </div>
     </div>
 
+    @unless(\App\Support\Demo::isActive())
     <div class="d-flex gap-2 mt-4">
         <button type="button" class="btn btn-primary"
                 wire:click="sauvegarder"
@@ -122,6 +130,7 @@
             </span>
         </button>
     </div>
+    @endunless
 
     @if ($testResult !== null)
         <div class="mt-3 alert {{ $testResult['success'] ? 'alert-success' : 'alert-danger' }} mb-0"
@@ -139,6 +148,7 @@
         </div>
     @endif
 
+    @unless(\App\Support\Demo::isActive())
     {{-- Modale modifications non enregistrées --}}
     <template x-if="showUnsavedModal">
         <div class="modal-backdrop fade show" style="z-index: 1050;"></div>
@@ -165,4 +175,5 @@
             </div>
         </div>
     </template>
+    @endunless
 </div>
