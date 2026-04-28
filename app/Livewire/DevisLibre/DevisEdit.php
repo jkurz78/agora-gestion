@@ -7,6 +7,7 @@ namespace App\Livewire\DevisLibre;
 use App\Enums\StatutDevis;
 use App\Models\Devis;
 use App\Models\DevisLigne;
+use App\Models\Facture;
 use App\Models\SousCategorie;
 use App\Services\DevisService;
 use Illuminate\Contracts\View\View;
@@ -281,6 +282,33 @@ final class DevisEdit extends Component
             $this->redirect(route('devis-libres.show', $nouveau));
         } catch (RuntimeException $e) {
             session()->flash('error', $e->getMessage());
+        }
+    }
+
+    // ── Transformer en facture ────────────────────────────────────────────────
+
+    public function transformerEnFacture(): mixed
+    {
+        if ($this->devis->statut !== StatutDevis::Accepte) {
+            session()->flash('error', 'Seul un devis accepté peut être transformé en facture.');
+
+            return null;
+        }
+
+        if ($this->devis->aDejaUneFacture()) {
+            session()->flash('error', 'Une facture issue de ce devis existe déjà.');
+
+            return null;
+        }
+
+        try {
+            $facture = app(DevisService::class)->transformerEnFacture($this->devis);
+
+            return $this->redirect(route('facturation.factures.show', $facture), navigate: false);
+        } catch (RuntimeException $e) {
+            session()->flash('error', $e->getMessage());
+
+            return null;
         }
     }
 
