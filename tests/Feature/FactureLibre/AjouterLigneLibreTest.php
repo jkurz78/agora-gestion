@@ -41,9 +41,9 @@ describe('ajouterLigneLibreMontant()', function () {
 
     it('happy path — crée une ligne MontantLibre avec les bons attributs (PU=800, qty=3, sous_cat fournie)', function () {
         $ligne = $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'         => 'Mission audit',
-            'prix_unitaire'   => 800,
-            'quantite'        => 3,
+            'libelle' => 'Mission audit',
+            'prix_unitaire' => 800,
+            'quantite' => 3,
             'sous_categorie_id' => $this->sousCategorie->id,
         ]);
 
@@ -61,9 +61,9 @@ describe('ajouterLigneLibreMontant()', function () {
 
     it('happy path partiel — sans operation_id ni seance, ces champs sont null', function () {
         $ligne = $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Prestation ponctuelle',
+            'libelle' => 'Prestation ponctuelle',
             'prix_unitaire' => 500,
-            'quantite'      => 1,
+            'quantite' => 1,
         ]);
 
         expect($ligne->operation_id)->toBeNull()
@@ -73,15 +73,15 @@ describe('ajouterLigneLibreMontant()', function () {
 
     it('ordre incrémental — deux ajouts successifs ont ordre 1 puis 2', function () {
         $ligne1 = $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Ligne 1',
+            'libelle' => 'Ligne 1',
             'prix_unitaire' => 100,
-            'quantite'      => 1,
+            'quantite' => 1,
         ]);
 
         $ligne2 = $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Ligne 2',
+            'libelle' => 'Ligne 2',
             'prix_unitaire' => 200,
-            'quantite'      => 1,
+            'quantite' => 1,
         ]);
 
         expect($ligne1->ordre)->toBe(1)
@@ -90,15 +90,15 @@ describe('ajouterLigneLibreMontant()', function () {
 
     it('recalcul total — deux lignes 1000 + 500 → montant_total = 1500', function () {
         $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Ligne A',
+            'libelle' => 'Ligne A',
             'prix_unitaire' => 1000,
-            'quantite'      => 1,
+            'quantite' => 1,
         ]);
 
         $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Ligne B',
+            'libelle' => 'Ligne B',
             'prix_unitaire' => 500,
-            'quantite'      => 1,
+            'quantite' => 1,
         ]);
 
         $this->facture->refresh();
@@ -107,33 +107,33 @@ describe('ajouterLigneLibreMontant()', function () {
 
     it('guard prix_unitaire = 0 → exception message "strictement positif"', function () {
         expect(fn () => $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Test',
+            'libelle' => 'Test',
             'prix_unitaire' => 0,
-            'quantite'      => 1,
+            'quantite' => 1,
         ]))->toThrow(RuntimeException::class, 'strictement positif');
     });
 
     it('guard prix_unitaire négatif → exception', function () {
         expect(fn () => $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Test',
+            'libelle' => 'Test',
             'prix_unitaire' => -100,
-            'quantite'      => 1,
+            'quantite' => 1,
         ]))->toThrow(RuntimeException::class);
     });
 
     it('guard quantite = 0 → exception message "strictement positif"', function () {
         expect(fn () => $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Test',
+            'libelle' => 'Test',
             'prix_unitaire' => 100,
-            'quantite'      => 0,
+            'quantite' => 0,
         ]))->toThrow(RuntimeException::class, 'strictement positif');
     });
 
     it('guard quantite négative → exception', function () {
         expect(fn () => $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Test',
+            'libelle' => 'Test',
             'prix_unitaire' => 100,
-            'quantite'      => -1,
+            'quantite' => -1,
         ]))->toThrow(RuntimeException::class);
     });
 
@@ -143,9 +143,9 @@ describe('ajouterLigneLibreMontant()', function () {
         $this->facture->refresh();
 
         expect(fn () => $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Test',
+            'libelle' => 'Test',
             'prix_unitaire' => 100,
-            'quantite'      => 1,
+            'quantite' => 1,
         ]))->toThrow(RuntimeException::class);
     });
 
@@ -154,20 +154,20 @@ describe('ajouterLigneLibreMontant()', function () {
 
         // Créer une facture cross-tenant directement en base
         $factureAutreAsso = Facture::withoutGlobalScopes()->create([
-            'association_id'   => $autreAssociation->id,
-            'numero'           => null,
-            'date'             => now()->toDateString(),
-            'statut'           => StatutFacture::Brouillon,
-            'tiers_id'         => $this->tiers->id,
-            'montant_total'    => 0,
-            'exercice'         => date('Y'),
-            'saisi_par'        => $this->user->id,
+            'association_id' => $autreAssociation->id,
+            'numero' => null,
+            'date' => now()->toDateString(),
+            'statut' => StatutFacture::Brouillon,
+            'tiers_id' => $this->tiers->id,
+            'montant_total' => 0,
+            'exercice' => date('Y'),
+            'saisi_par' => $this->user->id,
         ]);
 
         expect(fn () => $this->service->ajouterLigneLibreMontant($factureAutreAsso, [
-            'libelle'       => 'Test',
+            'libelle' => 'Test',
             'prix_unitaire' => 100,
-            'quantite'      => 1,
+            'quantite' => 1,
         ]))->toThrow(RuntimeException::class);
     });
 });
@@ -208,14 +208,14 @@ describe('ajouterLigneLibreTexte()', function () {
         $autreAssociation = Association::factory()->create();
 
         $factureAutreAsso = Facture::withoutGlobalScopes()->create([
-            'association_id'   => $autreAssociation->id,
-            'numero'           => null,
-            'date'             => now()->toDateString(),
-            'statut'           => StatutFacture::Brouillon,
-            'tiers_id'         => $this->tiers->id,
-            'montant_total'    => 0,
-            'exercice'         => date('Y'),
-            'saisi_par'        => $this->user->id,
+            'association_id' => $autreAssociation->id,
+            'numero' => null,
+            'date' => now()->toDateString(),
+            'statut' => StatutFacture::Brouillon,
+            'tiers_id' => $this->tiers->id,
+            'montant_total' => 0,
+            'exercice' => date('Y'),
+            'saisi_par' => $this->user->id,
         ]);
 
         expect(fn () => $this->service->ajouterLigneLibreTexte($factureAutreAsso, 'Texte'))
@@ -229,9 +229,9 @@ describe('mix ajouterLigneLibreMontant + ajouterLigneLibreTexte', function () {
 
     it('ajout montant puis texte → ordres 1 et 2 ; total = montant de la ligne montant', function () {
         $ligneMontant = $this->service->ajouterLigneLibreMontant($this->facture, [
-            'libelle'       => 'Prestation',
+            'libelle' => 'Prestation',
             'prix_unitaire' => 750,
-            'quantite'      => 2,
+            'quantite' => 2,
         ]);
 
         $ligneTexte = $this->service->ajouterLigneLibreTexte($this->facture, 'Mention contractuelle');
