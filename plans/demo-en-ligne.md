@@ -3,7 +3,7 @@
 **Created** : 2026-04-28
 **Branch** : `claude/funny-shamir-8661f9` (basée sur `main` post-v4.1.9)
 **Spec** : [docs/specs/2026-04-28-demo-en-ligne.md](../docs/specs/2026-04-28-demo-en-ligne.md)
-**Status** : approved (2026-04-28)
+**Status** : implemented (2026-04-29) — 14 commits sur `claude/funny-shamir-8661f9`, suite verte 0 régression
 
 ## Goal
 
