@@ -7,7 +7,7 @@ use App\Models\Facture;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\User;
-use Database\Seeders\FactureLibreSeeder;
+use Database\Seeders\FactureManuelSeeder;
 use Illuminate\Support\Facades\Artisan;
 
 /**
@@ -16,13 +16,13 @@ use Illuminate\Support\Facades\Artisan;
  * Vérifie que le seeder s'exécute sans exception et produit les 3 cas démo attendus.
  * Le TenantContext est booté par le beforeEach global de Pest.php.
  */
-it('runs without error via Artisan and seeds demo factures libres', function () {
+it('runs without error via Artisan and seeds demo factures manuelles', function () {
     // Pré-requis : un Tiers et une SousCategorie tenant-scopés
     Tiers::factory()->create();
     SousCategorie::factory()->create(['nom' => 'Formations']);
     User::factory()->create();
 
-    $exitCode = Artisan::call('db:seed', ['--class' => 'FactureLibreSeeder']);
+    $exitCode = Artisan::call('db:seed', ['--class' => 'FactureManuelSeeder']);
 
     expect($exitCode)->toBe(0);
 });
@@ -32,7 +32,7 @@ it('seeds at least one facture brouillon issue d un devis', function () {
     SousCategorie::factory()->create(['nom' => 'Formations']);
     User::factory()->create();
 
-    (new FactureLibreSeeder)->run();
+    (new FactureManuelSeeder)->run();
 
     expect(
         Facture::whereNotNull('devis_id')
@@ -41,12 +41,12 @@ it('seeds at least one facture brouillon issue d un devis', function () {
     )->toBeGreaterThanOrEqual(1);
 });
 
-it('seeds a validated facture libre with a linked transaction', function () {
+it('seeds a validated facture manuelle with a linked transaction', function () {
     Tiers::factory()->create();
     SousCategorie::factory()->create(['nom' => 'Formations']);
     User::factory()->create();
 
-    (new FactureLibreSeeder)->run();
+    (new FactureManuelSeeder)->run();
 
     $factureValidee = Facture::where('statut', StatutFacture::Validee->value)
         ->whereNull('devis_id')
@@ -61,7 +61,7 @@ it('is idempotent on second run', function () {
     SousCategorie::factory()->create(['nom' => 'Formations']);
     User::factory()->create();
 
-    $seeder = new FactureLibreSeeder;
+    $seeder = new FactureManuelSeeder;
     $seeder->run();
 
     $countAfterFirst = Facture::whereNotNull('devis_id')->count();

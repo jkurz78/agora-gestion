@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\StatutDevis;
-use App\Livewire\DevisLibre\DevisEdit;
-use App\Livewire\DevisLibre\DevisList;
+use App\Livewire\DevisManuel\DevisEdit;
+use App\Livewire\DevisManuel\DevisList;
 use App\Models\Association;
 use App\Models\Devis;
 use App\Models\Tiers;
@@ -89,7 +89,7 @@ it('DevisEdit throws ModelNotFoundException when asso B user tries to access ass
     // The TenantScope (fail-closed) causes Livewire model binding to fail:
     // Devis::find($this->devisA->id) returns null under asso B context.
     // Livewire raises ModelNotFoundException → 404.
-    $this->get(route('devis-libres.show', ['devis' => $this->devisA->id]))
+    $this->get(route('devis-manuels.show', ['devis' => $this->devisA->id]))
         ->assertStatus(404);
 });
 

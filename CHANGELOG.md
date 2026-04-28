@@ -7,13 +7,14 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [v4.2.0] — 2026-04-28
 
-### Nouveau : Facture libre (invoice-first)
+### Nouveau : Facture manuelle (invoice-first)
 
-- **Transformation Devis Accepté → Facture brouillon** — bouton "Transformer en facture" sur la fiche devis ; lignes recopiées en `MontantLibre` / `Texte` ; `factures.devis_id` renseigné ; bouton désactivé si une facture existe déjà
-- **Création directe** — bouton "Nouvelle facture libre" sur la liste des factures ; modale sélecteur de tiers identique à "Nouvelle facture" ; aucun devis source requis
-- **3 types de lignes facture** : `Montant` (ref vers transaction existante) / `MontantLibre` (libre, génère une transaction à la validation) / `Texte` (information, sans impact comptable) — mix autorisé sur la même facture
-- **Génération automatique d'une `Transaction` recette** à la validation d'une facture portant des lignes `MontantLibre` : 1 transaction recette + N `TransactionLignes` (1 par ligne libre) ; statut "à recevoir" ; mode = `facture.mode_paiement_prevu`
-- **Champ `mode_paiement_prevu`** (énum `ModePaiement`) sur la facture, visible et requis à la validation ssi ≥ 1 ligne `MontantLibre`
+- **Transformation Devis Accepté → Facture brouillon** — bouton "Transformer en facture" sur la fiche devis ; lignes recopiées en `MontantManuel` / `Texte` ; `factures.devis_id` renseigné ; bouton désactivé si une facture existe déjà
+- **Création directe** — bouton "Nouvelle facture" sur la liste des factures ; modale sélecteur de tiers ; aucun devis source requis
+- **3 types de lignes facture** : `Montant` (ref vers transaction existante) / `MontantManuel` (manuelle, génère une transaction à la validation) / `Texte` (information, sans impact comptable) — mix autorisé sur la même facture
+- **Génération automatique d'une `Transaction` recette** à la validation d'une facture portant des lignes `MontantManuel` : 1 transaction recette + N `TransactionLignes` (1 par ligne manuelle) ; statut "à recevoir" ; mode = `facture.mode_paiement_prevu`
+- **Champ `mode_paiement_prevu`** (énum `ModePaiement`) sur la facture, visible et requis à la validation ssi ≥ 1 ligne `MontantManuel`
+- **Édition inline PU / Qté** sur les lignes `MontantManuel` en mode brouillon : inputs `wire:blur` directement dans le tableau de lignes
 - **Encaissement inchangé** : le flow Créances v2.4.3 traite la transaction générée comme n'importe quelle créance — bouton "Encaisser" existant
 - **ADR-002** : décision architecturale invoice-first à 3 types de lignes (`docs/adr/ADR-002-facture-libre-invoice-first.md`)
 
@@ -23,17 +24,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ### Changements
 
-- **PDF facture** : colonnes PU / Qté / Montant rendues selon le type de ligne (option α "asymétrie honnête") : `MontantLibre` affiche 4 colonnes, `Montant` ref affiche libellé + montant total uniquement, `Texte` affiche libellé seul
+- **PDF facture** : colonnes PU / Qté / Montant rendues selon le type de ligne (option α "asymétrie honnête") : `MontantManuel` affiche 4 colonnes, `Montant` ref affiche libellé + montant total uniquement, `Texte` affiche libellé seul
 
 ### Technique
 
-- Enum `App\Enums\TypeLigneFacture` : 3e valeur `MontantLibre = 'montant_libre'` + helpers `genereTransactionLigne()`, `aImpactComptable()`
+- Enum `App\Enums\TypeLigneFacture` : 3e valeur `MontantManuel = 'montant_manuel'` + helpers `genereTransactionLigne()`, `aImpactComptable()`
 - `factures` += `devis_id` (FK nullable, ON DELETE RESTRICT), `mode_paiement_prevu` (enum `ModePaiement` nullable), index `(association_id, devis_id)`
 - `facture_lignes` += `prix_unitaire`, `quantite`, `sous_categorie_id`, `operation_id`, `seance` (toutes nullables)
-- `FactureService` += `creerLibreVierge()`, `ajouterLigneLibreMontant()`, `ajouterLigneLibreTexte()` ; `valider()` étendu
+- `FactureService` += `creerManuelleVierge()`, `ajouterLigneManuelle()`, `ajouterLigneTexteManuelle()`, `majPrixUnitaireLigneManuelle()`, `majQuantiteLigneManuelle()` ; `valider()` étendu
 - `DevisService` += `transformerEnFacture()`
+- Routes `/devis-manuels/` (ex `/devis-libres/`) — classes et vues renommées en conséquence
 - Migrations up + down réversibles, aucun backfill
-- Suite de tests : 3164 tests verts, 0 failed
+- Suite de tests : 3171 tests verts, 0 failed
 
 ---
 

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\StatutDevis;
-use App\Livewire\DevisLibre\DevisList;
+use App\Livewire\DevisManuel\DevisList;
 use App\Models\Association;
 use App\Models\Devis;
 use App\Models\Tiers;
@@ -304,7 +304,7 @@ it('paginates at 50 per page', function () {
 it('creerDevis with a tiers_id creates a brouillon devis and redirects', function () {
     Livewire::test(DevisList::class)
         ->call('creerDevis', $this->tiers->id)
-        ->assertRedirect(route('devis-libres.show', Devis::latest('id')->first()));
+        ->assertRedirect(route('devis-manuels.show', Devis::latest('id')->first()));
 });
 
 it('creerDevis creates exactly one devis for the given tiers', function () {

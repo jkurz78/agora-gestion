@@ -94,8 +94,8 @@ class DatabaseSeeder extends Seeder
 
         // Dev/staging only — demo devis libres
         if (! app()->isProduction()) {
-            $this->call(DevisLibreSeeder::class);
-            $this->call(FactureLibreSeeder::class);
+            $this->call(DevisManuelSeeder::class);
+            $this->call(FactureManuelSeeder::class);
         }
     }
 }

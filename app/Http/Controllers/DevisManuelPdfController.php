@@ -9,7 +9,7 @@ use App\Services\DevisService;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 
-final class DevisLibrePdfController extends Controller
+final class DevisManuelPdfController extends Controller
 {
     public function __invoke(Devis $devis, DevisService $service): Response
     {

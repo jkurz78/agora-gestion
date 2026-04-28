@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\StatutDevis;
 use App\Enums\TypeLigneDevis;
-use App\Livewire\DevisLibre\DevisEdit;
+use App\Livewire\DevisManuel\DevisEdit;
 use App\Models\Association;
 use App\Models\Devis;
 use App\Models\DevisLigne;
@@ -464,7 +464,7 @@ it('shows PDF link when devis has lignes with montant > 0', function () {
 
     // PDF button is now an <a> link opening in a new tab
     Livewire::test(DevisEdit::class, ['devis' => $this->devis])
-        ->assertSeeHtml('devis-libres/'.$this->devis->id.'/pdf')
+        ->assertSeeHtml('devis-manuels/'.$this->devis->id.'/pdf')
         ->assertSeeHtml('target="_blank"');
 });
 

@@ -36,7 +36,7 @@ use Illuminate\Support\Facades\DB;
  * Not called in production: DatabaseSeeder gates this with app()->environment().
  * Safe to re-run : idempotent guard via check on existing data.
  */
-final class FactureLibreSeeder extends Seeder
+final class FactureManuelSeeder extends Seeder
 {
     public function run(): void
     {
@@ -120,7 +120,7 @@ final class FactureLibreSeeder extends Seeder
 
         FactureLigne::create([
             'facture_id' => $factureCas1->id,
-            'type' => TypeLigneFacture::MontantLibre,
+            'type' => TypeLigneFacture::MontantManuel,
             'libelle' => 'Journée d\'audit et diagnostic',
             'prix_unitaire' => '1200.00',
             'quantite' => '1.000',
@@ -131,7 +131,7 @@ final class FactureLibreSeeder extends Seeder
 
         FactureLigne::create([
             'facture_id' => $factureCas1->id,
-            'type' => TypeLigneFacture::MontantLibre,
+            'type' => TypeLigneFacture::MontantManuel,
             'libelle' => 'Rapport de préconisations (forfait)',
             'prix_unitaire' => '800.00',
             'quantite' => '1.000',
@@ -183,7 +183,7 @@ final class FactureLibreSeeder extends Seeder
 
         FactureLigne::create([
             'facture_id' => $factureCas2->id,
-            'type' => TypeLigneFacture::MontantLibre,
+            'type' => TypeLigneFacture::MontantManuel,
             'libelle' => 'Formation initiale (2 jours)',
             'prix_unitaire' => '600.00',
             'quantite' => '2.000',
@@ -195,7 +195,7 @@ final class FactureLibreSeeder extends Seeder
 
         FactureLigne::create([
             'facture_id' => $factureCas2->id,
-            'type' => TypeLigneFacture::MontantLibre,
+            'type' => TypeLigneFacture::MontantManuel,
             'libelle' => 'Supports pédagogiques',
             'prix_unitaire' => '200.00',
             'quantite' => '1.000',
@@ -258,7 +258,7 @@ final class FactureLibreSeeder extends Seeder
         // Ligne 2 : MontantLibre — prestation libre
         FactureLigne::create([
             'facture_id' => $factureCas3->id,
-            'type' => TypeLigneFacture::MontantLibre,
+            'type' => TypeLigneFacture::MontantManuel,
             'libelle' => 'Prestation de conseil (1 journée)',
             'prix_unitaire' => '500.00',
             'quantite' => '1.000',

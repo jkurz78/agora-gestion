@@ -111,14 +111,14 @@ it('ligne Montant affiche libellé et montant, PU et Qté vides', function (): v
     expect($html)->not->toContain('>0,00<');
 });
 
-// ─── Test 2 : Ligne MontantLibre — PU, Qté et Montant rendus ────────────────
+// ─── Test 2 : Ligne MontantManuel — PU, Qté et Montant rendus ────────────────
 
-it('ligne MontantLibre affiche libellé, PU, Qté et montant', function (): void {
+it('ligne MontantManuel affiche libellé, PU, Qté et montant', function (): void {
     $facture = makeFacture(['montant_total' => 2400.00]);
 
     FactureLigne::create([
         'facture_id' => $facture->id,
-        'type' => TypeLigneFacture::MontantLibre,
+        'type' => TypeLigneFacture::MontantManuel,
         'libelle' => 'Mission audit',
         'prix_unitaire' => 800.00,
         'quantite' => 3.000,
@@ -184,7 +184,7 @@ it('mode_paiement_prevu est affiché dans le bloc Conditions de règlement si re
 
     FactureLigne::create([
         'facture_id' => $facture->id,
-        'type' => TypeLigneFacture::MontantLibre,
+        'type' => TypeLigneFacture::MontantManuel,
         'libelle' => 'Mission conseil',
         'prix_unitaire' => 2400.00,
         'quantite' => 1.000,
@@ -238,7 +238,7 @@ it('le PDF facture ne contient pas de mention Issue du devis même si devis_id r
 
     FactureLigne::create([
         'facture_id' => $facture->id,
-        'type' => TypeLigneFacture::MontantLibre,
+        'type' => TypeLigneFacture::MontantManuel,
         'libelle' => 'Prestation',
         'prix_unitaire' => 1000.00,
         'quantite' => 1.000,
@@ -262,7 +262,7 @@ it('le bloc total est toujours rendu en bas de la facture', function (): void {
 
     FactureLigne::create([
         'facture_id' => $facture->id,
-        'type' => TypeLigneFacture::MontantLibre,
+        'type' => TypeLigneFacture::MontantManuel,
         'libelle' => 'Formation',
         'prix_unitaire' => 1500.00,
         'quantite' => 1.000,

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\DevisLibre;
+namespace App\Livewire\DevisManuel;
 
 use App\Enums\StatutDevis;
 use App\Models\Devis;
@@ -279,7 +279,7 @@ final class DevisEdit extends Component
     {
         try {
             $nouveau = app(DevisService::class)->dupliquer($this->devis);
-            $this->redirect(route('devis-libres.show', $nouveau));
+            $this->redirect(route('devis-manuels.show', $nouveau));
         } catch (RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }
@@ -347,12 +347,12 @@ final class DevisEdit extends Component
 
         $lignes = $this->devis->lignes;
 
-        return view('livewire.devis-libre.devis-edit', [
+        return view('livewire.devis-manuel.devis-edit', [
             'lignes' => $lignes,
             'sousCategoriesDisponibles' => $this->sousCategoriesDisponibles,
         ])->layout('layouts.app-sidebar', [
             'title' => $this->devis->numero ?? 'Brouillon de devis',
-            'breadcrumbParent' => new ComponentSlot('Liste des devis', ['url' => route('devis-libres.index')]),
+            'breadcrumbParent' => new ComponentSlot('Liste des devis', ['url' => route('devis-manuels.index')]),
         ]);
     }
 

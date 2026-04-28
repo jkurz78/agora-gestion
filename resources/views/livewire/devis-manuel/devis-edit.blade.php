@@ -42,7 +42,7 @@
                 — Exercice {{ $devis->exercice }}
             </span>
         </div>
-        <a href="{{ route('devis-libres.index') }}" class="btn btn-sm btn-outline-secondary">
+        <a href="{{ route('devis-manuels.index') }}" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Retour à la liste
         </a>
     </div>
@@ -403,7 +403,7 @@
                     {{-- PDF — ouvre dans un nouvel onglet --}}
                     @php $peutPdf = $this->peutEtreEnvoye(); @endphp
                     @if ($peutPdf)
-                        <a href="{{ route('devis-libres.pdf', $devis) }}"
+                        <a href="{{ route('devis-manuels.pdf', $devis) }}"
                            target="_blank"
                            class="btn btn-outline-secondary">
                             <i class="bi bi-file-earmark-pdf"></i> Exporter PDF

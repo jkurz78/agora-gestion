@@ -8,7 +8,7 @@ use App\Http\Controllers\CategorieController;
 use App\Http\Controllers\CompteBancaireController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DevisLibrePdfController;
+use App\Http\Controllers\DevisManuelPdfController;
 use App\Http\Controllers\DocumentPrevisionnelPdfController;
 use App\Http\Controllers\DroitImagePdfController;
 use App\Http\Controllers\EmailOptoutController;
@@ -46,8 +46,8 @@ use App\Livewire\Auth\AssociationSelector;
 use App\Livewire\BackOffice\FacturePartenaire\Index as FpIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
-use App\Livewire\DevisLibre\DevisEdit;
-use App\Livewire\DevisLibre\DevisList;
+use App\Livewire\DevisManuel\DevisEdit;
+use App\Livewire\DevisManuel\DevisList;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Models\Association;
 use App\Models\CompteBancaire;
@@ -259,9 +259,9 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
 // ── Devis libres ──
 Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess::class.':comptabilite'])
     ->group(function (): void {
-        Route::get('/devis-libres', DevisList::class)->name('devis-libres.index');
-        Route::get('/devis-libres/{devis}', DevisEdit::class)->name('devis-libres.show');
-        Route::get('/devis-libres/{devis}/pdf', DevisLibrePdfController::class)->name('devis-libres.pdf');
+        Route::get('/devis-manuels', DevisList::class)->name('devis-manuels.index');
+        Route::get('/devis-manuels/{devis}', DevisEdit::class)->name('devis-manuels.show');
+        Route::get('/devis-manuels/{devis}/pdf', DevisManuelPdfController::class)->name('devis-manuels.pdf');
     });
 
 // ── Facturation ──

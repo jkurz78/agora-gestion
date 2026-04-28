@@ -241,8 +241,8 @@
                     <tr class="ligne-texte">
                         <td colspan="4">{{ $ligne->libelle }}</td>
                     </tr>
-                @elseif ($ligne->type === \App\Enums\TypeLigneFacture::MontantLibre)
-                    {{-- Ligne montant libre : libellé + PU + Qté + montant --}}
+                @elseif ($ligne->type === \App\Enums\TypeLigneFacture::MontantManuel)
+                    {{-- Ligne montant manuelle : libellé + PU + Qté + montant --}}
                     <tr class="{{ $montantIndex % 2 === 1 ? 'row-even' : '' }}">
                         <td>{{ $ligne->libelle }}</td>
                         <td class="text-end">{{ number_format((float) $ligne->prix_unitaire, 2, ',', "\u{00A0}") }} &euro;</td>
