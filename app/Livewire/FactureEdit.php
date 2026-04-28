@@ -369,6 +369,15 @@ final class FactureEdit extends Component
         $this->facture->update(['mode_paiement_prevu' => $mode?->value]);
     }
 
+    /**
+     * Quand l'opération du formulaire d'ajout change, la séance précédemment saisie
+     * réfère à une plage 1..nombre_seances qui n'est plus valable. Reset à null.
+     */
+    public function updatedNouvelleLigneMontantOperationId(): void
+    {
+        $this->nouvelleLigneMontantSeance = null;
+    }
+
     // ── Helpers privés ────────────────────────────────────────────────────────
 
     private function resetFormLigneMontant(): void

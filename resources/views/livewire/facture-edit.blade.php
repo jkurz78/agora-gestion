@@ -152,13 +152,18 @@
                                                                 @endforeach
                                                             </select>
                                                         </div>
-                                                        <div class="col-md-2">
-                                                            <input type="number"
-                                                                   class="form-control form-control-sm"
-                                                                   placeholder="Séance"
-                                                                   value="{{ $ligne->seance }}"
-                                                                   wire:blur="updateSeance({{ $ligne->id }}, $event.target.value)">
-                                                        </div>
+                                                        @php $opLigne = $ligne->operation_id !== null ? $operations->firstWhere('id', $ligne->operation_id) : null; @endphp
+                                                        @if ($opLigne !== null && (int) $opLigne->nombre_seances > 0)
+                                                            <div class="col-md-2">
+                                                                <select class="form-select form-select-sm"
+                                                                        wire:change="updateSeance({{ $ligne->id }}, $event.target.value)">
+                                                                    <option value="">— Séance —</option>
+                                                                    @for ($i = 1; $i <= (int) $opLigne->nombre_seances; $i++)
+                                                                        <option value="{{ $i }}" @selected((int) $ligne->seance === $i)>{{ $i }}</option>
+                                                                    @endfor
+                                                                </select>
+                                                            </div>
+                                                        @endif
                                                     </div>
                                                 @endif
                                             </td>

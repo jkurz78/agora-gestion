@@ -409,7 +409,8 @@ final class FactureService
             throw new \RuntimeException("L'opération ne peut être modifiée que sur une ligne libre montant.");
         }
 
-        $ligne->update(['operation_id' => $operationId]);
+        // Changer d'opération invalide la séance (qui réfère à une plage 1..nombre_seances spécifique).
+        $ligne->update(['operation_id' => $operationId, 'seance' => null]);
     }
 
     /**
