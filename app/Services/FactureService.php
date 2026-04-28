@@ -12,9 +12,11 @@ use App\Models\Association;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Seance;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Support\CurrentAssociation;
+use App\Tenant\TenantContext;
 use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -51,6 +53,56 @@ final class FactureService
                 'date' => now()->toDateString(),
                 'statut' => StatutFacture::Brouillon,
                 'tiers_id' => $tiersId,
+                'compte_bancaire_id' => $compteBancaireId,
+                'conditions_reglement' => $conditionsReglement,
+                'mentions_legales' => $mentionsLegales,
+                'montant_total' => 0,
+                'saisi_par' => auth()->id(),
+                'exercice' => $exercice,
+            ]);
+        });
+    }
+
+    /**
+     * Crée une facture brouillon vierge sans devis source (facture libre directe).
+     *
+     * Aucune ligne n'est créée. Le numéro reste null (statut brouillon).
+     * Le tiers doit appartenir à l'association courante (guard multi-tenant).
+     *
+     * @throws \RuntimeException si le tiers n'appartient pas à l'association courante
+     *                           ou si TenantContext n'est pas booté
+     */
+    public function creerLibreVierge(int $tiersId): Facture
+    {
+        $exercice = $this->exerciceService->current();
+        $this->exerciceService->assertOuvert($exercice);
+
+        return DB::transaction(function () use ($tiersId, $exercice): Facture {
+            $association = CurrentAssociation::get();
+
+            // Guard multi-tenant : charge le tiers sans scope pour pouvoir
+            // détecter les cross-tenant, puis vérifie l'appartenance.
+            $tiers = Tiers::withoutGlobalScopes()->find($tiersId);
+
+            if ($tiers === null || (int) $tiers->association_id !== (int) TenantContext::currentId()) {
+                throw new \RuntimeException("Accès interdit : ce tiers n'appartient pas à votre association.");
+            }
+
+            $mentionsLegales = $association->facture_mentions_legales
+                ?? "TVA non applicable, art. 261-7-1° du CGI\nPas d'escompte pour paiement anticipé";
+
+            $conditionsReglement = $association->facture_conditions_reglement
+                ?? 'Payable à réception';
+
+            $compteBancaireId = $association->facture_compte_bancaire_id;
+
+            return Facture::create([
+                'numero' => null,
+                'date' => now()->toDateString(),
+                'statut' => StatutFacture::Brouillon,
+                'tiers_id' => $tiersId,
+                'devis_id' => null,
+                'mode_paiement_prevu' => null,
                 'compte_bancaire_id' => $compteBancaireId,
                 'conditions_reglement' => $conditionsReglement,
                 'mentions_legales' => $mentionsLegales,
