@@ -18,6 +18,7 @@ use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Services\ExerciceService;
 use App\Support\CurrentAssociation;
+use App\Support\FlashMessages;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -392,7 +393,7 @@ final class CommunicationTiers extends Component
                 ->send($mail->from($assoc->email_from, $assoc->email_from_name ?? null));
 
             $this->showTestModal = false;
-            session()->flash('message', "Email de test envoyé à {$this->testEmail}.");
+            session()->flash('message', FlashMessages::emailSentTo($this->testEmail));
         } catch (\Throwable $e) {
             session()->flash('error', "Erreur d'envoi : {$e->getMessage()}");
         }

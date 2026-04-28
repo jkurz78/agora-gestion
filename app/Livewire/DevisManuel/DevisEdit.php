@@ -10,6 +10,7 @@ use App\Models\DevisLigne;
 use App\Models\Facture;
 use App\Models\SousCategorie;
 use App\Services\DevisService;
+use App\Support\FlashMessages;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\View\ComponentSlot;
@@ -333,7 +334,7 @@ final class DevisEdit extends Component
             $this->showEnvoyerEmailModal = false;
             $this->emailSujet = '';
             $this->emailCorps = '';
-            session()->flash('success', 'Email envoyé avec succès.');
+            session()->flash('success', FlashMessages::emailSent());
         } catch (RuntimeException $e) {
             session()->flash('error', $e->getMessage());
         }
