@@ -148,7 +148,13 @@
                                     </span>
                                 @endif
                             </td>
-                            <td onclick="event.stopPropagation()">
+                            <td onclick="event.stopPropagation()" class="text-nowrap">
+                                <a href="{{ route('facturation.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
+                                   target="_blank"
+                                   class="btn btn-sm btn-outline-danger"
+                                   title="Voir le PDF">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
                                 @if ($isBrouillon && $this->canEdit)
                                     <button wire:click="supprimer({{ $facture->id }})"
                                             wire:confirm="Supprimer ce brouillon de facture ?"
