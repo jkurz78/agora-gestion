@@ -63,10 +63,9 @@
         .lines-table tbody td {
             padding: 5px 8px;
             vertical-align: top;
+            background-color: #f9f9f9;
         }
         .lines-table tbody td.text-end { text-align: right; }
-        /* essai : pas de zebra-rows, fond blanc uniforme */
-        /* .lines-table .row-even { background-color: #f9f9f9; } */
         .lines-table tfoot tr {
             background-color: #e9ecef;
             font-weight: bold;
