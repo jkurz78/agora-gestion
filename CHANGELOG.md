@@ -5,7 +5,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
-## [v4.2.0] — 2026-04-28
+## [v4.1.9] — 2026-04-28
 
 ### Nouveau : Facture manuelle (invoice-first)
 
