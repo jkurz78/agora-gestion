@@ -308,6 +308,8 @@ Toutes les mutations en `DB::transaction()` avec `lockForUpdate` + `guardAssocia
 
 Pas d'appel à `TransactionUniverselleService` (qui modélise la saisie manuelle utilisateur). La génération est interne à `FactureService::valider()`. Refactor éventuel hors S2 si réutilisation s'impose.
 
+> **Note terminologique** : "à recevoir" dans cette spec correspond techniquement à `StatutReglement::EnAttente` (label "En attente") dans le code. Une évolution future pourrait introduire un case `ARecevoir` distinct si le besoin métier émerge (ex. label "À recevoir" exposé à l'utilisateur). Voir `project_statut_reglement_termino.md`.
+
 ### 3.4 UI Livewire — évolutions
 
 | Composant | Évolution |
