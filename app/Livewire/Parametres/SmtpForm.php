@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Parametres;
 
+use App\Exceptions\DemoOperationBlockedException;
 use App\Models\SmtpParametres;
 use App\Services\SmtpService;
+use App\Support\Demo;
 use App\Tenant\TenantContext;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -49,6 +51,10 @@ final class SmtpForm extends Component
 
     public function sauvegarder(): void
     {
+        if (Demo::isActive()) {
+            throw new DemoOperationBlockedException('configuration SMTP');
+        }
+
         $this->validate([
             'smtpHost' => ['nullable', 'string', 'max:255'],
             'smtpPort' => ['required', 'integer', 'min:1', 'max:65535'],
