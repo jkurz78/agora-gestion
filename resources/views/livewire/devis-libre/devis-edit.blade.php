@@ -435,6 +435,24 @@
                             <i class="bi bi-copy"></i> Dupliquer
                         </button>
                     @endif
+
+                    {{-- Transformer en facture (uniquement si statut Accepté) --}}
+                    @if ($devis->statut === \App\Enums\StatutDevis::Accepte)
+                        @php $dejaTransforme = $devis->aDejaUneFacture(); @endphp
+                        @if ($dejaTransforme)
+                            <button class="btn btn-outline-success"
+                                    disabled
+                                    title="Une facture issue de ce devis existe déjà">
+                                <i class="bi bi-file-earmark-arrow-up"></i> Transformer en facture
+                            </button>
+                        @else
+                            <button wire:click="transformerEnFacture"
+                                    wire:confirm="Transformer ce devis en facture brouillon ?"
+                                    class="btn btn-outline-success">
+                                <i class="bi bi-file-earmark-arrow-up"></i> Transformer en facture
+                            </button>
+                        @endif
+                    @endif
                 </div>
             </div>
 
