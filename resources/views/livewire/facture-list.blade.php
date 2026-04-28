@@ -52,6 +52,45 @@
         </div>
     </div>
 
+    {{-- Modale sélection tiers pour créer une facture libre --}}
+    <div class="modal fade {{ $showCreerLibreModal ? 'show d-block' : '' }}"
+         tabindex="-1"
+         role="dialog"
+         id="creerFactureLibreModal"
+         aria-labelledby="creerFactureLibreModalLabel"
+         @if($showCreerLibreModal) aria-modal="true" style="background:rgba(0,0,0,.4);" @else aria-hidden="true" @endif>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="creerFactureLibreModalLabel">
+                        <i class="bi bi-receipt me-1"></i> Nouvelle facture libre
+                    </h5>
+                    <button type="button" class="btn-close" wire:click="$set('showCreerLibreModal', false)"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label fw-semibold">
+                        Tiers à facturer <span class="text-danger">*</span>
+                    </label>
+                    <livewire:tiers-autocomplete
+                        wire:model.live="newFactureLibreTiersId"
+                        filtre="recettes"
+                        :key="'facture-libre-create-tiers-'.($showCreerLibreModal ? '1' : '0')" />
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm"
+                            wire:click="$set('showCreerLibreModal', false)">
+                        Annuler
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm"
+                            wire:click="creerFactureLibre({{ $newFactureLibreTiersId ?? 'null' }})"
+                            @if(!$newFactureLibreTiersId) disabled @endif>
+                        <i class="bi bi-check-lg"></i> Créer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Filtres + création --}}
     <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
         <select wire:model.live="filterStatut" class="form-select form-select-sm" style="max-width:180px;">
@@ -65,9 +104,14 @@
         <input type="text" wire:model.live.debounce.300ms="filterTiers" class="form-control form-control-sm" style="max-width:220px;" placeholder="Rechercher un tiers…">
 
         @if($this->canEdit)
-            <button wire:click="creer" class="btn btn-primary btn-sm ms-auto text-nowrap">
-                <i class="bi bi-plus-lg"></i> Nouvelle facture
-            </button>
+            <div class="ms-auto d-flex gap-2">
+                <button wire:click="creer" class="btn btn-primary btn-sm text-nowrap">
+                    <i class="bi bi-plus-lg"></i> Nouvelle facture
+                </button>
+                <button wire:click="ouvrirModalLibre" class="btn btn-outline-success btn-sm text-nowrap">
+                    <i class="bi bi-plus-lg"></i> Nouvelle facture libre
+                </button>
+            </div>
         @endif
     </div>
 
