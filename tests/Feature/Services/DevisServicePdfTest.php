@@ -64,13 +64,13 @@ it('genererPdf sur un brouillon retourne un path et le HTML contient BROUILLON s
     // Fichier écrit sur le fake disk
     Storage::disk('local')->assertExists($path);
 
-    // Path suit la convention associations/{id}/devis-libres/{devis_id}/devis-*.pdf
-    expect($path)->toContain('associations/'.$this->association->id.'/devis-libres/'.$devis->id.'/devis-');
+    // Path suit la convention associations/{id}/devis-manuels/{devis_id}/devis-*.pdf
+    expect($path)->toContain('associations/'.$this->association->id.'/devis-manuels/'.$devis->id.'/devis-');
     expect($path)->toEndWith('.pdf');
 
     // HTML rendu contient "BROUILLON" (filigrane textuel)
     $devis->load(['lignes', 'tiers']);
-    $html = view('pdf.devis-libre', [
+    $html = view('pdf.devis-manuel', [
         'devis' => $devis,
         'lignes' => $devis->lignes,
         'association' => $this->association,
@@ -110,7 +110,7 @@ it('genererPdf sur un devis validé produit un HTML avec numéro, tiers, lignes,
     Storage::disk('local')->assertExists($path);
 
     $devis->load(['lignes', 'tiers']);
-    $html = view('pdf.devis-libre', [
+    $html = view('pdf.devis-manuel', [
         'devis' => $devis,
         'lignes' => $devis->lignes,
         'association' => $this->association,
@@ -195,7 +195,7 @@ it('genererPdf avec brouillonWatermark=true sur un devis validé produit un HTML
     $this->service->genererPdf($devis, brouillonWatermark: true);
 
     $devis->load(['lignes', 'tiers']);
-    $html = view('pdf.devis-libre', [
+    $html = view('pdf.devis-manuel', [
         'devis' => $devis,
         'lignes' => $devis->lignes,
         'association' => $this->association,
@@ -225,7 +225,7 @@ it('genererPdf avec brouillonWatermark=false sur un brouillon n\'affiche pas BRO
     $this->service->genererPdf($devis, brouillonWatermark: false);
 
     $devis->load(['lignes', 'tiers']);
-    $html = view('pdf.devis-libre', [
+    $html = view('pdf.devis-manuel', [
         'devis' => $devis,
         'lignes' => $devis->lignes,
         'association' => $this->association,
@@ -237,7 +237,7 @@ it('genererPdf avec brouillonWatermark=false sur un brouillon n\'affiche pas BRO
 
 // ─── Test 7 : convention du path de stockage ──────────────────────────────────
 
-it('genererPdf suit la convention de path associations/{id}/devis-libres/{devis_id}/devis-*.pdf', function () {
+it('genererPdf suit la convention de path associations/{id}/devis-manuels/{devis_id}/devis-*.pdf', function () {
     $devis = Devis::factory()->valide()->create([
         'tiers_id' => $this->tiers->id,
         'numero' => 'D-2026-003',
@@ -254,7 +254,7 @@ it('genererPdf suit la convention de path associations/{id}/devis-libres/{devis_
 
     $path = $this->service->genererPdf($devis);
 
-    $expectedPrefix = 'associations/'.$this->association->id.'/devis-libres/'.$devis->id.'/devis-';
+    $expectedPrefix = 'associations/'.$this->association->id.'/devis-manuels/'.$devis->id.'/devis-';
 
     expect($path)->toStartWith($expectedPrefix);
     expect($path)->toEndWith('.pdf');

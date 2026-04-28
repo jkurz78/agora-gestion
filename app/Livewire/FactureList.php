@@ -58,13 +58,17 @@ final class FactureList extends Component
             return null;
         }
 
-        $this->newFactureTiersId = $tiersId;
+        // Flow unifié : la facture brouillon créée supporte les 3 types de lignes
+        // (Montant ref, MontantManuel, Texte) côté éditeur. creerManuelleVierge() apporte
+        // le guard multi-tenant (tiers vérifié appartenir à l'asso courante).
+        try {
+            $facture = app(FactureService::class)->creerManuelleVierge((int) $tiersId);
+        } catch (\RuntimeException $e) {
+            $this->showCreerModal = false;
+            session()->flash('error', $e->getMessage());
 
-        $this->validate([
-            'newFactureTiersId' => ['required', 'exists:tiers,id'],
-        ]);
-
-        $facture = app(FactureService::class)->creer($this->newFactureTiersId);
+            return null;
+        }
 
         return $this->redirect(route('facturation.factures.edit', $facture));
     }

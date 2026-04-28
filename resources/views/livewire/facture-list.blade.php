@@ -65,7 +65,7 @@
         <input type="text" wire:model.live.debounce.300ms="filterTiers" class="form-control form-control-sm" style="max-width:220px;" placeholder="Rechercher un tiers…">
 
         @if($this->canEdit)
-            <button wire:click="creer" class="btn btn-primary btn-sm ms-auto text-nowrap">
+            <button wire:click="creer" class="btn btn-primary btn-sm text-nowrap ms-auto">
                 <i class="bi bi-plus-lg"></i> Nouvelle facture
             </button>
         @endif
@@ -148,7 +148,13 @@
                                     </span>
                                 @endif
                             </td>
-                            <td onclick="event.stopPropagation()">
+                            <td onclick="event.stopPropagation()" class="text-nowrap">
+                                <a href="{{ route('facturation.factures.pdf', ['facture' => $facture, 'mode' => 'inline']) }}"
+                                   target="_blank"
+                                   class="btn btn-sm btn-outline-danger"
+                                   title="Voir le PDF">
+                                    <i class="bi bi-file-earmark-pdf"></i>
+                                </a>
                                 @if ($isBrouillon && $this->canEdit)
                                     <button wire:click="supprimer({{ $facture->id }})"
                                             wire:confirm="Supprimer ce brouillon de facture ?"

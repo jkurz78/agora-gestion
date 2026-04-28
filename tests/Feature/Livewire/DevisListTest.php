@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\StatutDevis;
-use App\Livewire\DevisLibre\DevisList;
+use App\Livewire\DevisManuel\DevisList;
 use App\Models\Association;
 use App\Models\Devis;
 use App\Models\Tiers;
@@ -304,7 +304,7 @@ it('paginates at 50 per page', function () {
 it('creerDevis with a tiers_id creates a brouillon devis and redirects', function () {
     Livewire::test(DevisList::class)
         ->call('creerDevis', $this->tiers->id)
-        ->assertRedirect(route('devis-libres.show', Devis::latest('id')->first()));
+        ->assertRedirect(route('devis-manuels.show', Devis::latest('id')->first()));
 });
 
 it('creerDevis creates exactly one devis for the given tiers', function () {
@@ -327,47 +327,27 @@ it('creerDevis without tiers_id opens the tiers selection modal', function () {
         ->assertSet('showCreerModal', true);
 });
 
-// ── Action icon : pencil pour les modifiables, eye pour les verrouillés ──────
+// ── Action icon : PDF (la ligne entière redirige vers la fiche, pas de bouton voir/modifier) ──
 
-it('shows pencil icon for brouillon devis in the action column', function () {
+it('shows PDF icon for any devis regardless of statut', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'statut' => StatutDevis::Brouillon,
-        'libelle' => 'Test pencil brouillon',
+        'libelle' => 'Test PDF brouillon',
         'exercice' => $this->exercice,
     ]);
 
-    Livewire::test(DevisList::class)
-        ->assertSeeHtml('bi-pencil');
-});
-
-it('shows pencil icon for valide devis (still modifiable, edit rebascules to brouillon)', function () {
-    Devis::factory()->create([
-        'association_id' => $this->association->id,
-        'tiers_id' => $this->tiers->id,
-        'statut' => StatutDevis::Valide,
-        'numero' => 'D-2026-099',
-        'libelle' => 'Test pencil valide',
-        'exercice' => $this->exercice,
-    ]);
-
-    Livewire::test(DevisList::class)
-        ->set('filtreStatut', 'valide')
-        ->assertSeeHtml('bi-pencil');
-});
-
-it('shows eye icon for verrouillé devis (accepte / refuse / annule)', function () {
     Devis::factory()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
         'statut' => StatutDevis::Accepte,
         'numero' => 'D-2026-098',
-        'libelle' => 'Test eye accepte',
+        'libelle' => 'Test PDF accepté',
         'exercice' => $this->exercice,
     ]);
 
     Livewire::test(DevisList::class)
-        ->set('filtreStatut', 'accepte')
-        ->assertSeeHtml('bi-eye');
+        ->assertSeeHtml('bi-file-earmark-pdf')
+        ->assertSeeHtml('devis-manuels/');
 });

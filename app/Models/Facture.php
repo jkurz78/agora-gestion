@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
@@ -17,6 +18,7 @@ final class Facture extends TenantModel
         'association_id', 'numero', 'date', 'statut', 'tiers_id', 'compte_bancaire_id',
         'conditions_reglement', 'mentions_legales', 'montant_total',
         'numero_avoir', 'date_annulation', 'notes', 'saisi_par', 'exercice',
+        'devis_id', 'mode_paiement_prevu',
     ];
 
     protected function casts(): array
@@ -30,7 +32,14 @@ final class Facture extends TenantModel
             'tiers_id' => 'integer',
             'compte_bancaire_id' => 'integer',
             'saisi_par' => 'integer',
+            'devis_id' => 'integer',
+            'mode_paiement_prevu' => ModePaiement::class,
         ];
+    }
+
+    public function devis(): BelongsTo
+    {
+        return $this->belongsTo(Devis::class);
     }
 
     public function tiers(): BelongsTo

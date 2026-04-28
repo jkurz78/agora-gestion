@@ -130,10 +130,15 @@ it('creer($tiersId) with valid tiers creates the facture and redirects to edit',
     expect($facture->numero)->toBeNull();
 });
 
-it('creer($invalidId) with non-existent tiers fails validation', function () {
-    Livewire::test(FactureList::class)
-        ->call('creer', 999999)
-        ->assertHasErrors(['newFactureTiersId']);
+it('creer($invalidId) with non-existent tiers flashes error and does not create a facture', function () {
+    // Le tiers 999999 n'existe pas → creerLibreVierge() lève RuntimeException → flash error.
+    // Pattern projet : appel direct via instance() pour observer session() (cf IndexTest:401).
+    $test = Livewire::test(FactureList::class);
+    $test->instance()->creer(999999);
+
+    expect(Facture::count())->toBe(0);
+    expect(session('error'))->not->toBeNull();
+    test()->assertStringContainsString("n'appartient pas à votre association", (string) session('error'));
 });
 
 it('deletes a brouillon facture', function () {
