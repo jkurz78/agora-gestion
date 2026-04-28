@@ -1,0 +1,86 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Demo;
+
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Captures all rows from a single DB table, converting datetime columns
+ * to relative delta strings and optionally overriding passwords.
+ */
+final class TableCapture
+{
+    private Carbon $capturedAt;
+
+    public function __construct(Carbon $capturedAt)
+    {
+        $this->capturedAt = $capturedAt;
+    }
+
+    /**
+     * Capture all rows from the given table and return them as an array,
+     * with datetime values converted to delta strings.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function capture(string $tableName): array
+    {
+        $rows = DB::table($tableName)->get();
+        $result = [];
+
+        foreach ($rows as $row) {
+            $rowArray = (array) $row;
+
+            // For users table: replace password with demo hash
+            if ($tableName === 'users') {
+                $rowArray['password'] = SnapshotConfig::DEMO_USER_PASSWORD_HASH;
+            }
+
+            // Sort keys alphabetically for stable YAML
+            ksort($rowArray);
+
+            // Convert datetime values to delta strings
+            $result[] = $this->convertDatetimeValues($rowArray);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Walk through all values and convert date/datetime/timestamp strings
+     * to relative delta strings.
+     *
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    private function convertDatetimeValues(array $row): array
+    {
+        foreach ($row as $key => $value) {
+            if (is_string($value) && $this->looksLikeDatetime($value)) {
+                try {
+                    $date = Carbon::parse($value);
+                    $row[$key] = DateDelta::toDelta($date, $this->capturedAt);
+                } catch (\Throwable) {
+                    // If parsing fails, leave the original value
+                }
+            }
+        }
+
+        return $row;
+    }
+
+    /**
+     * Returns true if the string matches a date or datetime pattern.
+     * We match: YYYY-MM-DD or YYYY-MM-DD HH:MM:SS (with optional fractional seconds).
+     */
+    private function looksLikeDatetime(string $value): bool
+    {
+        return (bool) preg_match(
+            '/^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}:\d{2}(\.\d+)?)?$/',
+            $value
+        );
+    }
+}
