@@ -9,7 +9,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ### Ajouts — Démo en ligne
 
-- **Environnement démo public** sur `demo.agoragestion.org` (sous-domaine O2Switch dédié, DB MySQL dédiée, `.env.demo` versionné côté serveur)
+- **Environnement démo public** sur `demo.agoragestion.org` (sous-domaine O2Switch dédié, DB MySQL dédiée, `.env.demo.example` versionné (template — `.env` réel posé manuellement côté serveur, jamais committé))
 - **Bandeau `/login`** listant les comptes démo (`admin@demo.fr / demo`, `jean@demo.fr / demo`) — visible ssi `APP_ENV=demo`, absent en prod
 - **Bridage des sorties externes** en `APP_ENV=demo` : mails routés vers le log (`MAIL_MAILER=log`) avec flash UI "Email enregistré (mode démo)", webhook HelloAsso retourne 200 no-op, commande `helloasso:sync` no-op, `incoming-mail:fetch` no-op, OCR factures partenaires retourne un payload stub statique
 - **Lecture seule sur paramètres sensibles** : écrans Livewire SMTP + HelloAsso affichent un bandeau d'information, inputs `disabled`, bouton "Enregistrer" absent ; middleware `EnforceDemoReadOnly` refuse les requêtes d'écriture HTTP sur ces routes (403)

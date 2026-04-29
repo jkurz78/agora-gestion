@@ -15,7 +15,7 @@ final class DemoCaptureCommand extends Command
 {
     protected $signature = 'demo:capture {--out=database/demo/snapshot.yaml : Output file path}';
 
-    protected $description = 'Capture the current DB into a YAML snapshot for demo:reset replay';
+    protected $description = 'Capture la base de données courante dans un snapshot YAML pour relecture par demo:reset';
 
     public function handle(): int
     {
