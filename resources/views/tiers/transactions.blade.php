@@ -2,6 +2,14 @@
     <x-slot:title>Transactions — {{ $tiers->displayName() }}</x-slot:title>
     <x-slot:breadcrumbParent url="{{ route('tiers.index') }}">Liste des tiers</x-slot:breadcrumbParent>
     <div class="container-fluid py-3">
+        @if(session()->has('message'))
+            <div class="alert alert-success py-2 mb-2 small">{{ session('message') }}</div>
+        @endif
+
+        <div class="d-flex justify-content-end mb-2">
+            <livewire:tiers-fusion :tiers="$tiers" />
+        </div>
+
         <livewire:transaction-universelle
             :tiers-id="$tiers->id"
             :locked-types="['depense', 'recette', 'don', 'cotisation']"
@@ -80,4 +88,6 @@
             </div>
         </div>
     </div>
+
+    <livewire:tiers-merge-modal />
 </x-app-layout>

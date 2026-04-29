@@ -41,14 +41,20 @@ final class TiersMergeModal extends Component
 
     public bool $helloassoIdConflict = false;
 
-    /** @var list<string> */
-    public const MERGE_FIELDS = [
-        'type', 'nom', 'prenom', 'entreprise', 'email',
-        'telephone', 'adresse_ligne1', 'code_postal', 'ville', 'pays',
-    ];
+    // ── Full merge context (context === 'merge_full') ───────────────────────
+    public ?int $sourceTiersId = null;
+
+    /** @var array<string, int> Count of dependent records on the source */
+    public array $impactCounts = [];
+
+    /** @var array<int, array{type: string, label: string, detail: string}> */
+    public array $blockingConflicts = [];
 
     /** @var list<string> */
-    private const BOOLEAN_FIELDS = ['pour_depenses', 'pour_recettes', 'est_helloasso'];
+    public const MERGE_FIELDS = TiersService::MERGE_FIELDS;
+
+    /** @var list<string> */
+    private const BOOLEAN_FIELDS = TiersService::BOOLEAN_FIELDS;
 
     #[On('open-tiers-merge')]
     public function openMerge(
@@ -61,6 +67,26 @@ final class TiersMergeModal extends Component
         array $contextData = [],
     ): void {
         $tiers = Tiers::findOrFail($tiersId);
+
+        // Full-merge context: source comes from contextData['source_id'] (a real
+        // Tiers row), not from external sourceData (CSV import case).
+        if ($context === 'merge_full' && isset($contextData['source_id'])) {
+            $sourceTiers = Tiers::findOrFail((int) $contextData['source_id']);
+            $this->sourceTiersId = $sourceTiers->id;
+            $sourceData = $sourceTiers->toArray();
+            // Sensible defaults overriding caller hints
+            $sourceLabel = $sourceLabel !== '' ? $sourceLabel : 'À fusionner — '.$sourceTiers->displayName();
+            $targetLabel = $targetLabel !== '' ? $targetLabel : 'Survivant — '.$tiers->displayName();
+            $confirmLabel = $confirmLabel !== '' ? $confirmLabel : 'Fusionner et supprimer le tiers source';
+
+            $service = app(TiersService::class);
+            $this->impactCounts = $service->countDependentRecords($sourceTiers);
+            $this->blockingConflicts = $service->detectMergeConflicts($sourceTiers, $tiers);
+        } else {
+            $this->sourceTiersId = null;
+            $this->impactCounts = [];
+            $this->blockingConflicts = [];
+        }
 
         $this->tiersId = $tiersId;
         $this->sourceLabel = $sourceLabel;
@@ -111,7 +137,7 @@ final class TiersMergeModal extends Component
 
     public function confirmMerge(): void
     {
-        if ($this->tiersId === null || $this->helloassoIdConflict) {
+        if ($this->tiersId === null || $this->helloassoIdConflict || ! empty($this->blockingConflicts)) {
             return;
         }
 
@@ -124,6 +150,28 @@ final class TiersMergeModal extends Component
                     'merge_data' => $this->resultData,
                     'boolean_data' => $this->sourceBooleans,
                 ]),
+            );
+            $this->closeModal();
+
+            return;
+        }
+
+        // Full-merge context: actually fuse source into target (FK reaffectation + delete)
+        if ($this->context === 'merge_full' && $this->sourceTiersId !== null) {
+            $source = Tiers::findOrFail($this->sourceTiersId);
+            $target = Tiers::findOrFail($this->tiersId);
+
+            $report = app(TiersService::class)->merge(
+                $source,
+                $target,
+                $this->resultData,
+                $this->sourceBooleans,
+            );
+
+            $this->dispatch('tiers-merge-confirmed',
+                tiersId: $this->tiersId,
+                context: $this->context,
+                contextData: array_merge($this->contextData, ['report' => $report]),
             );
             $this->closeModal();
 
@@ -186,6 +234,9 @@ final class TiersMergeModal extends Component
         $this->sourceBooleans = [];
         $this->contextData = [];
         $this->helloassoIdConflict = false;
+        $this->sourceTiersId = null;
+        $this->impactCounts = [];
+        $this->blockingConflicts = [];
     }
 
     private function normalizeValue(mixed $value): ?string
