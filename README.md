@@ -10,8 +10,12 @@ Pour installer une instance en production, voir [docs/INSTALL.md](docs/INSTALL.m
 
 ### Prerequis
 
-- Docker & Docker Compose
-- Composer
+- **PHP 8.4** + extensions standard (`pdo`, `mbstring`, `xml`, `dom`, `curl`, `zip`, `intl`, `bcmath`)
+- **Composer 2.x**
+- **MySQL 8.0** / MariaDB 10.6+ ou SQLite (pour des essais rapides)
+- **Docker & Docker Compose** (optionnel, uniquement si vous utilisez Laravel Sail — voir ci-dessous)
+
+> ℹ️ Pas de Node.js / npm requis : Bootstrap 5 et ses icônes sont chargés via CDN, il n'y a pas de build frontend.
 
 ### Installation
 
@@ -22,7 +26,9 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-### Lancer avec Docker (Sail)
+### Lancer avec Docker (Laravel Sail) — option pratique
+
+Si vous avez Docker & Docker Compose installés, Sail vous fournit une stack PHP 8.4 + MySQL 8 + Redis prête à l'emploi sans rien installer sur votre machine :
 
 ```bash
 ./vendor/bin/sail up -d
@@ -33,15 +39,14 @@ L'app tourne sur **http://localhost**.
 
 ### Lancer sans Docker
 
+Avec PHP 8.4 et MySQL/SQLite installés localement, configurez `DB_*` dans `.env` puis :
+
 ```bash
-# Configurer .env avec une base MySQL ou SQLite locale
 php artisan migrate:fresh --seed
-composer run dev
+php artisan serve
 ```
 
-`composer run dev` lance en parallele : `artisan serve`, `queue:listen`, `pail` (logs), et `npm run dev`.
-
-L'app tourne sur **http://localhost:8000**.
+L'app tourne sur **http://localhost:8000**. Pour le traitement en arrière-plan, lancer dans un autre terminal `php artisan queue:listen` (utile dès que vous activez la réception mail ou les rappels).
 
 ### Comptes dev
 
