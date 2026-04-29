@@ -85,11 +85,8 @@ final class DateDelta
         $amount = (int) $matches[2];
         $unit = $matches[3];
 
-        // Negative means in the past (before reference); positive means future
-        $isPast = ($signStr === '-' || $signStr === '');
-
-        // Default (no sign) means past — but '0d' is handled above
-        // A sign of '+' means future, '-' means past
+        // A sign of '+' means future, '-' or no sign means past.
+        // '0d' is already handled above, so no-sign here implies past.
         $isPast = ($signStr !== '+');
 
         $result = $refDate->copy();
