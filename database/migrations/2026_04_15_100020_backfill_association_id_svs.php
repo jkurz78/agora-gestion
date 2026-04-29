@@ -21,7 +21,24 @@ return new class extends Migration
     public function up(): void
     {
         DB::transaction(function (): void {
-            // If no association exists, create a default one (fresh install case)
+            // Detect orphan rows (legacy data with no association_id yet).
+            // On a fresh install every table is empty → nothing to backfill,
+            // and we explicitly do NOT create a placeholder association so
+            // that the super-admin onboarding stays clean.
+            $hasOrphans = false;
+            foreach ($this->tables as $table) {
+                if (DB::table($table)->whereNull('association_id')->exists()) {
+                    $hasOrphans = true;
+                    break;
+                }
+            }
+
+            if (! $hasOrphans) {
+                return;
+            }
+
+            // Legacy install: rebind orphan rows. Create a transition placeholder
+            // only if no association exists yet.
             $first = DB::table('association')->first();
             if (! $first) {
                 DB::table('association')->insert([
