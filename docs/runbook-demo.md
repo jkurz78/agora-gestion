@@ -105,7 +105,14 @@ Le snapshot est construit sur une DB locale dédiée (ne jamais utiliser la prod
    ```
    Produit `database/demo/snapshot.yaml`.
 
-7. Préparer les fichiers PDF de démonstration dans `database/demo/files/` (≤ 5 fichiers, total ≤ 1 Mo — factures, attestations, NDF exemples).
+   **La capture automatise désormais la copie des fichiers logo et signature :**
+   si l'association a un `logo_path` ou `cachet_signature_path` défini et que les fichiers existent sur le disque, ils sont automatiquement copiés dans `database/demo/files/branding/{id}/` et référencés dans la section `files:` du YAML. Plus besoin d'éditer manuellement le YAML pour ces fichiers.
+
+   Si un fichier référencé est absent (colonne renseignée mais fichier manquant), la capture émet un avertissement et continue sans bloquer.
+
+7. Vérifier les fichiers copiés dans `database/demo/files/` (logo, cachet...). Si nécessaire, ajouter manuellement des PDF de démonstration supplémentaires (≤ 5 fichiers au total, total ≤ 1 Mo — factures, attestations, NDF exemples) et les référencer à la main dans `files:`.
+
+   > **Note** : si une nouvelle colonne `*_path` est introduite dans le code et doit être capturée, l'ajouter à `SnapshotConfig::FILE_PATH_COLUMNS` dans `app/Support/Demo/SnapshotConfig.php`.
 
 8. Committer le snapshot et les fichiers :
    ```bash

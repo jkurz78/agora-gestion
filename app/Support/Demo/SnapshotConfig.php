@@ -35,6 +35,35 @@ final class SnapshotConfig
     public const SCHEMA_VERSION = 1;
 
     /**
+     * Map of "file path" columns to capture during demo:capture.
+     *
+     * Format: ['table_name' => ['column' => '<path_template>']]
+     *
+     * Template placeholders:
+     *   {value}          → contents of the column (basename of the file)
+     *   {association_id} → row.association_id for tenant-scoped tables;
+     *                      for the 'association' table itself, resolved to row.id
+     *   {id}             → row.id of the current row
+     *
+     * The resolved path is relative to the project root (storage/app/ prefix
+     * included) so that Storage::disk('local') can locate the file.
+     *
+     * V1 scope: branding files and type-operation logos.
+     * Ephemeral uploads (transactions, NDF, factures partenaires, etc.)
+     * are intentionally excluded — they are user-generated and not seeded.
+     */
+    public const FILE_PATH_COLUMNS = [
+        'association' => [
+            'logo_path' => 'storage/app/private/associations/{association_id}/branding/{value}',
+            'cachet_signature_path' => 'storage/app/private/associations/{association_id}/branding/{value}',
+        ],
+        'type_operations' => [
+            'logo_path' => 'storage/app/private/associations/{association_id}/type-operations/{id}/{value}',
+            'attestation_medicale_path' => 'storage/app/private/associations/{association_id}/type-operations/{id}/{value}',
+        ],
+    ];
+
+    /**
      * Columns that must be nulled out in the snapshot.
      * Keys are exact table names; values are column names to scrub.
      * These columns contain secrets (encrypted or plain) that must never

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Support\Demo\FilePathResolver;
 use App\Support\Demo\SnapshotConfig;
 use App\Support\Demo\TableCapture;
 use Carbon\Carbon;
@@ -61,10 +62,13 @@ final class DemoCaptureCommand extends Command
             }
         }
 
+        // Collect and copy file-path columns into database/demo/files/
+        $filesEntries = $this->collectAndCopyFiles($tablesData);
+
         // Build final snapshot structure
         $snapshot = [
             'captured_at' => $capturedAt->toIso8601String(),
-            'files' => [],
+            'files' => $filesEntries,
             'schema_version' => SnapshotConfig::SCHEMA_VERSION,
             'tables' => $tablesData,
         ];
@@ -92,12 +96,78 @@ final class DemoCaptureCommand extends Command
         $this->info("Snapshot written to: {$outPath}");
         $this->info("captured_at: {$capturedAt->toIso8601String()}");
         $this->info('Tables captured: '.count($tablesData).", total rows: {$totalRows}");
+        $this->info('Files captured: '.count($filesEntries));
 
         foreach ($tablesData as $name => $rows) {
             $this->line("  - {$name}: ".count($rows).' row(s)');
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Walk through captured table data, resolve file-path columns, copy files
+     * into database/demo/files/ and return the list of YAML files entries.
+     *
+     * @param  array<string, list<array<string, mixed>>>  $tablesData
+     * @return list<array{source: string, target: string}>
+     */
+    private function collectAndCopyFiles(array $tablesData): array
+    {
+        $filesDestBase = base_path('database/demo/files');
+        $entries = [];
+        $seenSources = [];
+
+        foreach (SnapshotConfig::FILE_PATH_COLUMNS as $tableName => $columns) {
+            $rows = $tablesData[$tableName] ?? [];
+
+            foreach ($rows as $row) {
+                foreach ($columns as $column => $template) {
+                    $resolver = new FilePathResolver($tableName, $column, $template);
+
+                    $sourcePath = $resolver->resolve($row);
+
+                    if ($sourcePath === null) {
+                        // File missing or column empty — warning already logged in resolver.
+                        continue;
+                    }
+
+                    // Deduplicate: same physical source → one entry
+                    if (in_array($sourcePath, $seenSources, true)) {
+                        continue;
+                    }
+
+                    $seenSources[] = $sourcePath;
+
+                    $destSubPath = $resolver->destSubPath($row);
+                    $destAbsolute = $filesDestBase.DIRECTORY_SEPARATOR.$destSubPath;
+                    $destDir = dirname($destAbsolute);
+
+                    if (! is_dir($destDir)) {
+                        mkdir($destDir, 0755, true);
+                    }
+
+                    if (! copy($sourcePath, $destAbsolute)) {
+                        $this->warn("demo:capture — impossible de copier {$sourcePath} → {$destAbsolute}");
+
+                        continue;
+                    }
+
+                    // Relative source path for YAML (relative to project root, portable)
+                    $relativeSource = 'database/demo/files/'.str_replace(DIRECTORY_SEPARATOR, '/', $destSubPath);
+                    $targetPath = $resolver->targetStoragePath($row);
+
+                    $entries[] = [
+                        'source' => $relativeSource,
+                        'target' => $targetPath,
+                    ];
+
+                    $this->line("  [file] {$relativeSource} → {$targetPath}");
+                }
+            }
+        }
+
+        return $entries;
     }
 
     /**

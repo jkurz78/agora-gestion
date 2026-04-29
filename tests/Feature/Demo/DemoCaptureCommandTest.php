@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Support\Demo\SnapshotConfig;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Yaml\Yaml;
 
 afterEach(function (): void {
@@ -210,4 +211,130 @@ it('scrubs sensitive columns and forces role_systeme to user in snapshot', funct
     expect($helloRow['callback_token'])->toBeNull('helloasso callback_token must be scrubbed');
 
     @unlink($outFile);
+});
+
+// T7 : asso avec logo sur disque → YAML contient files entries + fichier copié dans database/demo/files/
+it('copies logo file into database/demo/files and adds files entry to YAML', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    // Write a fake logo on the 'local' disk
+    $assocId = $current->id;
+    Storage::disk('local')->put(
+        "associations/{$assocId}/branding/logo.png",
+        'FAKE_PNG_CONTENT'
+    );
+
+    $current->update(['logo_path' => 'logo.png']);
+
+    $outFile = storage_path('testing-demo-files-t7-'.uniqid().'.yaml');
+    $demoDest = base_path('database/demo/files');
+
+    // Clean up any pre-existing copied file to ensure a clean state
+    @unlink("{$demoDest}/branding/{$assocId}/logo.png");
+
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0);
+
+    $yaml = @file_get_contents($outFile);
+    expect($yaml)->not->toBeFalse();
+    $data = Yaml::parse($yaml);
+
+    // files section must be a non-empty list
+    expect($data['files'])->not->toBe([]);
+    expect($data['files'])->toBeArray();
+
+    // At least one entry matches logo
+    $entry = collect($data['files'])->first(
+        fn ($f) => str_contains($f['source'] ?? '', 'logo.png')
+    );
+    expect($entry)->not->toBeNull('files entry for logo.png must exist');
+    expect($entry['source'])->toContain('database/demo/files');
+    expect($entry['target'])->toContain("associations/{$assocId}/branding/logo.png");
+
+    // File must be physically copied to database/demo/files/
+    expect(file_exists("{$demoDest}/branding/{$assocId}/logo.png"))->toBeTrue();
+
+    // Cleanup
+    @unlink($outFile);
+    @unlink("{$demoDest}/branding/{$assocId}/logo.png");
+    Storage::disk('local')->delete("associations/{$assocId}/branding/logo.png");
+    $current->update(['logo_path' => null]);
+});
+
+// T8 : asso avec logo_path défini mais fichier absent sur disque → capture réussit, files reste vide
+it('skips missing logo file and succeeds without files entry', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    // Set logo_path in DB but do NOT create the file on disk
+    $current->update(['logo_path' => 'logo-missing.png']);
+
+    $outFile = storage_path('testing-demo-files-t8-'.uniqid().'.yaml');
+
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0, 'Should succeed even when file is missing');
+
+    $yaml = @file_get_contents($outFile);
+    expect($yaml)->not->toBeFalse();
+    $data = Yaml::parse($yaml);
+
+    // files must be empty (file not found → skip)
+    expect($data['files'])->toBe([]);
+
+    // Cleanup
+    @unlink($outFile);
+    $current->update(['logo_path' => null]);
+});
+
+// T9 : asso avec logo + cachet → les 2 fichiers sont capturés
+it('copies both logo and cachet files and emits two files entries', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    $assocId = $current->id;
+    Storage::disk('local')->put(
+        "associations/{$assocId}/branding/logo.png",
+        'FAKE_PNG_CONTENT'
+    );
+    Storage::disk('local')->put(
+        "associations/{$assocId}/branding/cachet.jpg",
+        'FAKE_JPG_CONTENT'
+    );
+
+    $current->update([
+        'logo_path' => 'logo.png',
+        'cachet_signature_path' => 'cachet.jpg',
+    ]);
+
+    $outFile = storage_path('testing-demo-files-t9-'.uniqid().'.yaml');
+    $demoDest = base_path('database/demo/files');
+
+    @unlink("{$demoDest}/branding/{$assocId}/logo.png");
+    @unlink("{$demoDest}/branding/{$assocId}/cachet.jpg");
+
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0);
+
+    $yaml = @file_get_contents($outFile);
+    $data = Yaml::parse($yaml);
+
+    // Both entries must be present
+    $sources = collect($data['files'])->pluck('source');
+    expect($sources->filter(fn ($s) => str_contains($s, 'logo.png')))->not->toBeEmpty();
+    expect($sources->filter(fn ($s) => str_contains($s, 'cachet.jpg')))->not->toBeEmpty();
+
+    expect(count($data['files']))->toBeGreaterThanOrEqual(2);
+
+    // Both files must be copied
+    expect(file_exists("{$demoDest}/branding/{$assocId}/logo.png"))->toBeTrue();
+    expect(file_exists("{$demoDest}/branding/{$assocId}/cachet.jpg"))->toBeTrue();
+
+    // Cleanup
+    @unlink($outFile);
+    @unlink("{$demoDest}/branding/{$assocId}/logo.png");
+    @unlink("{$demoDest}/branding/{$assocId}/cachet.jpg");
+    Storage::disk('local')->delete("associations/{$assocId}/branding/logo.png");
+    Storage::disk('local')->delete("associations/{$assocId}/branding/cachet.jpg");
+    $current->update(['logo_path' => null, 'cachet_signature_path' => null]);
 });
