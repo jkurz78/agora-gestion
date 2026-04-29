@@ -18,7 +18,7 @@
 
 **Pourquoi maintenant.** AgoraGestion a atteint la maturité fonctionnelle (v4.1.9, multi-tenant v4) qui rend la démo représentative. Le multi-tenant strict (S6 hardening) garantit qu'une démo sur un tenant fictif ne pollue jamais d'autres tenants — l'asso démo est juste *une* asso parmi d'autres potentielles, gérée par les mêmes scopes globaux que la prod.
 
-**Quoi ce n'est pas.** Pas une instance multi-tenant accueillant plusieurs prospects dans des assos séparées (un seul tenant démo, partagé). Pas un bac à sable persistant — toute donnée saisie disparaît au reset suivant. Pas une intégration au site vitrine (CTA et tracking sont hors scope, c'est l'opérateur qui pose le lien). Pas une duplication automatisée de la prod — le snapshot est construit manuellement par l'opérateur (donnée 100 % fictive), versionné en git. Pas de monitoring/alerting dédié (sera traité par O2Switch + logs Laravel standards). Pas de rate limiting public spécifique au démo.
+**Quoi ce n'est pas.** Pas une instance multi-tenant accueillant plusieurs prospects dans des assos séparées (un seul tenant démo, partagé). Pas un bac à sable persistant — toute donnée saisie disparaît au reset suivant. Pas une intégration au site vitrine (CTA et tracking sont hors scope, c'est l'opérateur qui pose le lien). Pas une duplication automatisée de la prod — le snapshot est construit manuellement par l'opérateur (donnée 100 % fictive), versionné en git. Pas de monitoring/alerting dédié (sera traité par O2Switch + logs Laravel standards). Pas de rate limiting public spécifique au démo. Portail tiers exposé en démo via bypass OTP avec 2 personas pré-configurés (membre particulier + fournisseur entreprise) — détail §3.2.
 
 **Périmètre Slice 3.** Helpers `App\Support\Demo` + middleware `EnforceDemoReadOnly` ; bridage des sorties externes (mails, HelloAsso webhook, HelloAsso sync, IMAP, OCR) ; lecture seule sur écrans paramètres SMTP + HelloAsso ; refus suppression/archivage d'asso en démo ; bandeau démo conditionnel sur `/login` ; commandes artisan `demo:capture` + `demo:reset` ; format snapshot YAML versionné avec dates relatives ; workflow GitHub Actions `deploy-demo.yml` déclenché sur `push main` (clone strict de prod) ; script `deploy-demo.sh` ; cron O2Switch `0 4 * * *` ; documentation runbook démo.
 
@@ -215,6 +215,36 @@ Fonctionnalité: Démo publique AgoraGestion
     Alors "App\Support\Demo::isActive()" retourne true
     Et "config('app.env')" retourne "demo"
     Et tous les guards conditionnels (mail, hello-asso, imap, ocr, params, suppression) sont actifs
+
+  # ─── Portail tiers en démo ───────────────────────────────────────────
+
+  Scénario: Bandeau démo visible sur /portail/login en environnement démo
+    Étant donné que APP_ENV=demo
+    Quand un visiteur ouvre "/portail/login"
+    Alors un bandeau "alert-info" est affiché
+    Et il contient deux boutons "Marie GAUTHIER" et "Salle des Brotteaux"
+    Et aucun formulaire OTP n'est imposé pour ces personas
+
+  Scénario: Bandeau démo absent en environnement non-démo
+    Étant donné que APP_ENV=local (ou production)
+    Quand un visiteur ouvre "/portail/login"
+    Alors le bandeau démo est absent
+    Et seul le formulaire OTP standard est affiché
+
+  Scénario: Click sur carte Membre → session portail ouverte sans OTP
+    Étant donné que APP_ENV=demo
+    Et que je suis sur "/portail/login"
+    Quand je clique sur "Marie GAUTHIER"
+    Alors GET "/portail/demo/login-as/31" est déclenché
+    Et la session portail est ouverte sur le guard "tiers-portail" avec id=31
+    Et je suis redirigé vers la home du portail
+    Et un log "demo.portail.login_as_tier" est émis
+
+  Scénario: Bypass refusé hors démo
+    Étant donné que APP_ENV=local
+    Quand une requête GET "/portail/demo/login-as/31" est envoyée manuellement
+    Alors la réponse est 403
+    Et aucune session portail n'est ouverte
 ```
 
 ---
@@ -235,7 +265,49 @@ final class Demo {
 
 Convention : tous les guards conditionnels lisent **uniquement** `Demo::isActive()`. Pas de lecture directe de `app()->environment()` éparpillée. Permet un seul point de bascule lors des tests (`Config::set('app.env', 'demo')` ou refactor futur en feature flag).
 
-### 3.2 Bridage des sorties externes
+### 3.2 Portail tiers en démo — bypass OTP
+
+Le portail tiers (slice S1, OTP par email) est inutilisable en démo car `MAIL_MAILER=log` empêche la réception du code. Un bypass spécifique à l'environnement démo est activé via `Demo::isActive()`.
+
+**Deux personas pré-configurés dans le snapshot :**
+
+| ID snapshot | Nom | Type | Perspective |
+|---|---|---|---|
+| 31 | Marie GAUTHIER | Particulier, pour_depenses | NDF, attestations, abandon de créance |
+| 34 | Salle des Brotteaux | Entreprise, pour_depenses | Factures partenaires reçues |
+
+**Bandeau sur `/portail/login` (ssi `Demo::isActive()`) :**
+
+Composant Blade `<x-demo-portail-banner :association="$association" />` (`resources/views/components/demo-portail-banner.blade.php`) — bandeau `.alert.alert-info` avec deux boutons-liens vers `/portail/demo/login-as/{31|34}`.
+
+**Route bypass :**
+
+```
+GET /portail/demo/login-as/{tierId}         (mono)
+GET /{slug}/portail/demo/login-as/{tierId}  (slug-first)
+```
+
+Contrôleur : `App\Http\Controllers\Portail\DemoLoginAsTierController`.
+
+**Garde stricte (première instruction du contrôleur) :**
+
+```php
+if (! Demo::isActive()) {
+    abort(403, 'Bypass OTP portail interdit hors environnement démo.');
+}
+```
+
+Ensuite : `Tiers::findOrFail($tierId)`, log `demo.portail.login_as_tier`, `Auth::guard('tiers-portail')->login($tiers)`, redirect vers home portail.
+
+**Effets de bord reproduits fidèlement :** identiques à `AuthSessionService::loginSingleTiers()` — login sur le guard `tiers-portail`, log audit.
+
+**Sécurité :**
+- Aucun side-effect avant la garde `Demo::isActive()`
+- Pas de wildcard — seul `findOrFail()` (ID inexistant → 404, pas de session)
+- Log d'audit à chaque appel (traçabilité)
+- Strictement HTTP synchrone — pas de job ou queue
+
+### 3.4 Bridage des sorties externes
 
 | Service | Stratégie | Implémentation |
 |---|---|---|
@@ -247,7 +319,7 @@ Convention : tous les guards conditionnels lisent **uniquement** `Demo::isActive
 
 **Rationale** : guards en code (pas dans le scheduler) → comportement cohérent peu importe le mode d'invocation (cron, tinker, queue, manuel).
 
-### 3.3 Lecture seule sur paramètres sensibles
+### 3.5 Lecture seule sur paramètres sensibles
 
 Middleware `App\Http\Middleware\EnforceDemoReadOnly` :
 
@@ -259,7 +331,7 @@ Vues Livewire SMTP / HelloAsso : ajout d'une condition `@if(\App\Support\Demo::i
 
 Suppression d'asso & archivage : guard côté service (`AssociationService::destroy()`, `AssociationService::archive()`) — `throw DemoOperationBlockedException` si `Demo::isActive()`. Plus défensif que middleware seul (couvre les appels non routés).
 
-### 3.4 Login screen — bandeau démo
+### 3.6 Login screen — bandeau démo
 
 Vue `resources/views/auth/login.blade.php` : bloc conditionnel inséré au-dessus du formulaire :
 
@@ -278,9 +350,9 @@ Le composant `<x-demo-login-banner />` (`resources/views/components/demo-login-b
 
 Aucune modification du controller de login, de Fortify, de Breeze. Comportement d'auth strictement identique à la prod.
 
-### 3.5 Snapshot — capture & replay
+### 3.7 Snapshot — capture & replay
 
-#### 3.5.1 Format YAML
+#### 3.7.1 Format YAML
 
 Fichier unique versionné : `database/demo/snapshot.yaml`
 
@@ -324,7 +396,7 @@ files:
 
 **Files** : la capture **ne** copie **pas** les fichiers ; elle attend que l'opérateur prépare manuellement `database/demo/files/` avec un sous-ensemble représentatif (≤ 5 PDFs factures, ≤ 5 attestations) et déclare ces fichiers dans la section `files:` du YAML. Les fichiers sont versionnés en git (légers, peu nombreux).
 
-#### 3.5.2 Commande `demo:capture`
+#### 3.7.2 Commande `demo:capture`
 
 `App\Console\Commands\DemoCaptureCommand` (signature `demo:capture {--out=database/demo/snapshot.yaml}`).
 
@@ -337,7 +409,7 @@ files:
 6. Sérialiser en YAML stable (clés triées) et écrire dans `--out`
 7. Logger un récap : nb tables, nb lignes par table
 
-#### 3.5.3 Commande `demo:reset`
+#### 3.7.3 Commande `demo:reset`
 
 `App\Console\Commands\DemoResetCommand` (signature `demo:reset {--snapshot=database/demo/snapshot.yaml}`).
 
@@ -358,9 +430,9 @@ Garde-fou : la commande n'accepte de tourner **que** si `Demo::isActive()` (sino
 
 Performance cible : < 30s (incl. down/up). Snapshot ≤ 500 lignes par table ; bulk inserts.
 
-### 3.6 Déploiement
+### 3.8 Déploiement
 
-#### 3.6.1 Workflow GitHub Actions
+#### 3.8.1 Workflow GitHub Actions
 
 Nouveau fichier : `.github/workflows/deploy-demo.yml`
 
@@ -386,7 +458,7 @@ DB credentials vivent dans `.env.demo` côté serveur, jamais dans les secrets G
 
 Le workflow prod existant (`deploy.yml`) **reste strictement inchangé**.
 
-#### 3.6.2 `.env.demo` (côté serveur, jamais committé)
+#### 3.8.2 `.env.demo` (côté serveur, jamais committé)
 
 Variables clés :
 ```
@@ -402,7 +474,7 @@ SESSION_DRIVER=database  # idem prod
 QUEUE_CONNECTION=sync    # ou database, peu importe en démo, pas de jobs lourds
 ```
 
-#### 3.6.3 Cron O2Switch
+#### 3.8.3 Cron O2Switch
 
 Entrée crontab serveur démo :
 
@@ -410,7 +482,7 @@ Entrée crontab serveur démo :
 0 4 * * * cd /home/.../demo.agoragestion.org && php artisan demo:reset >> storage/logs/demo-reset.log 2>&1
 ```
 
-### 3.7 Frontière avec l'existant
+### 3.9 Frontière avec l'existant
 
 | Module | Impact |
 |---|---|
@@ -427,7 +499,7 @@ Entrée crontab serveur démo :
 | Super-admin | hors scope démo — le snapshot ne porte pas de super-admin (le wizard non plus, donc pas de SA dans la démo) |
 | Tests Pest | nouveaux tests `tests/Feature/Demo/*` ; suite globale reste verte |
 
-### 3.8 Contraintes techniques
+### 3.10 Contraintes techniques
 
 - `declare(strict_types=1)`, `final class`, type hints partout
 - PSR-12 / Pint
@@ -438,7 +510,7 @@ Entrée crontab serveur démo :
 - Pas de modification du schéma DB (pas de migration)
 - Pas de nouvelle dépendance Composer (YAML via `symfony/yaml` déjà transitif via Laravel)
 
-### 3.9 Risques
+### 3.11 Risques
 
 | Risque | Mitigation |
 |---|---|

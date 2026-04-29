@@ -99,6 +99,10 @@ Le snapshot est construit sur une DB locale dédiée (ne jamais utiliser la prod
 
 5. Peupler les données via l'UI selon la charte ci-dessous.
 
+5b. *(Optionnel)* **Pour seeder NDF / factures partenaires côté portail tiers** : l'environnement étant déjà `APP_ENV=demo`, navigue vers `/portail/login` — le bandeau démo s'affiche avec les 2 cartes personas. Clique sur une carte pour ouvrir la session portail sans saisie d'OTP, crée tes données NDF / factures partenaires, puis reviens à l'UI principale. Le bypass refuse de fonctionner si `APP_ENV` n'est pas `demo`.
+
+   > **Rappel :** les IDs 31 (`marie.gauthier@gmail.com`) et 34 (`reservation@salle-brotteaux.fr`) doivent exister dans la DB locale avant que les cartes soient cliquables. Ces tiers sont créés manuellement via l'UI "Tiers" ou par le seeder.
+
 6. Capturer le snapshot :
    ```bash
    ./vendor/bin/sail artisan demo:capture
