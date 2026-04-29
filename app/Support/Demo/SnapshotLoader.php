@@ -48,6 +48,16 @@ final class SnapshotLoader
         $this->disableForeignKeys($driver);
 
         try {
+            // First pass: clear all snapshot tables (idempotency).
+            // Backfill migrations may have pre-seeded rows (e.g. multi-tenant default
+            // association at id=1) which would collide with the snapshot's PKs.
+            // FKs are disabled above, so deletion order does not matter.
+            foreach ($tables as $tableName => $rows) {
+                if (is_array($rows) && $rows !== []) {
+                    DB::table($tableName)->delete();
+                }
+            }
+
             foreach ($tables as $tableName => $rows) {
                 if (! is_array($rows) || $rows === []) {
                     $rowsPerTable[$tableName] = 0;
