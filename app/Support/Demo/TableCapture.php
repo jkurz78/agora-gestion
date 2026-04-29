@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Support\Demo;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Captures all rows from a single DB table, converting datetime columns
@@ -32,6 +34,7 @@ final class TableCapture
         $result = [];
 
         $sensitiveColumns = SnapshotConfig::SENSITIVE_COLUMNS[$tableName] ?? [];
+        $encryptedColumns = EncryptedColumnsRegistry::forTable($tableName);
 
         foreach ($rows as $row) {
             $rowArray = (array) $row;
@@ -42,7 +45,25 @@ final class TableCapture
                 $rowArray['role_systeme'] = 'user';  // anti-fuite super-admin
             }
 
-            // Scrub sensitive columns (secrets, tokens, API keys)
+            // Decrypt encrypted columns so the plaintext is stored in YAML.
+            // The snapshot will be re-encrypted at reset time with the target APP_KEY.
+            foreach ($encryptedColumns as $col) {
+                if (array_key_exists($col, $rowArray) && $rowArray[$col] !== null) {
+                    try {
+                        $rowArray[$col] = Crypt::decryptString((string) $rowArray[$col]);
+                    } catch (\Throwable $e) {
+                        Log::warning('TableCapture: could not decrypt column, storing null', [
+                            'table' => $tableName,
+                            'column' => $col,
+                            'error' => $e->getMessage(),
+                        ]);
+                        $rowArray[$col] = null;
+                    }
+                }
+            }
+
+            // Scrub sensitive columns (secrets, tokens, API keys).
+            // These override any decrypted value above for columns we never want in YAML.
             foreach ($sensitiveColumns as $col) {
                 if (array_key_exists($col, $rowArray)) {
                     $rowArray[$col] = null;

@@ -83,27 +83,19 @@ final class SnapshotConfig
     /**
      * Columns that must be nulled out in the snapshot.
      * Keys are exact table names; values are column names to scrub.
-     * These columns contain secrets (encrypted or plain) that must never
-     * appear in a committed YAML file.
+     *
+     * NOTE: columns with an Eloquent cast of 'encrypted' (or 'encrypted:*')
+     * are now auto-detected by EncryptedColumnsRegistry and handled via
+     * round-trip decrypt-at-capture / re-encrypt-at-reset. They no longer
+     * need to be listed here (listing them would null them out instead of
+     * preserving the plaintext value in the YAML, which is what we want).
+     *
+     * Only list columns that are NOT encrypted but must still be scrubbed:
+     *   - remember_token  (plain random string, not encrypted, must not leak)
      */
     public const SENSITIVE_COLUMNS = [
         'users' => [
-            'two_factor_secret',
-            'two_factor_recovery_codes',
             'remember_token',
-        ],
-        'association' => [
-            'anthropic_api_key',
-        ],
-        'helloasso_parametres' => [
-            'client_secret',
-            'callback_token',
-        ],
-        'incoming_mail_parametres' => [
-            'imap_password',
-        ],
-        'smtp_parametres' => [
-            'smtp_password',
         ],
     ];
 }
