@@ -25,13 +25,16 @@ use Illuminate\Support\Facades\Log;
  */
 final class DemoLoginAsTierController extends Controller
 {
-    public function __invoke(int $tierId, Association $association): RedirectResponse
+    public function __invoke(\Illuminate\Http\Request $request): RedirectResponse
     {
         // ── GARDE STRICTE — doit rester en première position ──────────────────
         if (! Demo::isActive()) {
             abort(403, 'Bypass OTP portail interdit hors environnement démo.');
         }
         // ──────────────────────────────────────────────────────────────────────
+
+        $tierId = (int) $request->route('tierId');
+        $association = $request->route('association'); // null en mono, Association en slug-first
 
         /** @var Tiers $tiers */
         $tiers = Tiers::findOrFail($tierId);
