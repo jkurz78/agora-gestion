@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 
 final class User extends Authenticatable implements MustVerifyEmail
 {
@@ -122,5 +123,26 @@ final class User extends Authenticatable implements MustVerifyEmail
         }
 
         return true;
+    }
+
+    /**
+     * Cached check : does at least one super-admin user exist ?
+     *
+     * Used by the install flow to detect whether the instance has been
+     * bootstrapped (a super-admin exists) or is still in fresh-install
+     * state (no super-admin yet → expose the /setup page).
+     *
+     * Cache key 'app.installed' is invalidated by UserRoleObserver on any
+     * role_systeme change.
+     */
+    public static function superAdminExists(): bool
+    {
+        return Cache::remember(
+            'app.installed',
+            3600,
+            fn (): bool => self::query()
+                ->where('role_systeme', RoleSysteme::SuperAdmin)
+                ->exists(),
+        );
     }
 }

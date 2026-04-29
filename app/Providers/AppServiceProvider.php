@@ -14,9 +14,11 @@ use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
+use App\Models\User;
 use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\TransactionObserver;
+use App\Observers\UserRoleObserver;
 use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
@@ -41,6 +43,7 @@ final class AppServiceProvider extends ServiceProvider
         Association::observe(AssociationObserver::class);
         Association::observe(ImmutableSlugObserver::class);
         Transaction::observe(TransactionObserver::class);
+        User::observe(UserRoleObserver::class);
 
         if (! file_exists(config_path('version.php'))) {
             $data = VersionStampCommand::readGitVersion();
