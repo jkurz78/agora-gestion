@@ -24,45 +24,32 @@ L'environnement démo tourne sur le même hébergeur O2Switch que la prod. Un so
 
 ### (a) Poser `.env.demo` côté serveur
 
-Se connecter en SSH et créer le fichier à la racine du dossier démo :
+Le template versionné dans le repo est [`.env.demo.example`](../.env.demo.example) (à la racine du projet). Procédure :
 
-```bash
-ssh user@demo.agoragestion.org
-nano ~/public_html/demo.agoragestion.org/.env.demo
-```
+1. Se connecter en SSH (mêmes credentials que la prod) :
+   ```bash
+   ssh user@cpanel.o2switch.fr
+   cd ~/public_html/demo.agoragestion.org
+   ```
+2. Copier le template livré par le 1er déploiement (ou directement depuis le repo) :
+   ```bash
+   cp .env.demo.example .env
+   ```
+   ⚠️ Le fichier final côté serveur s'appelle `.env` (pas `.env.demo`) — Laravel ne lit que `.env`. Le suffixe `.demo` du template est juste un identifiant de format.
+3. Éditer `.env` avec les vraies valeurs :
+   ```bash
+   nano .env
+   ```
+4. Remplacer les placeholders `CHANGER_MOI_*` :
+   - `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` : valeurs créées dans cPanel pour la DB démo dédiée
+5. Générer `APP_KEY` (DIFFÉRENT de la prod) :
+   ```bash
+   php artisan key:generate
+   ```
 
-Template `.env.demo` :
+> **Important** : ne jamais copier-coller la `APP_KEY` de la prod. Sinon les tokens chiffrés en prod seraient déchiffrables en démo. La commande `key:generate` écrit la nouvelle clé directement dans `.env`.
 
-```env
-APP_NAME="AgoraGestion Démo"
-APP_ENV=demo
-APP_DEBUG=false
-APP_URL=https://demo.agoragestion.org
-
-# Générer une clé DIFFÉRENTE de la prod :
-#   php artisan key:generate --show
-# Une clé prod ne doit JAMAIS être utilisée ici —
-# les tokens chiffrés en prod seraient déchiffrables en démo.
-APP_KEY=
-
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=
-DB_USERNAME=
-DB_PASSWORD=
-
-MAIL_MAILER=log
-SESSION_DRIVER=database
-QUEUE_CONNECTION=sync
-CACHE_STORE=file
-
-LOG_CHANNEL=stack
-LOG_LEVEL=debug
-```
-
-Remplir `APP_KEY`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` selon les valeurs créées dans cPanel.
-
-> **Important** : `APP_KEY` doit être généré indépendamment (`php artisan key:generate --show` exécuté dans le dossier démo après le premier pull). Ne jamais copier-coller la clé de la prod.
+> **Sécurité** : `.env` est gitignored (jamais committé). Le template `.env.demo.example` est versionné mais ne contient que des placeholders, jamais de credentials réels.
 
 ### (b) Premier déploiement
 
