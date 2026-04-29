@@ -10,7 +10,7 @@
             font-size: 11px;
             color: #212529;
             line-height: 1.4;
-            margin: 15mm;
+            margin: 15mm 15mm 25mm 15mm;
         }
         table { width: 100%; border-collapse: collapse; }
         table.layout td { vertical-align: top; padding: 0; }
@@ -336,6 +336,9 @@
             <p class="mentions" style="margin-top: 6px;">{{ $mentionsPenalites }}</p>
         @endif
     </div>
+
+    {{-- FOOTER LOGOS --}}
+    @include('pdf.partials.footer-logos')
 
 </body>
 </html>

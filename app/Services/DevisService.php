@@ -16,6 +16,7 @@ use App\Models\EmailLog;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Support\CurrentAssociation;
+use App\Support\PdfFooterRenderer;
 use App\Tenant\TenantContext;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -767,6 +768,9 @@ final class DevisService
             }
         }
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $pdf = Pdf::loadView('pdf.devis-manuel', [
             'devis' => $devis,
             'lignes' => $devis->lignes,
@@ -774,7 +778,12 @@ final class DevisService
             'brouillonWatermark' => $watermark,
             'headerLogoBase64' => $headerLogoBase64,
             'headerLogoMime' => $headerLogoMime,
+            'appLogoBase64' => $appLogoBase64,
+            'footerLogoBase64' => null,
+            'footerLogoMime' => null,
         ])->setPaper('a4', 'portrait');
+
+        PdfFooterRenderer::render($pdf);
 
         // Nom de fichier : numéro ou brouillon-{id}
         $filename = $devis->numero !== null
