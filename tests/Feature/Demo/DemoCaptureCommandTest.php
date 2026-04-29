@@ -8,17 +8,23 @@ use App\Models\HelloassoParametres;
 use App\Models\NoteDeFrais;
 use App\Models\NoteDeFraisLigne;
 use App\Models\Operation;
+use App\Models\Participant;
+use App\Models\Presence;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Support\Demo\EncryptedColumnsRegistry;
 use App\Support\Demo\SnapshotConfig;
+use App\Support\Demo\SnapshotLoader;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Yaml\Yaml;
 
 afterEach(function (): void {
     app()->detectEnvironment(fn (): string => 'testing');
+    EncryptedColumnsRegistry::clearCache();
 });
 
 // T1 : DB vierge (aucune association) → exit ≠ 0
@@ -147,15 +153,16 @@ it('SnapshotConfig DEMO_USER_PASSWORD_HASH is valid bcrypt hash for demo', funct
     expect(Hash::check('demo', SnapshotConfig::DEMO_USER_PASSWORD_HASH))->toBeTrue();
 });
 
-// T6 : Sensitive columns + super-admin role are scrubbed in the snapshot
-it('scrubs sensitive columns and forces role_systeme to user in snapshot', function (): void {
+// T6 : Encrypted columns are decrypted (plaintext in YAML) + non-encrypted sensitive
+//      columns (remember_token) are still scrubbed + super-admin role is downgraded
+it('decrypts encrypted columns to plaintext in YAML and scrubs non-encrypted sensitive columns', function (): void {
     $current = TenantContext::current();
     Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
 
-    // Set anthropic_api_key on the association
+    // Set anthropic_api_key on the association (encrypted cast)
     $current->update(['anthropic_api_key' => 'sk-ant-super-secret-key-12345']);
 
-    // Create a super-admin user with two_factor_secret and remember_token
+    // Create a super-admin user with two_factor_secret (encrypted) and remember_token (plain)
     $superAdmin = User::factory()->create([
         'email' => 'superadmin@demo.fr',
         'role_systeme' => 'super_admin',
@@ -169,7 +176,7 @@ it('scrubs sensitive columns and forces role_systeme to user in snapshot', funct
         'joined_at' => now(),
     ]);
 
-    // Seed a HelloAsso config with secrets
+    // Seed a HelloAsso config with secrets (encrypted casts)
     HelloassoParametres::updateOrCreate(
         ['association_id' => $current->id],
         [
@@ -194,26 +201,26 @@ it('scrubs sensitive columns and forces role_systeme to user in snapshot', funct
     expect($userRow)->not->toBeNull();
     expect($userRow['role_systeme'])->toBe('user', 'role_systeme must be downgraded to user');
 
-    // two_factor_secret must be null
-    expect($userRow['two_factor_secret'])->toBeNull('two_factor_secret must be scrubbed');
+    // two_factor_secret — encrypted cast → decrypted to plaintext in YAML (for round-trip)
+    expect($userRow['two_factor_secret'])->toBe('TOTP_SECRET_ABC', 'two_factor_secret must be plaintext in YAML');
 
-    // two_factor_recovery_codes must be null
-    expect($userRow['two_factor_recovery_codes'])->toBeNull('two_factor_recovery_codes must be scrubbed');
+    // two_factor_recovery_codes — encrypted:array cast → decrypted (stored as the raw JSON string)
+    expect($userRow['two_factor_recovery_codes'])->not->toBeNull('two_factor_recovery_codes must be preserved as plaintext');
 
-    // remember_token must be null
-    expect($userRow['remember_token'])->toBeNull('remember_token must be scrubbed');
+    // remember_token — plain string, NOT encrypted → must still be null (SENSITIVE_COLUMNS)
+    expect($userRow['remember_token'])->toBeNull('remember_token must be scrubbed (not encrypted, plain sensitive)');
 
-    // anthropic_api_key must be null
+    // anthropic_api_key — encrypted cast → decrypted to plaintext in YAML
     $assoRow = collect($data['tables']['association'])->firstWhere('id', $current->id);
     expect($assoRow)->not->toBeNull();
-    expect($assoRow['anthropic_api_key'])->toBeNull('anthropic_api_key must be scrubbed');
+    expect($assoRow['anthropic_api_key'])->toBe('sk-ant-super-secret-key-12345', 'anthropic_api_key must be plaintext in YAML');
 
-    // helloasso client_secret and callback_token must be null
+    // helloasso client_secret and callback_token — encrypted casts → decrypted to plaintext
     expect($data['tables'])->toHaveKey('helloasso_parametres');
     $helloRow = collect($data['tables']['helloasso_parametres'])->firstWhere('association_id', $current->id);
     expect($helloRow)->not->toBeNull();
-    expect($helloRow['client_secret'])->toBeNull('helloasso client_secret must be scrubbed');
-    expect($helloRow['callback_token'])->toBeNull('helloasso callback_token must be scrubbed');
+    expect($helloRow['client_secret'])->toBe('helloasso-secret-xyz', 'helloasso client_secret must be plaintext in YAML');
+    expect($helloRow['callback_token'])->toBe('callback-secret-abc', 'helloasso callback_token must be plaintext in YAML');
 
     @unlink($outFile);
 });
@@ -564,6 +571,73 @@ it('T_TRAVERSAL_ABSOLUTE: skips NDF piece jointe with absolute path and does not
         fn ($f) => str_contains($f['target'] ?? '', 'shadow') || str_contains($f['source'] ?? '', 'shadow')
     );
     expect($badEntry)->toBeNull('absolute path must not appear in files entries');
+
+    @unlink($outFile);
+});
+
+// T_ROUNDTRIP_ENCRYPTION : présence avec statut et commentaire → capture déchiffre →
+//                           reset re-chiffre → Eloquent lit les valeurs en clair
+it('T_ROUNDTRIP_ENCRYPTION: encrypted presence columns survive capture→reset round-trip', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    $assocId = $current->id;
+
+    // Seed via factory to satisfy FK constraints
+    $operation = Operation::factory()->create(['association_id' => $assocId]);
+    $seance = Seance::create([
+        'association_id' => $assocId,
+        'operation_id' => $operation->id,
+        'numero' => 1,
+        'date' => '2026-04-01',
+        'titre' => 'Séance round-trip test',
+    ]);
+    $tiers = Tiers::factory()->create(['association_id' => $assocId]);
+    $participant = Participant::create([
+        'tiers_id' => $tiers->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => '2026-04-01',
+    ]);
+
+    // Eloquent's cast will encrypt on write; the DB stores ciphertext.
+    $presence = Presence::create([
+        'seance_id' => $seance->id,
+        'participant_id' => $participant->id,
+        'statut' => 'present',
+        'commentaire' => 'Test commentaire roundtrip',
+    ]);
+
+    $outFile = storage_path('testing-demo-roundtrip-'.uniqid().'.yaml');
+
+    // --- CAPTURE ---
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0, 'demo:capture should succeed');
+
+    $yaml = @file_get_contents($outFile);
+    expect($yaml)->not->toBeFalse();
+    $data = Yaml::parse($yaml);
+
+    // The YAML must store plaintext (not ciphertext) for presence encrypted columns
+    $presenceRow = collect($data['tables']['presences'] ?? [])
+        ->first(fn ($r) => (int) $r['id'] === (int) $presence->id);
+    expect($presenceRow)->not->toBeNull('presence row must appear in YAML');
+    expect($presenceRow['statut'])->toBe('present', 'statut must be plaintext in YAML after decrypt');
+    expect($presenceRow['commentaire'])->toBe('Test commentaire roundtrip', 'commentaire must be plaintext in YAML');
+
+    // --- RESET (same DB / same APP_KEY) ---
+    // Truncate presences table to simulate a fresh DB, then reload via SnapshotLoader.
+    DB::table('presences')->truncate();
+    expect(DB::table('presences')->count())->toBe(0);
+
+    // Load only the presences table to avoid re-inserting all other rows (would violate UQ).
+    $loader = new SnapshotLoader;
+    $loader->load(['presences' => $data['tables']['presences']]);
+
+    // Eloquent read: the cast decrypts the re-encrypted ciphertext → should match original values
+    $reloaded = Presence::find($presence->id);
+    expect($reloaded)->not->toBeNull('presence must be reloadable after reset');
+    expect($reloaded->statut)->toBe('present', 'statut must survive round-trip');
+    expect($reloaded->commentaire)->toBe('Test commentaire roundtrip', 'commentaire must survive round-trip');
 
     @unlink($outFile);
 });
