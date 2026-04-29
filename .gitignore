@@ -50,6 +50,7 @@ public/proto-*.html
 /deploy.sh
 /scripts/clone-prod.sh
 /scripts/deploy-hook.sh
+/scripts/backup-demo-seed.sh
 
 # Docs internes (specs, plans, design) — exclus du repo
 /docs/superpowers/
