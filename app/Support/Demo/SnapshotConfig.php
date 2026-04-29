@@ -40,17 +40,22 @@ final class SnapshotConfig
      * Format: ['table_name' => ['column' => '<path_template>']]
      *
      * Template placeholders:
-     *   {value}          → contents of the column (basename of the file)
+     *   {value}          → basename of the column value (basename mode)
+     *   {path}           → full column value as-is (full-path mode, with anti-traversal guard)
      *   {association_id} → row.association_id for tenant-scoped tables;
-     *                      for the 'association' table itself, resolved to row.id
+     *                      for the 'association' table itself, resolved to row.id.
+     *                      Guard only applies when this placeholder appears in the template.
      *   {id}             → row.id of the current row
+     *
+     * Resolution mode is selected automatically:
+     *   - Template contains {path}  → full-path mode (value stored is the full relative path)
+     *   - Template contains {value} → basename mode  (value stored is only the filename)
      *
      * The resolved path is relative to the project root (storage/app/ prefix
      * included) so that Storage::disk('local') can locate the file.
      *
-     * V1 scope: branding files and type-operation logos.
-     * Ephemeral uploads (transactions, NDF, factures partenaires, etc.)
-     * are intentionally excluded — they are user-generated and not seeded.
+     * V2 scope: branding, type-operation logos, NDF justificatifs,
+     *           factures partenaires, and séance signed sheets.
      */
     public const FILE_PATH_COLUMNS = [
         'association' => [
@@ -60,6 +65,18 @@ final class SnapshotConfig
         'type_operations' => [
             'logo_path' => 'storage/app/private/associations/{association_id}/type-operations/{id}/{value}',
             'attestation_medicale_path' => 'storage/app/private/associations/{association_id}/type-operations/{id}/{value}',
+        ],
+        // Full-path columns: the stored value IS the full relative path on the private disk.
+        // association_id is not needed in the template (it is embedded in the stored path).
+        'notes_de_frais_lignes' => [
+            'piece_jointe_path' => 'storage/app/private/{path}',
+        ],
+        'factures_partenaires_deposees' => [
+            'pdf_path' => 'storage/app/private/{path}',
+        ],
+        // Basename column: basename stored (e.g. 'feuille-signee.pdf'), path built from row context.
+        'seances' => [
+            'feuille_signee_path' => 'storage/app/private/associations/{association_id}/seances/{id}/{value}',
         ],
     ];
 
