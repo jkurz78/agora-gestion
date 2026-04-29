@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Enums\RoleSysteme;
 use App\Livewire\Setup\SetupForm;
+use App\Models\Association;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -66,4 +69,89 @@ it('rejects submit with email already taken', function () {
         ->set('nomAsso', 'Mon Asso')
         ->call('submit')
         ->assertHasErrors(['email']);
+});
+
+it('passes validation on a fully valid payload', function () {
+    Livewire::test(SetupForm::class)
+        ->set('prenom', 'Marie')
+        ->set('nom', 'Dupont')
+        ->set('email', 'marie@asso.fr')
+        ->set('password', 'azerty1234')
+        ->set('nomAsso', 'Mon Association')
+        ->call('submit')
+        ->assertHasNoErrors();
+});
+
+it('creates super-admin user, asso, binding and auto-logs in on valid submit', function () {
+    Livewire::test(SetupForm::class)
+        ->set('prenom', 'Marie')
+        ->set('nom', 'Dupont')
+        ->set('email', 'marie@asso.fr')
+        ->set('password', 'azerty1234')
+        ->set('nomAsso', 'Mon Association')
+        ->call('submit')
+        ->assertRedirect('/dashboard');
+
+    $user = User::where('email', 'marie@asso.fr')->first();
+    expect($user)->not->toBeNull();
+    expect($user->prenom)->toBe('Marie');
+    expect($user->nom)->toBe('Dupont');
+    expect($user->role_systeme)->toBe(RoleSysteme::SuperAdmin);
+    expect($user->email_verified_at)->not->toBeNull();
+    expect(Hash::check('azerty1234', $user->password))->toBeTrue();
+
+    $asso = Association::where('nom', 'Mon Association')->first();
+    expect($asso)->not->toBeNull();
+    expect($asso->slug)->toBe('mon-association');
+    expect($asso->statut)->toBe('actif');
+    expect($asso->wizard_completed_at)->toBeNull();
+
+    $binding = DB::table('association_user')
+        ->where('user_id', $user->id)
+        ->where('association_id', $asso->id)
+        ->first();
+    expect($binding)->not->toBeNull();
+    expect($binding->role)->toBe('admin');
+
+    expect(session('current_association_id'))->toBe($asso->id);
+    expect(auth()->id())->toBe($user->id);
+});
+
+it('handles slug collision by suffixing -2, -3, ...', function () {
+    Association::factory()->create([
+        'nom' => 'Pré-existant',
+        'slug' => 'mon-association',
+    ]);
+
+    Livewire::test(SetupForm::class)
+        ->set('prenom', 'Marie')
+        ->set('nom', 'Dupont')
+        ->set('email', 'marie@asso.fr')
+        ->set('password', 'azerty1234')
+        ->set('nomAsso', 'Mon Association')
+        ->call('submit')
+        ->assertRedirect('/dashboard');
+
+    $created = Association::where('nom', 'Mon Association')->first();
+    expect($created->slug)->toBe('mon-association-2');
+});
+
+it('redirects to /login when a super-admin already exists at submit time', function () {
+    User::factory()->create([
+        'email' => 'other@asso.fr',
+        'role_systeme' => RoleSysteme::SuperAdmin,
+    ]);
+    Cache::forget('app.installed');
+
+    Livewire::test(SetupForm::class)
+        ->set('prenom', 'Marie')
+        ->set('nom', 'Dupont')
+        ->set('email', 'marie@asso.fr')
+        ->set('password', 'azerty1234')
+        ->set('nomAsso', 'Mon Association')
+        ->call('submit')
+        ->assertRedirect('/login');
+
+    expect(User::where('email', 'marie@asso.fr')->exists())->toBeFalse();
+    expect(Association::where('nom', 'Mon Association')->exists())->toBeFalse();
 });
