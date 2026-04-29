@@ -7,6 +7,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 
 it('returns false when no super-admin exists', function () {
+    Cache::forget('app.installed');
+
     expect(User::superAdminExists())->toBeFalse();
 });
 

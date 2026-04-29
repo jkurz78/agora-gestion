@@ -3,6 +3,7 @@
 use App\Models\Association;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /*
@@ -39,6 +40,12 @@ pest()->extend(TestCase::class)
         // their own beforeEach — which runs AFTER this global hook.
         $association = Association::factory()->create();
         TenantContext::boot($association);
+
+        // Prime the install gate cache so tests can hit /dashboard, /login, etc.
+        // without being redirected to /setup by RedirectIfNotInstalled.
+        // Tests that exercise the install flow itself call Cache::forget('app.installed')
+        // in their own beforeEach to undo this.
+        Cache::put('app.installed', true);
     })
     ->afterEach(fn () => TenantContext::clear())
     ->in('Feature', 'Livewire', 'Unit');
