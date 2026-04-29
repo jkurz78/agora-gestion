@@ -18,6 +18,14 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            if ($this->command !== null) {
+                $this->command->error('DatabaseSeeder est interdit en production. Utilisez /setup à la place.');
+            }
+
+            return;
+        }
+
         // updateOrInsert: idempotent — works whether backfill migration already created
         // the default association (migrate:fresh --seed) or not (fresh production deploy).
         DB::table('association')->updateOrInsert(
