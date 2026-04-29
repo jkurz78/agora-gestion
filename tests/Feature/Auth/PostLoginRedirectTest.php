@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\RoleSysteme;
 use App\Models\Association;
 use App\Models\User;
 
@@ -47,4 +48,37 @@ it('auto-selects derniere if still valid', function () {
     ])->assertRedirect(route('dashboard'));
 
     expect(session('current_association_id'))->toBe($assoB->id);
+});
+
+it('redirects fresh super-admin without any association to /super-admin', function () {
+    // Bootstrap install scenario: the very first super-admin user has no
+    // association attached yet (no tenant exists). Pre-fix: the user was
+    // logged out with "Compte non rattaché à une association.". Now: they
+    // land on /super-admin to create the first tenant.
+    $user = User::factory()->create([
+        'role_systeme' => RoleSysteme::SuperAdmin,
+    ]);
+    expect($user->associations()->count())->toBe(0);
+
+    $this->post(route('login'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertRedirect(route('super-admin.dashboard'));
+
+    expect(auth()->check())->toBeTrue();
+});
+
+it('still rejects regular users without any association', function () {
+    $user = User::factory()->create([
+        'role_systeme' => RoleSysteme::User,
+    ]);
+
+    $response = $this->post(route('login'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ]);
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHasErrors(['email']);
+    expect(auth()->check())->toBeFalse();
 });

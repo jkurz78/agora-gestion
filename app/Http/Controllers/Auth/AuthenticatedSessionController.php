@@ -83,6 +83,15 @@ class AuthenticatedSessionController extends Controller
         $assos = $user->associations()->wherePivotNull('revoked_at')->get();
 
         if ($assos->count() === 0) {
+            // Fresh super-admin (no association attached yet — install
+            // bootstrap case): land on /super-admin to create the first
+            // tenant instead of being kicked out.
+            if ($user->isSuperAdmin()) {
+                $this->maybeGenerateTwoFactorCode($user, $request);
+
+                return redirect($this->safeIntended(route('super-admin.dashboard')));
+            }
+
             auth()->logout();
 
             return redirect()->route('login')
