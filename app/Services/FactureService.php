@@ -16,6 +16,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Support\CurrentAssociation;
+use App\Support\PdfFooterRenderer;
 use App\Tenant\TenantContext;
 use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -497,6 +498,9 @@ final class FactureService
             }
         }
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $pdf = Pdf::loadView('pdf.facture', [
             'facture' => $facture,
             'association' => $association,
@@ -506,7 +510,12 @@ final class FactureService
             'isAcquittee' => $facture->isAcquittee(),
             'mentionsPenalites' => $association?->facture_mentions_penalites,
             'forceOriginalFormat' => $forceOriginalFormat,
+            'appLogoBase64' => $appLogoBase64,
+            'footerLogoBase64' => null,
+            'footerLogoMime' => null,
         ])->setPaper('a4', 'portrait');
+
+        PdfFooterRenderer::render($pdf);
 
         $pdfContent = $pdf->output();
 
