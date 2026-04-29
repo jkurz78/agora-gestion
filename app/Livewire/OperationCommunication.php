@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\CategorieEmail;
+use App\Enums\TypeTransaction;
 use App\Helpers\EmailLogo;
 use App\Mail\MessageLibreMail;
 use App\Models\CampagneEmail;
@@ -15,6 +16,9 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TypeOperation;
 use App\Support\FlashMessages;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -51,6 +55,11 @@ final class OperationCommunication extends Component
     public array $selectedParticipants = [];
 
     public ?int $filtreSeanceId = null;
+
+    // Encadrant selection — tiers IDs (encadrants are sourced from depense
+    // transactions on the operation, never from the Participant table).
+    /** @var array<int> */
+    public array $selectedEncadrants = [];
 
     // Preview
     public bool $showPreview = false;
@@ -117,6 +126,7 @@ final class OperationCommunication extends Component
     {
         $this->operation = $operation;
         $this->initParticipants();
+        $this->initEncadrants();
         $this->testEmail = auth()->user()?->email ?? '';
     }
 
@@ -124,6 +134,13 @@ final class OperationCommunication extends Component
     {
         // Select all participants that have an email
         $this->selectedParticipants = $this->getParticipantsWithEmail()
+            ->pluck('id')
+            ->toArray();
+    }
+
+    private function initEncadrants(): void
+    {
+        $this->selectedEncadrants = $this->getEncadrantsWithEmail()
             ->pluck('id')
             ->toArray();
     }
@@ -161,6 +178,44 @@ final class OperationCommunication extends Component
         } else {
             $this->selectedParticipants = $withEmail;
         }
+    }
+
+    public function toggleSelectAllEncadrants(): void
+    {
+        $withEmail = $this->getEncadrantsWithEmail()->pluck('id')->toArray();
+        if (count($this->selectedEncadrants) === count($withEmail)) {
+            $this->selectedEncadrants = [];
+        } else {
+            $this->selectedEncadrants = $withEmail;
+        }
+    }
+
+    /**
+     * Return tiers acting as encadrants on this operation: any Tiers with at
+     * least one Depense transaction whose lines reference this operation.
+     */
+    public function getEncadrantsTiers(): Collection
+    {
+        $tiersIds = Transaction::query()
+            ->where('type', TypeTransaction::Depense)
+            ->whereHas('lignes', fn ($q) => $q->where('operation_id', $this->operation->id))
+            ->pluck('tiers_id')
+            ->filter()
+            ->unique();
+
+        if ($tiersIds->isEmpty()) {
+            return collect();
+        }
+
+        return Tiers::whereIn('id', $tiersIds)
+            ->orderBy('nom')
+            ->orderBy('prenom')
+            ->get();
+    }
+
+    public function getEncadrantsWithEmail(): Collection
+    {
+        return $this->getEncadrantsTiers()->filter(fn (Tiers $t) => ! empty($t->email));
     }
 
     public function loadTemplate(): void
@@ -315,8 +370,8 @@ final class OperationCommunication extends Component
             'corps' => 'required|string',
         ]);
 
-        if (empty($this->selectedParticipants)) {
-            session()->flash('error', 'Aucun participant sélectionné.');
+        if (empty($this->selectedParticipants) && empty($this->selectedEncadrants)) {
+            session()->flash('error', 'Aucun destinataire sélectionné.');
 
             return;
         }
@@ -330,12 +385,12 @@ final class OperationCommunication extends Component
             return;
         }
 
-        $participant = Participant::with('tiers')->find($this->selectedParticipants[0]);
-        if (! $participant) {
+        $tiers = $this->firstSelectedTiers();
+        if ($tiers === null) {
             return;
         }
 
-        $mail = $this->buildMail($participant, $operation, test: true);
+        $mail = $this->buildMail($tiers, $operation, test: true);
 
         try {
             Mail::mailer()
@@ -349,6 +404,25 @@ final class OperationCommunication extends Component
         }
     }
 
+    /**
+     * Resolve a Tiers to use for previews and test sends — first selected
+     * participant if any, otherwise first selected encadrant.
+     */
+    private function firstSelectedTiers(): ?Tiers
+    {
+        if (! empty($this->selectedParticipants)) {
+            $participant = Participant::with('tiers')->find($this->selectedParticipants[0]);
+
+            return $participant?->tiers;
+        }
+
+        if (! empty($this->selectedEncadrants)) {
+            return Tiers::find($this->selectedEncadrants[0]);
+        }
+
+        return null;
+    }
+
     public function envoyerMessages(): void
     {
         $this->validate([
@@ -356,8 +430,8 @@ final class OperationCommunication extends Component
             'corps' => 'required|string',
         ]);
 
-        if (empty($this->selectedParticipants)) {
-            session()->flash('error', 'Aucun participant sélectionné.');
+        if (empty($this->selectedParticipants) && empty($this->selectedEncadrants)) {
+            session()->flash('error', 'Aucun destinataire sélectionné.');
 
             return;
         }
@@ -375,8 +449,12 @@ final class OperationCommunication extends Component
             ->whereIn('id', $this->selectedParticipants)
             ->get();
 
+        $encadrants = empty($this->selectedEncadrants)
+            ? collect()
+            : Tiers::whereIn('id', $this->selectedEncadrants)->get();
+
         $this->envoiEnCours = true;
-        $this->envoiTotal = $participants->count();
+        $this->envoiTotal = $participants->count() + $encadrants->count();
         $this->envoiProgression = 0;
         $this->envoiResultat = '';
         $this->showConfirmSend = false;
@@ -409,60 +487,31 @@ final class OperationCommunication extends Component
         $errors = 0;
 
         foreach ($participants as $participant) {
-            $tiers = $participant->tiers;
-            $email = $tiers?->email;
+            [$ok, $err] = $this->sendOneMessage(
+                $participant->tiers,
+                $operation,
+                $typeOp,
+                $campagne,
+                $piecesJointes,
+                participantId: $participant->id,
+            );
+            $sent += $ok;
+            $errors += $err;
+            $this->envoiProgression++;
+            usleep(500_000);
+        }
 
-            if (! $email) {
-                $this->envoiProgression++;
-
-                continue;
-            }
-
-            try {
-                $trackingToken = Str::random(32);
-                $permanentPaths = array_map(
-                    fn (array $pj) => ['path' => Storage::disk('local')->path($pj['path']), 'nom' => $pj['nom']],
-                    $piecesJointes
-                );
-                $mail = $this->buildMail($participant, $operation, trackingToken: $trackingToken, storedAttachmentPaths: $permanentPaths);
-
-                Mail::mailer()
-                    ->to($email)
-                    ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
-
-                EmailLog::create([
-                    'tiers_id' => $participant->tiers_id,
-                    'participant_id' => $participant->id,
-                    'operation_id' => $operation->id,
-                    'categorie' => 'message',
-                    'destinataire_email' => $email,
-                    'destinataire_nom' => $tiers->displayName(),
-                    'objet' => $mail->envelope()->subject,
-                    'objet_rendu' => $mail->envelope()->subject,
-                    'corps_html' => EmailTemplate::sanitizeCorps($mail->corpsHtml),
-                    'statut' => 'envoye',
-                    'tracking_token' => $trackingToken,
-                    'envoye_par' => Auth::id(),
-                    'campagne_id' => $campagne->id,
-                ]);
-                $sent++;
-            } catch (\Throwable $e) {
-                EmailLog::create([
-                    'tiers_id' => $participant->tiers_id,
-                    'participant_id' => $participant->id,
-                    'operation_id' => $operation->id,
-                    'categorie' => 'message',
-                    'destinataire_email' => $email ?? '',
-                    'destinataire_nom' => $tiers?->displayName() ?? '',
-                    'objet' => $this->objet,
-                    'statut' => 'erreur',
-                    'erreur_message' => $e->getMessage(),
-                    'envoye_par' => Auth::id(),
-                    'campagne_id' => $campagne->id,
-                ]);
-                $errors++;
-            }
-
+        foreach ($encadrants as $encadrant) {
+            [$ok, $err] = $this->sendOneMessage(
+                $encadrant,
+                $operation,
+                $typeOp,
+                $campagne,
+                $piecesJointes,
+                participantId: null,
+            );
+            $sent += $ok;
+            $errors += $err;
             $this->envoiProgression++;
             usleep(500_000);
         }
@@ -483,11 +532,79 @@ final class OperationCommunication extends Component
     }
 
     /**
+     * Send one message to a single tiers and persist the corresponding
+     * EmailLog row (success or error).
+     *
+     * @param  array<int, array{nom: string, path: string, taille: int}>  $piecesJointes
+     * @return array{0: int, 1: int} [sent, errors] — each in {0, 1}
+     */
+    private function sendOneMessage(
+        ?Tiers $tiers,
+        Operation $operation,
+        TypeOperation $typeOp,
+        CampagneEmail $campagne,
+        array $piecesJointes,
+        ?int $participantId,
+    ): array {
+        $email = $tiers?->email;
+
+        if (! $tiers || ! $email) {
+            return [0, 0];
+        }
+
+        try {
+            $trackingToken = Str::random(32);
+            $permanentPaths = array_map(
+                fn (array $pj) => ['path' => Storage::disk('local')->path($pj['path']), 'nom' => $pj['nom']],
+                $piecesJointes
+            );
+            $mail = $this->buildMail($tiers, $operation, trackingToken: $trackingToken, storedAttachmentPaths: $permanentPaths);
+
+            Mail::mailer()
+                ->to($email)
+                ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
+
+            EmailLog::create([
+                'tiers_id' => $tiers->id,
+                'participant_id' => $participantId,
+                'operation_id' => $operation->id,
+                'categorie' => 'message',
+                'destinataire_email' => $email,
+                'destinataire_nom' => $tiers->displayName(),
+                'objet' => $mail->envelope()->subject,
+                'objet_rendu' => $mail->envelope()->subject,
+                'corps_html' => EmailTemplate::sanitizeCorps($mail->corpsHtml),
+                'statut' => 'envoye',
+                'tracking_token' => $trackingToken,
+                'envoye_par' => Auth::id(),
+                'campagne_id' => $campagne->id,
+            ]);
+
+            return [1, 0];
+        } catch (\Throwable $e) {
+            EmailLog::create([
+                'tiers_id' => $tiers->id,
+                'participant_id' => $participantId,
+                'operation_id' => $operation->id,
+                'categorie' => 'message',
+                'destinataire_email' => $email,
+                'destinataire_nom' => $tiers->displayName(),
+                'objet' => $this->objet,
+                'statut' => 'erreur',
+                'erreur_message' => $e->getMessage(),
+                'envoye_par' => Auth::id(),
+                'campagne_id' => $campagne->id,
+            ]);
+
+            return [0, 1];
+        }
+    }
+
+    /**
      * @param  array<int, string>|null  $storedAttachmentPaths  Permanent paths (after store). If null, uses temp Livewire files.
      */
-    private function buildMail(Participant $participant, Operation $operation, bool $test = false, ?string $trackingToken = null, ?array $storedAttachmentPaths = null): MessageLibreMail
+    private function buildMail(Tiers $tiers, Operation $operation, bool $test = false, ?string $trackingToken = null, ?array $storedAttachmentPaths = null): MessageLibreMail
     {
-        $tiers = $participant->tiers;
         $seances = $operation->seances->sortBy('date');
         $today = now()->startOfDay();
 
@@ -509,9 +626,9 @@ final class OperationCommunication extends Component
         $joursAvant = $prochaine?->date ? (int) $today->diffInDays($prochaine->date, false) : null;
 
         return new MessageLibreMail(
-            prenomParticipant: $tiers?->prenom ?? '',
-            nomParticipant: $tiers?->nom ?? '',
-            emailParticipant: $tiers?->email ?? '',
+            prenomParticipant: $tiers->prenom ?? '',
+            nomParticipant: $tiers->nom ?? '',
+            emailParticipant: $tiers->email ?? '',
             operationNom: $operation->nom,
             typeOperationNom: $operation->typeOperation?->nom ?? '',
             libelleArticle: $operation->typeOperation?->libelle_article,
@@ -596,22 +713,24 @@ final class OperationCommunication extends Component
 
     public function getPreviewHtml(): array
     {
-        if (empty($this->selectedParticipants) || empty($this->corps)) {
-            return ['objet' => $this->objet, 'corps' => '<p class="text-muted"><em>Saisissez un corps et sélectionnez au moins un participant.</em></p>'];
+        $hasDestinataire = ! empty($this->selectedParticipants) || ! empty($this->selectedEncadrants);
+
+        if (! $hasDestinataire || empty($this->corps)) {
+            return ['objet' => $this->objet, 'corps' => '<p class="text-muted"><em>Saisissez un corps et sélectionnez au moins un destinataire.</em></p>'];
         }
 
         $operation = $this->operation->loadMissing(['typeOperation', 'seances']);
-        $participant = Participant::with('tiers')->find($this->selectedParticipants[0]);
-        if (! $participant) {
+        $tiers = $this->firstSelectedTiers();
+        if ($tiers === null) {
             return ['objet' => $this->objet, 'corps' => ''];
         }
 
-        $mail = $this->buildMail($participant, $operation);
+        $mail = $this->buildMail($tiers, $operation);
 
         return [
             'objet' => $mail->envelope()->subject,
             'corps' => $mail->corpsHtml,
-            'participant' => $participant->tiers?->displayName() ?? '—',
+            'participant' => $tiers->displayName(),
         ];
     }
 
@@ -621,10 +740,17 @@ final class OperationCommunication extends Component
         $withEmail = $allParticipants->filter(fn (Participant $p) => ! empty($p->tiers?->email));
         $sansEmail = $allParticipants->count() - $withEmail->count();
 
+        $allEncadrants = $this->getEncadrantsTiers();
+        $encadrantsWithEmail = $allEncadrants->filter(fn (Tiers $t) => ! empty($t->email));
+        $encadrantsSansEmail = $allEncadrants->count() - $encadrantsWithEmail->count();
+
         return view('livewire.operation-communication', [
             'participants' => $allParticipants,
             'participantsWithEmailCount' => $withEmail->count(),
             'sansEmailCount' => $sansEmail,
+            'encadrants' => $allEncadrants,
+            'encadrantsWithEmailCount' => $encadrantsWithEmail->count(),
+            'encadrantsSansEmailCount' => $encadrantsSansEmail,
             'seances' => $this->operation->seances()->orderBy('numero')->get(),
             'templates' => $this->getAvailableTemplates(),
             'messageVariables' => CategorieEmail::Message->variables(),
