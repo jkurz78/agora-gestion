@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Demo;
 
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -66,7 +67,7 @@ final class SnapshotLoader
                 }
 
                 $rehydrated = array_map(
-                    fn (array $row) => $this->rehydrateRow($row),
+                    fn (array $row) => $this->rehydrateRow($row, $tableName),
                     $rows
                 );
 
@@ -88,12 +89,13 @@ final class SnapshotLoader
     }
 
     /**
-     * Walk all values of a row and rehydrate delta strings to absolute datetimes.
+     * Walk all values of a row: rehydrate delta strings to absolute datetimes,
+     * then re-encrypt any columns that were stored as plaintext in the snapshot.
      *
      * @param  array<string, mixed>  $row
      * @return array<string, mixed>
      */
-    public function rehydrateRow(array $row): array
+    public function rehydrateRow(array $row, string $tableName = ''): array
     {
         $now = Carbon::now();
 
@@ -102,6 +104,19 @@ final class SnapshotLoader
                 $carbon = DateDelta::fromDelta($value, $now);
                 // Use datetime format — MySQL/SQLite accept Y-m-d H:i:s
                 $row[$key] = $carbon->format('Y-m-d H:i:s');
+            }
+        }
+
+        // Re-encrypt plaintext values that were decrypted at capture time.
+        // This uses the current APP_KEY (the demo server's key), producing
+        // valid ciphertext for the target environment.
+        if ($tableName !== '') {
+            $encryptedColumns = EncryptedColumnsRegistry::forTable($tableName);
+
+            foreach ($encryptedColumns as $col) {
+                if (array_key_exists($col, $row) && $row[$col] !== null) {
+                    $row[$col] = Crypt::encryptString((string) $row[$col]);
+                }
             }
         }
 
