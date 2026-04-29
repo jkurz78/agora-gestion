@@ -6,9 +6,14 @@ use App\Enums\RoleAssociation;
 use App\Enums\RoleSysteme;
 use App\Models\Association;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 
 beforeEach(function () {
+    // RedirectIfNotInstalled bypasse toute la requête si aucun super-admin n'existe.
+    // On simule une installation terminée sans créer un super-admin en DB.
+    Cache::put('app.installed', true, 3600);
+
     $this->association = Association::factory()->unonboarded()->create();
     $this->admin = User::factory()->create(['role_systeme' => RoleSysteme::User]);
     $this->admin->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
@@ -45,6 +50,18 @@ it('does not redirect a super-admin', function () {
     $this->actingAs($super)
         ->get('/super-admin')
         ->assertOk();
+});
+
+it('redirects a super-admin who is admin of an unfinished-wizard asso', function () {
+    $super = User::factory()->create(['role_systeme' => RoleSysteme::SuperAdmin]);
+    $super->associations()->attach($this->association->id, [
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+
+    $this->actingAs($super)
+        ->get('/dashboard')
+        ->assertRedirect('/onboarding');
 });
 
 it('does not loop on /onboarding itself', function () {

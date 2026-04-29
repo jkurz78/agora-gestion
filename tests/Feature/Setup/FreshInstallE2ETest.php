@@ -38,16 +38,14 @@ it('walks through the full fresh-install flow : root → /setup → submit → /
     $this->get('/setup')->assertRedirect('/login');
 
     // Phase 5 : visiting /dashboard while wizard is incomplete redirects to /onboarding.
-    //
-    // DEVIATION from plan: the super-admin created by SetupForm is exempt from
-    // ForceWizardIfNotCompleted (line 42 of that middleware explicitly bypasses
-    // super-admins). We therefore test Phase 5 via a regular admin user bound to
-    // the newly created association whose wizard_completed_at is still null.
+    // The super-admin user created by SetupForm is admin of the new asso
+    // (form attached them with role=admin) AND wizard_completed_at is null →
+    // ForceWizardIfNotCompleted must redirect to /onboarding even though
+    // role_systeme=SuperAdmin.
     $asso = Association::where('nom', 'Mon Association')->first();
-    $adminUser = User::factory()->create();
-    $adminUser->associations()->attach($asso->id, ['role' => 'admin']);
+    $superAdmin = User::where('email', 'marie@asso.fr')->first();
 
-    $response = $this->actingAs($adminUser)
+    $response = $this->actingAs($superAdmin)
         ->withSession(['current_association_id' => $asso->id])
         ->get('/dashboard');
 

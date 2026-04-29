@@ -39,7 +39,7 @@ final class ForceWizardIfNotCompleted
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if ($user === null || $user->isSuperAdmin()) {
+        if ($user === null) {
             return $next($request);
         }
 
