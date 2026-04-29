@@ -31,12 +31,22 @@ final class TableCapture
         $rows = DB::table($tableName)->get();
         $result = [];
 
+        $sensitiveColumns = SnapshotConfig::SENSITIVE_COLUMNS[$tableName] ?? [];
+
         foreach ($rows as $row) {
             $rowArray = (array) $row;
 
-            // For users table: replace password with demo hash
+            // For users table: replace password with demo hash and force role to 'user'
             if ($tableName === 'users') {
                 $rowArray['password'] = SnapshotConfig::DEMO_USER_PASSWORD_HASH;
+                $rowArray['role_systeme'] = 'user';  // anti-fuite super-admin
+            }
+
+            // Scrub sensitive columns (secrets, tokens, API keys)
+            foreach ($sensitiveColumns as $col) {
+                if (array_key_exists($col, $rowArray)) {
+                    $rowArray[$col] = null;
+                }
             }
 
             // Sort keys alphabetically for stable YAML

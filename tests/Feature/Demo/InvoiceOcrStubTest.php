@@ -45,3 +45,31 @@ it('throws OcrNotConfiguredException in non-demo env when no API key is configur
     expect(fn () => app(InvoiceOcrService::class)->analyze($fakeFile))
         ->toThrow(OcrNotConfiguredException::class);
 });
+
+it('analyzeFromPath returns a static stub in demo env without calling the API', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+
+    // Create a temporary file to simulate a stored invoice path
+    $tmpPath = tempnam(sys_get_temp_dir(), 'ocr-test-');
+    file_put_contents($tmpPath, '%PDF-1.4 fake content');
+
+    $result = app(InvoiceOcrService::class)->analyzeFromPath($tmpPath, 'application/pdf');
+
+    expect($result)->toBeInstanceOf(InvoiceOcrResult::class);
+    expect($result->montant_total)->toBe(100.0);
+    expect($result->tiers_nom)->toBe('Facture exemple');
+
+    @unlink($tmpPath);
+});
+
+it('analyzeFromPath throws OcrNotConfiguredException in non-demo env when no API key is configured', function (): void {
+    app()->detectEnvironment(fn (): string => 'local');
+
+    $tmpPath = tempnam(sys_get_temp_dir(), 'ocr-test-');
+    file_put_contents($tmpPath, '%PDF-1.4 fake content');
+
+    expect(fn () => app(InvoiceOcrService::class)->analyzeFromPath($tmpPath, 'application/pdf'))
+        ->toThrow(OcrNotConfiguredException::class);
+
+    @unlink($tmpPath);
+});

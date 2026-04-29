@@ -137,6 +137,9 @@ jobs:
             'set -e
              DEMO_PATH=~/public_html/demo.agoragestion.org
              cd "$DEMO_PATH"
+             grep -q '"'"'^APP_ENV=demo$'"'"' .env || { echo "REFUS — APP_ENV n'\''est pas demo dans .env"; exit 1; }
+             realpath . | grep -q '"'"'demo.agoragestion.org'"'"' || { echo "REFUS — mauvais répertoire ($(realpath .))"; exit 1; }
+             echo "[deploy-demo] pre-flight OK"
              echo "[deploy-demo] git fetch + reset to origin/main"
              git fetch origin main
              git reset --hard origin/main

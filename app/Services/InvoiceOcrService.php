@@ -63,6 +63,10 @@ final class InvoiceOcrService
      */
     public function analyzeFromPath(string $path, string $mime, ?array $context = null): InvoiceOcrResult
     {
+        if (Demo::isActive()) {
+            return $this->demoStub();
+        }
+
         $apiKey = $this->apiKey();
         if ($apiKey === null) {
             throw new OcrNotConfiguredException;
