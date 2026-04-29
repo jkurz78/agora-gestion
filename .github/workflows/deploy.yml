@@ -1,3 +1,26 @@
+# deploy.yml — CI & Deploy unifié (prod + démo)
+#
+# Triggered on every push to main.
+# Runs prod and demo deployments SEQUENTIALLY in a single job, sharing the
+# cPanel SSH whitelist setup and cleanup. This avoids the race condition that
+# happened when two parallel workflows tried to whitelist their respective
+# runner IPs simultaneously (both calling SshWhitelist/remove_all then add).
+#
+# Sequence:
+#   test → setup firewall (whitelist runner IP) → deploy prod → deploy demo
+#        → cleanup firewall (always: unwhitelist + restore home IP)
+#
+# If prod deploy fails, demo deploy is skipped (default GHA step behaviour).
+# Cleanup steps always run to restore the firewall to its baseline state.
+#
+# PRE-REQUISITES (server-side, must be met for demo deploy to succeed):
+#   - ~/public_html/demo.agoragestion.org/ is a git clone of this repo
+#   - .env is present with APP_ENV=demo and a dedicated MySQL DB
+#   - database/demo/snapshot.yaml is committed in main
+#
+# Same secrets as before (no new secrets to add):
+#   CPANEL_USERNAME, CPANEL_API_TOKEN, CPANEL_SERVER, SSH_KEY, HOME_SSH_HOST
+
 name: CI & Deploy
 
 on:
@@ -42,6 +65,8 @@ jobs:
     needs: test
 
     steps:
+      # ─── Setup: whitelist runner IP on cPanel firewall ────────────────────
+
       - name: Get runner public IP
         id: ip
         run: |
@@ -102,27 +127,70 @@ jobs:
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 0400 ~/.ssh/id_ed25519
 
-      - name: Deploy
-        id: deploy
+      # ─── Deploy prod ──────────────────────────────────────────────────────
+
+      - name: Deploy prod
+        id: deploy_prod
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
             ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
             "bash ~/bin/deploy.sh"
 
-      - name: Tail deploy.log on failure
-        if: failure() && steps.deploy.outcome == 'failure'
+      - name: Tail deploy.log on prod failure
+        if: failure() && steps.deploy_prod.outcome == 'failure'
         run: |
-          echo "=== Dernières 100 lignes de deploy.log ==="
+          echo "=== Dernières 100 lignes de deploy.log (prod) ==="
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
             ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
             'LOG=$(find ~/public_html -maxdepth 4 -name deploy.log -printf "%T@ %p\n" 2>/dev/null | sort -rn | head -1 | cut -d" " -f2); if [ -n "$LOG" ]; then echo "Fichier: $LOG"; tail -n 100 "$LOG"; else echo "Aucun deploy.log trouvé sous ~/public_html"; fi' \
             || echo "Impossible d'exécuter le tail distant"
 
+      # ─── Deploy démo (only if prod deploy succeeded) ──────────────────────
+
+      - name: Deploy démo
+        id: deploy_demo
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
+            ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
+            'set -e
+             DEMO_PATH=~/public_html/demo.agoragestion.org
+             cd "$DEMO_PATH"
+             grep -q '"'"'^APP_ENV=demo$'"'"' .env || { echo "REFUS — APP_ENV n'\''est pas demo dans .env"; exit 1; }
+             realpath . | grep -q '"'"'demo.agoragestion.org'"'"' || { echo "REFUS — mauvais répertoire ($(realpath .))"; exit 1; }
+             echo "[deploy-demo] pre-flight OK"
+             echo "[deploy-demo] git fetch + reset to origin/main"
+             git fetch origin main
+             git reset --hard origin/main
+             echo "[deploy-demo] composer install"
+             composer install --no-dev --optimize-autoloader --no-interaction
+             echo "[deploy-demo] artisan cache"
+             php artisan config:cache
+             php artisan route:cache
+             php artisan view:cache
+             echo "[deploy-demo] migrate:fresh"
+             php artisan migrate:fresh --force
+             echo "[deploy-demo] demo:reset"
+             php artisan demo:reset --snapshot=database/demo/snapshot.yaml
+             echo "[deploy-demo] up"
+             php artisan up
+             echo "[deploy-demo] done"'
+
+      - name: Tail demo-reset.log on demo failure
+        if: failure() && steps.deploy_demo.outcome == 'failure'
+        run: |
+          echo "=== Dernières 100 lignes de demo-reset.log ==="
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_ed25519 \
+            ${{ secrets.CPANEL_USERNAME }}@${{ secrets.CPANEL_SERVER }} \
+            'LOG=~/public_html/demo.agoragestion.org/storage/logs/demo-reset.log; if [ -f "$LOG" ]; then echo "Fichier: $LOG"; tail -n 100 "$LOG"; else echo "Aucun demo-reset.log trouvé"; fi' \
+            || echo "Impossible d'exécuter le tail distant"
+
+      # ─── Cleanup (always run, even on prior failures) ─────────────────────
+
       - name: Clean up SSH key
         if: always()
         run: rm -rf ~/.ssh
 
-      - name: Restore whitelist
+      - name: Restore whitelist (remove runner IP, restore home IP)
         if: always()
         run: |
           curl -sm 45 \
