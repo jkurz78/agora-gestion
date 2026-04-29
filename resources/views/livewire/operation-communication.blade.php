@@ -168,7 +168,7 @@
             <div class="mb-3">
                 <div class="d-flex align-items-center justify-content-between mb-1">
                     <label class="form-label small fw-semibold mb-0">
-                        Destinataires
+                        Participants
                         <span class="badge bg-secondary ms-1">{{ count($selectedParticipants) }} sélectionné{{ count($selectedParticipants) > 1 ? 's' : '' }}</span>
                         @if($sansEmailCount > 0)
                             <span class="badge bg-warning text-dark ms-1">{{ $sansEmailCount }} sans email</span>
@@ -199,7 +199,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($participants as $participant)
+                            @forelse($participants as $participant)
                                 @php $hasEmail = !empty($participant->tiers?->email); @endphp
                                 <tr class="{{ !$hasEmail ? 'text-muted' : '' }}">
                                     <td>
@@ -220,11 +220,67 @@
                                         @endif
                                     </td>
                                 </tr>
+                            @empty
+                                <tr><td colspan="3" class="text-muted small text-center py-2"><em>Aucun participant.</em></td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {{-- Encadrants --}}
+            @if($encadrants->count() > 0)
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label small fw-semibold mb-0">
+                        Encadrants
+                        <span class="badge bg-secondary ms-1">{{ count($selectedEncadrants) }} sélectionné{{ count($selectedEncadrants) > 1 ? 's' : '' }}</span>
+                        @if($encadrantsSansEmailCount > 0)
+                            <span class="badge bg-warning text-dark ms-1">{{ $encadrantsSansEmailCount }} sans email</span>
+                        @endif
+                    </label>
+                </div>
+                <div class="border rounded" style="max-height: 250px; overflow-y: auto;">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880" class="table-dark">
+                                <th style="width: 40px;">
+                                    <input type="checkbox" class="form-check-input"
+                                           wire:click="toggleSelectAllEncadrants"
+                                           @checked(count($selectedEncadrants) === $encadrantsWithEmailCount && $encadrantsWithEmailCount > 0)>
+                                </th>
+                                <th>Nom</th>
+                                <th>Email</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($encadrants as $encadrant)
+                                @php $hasEmail = !empty($encadrant->email); @endphp
+                                <tr class="{{ !$hasEmail ? 'text-muted' : '' }}">
+                                    <td>
+                                        @if($hasEmail)
+                                            <input type="checkbox" class="form-check-input"
+                                                   value="{{ $encadrant->id }}"
+                                                   wire:model="selectedEncadrants">
+                                        @else
+                                            <input type="checkbox" class="form-check-input" disabled>
+                                        @endif
+                                    </td>
+                                    <td>{{ $encadrant->displayName() }}</td>
+                                    <td>
+                                        @if($hasEmail)
+                                            {{ $encadrant->email }}
+                                        @else
+                                            <em class="small">pas d'email</em>
+                                        @endif
+                                    </td>
+                                </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
             </div>
+            @endif
 
             {{-- Progress display during send --}}
             @if($envoiEnCours)
@@ -263,10 +319,11 @@
                         onclick="window.syncAndShowTestModal()">
                     <i class="bi bi-send me-1"></i>Envoyer un test
                 </button>
+                @php $totalDestinataires = count($selectedParticipants) + count($selectedEncadrants); @endphp
                 <button type="button" class="btn btn-sm btn-primary"
                         onclick="window.syncAndShowConfirmSend()"
-                        {{ count($selectedParticipants) === 0 ? 'disabled' : '' }}>
-                    <i class="bi bi-envelope-paper me-1"></i>Envoyer à {{ count($selectedParticipants) }} participant{{ count($selectedParticipants) > 1 ? 's' : '' }}
+                        {{ $totalDestinataires === 0 ? 'disabled' : '' }}>
+                    <i class="bi bi-envelope-paper me-1"></i>Envoyer à {{ $totalDestinataires }} destinataire{{ $totalDestinataires > 1 ? 's' : '' }}
                 </button>
             </div>
         </div>
@@ -428,9 +485,14 @@
          style="background:rgba(0,0,0,.3);z-index:2100"
          wire:click.self="$set('showConfirmSend', false)">
         <div class="bg-white rounded-3 shadow p-4" style="max-width:400px;width:100%">
+            @php $totalDestinataires = count($selectedParticipants) + count($selectedEncadrants); @endphp
             <h6 class="mb-3"><i class="bi bi-envelope-paper me-1"></i> Confirmer l'envoi</h6>
             <p class="mb-3">
-                Envoyer ce message à <strong>{{ count($selectedParticipants) }}</strong> participant{{ count($selectedParticipants) > 1 ? 's' : '' }} ?
+                Envoyer ce message à <strong>{{ $totalDestinataires }}</strong> destinataire{{ $totalDestinataires > 1 ? 's' : '' }}
+                @if(count($selectedParticipants) > 0 && count($selectedEncadrants) > 0)
+                    ({{ count($selectedParticipants) }} participant{{ count($selectedParticipants) > 1 ? 's' : '' }}, {{ count($selectedEncadrants) }} encadrant{{ count($selectedEncadrants) > 1 ? 's' : '' }})
+                @endif
+                ?
             </p>
             @if(count($emailAttachments) > 0)
                 <p class="small text-muted mb-3">

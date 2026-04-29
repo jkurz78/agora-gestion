@@ -14,6 +14,8 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Seance;
 use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
@@ -331,7 +333,7 @@ it('requires email_from configured for test send', function () {
     Mail::assertNothingSent();
 });
 
-it('requires selected participant for test send', function () {
+it('requires selected destinataire for test send', function () {
     Mail::fake();
 
     $typeOp = TypeOperation::factory()->create([
@@ -349,7 +351,7 @@ it('requires selected participant for test send', function () {
         ->set('testEmail', 'test@admin.fr')
         ->set('selectedParticipants', [])
         ->call('envoyerTest')
-        ->assertSee('Aucun participant sélectionné');
+        ->assertSee('Aucun destinataire sélectionné');
 
     Mail::assertNothingSent();
 });
@@ -551,4 +553,138 @@ it('does not duplicate templates when seeded twice', function () {
 
     $this->seed(MessageTemplateSeeder::class);
     expect(MessageTemplate::count())->toBe($countAfterFirst);
+});
+
+// ─── Encadrants (tiers from depense transactions on the operation) ──────────
+
+/**
+ * Helper: creates a depense transaction whose unique line is bound to the
+ * given operation. The transaction's tiers becomes an "encadrant" for that
+ * operation in the Communication tab.
+ */
+function makeEncadrantTransaction(int $associationId, int $operationId, Tiers $tiers, float $montant = 100.0): Transaction
+{
+    $transaction = Transaction::factory()->asDepense()->create([
+        'association_id' => $associationId,
+        'tiers_id' => $tiers->id,
+        'date' => now(),
+        'montant_total' => $montant,
+    ]);
+
+    TransactionLigne::where('transaction_id', $transaction->id)->delete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $transaction->id,
+        'operation_id' => $operationId,
+        'montant' => $montant,
+    ]);
+
+    return $transaction;
+}
+
+it('pre-selects encadrants with email at mount', function () {
+    $encadrantWithEmail = Tiers::factory()->create(['email' => 'enc@example.com', 'association_id' => $this->association->id]);
+    $encadrantNoEmail = Tiers::factory()->create(['email' => null, 'association_id' => $this->association->id]);
+
+    makeEncadrantTransaction($this->association->id, $this->operation->id, $encadrantWithEmail);
+    makeEncadrantTransaction($this->association->id, $this->operation->id, $encadrantNoEmail);
+
+    $component = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);
+
+    $selected = $component->get('selectedEncadrants');
+    expect($selected)->toContain($encadrantWithEmail->id)
+        ->not->toContain($encadrantNoEmail->id);
+});
+
+it('sends emails to selected encadrants alongside participants', function () {
+    Mail::fake();
+
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => 'from@asso.fr',
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
+
+    // 2 participants + 1 encadrant = 3 destinataires
+    $participants = [];
+    for ($i = 1; $i <= 2; $i++) {
+        $tiers = Tiers::factory()->create([
+            'email' => "p{$i}@example.com",
+            'association_id' => $this->association->id,
+        ]);
+        $participants[] = Participant::create([
+            'tiers_id' => $tiers->id,
+            'operation_id' => $operation->id,
+            'date_inscription' => now(),
+        ]);
+    }
+
+    $encadrant = Tiers::factory()->create([
+        'email' => 'encadrant@example.com',
+        'association_id' => $this->association->id,
+    ]);
+    makeEncadrantTransaction($this->association->id, $operation->id, $encadrant);
+
+    Livewire::test(OperationCommunication::class, ['operation' => $operation])
+        ->set('objet', 'Test')
+        ->set('corps', 'Bonjour {prenom}')
+        ->call('envoyerMessages');
+
+    Mail::assertSentCount(3);
+
+    $campagne = CampagneEmail::first();
+    expect($campagne->nb_destinataires)->toBe(3);
+    expect($campagne->nb_erreurs)->toBe(0);
+
+    // Encadrant gets a log row with participant_id null
+    $encadrantLog = EmailLog::where('tiers_id', $encadrant->id)->first();
+    expect($encadrantLog)->not->toBeNull();
+    expect($encadrantLog->participant_id)->toBeNull();
+});
+
+it('toggleSelectAllEncadrants flips encadrant selection', function () {
+    $e1 = Tiers::factory()->create(['email' => 'a@example.com', 'association_id' => $this->association->id]);
+    $e2 = Tiers::factory()->create(['email' => 'b@example.com', 'association_id' => $this->association->id]);
+    makeEncadrantTransaction($this->association->id, $this->operation->id, $e1);
+    makeEncadrantTransaction($this->association->id, $this->operation->id, $e2);
+
+    $component = Livewire::test(OperationCommunication::class, ['operation' => $this->operation]);
+    $component->call('toggleSelectAllEncadrants');
+    expect($component->get('selectedEncadrants'))->toBe([]);
+
+    $component->call('toggleSelectAllEncadrants');
+    $selected = $component->get('selectedEncadrants');
+    expect($selected)->toContain($e1->id)->toContain($e2->id);
+});
+
+it('test send works when only an encadrant is selected (no participant)', function () {
+    Mail::fake();
+
+    $typeOp = TypeOperation::factory()->create([
+        'email_from' => 'from@asso.fr',
+        'association_id' => $this->association->id,
+    ]);
+    $operation = Operation::factory()->create([
+        'type_operation_id' => $typeOp->id,
+        'association_id' => $this->association->id,
+    ]);
+
+    $encadrant = Tiers::factory()->create([
+        'email' => 'enc@example.com',
+        'association_id' => $this->association->id,
+        'prenom' => 'Marie',
+        'nom' => 'Dupont',
+    ]);
+    makeEncadrantTransaction($this->association->id, $operation->id, $encadrant);
+
+    Livewire::test(OperationCommunication::class, ['operation' => $operation])
+        ->set('objet', 'Bonjour {prenom}')
+        ->set('corps', 'Test')
+        ->set('testEmail', 'test@admin.fr')
+        ->set('selectedParticipants', [])
+        ->call('envoyerTest');
+
+    Mail::assertSentCount(1);
 });
