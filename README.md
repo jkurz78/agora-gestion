@@ -2,6 +2,10 @@
 
 Application de comptabilite pour association loi 1901 (non-profit). Construite avec Laravel 11, Livewire 4, et Bootstrap 5.
 
+Licence : [AGPL-3.0](LICENSE) — vous pouvez utiliser, modifier et redistribuer ce code, y compris pour heberger une instance accessible par reseau, a condition de publier vos modifications sous la meme licence.
+
+Pour installer une instance en production, voir [docs/INSTALL.md](docs/INSTALL.md).
+
 ## Demarrage rapide
 
 ### Prerequis
