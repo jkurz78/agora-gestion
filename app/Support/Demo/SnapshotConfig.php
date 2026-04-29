@@ -21,6 +21,10 @@ final class SnapshotConfig
         'migrations',
         'email_logs',
         'incoming_mail_logs',
+        // Toutes les colonnes sont chiffrées avec APP_KEY locale → ciphertext non
+        // déchiffrable côté serveur démo (APP_KEY différente). Skip toute la table.
+        'participant_donnees_medicales',
+        'super_admin_access_log',
     ];
 
     /**
@@ -104,6 +108,14 @@ final class SnapshotConfig
         ],
         'smtp_parametres' => [
             'smtp_password',
+        ],
+        // Colonnes chiffrées avec APP_KEY locale → ciphertext invalide côté démo.
+        // Le model Presence a 3 casts 'encrypted'. Les nuller permet de garder
+        // les rows (FK séances/participants) sans avoir à exclure toute la table.
+        'presences' => [
+            'statut',
+            'kine',
+            'commentaire',
         ],
     ];
 }

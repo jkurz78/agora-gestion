@@ -1,4 +1,4 @@
-captured_at: '2026-04-29T11:59:30+02:00'
+captured_at: '2026-04-29T12:52:59+02:00'
 files:
   -
     source: database/demo/files/branding/1/logo.png
@@ -556,31 +556,6 @@ tables:
       type_operation_id: 2
       updated_at: '-1d'
   participant_documents: {  }
-  participant_donnees_medicales:
-    -
-      created_at: '-1d'
-      date_naissance: null
-      id: 1
-      medecin_adresse: null
-      medecin_code_postal: null
-      medecin_email: null
-      medecin_nom: null
-      medecin_prenom: null
-      medecin_telephone: null
-      medecin_ville: null
-      notes: null
-      participant_id: 7
-      poids: null
-      sexe: null
-      taille: null
-      therapeute_adresse: null
-      therapeute_code_postal: null
-      therapeute_email: null
-      therapeute_nom: null
-      therapeute_prenom: null
-      therapeute_telephone: null
-      therapeute_ville: null
-      updated_at: '-1d'
   participants:
     -
       adresse_par_adresse: null
@@ -990,10 +965,10 @@ tables:
       commentaire: null
       created_at: '-1d'
       id: 1
-      kine: eyJpdiI6IitiK2tBYU5KRjZ4L1c4T0ZxVUlkT0E9PSIsInZhbHVlIjoia2l3ZEt0U2QyRmxMR2RvZ1RqTEVMZz09IiwibWFjIjoiMzAzNjcyZjhiZTcwOGUwODFjOTVmN2M0MWI4YjY3M2Y2YzA1YzM3ODEzNjMwZDU0YzE3MjQyYTMwMGYzODNiNCIsInRhZyI6IiJ9
+      kine: null
       participant_id: 3
       seance_id: 1
-      statut: eyJpdiI6InoxTXc5eWg2VUE5aExuU0RmZHBja3c9PSIsInZhbHVlIjoiNnZCWVhRTU4vZFZ2b2E0dVRabEplZz09IiwibWFjIjoiYTU3ZGRkZmM4YTRiOWRhMDczMGFhOWZjOGFlMWQxMjU0ODMxMTI1MWRhNjUyYmRjNWQ0ZWNkOWMwZjU1ZDMwNiIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1002,16 +977,16 @@ tables:
       kine: null
       participant_id: 6
       seance_id: 1
-      statut: eyJpdiI6InEzUnNmOUtlS3BMKy8wS3ArRkorYXc9PSIsInZhbHVlIjoid0lzOEFMdTlkVk5ROERDc05QcHhhQT09IiwibWFjIjoiYTdiYzJmMzFmOGFhNzVmNmJmNDBmNzM5NDA0NTdiODRhNTI5Y2U1NjkwYzFjOTc4YmZlY2JmMmVjM2I4ODE4MiIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
       created_at: '-1d'
       id: 3
-      kine: eyJpdiI6Ik5uUmcwTWVobUJLeDBSaVJsc1ZCOXc9PSIsInZhbHVlIjoiSWF4TURiWk9WZHZmTFBuZ3doZHVVQT09IiwibWFjIjoiOWE5MGI1YjczMWQxMWQwZmNiZTgxYjA1ZGRjZWVhYmZhNjhkYmI2NjkyZjIyNjE2N2U3ZDkyNDJlYTVhMDRlMyIsInRhZyI6IiJ9
+      kine: null
       participant_id: 5
       seance_id: 1
-      statut: eyJpdiI6IjR5MVJYUEZGZE9OaDhPNERzdmtEMmc9PSIsInZhbHVlIjoiRlhhZzVFaEhEVWpJcDZCSk1WNVpSZz09IiwibWFjIjoiNmQwYTFiMjA2ZDBkMDg4MzI0NjdiYTdiNTE0NzA2OWFlZmIxZmMyZDViMWY2MTcwZGM4ZmU0N2UyOTMzNDI5OCIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1020,7 +995,7 @@ tables:
       kine: null
       participant_id: 4
       seance_id: 1
-      statut: eyJpdiI6IkwyVHZRRE5WTVRDbGpwUitBem5NZlE9PSIsInZhbHVlIjoickVaZWxEMnFOYWdHdE9qbFNxSzc0dz09IiwibWFjIjoiZTZiYTc1MTYyN2RmYzc5ODRmYjQzOGY5ZmViZDcyMmQ4MjRiMTFjYmZkNzUzNTRlNzZjNmE1NjhjNTNkMWMwNiIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1029,7 +1004,7 @@ tables:
       kine: null
       participant_id: 2
       seance_id: 1
-      statut: eyJpdiI6ImNiK1dKL0g4M1NCV01lVWpqcmF4cGc9PSIsInZhbHVlIjoiaFB1bDlabHV4OW9nV00yNnR2bkVVZz09IiwibWFjIjoiNTA4MWQyNzFhMDZiYzQzMDdiN2ZlYTU0N2IwZGM0ODcyODkwMzg5Yjc5YmVhMzkwM2U3YWEyYTBmNTA5MDI3MyIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1038,7 +1013,7 @@ tables:
       kine: null
       participant_id: 1
       seance_id: 1
-      statut: eyJpdiI6IkdLYy8wcHR0SGt0dVdwZks0RUk2N3c9PSIsInZhbHVlIjoicVN4blkzOCtpMW5rVC8xQ0lqYlY0Zz09IiwibWFjIjoiNDhjN2E5Y2I1NDY5NDUzMmYwNDgzYjhlYTAzYjczN2EwM2ZjYmNlNWM1MmFiM2Q2YjU2OWQ0MGI3ZGYyNDQwOSIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1047,16 +1022,16 @@ tables:
       kine: null
       participant_id: 3
       seance_id: 2
-      statut: eyJpdiI6InpOdVY5S1ZhTjdiZ3J2TlQ2TWhLT1E9PSIsInZhbHVlIjoiTUtmVXhIQlVRZ3hQbjVWbFlaTkR6dz09IiwibWFjIjoiOGM5YTE2ODQ5YzdhOTY4MmRhYTExMDE5YTM4MjliZDU1MjI0NDFhMWRhMjZhMGZmZGY0MjU1MzE4MDdmM2U5YSIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
       created_at: '-1d'
       id: 8
-      kine: eyJpdiI6IkgzOTVDejRoZjVSZ2dreXI0MnJCZFE9PSIsInZhbHVlIjoiUmpIbkdpZThSYXJ3cDIwem00RzEwdz09IiwibWFjIjoiMTFiMGVhNmQ5ODA3YWE0ZjUzOTBjYzJiOWE4ZWJmY2EyNjFhNjc0MmQ0OTljMmNlOTJmNDI2YTI4N2ViYzNhZiIsInRhZyI6IiJ9
+      kine: null
       participant_id: 6
       seance_id: 2
-      statut: eyJpdiI6IlByOFpRdi9CcHpjMWlNSyt2OVp1UHc9PSIsInZhbHVlIjoiUXpKcFcvdTg1OVBRZDB0WmU0SEJzZz09IiwibWFjIjoiMDZmODE5YTE2OGI1ZDkyZGVmNmYzNTE5NDkwNDM5YjA1ZTlhZTY4YTYyZTM3ZjY4OTg0Y2E0YjZkNjc2NDAyMiIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1065,16 +1040,16 @@ tables:
       kine: null
       participant_id: 5
       seance_id: 2
-      statut: eyJpdiI6IjlxWFU4bHhnZThGVi9KZGFIYnE1L0E9PSIsInZhbHVlIjoibVAyNWVRYnpjaXBuZFUweUVHSDdMZz09IiwibWFjIjoiM2I5Zjc0MDk0OWE4NDE1MjJmMDE2OTY2MjU5Yzk0YjhmZjg5MGMyM2ZkYWQ5ZmI1NjQ3MDRmODQwZTI2MzEzMCIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
       created_at: '-1d'
       id: 10
-      kine: eyJpdiI6IktuMVVHbk9lZXlyMzFaMDBydFcwOGc9PSIsInZhbHVlIjoiRUNzRmFRTlpUa0wvc1MxYjhiQWxtdz09IiwibWFjIjoiM2FmNjFkMDU2NTJhNmYwNDgyMDFhNTE5MDczZDQzMWE3Mzc2NTcxZGY1MjM2Y2FiYzdjZWIwYzNhMDdkY2MxOCIsInRhZyI6IiJ9
+      kine: null
       participant_id: 4
       seance_id: 2
-      statut: eyJpdiI6IklSeGpzMm40QTMzdHJaR1ZiamV3S3c9PSIsInZhbHVlIjoiY0JDQ1g3akdqK1JyR0NyOTlONDRNUT09IiwibWFjIjoiMTczZjFjY2NlZjFmYzY3ZjYxOGIyM2Q5YWE1M2IzZDk0ZTAzM2UyZDZmYTlmOWMxYTkyYTNjYTFhMmZmNjJmZCIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1083,7 +1058,7 @@ tables:
       kine: null
       participant_id: 2
       seance_id: 2
-      statut: eyJpdiI6ImI2anRjcjZUSkhBenBVQVlCdTNLSWc9PSIsInZhbHVlIjoiV2haWlVLNU1ubzNtRHRTdHFQOUFHdz09IiwibWFjIjoiOWQ1MWE3YWM4YTQyZjkwZWE1YzEzZWNmNWI0ZjliNjhiM2ZkYWZlOTI0ZWYxZmNjMGQ3ZjVlMjIyYjhhYmMwOSIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1092,7 +1067,7 @@ tables:
       kine: null
       participant_id: 1
       seance_id: 2
-      statut: eyJpdiI6InVhVVg2Nkw0ZG5sV3M3RmtoY1h3MGc9PSIsInZhbHVlIjoiT1doK2t0Tkhmb2F0OFBwN204NFplZz09IiwibWFjIjoiOGUxYjUzODg1Mzk0NTNlOTE4OTY4MDg3YTQ0NTE2OWJjNDhjNjcwOTRiMjkxMmIxN2VjZTdlYmY2NmJkYTYwYiIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1101,7 +1076,7 @@ tables:
       kine: null
       participant_id: 3
       seance_id: 3
-      statut: eyJpdiI6IlMzZEhIT1lLQ2hZT1l5ZzhscUs4alE9PSIsInZhbHVlIjoiSEJVeE9zMHZtVTkwdDRBMHo5eUgwUT09IiwibWFjIjoiYWVhMjcxYTc2MDBmZmM1OGIyNjYyYTQ4NGRhMDllMjNhYmJlMTg0MTRmODljZDM3NjJiMGYyODNjNzgwZjEwYiIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1110,7 +1085,7 @@ tables:
       kine: null
       participant_id: 6
       seance_id: 3
-      statut: eyJpdiI6InJOS1ZmMUNlc2tVOURpUkdzdFVRSWc9PSIsInZhbHVlIjoidGhKVFdjWnVJemZBZmxYTjh6ay9jdz09IiwibWFjIjoiMGQ1MWQ5ZWQzMWYwMmQ3NzI1YjUyNThhZGFjOTQ2MjgzZTU1MThiNmVmNGFjYjhjZWM5YzFjMGM5ZTQyMjRmYiIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1119,7 +1094,7 @@ tables:
       kine: null
       participant_id: 5
       seance_id: 3
-      statut: eyJpdiI6IktMWTJiK2pOVU1RL252VWFOZFFMZWc9PSIsInZhbHVlIjoiNW4xZXBndTBGYUxxL1hUbmNPcnlKdz09IiwibWFjIjoiODAzMDE1NWY2ODVjMDg0MmZjMTU5NzZlOWQwYWQ0ZjljMTVlZWI1ZTEzNGNhMmZlMTFiODI4NTM0ZWM4OTY2NSIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1128,25 +1103,25 @@ tables:
       kine: null
       participant_id: 4
       seance_id: 3
-      statut: eyJpdiI6InhocjljVXE0VTdIZjltanFYMnhWZmc9PSIsInZhbHVlIjoiSXRPdk15RXlRb3NPMS9rYjkyWEVidz09IiwibWFjIjoiYjE3NDdlYjMzZmUzYjZmNTQ2ODQ5MjgxN2JkNGNkNmQ1NmI1YTEwOGQzOTNlMjZlNjQyOTlhYjI0OGEyY2ExNyIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
       created_at: '-1d'
       id: 17
-      kine: eyJpdiI6IldITjRhay9vdE40WkhEVnp5eGNkM2c9PSIsInZhbHVlIjoiNGNPRkg1NnhlT2h2dENBblYzLy9nQT09IiwibWFjIjoiMDdkNWQzZTAwZjQ3NDQyMGUyYjM0ODI3MWQ0MDBmNDM2M2VlMmVjYTAyOWU0YzAyNDVhYzQ5NTMyMjM1YjRiNyIsInRhZyI6IiJ9
+      kine: null
       participant_id: 2
       seance_id: 3
-      statut: eyJpdiI6InBOcktyZnpmN2VLZnFTRzRTWnJCbHc9PSIsInZhbHVlIjoibDRhSlpxaHFwenVSUm9DNFhVYUl3QT09IiwibWFjIjoiZTQ1MDM5NWNjNGU4MmVkN2YwNjhlYjY3NDQ3NmMwOTdmNGI5MzVhMTkwOGYzMjViOWQ0YjAwZWI2NzY1MGU0ZCIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
       created_at: '-1d'
       id: 18
-      kine: eyJpdiI6Im0ycUYwSjhRcjAwR3dVWElUaWpaM1E9PSIsInZhbHVlIjoiNEd1TEtmQkhTYUpaWnBLZEpEQ3ZvUT09IiwibWFjIjoiMTgzNmVmZGQ1YTExMmUzYmE0ZjJhMzcwNDUwMjVhYjUxYzI5ZmQxMzg5YWY4NjliZmE0Yzc5OWRlMzE0ZTA0YyIsInRhZyI6IiJ9
+      kine: null
       participant_id: 1
       seance_id: 3
-      statut: eyJpdiI6IjUvdEdmOTBqeDVDS3ZPSDgvd3ZCaVE9PSIsInZhbHVlIjoiRnk1ZjEyY1h1cmlkSWl2LzBuOG9iZz09IiwibWFjIjoiNDhmYmExOTVlMTc0N2YyMDkyNjVjYmNiYTBiOGM4OGJiYzQ5MjdjNmIzODM4YTYyYzFhMjcxNTM4YzQ2YjlkMyIsInRhZyI6IiJ9
+      statut: null
       updated_at: '-1d'
     -
       commentaire: null
@@ -1155,7 +1130,7 @@ tables:
       kine: null
       participant_id: 12
       seance_id: 1
-      statut: eyJpdiI6IkZNZ2tzZy95SFdMNFJkQVF5VFBMMFE9PSIsInZhbHVlIjoiMHJVWXViR3JyWGVsUzN1eFlKcVd3dz09IiwibWFjIjoiNjZhMzY4MTViNTQ0OWNhZGZkYzY3ZjM1Y2YxYTk5YTVkY2FjYTcwMDkzMWE5NWQxZGIyZDczZjZkNWJhNjU1ZCIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1164,7 +1139,7 @@ tables:
       kine: null
       participant_id: 12
       seance_id: 2
-      statut: eyJpdiI6InFwTFVDY0pYZEJuOXFTUTJGand6Snc9PSIsInZhbHVlIjoiUHp1a2tLVWZ4UUpUVDUrK2lFUEtTdz09IiwibWFjIjoiNGYwOGFjM2YzZmM0YmNlZDE5OTlmNzlmOTIyZDZjN2QxOTRiNmQwNDM3YWI3YzYxYjIwODVkN2NhZGE1NmVmZCIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1173,16 +1148,16 @@ tables:
       kine: null
       participant_id: 12
       seance_id: 3
-      statut: eyJpdiI6IjdaTEtLaE90UEZMOTlrdS9SMzcrZ2c9PSIsInZhbHVlIjoiSTBSWXZrbGcvc3dUb2tGUk13cG5tUT09IiwibWFjIjoiMjY5YjgyYTRlZWQ5MmNhMjJlNjIzNTMzOWRkMzdkOWYyNmU0ZDQ3ODYwNDUxYWQ4NDE3ZThlZDcwOTdkYTMzNyIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
       created_at: 0d
       id: 22
-      kine: eyJpdiI6Ikk4SlhzcHE0Y05tOHBJNy92clhqRHc9PSIsInZhbHVlIjoidGJ2QkZUM0hJcmdkV0MzMWFTRlZoZz09IiwibWFjIjoiN2UwNTRiYmViM2Y0YTQyYTRkOTYxZWY1Mjk5MmRmMjIxODEyMzljYWFmNDBjNWU1NDhmMWZiYjljMmYyNTJhMiIsInRhZyI6IiJ9
+      kine: null
       participant_id: 3
       seance_id: 4
-      statut: eyJpdiI6IjRWTVFTdDFFMUN3bG9QdWt1OGxGMEE9PSIsInZhbHVlIjoiNC90OW9Qc3JGa0FvRjNhL0YreEUzQT09IiwibWFjIjoiMWYxNTEzN2ViMjhlNWRhNjRlNThhMzZlOWU2MzRiOGQ3MzA2ZTdkMzRiMWYyOTA5NGVjZjUwN2ZlYzY0MTk3NCIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1191,16 +1166,16 @@ tables:
       kine: null
       participant_id: 6
       seance_id: 4
-      statut: eyJpdiI6Ik01Y2JESW90cTkyK1dZWGN2MnFmc0E9PSIsInZhbHVlIjoiYkxqVDhFV2dyem9xRVNMeGVSNlZUZz09IiwibWFjIjoiMTc3MzljNDM5MzZiZjRkN2IwOTc2NjRmNWNkNjIzNDU2OWQ5ODE0ODI3NWMyZDMwYWFmODcwNTI1Mjk2OWQyMCIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
       created_at: 0d
       id: 24
-      kine: eyJpdiI6IjJGVDgrTGRtdFpOOFBFWFpVVHdXblE9PSIsInZhbHVlIjoiVmFpbEdTU1FVS2VqYURSZGxRMVN4dz09IiwibWFjIjoiOTU1MWUwNzA2ODk0YTUxMGJmMWJhYjM1ZDQ3YzMyMDUyNGMzOTJmOWQwYTY4ZWViNWFkZjMyYmNmMmQ0MTBhNiIsInRhZyI6IiJ9
+      kine: null
       participant_id: 12
       seance_id: 4
-      statut: eyJpdiI6Img2amJyaG9meG5LT1I1TlR2TUR4aXc9PSIsInZhbHVlIjoiQWZaWVJRRFVCUHB6MWN5YzdmNkU3Zz09IiwibWFjIjoiNzAwNWVlNDlmMjQwNDZhNDE2YThiMDNlNjlmMDM3NTI5NWNlODgyOWEwZDNjYzBjZTg3YmJmOWNjMGZkYTdhMSIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1209,7 +1184,7 @@ tables:
       kine: null
       participant_id: 5
       seance_id: 4
-      statut: eyJpdiI6InRUQlpUcG5xMUtKUlFuK3pNcy9UdGc9PSIsInZhbHVlIjoiVG9Jb1o1aHh1eWdFc054SFZXYlhTQT09IiwibWFjIjoiOGMxZDE5ZjA4Y2RiNzk3MDcyM2NkNDEyMTQzMzc4MWUzMDlhZDRlODlkYTE1NDk1YjJjMWJkMDlhZDk2YjZkYyIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1218,7 +1193,7 @@ tables:
       kine: null
       participant_id: 4
       seance_id: 4
-      statut: eyJpdiI6ImJqN3M0RnhoeHRCNktWM1hGYi80NlE9PSIsInZhbHVlIjoiNHVUZEFtMTYxOFMrTXo1Rk8vSlRQZz09IiwibWFjIjoiZTVkMThhOWY2YWYxYTIwZTg4YzFhMzIwYjI2YjQ1Njc4OThmYTc3ZDc3M2ZiMjE2NzE5NDNkY2U0ZDJmYzcyMSIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1227,7 +1202,7 @@ tables:
       kine: null
       participant_id: 2
       seance_id: 4
-      statut: eyJpdiI6IjBkZ3FuRUc5czRpSnhPc2hJdjRjMVE9PSIsInZhbHVlIjoiRUVtTnVWeHFuYUh5SFNrY2hyNldwQT09IiwibWFjIjoiYWU1NTIxOGU5YzBjMjMxYmVhM2RmOGM0MGJjZmJkYjUxZmIyM2U5OGZlNzZiNTlmN2RiYmZhMDlkMThiYTJhMiIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1236,7 +1211,7 @@ tables:
       kine: null
       participant_id: 1
       seance_id: 4
-      statut: eyJpdiI6IjZFWGh6eHYyaVJYNStqeGIxQkUxZkE9PSIsInZhbHVlIjoiN09Ncnk5T0d3QUZVemlQRTJ0bVBNUT09IiwibWFjIjoiM2E0MGE3YzI1OTliODMwZmU1Mzg3ODY4OGRkMGU0ZGQwNDgyYzdjZTU5OTA4MzU0ZTc5YzRiZjIzNWM1MmNlOSIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1245,16 +1220,16 @@ tables:
       kine: null
       participant_id: 3
       seance_id: 5
-      statut: eyJpdiI6Imd4T1JsT0pBdGp5TldDQWNEY2VpNUE9PSIsInZhbHVlIjoiYVlEa1hLd2pMZGRqdnp3b2laRVZZUT09IiwibWFjIjoiZmZlMDIzM2ZjZmNiYmU3YTgwYjAwNTZmYTMxNDM3OGNmMWI1N2Y2ZDJiYTAxMDY0Mzg4NWZmMzUxODRmODVlOSIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
       created_at: 0d
       id: 30
-      kine: eyJpdiI6Imlwd3ZMVEdXWUJmbTY3MmpaTENuQVE9PSIsInZhbHVlIjoieG15aXBTaWErbWZXMTlmb2lraVpJZz09IiwibWFjIjoiY2I0YmU5NTVkYjJiYzRiODhkMjc3YzA1NTNjZmE2M2RhMzM2ZWUwZmFmYzE0NDUzZDVjNDdkNDk0ODZiMTA4MiIsInRhZyI6IiJ9
+      kine: null
       participant_id: 6
       seance_id: 5
-      statut: eyJpdiI6Ii9ScXFEYlhTS0Z2bm5tY2cxbmkrWHc9PSIsInZhbHVlIjoiVS9ZSThQb1hzbmlyVS95Q2NjSW9Bdz09IiwibWFjIjoiZjFhZmUxNzVjMjc4ZTFkYmMzNTAyNTM1ZmVkZmE5YTlmNTc3YjExYmNjMDI0OTIzMWFjMjgzY2Q1YTM0YTk5MSIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1263,16 +1238,16 @@ tables:
       kine: null
       participant_id: 12
       seance_id: 5
-      statut: eyJpdiI6IkZaYUJvb2RnOTlFODhNa2cyaU5nd2c9PSIsInZhbHVlIjoiaXgvTDl6ZlBlQVF6WTd1ajhYdW5zUT09IiwibWFjIjoiOWJkNzI5YTEzOGFkMDMzNTBmOTY2YjEwODlmZDVlZGM5YmFlMjc4MGU2ODU3ZjhiN2ExYzZkYjkxMTZhMTY1MCIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
       created_at: 0d
       id: 32
-      kine: eyJpdiI6InZ0dS9QQlhTWWphb0xST0tmRXNDTEE9PSIsInZhbHVlIjoiWUhPWWFZZ0xFMTc5c2Q3anNuZVIrZz09IiwibWFjIjoiNzIyODU3ZjRlYTFlMDdmYTRlMjMzZDIxNzU5ZDRlZTkzYzRkMjUzM2FhZTM1MzFlZjNmMmMzNjBiN2UxNTljNiIsInRhZyI6IiJ9
+      kine: null
       participant_id: 5
       seance_id: 5
-      statut: eyJpdiI6ImFvQ1RoeWxuQXZGb2s4d0pWTGFxNGc9PSIsInZhbHVlIjoicHc4OWtyV0xHRk02N1FBTFo4TTdpQT09IiwibWFjIjoiZTc5NDg0OTM3MWQwYTk4ZjU4YjMxMzQ2M2ViNzZkZTU3MzkzM2FhNzE2MzNjNWEwNTk4MTYzYTA5NmUyNzdhOSIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1281,7 +1256,7 @@ tables:
       kine: null
       participant_id: 4
       seance_id: 5
-      statut: eyJpdiI6IkN4OWNNakIrSUVzOTFOTU4rSy9wSkE9PSIsInZhbHVlIjoieCt0eXE2OERJSGVoeG9mR2RtZlordz09IiwibWFjIjoiZTQyYzQwNTU4Y2JkMzBjMjZiNjU3NDZmNDJiN2Y3NzU4NmE4ZjU0NzQ4M2VlMTg2M2ZiNzlhOTg1OWFmMGI5MCIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1290,7 +1265,7 @@ tables:
       kine: null
       participant_id: 2
       seance_id: 5
-      statut: eyJpdiI6ImNiYXpWNkFIR0luZUFwb2JXejVYWEE9PSIsInZhbHVlIjoiZHF5VVJpdGc2RGdraUJaZUVQeitjQT09IiwibWFjIjoiNTE3ZTNhMDkyNzNlYmI3NzQ0YzVlMTA5MGEwNzUwYzA3NmIyZDBkZjI2MTViNTFjMWI1Njg0ODU3ZGE0MmQyYyIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
     -
       commentaire: null
@@ -1299,7 +1274,7 @@ tables:
       kine: null
       participant_id: 1
       seance_id: 5
-      statut: eyJpdiI6Ilh6K3JheUN1S0ZQeXhIL1RBWWViOEE9PSIsInZhbHVlIjoiVzJYMmlHZTZ6WGJrTW84dG0yRnNNdz09IiwibWFjIjoiZmUzNWMyMzQyZWU1YWI3OGZkOTViMGZjNjY3OTI0ZGI4ZmZmNjE0NzdhYjIxOTE2ZDEwNGY4NzhiZWE4MDRjNyIsInRhZyI6IiJ9
+      statut: null
       updated_at: 0d
   provisions: {  }
   rapprochements_bancaires:
@@ -2511,14 +2486,6 @@ tables:
       id: 26
       nom: 'Frais bancaires'
       updated_at: '-1d'
-  super_admin_access_log:
-    -
-      action: update_slug
-      association_id: 1
-      created_at: '-1d'
-      id: 1
-      payload: '{"new_slug": "les-amis-de-la-demo", "old_slug": "mon-association"}'
-      user_id: 1
   tiers:
     -
       adresse_ligne1: '14 rue Vaubecour'
