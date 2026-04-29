@@ -15,6 +15,7 @@ use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Presence;
 use App\Models\Seance;
+use App\Support\FlashMessages;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -342,7 +343,7 @@ final class OperationCommunication extends Component
                 ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
             $this->showTestModal = false;
-            session()->flash('message', "Email de test envoyé à {$this->testEmail}.");
+            session()->flash('message', FlashMessages::emailSentTo($this->testEmail));
         } catch (\Throwable $e) {
             session()->flash('error', "Erreur d'envoi : {$e->getMessage()}");
         }

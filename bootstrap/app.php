@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\BlockWritesInSupport;
 use App\Http\Middleware\BootTenantConfig;
+use App\Http\Middleware\EnforceDemoReadOnly;
 use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureTenantAccess;
 use App\Http\Middleware\ForceWizardIfNotCompleted;
@@ -80,6 +81,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.access' => EnsureTenantAccess::class,
             'boot-tenant' => BootTenantConfig::class,
             'super-admin' => EnsureSuperAdmin::class,
+            'demo.read-only' => EnforceDemoReadOnly::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

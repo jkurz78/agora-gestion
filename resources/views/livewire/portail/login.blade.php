@@ -1,4 +1,8 @@
 <div>
+    @if(\App\Support\Demo::isActive())
+        <x-demo-portail-banner :association="$association" class="mb-4" />
+    @endif
+
     <p class="text-muted mb-3">Entrez votre adresse email pour recevoir votre code de connexion.</p>
 
     @if (session('portail.info'))

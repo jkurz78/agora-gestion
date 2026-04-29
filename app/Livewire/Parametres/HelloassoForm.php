@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres;
 
 use App\Enums\HelloAssoEnvironnement;
+use App\Exceptions\DemoOperationBlockedException;
 use App\Models\HelloAssoParametres;
 use App\Services\HelloAssoService;
+use App\Support\Demo;
 use Illuminate\View\View;
 use Livewire\Component;
 
@@ -44,6 +46,10 @@ final class HelloassoForm extends Component
 
     public function sauvegarder(): void
     {
+        if (Demo::isActive()) {
+            throw new DemoOperationBlockedException('configuration HelloAsso');
+        }
+
         $this->validate([
             'clientId' => ['nullable', 'string', 'max:255'],
             'clientSecret' => ['nullable', 'string'],
@@ -105,6 +111,10 @@ final class HelloassoForm extends Component
 
     public function testerConnexion(): void
     {
+        if (Demo::isActive()) {
+            throw new DemoOperationBlockedException('test connexion HelloAsso');
+        }
+
         $this->validate([
             'clientId' => ['required', 'string'],
             'clientSecret' => $this->secretDejaEnregistre ? ['nullable', 'string'] : ['required', 'string'],

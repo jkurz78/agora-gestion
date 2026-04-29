@@ -7,6 +7,7 @@ namespace App\Livewire\SuperAdmin;
 use App\Models\Association;
 use App\Models\SuperAdminAccessLog;
 use App\Rules\ReservedSlug;
+use App\Services\AssociationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -36,10 +37,7 @@ final class AssociationDetail extends Component
             return;
         }
 
-        DB::transaction(function () {
-            $this->association->update(['statut' => 'suspendu']);
-            $this->logTransition('suspend');
-        });
+        app(AssociationService::class)->suspend($this->association);
     }
 
     public function reactivate(): void
@@ -51,10 +49,7 @@ final class AssociationDetail extends Component
             return;
         }
 
-        DB::transaction(function () {
-            $this->association->update(['statut' => 'actif']);
-            $this->logTransition('reactivate');
-        });
+        app(AssociationService::class)->reactivate($this->association);
     }
 
     public function archive(): void
@@ -66,10 +61,7 @@ final class AssociationDetail extends Component
             return;
         }
 
-        DB::transaction(function () {
-            $this->association->update(['statut' => 'archive']);
-            $this->logTransition('archive');
-        });
+        app(AssociationService::class)->archive($this->association);
     }
 
     public function openSlugEditor(): void

@@ -8,6 +8,7 @@ use App\Models\IncomingMailAllowedSender;
 use App\Models\IncomingMailParametres;
 use App\Services\IncomingDocuments\IncomingDocumentFile;
 use App\Services\IncomingDocuments\IncomingDocumentIngester;
+use App\Support\Demo;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use DateTimeImmutable;
@@ -36,6 +37,12 @@ final class IncomingMailFetchCommand extends Command
 
     public function handle(): int
     {
+        if (Demo::isActive()) {
+            Log::info('incoming-mail.skipped_demo');
+
+            return self::SUCCESS;
+        }
+
         $paramsList = IncomingMailParametres::query()
             ->where('enabled', true)
             ->with('association')
