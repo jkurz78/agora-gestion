@@ -17,7 +17,7 @@ final class DemoResetCommand extends Command
         {--snapshot=database/demo/snapshot.yaml : Path to the YAML snapshot file}
         {--skip-migrate : Skip migrate:fresh (for testing only)}';
 
-    protected $description = 'Reset the demo database from a YAML snapshot (rehydrates dates, restores files)';
+    protected $description = 'Réinitialise la base démo depuis un snapshot YAML (réhydrate les dates, restaure les fichiers)';
 
     public function handle(): int
     {
@@ -30,7 +30,28 @@ final class DemoResetCommand extends Command
             return self::FAILURE;
         }
 
+        // Guard: refuse if APP_URL does not start with https://demo.
+        // This prevents accidental execution in a mis-configured env where
+        // APP_ENV=demo has been set but the URL points to a non-demo instance.
+        if (! str_starts_with((string) config('app.url'), 'https://demo.')) {
+            $this->error(
+                'demo:reset refuse de tourner — env='.app()->environment().', url='.config('app.url')
+            );
+
+            return self::FAILURE;
+        }
+
         $snapshotPath = (string) $this->option('snapshot');
+
+        // Guard: --snapshot must resolve inside database/demo/
+        $snapshotAbs = realpath($snapshotPath);
+        $snapshotRoot = realpath(base_path('database/demo'));
+
+        if ($snapshotAbs === false || $snapshotRoot === false || ! str_starts_with($snapshotAbs, $snapshotRoot.DIRECTORY_SEPARATOR)) {
+            $this->error("--snapshot doit pointer dans database/demo/ (reçu: {$snapshotPath})");
+
+            return self::FAILURE;
+        }
 
         // Validate file existence before going into maintenance mode
         if (! file_exists($snapshotPath)) {
@@ -47,7 +68,7 @@ final class DemoResetCommand extends Command
 
         // Parse YAML early so we can report a clear error before wiping the DB.
         try {
-            $snapshot = Yaml::parseFile($snapshotPath);
+            $snapshot = Yaml::parseFile($snapshotPath, Yaml::PARSE_EXCEPTION_ON_INVALID_TYPE);
         } catch (ParseException $e) {
             $this->error('Snapshot YAML invalide : '.$e->getMessage());
 
@@ -121,6 +142,9 @@ final class DemoResetCommand extends Command
     {
         $copied = 0;
 
+        $sourceRoot = realpath(base_path('database/demo/files'));
+        $targetRoot = realpath(base_path('storage/app'));
+
         foreach ($entries as $entry) {
             if (! isset($entry['source'], $entry['target'])) {
                 $this->warn('Entrée fichier invalide (source/target manquant), ignorée.');
@@ -128,24 +152,37 @@ final class DemoResetCommand extends Command
                 continue;
             }
 
-            $source = base_path($entry['source']);
-            $target = base_path($entry['target']);
-
-            if (! file_exists($source)) {
-                $this->warn("Fichier source introuvable : {$source}");
+            // Validate source: must resolve inside database/demo/files/
+            $sourceAbs = realpath(base_path($entry['source']));
+            if ($sourceRoot === false || $sourceAbs === false || ! str_starts_with($sourceAbs, $sourceRoot.DIRECTORY_SEPARATOR)) {
+                $this->warn('Skipping snapshot file (source hors database/demo/files): '.($entry['source'] ?? '?'));
 
                 continue;
             }
 
-            $targetDir = dirname($target);
+            // Validate target: must resolve inside storage/app/ (target may not exist yet — use base_path only)
+            $targetAbs = base_path($entry['target']);
+            if ($targetRoot === false || ! str_starts_with($targetAbs, $targetRoot.DIRECTORY_SEPARATOR)) {
+                $this->warn('Skipping snapshot file (target hors storage/app): '.($entry['target'] ?? '?'));
+
+                continue;
+            }
+
+            if (! file_exists($sourceAbs)) {
+                $this->warn("Fichier source introuvable : {$sourceAbs}");
+
+                continue;
+            }
+
+            $targetDir = dirname($targetAbs);
             if (! is_dir($targetDir)) {
                 mkdir($targetDir, 0755, true);
             }
 
-            if (copy($source, $target)) {
+            if (copy($sourceAbs, $targetAbs)) {
                 $copied++;
             } else {
-                $this->warn("Échec de la copie : {$source} → {$target}");
+                $this->warn("Échec de la copie : {$sourceAbs} → {$targetAbs}");
             }
         }
 

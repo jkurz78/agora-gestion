@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\HelloassoParametres;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Support\Demo\SnapshotConfig;
@@ -138,4 +139,75 @@ it('produces correct YAML snapshot with one association user and tiers', functio
 // T5 : Sanity check — Hash::check('demo', SnapshotConfig::DEMO_USER_PASSWORD_HASH) returns true
 it('SnapshotConfig DEMO_USER_PASSWORD_HASH is valid bcrypt hash for demo', function (): void {
     expect(Hash::check('demo', SnapshotConfig::DEMO_USER_PASSWORD_HASH))->toBeTrue();
+});
+
+// T6 : Sensitive columns + super-admin role are scrubbed in the snapshot
+it('scrubs sensitive columns and forces role_systeme to user in snapshot', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    // Set anthropic_api_key on the association
+    $current->update(['anthropic_api_key' => 'sk-ant-super-secret-key-12345']);
+
+    // Create a super-admin user with two_factor_secret and remember_token
+    $superAdmin = User::factory()->create([
+        'email' => 'superadmin@demo.fr',
+        'role_systeme' => 'super_admin',
+        'two_factor_secret' => 'TOTP_SECRET_ABC',
+        'two_factor_recovery_codes' => json_encode(['code1', 'code2']),
+        'remember_token' => 'remember-tok-xyz',
+        'derniere_association_id' => $current->id,
+    ]);
+    $superAdmin->associations()->attach($current->id, [
+        'role' => 'admin',
+        'joined_at' => now(),
+    ]);
+
+    // Seed a HelloAsso config with secrets
+    HelloassoParametres::updateOrCreate(
+        ['association_id' => $current->id],
+        [
+            'client_id' => 'my-client-id',
+            'client_secret' => 'helloasso-secret-xyz',
+            'callback_token' => 'callback-secret-abc',
+            'organisation_slug' => 'mon-asso',
+        ]
+    );
+
+    $outFile = storage_path('testing-demo-scrub-'.uniqid().'.yaml');
+
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0, 'demo:capture should succeed');
+
+    $yaml = @file_get_contents($outFile);
+    expect($yaml)->not->toBeFalse();
+    $data = Yaml::parse($yaml);
+
+    // role_systeme must be 'user' — never super_admin
+    $userRow = collect($data['tables']['users'])->firstWhere('email', 'superadmin@demo.fr');
+    expect($userRow)->not->toBeNull();
+    expect($userRow['role_systeme'])->toBe('user', 'role_systeme must be downgraded to user');
+
+    // two_factor_secret must be null
+    expect($userRow['two_factor_secret'])->toBeNull('two_factor_secret must be scrubbed');
+
+    // two_factor_recovery_codes must be null
+    expect($userRow['two_factor_recovery_codes'])->toBeNull('two_factor_recovery_codes must be scrubbed');
+
+    // remember_token must be null
+    expect($userRow['remember_token'])->toBeNull('remember_token must be scrubbed');
+
+    // anthropic_api_key must be null
+    $assoRow = collect($data['tables']['association'])->firstWhere('id', $current->id);
+    expect($assoRow)->not->toBeNull();
+    expect($assoRow['anthropic_api_key'])->toBeNull('anthropic_api_key must be scrubbed');
+
+    // helloasso client_secret and callback_token must be null
+    expect($data['tables'])->toHaveKey('helloasso_parametres');
+    $helloRow = collect($data['tables']['helloasso_parametres'])->firstWhere('association_id', $current->id);
+    expect($helloRow)->not->toBeNull();
+    expect($helloRow['client_secret'])->toBeNull('helloasso client_secret must be scrubbed');
+    expect($helloRow['callback_token'])->toBeNull('helloasso callback_token must be scrubbed');
+
+    @unlink($outFile);
 });

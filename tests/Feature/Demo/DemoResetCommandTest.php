@@ -16,6 +16,12 @@ use Symfony\Component\Yaml\Yaml;
 afterEach(function (): void {
     app()->detectEnvironment(fn (): string => 'testing');
     Carbon::setTestNow(null);
+    // Restore APP_URL to test default
+    config(['app.url' => 'http://localhost']);
+    // Clean up any test snapshots written to database/demo/
+    foreach (glob(base_path('database/demo/test-reset-*.yaml')) as $file) {
+        @unlink($file);
+    }
 });
 
 // ---------------------------------------------------------------------------
@@ -23,7 +29,7 @@ afterEach(function (): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Build a minimal valid snapshot YAML and write it to a temp file.
+ * Build a minimal valid snapshot YAML and write it to database/demo/.
  * Returns the path to the temp file.
  *
  * @param  array<string, mixed>  $overrides  top-level YAML overrides
@@ -76,7 +82,7 @@ function buildMinimalSnapshot(Carbon $ref, array $overrides = []): string
     ], $overrides);
 
     $yaml = Yaml::dump($snapshot, 8, 2);
-    $path = sys_get_temp_dir().'/demo-reset-test-'.uniqid().'.yaml';
+    $path = base_path('database/demo/test-reset-'.uniqid().'.yaml');
     file_put_contents($path, $yaml);
 
     return $path;
@@ -94,10 +100,35 @@ it('refuses to run outside demo environment', function (): void {
 });
 
 // ---------------------------------------------------------------------------
+// T1b — env=demo BUT APP_URL wrong → exit ≠ 0
+// ---------------------------------------------------------------------------
+it('refuses to run when APP_URL does not start with https://demo.', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://app.agoragestion.org']);
+
+    $this->artisan('demo:reset')
+        ->expectsOutputToContain('url=https://app.agoragestion.org')
+        ->assertFailed();
+});
+
+// ---------------------------------------------------------------------------
+// T1c — --snapshot outside database/demo/ → exit ≠ 0
+// ---------------------------------------------------------------------------
+it('refuses to run when --snapshot points outside database/demo/', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
+
+    $this->artisan('demo:reset', ['--snapshot' => '/tmp/evil.yaml'])
+        ->expectsOutputToContain('database/demo/')
+        ->assertFailed();
+});
+
+// ---------------------------------------------------------------------------
 // T2 — snapshot OK + env demo → DB peuplée, dates réhydratées, password OK
 // ---------------------------------------------------------------------------
 it('resets DB from valid snapshot with correct date rehydration and password', function (): void {
     app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
 
     $ref = Carbon::parse('2026-04-15T10:00:00+00:00');
     $snapshotPath = buildMinimalSnapshot($ref);
@@ -141,8 +172,6 @@ it('resets DB from valid snapshot with correct date rehydration and password', f
 
     // DEMO_USER_PASSWORD_HASH must verify against 'demo'
     expect(Hash::check('demo', $user->password))->toBeTrue();
-
-    @unlink($snapshotPath);
 });
 
 // ---------------------------------------------------------------------------
@@ -150,9 +179,10 @@ it('resets DB from valid snapshot with correct date rehydration and password', f
 // ---------------------------------------------------------------------------
 it('calls artisan up in finally even when snapshot is corrupted', function (): void {
     app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
 
-    // Write a corrupted YAML file
-    $corruptPath = sys_get_temp_dir().'/demo-reset-corrupt-'.uniqid().'.yaml';
+    // Write a corrupted YAML file inside database/demo/
+    $corruptPath = base_path('database/demo/test-reset-corrupt-'.uniqid().'.yaml');
     file_put_contents($corruptPath, "tables: [invalid yaml: {unclosed bracket\n  bad: [indent");
 
     // We need to verify 'up' is called in finally.
@@ -175,11 +205,51 @@ it('calls artisan up in finally even when snapshot is corrupted', function (): v
 // ---------------------------------------------------------------------------
 it('fails with error when snapshot file does not exist and still brings app back up', function (): void {
     app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
 
-    $exitCode = $this->artisan('demo:reset', ['--snapshot' => '/non/existent/snapshot.yaml'])->execute();
+    // Use a path inside database/demo/ that does not exist (passes path guard, fails existence check)
+    $exitCode = $this->artisan('demo:reset', ['--snapshot' => base_path('database/demo/nonexistent-99999.yaml')])->execute();
 
     expect($exitCode)->not->toBe(0);
     expect(app()->isDownForMaintenance())->toBeFalse('artisan up must be called in finally even when snapshot is missing');
+});
+
+// ---------------------------------------------------------------------------
+// T4b — path traversal in files[] → skipped, target not created
+// ---------------------------------------------------------------------------
+it('skips files entries with path traversal in target and logs a warning', function (): void {
+    app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
+
+    $ref = Carbon::parse('2026-04-15T10:00:00+00:00');
+
+    // Build snapshot with a malicious files entry pointing outside storage/app/
+    $snapshotPath = buildMinimalSnapshot($ref, [
+        'files' => [
+            [
+                'source' => 'database/demo/files/harmless.pdf',
+                'target' => 'storage/app/../../../etc/evil-target',
+            ],
+        ],
+    ]);
+
+    TenantContext::clear();
+    DB::statement('PRAGMA foreign_keys = OFF');
+    DB::table('association_user')->delete();
+    DB::table('users')->delete();
+    DB::table('association')->delete();
+    DB::statement('PRAGMA foreign_keys = ON');
+
+    $this->artisan('demo:reset', [
+        '--snapshot' => $snapshotPath,
+        '--skip-migrate' => true,
+    ])
+        ->expectsOutputToContain('Skipping snapshot file')
+        ->assertSuccessful();
+
+    // The malicious target must NOT have been created
+    $evilPath = base_path('etc/evil-target');
+    expect(file_exists($evilPath))->toBeFalse('path traversal target must not be created');
 });
 
 // ---------------------------------------------------------------------------
@@ -187,6 +257,7 @@ it('fails with error when snapshot file does not exist and still brings app back
 // ---------------------------------------------------------------------------
 it('round-trips data through demo:capture then demo:reset', function (): void {
     app()->detectEnvironment(fn (): string => 'demo');
+    config(['app.url' => 'https://demo.agoragestion.org']);
 
     // Arrange: exactly 1 association (created by global beforeEach)
     // Remove any extra ones
@@ -205,8 +276,8 @@ it('round-trips data through demo:capture then demo:reset', function (): void {
         'joined_at' => now(),
     ]);
 
-    // Step 1: capture
-    $snapPath = sys_get_temp_dir().'/demo-rt-'.uniqid().'.yaml';
+    // Step 1: capture — write into database/demo/ so reset path-guard accepts it
+    $snapPath = base_path('database/demo/test-reset-rt-'.uniqid().'.yaml');
     $captureExit = Artisan::call('demo:capture', ['--out' => $snapPath]);
     expect($captureExit)->toBe(0, 'demo:capture should succeed');
 
