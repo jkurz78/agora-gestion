@@ -783,7 +783,7 @@ final class DevisService
             'footerLogoMime' => null,
         ])->setPaper('a4', 'portrait');
 
-        PdfFooterRenderer::render($pdf);
+        PdfFooterRenderer::render($pdf, PdfFooterRenderer::generatedByText());
 
         // Nom de fichier : numéro ou brouillon-{id}
         $filename = $devis->numero !== null

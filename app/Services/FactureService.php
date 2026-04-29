@@ -515,7 +515,7 @@ final class FactureService
             'footerLogoMime' => null,
         ])->setPaper('a4', 'portrait');
 
-        PdfFooterRenderer::render($pdf);
+        PdfFooterRenderer::render($pdf, PdfFooterRenderer::generatedByText());
 
         $pdfContent = $pdf->output();
 
