@@ -7,6 +7,7 @@ use App\Http\Middleware\EnsureSuperAdmin;
 use App\Http\Middleware\EnsureTenantAccess;
 use App\Http\Middleware\ForceWizardIfNotCompleted;
 use App\Http\Middleware\Portail\BootTenantFromSlug;
+use App\Http\Middleware\RedirectIfNotInstalled;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\Middleware\Authenticate;
@@ -43,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(SecurityHeaders::class);
 
         $middleware->appendToGroup('web', [
+            RedirectIfNotInstalled::class,
             ResolveTenant::class,
             BootTenantConfig::class,
             ForceWizardIfNotCompleted::class,
@@ -63,6 +65,7 @@ return Application::configure(basePath: dirname(__DIR__))
             StartSession::class,
             ShareErrorsFromSession::class,
             ValidateCsrfToken::class,
+            RedirectIfNotInstalled::class,
             ResolveTenant::class,
             RedirectIfAuthenticated::class,
             BootTenantFromSlug::class,

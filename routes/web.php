@@ -61,6 +61,9 @@ use App\Models\Tiers;
 use App\Models\TypeOperation;
 use Illuminate\Support\Facades\Route;
 
+// ── Installation (fresh-install wizard — Task 3 will replace this placeholder) ──
+Route::get('/setup', fn () => 'TODO setup form')->name('setup');
+
 // Root: redirect to dashboard
 Route::middleware('auth')->get('/', function () {
     return redirect('/dashboard');
