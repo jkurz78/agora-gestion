@@ -91,6 +91,9 @@ return [
         'reset-password',
         'two-factor',
 
+        // Install wizard
+        'setup',
+
         // Health / infra
         'up',
     ],
