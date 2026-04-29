@@ -19,7 +19,13 @@
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-arrow-left-right me-2"></i>Enrichissement du tiers</h5>
+                    <h5 class="modal-title">
+                        @if($context === 'merge_full')
+                            <i class="bi bi-people-fill me-2"></i>Fusion de deux tiers
+                        @else
+                            <i class="bi bi-arrow-left-right me-2"></i>Enrichissement du tiers
+                        @endif
+                    </h5>
                     <button type="button" class="btn-close" wire:click="cancelMerge"></button>
                 </div>
                 <div class="modal-body px-4 py-3"
@@ -33,6 +39,17 @@
                         <div class="alert alert-danger">
                             <i class="bi bi-exclamation-triangle me-1"></i>
                             Ces deux tiers ont des identités HelloAsso différentes. La fusion n'est pas possible.
+                        </div>
+                    @endif
+
+                    @if($context === 'merge_full' && count($blockingConflicts) > 0)
+                        <div class="alert alert-danger">
+                            <h6 class="mb-2"><i class="bi bi-shield-exclamation me-1"></i> Fusion bloquée</h6>
+                            <ul class="mb-0 small">
+                                @foreach($blockingConflicts as $conflict)
+                                    <li><strong>{{ $conflict['label'] }}</strong> — {{ $conflict['detail'] }}</li>
+                                @endforeach
+                            </ul>
                         </div>
                     @endif
 
@@ -110,16 +127,59 @@
                             @endforeach
                         </tbody>
                     </table>
+
+                    @if($context === 'merge_full')
+                        @php
+                            $impactLabels = [
+                                'transactions' => 'transactions',
+                                'factures' => 'factures',
+                                'devis' => 'devis',
+                                'notes_de_frais' => 'notes de frais',
+                                'factures_partenaires_deposees' => 'factures partenaires',
+                                'provisions' => 'provisions',
+                                'email_logs' => 'logs email',
+                                'participants' => 'inscriptions participants',
+                                'participants_medecin' => 'liens médecin référent',
+                                'participants_therapeute' => 'liens thérapeute',
+                                'participants_refere_par' => 'liens référent (parrain)',
+                            ];
+                            $totalImpact = array_sum($impactCounts ?? []);
+                        @endphp
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <h6 class="mb-2"><i class="bi bi-arrow-repeat me-1"></i> Récapitulatif de la fusion</h6>
+                            @if($totalImpact === 0)
+                                <p class="small mb-2">Le tiers source n'a aucun enregistrement rattaché. Sa suppression sera silencieuse.</p>
+                            @else
+                                <p class="small mb-2">
+                                    Les enregistrements suivants seront <strong>réaffectés</strong> du tiers source vers le tiers survivant :
+                                </p>
+                                <ul class="small mb-2">
+                                    @foreach($impactCounts as $key => $count)
+                                        @if($count > 0)
+                                            <li>{{ $count }} {{ $impactLabels[$key] ?? $key }}</li>
+                                        @endif
+                                    @endforeach
+                                </ul>
+                            @endif
+                            <p class="small mb-0">
+                                <i class="bi bi-trash me-1"></i>
+                                À la fin, le tiers source <strong>« {{ $sourceLabel }} »</strong> sera <strong>supprimé définitivement</strong>.
+                            </p>
+                        </div>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" wire:click="cancelMerge">Annuler</button>
-                    <button type="button" class="btn btn-outline-success" wire:click="createNewTiers">
-                        <i class="bi bi-person-plus me-1"></i>Créer un nouveau tiers
-                    </button>
-                    <button type="button" class="btn btn-success"
+                    @if($context !== 'merge_full')
+                        <button type="button" class="btn btn-outline-success" wire:click="createNewTiers">
+                            <i class="bi bi-person-plus me-1"></i>Créer un nouveau tiers
+                        </button>
+                    @endif
+                    <button type="button"
+                            class="btn {{ $context === 'merge_full' ? 'btn-danger' : 'btn-success' }}"
                             wire:click="confirmMerge"
-                            @disabled($helloassoIdConflict)>
-                        <i class="bi bi-check-lg me-1"></i>{{ $confirmLabel }}
+                            @disabled($helloassoIdConflict || count($blockingConflicts) > 0)>
+                        <i class="bi {{ $context === 'merge_full' ? 'bi-people-fill' : 'bi-check-lg' }} me-1"></i>{{ $confirmLabel }}
                     </button>
                 </div>
             </div>
