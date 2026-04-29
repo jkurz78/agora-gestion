@@ -6,6 +6,18 @@ Licence : [AGPL-3.0](LICENSE) — vous pouvez utiliser, modifier et redistribuer
 
 Pour installer une instance en production, voir [docs/INSTALL.md](docs/INSTALL.md).
 
+### Quick start prod (TL;DR)
+
+```bash
+git clone <repo-url> && cd agora-gestion
+composer install --no-dev --optimize-autoloader
+cp .env.example .env && php artisan key:generate
+# éditer .env (DB_*, MAIL_*, APP_URL)
+php artisan migrate --force
+```
+
+Puis ouvrir l'URL de l'app dans un navigateur — la page `/setup` vous accueille pour créer le premier compte super-admin et la première association en un seul formulaire. Le wizard d'asso (8 étapes) prend ensuite le relais.
+
 ## Demarrage rapide
 
 ### Prerequis

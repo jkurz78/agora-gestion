@@ -64,7 +64,7 @@ MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS="noreply@votre-domaine.fr"
 MAIL_FROM_NAME="Votre asso"
 
-# QUEUE_CONNECTION=database  # Recommandé en prod (voir §7)
+# QUEUE_CONNECTION=database  # Recommandé en prod (voir §6)
 # SESSION_DRIVER=database
 ```
 
@@ -86,52 +86,30 @@ php artisan migrate --force
 
 ---
 
-## 5. Premier compte utilisateur
+## 5. Bootstrap via le navigateur (`/setup`)
 
-L'installation fresh n'a aucun compte. Deux options pour créer le premier user :
+Ouvrez votre navigateur sur `https://votre-domaine.fr` (ou l'URL configurée dans `APP_URL`). L'application détecte qu'aucun super-admin n'existe et vous redirige automatiquement vers `/setup`.
 
-### Option A — Via la page d'inscription (si Breeze est activé)
+Remplissez le formulaire :
 
-Ouvrir `https://votre-domaine.fr/register` et remplir le formulaire. Cela crée
-un user standard sans rôle système.
+| Champ | Description |
+|---|---|
+| Prénom + Nom | Votre identité (vous êtes le premier utilisateur, donc le futur super-administrateur) |
+| Email + Mot de passe | Vos identifiants de connexion |
+| Nom de votre association | Le nom de votre asso. Le slug technique est généré automatiquement. |
 
-### Option B — Via Tinker (recommandé pour la prod, plus contrôlé)
+Au submit, l'application crée en une seule transaction :
 
-```bash
-php artisan tinker
-```
+- **Votre compte utilisateur**, avec le rôle `super-admin` (vous pourrez créer d'autres associations plus tard via `/super-admin/`)
+- **Votre première association**, avec des valeurs par défaut sensées (forme juridique « Association loi 1901 », exercice comptable septembre→août — tout cela est éditable au prochain écran)
+- **Votre rattachement** comme admin de cette association
+- **Votre session** est ouverte automatiquement
 
-```php
-$user = \App\Models\User::create([
-    'name' => 'Marie Dupont',
-    'email' => 'marie@votre-domaine.fr',
-    'password' => bcrypt('changez-moi'),
-    'email_verified_at' => now(),
-]);
-```
-
-Sortir avec `exit`.
+Vous êtes alors redirigé vers `/dashboard` qui détecte que le wizard d'asso n'a pas encore été complété et vous emmène sur les **8 étapes du wizard** (identité, exercice, banque, SMTP, HelloAsso, IMAP, catégories, récap). Cette étape est obligatoire pour finaliser la configuration de l'asso.
 
 ---
 
-## 6. Promotion du premier super-admin
-
-Le rôle **super-admin** donne accès à `/super-admin/*` : création
-d'associations, mode support read-only, suspension/archivage de tenants.
-
-```bash
-php artisan app:promote-super-admin marie@votre-domaine.fr
-```
-
-La commande affiche `User marie@votre-domaine.fr promoted to super-admin.`
-puis vous pouvez vous connecter et accéder à `/super-admin`.
-
-> 🔒 La promotion en super-admin est délibérément réservée à la CLI (pas
-> d'interface) : c'est un acte d'admin système, pas un acte applicatif.
-
----
-
-## 7. Cron (scheduler) et queue worker
+## 6. Cron (scheduler) et queue worker
 
 ### Cron
 
@@ -163,24 +141,7 @@ Puis `supervisorctl reread && supervisorctl update`.
 
 ---
 
-## 8. Création de la première association
-
-1. Connectez-vous avec votre compte super-admin → `/super-admin`.
-2. Cliquez **« Créer une association »** → renseignez :
-   - **Nom**
-   - **Slug** (identifiant URL unique, ex. `mon-asso`)
-   - **Email** de l'administrateur de cette association
-3. L'admin de l'asso reçoit un mail d'invitation avec un lien de réinitialisation
-   de mot de passe (valide 60 minutes).
-4. À sa première connexion, l'admin est dirigé vers le **wizard d'onboarding**
-   (9 étapes : infos générales, exercice comptable, comptes bancaires, plan
-   comptable, modèles email, etc.).
-
-Détails complets : voir [`onboarding-new-tenant.md`](onboarding-new-tenant.md).
-
----
-
-## 9. Smoke test post-déploiement
+## 7. Smoke test post-déploiement
 
 ```bash
 # Vérification rapide de l'instance
@@ -192,14 +153,14 @@ php artisan tinker --execute="echo \App\Models\User::count();"
 Dans le navigateur :
 
 - `/login` → se connecter avec le super-admin
-- `/super-admin/associations` → voir l'asso créée à l'étape 8
+- `/super-admin/associations` → voir l'asso créée à l'étape 5
 - `/dashboard` (en mode support depuis l'asso) → vérifier l'isolation tenant
 - Créer une dépense de test, attacher un PDF, vérifier qu'il s'enregistre dans
   `storage/app/associations/{id}/…`
 
 ---
 
-## 10. Mise à jour
+## 8. Mise à jour
 
 ```bash
 cd /var/www/agora-gestion
@@ -214,6 +175,20 @@ supervisorctl restart agora-gestion-queue  # si queue worker
 > 💡 Un workflow GitHub Actions existe dans `.github/workflows/deploy.yml`
 > pour automatiser ce processus avec déploiement par cPanel API. Adaptez-le
 > à votre infra ou désactivez-le.
+
+---
+
+## Outils avancés
+
+### Promotion d'un super-admin (récupération d'urgence ou multi-asso)
+
+La page `/setup` est désactivée dès qu'un super-admin existe. Pour promouvoir un user existant en super-admin a posteriori (par exemple pour créer un second hébergeur d'asso, ou pour récupérer l'accès si vous perdez le compte initial) :
+
+```bash
+php artisan app:promote-super-admin marie@votre-domaine.fr
+```
+
+Cette commande est idempotente et accepte aussi `--demote` pour rétrograder.
 
 ---
 
