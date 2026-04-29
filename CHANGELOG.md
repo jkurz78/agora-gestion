@@ -5,6 +5,36 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [v4.2.0] — 2026-04-28
+
+### Ajouts — Démo en ligne
+
+- **Environnement démo public** sur `demo.agoragestion.org` (sous-domaine O2Switch dédié, DB MySQL dédiée, `.env.demo.example` versionné (template — `.env` réel posé manuellement côté serveur, jamais committé))
+- **Bandeau `/login`** listant les comptes démo (`admin@demo.fr / demo`, `jean@demo.fr / demo`) — visible ssi `APP_ENV=demo`, absent en prod
+- **Bridage des sorties externes** en `APP_ENV=demo` : mails routés vers le log (`MAIL_MAILER=log`) avec flash UI "Email enregistré (mode démo)", webhook HelloAsso retourne 200 no-op, commande `helloasso:sync` no-op, `incoming-mail:fetch` no-op, OCR factures partenaires retourne un payload stub statique
+- **Lecture seule sur paramètres sensibles** : écrans Livewire SMTP + HelloAsso affichent un bandeau d'information, inputs `disabled`, bouton "Enregistrer" absent ; middleware `EnforceDemoReadOnly` refuse les requêtes d'écriture HTTP sur ces routes (403)
+- **Refus des opérations destructives** : suppression et archivage d'association en démo lèvent `DemoOperationBlockedException`
+- **Commande `demo:capture`** : extrait toutes les tables tenant-scopées dans `database/demo/snapshot.yaml` versionné, convertit les dates en deltas relatifs (`-13d`, `-3M`), écrase les hash mots de passe en `demo`, refuse si > 1 association ou si `APP_ENV=production`
+- **Commande `demo:reset`** : rejoue le snapshot YAML (dates rehydratées par rapport à `now()`), restaure les fichiers depuis `database/demo/files/`, garantit `php artisan up` en `finally`
+- **Workflow `deploy-demo.yml`** déclenché sur `push main`, en parallèle du workflow prod (clone strict) : pull → composer → config:cache → migrate:fresh → demo:reset → up
+- **Cron O2Switch** `0 4 * * *` — réinitialisation automatique chaque nuit, log dans `storage/logs/demo-reset.log`
+- **Helper `App\Support\Demo::isActive()`** — point de bascule unique pour tous les comportements démo (délègue à `app()->environment('demo')`)
+- **Documentation** : `docs/runbook-demo.md` — guide opérateur complet (installation, snapshot, charte, recette manuelle, dépannage)
+
+### Technique
+
+- `App\Support\Demo` (helper statique)
+- `App\Support\FlashMessages::emailSent()` (message conditionnel démo/normal)
+- `App\Http\Middleware\EnforceDemoReadOnly` — alias `demo.read-only`, liste des routes protégées en constante de classe
+- `App\Exceptions\DemoOperationBlockedException` (extends `RuntimeException`)
+- `App\Console\Commands\DemoCaptureCommand` + `App\Support\Demo\SnapshotConfig` + `App\Support\Demo\DateDelta`
+- `App\Console\Commands\DemoResetCommand` + `App\Support\Demo\SnapshotLoader`
+- Composant Blade `<x-demo-readonly-banner />` (réutilisé SMTP + HelloAsso)
+- Composant Blade `<x-demo-login-banner />` (bandeau `/login`)
+- `.github/workflows/deploy-demo.yml`
+
+---
+
 ## [v4.1.9] — 2026-04-28
 
 ### Nouveau : Facture manuelle (invoice-first)

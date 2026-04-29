@@ -12,6 +12,7 @@ declare(strict_types=1);
  * Active only when MonoAssociation::isActive() === true (RequireMono middleware).
  */
 
+use App\Http\Controllers\Portail\DemoLoginAsTierController;
 use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
@@ -42,6 +43,7 @@ Route::prefix('portail')
         Route::get('/login', Login::class)->name('login');
         Route::get('/otp', OtpVerify::class)->name('otp');
         Route::get('/choisir', ChooseTiers::class)->name('choisir');
+        Route::get('/demo/login-as/{tierId}', DemoLoginAsTierController::class)->name('demo.login-as');
 
         Route::middleware([EnsureTiersChosen::class, EnforceSessionLifetime::class, Authenticate::class])->group(function (): void {
             Route::get('/', Home::class)->name('home');

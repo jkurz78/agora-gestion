@@ -18,6 +18,7 @@ use App\Models\ParticipantDocument;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use App\Services\DocumentPrevisionnelService;
+use App\Support\FlashMessages;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -810,7 +811,7 @@ final class ParticipantShow extends Component
                 'envoye_par' => Auth::id(),
             ]);
 
-            session()->flash('success', ucfirst($typeLabel)." envoyé à {$tiers->email}.");
+            session()->flash('success', FlashMessages::documentSentTo($typeLabel, $tiers->email));
         } catch (\Throwable $e) {
             EmailLog::create([
                 'tiers_id' => $tiers->id,

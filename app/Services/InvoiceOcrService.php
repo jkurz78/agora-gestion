@@ -12,12 +12,19 @@ use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Support\CurrentAssociation;
+use App\Support\Demo;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 
 final class InvoiceOcrService
 {
     private const MODEL = 'claude-sonnet-4-20250514';
+
+    private const DEMO_STUB_MONTANT = 100.0;
+
+    private const DEMO_STUB_TIERS_NOM = 'Facture exemple';
+
+    private const DEMO_STUB_DESCRIPTION = 'Prestation exemple';
 
     public static function isConfigured(): bool
     {
@@ -34,6 +41,10 @@ final class InvoiceOcrService
      */
     public function analyze(UploadedFile $file, ?array $context = null): InvoiceOcrResult
     {
+        if (Demo::isActive()) {
+            return $this->demoStub();
+        }
+
         $apiKey = $this->apiKey();
         if ($apiKey === null) {
             throw new OcrNotConfiguredException;
@@ -52,6 +63,10 @@ final class InvoiceOcrService
      */
     public function analyzeFromPath(string $path, string $mime, ?array $context = null): InvoiceOcrResult
     {
+        if (Demo::isActive()) {
+            return $this->demoStub();
+        }
+
         $apiKey = $this->apiKey();
         if ($apiKey === null) {
             throw new OcrNotConfiguredException;
@@ -66,6 +81,27 @@ final class InvoiceOcrService
             base64: base64_encode(file_get_contents($path)),
             mime: $mime,
             context: $context,
+        );
+    }
+
+    private function demoStub(): InvoiceOcrResult
+    {
+        return new InvoiceOcrResult(
+            date: now()->format('Y-m-d'),
+            reference: 'DEMO-001',
+            tiers_id: null,
+            tiers_nom: self::DEMO_STUB_TIERS_NOM,
+            montant_total: self::DEMO_STUB_MONTANT,
+            lignes: [
+                new InvoiceOcrLigne(
+                    description: self::DEMO_STUB_DESCRIPTION,
+                    sous_categorie_id: null,
+                    operation_id: null,
+                    seance: null,
+                    montant: self::DEMO_STUB_MONTANT,
+                ),
+            ],
+            warnings: [],
         );
     }
 

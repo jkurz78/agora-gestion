@@ -1,0 +1,7037 @@
+captured_at: '2026-04-29T11:59:30+02:00'
+files:
+  -
+    source: database/demo/files/branding/1/logo.png
+    target: storage/app/private/associations/1/branding/logo.png
+  -
+    source: database/demo/files/branding/1/cachet.jpg
+    target: storage/app/private/associations/1/branding/cachet.jpg
+  -
+    source: database/demo/files/notes_de_frais_lignes/notes-de-frais/1/ligne-1.pdf
+    target: storage/app/private/associations/1/notes-de-frais/1/ligne-1.pdf
+  -
+    source: database/demo/files/notes_de_frais_lignes/notes-de-frais/1/ligne-2.pdf
+    target: storage/app/private/associations/1/notes-de-frais/1/ligne-2.pdf
+  -
+    source: database/demo/files/factures_partenaires_deposees/factures-deposees/2026/04/2026-04-28-fa26456-asdmlm.pdf
+    target: storage/app/private/associations/1/factures-deposees/2026/04/2026-04-28-fa26456-asdmlm.pdf
+  -
+    source: database/demo/files/seances/1/1/feuille-signee.pdf
+    target: storage/app/private/associations/1/seances/1/feuille-signee.pdf
+  -
+    source: database/demo/files/seances/1/2/feuille-signee.pdf
+    target: storage/app/private/associations/1/seances/2/feuille-signee.pdf
+  -
+    source: database/demo/files/seances/1/3/feuille-signee.pdf
+    target: storage/app/private/associations/1/seances/3/feuille-signee.pdf
+schema_version: 1
+tables:
+  association:
+    -
+      adresse: '20 rue du bois'
+      anthropic_api_key: null
+      cachet_signature_path: cachet.jpg
+      code_postal: '66450'
+      created_at: '-1d'
+      devis_validite_jours: 30
+      email: contact@demo.fr
+      email_from: noreply@demo.fr
+      email_from_name: 'Amis de la démo'
+      exercice_mois_debut: 9
+      facture_compte_bancaire_id: 3
+      facture_conditions_reglement: 'Payable à réception'
+      facture_mentions_legales: |-
+        TVA non applicable, art. 261-7-1° du CGI
+        Pas d'escompte pour paiement anticipé
+      facture_mentions_penalites: "En cas de retard de paiement, pénalités au taux de 3× le taux d'intérêt légal. Indemnité forfaitaire de recouvrement : 40 € (art. D441-5 C.Com)."
+      forme_juridique: 'Association loi 1901'
+      id: 1
+      logo_path: logo.png
+      nom: 'Les amis de la démo'
+      siret: '12345678912345'
+      slug: les-amis-de-la-demo
+      statut: actif
+      telephone: '04 05 05 04 05'
+      updated_at: 0d
+      ville: 'Lyon 3'
+      wizard_completed_at: '-1d'
+      wizard_current_step: 1
+      wizard_state: null
+  association_slug_aliases: {  }
+  association_user:
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 1
+      invited_at: null
+      joined_at: '-1d'
+      revoked_at: null
+      role: admin
+      updated_at: '-1d'
+      user_id: 1
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 2
+      invited_at: null
+      joined_at: '-1d'
+      revoked_at: null
+      role: gestionnaire
+      updated_at: '-1d'
+      user_id: 2
+  budget_lines:
+    -
+      association_id: 1
+      created_at: '-1d'
+      exercice: 2025
+      id: 1
+      montant_prevu: '1500.00'
+      notes: null
+      sous_categorie_id: 13
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      exercice: 2025
+      id: 2
+      montant_prevu: '2500.00'
+      notes: null
+      sous_categorie_id: 17
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      exercice: 2025
+      id: 3
+      montant_prevu: '3600.00'
+      notes: null
+      sous_categorie_id: 2
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      exercice: 2025
+      id: 4
+      montant_prevu: '450.00'
+      notes: null
+      sous_categorie_id: 5
+      updated_at: '-1d'
+  campagnes_email:
+    -
+      association_id: 1
+      corps: |-
+        <p>{logo_operation}</p>
+        <p>Bonjour {prenom},</p>
+        <p><strong>{operation}</strong> débute le <strong>{date_debut}</strong> !</p>
+        <p>La première séance « {titre_prochaine_seance} » aura lieu le <strong>{date_prochaine_seance}</strong>.</p>
+        <p>Nous avons hâte de vous accueillir.</p>
+        <p>L'équipe d'animation de {type_operation}<br />{association}</p>
+      created_at: 0d
+      envoye_par: 1
+      id: 1
+      nb_destinataires: 7
+      nb_erreurs: 0
+      objet: '{operation} commence dans {jours_avant_prochaine_seance} jours'
+      operation_id: 1
+      pieces_jointes: null
+      updated_at: 0d
+  categories:
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 1
+      nom: '70 - Ventes et prestations'
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 2
+      nom: '74 - Subventions'
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 3
+      nom: '75 - Cotisations et dons'
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 4
+      nom: '76 - Produits financiers'
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 5
+      nom: '77 - Produits exceptionnels'
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 6
+      nom: '60 - Achats'
+      type: depense
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 7
+      nom: '61 - Charges de fonctionnement'
+      type: depense
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 8
+      nom: '62 - Autres services extérieurs'
+      type: depense
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 9
+      nom: '66 - Charges financières'
+      type: depense
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 10
+      nom: '67 - Charges exceptionnelles'
+      type: depense
+      updated_at: '-1d'
+  comptes_bancaires:
+    -
+      actif_recettes_depenses: 1
+      association_id: 1
+      bic: null
+      created_at: '-1d'
+      date_solde_initial: '-8M'
+      domiciliation: null
+      iban: FR7630006000011234567890189
+      id: 3
+      nom: 'Compte courant'
+      saisie_automatisee: 0
+      solde_initial: '5000.00'
+      updated_at: '-1d'
+    -
+      actif_recettes_depenses: 1
+      association_id: 1
+      bic: null
+      created_at: '-1d'
+      date_solde_initial: '-8M'
+      domiciliation: null
+      iban: FR7630006000019876543210456
+      id: 4
+      nom: 'Compte épargne'
+      saisie_automatisee: 0
+      solde_initial: '15000.00'
+      updated_at: '-1d'
+    -
+      actif_recettes_depenses: 1
+      association_id: 1
+      bic: null
+      created_at: '-1d'
+      date_solde_initial: '-8M'
+      domiciliation: null
+      iban: null
+      id: 5
+      nom: HelloAsso
+      saisie_automatisee: 1
+      solde_initial: '0.00'
+      updated_at: '-1d'
+  devis: {  }
+  devis_lignes: {  }
+  documents_previsionnels: {  }
+  email_opens:
+    -
+      email_log_id: 9
+      id: 1
+      ip: 192.168.65.1
+      opened_at: 0d
+      user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36'
+  email_templates:
+    -
+      association_id: 1
+      categorie: attestation
+      corps: "<p>Bonjour <strong>{prenom}</strong>,</p><p>Veuillez trouver ci-joint votre attestation de présence pour {type_operation} « <strong>{operation}</strong> ».</p>{bloc_seances}<p>Cordialement,<br>L'équipe</p>"
+      created_at: '-1d'
+      id: 1
+      objet: 'Attestation de présence — {operation}'
+      type_operation_id: null
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie: formulaire
+      corps: "<p>Bonjour {prenom},</p><p>Afin de compléter votre dossier d'inscription au parcours {type_operation}, nous vous remercions de compléter le formulaire dont le lien est ci-dessous.</p><p>Rappel : ce parcours se déroulera sur {nb_seances} séances du {date_debut} au {date_fin}.</p><p>Cordialement,<br>L'équipe encadrante {type_operation}</p>"
+      created_at: '-1d'
+      id: 2
+      objet: 'Action requise : Formulaire à compléter pour votre inscription au parcours {operation}'
+      type_operation_id: null
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie: document
+      corps: "<p>Bonjour <strong>{prenom} {nom}</strong>,</p><p>Veuillez trouver ci-joint {type_document_article} n°<strong>{numero_document}</strong> du {date_document}.</p><p>Cordialement,<br>L'équipe</p>"
+      created_at: '-1d'
+      id: 3
+      objet: '{type_document_uc} n°{numero_document} — {operation}'
+      type_operation_id: null
+      updated_at: '-1d'
+  exercice_actions: {  }
+  exercices:
+    -
+      annee: 2025
+      association_id: 1
+      cloture_par_id: null
+      created_at: '-1d'
+      date_cloture: null
+      helloasso_url: null
+      id: 1
+      statut: ouvert
+      updated_at: '-1d'
+  facture_lignes:
+    -
+      facture_id: 1
+      id: 1
+      libelle: 'Parcours thérapeutiques — Parcours femmes 1 — Séance 1 du 15/09/2025'
+      montant: '150.00'
+      operation_id: null
+      ordre: 1
+      prix_unitaire: null
+      quantite: null
+      seance: null
+      sous_categorie_id: null
+      transaction_ligne_id: 7
+      type: montant
+    -
+      facture_id: 1
+      id: 2
+      libelle: 'Parcours thérapeutiques — Parcours femmes 1 — Séance 2 du 15/10/2025'
+      montant: '150.00'
+      operation_id: null
+      ordre: 2
+      prix_unitaire: null
+      quantite: null
+      seance: null
+      sous_categorie_id: null
+      transaction_ligne_id: 13
+      type: montant
+    -
+      facture_id: 1
+      id: 3
+      libelle: 'Parcours thérapeutiques — Parcours femmes 1 — Séance 3 du 14/11/2025'
+      montant: '150.00'
+      operation_id: null
+      ordre: 3
+      prix_unitaire: null
+      quantite: null
+      seance: null
+      sous_categorie_id: null
+      transaction_ligne_id: 19
+      type: montant
+    -
+      facture_id: 1
+      id: 4
+      libelle: 'Parcours thérapeutiques — Parcours femmes 1 — Séance 4 du 22/12/2025'
+      montant: '150.00'
+      operation_id: null
+      ordre: 4
+      prix_unitaire: null
+      quantite: null
+      seance: null
+      sous_categorie_id: null
+      transaction_ligne_id: 25
+      type: montant
+    -
+      facture_id: 1
+      id: 5
+      libelle: 'Parcours thérapeutiques — Parcours femmes 1 — Séance 5 du 18/01/2026'
+      montant: '150.00'
+      operation_id: null
+      ordre: 5
+      prix_unitaire: null
+      quantite: null
+      seance: null
+      sous_categorie_id: null
+      transaction_ligne_id: 31
+      type: montant
+  facture_transaction:
+    -
+      facture_id: 1
+      transaction_id: 7
+    -
+      facture_id: 1
+      transaction_id: 13
+    -
+      facture_id: 1
+      transaction_id: 19
+    -
+      facture_id: 1
+      transaction_id: 25
+    -
+      facture_id: 1
+      transaction_id: 31
+  factures:
+    -
+      association_id: 1
+      compte_bancaire_id: null
+      conditions_reglement: 'Payable à réception'
+      created_at: '-1d'
+      date: '-1d'
+      date_annulation: null
+      devis_id: null
+      exercice: 2025
+      id: 1
+      mentions_legales: |-
+        TVA non applicable, art. 261-7-1° du CGI
+        Pas d'escompte pour paiement anticipé
+      mode_paiement_prevu: null
+      montant_total: '750.00'
+      notes: null
+      numero: F-2025-0001
+      numero_avoir: null
+      saisi_par: 1
+      statut: validee
+      tiers_id: 15
+      updated_at: '-1d'
+  factures_partenaires_deposees:
+    -
+      association_id: 1
+      created_at: 0d
+      date_facture: '-1d'
+      id: 1
+      motif_rejet: null
+      numero_facture: FA26456
+      pdf_path: associations/1/factures-deposees/2026/04/2026-04-28-fa26456-asdmlm.pdf
+      pdf_taille: 9773
+      statut: soumise
+      tiers_id: 34
+      traitee_at: null
+      transaction_id: null
+      updated_at: 0d
+  formulaire_tokens: {  }
+  helloasso_form_mappings: {  }
+  helloasso_notifications: {  }
+  helloasso_parametres: {  }
+  incoming_documents: {  }
+  incoming_mail_allowed_senders: {  }
+  incoming_mail_parametres: {  }
+  job_batches: {  }
+  message_templates:
+    -
+      association_id: 1
+      categorie: operation
+      corps: "<p>{logo_operation}</p><p>Bonjour {prenom},</p><p>Nous avons le plaisir de vous confirmer votre inscription à <strong>{operation}</strong>.</p><p>La première séance est prévue le <strong>{date_prochaine_seance}</strong>.</p><p>N'hésitez pas à nous contacter pour toute question.</p><p>À bientôt,<br>L'équipe d'animation de {type_operation}<br>{association}</p>"
+      created_at: '-1d'
+      id: 1
+      nom: "Confirmation d'inscription"
+      objet: "Confirmation d'inscription à {operation}"
+      type_operation_id: null
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie: operation
+      corps: "<p>{logo_operation}</p><p>Bonjour {prenom},</p><p><strong>{operation}</strong> débute le <strong>{date_debut}</strong> !</p><p>La première séance « {titre_prochaine_seance} » aura lieu le <strong>{date_prochaine_seance}</strong>.</p><p>Nous avons hâte de vous accueillir.</p><p>L'équipe d'animation de {type_operation}<br>{association}</p>"
+      created_at: '-1d'
+      id: 2
+      nom: 'Démarrage imminent'
+      objet: '{operation} commence dans {jours_avant_prochaine_seance} jours'
+      type_operation_id: null
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie: operation
+      corps: "<p>{logo_operation}</p><p>Bonjour {prenom},</p><p>Nous vous rappelons votre prochaine séance de <strong>{operation}</strong> :</p><p>Séance n°{numero_prochaine_seance} — « {titre_prochaine_seance} »<br>Date : <strong>{date_prochaine_seance}</strong></p><p>À bientôt,<br>L'équipe d'animation de {type_operation}<br>{association}</p>"
+      created_at: '-1d'
+      id: 3
+      nom: 'Rappel prochaine séance'
+      objet: 'Rappel : séance n°{numero_prochaine_seance} dans {jours_avant_prochaine_seance} jours'
+      type_operation_id: null
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie: operation
+      corps: "<p>{logo_operation}</p><p>Bonjour {prenom},</p><p>Voici les informations pratiques pour votre prochaine séance de <strong>{operation}</strong> (séance n°{numero_prochaine_seance} — « {titre_prochaine_seance} ») :</p><p><em>[Ajoutez vos consignes ici]</em></p><p>Bonne séance !<br>L'équipe d'animation de {type_operation}<br>{association}</p>"
+      created_at: '-1d'
+      id: 4
+      nom: 'Instructions prochaine séance'
+      objet: 'Informations pour la séance du {date_prochaine_seance}'
+      type_operation_id: null
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie: operation
+      corps: "<p>{logo_operation}</p><p>Bonjour {prenom},</p><p>Vous avez participé à {nb_seances_effectuees} séances de <strong>{operation}</strong>.</p><p>Nous tenions à vous remercier chaleureusement pour votre engagement tout au long de ce parcours.</p><p>N'hésitez pas à nous faire part de vos retours.</p><p>L'équipe d'animation de {type_operation}<br>{association}</p>"
+      created_at: '-1d'
+      id: 5
+      nom: 'Remerciements fin de parcours'
+      objet: 'Merci pour votre participation à {operation}'
+      type_operation_id: null
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie: operation
+      corps: "<p>{logo_operation}</p><p>Bonjour {prenom},</p><p>Merci d'avoir participé à <strong>{operation}</strong>.</p><p>Nous serions ravis de recueillir votre avis. Pourriez-vous prendre quelques minutes pour répondre à notre questionnaire de satisfaction ?</p><p><em>[Insérez le lien vers votre questionnaire ici]</em></p><p>L'équipe d'animation de {type_operation}<br>{association}</p>"
+      created_at: '-1d'
+      id: 6
+      nom: 'Remerciements et questionnaire'
+      objet: 'Merci pour votre participation à {operation}'
+      type_operation_id: null
+      updated_at: '-1d'
+  notes_de_frais:
+    -
+      abandon_creance_propose: 0
+      archived_at: null
+      association_id: 1
+      created_at: 0d
+      date: '-45d'
+      deleted_at: null
+      don_transaction_id: null
+      id: 1
+      libelle: 'Déplacement sur Marseilles'
+      motif_rejet: null
+      statut: soumise
+      submitted_at: 0d
+      tiers_id: 34
+      transaction_id: null
+      updated_at: 0d
+      validee_at: null
+  notes_de_frais_lignes:
+    -
+      created_at: 0d
+      id: 1
+      libelle: 'Repas midi'
+      metadata: null
+      montant: '25.50'
+      note_de_frais_id: 1
+      operation_id: null
+      piece_jointe_path: associations/1/notes-de-frais/1/ligne-1.pdf
+      seance: null
+      sous_categorie_id: 22
+      type: standard
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 2
+      libelle: 'Lyon à Marseille et retour.'
+      metadata: '{"cv_fiscaux": 11, "distance_km": 435, "bareme_eur_km": 0.65}'
+      montant: '282.75'
+      note_de_frais_id: 1
+      operation_id: null
+      piece_jointe_path: associations/1/notes-de-frais/1/ligne-2.pdf
+      seance: null
+      sous_categorie_id: 21
+      type: kilometrique
+      updated_at: 0d
+  operations:
+    -
+      association_id: 1
+      created_at: '-1d'
+      date_debut: '-226d'
+      date_fin: +62d
+      description: ''
+      id: 1
+      nom: 'Parcours femmes 1'
+      nombre_seances: 10
+      statut: en_cours
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      date_debut: +11d
+      date_fin: +12d
+      description: ''
+      id: 2
+      nom: 'La connaissance de base des associations 1901'
+      nombre_seances: 2
+      statut: en_cours
+      type_operation_id: 2
+      updated_at: '-1d'
+  participant_documents: {  }
+  participant_donnees_medicales:
+    -
+      created_at: '-1d'
+      date_naissance: null
+      id: 1
+      medecin_adresse: null
+      medecin_code_postal: null
+      medecin_email: null
+      medecin_nom: null
+      medecin_prenom: null
+      medecin_telephone: null
+      medecin_ville: null
+      notes: null
+      participant_id: 7
+      poids: null
+      sexe: null
+      taille: null
+      therapeute_adresse: null
+      therapeute_code_postal: null
+      therapeute_email: null
+      therapeute_nom: null
+      therapeute_prenom: null
+      therapeute_telephone: null
+      therapeute_ville: null
+      updated_at: '-1d'
+  participants:
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 1
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 1
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 13
+      type_operation_tarif_id: 7
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 2
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 1
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 9
+      type_operation_tarif_id: 8
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 3
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 1
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 7
+      type_operation_tarif_id: 7
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 4
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 1
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 15
+      type_operation_tarif_id: 6
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 5
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 1
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 21
+      type_operation_tarif_id: 6
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 6
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 1
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 25
+      type_operation_tarif_id: 8
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 7
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 2
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 12
+      type_operation_tarif_id: 4
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 8
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 2
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 9
+      type_operation_tarif_id: 4
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 9
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 2
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 11
+      type_operation_tarif_id: 5
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 10
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 2
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 13
+      type_operation_tarif_id: 5
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: '-1d'
+      date_inscription: '-1d'
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 11
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 2
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 8
+      type_operation_tarif_id: 4
+      updated_at: '-1d'
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: 0d
+      date_inscription: 0d
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 12
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 1
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 31
+      type_operation_tarif_id: 8
+      updated_at: 0d
+    -
+      adresse_par_adresse: null
+      adresse_par_code_postal: null
+      adresse_par_email: null
+      adresse_par_etablissement: null
+      adresse_par_nom: null
+      adresse_par_prenom: null
+      adresse_par_telephone: null
+      adresse_par_ville: null
+      association_id: 1
+      autorisation_contact_medecin: 0
+      created_at: 0d
+      date_inscription: 0d
+      droit_image: null
+      est_helloasso: 0
+      helloasso_item_id: null
+      helloasso_order_id: null
+      id: 13
+      medecin_tiers_id: null
+      mode_paiement_choisi: null
+      moyen_paiement_choisi: null
+      nationalite: null
+      nom_jeune_fille: null
+      notes: null
+      operation_id: 2
+      refere_par_id: null
+      rgpd_accepte_at: null
+      therapeute_tiers_id: null
+      tiers_id: 31
+      type_operation_tarif_id: 5
+      updated_at: 0d
+  presences:
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 1
+      kine: eyJpdiI6IitiK2tBYU5KRjZ4L1c4T0ZxVUlkT0E9PSIsInZhbHVlIjoia2l3ZEt0U2QyRmxMR2RvZ1RqTEVMZz09IiwibWFjIjoiMzAzNjcyZjhiZTcwOGUwODFjOTVmN2M0MWI4YjY3M2Y2YzA1YzM3ODEzNjMwZDU0YzE3MjQyYTMwMGYzODNiNCIsInRhZyI6IiJ9
+      participant_id: 3
+      seance_id: 1
+      statut: eyJpdiI6InoxTXc5eWg2VUE5aExuU0RmZHBja3c9PSIsInZhbHVlIjoiNnZCWVhRTU4vZFZ2b2E0dVRabEplZz09IiwibWFjIjoiYTU3ZGRkZmM4YTRiOWRhMDczMGFhOWZjOGFlMWQxMjU0ODMxMTI1MWRhNjUyYmRjNWQ0ZWNkOWMwZjU1ZDMwNiIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 2
+      kine: null
+      participant_id: 6
+      seance_id: 1
+      statut: eyJpdiI6InEzUnNmOUtlS3BMKy8wS3ArRkorYXc9PSIsInZhbHVlIjoid0lzOEFMdTlkVk5ROERDc05QcHhhQT09IiwibWFjIjoiYTdiYzJmMzFmOGFhNzVmNmJmNDBmNzM5NDA0NTdiODRhNTI5Y2U1NjkwYzFjOTc4YmZlY2JmMmVjM2I4ODE4MiIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 3
+      kine: eyJpdiI6Ik5uUmcwTWVobUJLeDBSaVJsc1ZCOXc9PSIsInZhbHVlIjoiSWF4TURiWk9WZHZmTFBuZ3doZHVVQT09IiwibWFjIjoiOWE5MGI1YjczMWQxMWQwZmNiZTgxYjA1ZGRjZWVhYmZhNjhkYmI2NjkyZjIyNjE2N2U3ZDkyNDJlYTVhMDRlMyIsInRhZyI6IiJ9
+      participant_id: 5
+      seance_id: 1
+      statut: eyJpdiI6IjR5MVJYUEZGZE9OaDhPNERzdmtEMmc9PSIsInZhbHVlIjoiRlhhZzVFaEhEVWpJcDZCSk1WNVpSZz09IiwibWFjIjoiNmQwYTFiMjA2ZDBkMDg4MzI0NjdiYTdiNTE0NzA2OWFlZmIxZmMyZDViMWY2MTcwZGM4ZmU0N2UyOTMzNDI5OCIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 4
+      kine: null
+      participant_id: 4
+      seance_id: 1
+      statut: eyJpdiI6IkwyVHZRRE5WTVRDbGpwUitBem5NZlE9PSIsInZhbHVlIjoickVaZWxEMnFOYWdHdE9qbFNxSzc0dz09IiwibWFjIjoiZTZiYTc1MTYyN2RmYzc5ODRmYjQzOGY5ZmViZDcyMmQ4MjRiMTFjYmZkNzUzNTRlNzZjNmE1NjhjNTNkMWMwNiIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 5
+      kine: null
+      participant_id: 2
+      seance_id: 1
+      statut: eyJpdiI6ImNiK1dKL0g4M1NCV01lVWpqcmF4cGc9PSIsInZhbHVlIjoiaFB1bDlabHV4OW9nV00yNnR2bkVVZz09IiwibWFjIjoiNTA4MWQyNzFhMDZiYzQzMDdiN2ZlYTU0N2IwZGM0ODcyODkwMzg5Yjc5YmVhMzkwM2U3YWEyYTBmNTA5MDI3MyIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 6
+      kine: null
+      participant_id: 1
+      seance_id: 1
+      statut: eyJpdiI6IkdLYy8wcHR0SGt0dVdwZks0RUk2N3c9PSIsInZhbHVlIjoicVN4blkzOCtpMW5rVC8xQ0lqYlY0Zz09IiwibWFjIjoiNDhjN2E5Y2I1NDY5NDUzMmYwNDgzYjhlYTAzYjczN2EwM2ZjYmNlNWM1MmFiM2Q2YjU2OWQ0MGI3ZGYyNDQwOSIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 7
+      kine: null
+      participant_id: 3
+      seance_id: 2
+      statut: eyJpdiI6InpOdVY5S1ZhTjdiZ3J2TlQ2TWhLT1E9PSIsInZhbHVlIjoiTUtmVXhIQlVRZ3hQbjVWbFlaTkR6dz09IiwibWFjIjoiOGM5YTE2ODQ5YzdhOTY4MmRhYTExMDE5YTM4MjliZDU1MjI0NDFhMWRhMjZhMGZmZGY0MjU1MzE4MDdmM2U5YSIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 8
+      kine: eyJpdiI6IkgzOTVDejRoZjVSZ2dreXI0MnJCZFE9PSIsInZhbHVlIjoiUmpIbkdpZThSYXJ3cDIwem00RzEwdz09IiwibWFjIjoiMTFiMGVhNmQ5ODA3YWE0ZjUzOTBjYzJiOWE4ZWJmY2EyNjFhNjc0MmQ0OTljMmNlOTJmNDI2YTI4N2ViYzNhZiIsInRhZyI6IiJ9
+      participant_id: 6
+      seance_id: 2
+      statut: eyJpdiI6IlByOFpRdi9CcHpjMWlNSyt2OVp1UHc9PSIsInZhbHVlIjoiUXpKcFcvdTg1OVBRZDB0WmU0SEJzZz09IiwibWFjIjoiMDZmODE5YTE2OGI1ZDkyZGVmNmYzNTE5NDkwNDM5YjA1ZTlhZTY4YTYyZTM3ZjY4OTg0Y2E0YjZkNjc2NDAyMiIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 9
+      kine: null
+      participant_id: 5
+      seance_id: 2
+      statut: eyJpdiI6IjlxWFU4bHhnZThGVi9KZGFIYnE1L0E9PSIsInZhbHVlIjoibVAyNWVRYnpjaXBuZFUweUVHSDdMZz09IiwibWFjIjoiM2I5Zjc0MDk0OWE4NDE1MjJmMDE2OTY2MjU5Yzk0YjhmZjg5MGMyM2ZkYWQ5ZmI1NjQ3MDRmODQwZTI2MzEzMCIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 10
+      kine: eyJpdiI6IktuMVVHbk9lZXlyMzFaMDBydFcwOGc9PSIsInZhbHVlIjoiRUNzRmFRTlpUa0wvc1MxYjhiQWxtdz09IiwibWFjIjoiM2FmNjFkMDU2NTJhNmYwNDgyMDFhNTE5MDczZDQzMWE3Mzc2NTcxZGY1MjM2Y2FiYzdjZWIwYzNhMDdkY2MxOCIsInRhZyI6IiJ9
+      participant_id: 4
+      seance_id: 2
+      statut: eyJpdiI6IklSeGpzMm40QTMzdHJaR1ZiamV3S3c9PSIsInZhbHVlIjoiY0JDQ1g3akdqK1JyR0NyOTlONDRNUT09IiwibWFjIjoiMTczZjFjY2NlZjFmYzY3ZjYxOGIyM2Q5YWE1M2IzZDk0ZTAzM2UyZDZmYTlmOWMxYTkyYTNjYTFhMmZmNjJmZCIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 11
+      kine: null
+      participant_id: 2
+      seance_id: 2
+      statut: eyJpdiI6ImI2anRjcjZUSkhBenBVQVlCdTNLSWc9PSIsInZhbHVlIjoiV2haWlVLNU1ubzNtRHRTdHFQOUFHdz09IiwibWFjIjoiOWQ1MWE3YWM4YTQyZjkwZWE1YzEzZWNmNWI0ZjliNjhiM2ZkYWZlOTI0ZWYxZmNjMGQ3ZjVlMjIyYjhhYmMwOSIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 12
+      kine: null
+      participant_id: 1
+      seance_id: 2
+      statut: eyJpdiI6InVhVVg2Nkw0ZG5sV3M3RmtoY1h3MGc9PSIsInZhbHVlIjoiT1doK2t0Tkhmb2F0OFBwN204NFplZz09IiwibWFjIjoiOGUxYjUzODg1Mzk0NTNlOTE4OTY4MDg3YTQ0NTE2OWJjNDhjNjcwOTRiMjkxMmIxN2VjZTdlYmY2NmJkYTYwYiIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 13
+      kine: null
+      participant_id: 3
+      seance_id: 3
+      statut: eyJpdiI6IlMzZEhIT1lLQ2hZT1l5ZzhscUs4alE9PSIsInZhbHVlIjoiSEJVeE9zMHZtVTkwdDRBMHo5eUgwUT09IiwibWFjIjoiYWVhMjcxYTc2MDBmZmM1OGIyNjYyYTQ4NGRhMDllMjNhYmJlMTg0MTRmODljZDM3NjJiMGYyODNjNzgwZjEwYiIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 14
+      kine: null
+      participant_id: 6
+      seance_id: 3
+      statut: eyJpdiI6InJOS1ZmMUNlc2tVOURpUkdzdFVRSWc9PSIsInZhbHVlIjoidGhKVFdjWnVJemZBZmxYTjh6ay9jdz09IiwibWFjIjoiMGQ1MWQ5ZWQzMWYwMmQ3NzI1YjUyNThhZGFjOTQ2MjgzZTU1MThiNmVmNGFjYjhjZWM5YzFjMGM5ZTQyMjRmYiIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 15
+      kine: null
+      participant_id: 5
+      seance_id: 3
+      statut: eyJpdiI6IktMWTJiK2pOVU1RL252VWFOZFFMZWc9PSIsInZhbHVlIjoiNW4xZXBndTBGYUxxL1hUbmNPcnlKdz09IiwibWFjIjoiODAzMDE1NWY2ODVjMDg0MmZjMTU5NzZlOWQwYWQ0ZjljMTVlZWI1ZTEzNGNhMmZlMTFiODI4NTM0ZWM4OTY2NSIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 16
+      kine: null
+      participant_id: 4
+      seance_id: 3
+      statut: eyJpdiI6InhocjljVXE0VTdIZjltanFYMnhWZmc9PSIsInZhbHVlIjoiSXRPdk15RXlRb3NPMS9rYjkyWEVidz09IiwibWFjIjoiYjE3NDdlYjMzZmUzYjZmNTQ2ODQ5MjgxN2JkNGNkNmQ1NmI1YTEwOGQzOTNlMjZlNjQyOTlhYjI0OGEyY2ExNyIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 17
+      kine: eyJpdiI6IldITjRhay9vdE40WkhEVnp5eGNkM2c9PSIsInZhbHVlIjoiNGNPRkg1NnhlT2h2dENBblYzLy9nQT09IiwibWFjIjoiMDdkNWQzZTAwZjQ3NDQyMGUyYjM0ODI3MWQ0MDBmNDM2M2VlMmVjYTAyOWU0YzAyNDVhYzQ5NTMyMjM1YjRiNyIsInRhZyI6IiJ9
+      participant_id: 2
+      seance_id: 3
+      statut: eyJpdiI6InBOcktyZnpmN2VLZnFTRzRTWnJCbHc9PSIsInZhbHVlIjoibDRhSlpxaHFwenVSUm9DNFhVYUl3QT09IiwibWFjIjoiZTQ1MDM5NWNjNGU4MmVkN2YwNjhlYjY3NDQ3NmMwOTdmNGI5MzVhMTkwOGYzMjViOWQ0YjAwZWI2NzY1MGU0ZCIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: '-1d'
+      id: 18
+      kine: eyJpdiI6Im0ycUYwSjhRcjAwR3dVWElUaWpaM1E9PSIsInZhbHVlIjoiNEd1TEtmQkhTYUpaWnBLZEpEQ3ZvUT09IiwibWFjIjoiMTgzNmVmZGQ1YTExMmUzYmE0ZjJhMzcwNDUwMjVhYjUxYzI5ZmQxMzg5YWY4NjliZmE0Yzc5OWRlMzE0ZTA0YyIsInRhZyI6IiJ9
+      participant_id: 1
+      seance_id: 3
+      statut: eyJpdiI6IjUvdEdmOTBqeDVDS3ZPSDgvd3ZCaVE9PSIsInZhbHVlIjoiRnk1ZjEyY1h1cmlkSWl2LzBuOG9iZz09IiwibWFjIjoiNDhmYmExOTVlMTc0N2YyMDkyNjVjYmNiYTBiOGM4OGJiYzQ5MjdjNmIzODM4YTYyYzFhMjcxNTM4YzQ2YjlkMyIsInRhZyI6IiJ9
+      updated_at: '-1d'
+    -
+      commentaire: null
+      created_at: 0d
+      id: 19
+      kine: null
+      participant_id: 12
+      seance_id: 1
+      statut: eyJpdiI6IkZNZ2tzZy95SFdMNFJkQVF5VFBMMFE9PSIsInZhbHVlIjoiMHJVWXViR3JyWGVsUzN1eFlKcVd3dz09IiwibWFjIjoiNjZhMzY4MTViNTQ0OWNhZGZkYzY3ZjM1Y2YxYTk5YTVkY2FjYTcwMDkzMWE5NWQxZGIyZDczZjZkNWJhNjU1ZCIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 20
+      kine: null
+      participant_id: 12
+      seance_id: 2
+      statut: eyJpdiI6InFwTFVDY0pYZEJuOXFTUTJGand6Snc9PSIsInZhbHVlIjoiUHp1a2tLVWZ4UUpUVDUrK2lFUEtTdz09IiwibWFjIjoiNGYwOGFjM2YzZmM0YmNlZDE5OTlmNzlmOTIyZDZjN2QxOTRiNmQwNDM3YWI3YzYxYjIwODVkN2NhZGE1NmVmZCIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 21
+      kine: null
+      participant_id: 12
+      seance_id: 3
+      statut: eyJpdiI6IjdaTEtLaE90UEZMOTlrdS9SMzcrZ2c9PSIsInZhbHVlIjoiSTBSWXZrbGcvc3dUb2tGUk13cG5tUT09IiwibWFjIjoiMjY5YjgyYTRlZWQ5MmNhMjJlNjIzNTMzOWRkMzdkOWYyNmU0ZDQ3ODYwNDUxYWQ4NDE3ZThlZDcwOTdkYTMzNyIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 22
+      kine: eyJpdiI6Ikk4SlhzcHE0Y05tOHBJNy92clhqRHc9PSIsInZhbHVlIjoidGJ2QkZUM0hJcmdkV0MzMWFTRlZoZz09IiwibWFjIjoiN2UwNTRiYmViM2Y0YTQyYTRkOTYxZWY1Mjk5MmRmMjIxODEyMzljYWFmNDBjNWU1NDhmMWZiYjljMmYyNTJhMiIsInRhZyI6IiJ9
+      participant_id: 3
+      seance_id: 4
+      statut: eyJpdiI6IjRWTVFTdDFFMUN3bG9QdWt1OGxGMEE9PSIsInZhbHVlIjoiNC90OW9Qc3JGa0FvRjNhL0YreEUzQT09IiwibWFjIjoiMWYxNTEzN2ViMjhlNWRhNjRlNThhMzZlOWU2MzRiOGQ3MzA2ZTdkMzRiMWYyOTA5NGVjZjUwN2ZlYzY0MTk3NCIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 23
+      kine: null
+      participant_id: 6
+      seance_id: 4
+      statut: eyJpdiI6Ik01Y2JESW90cTkyK1dZWGN2MnFmc0E9PSIsInZhbHVlIjoiYkxqVDhFV2dyem9xRVNMeGVSNlZUZz09IiwibWFjIjoiMTc3MzljNDM5MzZiZjRkN2IwOTc2NjRmNWNkNjIzNDU2OWQ5ODE0ODI3NWMyZDMwYWFmODcwNTI1Mjk2OWQyMCIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 24
+      kine: eyJpdiI6IjJGVDgrTGRtdFpOOFBFWFpVVHdXblE9PSIsInZhbHVlIjoiVmFpbEdTU1FVS2VqYURSZGxRMVN4dz09IiwibWFjIjoiOTU1MWUwNzA2ODk0YTUxMGJmMWJhYjM1ZDQ3YzMyMDUyNGMzOTJmOWQwYTY4ZWViNWFkZjMyYmNmMmQ0MTBhNiIsInRhZyI6IiJ9
+      participant_id: 12
+      seance_id: 4
+      statut: eyJpdiI6Img2amJyaG9meG5LT1I1TlR2TUR4aXc9PSIsInZhbHVlIjoiQWZaWVJRRFVCUHB6MWN5YzdmNkU3Zz09IiwibWFjIjoiNzAwNWVlNDlmMjQwNDZhNDE2YThiMDNlNjlmMDM3NTI5NWNlODgyOWEwZDNjYzBjZTg3YmJmOWNjMGZkYTdhMSIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 25
+      kine: null
+      participant_id: 5
+      seance_id: 4
+      statut: eyJpdiI6InRUQlpUcG5xMUtKUlFuK3pNcy9UdGc9PSIsInZhbHVlIjoiVG9Jb1o1aHh1eWdFc054SFZXYlhTQT09IiwibWFjIjoiOGMxZDE5ZjA4Y2RiNzk3MDcyM2NkNDEyMTQzMzc4MWUzMDlhZDRlODlkYTE1NDk1YjJjMWJkMDlhZDk2YjZkYyIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 26
+      kine: null
+      participant_id: 4
+      seance_id: 4
+      statut: eyJpdiI6ImJqN3M0RnhoeHRCNktWM1hGYi80NlE9PSIsInZhbHVlIjoiNHVUZEFtMTYxOFMrTXo1Rk8vSlRQZz09IiwibWFjIjoiZTVkMThhOWY2YWYxYTIwZTg4YzFhMzIwYjI2YjQ1Njc4OThmYTc3ZDc3M2ZiMjE2NzE5NDNkY2U0ZDJmYzcyMSIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 27
+      kine: null
+      participant_id: 2
+      seance_id: 4
+      statut: eyJpdiI6IjBkZ3FuRUc5czRpSnhPc2hJdjRjMVE9PSIsInZhbHVlIjoiRUVtTnVWeHFuYUh5SFNrY2hyNldwQT09IiwibWFjIjoiYWU1NTIxOGU5YzBjMjMxYmVhM2RmOGM0MGJjZmJkYjUxZmIyM2U5OGZlNzZiNTlmN2RiYmZhMDlkMThiYTJhMiIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 28
+      kine: null
+      participant_id: 1
+      seance_id: 4
+      statut: eyJpdiI6IjZFWGh6eHYyaVJYNStqeGIxQkUxZkE9PSIsInZhbHVlIjoiN09Ncnk5T0d3QUZVemlQRTJ0bVBNUT09IiwibWFjIjoiM2E0MGE3YzI1OTliODMwZmU1Mzg3ODY4OGRkMGU0ZGQwNDgyYzdjZTU5OTA4MzU0ZTc5YzRiZjIzNWM1MmNlOSIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 29
+      kine: null
+      participant_id: 3
+      seance_id: 5
+      statut: eyJpdiI6Imd4T1JsT0pBdGp5TldDQWNEY2VpNUE9PSIsInZhbHVlIjoiYVlEa1hLd2pMZGRqdnp3b2laRVZZUT09IiwibWFjIjoiZmZlMDIzM2ZjZmNiYmU3YTgwYjAwNTZmYTMxNDM3OGNmMWI1N2Y2ZDJiYTAxMDY0Mzg4NWZmMzUxODRmODVlOSIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 30
+      kine: eyJpdiI6Imlwd3ZMVEdXWUJmbTY3MmpaTENuQVE9PSIsInZhbHVlIjoieG15aXBTaWErbWZXMTlmb2lraVpJZz09IiwibWFjIjoiY2I0YmU5NTVkYjJiYzRiODhkMjc3YzA1NTNjZmE2M2RhMzM2ZWUwZmFmYzE0NDUzZDVjNDdkNDk0ODZiMTA4MiIsInRhZyI6IiJ9
+      participant_id: 6
+      seance_id: 5
+      statut: eyJpdiI6Ii9ScXFEYlhTS0Z2bm5tY2cxbmkrWHc9PSIsInZhbHVlIjoiVS9ZSThQb1hzbmlyVS95Q2NjSW9Bdz09IiwibWFjIjoiZjFhZmUxNzVjMjc4ZTFkYmMzNTAyNTM1ZmVkZmE5YTlmNTc3YjExYmNjMDI0OTIzMWFjMjgzY2Q1YTM0YTk5MSIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 31
+      kine: null
+      participant_id: 12
+      seance_id: 5
+      statut: eyJpdiI6IkZaYUJvb2RnOTlFODhNa2cyaU5nd2c9PSIsInZhbHVlIjoiaXgvTDl6ZlBlQVF6WTd1ajhYdW5zUT09IiwibWFjIjoiOWJkNzI5YTEzOGFkMDMzNTBmOTY2YjEwODlmZDVlZGM5YmFlMjc4MGU2ODU3ZjhiN2ExYzZkYjkxMTZhMTY1MCIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 32
+      kine: eyJpdiI6InZ0dS9QQlhTWWphb0xST0tmRXNDTEE9PSIsInZhbHVlIjoiWUhPWWFZZ0xFMTc5c2Q3anNuZVIrZz09IiwibWFjIjoiNzIyODU3ZjRlYTFlMDdmYTRlMjMzZDIxNzU5ZDRlZTkzYzRkMjUzM2FhZTM1MzFlZjNmMmMzNjBiN2UxNTljNiIsInRhZyI6IiJ9
+      participant_id: 5
+      seance_id: 5
+      statut: eyJpdiI6ImFvQ1RoeWxuQXZGb2s4d0pWTGFxNGc9PSIsInZhbHVlIjoicHc4OWtyV0xHRk02N1FBTFo4TTdpQT09IiwibWFjIjoiZTc5NDg0OTM3MWQwYTk4ZjU4YjMxMzQ2M2ViNzZkZTU3MzkzM2FhNzE2MzNjNWEwNTk4MTYzYTA5NmUyNzdhOSIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 33
+      kine: null
+      participant_id: 4
+      seance_id: 5
+      statut: eyJpdiI6IkN4OWNNakIrSUVzOTFOTU4rSy9wSkE9PSIsInZhbHVlIjoieCt0eXE2OERJSGVoeG9mR2RtZlordz09IiwibWFjIjoiZTQyYzQwNTU4Y2JkMzBjMjZiNjU3NDZmNDJiN2Y3NzU4NmE4ZjU0NzQ4M2VlMTg2M2ZiNzlhOTg1OWFmMGI5MCIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 34
+      kine: null
+      participant_id: 2
+      seance_id: 5
+      statut: eyJpdiI6ImNiYXpWNkFIR0luZUFwb2JXejVYWEE9PSIsInZhbHVlIjoiZHF5VVJpdGc2RGdraUJaZUVQeitjQT09IiwibWFjIjoiNTE3ZTNhMDkyNzNlYmI3NzQ0YzVlMTA5MGEwNzUwYzA3NmIyZDBkZjI2MTViNTFjMWI1Njg0ODU3ZGE0MmQyYyIsInRhZyI6IiJ9
+      updated_at: 0d
+    -
+      commentaire: null
+      created_at: 0d
+      id: 35
+      kine: null
+      participant_id: 1
+      seance_id: 5
+      statut: eyJpdiI6Ilh6K3JheUN1S0ZQeXhIL1RBWWViOEE9PSIsInZhbHVlIjoiVzJYMmlHZTZ6WGJrTW84dG0yRnNNdz09IiwibWFjIjoiZmUzNWMyMzQyZWU1YWI3OGZkOTViMGZjNjY3OTI0ZGI4ZmZmNjE0NzdhYjIxOTE2ZDEwNGY4NzhiZWE4MDRjNyIsInRhZyI6IiJ9
+      updated_at: 0d
+  provisions: {  }
+  rapprochements_bancaires:
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date_fin: '-181d'
+      id: 1
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      saisi_par: 1
+      solde_fin: '5600.00'
+      solde_ouverture: '5000.00'
+      statut: verrouille
+      updated_at: '-1d'
+      verrouille_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date_fin: '-156d'
+      id: 3
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      saisi_par: 1
+      solde_fin: '5910.00'
+      solde_ouverture: '5600.00'
+      statut: verrouille
+      updated_at: 0d
+      verrouille_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date_fin: '-4M'
+      id: 4
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      saisi_par: 1
+      solde_fin: '5630.00'
+      solde_ouverture: '5910.00'
+      statut: verrouille
+      updated_at: 0d
+      verrouille_at: 0d
+  reglements:
+    -
+      created_at: '-1d'
+      id: 1
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 2
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 3
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 3
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 4
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 4
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 5
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 5
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 6
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 6
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 7
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 7
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 8
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 8
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 9
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 9
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 10
+      mode_paiement: especes
+      montant_prevu: '100.00'
+      participant_id: 1
+      remise_id: null
+      seance_id: 10
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 11
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 12
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 13
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 3
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 14
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 4
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 15
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 5
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 16
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 6
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 17
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 7
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 18
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 8
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 19
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 9
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 20
+      mode_paiement: virement
+      montant_prevu: '45.00'
+      participant_id: 2
+      remise_id: null
+      seance_id: 10
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 21
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 22
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 23
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 3
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 24
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 4
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 25
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 5
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 26
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 6
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 27
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 7
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 28
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 8
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 29
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 9
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 30
+      mode_paiement: cheque
+      montant_prevu: '100.00'
+      participant_id: 3
+      remise_id: null
+      seance_id: 10
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 31
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 32
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 33
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 3
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 34
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 4
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 35
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 5
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 36
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 6
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 37
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 7
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 38
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 8
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 39
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 9
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 40
+      mode_paiement: cheque
+      montant_prevu: '150.00'
+      participant_id: 4
+      remise_id: null
+      seance_id: 10
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 41
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 42
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 43
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 3
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 44
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 4
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 45
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 5
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 46
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 6
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 47
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 7
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 48
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 8
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 49
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 9
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 50
+      mode_paiement: virement
+      montant_prevu: '150.00'
+      participant_id: 5
+      remise_id: null
+      seance_id: 10
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 51
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 52
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 53
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 3
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 54
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 4
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 55
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 5
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 56
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 6
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 57
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 7
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 58
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 8
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 59
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 9
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 60
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 6
+      remise_id: null
+      seance_id: 10
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 61
+      mode_paiement: cheque
+      montant_prevu: '180.00'
+      participant_id: 7
+      remise_id: null
+      seance_id: 11
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 62
+      mode_paiement: cheque
+      montant_prevu: '180.00'
+      participant_id: 7
+      remise_id: null
+      seance_id: 12
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 63
+      mode_paiement: cheque
+      montant_prevu: '180.00'
+      participant_id: 8
+      remise_id: null
+      seance_id: 11
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 64
+      mode_paiement: cheque
+      montant_prevu: '180.00'
+      participant_id: 8
+      remise_id: null
+      seance_id: 12
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 65
+      mode_paiement: virement
+      montant_prevu: '120.00'
+      participant_id: 9
+      remise_id: null
+      seance_id: 11
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 66
+      mode_paiement: virement
+      montant_prevu: '120.00'
+      participant_id: 9
+      remise_id: null
+      seance_id: 12
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 67
+      mode_paiement: virement
+      montant_prevu: '120.00'
+      participant_id: 10
+      remise_id: null
+      seance_id: 11
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 68
+      mode_paiement: virement
+      montant_prevu: '120.00'
+      participant_id: 10
+      remise_id: null
+      seance_id: 12
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 69
+      mode_paiement: cheque
+      montant_prevu: '180.00'
+      participant_id: 11
+      remise_id: null
+      seance_id: 11
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 70
+      mode_paiement: cheque
+      montant_prevu: '180.00'
+      participant_id: 11
+      remise_id: null
+      seance_id: 12
+      updated_at: '-1d'
+    -
+      created_at: 0d
+      id: 71
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 1
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 72
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 2
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 73
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 3
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 74
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 4
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 75
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 5
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 76
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 6
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 77
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 7
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 78
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 8
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 79
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 9
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 80
+      mode_paiement: cheque
+      montant_prevu: '45.00'
+      participant_id: 12
+      remise_id: null
+      seance_id: 10
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 81
+      mode_paiement: cheque
+      montant_prevu: '120.00'
+      participant_id: 13
+      remise_id: null
+      seance_id: 11
+      updated_at: 0d
+    -
+      created_at: 0d
+      id: 82
+      mode_paiement: cheque
+      montant_prevu: '120.00'
+      participant_id: 13
+      remise_id: null
+      seance_id: 12
+      updated_at: 0d
+  remises_bancaires:
+    -
+      association_id: 1
+      compte_cible_id: 3
+      created_at: '-1d'
+      date: '-196d'
+      deleted_at: null
+      id: 1
+      libelle: 'Remise espèces n°1'
+      mode_paiement: especes
+      numero: 1
+      saisi_par: 1
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_cible_id: 3
+      created_at: '-1d'
+      date: '-196d'
+      deleted_at: null
+      id: 2
+      libelle: 'Remise chèques n°2'
+      mode_paiement: cheque
+      numero: 2
+      saisi_par: 1
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_cible_id: 3
+      created_at: 0d
+      date: '-162d'
+      deleted_at: null
+      id: 3
+      libelle: 'Remise chèques n°3'
+      mode_paiement: cheque
+      numero: 3
+      saisi_par: 1
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_cible_id: 3
+      created_at: 0d
+      date: '-4M'
+      deleted_at: null
+      id: 4
+      libelle: 'Remise chèques n°4'
+      mode_paiement: cheque
+      numero: 4
+      saisi_par: 1
+      updated_at: 0d
+  seances:
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: '-226d'
+      feuille_signee_at: 0d
+      feuille_signee_path: feuille-signee.pdf
+      feuille_signee_sender_email: null
+      feuille_signee_source: manual
+      id: 1
+      numero: 1
+      operation_id: 1
+      titre: Découverte
+      updated_at: 0d
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: '-196d'
+      feuille_signee_at: 0d
+      feuille_signee_path: feuille-signee.pdf
+      feuille_signee_sender_email: null
+      feuille_signee_source: manual
+      id: 2
+      numero: 2
+      operation_id: 1
+      titre: 'Mes émotions'
+      updated_at: 0d
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: '-166d'
+      feuille_signee_at: 0d
+      feuille_signee_path: feuille-signee.pdf
+      feuille_signee_sender_email: null
+      feuille_signee_source: manual
+      id: 3
+      numero: 3
+      operation_id: 1
+      titre: 'Les limites'
+      updated_at: 0d
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: '-128d'
+      feuille_signee_at: null
+      feuille_signee_path: null
+      feuille_signee_sender_email: null
+      feuille_signee_source: null
+      id: 4
+      numero: 4
+      operation_id: 1
+      titre: 'Ancré ?'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: '-101d'
+      feuille_signee_at: null
+      feuille_signee_path: null
+      feuille_signee_sender_email: null
+      feuille_signee_source: null
+      id: 5
+      numero: 5
+      operation_id: 1
+      titre: Equilibre
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: '-65d'
+      feuille_signee_at: null
+      feuille_signee_path: null
+      feuille_signee_sender_email: null
+      feuille_signee_source: null
+      id: 6
+      numero: 6
+      operation_id: 1
+      titre: Projection
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: '-37d'
+      feuille_signee_at: null
+      feuille_signee_path: null
+      feuille_signee_sender_email: null
+      feuille_signee_source: null
+      id: 7
+      numero: 7
+      operation_id: 1
+      titre: 'Retour sur mes émotions'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: '-15d'
+      feuille_signee_at: null
+      feuille_signee_path: null
+      feuille_signee_sender_email: null
+      feuille_signee_source: null
+      id: 8
+      numero: 8
+      operation_id: 1
+      titre: 'Mes objectifs'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: +16d
+      feuille_signee_at: null
+      feuille_signee_path: null
+      feuille_signee_sender_email: null
+      feuille_signee_source: null
+      id: 9
+      numero: 9
+      operation_id: 1
+      titre: 'Stabilité et résiliance'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: +50d
+      feuille_signee_at: null
+      feuille_signee_path: null
+      feuille_signee_sender_email: null
+      feuille_signee_source: null
+      id: 10
+      numero: 10
+      operation_id: 1
+      titre: 'Bilan et futur'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: +11d
+      feuille_signee_at: null
+      feuille_signee_path: null
+      feuille_signee_sender_email: null
+      feuille_signee_source: null
+      id: 11
+      numero: 1
+      operation_id: 2
+      titre: 'Jour 1'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      created_at: '-1d'
+      date: +12d
+      feuille_signee_at: null
+      feuille_signee_path: null
+      feuille_signee_sender_email: null
+      feuille_signee_source: null
+      id: 12
+      numero: 2
+      operation_id: 2
+      titre: 'Jour 2'
+      updated_at: '-1d'
+  sequences:
+    -
+      association_id: 1
+      created_at: null
+      dernier_numero: 61
+      exercice: 2025-2026
+      id: 1
+      updated_at: 0d
+  smtp_parametres: {  }
+  sous_categories:
+    -
+      association_id: 1
+      categorie_id: 1
+      code_cerfa: 706A
+      created_at: '-1d'
+      id: 1
+      nom: Formations
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 1
+      code_cerfa: 706B
+      created_at: '-1d'
+      id: 2
+      nom: 'Parcours thérapeutiques'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 1
+      code_cerfa: '707'
+      created_at: '-1d'
+      id: 3
+      nom: 'Ventes de produits'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 2
+      code_cerfa: '741'
+      created_at: '-1d'
+      id: 4
+      nom: 'Subvention État'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 3
+      code_cerfa: '751'
+      created_at: '-1d'
+      id: 5
+      nom: Cotisations
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 3
+      code_cerfa: '754'
+      created_at: '-1d'
+      id: 6
+      nom: 'Dons manuels'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 3
+      code_cerfa: '756'
+      created_at: '-1d'
+      id: 7
+      nom: Mécénat
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 4
+      code_cerfa: '761'
+      created_at: '-1d'
+      id: 8
+      nom: Intérêts
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 5
+      code_cerfa: '771'
+      created_at: '-1d'
+      id: 9
+      nom: 'Abandon de créance'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 6
+      code_cerfa: '606'
+      created_at: '-1d'
+      id: 10
+      nom: Fournitures
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 6
+      code_cerfa: 606B
+      created_at: '-1d'
+      id: 11
+      nom: 'Petits équipements'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 6
+      code_cerfa: '609'
+      created_at: '-1d'
+      id: 12
+      nom: 'Achats divers'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 7
+      code_cerfa: 613A
+      created_at: '-1d'
+      id: 13
+      nom: 'Location salle'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 7
+      code_cerfa: 613B
+      created_at: '-1d'
+      id: 14
+      nom: 'Location lieu (centre équestre)'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 7
+      code_cerfa: 613C
+      created_at: '-1d'
+      id: 15
+      nom: "Location lieu (salle d'armes)"
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: 611A
+      created_at: '-1d'
+      id: 16
+      nom: 'Bilan pré-thérapeutique'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: 611B
+      created_at: '-1d'
+      id: 17
+      nom: 'Animation / Encadrement'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: 611C
+      created_at: '-1d'
+      id: 18
+      nom: Supervision
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: 611D
+      created_at: '-1d'
+      id: 19
+      nom: 'Sessions inter-ateliers'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: '622'
+      created_at: '-1d'
+      id: 20
+      nom: 'Honoraires juridiques'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: 625A
+      created_at: '-1d'
+      id: 21
+      nom: 'Frais de déplacements'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: 625B
+      created_at: '-1d'
+      id: 22
+      nom: 'Repas / Restauration'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: 628A
+      created_at: '-1d'
+      id: 23
+      nom: 'Locations de logiciels'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: 628B
+      created_at: '-1d'
+      id: 24
+      nom: 'Hébergement internet'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 8
+      code_cerfa: 628C
+      created_at: '-1d'
+      id: 25
+      nom: 'Développement logiciel'
+      updated_at: '-1d'
+    -
+      association_id: 1
+      categorie_id: 9
+      code_cerfa: '627'
+      created_at: '-1d'
+      id: 26
+      nom: 'Frais bancaires'
+      updated_at: '-1d'
+  super_admin_access_log:
+    -
+      action: update_slug
+      association_id: 1
+      created_at: '-1d'
+      id: 1
+      payload: '{"new_slug": "les-amis-de-la-demo", "old_slug": "mon-association"}'
+      user_id: 1
+  tiers:
+    -
+      adresse_ligne1: '14 rue Vaubecour'
+      association_id: 1
+      code_postal: '69002'
+      created_at: '-1d'
+      date_naissance: null
+      email: sophie.bernard@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 7
+      nom: Bernard
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Sophie
+      telephone: 06.12.45.78.91
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '38 cours Lafayette'
+      association_id: 1
+      code_postal: '69003'
+      created_at: '-1d'
+      date_naissance: null
+      email: p.dubois@orange.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 8
+      nom: Dubois
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Pierre
+      telephone: 06.23.56.89.12
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '7 quai Saint-Vincent'
+      association_id: 1
+      code_postal: '69001'
+      created_at: '-1d'
+      date_naissance: null
+      email: camille.martin@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 9
+      nom: Martin
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Camille
+      telephone: 07.34.67.90.23
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '22 rue de la République'
+      association_id: 1
+      code_postal: '69002'
+      created_at: '-1d'
+      date_naissance: null
+      email: lucas.petit@laposte.net
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 10
+      nom: Petit
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Lucas
+      telephone: 06.45.78.01.34
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '5 place Bellecour'
+      association_id: 1
+      code_postal: '69002'
+      created_at: '-1d'
+      date_naissance: null
+      email: emilie.roux@free.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 11
+      nom: Roux
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Émilie
+      telephone: 07.56.89.12.45
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '11 avenue Berthelot'
+      association_id: 1
+      code_postal: '69007'
+      created_at: '-1d'
+      date_naissance: null
+      email: antoine.lefebvre@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 12
+      nom: LEFEBVRE
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Antoine
+      telephone: 06.67.90.23.56
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '29 rue Tronchet'
+      association_id: 1
+      code_postal: '69006'
+      created_at: '-1d'
+      date_naissance: null
+      email: julie.moreau@hotmail.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 13
+      nom: Moreau
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Julie
+      telephone: 07.78.01.34.67
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '8 rue Mercière'
+      association_id: 1
+      code_postal: '69002'
+      created_at: '-1d'
+      date_naissance: null
+      email: thomas.garcia@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 14
+      nom: Garcia
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Thomas
+      telephone: 06.89.12.45.78
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '3 boulevard de la Croix-Rousse'
+      association_id: 1
+      code_postal: '69004'
+      created_at: '-1d'
+      date_naissance: null
+      email: mathilde.lopez@yahoo.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 15
+      nom: Lopez
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Mathilde
+      telephone: 07.90.23.56.89
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '17 rue Smith'
+      association_id: 1
+      code_postal: '69002'
+      created_at: '-1d'
+      date_naissance: null
+      email: n.david@outlook.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 16
+      nom: David
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Nicolas
+      telephone: 06.01.34.67.90
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '6 cours Gambetta'
+      association_id: 1
+      code_postal: '69003'
+      created_at: '-1d'
+      date_naissance: null
+      email: lea.bertrand@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 17
+      nom: Bertrand
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Léa
+      telephone: 07.12.45.78.01
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '24 rue Garibaldi'
+      association_id: 1
+      code_postal: '69006'
+      created_at: '-1d'
+      date_naissance: null
+      email: maxime.robert@laposte.net
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 18
+      nom: Robert
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Maxime
+      telephone: 06.23.67.90.12
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '12 rue Pierre Corneille'
+      association_id: 1
+      code_postal: '69003'
+      created_at: '-1d'
+      date_naissance: null
+      email: clara.richard@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 19
+      nom: Richard
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Clara
+      telephone: 07.34.78.01.23
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '9 rue de Marseille'
+      association_id: 1
+      code_postal: '69007'
+      created_at: '-1d'
+      date_naissance: null
+      email: hugo.durand@orange.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 20
+      nom: Durand
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Hugo
+      telephone: 06.45.89.12.34
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '15 rue de Montbrillant'
+      association_id: 1
+      code_postal: '69003'
+      created_at: '-1d'
+      date_naissance: null
+      email: anais.leroy@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 21
+      nom: Leroy
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Anaïs
+      telephone: 07.56.90.23.45
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '4 rue de la Charité'
+      association_id: 1
+      code_postal: '69002'
+      created_at: '-1d'
+      date_naissance: null
+      email: vincent.fournier@free.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 22
+      nom: Fournier
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Vincent
+      telephone: 06.67.01.34.56
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '21 grande rue de Vaise'
+      association_id: 1
+      code_postal: '69009'
+      created_at: '-1d'
+      date_naissance: null
+      email: sarah.girard@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 23
+      nom: Girard
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Sarah
+      telephone: 07.78.12.45.67
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '13 rue Auguste Comte'
+      association_id: 1
+      code_postal: '69002'
+      created_at: '-1d'
+      date_naissance: null
+      email: julien.lambert@hotmail.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 24
+      nom: LAMBERT
+      pays: France
+      pour_depenses: 1
+      pour_recettes: 1
+      prenom: Julien
+      telephone: 06.89.23.56.78
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '2 rue de la Part-Dieu'
+      association_id: 1
+      code_postal: '69003'
+      created_at: '-1d'
+      date_naissance: null
+      email: manon.bonnet@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 25
+      nom: Bonnet
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Manon
+      telephone: 07.90.34.67.89
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '18 rue de Gerland'
+      association_id: 1
+      code_postal: '69007'
+      created_at: '-1d'
+      date_naissance: null
+      email: romain.francois@laposte.net
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 26
+      nom: François
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Romain
+      telephone: 06.01.45.78.90
+      type: particulier
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '7 avenue Jean Jaurès'
+      association_id: 1
+      code_postal: '69100'
+      created_at: '-1d'
+      date_naissance: null
+      email: elodie.mercier@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 27
+      nom: Mercier
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Élodie
+      telephone: 07.12.56.89.01
+      type: particulier
+      updated_at: '-1d'
+      ville: Villeurbanne
+    -
+      adresse_ligne1: '11 cours Émile Zola'
+      association_id: 1
+      code_postal: '69100'
+      created_at: '-1d'
+      date_naissance: null
+      email: damien.blanc@orange.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 28
+      nom: Blanc
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Damien
+      telephone: 06.23.78.01.34
+      type: particulier
+      updated_at: '-1d'
+      ville: Villeurbanne
+    -
+      adresse_ligne1: '6 rue de la République'
+      association_id: 1
+      code_postal: '69300'
+      created_at: '-1d'
+      date_naissance: null
+      email: charlotte.henry@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 29
+      nom: Henry
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Charlotte
+      telephone: 07.34.89.12.45
+      type: particulier
+      updated_at: '-1d'
+      ville: Caluire-et-Cuire
+    -
+      adresse_ligne1: '25 chemin de Vassieux'
+      association_id: 1
+      code_postal: '69300'
+      created_at: '-1d'
+      date_naissance: null
+      email: olivier.faure@free.fr
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 30
+      nom: Faure
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Olivier
+      telephone: 06.45.90.23.56
+      type: particulier
+      updated_at: '-1d'
+      ville: Caluire-et-Cuire
+    -
+      adresse_ligne1: '4 place de la Mairie'
+      association_id: 1
+      code_postal: '69500'
+      created_at: '-1d'
+      date_naissance: null
+      email: marie.gauthier@gmail.com
+      email_optout: 0
+      entreprise: null
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 31
+      nom: Gauthier
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Marie
+      telephone: 07.56.01.34.67
+      type: particulier
+      updated_at: '-1d'
+      ville: Bron
+    -
+      adresse_ligne1: '42 rue Hippolyte Kahn'
+      association_id: 1
+      code_postal: '69100'
+      created_at: '-1d'
+      date_naissance: null
+      email: contact@rhone-express.fr
+      email_optout: 0
+      entreprise: 'Imprimerie Rhône Express'
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 32
+      nom: Renaud
+      pays: France
+      pour_depenses: 1
+      pour_recettes: 0
+      prenom: Philippe
+      telephone: 04.78.12.34.56
+      type: entreprise
+      updated_at: '-1d'
+      ville: Villeurbanne
+    -
+      adresse_ligne1: '15 rue des Farges'
+      association_id: 1
+      code_postal: '69005'
+      created_at: '-1d'
+      date_naissance: null
+      email: contact@boulangerie-stjust.fr
+      email_optout: 0
+      entreprise: 'Boulangerie Saint-Just'
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 33
+      nom: Vidal
+      pays: France
+      pour_depenses: 1
+      pour_recettes: 0
+      prenom: Christine
+      telephone: 04.78.23.45.67
+      type: entreprise
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '8 rue Bossuet'
+      association_id: 1
+      code_postal: '69006'
+      created_at: '-1d'
+      date_naissance: null
+      email: reservation@salle-brotteaux.fr
+      email_optout: 0
+      entreprise: 'Salle des Brotteaux'
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 34
+      nom: MOREL
+      pays: France
+      pour_depenses: 1
+      pour_recettes: 0
+      prenom: Sébastien
+      telephone: 04.78.34.56.78
+      type: entreprise
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '5 place Bellecour'
+      association_id: 1
+      code_postal: '69002'
+      created_at: '-1d'
+      date_naissance: null
+      email: contact.lyon@cm-cic.fr
+      email_optout: 0
+      entreprise: 'Crédit Mutuel Lyon Centre'
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 35
+      nom: Lemoine
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Catherine
+      telephone: 04.78.45.67.89
+      type: entreprise
+      updated_at: '-1d'
+      ville: Lyon
+    -
+      adresse_ligne1: '21 rue de la Bourse'
+      association_id: 1
+      code_postal: '69002'
+      created_at: '-1d'
+      date_naissance: null
+      email: contact@atos-conseil.fr
+      email_optout: 0
+      entreprise: 'ATOS Conseil'
+      est_helloasso: 0
+      helloasso_nom: null
+      helloasso_prenom: null
+      id: 36
+      nom: Chevalier
+      pays: France
+      pour_depenses: 0
+      pour_recettes: 1
+      prenom: Frédéric
+      telephone: 04.78.56.78.90
+      type: entreprise
+      updated_at: '-1d'
+      ville: Lyon
+  tiers_portail_otps: {  }
+  transaction_ligne_affectations: {  }
+  transaction_lignes:
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 1
+      montant: '25.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 1
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 2
+      montant: '25.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 2
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 3
+      montant: '25.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 3
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 4
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 2
+      transaction_id: 4
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 5
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 2
+      transaction_id: 5
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 6
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 2
+      transaction_id: 6
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 7
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 2
+      transaction_id: 7
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 8
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 2
+      transaction_id: 8
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 9
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 2
+      transaction_id: 9
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 10
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 2
+      transaction_id: 10
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 11
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 2
+      transaction_id: 11
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 12
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 2
+      transaction_id: 12
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 13
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 2
+      transaction_id: 13
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 14
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 2
+      transaction_id: 14
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 15
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 2
+      transaction_id: 15
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 16
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 3
+      sous_categorie_id: 2
+      transaction_id: 16
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 17
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 3
+      sous_categorie_id: 2
+      transaction_id: 17
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 18
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 3
+      sous_categorie_id: 2
+      transaction_id: 18
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 19
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 3
+      sous_categorie_id: 2
+      transaction_id: 19
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 20
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 3
+      sous_categorie_id: 2
+      transaction_id: 20
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 21
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 3
+      sous_categorie_id: 2
+      transaction_id: 21
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 22
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 4
+      sous_categorie_id: 2
+      transaction_id: 22
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 23
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 4
+      sous_categorie_id: 2
+      transaction_id: 23
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 24
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 4
+      sous_categorie_id: 2
+      transaction_id: 24
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 25
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 4
+      sous_categorie_id: 2
+      transaction_id: 25
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 26
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 4
+      sous_categorie_id: 2
+      transaction_id: 26
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 27
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 4
+      sous_categorie_id: 2
+      transaction_id: 27
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 28
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 5
+      sous_categorie_id: 2
+      transaction_id: 28
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 29
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 5
+      sous_categorie_id: 2
+      transaction_id: 29
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 30
+      montant: '100.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 5
+      sous_categorie_id: 2
+      transaction_id: 30
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 31
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 5
+      sous_categorie_id: 2
+      transaction_id: 31
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 32
+      montant: '150.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 5
+      sous_categorie_id: 2
+      transaction_id: 32
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 33
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 5
+      sous_categorie_id: 2
+      transaction_id: 33
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 34
+      montant: '250.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 17
+      transaction_id: 34
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 35
+      montant: '180.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 13
+      transaction_id: 35
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 36
+      montant: '180.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 13
+      transaction_id: 36
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 37
+      montant: '180.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 3
+      sous_categorie_id: 13
+      transaction_id: 37
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 38
+      montant: '250.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 17
+      transaction_id: 38
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 40
+      montant: '250.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 3
+      sous_categorie_id: 17
+      transaction_id: 39
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 41
+      montant: '190.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 4
+      sous_categorie_id: 13
+      transaction_id: 40
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 42
+      montant: '195.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 5
+      sous_categorie_id: 13
+      transaction_id: 41
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 43
+      montant: '250.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 4
+      sous_categorie_id: 17
+      transaction_id: 42
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 44
+      montant: '260.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 5
+      sous_categorie_id: 17
+      transaction_id: 43
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 45
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 44
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 46
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 45
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 47
+      montant: '30.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 46
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 48
+      montant: '30.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 47
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 49
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 48
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 50
+      montant: '80.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 49
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 51
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 50
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 52
+      montant: '80.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 51
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 53
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 52
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 54
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 53
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 55
+      montant: '30.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 54
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 56
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 55
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 57
+      montant: '80.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 56
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 58
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 57
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 59
+      montant: '30.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 58
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 60
+      montant: '80.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 59
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 61
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 60
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 62
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 61
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 63
+      montant: '30.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 62
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 64
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 63
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 65
+      montant: '100.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 64
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 66
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 65
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 67
+      montant: '200.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 66
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 68
+      montant: '500.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 67
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 69
+      montant: '20.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 68
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 70
+      montant: '80.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 69
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 71
+      montant: '150.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 70
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 72
+      montant: '1000.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 71
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 73
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 2
+      transaction_id: 72
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 74
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 2
+      transaction_id: 73
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 75
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 3
+      sous_categorie_id: 2
+      transaction_id: 74
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 76
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 4
+      sous_categorie_id: 2
+      transaction_id: 75
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 77
+      montant: '45.00'
+      notes: null
+      operation_id: 1
+      piece_jointe_path: null
+      seance: 5
+      sous_categorie_id: 2
+      transaction_id: 76
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 78
+      montant: '180.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 1
+      transaction_id: 77
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 79
+      montant: '180.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 1
+      transaction_id: 78
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 80
+      montant: '120.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 1
+      transaction_id: 79
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 81
+      montant: '120.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 1
+      transaction_id: 80
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 82
+      montant: '180.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 1
+      transaction_id: 81
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 83
+      montant: '120.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 1
+      sous_categorie_id: 1
+      transaction_id: 82
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 84
+      montant: '180.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 1
+      transaction_id: 83
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 85
+      montant: '180.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 1
+      transaction_id: 84
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 86
+      montant: '120.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 1
+      transaction_id: 85
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 87
+      montant: '120.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 1
+      transaction_id: 86
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 88
+      montant: '180.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 1
+      transaction_id: 87
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 89
+      montant: '120.00'
+      notes: null
+      operation_id: 2
+      piece_jointe_path: null
+      seance: 2
+      sous_categorie_id: 1
+      transaction_id: 88
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 90
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 89
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 91
+      montant: '80.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 90
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 92
+      montant: '50.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 5
+      transaction_id: 91
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 93
+      montant: '30.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 92
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 94
+      montant: '80.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 93
+    -
+      deleted_at: null
+      helloasso_item_id: null
+      id: 95
+      montant: '100.00'
+      notes: null
+      operation_id: null
+      piece_jointe_path: null
+      seance: null
+      sous_categorie_id: 6
+      transaction_id: 94
+  transactions:
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-28d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 1
+      libelle: 'Cotisation annuelle'
+      mode_paiement: cheque
+      montant_total: '25.00'
+      notes: null
+      numero_piece: '2025-2026:00001'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: Cotis001
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: recu
+      tiers_id: 24
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-27d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 2
+      libelle: 'Cotisation annuelle'
+      mode_paiement: cheque
+      montant_total: '25.00'
+      notes: null
+      numero_piece: '2025-2026:00002'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: Cotis002
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: recu
+      tiers_id: 13
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-27d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 3
+      libelle: Cotisation
+      mode_paiement: virement
+      montant_total: '25.00'
+      notes: null
+      numero_piece: '2025-2026:00003'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: Cotis003
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: recu
+      tiers_id: 9
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-226d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 4
+      libelle: 'Règlement Julie MOREAU — Parcours femmes 1 S1'
+      mode_paiement: especes
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00004'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 1
+      remise_id: 1
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 13
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-226d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 5
+      libelle: 'Règlement Camille MARTIN — Parcours femmes 1 S1'
+      mode_paiement: virement
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00005'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 11
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 9
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-226d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 6
+      libelle: 'Règlement Sophie BERNARD — Parcours femmes 1 S1'
+      mode_paiement: cheque
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00006'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 21
+      remise_id: 2
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 7
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-226d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 7
+      libelle: 'Règlement Mathilde LOPEZ — Parcours femmes 1 S1'
+      mode_paiement: cheque
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00007'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 31
+      remise_id: 2
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 15
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-226d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 8
+      libelle: 'Règlement Anaïs LEROY — Parcours femmes 1 S1'
+      mode_paiement: virement
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00008'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 41
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 21
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-226d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 9
+      libelle: 'Règlement Manon BONNET — Parcours femmes 1 S1'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00009'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 51
+      remise_id: 2
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 25
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-196d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 10
+      libelle: 'Règlement Julie MOREAU — Parcours femmes 1 S2'
+      mode_paiement: especes
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00010'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 2
+      remise_id: 1
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 13
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-196d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 11
+      libelle: 'Règlement Camille MARTIN — Parcours femmes 1 S2'
+      mode_paiement: virement
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00011'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 12
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 9
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-196d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 12
+      libelle: 'Règlement Sophie BERNARD — Parcours femmes 1 S2'
+      mode_paiement: cheque
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00012'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 22
+      remise_id: 2
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 7
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-196d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 13
+      libelle: 'Règlement Mathilde LOPEZ — Parcours femmes 1 S2'
+      mode_paiement: cheque
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00013'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 32
+      remise_id: 2
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 15
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-196d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 14
+      libelle: 'Règlement Anaïs LEROY — Parcours femmes 1 S2'
+      mode_paiement: virement
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00014'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 3
+      reference: null
+      reglement_id: 42
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 21
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-196d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 15
+      libelle: 'Règlement Manon BONNET — Parcours femmes 1 S2'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00015'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: null
+      reglement_id: 52
+      remise_id: 2
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 25
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-166d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 16
+      libelle: 'Règlement Julie MOREAU — Parcours femmes 1 S3'
+      mode_paiement: especes
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00016'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 3
+      reference: null
+      reglement_id: 3
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 13
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-166d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 17
+      libelle: 'Règlement Camille MARTIN — Parcours femmes 1 S3'
+      mode_paiement: virement
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00017'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 3
+      reference: null
+      reglement_id: 13
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 9
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-166d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 18
+      libelle: 'Règlement Sophie BERNARD — Parcours femmes 1 S3'
+      mode_paiement: cheque
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00018'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 3
+      reference: null
+      reglement_id: 23
+      remise_id: 3
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 7
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-166d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 19
+      libelle: 'Règlement Mathilde LOPEZ — Parcours femmes 1 S3'
+      mode_paiement: cheque
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00019'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 3
+      reference: null
+      reglement_id: 33
+      remise_id: 3
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 15
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-166d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 20
+      libelle: 'Règlement Anaïs LEROY — Parcours femmes 1 S3'
+      mode_paiement: virement
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00020'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 3
+      reference: null
+      reglement_id: 43
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 21
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-166d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 21
+      libelle: 'Règlement Manon BONNET — Parcours femmes 1 S3'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00021'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 3
+      reference: null
+      reglement_id: 53
+      remise_id: 3
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 25
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-128d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 22
+      libelle: 'Règlement Julie MOREAU — Parcours femmes 1 S4'
+      mode_paiement: especes
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00022'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: null
+      reglement_id: 4
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 13
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-128d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 23
+      libelle: 'Règlement Camille MARTIN — Parcours femmes 1 S4'
+      mode_paiement: virement
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00023'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: null
+      reglement_id: 14
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 9
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-128d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 24
+      libelle: 'Règlement Sophie BERNARD — Parcours femmes 1 S4'
+      mode_paiement: cheque
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00024'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: null
+      reglement_id: 24
+      remise_id: 4
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 7
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-128d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 25
+      libelle: 'Règlement Mathilde LOPEZ — Parcours femmes 1 S4'
+      mode_paiement: cheque
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00025'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: null
+      reglement_id: 34
+      remise_id: 4
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 15
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-128d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 26
+      libelle: 'Règlement Anaïs LEROY — Parcours femmes 1 S4'
+      mode_paiement: virement
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00026'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: null
+      reglement_id: 44
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 21
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-128d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 27
+      libelle: 'Règlement Manon BONNET — Parcours femmes 1 S4'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00027'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: null
+      reglement_id: 54
+      remise_id: 4
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 25
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-101d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 28
+      libelle: 'Règlement Julie MOREAU — Parcours femmes 1 S5'
+      mode_paiement: especes
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00028'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 5
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 13
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-101d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 29
+      libelle: 'Règlement Camille MARTIN — Parcours femmes 1 S5'
+      mode_paiement: virement
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00029'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 15
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 9
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-101d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 30
+      libelle: 'Règlement Sophie BERNARD — Parcours femmes 1 S5'
+      mode_paiement: cheque
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00030'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 25
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 7
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-101d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 31
+      libelle: 'Règlement Mathilde LOPEZ — Parcours femmes 1 S5'
+      mode_paiement: cheque
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00031'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 35
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 15
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-101d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 32
+      libelle: 'Règlement Anaïs LEROY — Parcours femmes 1 S5'
+      mode_paiement: virement
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00032'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 45
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 21
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-101d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 33
+      libelle: 'Règlement Manon BONNET — Parcours femmes 1 S5'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00033'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 55
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 25
+      type: recette
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-212d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 34
+      libelle: 'Animation parcours S01'
+      mode_paiement: virement
+      montant_total: '250.00'
+      notes: null
+      numero_piece: '2025-2026:00034'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: fa25003
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 24
+      type: depense
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-214d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 35
+      libelle: 'Location salle'
+      mode_paiement: virement
+      montant_total: '180.00'
+      notes: null
+      numero_piece: '2025-2026:00035'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 1
+      reference: '01245845'
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 34
+      type: depense
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-183d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 36
+      libelle: 'Location salle'
+      mode_paiement: virement
+      montant_total: '180.00'
+      notes: null
+      numero_piece: '2025-2026:00036'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 3
+      reference: '01254533'
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 34
+      type: depense
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-162d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 37
+      libelle: 'Location Samme'
+      mode_paiement: virement
+      montant_total: '180.00'
+      notes: null
+      numero_piece: '2025-2026:00037'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: '6544582'
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 34
+      type: depense
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-188d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 38
+      libelle: 'Animation parcours S02'
+      mode_paiement: virement
+      montant_total: '250.00'
+      notes: null
+      numero_piece: '2025-2026:00038'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 3
+      reference: fa250045
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 24
+      type: depense
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-162d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 39
+      libelle: 'Animation parcours S03'
+      mode_paiement: virement
+      montant_total: '250.00'
+      notes: null
+      numero_piece: '2025-2026:00039'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: fa250045
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 24
+      type: depense
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-135d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 40
+      libelle: 'Location salle'
+      mode_paiement: virement
+      montant_total: '190.00'
+      notes: null
+      numero_piece: '2025-2026:00040'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: '457884'
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 34
+      type: depense
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-91d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 41
+      libelle: 'Location Salle'
+      mode_paiement: virement
+      montant_total: '195.00'
+      notes: null
+      numero_piece: '2025-2026:00041'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: '456876'
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 34
+      type: depense
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-135d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 42
+      libelle: 'Animation Parcours S4'
+      mode_paiement: cheque
+      montant_total: '250.00'
+      notes: null
+      numero_piece: '2025-2026:00042'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: 4
+      reference: fa250487
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: pointe
+      tiers_id: 24
+      type: depense
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: '-1d'
+      date: '-101d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 43
+      libelle: 'Animation parcours S5'
+      mode_paiement: virement
+      montant_total: '260.00'
+      notes: null
+      numero_piece: '2025-2026:00043'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: fa26024
+      reglement_id: null
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 24
+      type: depense
+      updated_at: '-1d'
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-233d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 44
+      libelle: 'Cotisation 2025-2026 - Bernard Sophie'
+      mode_paiement: cheque
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00044'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 7
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-232d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 45
+      libelle: 'Cotisation 2025-2026 - Dubois Pierre'
+      mode_paiement: virement
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00045'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 8
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-231d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 46
+      libelle: 'Cotisation 2025-2026 - Martin Camille'
+      mode_paiement: especes
+      montant_total: '30.00'
+      notes: null
+      numero_piece: '2025-2026:00046'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 9
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-229d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 47
+      libelle: 'Cotisation 2025-2026 - Petit Lucas'
+      mode_paiement: especes
+      montant_total: '30.00'
+      notes: null
+      numero_piece: '2025-2026:00047'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 10
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-226d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 48
+      libelle: 'Cotisation 2025-2026 - Roux Émilie'
+      mode_paiement: cheque
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00048'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 11
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-225d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 49
+      libelle: 'Cotisation 2025-2026 - Lefebvre Antoine'
+      mode_paiement: virement
+      montant_total: '80.00'
+      notes: null
+      numero_piece: '2025-2026:00049'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 12
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-223d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 50
+      libelle: 'Cotisation 2025-2026 - Moreau Julie'
+      mode_paiement: cheque
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00050'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 13
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-219d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 51
+      libelle: 'Cotisation 2025-2026 - Garcia Thomas'
+      mode_paiement: virement
+      montant_total: '80.00'
+      notes: null
+      numero_piece: '2025-2026:00051'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 14
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-216d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 52
+      libelle: 'Cotisation 2025-2026 - Lopez Mathilde'
+      mode_paiement: cheque
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00052'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 15
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-212d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 53
+      libelle: 'Cotisation 2025-2026 - David Nicolas'
+      mode_paiement: especes
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00053'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 16
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-208d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 54
+      libelle: 'Cotisation 2025-2026 - Bertrand Léa'
+      mode_paiement: especes
+      montant_total: '30.00'
+      notes: null
+      numero_piece: '2025-2026:00054'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 17
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-204d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 55
+      libelle: 'Cotisation 2025-2026 - Robert Maxime'
+      mode_paiement: cheque
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00055'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 18
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-197d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 56
+      libelle: 'Cotisation 2025-2026 - Richard Clara'
+      mode_paiement: virement
+      montant_total: '80.00'
+      notes: null
+      numero_piece: '2025-2026:00056'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 19
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-191d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 57
+      libelle: 'Cotisation 2025-2026 - Durand Hugo'
+      mode_paiement: cheque
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00057'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 20
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-183d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 58
+      libelle: 'Cotisation 2025-2026 - Leroy Anaïs'
+      mode_paiement: especes
+      montant_total: '30.00'
+      notes: null
+      numero_piece: '2025-2026:00058'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 21
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-174d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 59
+      libelle: 'Cotisation 2025-2026 - Fournier Vincent'
+      mode_paiement: virement
+      montant_total: '80.00'
+      notes: null
+      numero_piece: '2025-2026:00059'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 22
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-148d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 60
+      libelle: 'Cotisation 2025-2026 - Girard Sarah'
+      mode_paiement: cheque
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00060'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 23
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-111d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 61
+      libelle: 'Cotisation 2025-2026 - Bonnet Manon'
+      mode_paiement: virement
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00061'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 25
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-85d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 62
+      libelle: 'Cotisation 2025-2026 - Mercier Élodie'
+      mode_paiement: especes
+      montant_total: '30.00'
+      notes: null
+      numero_piece: '2025-2026:00062'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 27
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-50d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 63
+      libelle: 'Cotisation 2025-2026 - Henry Charlotte'
+      mode_paiement: cheque
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00063'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 29
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-196d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 64
+      libelle: 'Don de Dubois Pierre'
+      mode_paiement: cheque
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00064'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 8
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-160d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 65
+      libelle: 'Don de Garcia Thomas'
+      mode_paiement: virement
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00065'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 14
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-145d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 66
+      libelle: 'Don de Richard Clara'
+      mode_paiement: cheque
+      montant_total: '200.00'
+      notes: null
+      numero_piece: '2025-2026:00066'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 19
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-132d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 67
+      libelle: 'Don de Lambert Julien'
+      mode_paiement: virement
+      montant_total: '500.00'
+      notes: null
+      numero_piece: '2025-2026:00067'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 24
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-105d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 68
+      libelle: 'Don de François Romain'
+      mode_paiement: especes
+      montant_total: '20.00'
+      notes: null
+      numero_piece: '2025-2026:00068'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 26
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-78d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 69
+      libelle: 'Don de Blanc Damien'
+      mode_paiement: cheque
+      montant_total: '80.00'
+      notes: null
+      numero_piece: '2025-2026:00069'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 28
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-55d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 70
+      libelle: 'Don de Gauthier Marie'
+      mode_paiement: virement
+      montant_total: '150.00'
+      notes: null
+      numero_piece: '2025-2026:00070'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 31
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-140d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 71
+      libelle: 'Don Crédit Mutuel Lyon Centre'
+      mode_paiement: virement
+      montant_total: '1000.00'
+      notes: null
+      numero_piece: '2025-2026:00071'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 35
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-226d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 72
+      libelle: 'Règlement Marie GAUTHIER — Parcours femmes 1 S1'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00044'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 71
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 31
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-196d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 73
+      libelle: 'Règlement Marie GAUTHIER — Parcours femmes 1 S2'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00045'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 72
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 31
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-166d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 74
+      libelle: 'Règlement Marie GAUTHIER — Parcours femmes 1 S3'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00046'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 73
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 31
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-128d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 75
+      libelle: 'Règlement Marie GAUTHIER — Parcours femmes 1 S4'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00047'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 74
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 31
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: '-101d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 76
+      libelle: 'Règlement Marie GAUTHIER — Parcours femmes 1 S5'
+      mode_paiement: cheque
+      montant_total: '45.00'
+      notes: null
+      numero_piece: '2025-2026:00048'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 75
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 31
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +11d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 77
+      libelle: 'Règlement Antoine LEFEBVRE — La connaissance de base des associations 1901 S1'
+      mode_paiement: cheque
+      montant_total: '180.00'
+      notes: null
+      numero_piece: '2025-2026:00049'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 61
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 12
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +11d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 78
+      libelle: 'Règlement Camille MARTIN — La connaissance de base des associations 1901 S1'
+      mode_paiement: cheque
+      montant_total: '180.00'
+      notes: null
+      numero_piece: '2025-2026:00050'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 63
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 9
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +11d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 79
+      libelle: 'Règlement Émilie ROUX — La connaissance de base des associations 1901 S1'
+      mode_paiement: virement
+      montant_total: '120.00'
+      notes: null
+      numero_piece: '2025-2026:00051'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 65
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 11
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +11d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 80
+      libelle: 'Règlement Julie MOREAU — La connaissance de base des associations 1901 S1'
+      mode_paiement: virement
+      montant_total: '120.00'
+      notes: null
+      numero_piece: '2025-2026:00052'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 67
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 13
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +11d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 81
+      libelle: 'Règlement Pierre DUBOIS — La connaissance de base des associations 1901 S1'
+      mode_paiement: cheque
+      montant_total: '180.00'
+      notes: null
+      numero_piece: '2025-2026:00053'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 69
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 8
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +11d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 82
+      libelle: 'Règlement Marie GAUTHIER — La connaissance de base des associations 1901 S1'
+      mode_paiement: cheque
+      montant_total: '120.00'
+      notes: null
+      numero_piece: '2025-2026:00054'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 81
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 31
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +12d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 83
+      libelle: 'Règlement Antoine LEFEBVRE — La connaissance de base des associations 1901 S2'
+      mode_paiement: cheque
+      montant_total: '180.00'
+      notes: null
+      numero_piece: '2025-2026:00055'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 62
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 12
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +12d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 84
+      libelle: 'Règlement Camille MARTIN — La connaissance de base des associations 1901 S2'
+      mode_paiement: cheque
+      montant_total: '180.00'
+      notes: null
+      numero_piece: '2025-2026:00056'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 64
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 9
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +12d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 85
+      libelle: 'Règlement Émilie ROUX — La connaissance de base des associations 1901 S2'
+      mode_paiement: virement
+      montant_total: '120.00'
+      notes: null
+      numero_piece: '2025-2026:00057'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 66
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 11
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +12d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 86
+      libelle: 'Règlement Julie MOREAU — La connaissance de base des associations 1901 S2'
+      mode_paiement: virement
+      montant_total: '120.00'
+      notes: null
+      numero_piece: '2025-2026:00058'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 68
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 13
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +12d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 87
+      libelle: 'Règlement Pierre DUBOIS — La connaissance de base des associations 1901 S2'
+      mode_paiement: cheque
+      montant_total: '180.00'
+      notes: null
+      numero_piece: '2025-2026:00059'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 70
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 8
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 3
+      created_at: 0d
+      date: +12d
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: null
+      helloasso_payment_id: null
+      id: 88
+      libelle: 'Règlement Marie GAUTHIER — La connaissance de base des associations 1901 S2'
+      mode_paiement: cheque
+      montant_total: '120.00'
+      notes: null
+      numero_piece: '2025-2026:00060'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: null
+      reglement_id: 82
+      remise_id: null
+      saisi_par: 1
+      statut_reglement: en_attente
+      tiers_id: 31
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 5
+      created_at: 0d
+      date: '-233d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: 1024781
+      helloasso_payment_id: 2056842
+      id: 89
+      libelle: 'Cotisation HelloAsso - Lambert Julien'
+      mode_paiement: cb
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00072'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: HA-ORDER-1024781
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 24
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 5
+      created_at: 0d
+      date: '-219d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: 1031245
+      helloasso_payment_id: 2073156
+      id: 90
+      libelle: 'Cotisation HelloAsso - François Romain'
+      mode_paiement: cb
+      montant_total: '80.00'
+      notes: null
+      numero_piece: '2025-2026:00073'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: HA-ORDER-1031245
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 26
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 5
+      created_at: 0d
+      date: '-199d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: 1042890
+      helloasso_payment_id: 2089234
+      id: 91
+      libelle: 'Cotisation HelloAsso - Faure Olivier'
+      mode_paiement: cb
+      montant_total: '50.00'
+      notes: null
+      numero_piece: '2025-2026:00074'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: HA-ORDER-1042890
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 30
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 5
+      created_at: 0d
+      date: '-172d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: 1056723
+      helloasso_payment_id: 2104567
+      id: 92
+      libelle: 'Don HelloAsso - Gauthier Marie'
+      mode_paiement: cb
+      montant_total: '30.00'
+      notes: null
+      numero_piece: '2025-2026:00075'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: HA-ORDER-1056723
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 31
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 5
+      created_at: 0d
+      date: '-128d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: 1078412
+      helloasso_payment_id: 2128943
+      id: 93
+      libelle: 'Don HelloAsso - Dubois Pierre'
+      mode_paiement: cb
+      montant_total: '80.00'
+      notes: null
+      numero_piece: '2025-2026:00076'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: HA-ORDER-1078412
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 8
+      type: recette
+      updated_at: 0d
+    -
+      association_id: 1
+      compte_id: 5
+      created_at: 0d
+      date: '-73d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      helloasso_order_id: 1102587
+      helloasso_payment_id: 2156782
+      id: 94
+      libelle: 'Don HelloAsso - Lopez Mathilde'
+      mode_paiement: cb
+      montant_total: '100.00'
+      notes: null
+      numero_piece: '2025-2026:00077'
+      piece_jointe_mime: null
+      piece_jointe_nom: null
+      piece_jointe_path: null
+      rapprochement_id: null
+      reference: HA-ORDER-1102587
+      reglement_id: null
+      remise_id: null
+      saisi_par: null
+      statut_reglement: recu
+      tiers_id: 15
+      type: recette
+      updated_at: 0d
+  two_factor_codes: {  }
+  type_operation_seances:
+    -
+      created_at: '-1d'
+      id: 1
+      numero: 1
+      titre: 'Jour 1'
+      type_operation_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 2
+      numero: 2
+      titre: 'Jour 2'
+      type_operation_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 3
+      numero: 1
+      titre: Découverte
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 4
+      numero: 2
+      titre: 'Mes émotions'
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 5
+      numero: 3
+      titre: 'Les limites'
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 6
+      numero: 4
+      titre: 'Ancré ?'
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 7
+      numero: 5
+      titre: Equilibre
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 8
+      numero: 6
+      titre: Projection
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 9
+      numero: 7
+      titre: 'Retour sur mes émotions'
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 10
+      numero: 8
+      titre: 'Mes objectifs'
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 11
+      numero: 9
+      titre: 'Stabilité et résiliance'
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 12
+      numero: 10
+      titre: 'Bilan et futur'
+      type_operation_id: 1
+      updated_at: '-1d'
+  type_operation_tarifs:
+    -
+      created_at: '-1d'
+      id: 4
+      libelle: Normal
+      montant: '180.00'
+      type_operation_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 5
+      libelle: Réduit
+      montant: '120.00'
+      type_operation_id: 2
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 6
+      libelle: 'Tarif normal'
+      montant: '150.00'
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 7
+      libelle: 'Tarif réduit'
+      montant: '100.00'
+      type_operation_id: 1
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      id: 8
+      libelle: 'Tarif solidaire'
+      montant: '45.00'
+      type_operation_id: 1
+      updated_at: '-1d'
+  type_operations:
+    -
+      actif: 1
+      association_id: 1
+      attestation_medicale_path: null
+      created_at: '-1d'
+      description: 'Parcours thérapeutique de 10 séances avec médiation animale.'
+      email_from: null
+      email_from_name: null
+      formulaire_actif: 0
+      formulaire_droit_image: 1
+      formulaire_parcours_therapeutique: 1
+      formulaire_prescripteur: 1
+      formulaire_prescripteur_titre: null
+      formulaire_qualificatif_atelier: null
+      id: 1
+      libelle_article: 'le parcours de soins thérapeutique'
+      logo_path: null
+      nom: 'Parcours de soins thérapeutique'
+      nombre_seances: 10
+      reserve_adherents: 1
+      sous_categorie_id: 2
+      updated_at: '-1d'
+    -
+      actif: 1
+      association_id: 1
+      attestation_medicale_path: null
+      created_at: '-1d'
+      description: 'Formation ouverte à tous, sur deux jours.'
+      email_from: null
+      email_from_name: null
+      formulaire_actif: 0
+      formulaire_droit_image: 0
+      formulaire_parcours_therapeutique: 0
+      formulaire_prescripteur: 0
+      formulaire_prescripteur_titre: null
+      formulaire_qualificatif_atelier: null
+      id: 2
+      libelle_article: 'la formation'
+      logo_path: null
+      nom: Formation
+      nombre_seances: 2
+      reserve_adherents: 1
+      sous_categorie_id: 1
+      updated_at: '-1d'
+  usages_sous_categories:
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 1
+      sous_categorie_id: 1
+      updated_at: '-1d'
+      usage: inscription
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 2
+      sous_categorie_id: 2
+      updated_at: '-1d'
+      usage: inscription
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 3
+      sous_categorie_id: 5
+      updated_at: '-1d'
+      usage: cotisation
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 4
+      sous_categorie_id: 6
+      updated_at: '-1d'
+      usage: don
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 5
+      sous_categorie_id: 7
+      updated_at: '-1d'
+      usage: don
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 6
+      sous_categorie_id: 9
+      updated_at: '-1d'
+      usage: don
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 7
+      sous_categorie_id: 9
+      updated_at: '-1d'
+      usage: abandon_creance
+    -
+      association_id: 1
+      created_at: '-1d'
+      id: 8
+      sous_categorie_id: 21
+      updated_at: '-1d'
+      usage: frais_kilometriques
+  users:
+    -
+      created_at: '-1d'
+      dernier_espace: compta
+      derniere_association_id: 1
+      email: admin@demo.fr
+      email_verified_at: '-1d'
+      id: 1
+      nom: 'Marie Dupont'
+      password: $2y$12$70r/NnnHK5IpvNqor/8crO/xnNsascPzsKdorcqAASnP3MQkD6tTC
+      peut_voir_donnees_sensibles: 1
+      remember_token: null
+      role_systeme: user
+      two_factor_confirmed_at: null
+      two_factor_method: null
+      two_factor_recovery_codes: null
+      two_factor_secret: null
+      two_factor_trusted_token: null
+      updated_at: '-1d'
+    -
+      created_at: '-1d'
+      dernier_espace: compta
+      derniere_association_id: null
+      email: jean@demo.fr
+      email_verified_at: '-1d'
+      id: 2
+      nom: 'Jean Martin'
+      password: $2y$12$70r/NnnHK5IpvNqor/8crO/xnNsascPzsKdorcqAASnP3MQkD6tTC
+      peut_voir_donnees_sensibles: 0
+      remember_token: null
+      role_systeme: user
+      two_factor_confirmed_at: null
+      two_factor_method: null
+      two_factor_recovery_codes: null
+      two_factor_secret: null
+      two_factor_trusted_token: null
+      updated_at: '-1d'
+  virements_internes:
+    -
+      association_id: 1
+      compte_destination_id: 4
+      compte_source_id: 3
+      created_at: 0d
+      date: '-4d'
+      deleted_at: null
+      helloasso_cashout_id: null
+      id: 1
+      montant: '1500.00'
+      notes: null
+      numero_piece: '2025-2026:00061'
+      rapprochement_destination_id: null
+      rapprochement_source_id: null
+      reference: epargne
+      saisi_par: 1
+      updated_at: 0d

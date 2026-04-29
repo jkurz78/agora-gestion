@@ -40,6 +40,7 @@ use App\Http\Controllers\TransactionLignePieceJointeController;
 use App\Http\Controllers\TransactionPieceJointeController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\CheckEspaceAccess;
+use App\Http\Middleware\EnforceDemoReadOnly;
 use App\Http\Middleware\EnsureTwoFactor;
 use App\Http\Middleware\VerifyTenantAsset;
 use App\Livewire\Auth\AssociationSelector;
@@ -66,7 +67,7 @@ Route::middleware('auth')->get('/', function () {
 })->name('home');
 
 // ── Paramètres ──
-Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess::class.':parametres'])
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess::class.':parametres', EnforceDemoReadOnly::class])
     ->prefix('parametres')
     ->name('parametres.')
     ->group(function (): void {

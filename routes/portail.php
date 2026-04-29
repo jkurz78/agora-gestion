@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Portail\DemoLoginAsTierController;
 use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
@@ -33,6 +34,7 @@ Route::prefix('{association:slug}/portail')
         Route::get('/login', Login::class)->name('login');
         Route::get('/otp', OtpVerify::class)->name('otp');
         Route::get('/choisir', ChooseTiers::class)->name('choisir');
+        Route::get('/demo/login-as/{tierId}', DemoLoginAsTierController::class)->name('demo.login-as');
         Route::middleware([EnsureTiersChosen::class, EnforceSessionLifetime::class, Authenticate::class])->group(function () {
             Route::get('/', Home::class)->name('home');
             Route::post('/logout', LogoutController::class)->name('logout');
