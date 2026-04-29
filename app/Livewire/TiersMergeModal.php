@@ -160,6 +160,7 @@ final class TiersMergeModal extends Component
         if ($this->context === 'merge_full' && $this->sourceTiersId !== null) {
             $source = Tiers::findOrFail($this->sourceTiersId);
             $target = Tiers::findOrFail($this->tiersId);
+            $targetId = $target->id;
 
             $report = app(TiersService::class)->merge(
                 $source,
@@ -168,12 +169,17 @@ final class TiersMergeModal extends Component
                 $this->sourceBooleans,
             );
 
-            $this->dispatch('tiers-merge-confirmed',
-                tiersId: $this->tiersId,
-                context: $this->context,
-                contextData: array_merge($this->contextData, ['report' => $report]),
-            );
+            $totalMoved = array_sum($report['counts']);
+            $survivorName = Tiers::find($targetId)?->displayName() ?? 'Tiers cible';
+            session()->flash('message', "Fusion terminée : {$totalMoved} enregistrement(s) réaffecté(s) sur « {$survivorName} ». Le tiers source a été supprimé.");
+
             $this->closeModal();
+
+            // Redirect from the modal itself: any other Livewire component on
+            // the page mounted with the source tiers (e.g. TiersFusion) would
+            // fail to rehydrate after this AJAX request, since the source row
+            // is gone. Forcing a full navigation here sidesteps that.
+            $this->redirect(route('tiers.transactions', $targetId), navigate: false);
 
             return;
         }

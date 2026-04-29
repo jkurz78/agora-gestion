@@ -72,27 +72,6 @@ final class TiersFusion extends Component
         );
     }
 
-    /**
-     * Once the modal has fused source into target, redirect to the survivor's
-     * detail page with a flash message recapping what moved.
-     */
-    #[On('tiers-merge-confirmed')]
-    public function onMergeConfirmed(int $tiersId, string $context, array $contextData = []): void
-    {
-        if ($context !== 'merge_full') {
-            return;
-        }
-
-        $report = $contextData['report'] ?? null;
-        $totalMoved = is_array($report['counts'] ?? null) ? array_sum($report['counts']) : 0;
-
-        $survivorName = Tiers::find($tiersId)?->displayName() ?? 'Tiers cible';
-
-        session()->flash('message', "Fusion terminée : {$totalMoved} enregistrement(s) réaffecté(s) sur « {$survivorName} ». Le tiers source a été supprimé.");
-
-        $this->redirect(route('tiers.transactions', $tiersId), navigate: false);
-    }
-
     public function render(): View
     {
         return view('livewire.tiers-fusion');
