@@ -27,6 +27,9 @@ final class DemoLoginAsTierController extends Controller
 {
     public function __invoke(\Illuminate\Http\Request $request): RedirectResponse
     {
+        $tierId = (int) $request->route('tierId');
+        $association = $request->route('association'); // null en mono, Association en slug-first
+
         // ── GARDE STRICTE — doit rester en première position ──────────────────
         if (! Demo::isActive()) {
             abort(403, 'Bypass OTP portail interdit hors environnement démo.');

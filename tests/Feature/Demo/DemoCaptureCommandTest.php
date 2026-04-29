@@ -3,7 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\FacturePartenaireDeposee;
 use App\Models\HelloassoParametres;
+use App\Models\NoteDeFrais;
+use App\Models\NoteDeFraisLigne;
+use App\Models\Operation;
+use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Support\Demo\SnapshotConfig;
@@ -337,4 +342,228 @@ it('copies both logo and cachet files and emits two files entries', function ():
     Storage::disk('local')->delete("associations/{$assocId}/branding/logo.png");
     Storage::disk('local')->delete("associations/{$assocId}/branding/cachet.jpg");
     $current->update(['logo_path' => null, 'cachet_signature_path' => null]);
+});
+
+// T_NDF : ligne NDF avec piece_jointe_path (full path) → copie + entrée YAML
+it('T_NDF: copies NDF piece jointe full-path file and adds files entry to YAML', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    $assocId = $current->id;
+
+    // Seed NDF and ligne via factories (FK-safe)
+    $ndf = NoteDeFrais::factory()->create(['association_id' => $assocId]);
+    $fullPath = "associations/{$assocId}/notes-de-frais/{$ndf->id}/ligne-1.pdf";
+
+    // Place fake file on disk
+    Storage::disk('local')->put($fullPath, 'FAKE_PDF_CONTENT');
+
+    $ligne = NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'piece_jointe_path' => $fullPath,
+    ]);
+
+    $outFile = storage_path('testing-demo-ndf-'.uniqid().'.yaml');
+    $demoDest = base_path('database/demo/files');
+
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0, 'demo:capture should succeed');
+
+    $yaml = @file_get_contents($outFile);
+    expect($yaml)->not->toBeFalse();
+    $data = Yaml::parse($yaml);
+
+    // files section must contain the NDF entry
+    $entry = collect($data['files'])->first(
+        fn ($f) => str_contains($f['target'] ?? '', 'ligne-1.pdf')
+    );
+    expect($entry)->not->toBeNull('files entry for ligne-1.pdf must exist');
+
+    // target must be the full storage path
+    expect($entry['target'])->toBe("storage/app/private/{$fullPath}");
+
+    // source must point inside database/demo/files/
+    expect($entry['source'])->toContain('database/demo/files');
+    expect($entry['source'])->toContain('ligne-1.pdf');
+
+    // Physical file must be copied into database/demo/files/
+    $copiedPath = base_path($entry['source']);
+    expect(file_exists($copiedPath))->toBeTrue('File must be physically copied');
+
+    // Cleanup
+    @unlink($outFile);
+    @unlink($copiedPath);
+    Storage::disk('local')->delete($fullPath);
+});
+
+// T_FACTURE_PARTENAIRE : facture partenaire avec pdf_path (full path) → copie + entrée YAML
+it('T_FACTURE_PARTENAIRE: copies facture partenaire pdf full-path file and adds files entry to YAML', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    $assocId = $current->id;
+
+    $fullPath = "associations/{$assocId}/factures-deposees/2026/04/2026-04-28-fa26456-asdmlm.pdf";
+
+    // Place fake file on disk
+    Storage::disk('local')->put($fullPath, 'FAKE_PDF_FACTURE');
+
+    $facture = FacturePartenaireDeposee::factory()->create([
+        'association_id' => $assocId,
+        'pdf_path' => $fullPath,
+    ]);
+
+    $outFile = storage_path('testing-demo-facture-'.uniqid().'.yaml');
+
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0, 'demo:capture should succeed');
+
+    $yaml = @file_get_contents($outFile);
+    expect($yaml)->not->toBeFalse();
+    $data = Yaml::parse($yaml);
+
+    // files section must contain the facture entry
+    $entry = collect($data['files'])->first(
+        fn ($f) => str_contains($f['target'] ?? '', '2026-04-28-fa26456-asdmlm.pdf')
+    );
+    expect($entry)->not->toBeNull('files entry for facture PDF must exist');
+
+    // target must be the full storage path
+    expect($entry['target'])->toBe("storage/app/private/{$fullPath}");
+
+    // source must point inside database/demo/files/
+    expect($entry['source'])->toContain('database/demo/files');
+    expect($entry['source'])->toContain('2026-04-28-fa26456-asdmlm.pdf');
+
+    // Physical file must be copied into database/demo/files/
+    $copiedPath = base_path($entry['source']);
+    expect(file_exists($copiedPath))->toBeTrue('File must be physically copied');
+
+    // Cleanup
+    @unlink($outFile);
+    @unlink($copiedPath);
+    Storage::disk('local')->delete($fullPath);
+});
+
+// T_SEANCE : séance avec feuille_signee_path (basename) → copie + entrée YAML
+it('T_SEANCE: copies seance feuille signee basename file and adds files entry to YAML', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    $assocId = $current->id;
+
+    // Seance requires FK to operation — create a real operation first.
+    $operation = Operation::factory()->create(['association_id' => $assocId]);
+
+    $seance = Seance::create([
+        'association_id' => $assocId,
+        'operation_id' => $operation->id,
+        'numero' => 1,
+        'date' => '2026-04-01',
+        'titre' => 'Séance test capture',
+        'feuille_signee_path' => 'feuille-signee.pdf',
+    ]);
+
+    // Place fake file on disk
+    $storagePath = "associations/{$assocId}/seances/{$seance->id}/feuille-signee.pdf";
+    Storage::disk('local')->put($storagePath, 'FAKE_PDF_FEUILLE');
+
+    $outFile = storage_path('testing-demo-seance-'.uniqid().'.yaml');
+
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0, 'demo:capture should succeed');
+
+    $yaml = @file_get_contents($outFile);
+    expect($yaml)->not->toBeFalse();
+    $data = Yaml::parse($yaml);
+
+    // files section must contain the seance entry
+    $entry = collect($data['files'])->first(
+        fn ($f) => str_contains($f['target'] ?? '', 'seances') && str_contains($f['target'] ?? '', 'feuille-signee.pdf')
+    );
+    expect($entry)->not->toBeNull('files entry for feuille-signee.pdf must exist');
+
+    // target must match the storage path pattern
+    expect($entry['target'])->toBe("storage/app/private/{$storagePath}");
+
+    // Physical file must be copied
+    $copiedPath = base_path($entry['source']);
+    expect(file_exists($copiedPath))->toBeTrue('File must be physically copied');
+
+    // Cleanup
+    @unlink($outFile);
+    @unlink($copiedPath);
+    Storage::disk('local')->delete($storagePath);
+});
+
+// T_TRAVERSAL : path traversal dans piece_jointe_path → refus, fichier non copié
+it('T_TRAVERSAL: skips NDF piece jointe with path traversal and does not copy file', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    $assocId = $current->id;
+
+    $ndf = NoteDeFrais::factory()->create(['association_id' => $assocId]);
+
+    // Malicious paths — one with .., one absolute
+    $maliciousPath = '../../../etc/passwd';
+
+    $ligne = NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'piece_jointe_path' => $maliciousPath,
+    ]);
+
+    $outFile = storage_path('testing-demo-traversal-'.uniqid().'.yaml');
+
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0, 'demo:capture should succeed even with bad paths (skip silently)');
+
+    $yaml = @file_get_contents($outFile);
+    expect($yaml)->not->toBeFalse();
+    $data = Yaml::parse($yaml);
+
+    // No files entry for the traversal path
+    $traversalEntry = collect($data['files'])->first(
+        fn ($f) => str_contains($f['target'] ?? '', 'passwd') || str_contains($f['source'] ?? '', 'passwd')
+    );
+    expect($traversalEntry)->toBeNull('traversal path must not appear in files entries');
+
+    // /etc/passwd must not be touched
+    expect(file_exists(base_path('etc/passwd')))->toBeFalse('path traversal target must not be created');
+
+    @unlink($outFile);
+});
+
+// T_TRAVERSAL_ABSOLUTE : path absolu → refus
+it('T_TRAVERSAL_ABSOLUTE: skips NDF piece jointe with absolute path and does not copy file', function (): void {
+    $current = TenantContext::current();
+    Association::withoutGlobalScopes()->where('id', '!=', $current->id)->delete();
+
+    $assocId = $current->id;
+
+    $ndf = NoteDeFrais::factory()->create(['association_id' => $assocId]);
+
+    $absolutePath = '/etc/shadow';
+
+    $ligne = NoteDeFraisLigne::factory()->create([
+        'note_de_frais_id' => $ndf->id,
+        'piece_jointe_path' => $absolutePath,
+    ]);
+
+    $outFile = storage_path('testing-demo-traversal-abs-'.uniqid().'.yaml');
+
+    $exitCode = $this->artisan('demo:capture', ['--out' => $outFile])->execute();
+    expect($exitCode)->toBe(0, 'demo:capture should succeed even with absolute paths (skip silently)');
+
+    $yaml = @file_get_contents($outFile);
+    expect($yaml)->not->toBeFalse();
+    $data = Yaml::parse($yaml);
+
+    // No files entry for the absolute path
+    $badEntry = collect($data['files'])->first(
+        fn ($f) => str_contains($f['target'] ?? '', 'shadow') || str_contains($f['source'] ?? '', 'shadow')
+    );
+    expect($badEntry)->toBeNull('absolute path must not appear in files entries');
+
+    @unlink($outFile);
 });
