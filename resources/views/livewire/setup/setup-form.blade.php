@@ -3,17 +3,10 @@
         <h1 class="h4 mb-1"><i class="bi bi-stars me-2" aria-hidden="true"></i>Bienvenue sur AgoraGestion</h1>
         <p class="text-muted small mb-4">Configurons votre instance en quelques secondes.</p>
 
-        <div class="row g-3">
-            <div class="col-md-6">
-                <label for="setup-prenom" class="form-label small fw-semibold">Prénom</label>
-                <input type="text" id="setup-prenom" class="form-control" wire:model="prenom" autocomplete="given-name" required maxlength="50" autofocus>
-                @error('prenom')<div class="invalid-feedback d-block small">{{ $message }}</div>@enderror
-            </div>
-            <div class="col-md-6">
-                <label for="setup-nom" class="form-label small fw-semibold">Nom</label>
-                <input type="text" id="setup-nom" class="form-control" wire:model="nom" autocomplete="family-name" required maxlength="50">
-                @error('nom')<div class="invalid-feedback d-block small">{{ $message }}</div>@enderror
-            </div>
+        <div>
+            <label for="setup-nom" class="form-label small fw-semibold">Nom complet</label>
+            <input type="text" id="setup-nom" class="form-control" wire:model="nom" autocomplete="name" required maxlength="100" autofocus>
+            @error('nom')<div class="invalid-feedback d-block small">{{ $message }}</div>@enderror
         </div>
 
         <div class="mt-3">

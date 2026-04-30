@@ -18,8 +18,6 @@ use Livewire\Component;
 
 final class SetupForm extends Component
 {
-    public string $prenom = '';
-
     public string $nom = '';
 
     public string $email = '';
@@ -36,8 +34,7 @@ final class SetupForm extends Component
     protected function rules(): array
     {
         return [
-            'prenom' => 'required|string|max:50',
-            'nom' => 'required|string|max:50',
+            'nom' => 'required|string|max:100',
             'email' => 'required|email|max:150|unique:users,email',
             'password' => ['required', 'string', 'confirmed', Password::defaults()],
             'nomAsso' => 'required|string|max:100',
@@ -50,10 +47,8 @@ final class SetupForm extends Component
     protected function messages(): array
     {
         return [
-            'prenom.required' => 'Le prénom est obligatoire.',
-            'prenom.max' => 'Le prénom ne doit pas dépasser 50 caractères.',
-            'nom.required' => 'Le nom est obligatoire.',
-            'nom.max' => 'Le nom ne doit pas dépasser 50 caractères.',
+            'nom.required' => 'Le nom complet est obligatoire.',
+            'nom.max' => 'Le nom complet ne doit pas dépasser 100 caractères.',
             'email.required' => "L'email est obligatoire.",
             'email.email' => "L'email n'est pas valide.",
             'email.max' => "L'email ne doit pas dépasser 150 caractères.",
@@ -100,7 +95,6 @@ final class SetupForm extends Component
             ]);
 
             $user = User::create([
-                'prenom' => $this->prenom,
                 'nom' => $this->nom,
                 'email' => $this->email,
                 'password' => Hash::make($this->password),

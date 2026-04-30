@@ -23,7 +23,6 @@ it('renders the setup form when the page is requested', function () {
 
 it('exposes 5 form fields with correct initial values', function () {
     Livewire::test(SetupForm::class)
-        ->assertSet('prenom', '')
         ->assertSet('nom', '')
         ->assertSet('email', '')
         ->assertSet('password', '')
@@ -38,13 +37,12 @@ it('exposes the password_confirmation property', function () {
 it('rejects submit with empty fields', function () {
     Livewire::test(SetupForm::class)
         ->call('submit')
-        ->assertHasErrors(['prenom', 'nom', 'email', 'password', 'nomAsso']);
+        ->assertHasErrors(['nom', 'email', 'password', 'nomAsso']);
 });
 
 it('rejects submit with invalid email format', function () {
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'not-an-email')
         ->set('password', 'azerty1234')
         ->set('password_confirmation', 'azerty1234')
@@ -55,8 +53,7 @@ it('rejects submit with invalid email format', function () {
 
 it('rejects submit with password shorter than 8 characters', function () {
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'abc12')
         ->set('nomAsso', 'Mon Asso')
@@ -66,8 +63,7 @@ it('rejects submit with password shorter than 8 characters', function () {
 
 it('rejects submit when password and confirmation do not match', function () {
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
         ->set('password_confirmation', 'WRONG')
@@ -80,8 +76,7 @@ it('rejects submit with email already taken', function () {
     User::factory()->create(['email' => 'marie@asso.fr']);
 
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
         ->set('password_confirmation', 'azerty1234')
@@ -92,8 +87,7 @@ it('rejects submit with email already taken', function () {
 
 it('passes validation on a fully valid payload', function () {
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
         ->set('password_confirmation', 'azerty1234')
@@ -104,8 +98,7 @@ it('passes validation on a fully valid payload', function () {
 
 it('creates super-admin user, asso, binding and auto-logs in on valid submit', function () {
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
         ->set('password_confirmation', 'azerty1234')
@@ -115,8 +108,7 @@ it('creates super-admin user, asso, binding and auto-logs in on valid submit', f
 
     $user = User::where('email', 'marie@asso.fr')->first();
     expect($user)->not->toBeNull();
-    expect($user->prenom)->toBe('Marie');
-    expect($user->nom)->toBe('Dupont');
+    expect($user->nom)->toBe('Marie Dupont');
     expect($user->role_systeme)->toBe(RoleSysteme::SuperAdmin);
     expect($user->email_verified_at)->not->toBeNull();
     expect(Hash::check('azerty1234', $user->password))->toBeTrue();
@@ -142,8 +134,7 @@ it('invalidates the app.installed cache after a successful submit', function () 
     Cache::put('app.installed', false, 3600);
 
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
         ->set('password_confirmation', 'azerty1234')
@@ -161,8 +152,7 @@ it('handles slug collision by suffixing -2, -3, ...', function () {
     ]);
 
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
         ->set('password_confirmation', 'azerty1234')
@@ -182,8 +172,7 @@ it('redirects to /login when a super-admin already exists at submit time', funct
     Cache::forget('app.installed');
 
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
         ->set('password_confirmation', 'azerty1234')

@@ -22,8 +22,7 @@ it('walks through the full fresh-install flow : root → /setup → submit → /
 
     // Phase 3 : submitting the form creates everything
     Livewire::test(SetupForm::class)
-        ->set('prenom', 'Marie')
-        ->set('nom', 'Dupont')
+        ->set('nom', 'Marie Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
         ->set('password_confirmation', 'azerty1234')
