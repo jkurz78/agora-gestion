@@ -26,6 +26,7 @@ it('walks through the full fresh-install flow : root → /setup → submit → /
         ->set('nom', 'Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
+        ->set('password_confirmation', 'azerty1234')
         ->set('nomAsso', 'Mon Association')
         ->call('submit')
         ->assertRedirect('/dashboard');

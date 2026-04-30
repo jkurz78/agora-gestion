@@ -24,8 +24,24 @@
 
         <div class="mt-3">
             <label for="setup-password" class="form-label small fw-semibold">Mot de passe</label>
-            <input type="password" id="setup-password" class="form-control" wire:model="password" autocomplete="new-password" required minlength="8">
+            <div class="input-group">
+                <input type="password" id="setup-password" class="form-control" wire:model="password" autocomplete="new-password" required minlength="8">
+                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('setup-password', 'setup-password-icon')" aria-label="Afficher/masquer le mot de passe">
+                    <i class="bi bi-eye" id="setup-password-icon" aria-hidden="true"></i>
+                </button>
+            </div>
             <small class="text-muted">Minimum 8 caractères.</small>
+            @error('password')<div class="invalid-feedback d-block small">{{ $message }}</div>@enderror
+        </div>
+
+        <div class="mt-3">
+            <label for="setup-password-confirmation" class="form-label small fw-semibold">Confirmer le mot de passe</label>
+            <div class="input-group">
+                <input type="password" id="setup-password-confirmation" class="form-control" wire:model="password_confirmation" autocomplete="new-password" required minlength="8">
+                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('setup-password-confirmation', 'setup-password-confirmation-icon')" aria-label="Afficher/masquer le mot de passe">
+                    <i class="bi bi-eye" id="setup-password-confirmation-icon" aria-hidden="true"></i>
+                </button>
+            </div>
             @error('password')<div class="invalid-feedback d-block small">{{ $message }}</div>@enderror
         </div>
 

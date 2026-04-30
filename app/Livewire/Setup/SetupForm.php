@@ -26,6 +26,8 @@ final class SetupForm extends Component
 
     public string $password = '';
 
+    public string $password_confirmation = '';
+
     public string $nomAsso = '';
 
     /**
@@ -37,7 +39,7 @@ final class SetupForm extends Component
             'prenom' => 'required|string|max:50',
             'nom' => 'required|string|max:50',
             'email' => 'required|email|max:150|unique:users,email',
-            'password' => ['required', 'string', Password::defaults()],
+            'password' => ['required', 'string', 'confirmed', Password::defaults()],
             'nomAsso' => 'required|string|max:100',
         ];
     }
@@ -57,6 +59,7 @@ final class SetupForm extends Component
             'email.max' => "L'email ne doit pas dépasser 150 caractères.",
             'email.unique' => 'Cet email est déjà utilisé.',
             'password.required' => 'Le mot de passe est obligatoire.',
+            'password.confirmed' => 'Les deux mots de passe ne correspondent pas.',
             'nomAsso.required' => 'Le nom de l\'association est obligatoire.',
             'nomAsso.max' => 'Le nom de l\'association ne doit pas dépasser 100 caractères.',
         ];

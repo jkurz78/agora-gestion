@@ -30,6 +30,11 @@ it('exposes 5 form fields with correct initial values', function () {
         ->assertSet('nomAsso', '');
 });
 
+it('exposes the password_confirmation property', function () {
+    Livewire::test(SetupForm::class)
+        ->assertSet('password_confirmation', '');
+});
+
 it('rejects submit with empty fields', function () {
     Livewire::test(SetupForm::class)
         ->call('submit')
@@ -42,6 +47,7 @@ it('rejects submit with invalid email format', function () {
         ->set('nom', 'Dupont')
         ->set('email', 'not-an-email')
         ->set('password', 'azerty1234')
+        ->set('password_confirmation', 'azerty1234')
         ->set('nomAsso', 'Mon Asso')
         ->call('submit')
         ->assertHasErrors(['email']);
@@ -58,6 +64,18 @@ it('rejects submit with password shorter than 8 characters', function () {
         ->assertHasErrors(['password']);
 });
 
+it('rejects submit when password and confirmation do not match', function () {
+    Livewire::test(SetupForm::class)
+        ->set('prenom', 'Marie')
+        ->set('nom', 'Dupont')
+        ->set('email', 'marie@asso.fr')
+        ->set('password', 'azerty1234')
+        ->set('password_confirmation', 'WRONG')
+        ->set('nomAsso', 'Mon Asso')
+        ->call('submit')
+        ->assertHasErrors(['password']);
+});
+
 it('rejects submit with email already taken', function () {
     User::factory()->create(['email' => 'marie@asso.fr']);
 
@@ -66,6 +84,7 @@ it('rejects submit with email already taken', function () {
         ->set('nom', 'Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
+        ->set('password_confirmation', 'azerty1234')
         ->set('nomAsso', 'Mon Asso')
         ->call('submit')
         ->assertHasErrors(['email']);
@@ -77,6 +96,7 @@ it('passes validation on a fully valid payload', function () {
         ->set('nom', 'Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
+        ->set('password_confirmation', 'azerty1234')
         ->set('nomAsso', 'Mon Association')
         ->call('submit')
         ->assertHasNoErrors();
@@ -88,6 +108,7 @@ it('creates super-admin user, asso, binding and auto-logs in on valid submit', f
         ->set('nom', 'Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
+        ->set('password_confirmation', 'azerty1234')
         ->set('nomAsso', 'Mon Association')
         ->call('submit')
         ->assertRedirect('/dashboard');
@@ -125,6 +146,7 @@ it('invalidates the app.installed cache after a successful submit', function () 
         ->set('nom', 'Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
+        ->set('password_confirmation', 'azerty1234')
         ->set('nomAsso', 'Mon Association')
         ->call('submit')
         ->assertRedirect('/dashboard');
@@ -143,6 +165,7 @@ it('handles slug collision by suffixing -2, -3, ...', function () {
         ->set('nom', 'Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
+        ->set('password_confirmation', 'azerty1234')
         ->set('nomAsso', 'Mon Association')
         ->call('submit')
         ->assertRedirect('/dashboard');
@@ -163,6 +186,7 @@ it('redirects to /login when a super-admin already exists at submit time', funct
         ->set('nom', 'Dupont')
         ->set('email', 'marie@asso.fr')
         ->set('password', 'azerty1234')
+        ->set('password_confirmation', 'azerty1234')
         ->set('nomAsso', 'Mon Association')
         ->call('submit')
         ->assertRedirect('/login');
