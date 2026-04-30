@@ -18,9 +18,15 @@ Pour un environnement de développement local, voir le [README](../README.md).
 | Composer | 2.x |
 | MySQL | 8.0 (ou MariaDB 10.6+) |
 | Node.js | non requis (Bootstrap chargé via CDN, pas de build frontend) |
-| Web server | Nginx ou Apache (PHP-FPM 8.4) |
+| Web server | Nginx ou Apache (PHP-FPM 8.4), **document root pointé sur `public/`** |
 | Cron | requis pour le scheduler (réception mail, queue, rappels…) |
 | Ghostscript | requis pour la génération PDF/A-3 (Factur-X) |
+
+> ⚠️ **Document root = `public/`** : comme toute app Laravel, le `DocumentRoot`
+> Apache (ou `root` Nginx) doit pointer sur `/var/www/agora-gestion/public/`,
+> **jamais** sur la racine du repo. Pointer le webroot sur la racine exposerait
+> `.env`, `composer.lock`, `storage/`, etc. à Internet. Sur cPanel/O2Switch :
+> régler le « Document Root » du sous-domaine sur `public_html/<sous-domaine>/public`.
 
 ---
 
@@ -80,9 +86,10 @@ MAIL_FROM_NAME="Votre asso"
 php artisan migrate --force
 ```
 
-> ❗ Ne pas lancer `--seed` en production : les seeders créent des comptes
-> dev fictifs (`admin@monasso.fr`, `jean@monasso.fr`) qu'il faudrait
-> ensuite supprimer.
+> ❗ Ne pas lancer `--seed` en production : le `DatabaseSeeder` est bloqué
+> par un garde-fou en `APP_ENV=production` (il retourne early sans rien
+> écrire), mais évitez d'invoquer la commande inutilement. La création
+> du premier compte se fait par le navigateur à l'étape suivante.
 
 ---
 

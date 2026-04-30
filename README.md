@@ -60,14 +60,18 @@ php artisan serve
 
 L'app tourne sur **http://localhost:8000**. Pour le traitement en arrière-plan, lancer dans un autre terminal `php artisan queue:listen` (utile dès que vous activez la réception mail ou les rappels).
 
-### Comptes dev
+### Comptes dev (avec `--seed`)
 
-| Email | Mot de passe | Role |
+Si vous lancez `migrate:fresh --seed`, le `DatabaseSeeder` provisionne deux comptes de test pour explorer rapidement l'app :
+
+| Email | Mot de passe | Rôle |
 |-------|-------------|------|
 | `admin@monasso.fr` | `password` | Admin (Marie Dupont) |
 | `jean@monasso.fr` | `password` | Utilisateur (Jean Martin) |
 
-Le seeder cree aussi : 3 comptes bancaires, des categories/sous-categories, 2 operations avec seances, des depenses, recettes, membres, cotisations et dons.
+Le seeder crée aussi : 3 comptes bancaires, des catégories/sous-catégories, 2 opérations avec séances, des dépenses, recettes, membres, cotisations et dons.
+
+> ℹ️ **Tester le parcours fresh install** (pas de seeder) : lancer `php artisan migrate:fresh` (sans `--seed`), puis ouvrir `http://localhost` → l'app vous redirige automatiquement vers `/setup` pour créer le premier super-admin + association via formulaire web. C'est exactement ce qu'un nouvel utilisateur en prod expérimentera. Le `DatabaseSeeder` est par ailleurs bloqué par un garde-fou en `APP_ENV=production`.
 
 ## Hot Reload
 
