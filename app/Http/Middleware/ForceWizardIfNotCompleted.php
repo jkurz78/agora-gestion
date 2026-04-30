@@ -18,6 +18,7 @@ final class ForceWizardIfNotCompleted
     private const EXEMPT_PATHS = [
         'onboarding',
         'onboarding/*',
+        'setup',
         'super-admin',
         'super-admin/*',
         'livewire/*',

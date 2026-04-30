@@ -46,3 +46,19 @@ it('invalidates the cache when a super-admin is demoted', function () {
 
     expect(Cache::has('app.installed'))->toBeFalse();
 });
+
+it('invalidates the cache when a super-admin user is created', function () {
+    Cache::put('app.installed', false, 3600);
+
+    User::factory()->create(['role_systeme' => RoleSysteme::SuperAdmin]);
+
+    expect(Cache::has('app.installed'))->toBeFalse();
+});
+
+it('does NOT invalidate the cache when a regular user is created', function () {
+    Cache::put('app.installed', false, 3600);
+
+    User::factory()->create(['role_systeme' => RoleSysteme::User]);
+
+    expect(Cache::has('app.installed'))->toBeTrue();
+});

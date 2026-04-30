@@ -117,6 +117,21 @@ it('creates super-admin user, asso, binding and auto-logs in on valid submit', f
     expect(auth()->id())->toBe($user->id);
 });
 
+it('invalidates the app.installed cache after a successful submit', function () {
+    Cache::put('app.installed', false, 3600);
+
+    Livewire::test(SetupForm::class)
+        ->set('prenom', 'Marie')
+        ->set('nom', 'Dupont')
+        ->set('email', 'marie@asso.fr')
+        ->set('password', 'azerty1234')
+        ->set('nomAsso', 'Mon Association')
+        ->call('submit')
+        ->assertRedirect('/dashboard');
+
+    expect(Cache::has('app.installed'))->toBeFalse();
+});
+
 it('handles slug collision by suffixing -2, -3, ...', function () {
     Association::factory()->create([
         'nom' => 'Pré-existant',

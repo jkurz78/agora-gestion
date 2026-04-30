@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\RoleAssociation;
 use App\Enums\RoleSysteme;
+use App\Http\Middleware\RedirectIfNotInstalled;
 use App\Models\Association;
 use App\Models\User;
 use Livewire\Livewire;
@@ -63,6 +64,15 @@ it('does not loop on /onboarding itself', function () {
     $this->actingAs($this->admin)
         ->get('/onboarding')
         ->assertOk();
+});
+
+it('does not redirect /setup even with an admin needing the wizard', function () {
+    // RedirectIfNotInstalled is disabled so we can isolate ForceWizardIfNotCompleted.
+    // The key assertion is that ForceWizardIfNotCompleted does NOT redirect /setup to /onboarding.
+    $this->withoutMiddleware(RedirectIfNotInstalled::class)
+        ->actingAs($this->admin)
+        ->get('/setup')
+        ->assertOk(); // /setup renders, not redirected to /onboarding by the wizard middleware
 });
 
 it('does not redirect on /logout POST', function () {
