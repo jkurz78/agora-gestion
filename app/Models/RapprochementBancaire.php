@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\StatutRapprochement;
+use App\Enums\TypeRapprochement;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,7 @@ final class RapprochementBancaire extends TenantModel
         'solde_ouverture',
         'solde_fin',
         'statut',
+        'type',
         'saisi_par',
         'verrouille_at',
         'piece_jointe_path',
@@ -37,6 +39,7 @@ final class RapprochementBancaire extends TenantModel
             'solde_ouverture' => 'decimal:2',
             'solde_fin' => 'decimal:2',
             'statut' => StatutRapprochement::class,
+            'type' => TypeRapprochement::class,
             'verrouille_at' => 'datetime',
             'compte_id' => 'integer',
             'saisi_par' => 'integer',
@@ -87,6 +90,16 @@ final class RapprochementBancaire extends TenantModel
     public function isEnCours(): bool
     {
         return $this->statut === StatutRapprochement::EnCours;
+    }
+
+    public function isBancaire(): bool
+    {
+        return $this->type === TypeRapprochement::Bancaire;
+    }
+
+    public function isLettrage(): bool
+    {
+        return $this->type === TypeRapprochement::Lettrage;
     }
 
     public function hasPieceJointe(): bool
