@@ -48,9 +48,9 @@ Note refactor (post code review Step 5) : le binôme trait `RefusesMontantNegati
 - [x] TransactionForm (Step 5) — verdict : **Patché** — `lignes.*.montant` : `min:0.01` → `MontantValidation::RULE` + `MontantValidation::messages(['lignes.*.montant'])`. Idem sur `affectations.*.montant` dans `saveVentilation()` : `MontantValidation::RULE` + `MontantValidation::messages(['affectations.*.montant'])`. 3 tests verts (dont `save_ventilation_refuse_montant_negatif_avec_message_standard`).
 - [x] TransactionUniverselle (Step 5) — verdict : **n/a** — composant listing uniquement, aucune saisie de montant. Test documentant l'analyse : 1 test skipé.
 - [x] FactureEdit (Step 5) — verdict : **Patché** — `ajouterLigneManuelle()` avait déjà `gt:0` mais sans message standardisé. Remplacé par `MontantValidation::RULE` + `MontantValidation::messages([...])` sur `nouvelleLigneMontantPrixUnitaire` et `nouvelleLigneMontantQuantite`. 2 tests verts.
-- [ ] ReglementTable (Step 6)
-- [ ] BackOffice/NoteDeFrais (Step 6)
-- [ ] VirementInterneForm (Step 6)
+- [x] ReglementTable (Step 6) — verdict : **Patché** — `updateMontant()` : ajout `Validator::make()` + `MontantValidation::RULE` + `MontantValidation::messages(['montant'])` avant la persistance. Erreur exposée via `$this->addError('montant', ...)`. 2 tests verts.
+- [x] BackOffice/NoteDeFrais (Step 6) — verdict : **n/a (×2)** — `Index` est un listing pur (pas de saisie de montant). `Show::confirmValidation()` valide compte/date/modePaiement lors de la validation back-office ; le montant de la NDF est fixé à la soumission portail, pas ici. 2 tests skipés documentant l'analyse.
+- [x] VirementInterneForm (Step 6) — verdict : **Patché** — `save()` : `'min:0.01'` remplacé par `MontantValidation::RULE`, message standardisé ajouté via `array_merge(MontantValidation::messages(['montant']), [...])`. 3 tests verts (négatif, zéro, positif).
 - [ ] RemiseBancaireList (Step 7)
 - [ ] Portail/NoteDeFrais (Step 7)
 - [ ] CsvImportService (Step 8) — refus avec log
@@ -80,6 +80,13 @@ Nota bene sur `FluxTresorerieBuilder` : les requêtes mensuelle et rapprochement
 - `app/Livewire/FactureEdit.php` méthode `ajouterLigneManuelle()` : règle `gt:0` déjà présente, remplacée par `MontantValidation::RULE` ; messages standardisés via `MontantValidation::messages([...])` sur `nouvelleLigneMontantPrixUnitaire` et `nouvelleLigneMontantQuantite`.
 - `app/Livewire/TransactionUniverselle.php` : aucun patch nécessaire — composant listing, pas de saisie de montant.
 - Refactor post code review : `app/Livewire/Concerns/RefusesMontantNegatif.php` (trait) supprimé. `MontantValidation` étendu pour être la seule source de vérité (`RULE`, `MESSAGE`, `messages()`). Pattern à suivre pour Steps 6-8 : `MontantValidation::RULE` dans les règles, `MontantValidation::messages([...])` dans les messages.
+
+**Step 6 : deux patches nécessaires.**
+
+- `app/Livewire/ReglementTable.php` méthode `updateMontant()` : ajout `Validator::make(['montant' => $parsed], ['montant' => ['required', 'numeric', MontantValidation::RULE]], MontantValidation::messages(['montant']))` avant la persistance. Si validation échoue : `$this->addError('montant', ...)` + `return`. Cette approche (Validator manuel + addError) est utilisée car les paramètres arrivent en argument et non via une propriété Livewire.
+- `app/Livewire/VirementInterneForm.php` méthode `save()` : `'min:0.01'` remplacé par `MontantValidation::RULE` ; message standardisé ajouté via `array_merge(MontantValidation::messages(['montant']), [...autres messages...])`.
+- `app/Livewire/BackOffice/NoteDeFrais/Index.php` : n/a — listing uniquement.
+- `app/Livewire/BackOffice/NoteDeFrais/Show.php` : n/a — `confirmValidation()` ne saisit pas de montant (le montant est fixé à la soumission portail).
 
 ## 4. Précédent dans le code : extournes de provisions
 
