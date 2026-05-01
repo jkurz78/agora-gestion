@@ -2,7 +2,7 @@
 
 **Created**: 2026-05-01
 **Branch**: `claude/funny-shamir-8661f9` (worktree, post-S1 — HEAD `5f99847d`)
-**Status**: approved (2026-05-01)
+**Status**: implemented (2026-05-01)
 **Modèle de livraison** : pas de PR par slice — évolution continue S0 → S1 → S2 sur la même branche worktree (utilisateur unique reviewer). PR vers main après S2 livré et testé staging.
 **Spec source** : [docs/specs/2026-05-01-annulation-facture-avoir-s2.md](docs/specs/2026-05-01-annulation-facture-avoir-s2.md) (PASS 2026-05-01)
 **Préalables** : Slice 0 ✅ ([plans/audit-signe-negatif-s0.md](plans/audit-signe-negatif-s0.md)) + Slice 1 ✅ ([plans/extourne-transaction-s1.md](plans/extourne-transaction-s1.md))
