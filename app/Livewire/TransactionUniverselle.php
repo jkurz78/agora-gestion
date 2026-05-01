@@ -345,6 +345,9 @@ final class TransactionUniverselle extends Component
     #[On('virement-saved')]
     public function onVirementSaved(): void {}
 
+    #[On('extourne:success')]
+    public function onExtourneSuccess(): void {}
+
     public function render(): View
     {
         $activeCompteId = $this->compteId ?? $this->filterCompteId;
