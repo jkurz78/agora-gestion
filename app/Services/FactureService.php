@@ -466,7 +466,11 @@ final class FactureService
 
         $exerciceCourant = $this->exerciceService->current();
 
-        DB::transaction(function () use ($facture, $exerciceCourant): void {
+        // Capture des IDs pour le log post-commit (hors transaction)
+        $idsExtournes = [];
+        $idsDetaches = [];
+
+        DB::transaction(function () use ($facture, $exerciceCourant, &$idsExtournes, &$idsDetaches): void {
             // Lock avoirs of current exercise for sequential numbering
             $numeroAvoir = $this->calculerNumeroAvoir($exerciceCourant);
 
@@ -488,6 +492,7 @@ final class FactureService
                     $tg,
                     ExtournePayload::fromOrigine($tg),
                 );
+                $idsExtournes[] = (int) $tg->id;
             }
 
             // Détacher du pivot les TX référencées (Montant ref, sans extourne).
@@ -495,8 +500,17 @@ final class FactureService
             // they can be re-attached to a new brouillon facture (AC-5, AC-18).
             foreach ($facture->transactionsReferencees() as $tref) {
                 $facture->transactions()->detach($tref->id);
+                $idsDetaches[] = (int) $tref->id;
             }
         });
+
+        // Log après le commit (pattern identique à FactureService::valider ligne 294)
+        Log::info('facture.annulee', [
+            'facture_id' => (int) $facture->id,
+            'numero_avoir' => $facture->fresh()->numero_avoir,
+            'transactions_extournees' => $idsExtournes,
+            'transactions_detachees' => $idsDetaches,
+        ]);
     }
 
     /**
