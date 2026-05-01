@@ -8,6 +8,7 @@ use App\Models\Association;
 use App\Models\Facture;
 use App\Models\Tiers;
 use App\Models\User;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
@@ -44,6 +45,7 @@ function policyCreateFacture(Association $association): Facture
 {
     $tiers = Tiers::factory()->create(['association_id' => $association->id]);
     $user = User::factory()->create();
+    $exercice = app(ExerciceService::class)->current();
 
     return Facture::create([
         'association_id' => $association->id,
@@ -52,8 +54,8 @@ function policyCreateFacture(Association $association): Facture
         'date' => now()->toDateString(),
         'montant_total' => 100,
         'saisi_par' => $user->id,
-        'exercice' => 2025,
-        'numero' => 'F-2025-0001',
+        'exercice' => $exercice,
+        'numero' => sprintf('F-%d-0001', $exercice),
     ]);
 }
 

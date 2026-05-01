@@ -45,7 +45,7 @@ function mtCreerAssociation(): array
 /**
  * Crée une facture validée appartenant à une association donnée (bypass scope).
  */
-function mtCreerFactureValidee(Association $asso, Tiers $tiers, int $exercice): Facture
+function mtCreerFactureValidee(Association $asso, Tiers $tiers, int $exercice, User $auteur): Facture
 {
     $facture = new Facture([
         'numero' => 'F-'.$exercice.'-9901',
@@ -55,7 +55,7 @@ function mtCreerFactureValidee(Association $asso, Tiers $tiers, int $exercice): 
         'montant_total' => 100.0,
         'exercice' => $exercice,
         'mode_paiement_prevu' => ModePaiement::Virement->value,
-        'saisi_par' => 1,
+        'saisi_par' => $auteur->id,
     ]);
     $facture->association_id = $asso->id;
     $facture->saveQuietly();
@@ -109,7 +109,7 @@ beforeEach(function (): void {
     // Tiers et facture appartenant à Asso B (créés en boot B)
     TenantContext::boot($this->assoB);
     $this->tiersB = mtCreerTiers($this->assoB);
-    $this->factureB = mtCreerFactureValidee($this->assoB, $this->tiersB, $exercice);
+    $this->factureB = mtCreerFactureValidee($this->assoB, $this->tiersB, $exercice, $this->comptableB);
     TenantContext::clear();
 
     // Contexte courant = Asso A (l'intrus)

@@ -106,7 +106,7 @@ function selecteurCreerFactureAnnuleeAvecMM(
 
 // ─── BDD §2 #11 — Test 1 : sélecteur exclut la TX origine extournée ──────────
 
-test('le selecteur de FactureEdit n exclut pas la TX origine extournee d une facture precedemment annulee', function (): void {
+test('le selecteur de FactureEdit exclut la TX origine extournee d une facture precedemment annulee', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
 
     [$f1annulee, $tg, $tm] = selecteurCreerFactureAnnuleeAvecMM(
@@ -146,7 +146,7 @@ test('le selecteur de FactureEdit n exclut pas la TX origine extournee d une fac
 
 // ─── BDD §2 #11 — Test 2 : sélecteur exclut le miroir d'extourne ─────────────
 
-test('le selecteur de FactureEdit n exclut pas la TX miroir d extourne', function (): void {
+test('le selecteur de FactureEdit exclut la TX miroir d extourne', function (): void {
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
 
     [$f1annulee, $tg, $tm] = selecteurCreerFactureAnnuleeAvecMM(
