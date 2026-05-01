@@ -464,6 +464,10 @@ final class FactureService
 
         Gate::authorize('annuler', $facture);
 
+        // Pré-validation : refuse si une TX MontantManuel a déjà été extournée hors flux.
+        // Exécutée AVANT DB::transaction → si exception, la facture reste Validee sans rollback.
+        $this->assertExtournableMM($facture);
+
         $exerciceCourant = $this->exerciceService->current();
 
         // Capture des IDs pour le log post-commit (hors transaction)
@@ -922,6 +926,26 @@ XML;
         $facture->transactions()->attach($transaction->id);
 
         return $transaction;
+    }
+
+    /**
+     * Pré-validation : refuse si une TX MontantManuel a déjà été extournée hors du flux normal.
+     *
+     * Exécutée AVANT DB::transaction dans annuler(), donc si exception, la facture reste Validee
+     * sans avoir besoin de rollback. Cible l'état pathologique où extournee_at est non nul mais
+     * sans entrée Extourne correspondante (manipulation directe en base ou appel service hors UI).
+     *
+     * @throws \RuntimeException avec message "déjà été annulée" et "État incohérent"
+     */
+    private function assertExtournableMM(Facture $facture): void
+    {
+        foreach ($facture->transactionsGenereesParLignesManuelles() as $tg) {
+            if ($tg->extournee_at !== null) {
+                throw new \RuntimeException(
+                    "La transaction « {$tg->libelle} » a déjà été annulée. État incohérent — contactez l'admin."
+                );
+            }
+        }
     }
 
     /**
