@@ -57,8 +57,8 @@ Note refactor (post code review Step 5) : le binôme trait `RefusesMontantNegati
 
 ### 2.5 Affichage (Step 9)
 
-- [ ] Helper formatMontant (à identifier ou créer) — gestion signe
-- [ ] Tri data-sort sur colonnes montants — vérification numérique
+- [x] Helper formatMontant — verdict : **absent** — Aucun helper global `formatMontant` n'existe dans le projet (`app/Helpers/` contient uniquement `EmailLogo.php`, `Pays.php`, `ArticleFr.php` ; `composer.json` ne déclare pas de fichiers autoload). Le formatage est fait par `number_format($montant, 2, ',', ' ').' €'` directement dans les vues. PHP gère nativement le signe négatif : `number_format(-80, 2, ',', ' ').' €'` → `'-80,00 €'`. Pas de création d'helper (scope creep Slice 0). 1 test unitaire vérifie le comportement avec 7 valeurs représentatives (dont -1 500,00 €, 0,00 €, montants audit).
+- [x] Tri data-sort sur colonnes montants — verdict : **Bug détecté et patché** — Inventaire complet : 13 occurrences `data-sort` sur colonnes montants dans les vues blade ; 4 vues ont du tri JS côté client (`localeCompare`). Seule `resources/views/livewire/provisions/provision-index.blade.php` cumule (a) `data-sort="{{ $provision->montant }}"` sur la colonne Montant et (b) tri JS `localeCompare('fr')`. Bug : `localeCompare` est lexicographique et produit un ordre incorrect pour les montants (ex. `'9.00'` trié après `'150.00'`). **Patch** : ajout de `compareVals(aVal, bVal)` dans le script JS de `provision-index.blade.php` — détecte si les deux valeurs sont numériques (`parseFloat` + `!isNaN`) et utilise la soustraction arithmétique, sinon replie sur `localeCompare`. La fonction est appliquée aux deux callsites (tri click + `reApplySort`). 2 tests Pest : (1) `data-sort` émet des valeurs numériques brutes `decimal:2` (ex. `-100.00`, pas `-100,00 €`) ; (2) démontre que `localeCompare` bogue sur `['9.00', '150.00']` tandis que le tri numérique par `(float)` est correct.
 
 ## 3. Patches apportés
 
@@ -96,6 +96,11 @@ Nota bene sur `FluxTresorerieBuilder` : les requêtes mensuelle et rapprochement
 **Step 8 : un patch nécessaire.**
 
 - `app/Services/CsvImportService.php` méthode `validateRow()` : la validation de `montant_ligne` était une condition combinée (`! is_numeric($montant) || (float) $montant <= 0`) avec message générique `"doit être un nombre > 0"`. Scindée en deux branches : (1) non-numérique → message "valeur numérique attendue" ; (2) valeur <= 0 → `Log::warning('CsvImportService : montant négatif ou nul rejeté', ['csv_line' => $csvLine, 'montant' => $montant, 'raison' => MontantValidation::MESSAGE])` + erreur rapport `'Colonne montant_ligne : '.MontantValidation::MESSAGE`. Imports `MontantValidation` et `Log` ajoutés. Le log porte toujours le numéro de ligne CSV 1-based (`csv_line`) pour traçabilité. Les autres lignes du fichier sont toujours traitées (validation exhaustive : Phase 1 collecte toutes les erreurs avant de rejeter l'import entier en Phase 2).
+
+**Step 9 : un patch nécessaire (tri JS provision-index).**
+
+- `resources/views/livewire/provisions/provision-index.blade.php` script JS : les deux callsites de `localeCompare(bVal, 'fr')` remplacés par `compareVals(aVal, bVal)`. La fonction `compareVals` (ajoutée juste avant les event listeners) détecte si les deux valeurs sont parsables en float (`!isNaN(parseFloat(…))`) et retourne leur différence arithmétique ; sinon replie sur `localeCompare`. La colonne Montant (`data-sort="{{ $provision->montant }}"`) émet des valeurs `decimal:2` (`'-100.00'`, `'50.00'` etc.) qui sont désormais triées numériquement. Les colonnes texte (Libellé, Sous-catégorie, Type, Tiers, Opération, Séance) conservent le tri `localeCompare` via la branche `isNaN`.
+- `tests/Feature/Audit/SigneNegatifAffichageTest.php` : 3 tests verts — (1) `format_montant_affiche_signe_negatif_correctement` : 7 assertions `number_format` ; (2) `data_sort_sur_colonnes_montants_est_numerique` : parse HTML Livewire ProvisionIndex, vérifie présence des 4 valeurs brutes et absence de texte formaté avec virgule ou € ; (3) `tri_data_sort_montants_est_numerique_pas_lexicographique` : démontre le bug `localeCompare` sur `['9.00', '150.00']` vs tri `(float)` correct.
 
 ## 4. Précédent dans le code : extournes de provisions
 
