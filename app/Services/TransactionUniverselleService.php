@@ -54,6 +54,14 @@ final class TransactionUniverselleService
             ->when($searchNumeroPiece, fn ($q) => $q->where('t.numero_piece', 'like', "%{$searchNumeroPiece}%"))
             ->when($modePaiement, fn ($q) => $q->where('t.mode_paiement', $modePaiement))
             ->when($statutReglement, fn ($q) => $q->where('t.statut_reglement', $statutReglement))
+            // Créances à recevoir (en_attente) : exclure les recettes à montant négatif.
+            // Une recette à montant_total < 0 est une extourne future (Slice 1), pas une créance réelle.
+            // Les dépenses à régler (montant dans l'outer = -montant_total < 0) sont préservées.
+            // Préparation Slice 1 — voir docs/audit/2026-04-30-signe-negatif.md §2.3
+            ->when(
+                $statutReglement === 'en_attente',
+                fn ($q) => $q->whereNot(fn ($w) => $w->where('t.source_type', 'recette')->where('t.montant', '<=', 0))
+            )
             ->orderBy("t.{$sortColumn}", $sortDirection)
             ->orderBy('t.source_type')
             ->orderBy('t.id');
