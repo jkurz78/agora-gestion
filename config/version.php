@@ -1,6 +1,7 @@
 <?php
-return array (
-  'tag' => 'dev',
-  'date' => '2026-05-01',
-  'year' => '2026',
-);
+
+return [
+    'tag' => 'dev',
+    'date' => '2026-05-01',
+    'year' => '2026',
+];

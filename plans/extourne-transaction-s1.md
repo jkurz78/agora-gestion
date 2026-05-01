@@ -2,8 +2,9 @@
 
 **Created**: 2026-05-01
 **Branch**: `claude/funny-shamir-8661f9` (worktree, post-S0 — HEAD `a4cda304`)
-**Status**: approved
+**Status**: implemented
 **Modèle de livraison** : pas de PR par slice — une seule évolution continue S0 → S1 → S2 sur la même branche worktree (utilisateur unique reviewer).
+**Livraison** : 2026-05-01, +14 commits sur worktree `claude/funny-shamir-8661f9`, +84 tests Pest (231 assertions). Suite Feature 2840 tests / 0 fail. Pint vert. Prêt pour S2.
 **Spec source**: [docs/specs/2026-04-30-extourne-transaction-s1.md](docs/specs/2026-04-30-extourne-transaction-s1.md) (PASS)
 **Préalable** : Slice 0 livré ✅ ([plans/audit-signe-negatif-s0.md](plans/audit-signe-negatif-s0.md), 15 commits, suite verte). Slice 2 (annulation de facture) sera spécifié séparément après livraison de S1.
 
