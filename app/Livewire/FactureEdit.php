@@ -444,15 +444,15 @@ final class FactureEdit extends Component
     {
         $selectedIds = $this->facture->transactions()->pluck('transactions.id')->toArray();
 
-        $transactions = Transaction::where(function ($query) {
-            $query->where('type', TypeTransaction::Recette)
-                ->where('tiers_id', $this->facture->tiers_id)
-                ->whereDoesntHave('factures', fn ($q) => $q->whereIn('statut', [StatutFacture::Brouillon, StatutFacture::Validee])
-                );
-        })
+        $transactions = Transaction::query()
+            ->where(function ($query) {
+                $query->where('type', TypeTransaction::Recette)
+                    ->where('tiers_id', $this->facture->tiers_id)
+                    ->rattachableAFacture()
+                    ->whereDoesntHave('factures', fn ($q) => $q->whereIn('statut', [StatutFacture::Brouillon, StatutFacture::Validee]));
+            })
             ->orWhere(function ($q) {
-                $q->whereHas('factures', fn ($fq) => $fq->where('factures.id', $this->facture->id)
-                );
+                $q->whereHas('factures', fn ($fq) => $fq->where('factures.id', $this->facture->id));
             })
             ->orderByDesc('date')
             ->get();

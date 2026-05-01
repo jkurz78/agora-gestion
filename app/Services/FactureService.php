@@ -486,7 +486,12 @@ final class FactureService
                 );
             }
 
-            // (Step 3: boucle détachement des TX Montant ref)
+            // Détacher du pivot les TX référencées (Montant ref, sans extourne).
+            // These transactions pre-existed the invoice; they are simply unlinked so
+            // they can be re-attached to a new brouillon facture (AC-5, AC-18).
+            foreach ($facture->transactionsReferencees() as $tref) {
+                $facture->transactions()->detach($tref->id);
+            }
         });
     }
 
