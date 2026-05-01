@@ -35,4 +35,13 @@ final class FacturePolicy
     {
         return RoleAssociation::tryFrom($user->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
     }
+
+    /**
+     * Seuls Comptable et Admin peuvent annuler une facture validée (via l'avoir).
+     * Cohérent avec les autres droits en écriture sur Espace::Compta (update, delete).
+     */
+    public function annuler(User $user, Facture $facture): bool
+    {
+        return RoleAssociation::tryFrom($user->currentRole() ?? '')?->canWrite(Espace::Compta) ?? false;
+    }
 }

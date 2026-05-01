@@ -176,6 +176,22 @@ final class Transaction extends TenantModel
     }
 
     /**
+     * Exclut les transactions extournées (origines + miroirs) des sélecteurs de règlement.
+     *
+     * Invariant cross-S1/S2 : une transaction dont extournee_at est non nul (origine extournée)
+     * OU dont l'ID figure dans extournes.transaction_extourne_id (miroir d'extourne) ne doit
+     * jamais être proposée comme règlement rattachable à une facture brouillon.
+     *
+     * @param  Builder<Transaction>  $query
+     */
+    public function scopeRattachableAFacture(Builder $query): Builder
+    {
+        return $query
+            ->whereNull('extournee_at')
+            ->whereNotIn('id', Extourne::query()->select('transaction_extourne_id'));
+    }
+
+    /**
      * Extourne entry where this Transaction is the origin (one-shot).
      */
     public function extourneeVers(): HasOne
