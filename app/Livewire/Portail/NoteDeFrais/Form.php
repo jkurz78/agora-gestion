@@ -7,6 +7,7 @@ namespace App\Livewire\Portail\NoteDeFrais;
 use App\Enums\NoteDeFraisLigneType;
 use App\Enums\StatutOperation;
 use App\Enums\TypeCategorie;
+use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Portail\Concerns\WithPortailTenant;
 use App\Models\Association;
 use App\Models\NoteDeFrais;
@@ -169,12 +170,11 @@ final class Form extends Component
 
         if ($this->wizardStep === 2 && $this->wizardType !== 'kilometrique') {
             $this->validateOnly('draftLigne.montant', [
-                'draftLigne.montant' => ['required', 'numeric', 'gt:0'],
-            ], [
+                'draftLigne.montant' => ['required', 'numeric', MontantValidation::RULE],
+            ], array_merge([
                 'draftLigne.montant.required' => 'Le montant est obligatoire.',
                 'draftLigne.montant.numeric' => 'Le montant doit être un nombre.',
-                'draftLigne.montant.gt' => 'Le montant doit être supérieur à zéro.',
-            ]);
+            ], MontantValidation::messages(['draftLigne.montant'])));
 
             $this->wizardStep = 3;
         }

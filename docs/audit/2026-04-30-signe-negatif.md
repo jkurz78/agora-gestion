@@ -51,8 +51,8 @@ Note refactor (post code review Step 5) : le binôme trait `RefusesMontantNegati
 - [x] ReglementTable (Step 6) — verdict : **Patché** — `updateMontant()` : ajout `Validator::make()` + `MontantValidation::RULE` + `MontantValidation::messages(['montant'])` avant la persistance. Erreur exposée via `$this->addError('montant', ...)`. 2 tests verts.
 - [x] BackOffice/NoteDeFrais (Step 6) — verdict : **n/a (×2)** — `Index` est un listing pur (pas de saisie de montant). `Show::confirmValidation()` valide compte/date/modePaiement lors de la validation back-office ; le montant de la NDF est fixé à la soumission portail, pas ici. 2 tests skipés documentant l'analyse.
 - [x] VirementInterneForm (Step 6) — verdict : **Patché** — `save()` : `'min:0.01'` remplacé par `MontantValidation::RULE`, message standardisé ajouté via `array_merge(MontantValidation::messages(['montant']), [...])`. 3 tests verts (négatif, zéro, positif).
-- [ ] RemiseBancaireList (Step 7)
-- [ ] Portail/NoteDeFrais (Step 7)
+- [x] RemiseBancaireList (Step 7) — verdict : **n/a** — `create()` ne saisit aucun montant directement. Le montant total d'une remise est dérivé des transactions sélectionnées dans `RemiseBancaireSelection` (sélection de transactions existantes, pas saisie de montant). Aucun patch nécessaire. 1 test skipé + 1 test positif documentant l'analyse.
+- [x] Portail/NoteDeFrais (Step 7) — verdict : **Patché** — `Form::wizardNext()` étape 2 : règle `gt:0` déjà présente mais message non standardisé (`'Le montant doit être supérieur à zéro.'`). Remplacé par `MontantValidation::RULE` + `MontantValidation::messages(['draftLigne.montant'])` via `array_merge`. 3 tests verts (négatif, zéro, positif).
 - [ ] CsvImportService (Step 8) — refus avec log
 
 ### 2.5 Affichage (Step 9)
@@ -87,6 +87,11 @@ Nota bene sur `FluxTresorerieBuilder` : les requêtes mensuelle et rapprochement
 - `app/Livewire/VirementInterneForm.php` méthode `save()` : `'min:0.01'` remplacé par `MontantValidation::RULE` ; message standardisé ajouté via `array_merge(MontantValidation::messages(['montant']), [...autres messages...])`.
 - `app/Livewire/BackOffice/NoteDeFrais/Index.php` : n/a — listing uniquement.
 - `app/Livewire/BackOffice/NoteDeFrais/Show.php` : n/a — `confirmValidation()` ne saisit pas de montant (le montant est fixé à la soumission portail).
+
+**Step 7 : un patch nécessaire.**
+
+- `app/Livewire/Portail/NoteDeFrais/Form.php` méthode `wizardNext()` étape 2 : la règle `gt:0` existait déjà mais le message était non standardisé (`'Le montant doit être supérieur à zéro.'`). Remplacé par `MontantValidation::RULE` + `array_merge(['required' => ..., 'numeric' => ...], MontantValidation::messages(['draftLigne.montant']))`. Message standardisé : `MontantValidation::MESSAGE`.
+- `app/Livewire/RemiseBancaireList.php` : n/a — `create()` ne saisit aucun montant. Le montant total d'une remise est dérivé des transactions sélectionnées dans `RemiseBancaireSelection`. Aucun patch nécessaire.
 
 ## 4. Précédent dans le code : extournes de provisions
 
