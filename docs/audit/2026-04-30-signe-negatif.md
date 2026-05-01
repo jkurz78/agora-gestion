@@ -53,7 +53,7 @@ Note refactor (post code review Step 5) : le binôme trait `RefusesMontantNegati
 - [x] VirementInterneForm (Step 6) — verdict : **Patché** — `save()` : `'min:0.01'` remplacé par `MontantValidation::RULE`, message standardisé ajouté via `array_merge(MontantValidation::messages(['montant']), [...])`. 3 tests verts (négatif, zéro, positif).
 - [x] RemiseBancaireList (Step 7) — verdict : **n/a** — `create()` ne saisit aucun montant directement. Le montant total d'une remise est dérivé des transactions sélectionnées dans `RemiseBancaireSelection` (sélection de transactions existantes, pas saisie de montant). Aucun patch nécessaire. 1 test skipé + 1 test positif documentant l'analyse.
 - [x] Portail/NoteDeFrais (Step 7) — verdict : **Patché** — `Form::wizardNext()` étape 2 : règle `gt:0` déjà présente mais message non standardisé (`'Le montant doit être supérieur à zéro.'`). Remplacé par `MontantValidation::RULE` + `MontantValidation::messages(['draftLigne.montant'])` via `array_merge`. 3 tests verts (négatif, zéro, positif).
-- [ ] CsvImportService (Step 8) — refus avec log
+- [x] CsvImportService (Step 8) — verdict : **Patché** — `validateRow()` : validation `montant_ligne` scindée en deux branches distinctes : (1) non-numérique → message "valeur numérique attendue" inchangé ; (2) `<= 0` → `Log::warning('CsvImportService : montant négatif ou nul rejeté', ['csv_line' => $csvLine, 'montant' => ..., 'raison' => MontantValidation::MESSAGE])` + erreur rapport `'Colonne montant_ligne : '.MontantValidation::MESSAGE`. Le log porte `csv_line` (numéro de ligne CSV 1-based) et la raison standardisée. 4 tests verts : rejet avec message dans rapport (ligne 3), message contient `MontantValidation::MESSAGE`, log `warning` capté avec `csv_line=3`, rejet montant zéro.
 
 ### 2.5 Affichage (Step 9)
 
@@ -92,6 +92,10 @@ Nota bene sur `FluxTresorerieBuilder` : les requêtes mensuelle et rapprochement
 
 - `app/Livewire/Portail/NoteDeFrais/Form.php` méthode `wizardNext()` étape 2 : la règle `gt:0` existait déjà mais le message était non standardisé (`'Le montant doit être supérieur à zéro.'`). Remplacé par `MontantValidation::RULE` + `array_merge(['required' => ..., 'numeric' => ...], MontantValidation::messages(['draftLigne.montant']))`. Message standardisé : `MontantValidation::MESSAGE`.
 - `app/Livewire/RemiseBancaireList.php` : n/a — `create()` ne saisit aucun montant. Le montant total d'une remise est dérivé des transactions sélectionnées dans `RemiseBancaireSelection`. Aucun patch nécessaire.
+
+**Step 8 : un patch nécessaire.**
+
+- `app/Services/CsvImportService.php` méthode `validateRow()` : la validation de `montant_ligne` était une condition combinée (`! is_numeric($montant) || (float) $montant <= 0`) avec message générique `"doit être un nombre > 0"`. Scindée en deux branches : (1) non-numérique → message "valeur numérique attendue" ; (2) valeur <= 0 → `Log::warning('CsvImportService : montant négatif ou nul rejeté', ['csv_line' => $csvLine, 'montant' => $montant, 'raison' => MontantValidation::MESSAGE])` + erreur rapport `'Colonne montant_ligne : '.MontantValidation::MESSAGE`. Imports `MontantValidation` et `Log` ajoutés. Le log porte toujours le numéro de ligne CSV 1-based (`csv_line`) pour traçabilité. Les autres lignes du fichier sont toujours traitées (validation exhaustive : Phase 1 collecte toutes les erreurs avant de rejeter l'import entier en Phase 2).
 
 ## 4. Précédent dans le code : extournes de provisions
 

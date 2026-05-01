@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\ModePaiement;
 use App\Enums\TypeCategorie;
+use App\Livewire\Concerns\MontantValidation;
 use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\SousCategorie;
@@ -13,6 +14,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -329,8 +331,16 @@ final class CsvImportService
 
         // montant_ligne (col 3)
         $montant = trim($row[3] ?? '');
-        if (! is_numeric($montant) || (float) $montant <= 0) {
-            $errors[] = ['line' => $csvLine, 'message' => "Colonne montant_ligne : valeur \"{$montant}\" invalide (doit être un nombre > 0)."];
+        if (! is_numeric($montant)) {
+            $errors[] = ['line' => $csvLine, 'message' => "Colonne montant_ligne : valeur \"{$montant}\" invalide (valeur numérique attendue)."];
+        } elseif ((float) $montant <= 0) {
+            $message = 'Colonne montant_ligne : '.MontantValidation::MESSAGE;
+            Log::warning('CsvImportService : montant négatif ou nul rejeté', [
+                'csv_line' => $csvLine,
+                'montant' => $montant,
+                'raison' => MontantValidation::MESSAGE,
+            ]);
+            $errors[] = ['line' => $csvLine, 'message' => $message];
         }
 
         // tiers (col 7) — optionnel
