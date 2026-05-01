@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\DataTransferObjects\ExtournePayload;
+use App\Enums\StatutFacture;
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeRapprochement;
+use App\Enums\TypeTransaction;
 use App\Events\TransactionExtournee;
 use App\Models\Extourne;
 use App\Models\RapprochementBancaire;
@@ -17,6 +19,7 @@ use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 final class TransactionExtourneService
 {
@@ -30,7 +33,9 @@ final class TransactionExtourneService
      */
     public function extourner(Transaction $origine, ExtournePayload $payload): Extourne
     {
+        $this->assertSameTenant($origine);
         Gate::authorize('create', [Extourne::class, $origine]);
+        $this->assertExtournable($origine);
 
         return DB::transaction(function () use ($origine, $payload): Extourne {
             $miroir = $this->creerTransactionMiroir($origine, $payload);
@@ -137,6 +142,52 @@ final class TransactionExtourneService
             'saisi_par' => (int) auth()->id(),
             'verrouille_at' => now(),
         ]);
+    }
+
+    /**
+     * Vérifie que la transaction appartient au tenant courant.
+     * Ceinture-bretelles en plus du scope global qui agit déjà côté query builder.
+     */
+    private function assertSameTenant(Transaction $origine): void
+    {
+        if ((int) $origine->association_id !== (int) TenantContext::currentId()) {
+            throw new RuntimeException('Transaction introuvable.');
+        }
+    }
+
+    /**
+     * Vérifie tous les guards d'éligibilité métier avec un message francisé spécifique.
+     */
+    private function assertExtournable(Transaction $origine): void
+    {
+        if ($origine->trashed()) {
+            throw new RuntimeException('Cette transaction a été supprimée et ne peut pas être annulée.');
+        }
+
+        if ($origine->type !== TypeTransaction::Recette) {
+            throw new RuntimeException('Seules les recettes peuvent être annulées via ce mécanisme.');
+        }
+
+        if ($origine->extournee_at !== null) {
+            throw new RuntimeException('Cette transaction a déjà été annulée.');
+        }
+
+        if ($origine->estUneExtourne) {
+            throw new RuntimeException('Cette transaction est elle-même une annulation et ne peut pas être annulée.');
+        }
+
+        if ($origine->helloasso_order_id !== null) {
+            throw new RuntimeException('Les transactions issues de HelloAsso ne peuvent pas être annulées manuellement.');
+        }
+
+        $factureValidee = $origine->factures()
+            ->where('statut', StatutFacture::Validee)
+            ->first();
+        if ($factureValidee !== null) {
+            throw new RuntimeException(
+                "Cette transaction est portée par la facture {$factureValidee->numero}. Annulez la facture pour la libérer."
+            );
+        }
     }
 
     /**
