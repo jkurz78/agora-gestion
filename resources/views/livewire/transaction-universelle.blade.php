@@ -494,7 +494,15 @@
                     $isLocked = (bool) $tx->pointe;
                     $statutReglement = $tx->statut_reglement ?? null; // null for virements
                 @endphp
-                <tr style="cursor:pointer" wire:click="toggleDetail('{{ $tx->source_type }}', {{ $tx->id }})">
+                @php
+                    // Indicateurs Slice 1 — extourne. extournee_at non null = origine
+                    // déjà annulée (badge "annulée"). is_extourne_miroir = ligne d'extourne
+                    // (libellé en italique, montant déjà négatif côté DB).
+                    $isExtourneOrigine = ! empty($tx->extournee_at);
+                    $isExtourneMiroir = ! empty($tx->is_extourne_miroir);
+                @endphp
+                <tr style="cursor:pointer" wire:click="toggleDetail('{{ $tx->source_type }}', {{ $tx->id }})"
+                    @class(['fst-italic' => $isExtourneMiroir])>
                     <td style="width:1rem;padding:.25rem .3rem;text-align:center;color:#adb5bd">
                         <i class="bi bi-caret-{{ $isExpanded ? 'down' : 'right' }}-fill" style="font-size:.6rem"></i>
                     </td>
@@ -536,6 +544,12 @@
                             </span>
                         @else
                             {{ $tx->libelle ?? '—' }}
+                        @endif
+                        @if($isExtourneOrigine)
+                            <span class="badge text-bg-warning ms-1" style="font-size:.6rem"
+                                  title="Cette transaction a été annulée — voir la transaction d'extourne">
+                                annulée
+                            </span>
                         @endif
                         @if($tx->piece_jointe_path)
                             <a href="{{ route('transactions.piece-jointe', $tx->id) }}" target="_blank"

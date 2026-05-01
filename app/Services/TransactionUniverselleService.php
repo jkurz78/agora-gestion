@@ -140,7 +140,8 @@ final class TransactionUniverselleService
                  NULL as categorie_label, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
                  NULL as mode_paiement, 0 as montant, NULL as pointe,
                  NULL as statut_reglement, NULL as remise_id, NULL as rapprochement_id,
-                 NULL as notes, NULL as piece_jointe_path, NULL as piece_jointe_nom, 0 as is_helloasso"
+                 NULL as notes, NULL as piece_jointe_path, NULL as piece_jointe_nom, 0 as is_helloasso,
+                 NULL as extournee_at, 0 as is_extourne_miroir"
             );
         }
 
@@ -188,7 +189,9 @@ final class TransactionUniverselleService
                 tx.notes,
                 tx.piece_jointe_path,
                 tx.piece_jointe_nom,
-                (tx.helloasso_order_id IS NOT NULL) as is_helloasso
+                (tx.helloasso_order_id IS NOT NULL) as is_helloasso,
+                tx.extournee_at,
+                EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir
             ")
             ->where('tx.type', 'depense')
             ->whereNull('tx.deleted_at')
@@ -248,7 +251,9 @@ final class TransactionUniverselleService
                 tx.notes,
                 tx.piece_jointe_path,
                 tx.piece_jointe_nom,
-                (tx.helloasso_order_id IS NOT NULL) as is_helloasso
+                (tx.helloasso_order_id IS NOT NULL) as is_helloasso,
+                tx.extournee_at,
+                EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir
             ")
             ->where('tx.type', 'recette')
             ->whereNull('tx.deleted_at')
@@ -304,7 +309,9 @@ final class TransactionUniverselleService
                 vi.notes,
                 NULL as piece_jointe_path,
                 NULL as piece_jointe_nom,
-                0 as is_helloasso
+                0 as is_helloasso,
+                NULL as extournee_at,
+                0 as is_extourne_miroir
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))
@@ -346,7 +353,9 @@ final class TransactionUniverselleService
                 vi.notes,
                 NULL as piece_jointe_path,
                 NULL as piece_jointe_nom,
-                0 as is_helloasso
+                0 as is_helloasso,
+                NULL as extournee_at,
+                0 as is_extourne_miroir
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))
