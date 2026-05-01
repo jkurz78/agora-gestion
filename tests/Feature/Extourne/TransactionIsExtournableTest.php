@@ -63,7 +63,7 @@ test('recette HelloAsso — isExtournable returns false', function (): void {
 });
 
 test('recette portée par facture validée — isExtournable returns false', function (): void {
-    $facture = createFacture(StatutFacture::Validee);
+    $facture = extourneCreateFacture(StatutFacture::Validee);
     $tx = Transaction::factory()->create(['type' => TypeTransaction::Recette]);
     $facture->transactions()->attach($tx->id);
 
@@ -71,7 +71,7 @@ test('recette portée par facture validée — isExtournable returns false', fun
 });
 
 test('recette portée par facture brouillon — isExtournable returns true (pas de blocage)', function (): void {
-    $facture = createFacture(StatutFacture::Brouillon);
+    $facture = extourneCreateFacture(StatutFacture::Brouillon);
     $tx = Transaction::factory()->create(['type' => TypeTransaction::Recette]);
     $facture->transactions()->attach($tx->id);
 
@@ -79,14 +79,14 @@ test('recette portée par facture brouillon — isExtournable returns true (pas 
 });
 
 test('recette portée par facture annulée — isExtournable returns true (pas de blocage)', function (): void {
-    $facture = createFacture(StatutFacture::Annulee);
+    $facture = extourneCreateFacture(StatutFacture::Annulee);
     $tx = Transaction::factory()->create(['type' => TypeTransaction::Recette]);
     $facture->transactions()->attach($tx->id);
 
     expect($tx->fresh()->isExtournable())->toBeTrue();
 });
 
-function createFacture(StatutFacture $statut): Facture
+function extourneCreateFacture(StatutFacture $statut): Facture
 {
     $tiers = Tiers::factory()->create();
     $user = User::factory()->create();

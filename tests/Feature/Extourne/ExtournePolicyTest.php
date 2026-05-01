@@ -9,7 +9,7 @@ use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
 
-function createUserWithRole(RoleAssociation $role): User
+function extourneCreateUserWithRole(RoleAssociation $role): User
 {
     $user = User::factory()->create();
     $user->associations()->attach(TenantContext::currentId(), [
@@ -22,28 +22,28 @@ function createUserWithRole(RoleAssociation $role): User
 }
 
 test('Admin can create extourne', function (): void {
-    $user = createUserWithRole(RoleAssociation::Admin);
+    $user = extourneCreateUserWithRole(RoleAssociation::Admin);
     $tx = Transaction::factory()->create();
 
     expect($user->can('create', [Extourne::class, $tx]))->toBeTrue();
 });
 
 test('Comptable can create extourne', function (): void {
-    $user = createUserWithRole(RoleAssociation::Comptable);
+    $user = extourneCreateUserWithRole(RoleAssociation::Comptable);
     $tx = Transaction::factory()->create();
 
     expect($user->can('create', [Extourne::class, $tx]))->toBeTrue();
 });
 
 test('Gestionnaire cannot create extourne', function (): void {
-    $user = createUserWithRole(RoleAssociation::Gestionnaire);
+    $user = extourneCreateUserWithRole(RoleAssociation::Gestionnaire);
     $tx = Transaction::factory()->create();
 
     expect($user->can('create', [Extourne::class, $tx]))->toBeFalse();
 });
 
 test('Consultation cannot create extourne', function (): void {
-    $user = createUserWithRole(RoleAssociation::Consultation);
+    $user = extourneCreateUserWithRole(RoleAssociation::Consultation);
     $tx = Transaction::factory()->create();
 
     expect($user->can('create', [Extourne::class, $tx]))->toBeFalse();
