@@ -109,24 +109,8 @@ it('tiers_transactions_render_avec_negatifs', function () {
     // Créer un tiers et lui associer une transaction recette à -80 €
     $tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
 
-    // Insérer manuellement la transaction pour ce tiers
-    $tx = Transaction::create([
-        'association_id' => $this->association->id,
-        'type' => 'recette',
-        'date' => '2025-10-15',
-        'libelle' => 'Audit test recette -80',
-        'montant_total' => -80.0,
-        'mode_paiement' => 'virement',
-        'compte_id' => $this->compte->id,
-        'statut_reglement' => 'en_attente',
+    $this->makeAuditTransaction('recette', -80.0, $this->sc, $this->compte, 2025, null, [
         'tiers_id' => $tiers->id,
-        'saisi_par' => $this->user->id,
-    ]);
-
-    TransactionLigne::create([
-        'transaction_id' => $tx->id,
-        'sous_categorie_id' => $this->sc->id,
-        'montant' => -80.0,
     ]);
 
     Livewire::test(TiersTransactions::class, [
@@ -174,16 +158,71 @@ it('creances_a_recevoir_exclut_montants_negatifs', function () {
         'montant' => -50.0,
     ]);
 
-    // La vue "Créances à recevoir" utilise TransactionUniverselle + filterStatut = 'en_attente'
+    // La vue "Créances à recevoir" utilise TransactionUniverselle + filterStatut = 'en_attente'.
+    // Le filtre 'en_attente' est appliqué manuellement par l'utilisateur via le dropdown du composant.
     Livewire::test(TransactionUniverselle::class, [
         'lockedTypes' => ['recette'],
     ])
         ->set('filterStatut', 'en_attente')
         ->assertOk()
-        // La créance positive (+100) doit apparaître
-        ->assertSee('100')
+        // La créance positive (+100) doit apparaître (assertSee sur le libellé unique, pas le montant)
+        ->assertSee('Créance positive')
         // La créance négative (-50) NE doit PAS apparaître dans cette vue
         ->assertDontSee('Créance négative (extourne)');
+});
+
+// ── Test 4bis : Créances à recevoir — sans lockedTypes (path types=null) ─────
+
+it('creances_a_recevoir_exclut_montants_negatifs_sans_locked_types', function () {
+    // Mêmes fixtures que Test 4 : +100 visible, -50 exclu — mais sans lockedTypes.
+    // Ce path (types=null) est utilisé par la vue "Toutes les transactions" filtrée.
+    // Prouve que le filtre patch dans TransactionUniverselleService fonctionne aussi
+    // quand $types=null (la branche recette est incluse via le union complet).
+    $txPositif = Transaction::create([
+        'association_id' => $this->association->id,
+        'type' => 'recette',
+        'date' => '2025-10-15',
+        'libelle' => 'Créance positive bis',
+        'montant_total' => 100.0,
+        'mode_paiement' => 'virement',
+        'compte_id' => $this->compte->id,
+        'statut_reglement' => 'en_attente',
+        'saisi_par' => $this->user->id,
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $txPositif->id,
+        'sous_categorie_id' => $this->sc->id,
+        'montant' => 100.0,
+    ]);
+
+    $txNegatif = Transaction::create([
+        'association_id' => $this->association->id,
+        'type' => 'recette',
+        'date' => '2025-10-20',
+        'libelle' => 'Extourne négative bis',
+        'montant_total' => -50.0,
+        'mode_paiement' => 'virement',
+        'compte_id' => $this->compte->id,
+        'statut_reglement' => 'en_attente',
+        'saisi_par' => $this->user->id,
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $txNegatif->id,
+        'sous_categorie_id' => $this->sc->id,
+        'montant' => -50.0,
+    ]);
+
+    // Sans lockedTypes → types=null → le union inclut dépenses + recettes + virements.
+    // Le filtre 'en_attente' est appliqué manuellement par l'utilisateur via le dropdown du composant.
+    Livewire::test(TransactionUniverselle::class, [
+        'pageTitle' => 'Toutes les transactions',
+    ])
+        ->set('filterStatut', 'en_attente')
+        ->assertOk()
+        // La créance positive (+100) doit apparaître
+        ->assertSee('Créance positive bis')
+        // L'extourne négative (-50) NE doit PAS apparaître dans cette vue
+        ->assertDontSee('Extourne négative bis');
 });
 
 // ── Test 5 : Dashboard ────────────────────────────────────────────────────────
@@ -202,10 +241,10 @@ it('dashboard_render_avec_negatifs', function () {
 
     Livewire::test(Dashboard::class)
         ->assertOk()
-        // totalRecettes = 150 + (-80) = 70
-        ->assertSee('70')
-        // totalDepenses = 50
-        ->assertSee('50');
+        // totalRecettes = 150 + (-80) = 70 — format fr : "70,00"
+        ->assertSee('70,00')
+        // totalDepenses = 50 — format fr : "50,00"
+        ->assertSee('50,00');
 });
 
 // ── Test 6 : RapprochementList ────────────────────────────────────────────────

@@ -70,7 +70,7 @@ Nota bene sur `FluxTresorerieBuilder` : les requêtes mensuelle et rapprochement
 
 **Step 4 : un patch nécessaire.**
 
-- `app/Services/TransactionUniverselleService.php` méthode `paginate()` : le filtre `statutReglement='en_attente'` n'excluait pas les recettes à montant négatif. Ces recettes apparaissaient dans la vue "Créances à recevoir" alors qu'elles ne constituent pas des créances réelles (une recette négative = extourne future du Slice 1). Corrigé en ajoutant `whereNot(source_type='recette' AND montant<=0)` dans la query outer uniquement quand `statutReglement='en_attente'`. Les dépenses à régler (montant dans l'outer = `-montant_total`, négatif pour des dépenses positives) ne sont pas affectées par ce filtre qui cible uniquement `source_type='recette'`.
+- `app/Services/TransactionUniverselleService.php` méthode `paginate()` : le filtre `statutReglement='en_attente'` n'excluait pas les recettes à montant négatif ou nul. Ces recettes apparaissaient dans la vue "Créances à recevoir" alors qu'elles ne constituent pas des créances réelles (une recette à montant_total <= 0 est soit une extourne future du Slice 1, soit invalide comme créance à encaisser). Corrigé en ajoutant `whereNot(source_type='recette' AND montant<=0)` dans la query outer uniquement quand `statutReglement='en_attente'`. Les dépenses à régler (montant dans l'outer = `-montant_total`, négatif pour des dépenses positives) ne sont pas affectées par ce filtre qui cible uniquement `source_type='recette'`.
 
 ## 4. Précédent dans le code : extournes de provisions
 
