@@ -10,6 +10,7 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -44,6 +45,7 @@ final class Transaction extends TenantModel
         'helloasso_cashout_id',
         'helloasso_payment_id',
         'statut_reglement',
+        'extournee_at',
     ];
 
     protected function casts(): array
@@ -63,6 +65,7 @@ final class Transaction extends TenantModel
             'helloasso_order_id' => 'integer',
             'helloasso_cashout_id' => 'integer',
             'helloasso_payment_id' => 'integer',
+            'extournee_at' => 'datetime',
         ];
     }
 
@@ -170,5 +173,71 @@ final class Transaction extends TenantModel
             "{$exercice}-09-01",
             ($exercice + 1).'-08-31',
         ]);
+    }
+
+    /**
+     * Extourne entry where this Transaction is the origin (one-shot).
+     */
+    public function extourneeVers(): HasOne
+    {
+        return $this->hasOne(Extourne::class, 'transaction_origine_id');
+    }
+
+    /**
+     * Extourne entry where this Transaction is the mirror.
+     */
+    public function extournePour(): HasOne
+    {
+        return $this->hasOne(Extourne::class, 'transaction_extourne_id');
+    }
+
+    /**
+     * True when this Transaction is itself an extourne (the mirror side).
+     */
+    protected function estUneExtourne(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): bool => $this->extournePour()->exists(),
+        );
+    }
+
+    /**
+     * Returns true when the user can extourne this transaction.
+     *
+     * Guards (must all hold) :
+     *  - sens recette
+     *  - non encore extournée (extournee_at null)
+     *  - n'est pas elle-même une extourne
+     *  - non issue de HelloAsso
+     *  - non portée par une facture validée
+     *  - non soft-deleted
+     */
+    public function isExtournable(): bool
+    {
+        if ($this->type !== TypeTransaction::Recette) {
+            return false;
+        }
+
+        if ($this->extournee_at !== null) {
+            return false;
+        }
+
+        if ($this->estUneExtourne) {
+            return false;
+        }
+
+        if ($this->helloasso_order_id !== null) {
+            return false;
+        }
+
+        if ($this->trashed()) {
+            return false;
+        }
+
+        if ($this->isLockedByFacture()) {
+            return false;
+        }
+
+        return true;
     }
 }
