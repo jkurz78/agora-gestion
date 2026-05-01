@@ -27,54 +27,15 @@ use App\Models\Exercice;
 use App\Models\Provision;
 use App\Models\RapprochementBancaire;
 use App\Models\SousCategorie;
-use App\Models\Transaction;
-use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Services\RapprochementBancaireService;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
+use Tests\Support\Concerns\MakesAuditTransactions;
 
-// ── Shared helpers ────────────────────────────────────────────────────────────
-
-/**
- * Crée une transaction (recette ou dépense) avec une seule ligne sur la
- * sous-catégorie donnée, dans l'exercice donné.
- * Le montant peut être négatif — aucune validation Eloquent ne l'interdit.
- */
-function makeAuditTransaction(
-    string $type,
-    float $montant,
-    SousCategorie $sc,
-    CompteBancaire $compte,
-    int $exercice,
-    ?RapprochementBancaire $rapprochement = null,
-): Transaction {
-    // L'exercice 2025 court du 2025-09-01 au 2026-08-31
-    $date = "{$exercice}-10-15";
-
-    $tx = Transaction::create([
-        'association_id' => TenantContext::currentId(),
-        'type' => $type,
-        'date' => $date,
-        'libelle' => "Test {$type} {$montant}",
-        'montant_total' => $montant,
-        'mode_paiement' => 'virement',
-        'compte_id' => $compte->id,
-        'statut_reglement' => 'en_attente',
-        'saisi_par' => User::factory()->create()->id,
-        'rapprochement_id' => $rapprochement?->id,
-    ]);
-
-    TransactionLigne::create([
-        'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
-        'montant' => $montant,
-    ]);
-
-    return $tx;
-}
+uses(MakesAuditTransactions::class);
 
 // ── Fixtures shared via beforeEach ────────────────────────────────────────────
 
@@ -119,8 +80,8 @@ afterEach(function () {
 
 it('compte_resultat_somme_correctement_les_negatifs', function () {
     // +80 et -80 dans la même sous-cat → ∑ = 0
-    makeAuditTransaction('recette', 80.0, $this->sc, $this->compte, 2025);
-    makeAuditTransaction('recette', -80.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 80.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -80.0, $this->sc, $this->compte, 2025);
 
     $builder = app(CompteResultatBuilder::class);
     $result = $builder->compteDeResultat(2025);
@@ -149,7 +110,7 @@ it('flux_tresorerie_inclut_negatifs_pointes', function () {
     ]);
 
     // Tx recette -50 € pointée
-    makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
+    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
 
     $builder = app(FluxTresorerieBuilder::class);
     $data = $builder->fluxTresorerie(2025);
@@ -165,14 +126,14 @@ it('flux_tresorerie_inclut_negatifs_pointes', function () {
 
 it('dashboard_kpis_somme_negatifs', function () {
     // +100 recette, -30 recette, +50 dépense
-    makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
-    makeAuditTransaction('recette', -30.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -30.0, $this->sc, $this->compte, 2025);
 
     $scDepense = SousCategorie::factory()->create([
         'categorie_id' => $this->categorie->id,
         'association_id' => $this->association->id,
     ]);
-    makeAuditTransaction('depense', 50.0, $scDepense, $this->compte, 2025);
+    $this->makeAuditTransaction('depense', 50.0, $scDepense, $this->compte, 2025);
 
     $component = Livewire::test(Dashboard::class);
 
@@ -193,8 +154,8 @@ it('super_admin_dashboard_renders_with_negative_transactions_in_db', function ()
     // il compte seulement les associations (actif/suspendu/archive).
     // On vérifie qu'il rend sans erreur même si des transactions négatives
     // existent en base dans le tenant courant.
-    makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025);
-    makeAuditTransaction('depense', -200.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('depense', -200.0, $this->sc, $this->compte, 2025);
 
     $superAdmin = User::factory()->create(['role_systeme' => RoleSysteme::SuperAdmin]);
 
@@ -211,7 +172,7 @@ it('super_admin_dashboard_renders_with_negative_transactions_in_db', function ()
 it('cloture_wizard_calcule_solde_ouverture_avec_negatifs', function () {
     // Tx recette -100 € : réduit totalRecettes, ce qui augmente soldeOuverture calculé
     // (formule : soldeReel - recettes + depenses - vIn + vOut)
-    makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -100.0, $this->sc, $this->compte, 2025);
 
     $component = Livewire::test(ClotureWizard::class)
         ->call('suite')   // step 1 → step 2
@@ -230,14 +191,14 @@ it('cloture_wizard_calcule_solde_ouverture_avec_negatifs', function () {
 
 it('cloture_wizard_resultat_avec_dataset_mixte', function () {
     // +200 recette, -50 recette, +80 dépense
-    makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025);
-    makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 200.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
 
     $scDepense = SousCategorie::factory()->create([
         'categorie_id' => $this->categorie->id,
         'association_id' => $this->association->id,
     ]);
-    makeAuditTransaction('depense', 80.0, $scDepense, $this->compte, 2025);
+    $this->makeAuditTransaction('depense', 80.0, $scDepense, $this->compte, 2025);
 
     $component = Livewire::test(ClotureWizard::class)
         ->call('suite')
@@ -275,7 +236,7 @@ it('rapprochement_service_solde_avec_negatif', function () {
     //   + SUM(CASE WHEN type='depense' THEN -montant_total ELSE montant_total END)
     // Pour une recette à -50 : contribution = -50
     // Résultat attendu : 500 + (-50) = 450
-    makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
+    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025, $rapprochement);
 
     $service = app(RapprochementBancaireService::class);
     $solde = $service->calculerSoldePointage($rapprochement->fresh());
@@ -287,8 +248,8 @@ it('rapprochement_service_solde_avec_negatif', function () {
 
 it('rapport_compte_resultat_livewire_render_dataset_mixte', function () {
     // +100 recette, -40 recette (même sous-cat) → ∑ produits = 60
-    makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
-    makeAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
 
     Livewire::test(RapportCompteResultat::class)
         ->assertOk()
@@ -302,8 +263,8 @@ it('rapport_compte_resultat_livewire_render_dataset_mixte', function () {
 
 it('rapport_export_controller_synthese_compte_resultat_avec_negatifs', function () {
     // +120 recette, -20 recette → produits = 100
-    makeAuditTransaction('recette', 120.0, $this->sc, $this->compte, 2025);
-    makeAuditTransaction('recette', -20.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 120.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -20.0, $this->sc, $this->compte, 2025);
 
     // L'export XLSX doit retourner 200 OK et le bon content-type
     $this->get('/rapports/export/compte-resultat/xlsx?exercice=2025')
@@ -315,7 +276,7 @@ it('rapport_export_controller_synthese_compte_resultat_avec_negatifs', function 
 
 it('compte_resultat_avec_transactions_negatives_ET_provisions_PCA', function () {
     // (a) Tx recette -50 € (future extourne Slice 1)
-    makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -50.0, $this->sc, $this->compte, 2025);
 
     // (b) Provision de type recette à montant négatif (PCA — déjà supporté)
     // montantSigne() : type=recette → retourne montant tel quel = -30

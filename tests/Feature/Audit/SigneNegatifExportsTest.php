@@ -17,13 +17,14 @@ use App\Models\Categorie;
 use App\Models\CompteBancaire;
 use App\Models\Exercice;
 use App\Models\SousCategorie;
-use App\Models\Transaction;
-use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Services\Rapports\FluxTresorerieBuilder;
 use App\Services\RapportService;
 use App\Tenant\TenantContext;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Tests\Support\Concerns\MakesAuditTransactions;
+
+uses(MakesAuditTransactions::class);
 
 // ── Fixtures shared via beforeEach ────────────────────────────────────────────
 
@@ -64,49 +65,12 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-// ── Helper local ──────────────────────────────────────────────────────────────
-
-/**
- * Crée une transaction (recette ou dépense) avec une seule ligne sur la
- * sous-catégorie donnée dans l'exercice donné.
- * Le montant peut être négatif.
- */
-function makeExportAuditTransaction(
-    string $type,
-    float $montant,
-    SousCategorie $sc,
-    CompteBancaire $compte,
-    int $exercice,
-): Transaction {
-    $date = "{$exercice}-10-15";
-
-    $tx = Transaction::create([
-        'association_id' => TenantContext::currentId(),
-        'type' => $type,
-        'date' => $date,
-        'libelle' => "Export test {$type} {$montant}",
-        'montant_total' => $montant,
-        'mode_paiement' => 'virement',
-        'compte_id' => $compte->id,
-        'statut_reglement' => 'en_attente',
-        'saisi_par' => User::factory()->create()->id,
-    ]);
-
-    TransactionLigne::create([
-        'transaction_id' => $tx->id,
-        'sous_categorie_id' => $sc->id,
-        'montant' => $montant,
-    ]);
-
-    return $tx;
-}
-
 // ── Test 1 — Excel compte de résultat ────────────────────────────────────────
 
 it('export_excel_compte_resultat_somme_negatifs', function () {
     // +100 € et -40 € dans même sous-cat → total net attendu = 60 €
-    makeExportAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
-    makeExportAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
 
     // Générer le Spreadsheet directement via le builder (même logique que le controller)
     $rapportService = app(RapportService::class);
@@ -133,6 +97,7 @@ it('export_excel_compte_resultat_somme_negatifs', function () {
     ob_start();
     $response->sendContent();
     $content = ob_get_clean();
+    expect(strlen($content))->toBeGreaterThan(100, 'Le contenu XLSX streamé ne doit pas être vide');
 
     // Écrire dans un fichier tmp pour le parser via PhpSpreadsheet
     $tmpFile = tempnam(sys_get_temp_dir(), 'audit_export_').'.xlsx';
@@ -173,8 +138,8 @@ it('export_excel_compte_resultat_somme_negatifs', function () {
 
 it('pdf_compte_resultat_somme_negatifs', function () {
     // +100 € recette, -40 € recette → résultat net = 60 €
-    makeExportAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
-    makeExportAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
 
     // Générer les données de vue exactement comme le controller
     $rapportService = app(RapportService::class);
@@ -240,7 +205,7 @@ it('pdf_compte_resultat_sous_categorie_negative_visible', function () {
         'association_id' => $this->association->id,
     ]);
 
-    makeExportAuditTransaction('recette', -40.0, $sc2, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -40.0, $sc2, $this->compte, 2025);
 
     $rapportService = app(RapportService::class);
     $data = $rapportService->compteDeResultat(2025);
@@ -289,8 +254,8 @@ it('pdf_compte_resultat_sous_categorie_negative_visible', function () {
 
 it('pdf_flux_tresorerie_somme_negatifs', function () {
     // +80 € recette, -30 € recette → total_recettes = 50 (algébrique)
-    makeExportAuditTransaction('recette', 80.0, $this->sc, $this->compte, 2025);
-    makeExportAuditTransaction('recette', -30.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 80.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -30.0, $this->sc, $this->compte, 2025);
 
     $rapportService = app(RapportService::class);
     $ftData = $rapportService->fluxTresorerie(2025);
@@ -329,8 +294,8 @@ it('pdf_flux_tresorerie_somme_negatifs', function () {
 
 it('export_excel_flux_tresorerie_somme_negatifs', function () {
     // +60 € recette, -20 € recette → total_recettes = 40 (algébrique)
-    makeExportAuditTransaction('recette', 60.0, $this->sc, $this->compte, 2025);
-    makeExportAuditTransaction('recette', -20.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 60.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -20.0, $this->sc, $this->compte, 2025);
 
     // Vérification builder avant export
     $builder = app(FluxTresorerieBuilder::class);
@@ -347,6 +312,7 @@ it('export_excel_flux_tresorerie_somme_negatifs', function () {
     ob_start();
     $response->sendContent();
     $content = ob_get_clean();
+    expect(strlen($content))->toBeGreaterThan(100, 'Le contenu XLSX streamé ne doit pas être vide');
 
     $tmpFile = tempnam(sys_get_temp_dir(), 'audit_flux_').'.xlsx';
     file_put_contents($tmpFile, $content);
@@ -387,11 +353,11 @@ it('export_excel_flux_tresorerie_somme_negatifs', function () {
 
 // ── Test 6 — Builder Excel compte de résultat : valeur cellule exacte ─────────
 
-it('export_excel_compte_resultat_builder_valeurs_celllules', function () {
+it('export_excel_compte_resultat_builder_valeurs_cellules', function () {
     // 3 transactions dans même sous-cat : +100, -40, +20 → net = 80
-    makeExportAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
-    makeExportAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
-    makeExportAuditTransaction('recette', 20.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 100.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', -40.0, $this->sc, $this->compte, 2025);
+    $this->makeAuditTransaction('recette', 20.0, $this->sc, $this->compte, 2025);
 
     $rapportService = app(RapportService::class);
     $data = $rapportService->compteDeResultat(2025);
@@ -414,6 +380,7 @@ it('export_excel_compte_resultat_builder_valeurs_celllules', function () {
     ob_start();
     $response->sendContent();
     $content = ob_get_clean();
+    expect(strlen($content))->toBeGreaterThan(100, 'Le contenu XLSX streamé ne doit pas être vide');
 
     $tmpFile = tempnam(sys_get_temp_dir(), 'audit_cr_').'.xlsx';
     file_put_contents($tmpFile, $content);
