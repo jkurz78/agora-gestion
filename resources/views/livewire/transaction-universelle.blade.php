@@ -606,15 +606,30 @@
                                     title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
                                 <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
                             </button>
-                            {{-- Bouton "Annuler la transaction" : recettes non HelloAsso, hors exercice clôturé.
-                                 La modale revérifie isExtournable() côté serveur (extournee_at, est elle-même
-                                 extourne, facture validée…) et affiche un toast d'erreur si non éligible. --}}
-                            @if(! $exerciceCloture && $tx->source_type === 'recette' && ! $tx->is_helloasso)
+                            @php
+                                // Mutex poubelle/annuler — Slice 1 amendement :
+                                //   - Tx supprimable « safely » : EnAttente sans aucun attachement banque/règlement/remise/facture
+                                //   - Sinon : annulation comptable (extourne) si éligible
+                                $hasAttachement = $tx->remise_id || $tx->reglement_id || $tx->rapprochement_id || ! empty($tx->is_locked_by_facture);
+                                $estSupprimableSafely = ! $exerciceCloture
+                                    && ($statutReglement === 'en_attente' || $tx->source_type === 'virement_sortant' || $tx->source_type === 'virement_entrant')
+                                    && ! $hasAttachement
+                                    && empty($tx->extournee_at)
+                                    && empty($tx->is_extourne_miroir);
+                                $isExtournableUI = ! $exerciceCloture
+                                    && in_array($tx->source_type, ['recette', 'depense'], true)
+                                    && ! $tx->is_helloasso
+                                    && empty($tx->extournee_at)
+                                    && empty($tx->is_extourne_miroir);
+                            @endphp
+                            {{-- Bouton "Annuler la transaction" — affiché ssi extournable ET non supprimable safely
+                                 (mutex avec poubelle). La modale revérifie isExtournable() côté serveur. --}}
+                            @if($isExtournableUI && ! $estSupprimableSafely)
                                 <button type="button"
                                         @click="$dispatch('extourne:open', { id: {{ $tx->id }} })"
                                         class="btn btn-sm btn-outline-warning"
                                         style="padding:.15rem .3rem;font-size:.7rem"
-                                        title="Annuler la transaction">
+                                        title="Annuler la transaction (extourne comptable)">
                                     <i class="bi bi-arrow-counterclockwise"></i>
                                 </button>
                             @endif
@@ -629,15 +644,7 @@
                                 </button>
                             @endif
                             @if (! $exerciceCloture)
-                            @if($isLocked)
-                                <span title="Écriture rapprochée bancaire — suppression interdite" style="cursor:not-allowed">
-                                    <button type="button" disabled
-                                            class="btn btn-sm btn-outline-danger"
-                                            style="padding:.15rem .3rem;font-size:.7rem;opacity:.4;pointer-events:none">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </span>
-                            @else
+                            @if($estSupprimableSafely || $tx->is_helloasso)
                                 <button type="button"
                                         wire:click="deleteRow('{{ e($tx->source_type) }}', {{ $tx->id }})"
                                         wire:confirm="{{ $tx->is_helloasso ? 'Supprimer cette transaction HelloAsso ? Elle ne sera plus ré-importée lors des prochaines synchronisations.' : 'Supprimer cette ligne ?' }}"
@@ -646,6 +653,16 @@
                                         title="Supprimer">
                                     <i class="bi bi-trash"></i>
                                 </button>
+                            @elseif(! $isExtournableUI)
+                                {{-- Ni supprimable safely, ni extournable (ex: déjà extournée, ou extourne miroir) :
+                                     poubelle désactivée pour signaler que la ligne est immuable. --}}
+                                <span title="Cette transaction ne peut être ni supprimée ni annulée" style="cursor:not-allowed">
+                                    <button type="button" disabled
+                                            class="btn btn-sm btn-outline-danger"
+                                            style="padding:.15rem .3rem;font-size:.7rem;opacity:.4;pointer-events:none">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </span>
                             @endif
                             @endif
                         </div>

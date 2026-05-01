@@ -22,12 +22,14 @@ test('recette éligible — isExtournable returns true', function (): void {
     expect($tx->isExtournable())->toBeTrue();
 });
 
-test('dépense — isExtournable returns false', function (): void {
+test('dépense — isExtournable returns true (extourne couvre les deux sens)', function (): void {
     $tx = Transaction::factory()->create([
         'type' => TypeTransaction::Depense,
+        'helloasso_order_id' => null,
+        'extournee_at' => null,
     ]);
 
-    expect($tx->isExtournable())->toBeFalse();
+    expect($tx->isExtournable())->toBeTrue();
 });
 
 test('recette déjà extournée (extournee_at non null) — isExtournable returns false', function (): void {

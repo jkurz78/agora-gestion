@@ -9,7 +9,6 @@ use App\Enums\StatutFacture;
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
 use App\Enums\TypeRapprochement;
-use App\Enums\TypeTransaction;
 use App\Events\TransactionExtournee;
 use App\Models\Extourne;
 use App\Models\RapprochementBancaire;
@@ -162,10 +161,6 @@ final class TransactionExtourneService
     {
         if ($origine->trashed()) {
             throw new RuntimeException('Cette transaction a été supprimée et ne peut pas être annulée.');
-        }
-
-        if ($origine->type !== TypeTransaction::Recette) {
-            throw new RuntimeException('Seules les recettes peuvent être annulées via ce mécanisme.');
         }
 
         if ($origine->extournee_at !== null) {

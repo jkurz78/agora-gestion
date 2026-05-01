@@ -205,7 +205,8 @@ final class Transaction extends TenantModel
      * Returns true when the user can extourne this transaction.
      *
      * Guards (must all hold) :
-     *  - sens recette
+     *  - sens recette OU dépense — l'extourne est PCG-symétrique
+     *    (amendement spec S1 — limitation MVP recette levée)
      *  - non encore extournée (extournee_at null)
      *  - n'est pas elle-même une extourne
      *  - non issue de HelloAsso
@@ -214,10 +215,6 @@ final class Transaction extends TenantModel
      */
     public function isExtournable(): bool
     {
-        if ($this->type !== TypeTransaction::Recette) {
-            return false;
-        }
-
         if ($this->extournee_at !== null) {
             return false;
         }

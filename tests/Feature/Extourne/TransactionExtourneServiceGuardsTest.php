@@ -73,15 +73,16 @@ test('refus si Consultation — AuthorizationException', function (): void {
         ->toThrow(AuthorizationException::class);
 });
 
-test('refus si transaction dépense', function (): void {
+test('extourne dépense — autorisée (extourne couvre recette ET dépense)', function (): void {
     guardsActAsRole(RoleAssociation::Comptable);
     $tx = guardsCreateRecette(['type' => TypeTransaction::Depense]);
 
-    expect(fn () => app(TransactionExtourneService::class)
-        ->extourner($tx, ExtournePayload::fromOrigine($tx)))
-        ->toThrow(RuntimeException::class);
+    $extourne = app(TransactionExtourneService::class)
+        ->extourner($tx, ExtournePayload::fromOrigine($tx));
 
-    expect(Extourne::query()->count())->toBe(0);
+    expect($extourne)->not->toBeNull();
+    expect($extourne->extourne->type)->toBe(TypeTransaction::Depense);
+    expect((float) $extourne->extourne->montant_total)->toBe(-80.0);
 });
 
 test('refus si transaction déjà extournée', function (): void {
