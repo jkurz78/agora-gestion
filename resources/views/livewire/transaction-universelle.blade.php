@@ -592,6 +592,18 @@
                                     title="{{ $exerciceCloture ? 'Visualiser' : 'Modifier' }}">
                                 <i class="bi bi-{{ $exerciceCloture ? 'eye' : 'pencil' }}"></i>
                             </button>
+                            {{-- Bouton "Annuler la transaction" : recettes non HelloAsso, hors exercice clôturé.
+                                 La modale revérifie isExtournable() côté serveur (extournee_at, est elle-même
+                                 extourne, facture validée…) et affiche un toast d'erreur si non éligible. --}}
+                            @if(! $exerciceCloture && $tx->source_type === 'recette' && ! $tx->is_helloasso)
+                                <button type="button"
+                                        @click="$dispatch('extourne:open', { id: {{ $tx->id }} })"
+                                        class="btn btn-sm btn-outline-warning"
+                                        style="padding:.15rem .3rem;font-size:.7rem"
+                                        title="Annuler la transaction">
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                </button>
+                            @endif
                             {{-- Bouton Marquer reçu / payé (en_attente non verrouillé) --}}
                             @if(! $exerciceCloture && $statutReglement === 'en_attente' && in_array($tx->source_type, ['recette', 'depense'], true))
                                 <button type="button"
@@ -698,4 +710,7 @@
         <x-per-page-selector :paginator="$paginator" storageKey="transaction-universelle" wire:model.live="perPage" />
         {{ $paginator->links() }}
     </div>
+
+    {{-- Modale d'annulation de transaction (Slice 1 — extourne) --}}
+    <livewire:extournes.annuler-transaction-modal />
 </div>
