@@ -10,6 +10,7 @@ use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
+use App\Livewire\Concerns\RefusesMontantNegatif;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
@@ -22,6 +23,8 @@ use Livewire\Component;
 
 final class FactureEdit extends Component
 {
+    use RefusesMontantNegatif;
+
     public Facture $facture;
 
     public string $date = '';
@@ -346,11 +349,14 @@ final class FactureEdit extends Component
         $prixUnitaire = (float) $this->nouvelleLigneMontantPrixUnitaire;
         $quantite = (float) $this->nouvelleLigneMontantQuantite;
 
-        $this->validate([
-            'nouvelleLigneMontantLibelle' => ['required', 'string', 'max:255'],
-            'nouvelleLigneMontantPrixUnitaire' => ['required', 'numeric', 'gt:0'],
-            'nouvelleLigneMontantQuantite' => ['required', 'numeric', 'gt:0'],
-        ]);
+        $this->validate(
+            [
+                'nouvelleLigneMontantLibelle' => ['required', 'string', 'max:255'],
+                'nouvelleLigneMontantPrixUnitaire' => ['required', 'numeric', self::montantPositifRule()],
+                'nouvelleLigneMontantQuantite' => ['required', 'numeric', self::montantPositifRule()],
+            ],
+            self::montantNegatifMessages(['nouvelleLigneMontantPrixUnitaire', 'nouvelleLigneMontantQuantite'])
+        );
 
         try {
             app(FactureService::class)->ajouterLigneManuelle($this->facture, [
