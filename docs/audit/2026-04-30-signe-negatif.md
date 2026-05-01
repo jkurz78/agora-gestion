@@ -4,7 +4,7 @@
 **Branche** : claude/funny-shamir-8661f9
 **Spec** : docs/specs/2026-04-30-audit-signe-negatif-s0.md
 **Plan** : plans/audit-signe-negatif-s0.md
-**Statut** : en cours (sera "Slice 0 prêt" en step 10)
+**Statut** : Slice 0 prêt — Slice 1 peut démarrer
 
 ## 1. Contexte
 
@@ -108,4 +108,52 @@ Nota bene sur `FluxTresorerieBuilder` : les requêtes mensuelle et rapprochement
 
 ## 5. Conclusion (Step 10)
 
-(À remplir au step 10 : récap patches, sites OK sans patch, recommandation explicite "Slice 1 peut démarrer".)
+### Récap des patches apportés (5 patches production)
+
+1. **PDF compte de résultat** (`resources/views/pdf/rapport-compte-resultat.blade.php` ligne 84) — filtre de visibilité `$sc['montant_n'] > 0` remplacé par `$sc['montant_n'] != 0` (idem `montant_n1` et `budget`). Les sous-catégories à montant strictement négatif n'étaient plus exclues silencieusement du PDF imprimé.
+
+2. **Filtre créances à recevoir** (`app/Services/TransactionUniverselleService.php` méthode `paginate()`) — ajout de `whereNot(source_type='recette' AND montant_total<=0)` quand `statutReglement='en_attente'`. Une recette à montant négatif n'est pas une créance à encaisser.
+
+3. **Classe MontantValidation** (`app/Livewire/Concerns/MontantValidation.php`) — nouvelle classe statique pure (source de vérité unique) exposant `RULE` (`gt:0`), `MESSAGE` et `messages()`. Remplace l'ancien trait `RefusesMontantNegatif` (supprimé). Adoptée dans `TransactionForm.php` (règles `lignes.*.montant` et `affectations.*.montant`) et `FactureEdit.php` (règles `nouvelleLigneMontantPrixUnitaire` et `nouvelleLigneMontantQuantite`).
+
+4. **Harmonisation messages de validation** (`app/Livewire/ReglementTable.php`, `app/Livewire/VirementInterneForm.php`, `app/Livewire/Portail/NoteDeFrais/Form.php`, `app/Services/CsvImportService.php`) — remplacement des messages ad hoc (`'min:0.01'`, `'Le montant doit être supérieur à zéro.'`) par `MontantValidation::RULE` + `MontantValidation::messages([...])`. `CsvImportService` ajoute en outre un `Log::warning` avec `csv_line` pour traçabilité des rejets CSV.
+
+5. **Tri numérique colonne montant provisions** (`resources/views/livewire/provisions/provision-index.blade.php`) — les deux callsites `localeCompare` du tri JS côté client remplacés par `compareVals(aVal, bVal)`. La fonction `compareVals` utilise la soustraction arithmétique quand les deux valeurs sont parsables en float, et replie sur `localeCompare` sinon. Corrige le tri lexicographique incorrect sur des chaînes décimales (ex. `'9.00'` > `'150.00'` en localeCompare).
+
+### Sites OK sans patch (aucune modification nécessaire)
+
+Les composants et services suivants gèrent nativement les montants négatifs et n'ont requis aucun patch :
+
+- `CompteResultatBuilder`, `FluxTresorerieBuilder` — `SUM()` algébrique en SQL
+- `Dashboard.php` (tenant), `SuperAdmin/Dashboard.php` — `sum('montant_total')` algébrique
+- `ClotureWizard.php` — `sum('montant_total')` algébrique dans `computeFinancialSummary()`
+- `RapprochementBancaireService::calculerSoldePointage()` — `CASE WHEN type='depense' THEN -montant_total ELSE montant_total END`
+- `RapportCompteResultat`, `RapportCompteResultatOperations` — délèguent à `CompteResultatBuilder`
+- `RapportExportController` (exports XLSX et PDF flux trésorerie) — délèguent aux builders
+- `TransactionUniverselle`, `TransactionCompteList`, `TiersTransactions` — affichage et tri sans filtre `> 0`
+- `RapprochementList` — totaux crédit/débit `SUM(montant_total)` algébrique
+- `BackOffice/NoteDeFrais/Index`, `BackOffice/NoteDeFrais/Show` — listing / validation sans saisie de montant
+- `RemiseBancaireList` — montant total dérivé des transactions sélectionnées, pas saisi directement
+- `PDF rapport flux trésorerie` — `number_format()` accepte nativement les valeurs négatives
+
+### Statistiques du Slice 0
+
+- **Commits** : 14 (de `f0b8ecd6` à `8fa4202e`)
+- **Fichiers de tests ajoutés** : 13 fichiers dans `tests/Feature/Audit/` (48 cas de test `it(...)`, 146 assertions)
+- **Fichiers de production modifiés / créés** : 10 (1 créé : `MontantValidation.php` ; 9 modifiés : voir section 3)
+- **Fichier de documentation** : 1 (`docs/audit/2026-04-30-signe-negatif.md`)
+- **Migrations de schéma** : aucune (le Slice 0 est un audit pur — zéro DDL)
+- **Fonctionnalités utilisateur nouvelles** : aucune (les validations existantes produisent désormais un message standard ; UX identique)
+
+### Résultat de la suite de tests
+
+- Suite Audit (`tests/Feature/Audit/`) : **48 passed** (146 assertions) — tous verts
+- Suite Feature complète : **2740 passed, 4 failed préexistants** (`EmargementRoundTripTest` × 1, `QrCodeExtractorTest` × 3) — ces échecs existent depuis avant Slice 0 et ne concernent pas les montants signés
+- Suite Unit : **1 passed, 399 deprecated** (avertissements `PDO::MYSQL_ATTR_SSL_CA` — non bloquants, PHP 8.4 compat, présents sur tout le projet avant Slice 0)
+- Pint : **vert sur tous les fichiers Slice 0** ; 2 violations préexistantes dans `DemoLoginAsTierController.php` et `config/version.php` (introduites avant le Slice 0, hors périmètre de cet audit)
+
+### Recommandation
+
+Le code est prêt à accueillir des transactions à montant négatif. Les cinq sites qui auraient silencieusement cassé (PDF compte de résultat, filtre créances, validation TransactionForm/FactureEdit, messages validation, tri provisions) ont été patchés et couverts par des tests de régression. Tous les autres sites de sommation et d'affichage gèrent algébriquement les montants négatifs sans modification.
+
+**Le Slice 1 (extourne de transaction) peut démarrer.**
