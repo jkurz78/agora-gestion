@@ -41,12 +41,13 @@ Le Slice 1 (programme Extourne) introduira des `Transaction` à `montant_total <
 
 ### 2.4 Validations de saisie (Steps 5, 6, 7, 8)
 
-Trait commun : `app/Livewire/Concerns/RefusesMontantNegatif.php` (créé Step 5)
-Classe compagnon : `app/Livewire/Concerns/MontantValidation.php` — porte `MESSAGE` (constante de trait non accessible directement en PHP, exposée via classe finale).
+Classe utilitaire : `app/Livewire/Concerns/MontantValidation.php` — classe statique finale portant `MESSAGE`, `RULE` et `messages()`. Convention pour Steps 6-8 : utiliser `MontantValidation::RULE` dans les tableaux de règles et `MontantValidation::messages([...])` dans les tableaux de messages.
 
-- [x] TransactionForm (Step 5) — verdict : **Patché** — `lignes.*.montant` : `min:0.01` → `gt:0` + message standardisé via trait. Idem sur `affectations.*.montant` dans `saveVentilation()` (harmonisation). 2 tests verts.
-- [x] TransactionUniverselle (Step 5) — verdict : **n/a** — composant listing uniquement, aucune saisie de montant. Trait non applicable. Test documentant l'analyse : 1 test skipé.
-- [x] FactureEdit (Step 5) — verdict : **Patché** — `ajouterLigneManuelle()` avait déjà `gt:0` mais sans message standardisé. Ajout du trait + `montantNegatifMessages()` sur `nouvelleLigneMontantPrixUnitaire` et `nouvelleLigneMontantQuantite`. 2 tests verts.
+Note refactor (post code review Step 5) : le binôme trait `RefusesMontantNegatif` + classe compagnon `MontantValidation` a été simplifié. Le trait a été supprimé ; `MontantValidation` est désormais la seule source de vérité (classe statique pure avec constructeur privé, expose `RULE`, `MESSAGE` et `messages()`). Moins de couplage, base propre pour Steps 6-8.
+
+- [x] TransactionForm (Step 5) — verdict : **Patché** — `lignes.*.montant` : `min:0.01` → `MontantValidation::RULE` + `MontantValidation::messages(['lignes.*.montant'])`. Idem sur `affectations.*.montant` dans `saveVentilation()` : `MontantValidation::RULE` + `MontantValidation::messages(['affectations.*.montant'])`. 3 tests verts (dont `save_ventilation_refuse_montant_negatif_avec_message_standard`).
+- [x] TransactionUniverselle (Step 5) — verdict : **n/a** — composant listing uniquement, aucune saisie de montant. Test documentant l'analyse : 1 test skipé.
+- [x] FactureEdit (Step 5) — verdict : **Patché** — `ajouterLigneManuelle()` avait déjà `gt:0` mais sans message standardisé. Remplacé par `MontantValidation::RULE` + `MontantValidation::messages([...])` sur `nouvelleLigneMontantPrixUnitaire` et `nouvelleLigneMontantQuantite`. 2 tests verts.
 - [ ] ReglementTable (Step 6)
 - [ ] BackOffice/NoteDeFrais (Step 6)
 - [ ] VirementInterneForm (Step 6)
@@ -73,11 +74,12 @@ Nota bene sur `FluxTresorerieBuilder` : les requêtes mensuelle et rapprochement
 
 - `app/Services/TransactionUniverselleService.php` méthode `paginate()` : le filtre `statutReglement='en_attente'` n'excluait pas les recettes à montant négatif ou nul. Ces recettes apparaissaient dans la vue "Créances à recevoir" alors qu'elles ne constituent pas des créances réelles (une recette à montant_total <= 0 est soit une extourne future du Slice 1, soit invalide comme créance à encaisser). Corrigé en ajoutant `whereNot(source_type='recette' AND montant<=0)` dans la query outer uniquement quand `statutReglement='en_attente'`. Les dépenses à régler (montant dans l'outer = `-montant_total`, négatif pour des dépenses positives) ne sont pas affectées par ce filtre qui cible uniquement `source_type='recette'`.
 
-**Step 5 : deux patches nécessaires.**
+**Step 5 : deux patches nécessaires (refactorisés post code review).**
 
-- `app/Livewire/TransactionForm.php` méthode `save()` : règle `lignes.*.montant` changée de `min:0.01` à `gt:0`, message standardisé `MontantValidation::MESSAGE` ajouté via `self::montantNegatifMessages()`. Même harmonisation sur `affectations.*.montant` dans `saveVentilation()`.
-- `app/Livewire/FactureEdit.php` méthode `ajouterLigneManuelle()` : règle `gt:0` déjà présente sur `nouvelleLigneMontantPrixUnitaire` et `nouvelleLigneMontantQuantite`, mais sans message. Ajout du trait `RefusesMontantNegatif` et des messages standardisés via `self::montantNegatifMessages()`.
+- `app/Livewire/TransactionForm.php` méthode `save()` : règle `lignes.*.montant` changée de `min:0.01` à `MontantValidation::RULE`, messages via `MontantValidation::messages(['lignes.*.montant'])`. Méthode `saveVentilation()` : harmonisation `affectations.*.montant` avec `MontantValidation::RULE` + `MontantValidation::messages(['affectations.*.montant'])`.
+- `app/Livewire/FactureEdit.php` méthode `ajouterLigneManuelle()` : règle `gt:0` déjà présente, remplacée par `MontantValidation::RULE` ; messages standardisés via `MontantValidation::messages([...])` sur `nouvelleLigneMontantPrixUnitaire` et `nouvelleLigneMontantQuantite`.
 - `app/Livewire/TransactionUniverselle.php` : aucun patch nécessaire — composant listing, pas de saisie de montant.
+- Refactor post code review : `app/Livewire/Concerns/RefusesMontantNegatif.php` (trait) supprimé. `MontantValidation` étendu pour être la seule source de vérité (`RULE`, `MESSAGE`, `messages()`). Pattern à suivre pour Steps 6-8 : `MontantValidation::RULE` dans les règles, `MontantValidation::messages([...])` dans les messages.
 
 ## 4. Précédent dans le code : extournes de provisions
 

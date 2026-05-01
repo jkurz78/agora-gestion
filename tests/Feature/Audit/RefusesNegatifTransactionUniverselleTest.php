@@ -13,7 +13,6 @@ declare(strict_types=1);
  * @see docs/audit/2026-04-30-signe-negatif.md §2.4
  */
 
-use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\TransactionUniverselle;
 
 it('transaction_universelle_na_pas_de_saisie_de_montant', function (): void {

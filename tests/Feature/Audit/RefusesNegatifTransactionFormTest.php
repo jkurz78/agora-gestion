@@ -96,3 +96,27 @@ it('transaction_form_accepte_montant_positif_sur_ligne', function (): void {
     // Pas d'erreur sur le montant
     $component->assertHasNoErrors(['lignes.0.montant']);
 });
+
+it('save_ventilation_refuse_montant_negatif_avec_message_standard', function (): void {
+    // Injecter un état de ventilation avec une ligne factice dont l'ID correspond à ventilationLigneId.
+    // La garde allowedIds lit uniquement $this->lignes — pas de DB requise pour la passer.
+    // La validation est ensuite déclenchée avant tout accès DB sur TransactionLigne.
+    $component = Livewire::test(TransactionForm::class);
+
+    // Simuler une ligne existante avec ID 999 (ne doit pas exister en DB pour ce test)
+    $component->set('lignes', [
+        ['id' => 999, 'sous_categorie_id' => '', 'operation_id' => '', 'seance' => '', 'montant' => '50', 'notes' => ''],
+    ]);
+    $component->set('ventilationLigneId', 999);
+    $component->set('affectations', [
+        ['operation_id' => '', 'seance' => '', 'montant' => '-50', 'notes' => ''],
+    ]);
+
+    $component->call('saveVentilation');
+
+    // La validation `gt:0` doit refuser le montant négatif avec le message standardisé
+    $component->assertHasErrors(['affectations.0.montant']);
+
+    expect($component->errors()->first('affectations.0.montant'))
+        ->toBe(MontantValidation::MESSAGE);
+});

@@ -10,7 +10,7 @@ use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
-use App\Livewire\Concerns\RefusesMontantNegatif;
+use App\Livewire\Concerns\MontantValidation;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
@@ -23,8 +23,6 @@ use Livewire\Component;
 
 final class FactureEdit extends Component
 {
-    use RefusesMontantNegatif;
-
     public Facture $facture;
 
     public string $date = '';
@@ -352,10 +350,10 @@ final class FactureEdit extends Component
         $this->validate(
             [
                 'nouvelleLigneMontantLibelle' => ['required', 'string', 'max:255'],
-                'nouvelleLigneMontantPrixUnitaire' => ['required', 'numeric', self::montantPositifRule()],
-                'nouvelleLigneMontantQuantite' => ['required', 'numeric', self::montantPositifRule()],
+                'nouvelleLigneMontantPrixUnitaire' => ['required', 'numeric', MontantValidation::RULE],
+                'nouvelleLigneMontantQuantite' => ['required', 'numeric', MontantValidation::RULE],
             ],
-            self::montantNegatifMessages(['nouvelleLigneMontantPrixUnitaire', 'nouvelleLigneMontantQuantite'])
+            MontantValidation::messages(['nouvelleLigneMontantPrixUnitaire', 'nouvelleLigneMontantQuantite'])
         );
 
         try {
