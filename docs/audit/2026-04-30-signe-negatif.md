@@ -32,12 +32,12 @@ Le Slice 1 (programme Extourne) introduira des `Transaction` à `montant_total <
 
 ### 2.3 Robustesse écrans (Step 4)
 
-- [ ] TransactionUniverselle — verdict :
-- [ ] TransactionCompteList — verdict :
-- [ ] TiersTransactions — verdict :
-- [ ] Vue Créances à recevoir + filtre `montant > 0` — verdict :
-- [ ] Dashboard rendering — verdict :
-- [ ] Liste Rapprochements bancaires — verdict :
+- [x] TransactionUniverselle (`app/Livewire/TransactionUniverselle.php`) — verdict : **OK** — le composant rend sans erreur avec une recette -80 € en base. Pagination, tri, header intégré fonctionnent. La valeur `-80` est affichée correctement dans la liste.
+- [x] TransactionCompteList (`app/Livewire/TransactionCompteList.php`) — verdict : **OK** — sélection du compte, rendu de la liste avec une recette -80 € : pas d'erreur. Le solde progressif (solde_courant) calcule algébriquement.
+- [x] TiersTransactions (`app/Livewire/TiersTransactions.php`) — verdict : **OK** — le composant rend pour un tiers ayant une transaction -80 € sans erreur ni exception.
+- [x] Vue Créances à recevoir + filtre `montant > 0` — verdict : **Patché** — `TransactionUniverselleService::paginate()` ligne 56-60 : ajout d'un filtre `whereNot(source_type='recette' AND montant<=0)` quand `statutReglement='en_attente'`. Sans ce filtre, une recette à `montant_total=-50` avec `statut_reglement=en_attente` apparaissait dans la vue "Créances à recevoir" — ce qui est incorrect (une recette négative n'est pas une créance à encaisser). Les dépenses à régler (montant dans l'outer = `-montant_total`, toujours négatif pour les dépenses positives) sont préservées.
+- [x] Dashboard rendering (`app/Livewire/Dashboard.php`) — verdict : **OK** — le composant rend avec un dataset mixte (+150, -80 recettes, +50 dépense). KPIs : totalRecettes=70, totalDepenses=50 visibles sans erreur.
+- [x] Liste Rapprochements bancaires (`app/Livewire/RapprochementList.php`) — verdict : **OK** — le composant rend avec un rapprochement lié à une tx recette -80 €. Les totaux (crédit/débit) sont calculés par `SUM(montant_total)` algébrique, pas de crash.
 
 ### 2.4 Validations de saisie (Steps 5, 6, 7, 8)
 
@@ -67,6 +67,10 @@ Nota bene sur `FluxTresorerieBuilder` : les requêtes mensuelle et rapprochement
 **Step 3 : un patch nécessaire.**
 
 - `resources/views/pdf/rapport-compte-resultat.blade.php` ligne 84 : filtre de visibilité des sous-catégories dans la vue PDF. Le filtre `$sc['montant_n'] > 0` excluait silencieusement les sous-catégories dont le montant exercice N est strictement négatif — elles n'apparaissaient pas dans le PDF imprimé. Corrigé en `$sc['montant_n'] != 0` (idem pour `montant_n1` et `budget`). La sémantique correcte est : afficher une sous-catégorie dès qu'elle a un montant non-nul sur l'un des deux exercices ou un budget alloué, quelle que soit la polarité du montant.
+
+**Step 4 : un patch nécessaire.**
+
+- `app/Services/TransactionUniverselleService.php` méthode `paginate()` : le filtre `statutReglement='en_attente'` n'excluait pas les recettes à montant négatif. Ces recettes apparaissaient dans la vue "Créances à recevoir" alors qu'elles ne constituent pas des créances réelles (une recette négative = extourne future du Slice 1). Corrigé en ajoutant `whereNot(source_type='recette' AND montant<=0)` dans la query outer uniquement quand `statutReglement='en_attente'`. Les dépenses à régler (montant dans l'outer = `-montant_total`, négatif pour des dépenses positives) ne sont pas affectées par ce filtre qui cible uniquement `source_type='recette'`.
 
 ## 4. Précédent dans le code : extournes de provisions
 
