@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\DataTransferObjects\ExtournePayload;
+use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
+use App\Enums\TypeRapprochement;
 use App\Events\TransactionExtournee;
 use App\Models\Extourne;
+use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
@@ -33,10 +36,26 @@ final class TransactionExtourneService
             $miroir = $this->creerTransactionMiroir($origine, $payload);
             $this->copierLignesInversees($origine, $miroir);
 
+            $lettrageId = null;
+            if ($origine->statut_reglement === StatutReglement::EnAttente) {
+                $lettrage = $this->creerLettrage($origine, $miroir, $payload);
+                $lettrageId = $lettrage->id;
+
+                $origine->forceFill([
+                    'rapprochement_id' => $lettrage->id,
+                    'statut_reglement' => StatutReglement::Pointe,
+                ])->save();
+
+                $miroir->forceFill([
+                    'rapprochement_id' => $lettrage->id,
+                    'statut_reglement' => StatutReglement::Pointe,
+                ])->save();
+            }
+
             $extourne = Extourne::create([
                 'transaction_origine_id' => $origine->id,
                 'transaction_extourne_id' => $miroir->id,
-                'rapprochement_lettrage_id' => null,
+                'rapprochement_lettrage_id' => $lettrageId,
                 'created_by' => (int) auth()->id(),
             ]);
 
@@ -98,5 +117,42 @@ final class TransactionExtourneService
                 'helloasso_item_id' => null,
             ]);
         }
+    }
+
+    /**
+     * Crée le lettrage automatique : un RapprochementBancaire de type Lettrage
+     * directement Verrouillé (∑=0, solde inchangé).
+     */
+    private function creerLettrage(Transaction $origine, Transaction $miroir, ExtournePayload $payload): RapprochementBancaire
+    {
+        $solde = $this->soldeActuelCompte((int) $origine->compte_id);
+
+        return RapprochementBancaire::create([
+            'compte_id' => $origine->compte_id,
+            'date_fin' => $payload->date->toDateString(),
+            'solde_ouverture' => $solde,
+            'solde_fin' => $solde,
+            'statut' => StatutRapprochement::Verrouille,
+            'type' => TypeRapprochement::Lettrage,
+            'saisi_par' => (int) auth()->id(),
+            'verrouille_at' => now(),
+        ]);
+    }
+
+    /**
+     * Solde courant du compte = solde_fin du dernier rapprochement bancaire
+     * verrouillé (type Bancaire), ou 0 si aucun.
+     */
+    private function soldeActuelCompte(int $compteId): float
+    {
+        $dernier = RapprochementBancaire::query()
+            ->where('compte_id', $compteId)
+            ->where('type', TypeRapprochement::Bancaire)
+            ->where('statut', StatutRapprochement::Verrouille)
+            ->orderByDesc('date_fin')
+            ->orderByDesc('id')
+            ->first();
+
+        return $dernier ? (float) $dernier->solde_fin : 0.0;
     }
 }
