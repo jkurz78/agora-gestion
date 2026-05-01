@@ -387,4 +387,37 @@ Toutes réversibles (`down()`). Aucune perte de données. FK `RESTRICT` empêche
 | Permissions | Comptable + Admin uniquement. Gestionnaire refusé. |
 | UI rapprochement / lettrage | Même écran, filtre `type` (default `Bancaire`). |
 | Vocabulaire | "Extourne" en code, "Annulation" en UI. |
-| Hors scope explicite | Extourne dépense, extourne partielle, extourne d'extourne, annulation de facture (Slice 2), ré-émission corrective, dé-lettrage manuel, gestion exercice clos. |
+| Hors scope explicite | Extourne partielle, extourne d'extourne, annulation de facture (Slice 2), ré-émission corrective, dé-lettrage manuel, gestion exercice clos. |
+
+---
+
+## 7. Amendements post-livraison (2026-05-01)
+
+### 7.1 Extourne du sens dépense — limitation MVP levée
+
+**Décision initiale (§1)** : "Pas une extourne de dépense (sens dépense est bloqué au MVP, le besoin n'est pas remonté)."
+
+**Amendement** : la primitive d'extourne couvre désormais **les deux sens** (recette et dépense). Justification : la limite n'avait de sens que pour le Slice 2 (annulation de facture, presque toujours une recette). Pour la primitive autonome "annuler une transaction", la symétrie PCG s'applique sans condition.
+
+**Cas concret débloqué** : chèque émis à un fournisseur, erreur de bénéficiaire, on annule comptablement → extourne dépense (montant négatif côté dépense = remontée en trésorerie, attendant le remboursement réel).
+
+**Impact code** : `Transaction::isExtournable()` retire le guard `type === Recette`. Service inchangé (déjà type-agnostique). Vue UI : bouton "Annuler" affiché aussi sur les dépenses.
+
+### 7.2 Mutex poubelle ↔ annuler dans la liste
+
+**Constat UX** : initialement les deux boutons cohabitaient sur la même ligne, prêtant à confusion. Une transaction `EnAttente` sans aucun attachement n'a pas besoin d'un trail comptable — la suppression directe suffit.
+
+**Règle adoptée** :
+
+| Conditions | Bouton affiché |
+|---|---|
+| Exercice ouvert + `EnAttente` (ou virement interne) + aucun attachement (remise / règlement / rapprochement / facture validée) + non extournée + non miroir | **Poubelle** uniquement |
+| Extournable (recette ou dépense, non HelloAsso, non extournée, non miroir) ET non supprimable safely | **Annuler** uniquement |
+| HelloAsso | **Poubelle** uniquement (verrou applicatif sur l'annulation, delete avec confirm) |
+| Ni l'un ni l'autre (ex: déjà extournée) | Poubelle désactivée avec tooltip explicite |
+
+**Conséquence sur la BDD** : le scénario 1 du §2 ("Annuler une recette non encaissée crée une extourne et un lettrage automatique") n'est plus déclenchable depuis le bouton UI standard — le service `TransactionExtourneService::extourner` reste capable (utilisé par le Slice 2 pour les lignes manuelles). Les tests Feature qui exécutent ce scénario continuent de passer en invoquant le service directement.
+
+**Impact code** :
+- `TransactionUniverselleService::brancheRecette/Depense` : le union expose désormais `tx.reglement_id` + `is_locked_by_facture` (EXISTS facture validée).
+- Vue : `$estSupprimableSafely` calculé inline ; les deux boutons sont mutuellement exclusifs.
