@@ -26,9 +26,9 @@ Le Slice 1 (programme Extourne) introduira des `Transaction` à `montant_total <
 
 ### 2.2 Exports (Step 3)
 
-- [ ] Exports Excel `app/Exports/*` (à identifier) — verdict :
-- [ ] PDF compte de résultat — verdict :
-- [ ] PDF flux trésorerie — verdict :
+- [x] Exports Excel compte de résultat + flux trésorerie (`app/Http/Controllers/RapportExportController.php`) — verdict : **OK** — les builders (`CompteResultatBuilder`, `FluxTresorerieBuilder`) délèguent à `SUM()` algébrique. Le Spreadsheet PhpSpreadsheet écrit les valeurs numériques telles quelles (pas de `abs()`). Tests 1, 5, 6 vérifient les valeurs numériques dans les cellules Excel (parse via `PhpOffice\PhpSpreadsheet\IOFactory::load()`).
+- [x] PDF compte de résultat (`resources/views/pdf/rapport-compte-resultat.blade.php`) — verdict : **Patché** — filtre ligne 84 `$sc['montant_n'] > 0` remplacé par `$sc['montant_n'] != 0` (idem montant_n1 et budget). Les sous-catégories à montant strictement négatif étaient exclues silencieusement du PDF. Patch minimal, aucune autre logique modifiée. Tests 2 et 3 vérifient via rendu HTML pré-PDF : `60,00 €` apparaît, `-40,00 €` apparaît.
+- [x] PDF flux trésorerie (`resources/views/pdf/rapport-flux-tresorerie.blade.php`) — verdict : **OK** — pas de filtre `> 0` sur les montants. `number_format()` accepte les valeurs négatives nativement. Test 4 vérifie `50,00 €` (algébrique) présent dans le HTML, `110,00 €` (abs naïve) absent.
 
 ### 2.3 Robustesse écrans (Step 4)
 
@@ -63,6 +63,10 @@ Trait commun : `app/Livewire/Concerns/RefusesMontantNegatif.php` (créé Step 5)
 **Step 2 : aucun patch nécessaire.** Tous les builders de rapports, dashboards et exports gèrent nativement les montants négatifs via des sommations SQL algébriques (`SUM()`, `sum('montant_total')`). Aucun `abs()` indu ni filtre `WHERE montant > 0` injustifié détecté dans les cibles du Step 2.
 
 Nota bene sur `FluxTresorerieBuilder` : les requêtes mensuelle et rapprochement utilisent `CASE WHEN type='recette' THEN montant_total ELSE 0 END` pour agréger séparément recettes et dépenses. Une recette à montant négatif réduit correctement `total_recettes` — comportement cohérent.
+
+**Step 3 : un patch nécessaire.**
+
+- `resources/views/pdf/rapport-compte-resultat.blade.php` ligne 84 : filtre de visibilité des sous-catégories dans la vue PDF. Le filtre `$sc['montant_n'] > 0` excluait silencieusement les sous-catégories dont le montant exercice N est strictement négatif — elles n'apparaissaient pas dans le PDF imprimé. Corrigé en `$sc['montant_n'] != 0` (idem pour `montant_n1` et `budget`). La sémantique correcte est : afficher une sous-catégorie dès qu'elle a un montant non-nul sur l'un des deux exercices ou un budget alloué, quelle que soit la polarité du montant.
 
 ## 4. Précédent dans le code : extournes de provisions
 
