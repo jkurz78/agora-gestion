@@ -454,6 +454,10 @@ final class FactureService
     {
         $this->assertTenantOwnership($facture);
 
+        if ($facture->statut === StatutFacture::Annulee) {
+            throw new \RuntimeException('Cette facture est déjà annulée.');
+        }
+
         if ($facture->statut !== StatutFacture::Validee) {
             throw new \RuntimeException('Seule une facture validée peut être annulée.');
         }
