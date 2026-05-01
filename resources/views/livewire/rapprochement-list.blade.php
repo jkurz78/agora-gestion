@@ -21,6 +21,13 @@
                 <option value="{{ $compte->id }}">{{ $compte->nom }}</option>
             @endforeach
         </select>
+        <label for="filter-type" class="form-label mb-0 small text-muted">Type</label>
+        <select wire:model.live="filterType" id="filter-type" class="form-select form-select-sm" style="max-width:140px;"
+                title="Filtrer les rapprochements bancaires (relevés extrait) ou les lettrages (extournes appariées sans flux bancaire)">
+            <option value="bancaire">Bancaire</option>
+            <option value="lettrage">Lettrage</option>
+            <option value="tous">Tous</option>
+        </select>
         @if (! $exerciceCloture && $compte_id)
             @if (! $aEnCours)
                 <button wire:click="$set('showCreateForm', true)"
@@ -81,6 +88,7 @@
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Date de fin</th>
+                            <th>Type</th>
                             <th class="text-end">Solde ouverture</th>
                             <th class="text-end">Total débit</th>
                             <th class="text-end">Total crédit</th>
@@ -95,6 +103,19 @@
                         @foreach ($rapprochements as $rapprochement)
                             <tr wire:key="rapprochement-{{ $rapprochement->id }}">
                                 <td class="small text-nowrap">{{ $rapprochement->date_fin->format('d/m/Y') }}</td>
+                                <td class="small text-nowrap">
+                                    @if ($rapprochement->isLettrage())
+                                        <span class="badge text-bg-info" style="font-size:.65rem"
+                                              title="Lettrage : extourne appariée à son origine, sans flux bancaire (∑=0)">
+                                            <i class="bi bi-link-45deg"></i> {{ $rapprochement->type->label() }}
+                                        </span>
+                                    @else
+                                        <span class="badge text-bg-light" style="font-size:.65rem"
+                                              title="Rapprochement bancaire : appariement avec un extrait de compte">
+                                            <i class="bi bi-bank"></i> {{ $rapprochement->type->label() }}
+                                        </span>
+                                    @endif
+                                </td>
                                 <td class="text-end fw-semibold small text-nowrap">{{ number_format((float) $rapprochement->solde_ouverture, 2, ',', ' ') }} €</td>
                                 <td class="text-end small text-nowrap text-danger">{{ number_format($rapprochementTotals[$rapprochement->id]['debit'] ?? 0, 2, ',', ' ') }} €</td>
                                 <td class="text-end small text-nowrap text-success">{{ number_format($rapprochementTotals[$rapprochement->id]['credit'] ?? 0, 2, ',', ' ') }} €</td>
