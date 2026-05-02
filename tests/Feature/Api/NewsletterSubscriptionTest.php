@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\Newsletter\SubscriptionRequestStatus;
+use App\Models\Newsletter\SubscriptionRequest;
 use Illuminate\Support\Facades\Schema;
 
 it('creates the newsletter_subscription_requests table with all expected columns', function () {
@@ -25,4 +27,23 @@ it('creates the newsletter_subscription_requests table with all expected columns
         'created_at',
         'updated_at',
     ]))->toBeTrue();
+});
+
+it('creates a SubscriptionRequest via factory with default pending status', function () {
+    $r = SubscriptionRequest::factory()->create(['email' => 'alice@example.fr']);
+
+    expect($r->email)->toBe('alice@example.fr');
+    expect($r->status)->toBe(SubscriptionRequestStatus::Pending);
+    expect((int) $r->association_id)->toBe((int) \App\Tenant\TenantContext::currentId());
+});
+
+it('scope active() returns only confirmed rows', function () {
+    SubscriptionRequest::factory()->create(['status' => SubscriptionRequestStatus::Pending]);
+    $confirmed = SubscriptionRequest::factory()->create(['status' => SubscriptionRequestStatus::Confirmed]);
+    SubscriptionRequest::factory()->create(['status' => SubscriptionRequestStatus::Unsubscribed]);
+
+    $active = SubscriptionRequest::active()->get();
+
+    expect($active)->toHaveCount(1);
+    expect($active->first()->id)->toBe($confirmed->id);
 });
