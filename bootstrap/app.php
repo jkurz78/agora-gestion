@@ -13,6 +13,7 @@ use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -26,6 +27,7 @@ use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -79,6 +81,16 @@ return Application::configure(basePath: dirname(__DIR__))
             ForceWizardIfNotCompleted::class,
             BlockWritesInSupport::class,
         ]);
+
+        // Rate limiter pour l'API newsletter publique : 5 requêtes / IP / heure.
+        // Réponse 429 normalisée {"error": "rate_limit"} pour le contrat API.
+        RateLimiter::for('newsletter', function (Request $request) {
+            return Limit::perHour(
+                (int) config('newsletter.rate_limit.max_attempts', 5)
+            )
+                ->by((string) $request->ip())
+                ->response(fn () => response()->json(['error' => 'rate_limit'], 429));
+        });
 
         $middleware->alias([
             'tenant.access' => EnsureTenantAccess::class,

@@ -7,6 +7,7 @@ use App\Mail\NewsletterConfirmation;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Services\Newsletter\SubscriptionService;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
@@ -134,7 +135,7 @@ it('subscribe is idempotent for a pending duplicate (rotates token, resends mail
     $firstExpiry = $first->confirmation_expires_at;
 
     // Avance le temps pour observer la rotation d'expiry
-    \Illuminate\Support\Carbon::setTestNow(now()->addMinute());
+    Carbon::setTestNow(now()->addMinute());
 
     $service->subscribe('bob@example.fr', 'Bob', '1.2.3.4', 'UA');
 
@@ -152,12 +153,12 @@ it('subscribe is silent for a confirmed duplicate (no mutation, no mail)', funct
     $service = app(SubscriptionService::class);
 
     $existing = SubscriptionRequest::factory()->create([
-        'email'  => 'carol@example.fr',
+        'email' => 'carol@example.fr',
         'status' => SubscriptionRequestStatus::Confirmed,
     ]);
     $existingUpdatedAt = $existing->updated_at;
 
-    \Illuminate\Support\Carbon::setTestNow(now()->addMinute());
+    Carbon::setTestNow(now()->addMinute());
 
     $service->subscribe('carol@example.fr', 'Carol', '1.2.3.4', 'UA');
 
@@ -174,7 +175,7 @@ it('subscribe creates a NEW row for a previously unsubscribed email (preserves h
     $service = app(SubscriptionService::class);
 
     $past = SubscriptionRequest::factory()->create([
-        'email'  => 'dave@example.fr',
+        'email' => 'dave@example.fr',
         'status' => SubscriptionRequestStatus::Unsubscribed,
     ]);
 
@@ -213,8 +214,8 @@ it('confirmation email contains clear-text confirm and unsubscribe URLs (not has
 
         // Le rendu HTML contient les liens clairs
         $html = $mail->render();
-        expect($html)->toContain('/newsletter/confirm/' . $mail->confirmationToken);
-        expect($html)->toContain('/newsletter/unsubscribe/' . $mail->unsubscribeToken);
+        expect($html)->toContain('/newsletter/confirm/'.$mail->confirmationToken);
+        expect($html)->toContain('/newsletter/unsubscribe/'.$mail->unsubscribeToken);
 
         // Et NE contient PAS les hash
         expect($html)->not->toContain($row->confirmation_token_hash);
@@ -226,21 +227,20 @@ it('confirmation email contains clear-text confirm and unsubscribe URLs (not has
 
 // ─── Tasks 9–11 : Middleware Origin + Controller HTTP ────────────────────────
 
-use App\Models\Association;
-
 beforeEach(function () {
-    // Récupère l'asso bootée par tests/Pest.php et la rend résoluble par slug
+    // Récupère l'asso bootée par tests/Pest.php et la rend résoluble par slug.
+    // allowSlugChange = true est nécessaire pour contourner ImmutableSlugObserver
+    // (le slug factory est auto-généré ; on l'écrase ici pour le test).
     $association = TenantContext::current();
-    if ($association && ! $association->slug) {
+    if ($association) {
+        $association->allowSlugChange = true;
         $association->slug = 'soigner-vivre-sourire';
         $association->save();
-    } else {
-        $association?->update(['slug' => 'soigner-vivre-sourire']);
     }
 
     config(['newsletter.origins' => [
         'https://soigner-vivre-sourire.fr' => 'soigner-vivre-sourire',
-        'http://localhost:4321'            => 'soigner-vivre-sourire',
+        'http://localhost:4321' => 'soigner-vivre-sourire',
     ]]);
 });
 
@@ -248,11 +248,11 @@ it('rejects POST /api/newsletter/subscribe from an unauthorized origin (403)', f
     Mail::fake();
 
     $response = $this->withHeaders([
-        'Origin'       => 'https://attaquant.example',
+        'Origin' => 'https://attaquant.example',
         'Content-Type' => 'application/json',
     ])->postJson('/api/newsletter/subscribe', [
-        'email'    => 'alice@example.fr',
-        'consent'  => true,
+        'email' => 'alice@example.fr',
+        'consent' => true,
         'bot_trap' => '',
     ]);
 
@@ -267,9 +267,9 @@ it('POST /api/newsletter/subscribe with valid payload returns 200 and creates a 
     $response = $this->withHeaders([
         'Origin' => 'https://soigner-vivre-sourire.fr',
     ])->postJson('/api/newsletter/subscribe', [
-        'email'    => 'alice@example.fr',
-        'prenom'   => 'Alice',
-        'consent'  => true,
+        'email' => 'alice@example.fr',
+        'prenom' => 'Alice',
+        'consent' => true,
         'bot_trap' => '',
     ]);
 
@@ -287,8 +287,8 @@ it('POST with malformed email returns 422 with validation_failed shape', functio
     $response = $this->withHeaders([
         'Origin' => 'https://soigner-vivre-sourire.fr',
     ])->postJson('/api/newsletter/subscribe', [
-        'email'    => 'pas-un-email',
-        'consent'  => true,
+        'email' => 'pas-un-email',
+        'consent' => true,
         'bot_trap' => '',
     ]);
 
@@ -301,8 +301,8 @@ it('POST without consent returns 422', function () {
     $response = $this->withHeaders([
         'Origin' => 'https://soigner-vivre-sourire.fr',
     ])->postJson('/api/newsletter/subscribe', [
-        'email'    => 'alice@example.fr',
-        'consent'  => false,
+        'email' => 'alice@example.fr',
+        'consent' => false,
         'bot_trap' => '',
     ]);
 
@@ -317,8 +317,8 @@ it('POST with filled bot_trap returns 200 silently with no row and no mail', fun
     $response = $this->withHeaders([
         'Origin' => 'https://soigner-vivre-sourire.fr',
     ])->postJson('/api/newsletter/subscribe', [
-        'email'    => 'bot@spam.com',
-        'consent'  => true,
+        'email' => 'bot@spam.com',
+        'consent' => true,
         'bot_trap' => 'http://link-spam',
     ]);
 
@@ -332,21 +332,21 @@ it('rate-limits to 5 requests per IP per hour', function () {
 
     for ($i = 1; $i <= 5; $i++) {
         $this->withHeaders([
-            'Origin'          => 'https://soigner-vivre-sourire.fr',
+            'Origin' => 'https://soigner-vivre-sourire.fr',
             'X-Forwarded-For' => '1.2.3.4',
         ])->postJson('/api/newsletter/subscribe', [
-            'email'    => "user{$i}@example.fr",
-            'consent'  => true,
+            'email' => "user{$i}@example.fr",
+            'consent' => true,
             'bot_trap' => '',
         ])->assertStatus(200);
     }
 
     $sixth = $this->withHeaders([
-        'Origin'          => 'https://soigner-vivre-sourire.fr',
+        'Origin' => 'https://soigner-vivre-sourire.fr',
         'X-Forwarded-For' => '1.2.3.4',
     ])->postJson('/api/newsletter/subscribe', [
-        'email'    => 'user6@example.fr',
-        'consent'  => true,
+        'email' => 'user6@example.fr',
+        'consent' => true,
         'bot_trap' => '',
     ]);
 
