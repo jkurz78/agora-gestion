@@ -101,6 +101,53 @@ Les tests utilisent **Pest PHP**. Il y a des tests Feature (auth, CRUD), Unit (s
 
 ---
 
+## API publique — newsletter
+
+AgoraGestion expose un endpoint REST public pour collecter les inscriptions newsletter envoyées par un site web vitrine. L'asso reste maître de ses données : pas de prestataire tiers (Brevo / Mailchimp).
+
+### Endpoint
+
+```
+POST /api/newsletter/subscribe
+Content-Type: application/json
+Origin: <l'une des origines whitelistées dans config/newsletter.php>
+```
+
+### Exemple curl
+
+```bash
+curl -X POST https://app.example.org/api/newsletter/subscribe \
+  -H "Origin: https://soigner-vivre-sourire.fr" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.fr","prenom":"Alice","consent":true,"bot_trap":""}'
+```
+
+Réponse : `200 {"status":"pending_double_optin"}`.
+
+### Double opt-in RGPD
+
+L'inscription est stockée dans la table buffer `newsletter_subscription_requests` avec un statut `pending`. Un email est envoyé à l'abonné contenant un lien `GET /newsletter/confirm/{token}` qui marque la ligne `confirmed`. Chaque email contient également le lien `GET /newsletter/unsubscribe/{token}` (présent dès le 1er message, conformité RGPD).
+
+### Tenant resolution
+
+L'asso destinataire est résolue à partir du header HTTP `Origin` via une whitelist dans `config/newsletter.php`. Pour ajouter une asso : ajouter une ligne origin → slug.
+
+### Hors-scope
+
+L'import des demandes confirmées vers la table `tiers` (déduplication, fusion) sera traité dans une PR ultérieure comme nouvel élément de la **Boîte de réception** unifiée.
+
+### Site web qui consomme l'endpoint
+
+[https://github.com/jkurz78/www.soigner-vivre-sourire.fr](https://github.com/jkurz78/www.soigner-vivre-sourire.fr)
+
+### Droit à l'effacement
+
+```bash
+./vendor/bin/sail artisan newsletter:forget alice@example.fr
+```
+
+---
+
 ## Architecture
 
 ### Structure
