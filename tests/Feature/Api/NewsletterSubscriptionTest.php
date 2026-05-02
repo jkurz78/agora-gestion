@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Newsletter\SubscriptionRequestStatus;
 use App\Models\Newsletter\SubscriptionRequest;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Schema;
 
 it('creates the newsletter_subscription_requests table with all expected columns', function () {
@@ -34,7 +35,7 @@ it('creates a SubscriptionRequest via factory with default pending status', func
 
     expect($r->email)->toBe('alice@example.fr');
     expect($r->status)->toBe(SubscriptionRequestStatus::Pending);
-    expect((int) $r->association_id)->toBe((int) \App\Tenant\TenantContext::currentId());
+    expect((int) $r->association_id)->toBe((int) TenantContext::currentId());
 });
 
 it('scope active() returns only confirmed rows', function () {

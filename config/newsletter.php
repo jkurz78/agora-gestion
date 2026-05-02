@@ -16,9 +16,9 @@ return [
     |
     */
     'origins' => [
-        'https://soigner-vivre-sourire.fr'     => 'soigner-vivre-sourire',
+        'https://soigner-vivre-sourire.fr' => 'soigner-vivre-sourire',
         'https://dev.soigner-vivre-sourire.fr' => 'soigner-vivre-sourire',
-        'http://localhost:4321'                => 'soigner-vivre-sourire',
+        'http://localhost:4321' => 'soigner-vivre-sourire',
     ],
 
     /*
@@ -32,7 +32,7 @@ return [
     */
     'rate_limit' => [
         'max_attempts' => 5,
-        'decay_hours'  => 1,
+        'decay_hours' => 1,
     ],
 
     /*
