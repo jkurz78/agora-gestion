@@ -352,3 +352,88 @@ it('rate-limits to 5 requests per IP per hour', function () {
 
     $sixth->assertStatus(429)->assertJson(['error' => 'rate_limit']);
 });
+
+// ─── Task 12 : Routes web confirm/unsubscribe ─────────────────────────────────
+
+it('GET /newsletter/confirm/{token} with valid token marks confirmed and renders thank-you page', function () {
+    Mail::fake();
+
+    // Inscription pour récupérer un token clair
+    $service = app(SubscriptionService::class);
+    $service->subscribe('frank@example.fr', 'Frank', '1.2.3.4', 'UA');
+
+    $sentMail = collect(Mail::sent(NewsletterConfirmation::class))->first();
+    $clearToken = $sentMail->confirmationToken;
+
+    $response = $this->get('/newsletter/confirm/'.$clearToken);
+
+    $response->assertStatus(200)->assertSee('Inscription confirmée');
+
+    $row = SubscriptionRequest::where('email', 'frank@example.fr')->firstOrFail();
+    expect($row->status)->toBe(SubscriptionRequestStatus::Confirmed);
+    expect($row->confirmed_at)->not->toBeNull();
+});
+
+it('GET /newsletter/confirm/{token} with expired token returns 410', function () {
+    Mail::fake();
+    $service = app(SubscriptionService::class);
+    $service->subscribe('grace@example.fr', 'Grace', '1.2.3.4', 'UA');
+
+    $sentMail = collect(Mail::sent(NewsletterConfirmation::class))->first();
+    $clearToken = $sentMail->confirmationToken;
+
+    // Expire la ligne en DB
+    SubscriptionRequest::where('email', 'grace@example.fr')->update([
+        'confirmation_expires_at' => now()->subHour(),
+    ]);
+
+    $response = $this->get('/newsletter/confirm/'.$clearToken);
+
+    $response->assertStatus(410)->assertSee('expiré');
+
+    $row = SubscriptionRequest::where('email', 'grace@example.fr')->firstOrFail();
+    expect($row->status)->toBe(SubscriptionRequestStatus::Pending);
+});
+
+it('GET /newsletter/confirm/{unknown-token} returns 404', function () {
+    $response = $this->get('/newsletter/confirm/'.str_repeat('x', 48));
+    $response->assertStatus(404);
+});
+
+it('GET /newsletter/unsubscribe/{token} from confirmed row marks unsubscribed', function () {
+    Mail::fake();
+    $service = app(SubscriptionService::class);
+    $service->subscribe('hank@example.fr', 'Hank', '1.2.3.4', 'UA');
+
+    $sentMail = collect(Mail::sent(NewsletterConfirmation::class))->first();
+    $clearConfirm = $sentMail->confirmationToken;
+    $clearUnsub = $sentMail->unsubscribeToken;
+
+    $this->get('/newsletter/confirm/'.$clearConfirm)->assertStatus(200);
+
+    $response = $this->get('/newsletter/unsubscribe/'.$clearUnsub);
+    $response->assertStatus(200)->assertSee('désinscrit');
+
+    $row = SubscriptionRequest::where('email', 'hank@example.fr')->firstOrFail();
+    expect($row->status)->toBe(SubscriptionRequestStatus::Unsubscribed);
+});
+
+it('GET /newsletter/unsubscribe/{token} from pending row marks unsubscribed (RGPD pre-confirmation)', function () {
+    Mail::fake();
+    $service = app(SubscriptionService::class);
+    $service->subscribe('ivy@example.fr', 'Ivy', '1.2.3.4', 'UA');
+
+    $sentMail = collect(Mail::sent(NewsletterConfirmation::class))->first();
+    $clearUnsub = $sentMail->unsubscribeToken;
+
+    $response = $this->get('/newsletter/unsubscribe/'.$clearUnsub);
+    $response->assertStatus(200);
+
+    $row = SubscriptionRequest::where('email', 'ivy@example.fr')->firstOrFail();
+    expect($row->status)->toBe(SubscriptionRequestStatus::Unsubscribed);
+});
+
+it('GET /newsletter/unsubscribe/{unknown-token} returns 404', function () {
+    $response = $this->get('/newsletter/unsubscribe/'.str_repeat('y', 48));
+    $response->assertStatus(404);
+});
