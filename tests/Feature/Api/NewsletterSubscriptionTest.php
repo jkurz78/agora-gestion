@@ -121,3 +121,73 @@ it('subscribe creates a pending row and sends confirmation email for a new email
         return $mail->hasTo('alice@example.fr');
     });
 });
+
+// ─── Task 6 : Idempotence ─────────────────────────────────────────────────────
+
+it('subscribe is idempotent for a pending duplicate (rotates token, resends mail)', function () {
+    Mail::fake();
+    $service = app(SubscriptionService::class);
+
+    $service->subscribe('bob@example.fr', 'Bob', '1.2.3.4', 'UA');
+    $first = SubscriptionRequest::where('email', 'bob@example.fr')->firstOrFail();
+    $firstHash = $first->confirmation_token_hash;
+    $firstExpiry = $first->confirmation_expires_at;
+
+    // Avance le temps pour observer la rotation d'expiry
+    \Illuminate\Support\Carbon::setTestNow(now()->addMinute());
+
+    $service->subscribe('bob@example.fr', 'Bob', '1.2.3.4', 'UA');
+
+    expect(SubscriptionRequest::where('email', 'bob@example.fr')->count())->toBe(1);
+    $second = SubscriptionRequest::where('email', 'bob@example.fr')->firstOrFail();
+    expect($second->id)->toBe($first->id);
+    expect($second->confirmation_token_hash)->not->toBe($firstHash);
+    expect($second->confirmation_expires_at)->not->toEqual($firstExpiry);
+
+    Mail::assertSent(NewsletterConfirmation::class, 2);
+});
+
+it('subscribe is silent for a confirmed duplicate (no mutation, no mail)', function () {
+    Mail::fake();
+    $service = app(SubscriptionService::class);
+
+    $existing = SubscriptionRequest::factory()->create([
+        'email'  => 'carol@example.fr',
+        'status' => SubscriptionRequestStatus::Confirmed,
+    ]);
+    $existingUpdatedAt = $existing->updated_at;
+
+    \Illuminate\Support\Carbon::setTestNow(now()->addMinute());
+
+    $service->subscribe('carol@example.fr', 'Carol', '1.2.3.4', 'UA');
+
+    $still = SubscriptionRequest::where('email', 'carol@example.fr')->firstOrFail();
+    expect($still->id)->toBe($existing->id);
+    expect($still->status)->toBe(SubscriptionRequestStatus::Confirmed);
+    expect($still->updated_at->equalTo($existingUpdatedAt))->toBeTrue();
+
+    Mail::assertNothingSent();
+});
+
+it('subscribe creates a NEW row for a previously unsubscribed email (preserves history)', function () {
+    Mail::fake();
+    $service = app(SubscriptionService::class);
+
+    $past = SubscriptionRequest::factory()->create([
+        'email'  => 'dave@example.fr',
+        'status' => SubscriptionRequestStatus::Unsubscribed,
+    ]);
+
+    $service->subscribe('dave@example.fr', 'Dave', '1.2.3.4', 'UA');
+
+    expect(SubscriptionRequest::where('email', 'dave@example.fr')->count())->toBe(2);
+    expect(SubscriptionRequest::find($past->id)->status)
+        ->toBe(SubscriptionRequestStatus::Unsubscribed);
+    expect(
+        SubscriptionRequest::where('email', 'dave@example.fr')
+            ->where('status', SubscriptionRequestStatus::Pending)
+            ->exists()
+    )->toBeTrue();
+
+    Mail::assertSent(NewsletterConfirmation::class, 1);
+});
