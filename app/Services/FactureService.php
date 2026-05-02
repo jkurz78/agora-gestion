@@ -31,6 +31,7 @@ final class FactureService
     public function __construct(
         private readonly ExerciceService $exerciceService,
         private readonly TransactionExtourneService $extourneService,
+        private readonly NumeroPieceService $numeroPiece,
     ) {}
 
     /**
@@ -892,6 +893,7 @@ XML;
         }
 
         $montantTotal = $lignesManuelles->sum(fn (FactureLigne $l) => (float) $l->montant);
+        $dateTransaction = now();
 
         // 1. Crée la Transaction recette entête
         $transaction = Transaction::create([
@@ -899,12 +901,13 @@ XML;
             'type' => TypeTransaction::Recette,
             'tiers_id' => (int) $facture->tiers_id,
             'compte_id' => $facture->compte_bancaire_id !== null ? (int) $facture->compte_bancaire_id : null,
-            'date' => now()->toDateString(),
+            'date' => $dateTransaction->toDateString(),
             'libelle' => "Facture {$facture->numero}",
             'montant_total' => round($montantTotal, 2),
             'mode_paiement' => $facture->mode_paiement_prevu?->value,
             'statut_reglement' => StatutReglement::EnAttente->value,
             'saisi_par' => auth()->id(),
+            'numero_piece' => $this->numeroPiece->assign($dateTransaction),
         ]);
 
         // 2. Crée les TransactionLignes + 3. set facture_lignes.transaction_ligne_id
