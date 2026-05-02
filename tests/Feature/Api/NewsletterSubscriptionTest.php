@@ -223,3 +223,132 @@ it('confirmation email contains clear-text confirm and unsubscribe URLs (not has
         return true;
     });
 });
+
+// ─── Tasks 9–11 : Middleware Origin + Controller HTTP ────────────────────────
+
+use App\Models\Association;
+
+beforeEach(function () {
+    // Récupère l'asso bootée par tests/Pest.php et la rend résoluble par slug
+    $association = TenantContext::current();
+    if ($association && ! $association->slug) {
+        $association->slug = 'soigner-vivre-sourire';
+        $association->save();
+    } else {
+        $association?->update(['slug' => 'soigner-vivre-sourire']);
+    }
+
+    config(['newsletter.origins' => [
+        'https://soigner-vivre-sourire.fr' => 'soigner-vivre-sourire',
+        'http://localhost:4321'            => 'soigner-vivre-sourire',
+    ]]);
+});
+
+it('rejects POST /api/newsletter/subscribe from an unauthorized origin (403)', function () {
+    Mail::fake();
+
+    $response = $this->withHeaders([
+        'Origin'       => 'https://attaquant.example',
+        'Content-Type' => 'application/json',
+    ])->postJson('/api/newsletter/subscribe', [
+        'email'    => 'alice@example.fr',
+        'consent'  => true,
+        'bot_trap' => '',
+    ]);
+
+    $response->assertStatus(403);
+    expect(SubscriptionRequest::count())->toBe(0);
+    Mail::assertNothingSent();
+});
+
+it('POST /api/newsletter/subscribe with valid payload returns 200 and creates a pending row', function () {
+    Mail::fake();
+
+    $response = $this->withHeaders([
+        'Origin' => 'https://soigner-vivre-sourire.fr',
+    ])->postJson('/api/newsletter/subscribe', [
+        'email'    => 'alice@example.fr',
+        'prenom'   => 'Alice',
+        'consent'  => true,
+        'bot_trap' => '',
+    ]);
+
+    $response->assertStatus(200)->assertJson(['status' => 'pending_double_optin']);
+
+    $row = SubscriptionRequest::where('email', 'alice@example.fr')->first();
+    expect($row)->not->toBeNull();
+    expect($row->status)->toBe(SubscriptionRequestStatus::Pending);
+    expect((int) $row->association_id)->toBe((int) TenantContext::currentId());
+
+    Mail::assertSent(NewsletterConfirmation::class);
+});
+
+it('POST with malformed email returns 422 with validation_failed shape', function () {
+    $response = $this->withHeaders([
+        'Origin' => 'https://soigner-vivre-sourire.fr',
+    ])->postJson('/api/newsletter/subscribe', [
+        'email'    => 'pas-un-email',
+        'consent'  => true,
+        'bot_trap' => '',
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJsonStructure(['error', 'fields' => ['email']])
+        ->assertJson(['error' => 'validation_failed']);
+});
+
+it('POST without consent returns 422', function () {
+    $response = $this->withHeaders([
+        'Origin' => 'https://soigner-vivre-sourire.fr',
+    ])->postJson('/api/newsletter/subscribe', [
+        'email'    => 'alice@example.fr',
+        'consent'  => false,
+        'bot_trap' => '',
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJsonPath('error', 'validation_failed')
+        ->assertJsonStructure(['fields' => ['consent']]);
+});
+
+it('POST with filled bot_trap returns 200 silently with no row and no mail', function () {
+    Mail::fake();
+
+    $response = $this->withHeaders([
+        'Origin' => 'https://soigner-vivre-sourire.fr',
+    ])->postJson('/api/newsletter/subscribe', [
+        'email'    => 'bot@spam.com',
+        'consent'  => true,
+        'bot_trap' => 'http://link-spam',
+    ]);
+
+    $response->assertStatus(200)->assertJson(['status' => 'pending_double_optin']);
+    expect(SubscriptionRequest::count())->toBe(0);
+    Mail::assertNothingSent();
+});
+
+it('rate-limits to 5 requests per IP per hour', function () {
+    Mail::fake();
+
+    for ($i = 1; $i <= 5; $i++) {
+        $this->withHeaders([
+            'Origin'          => 'https://soigner-vivre-sourire.fr',
+            'X-Forwarded-For' => '1.2.3.4',
+        ])->postJson('/api/newsletter/subscribe', [
+            'email'    => "user{$i}@example.fr",
+            'consent'  => true,
+            'bot_trap' => '',
+        ])->assertStatus(200);
+    }
+
+    $sixth = $this->withHeaders([
+        'Origin'          => 'https://soigner-vivre-sourire.fr',
+        'X-Forwarded-For' => '1.2.3.4',
+    ])->postJson('/api/newsletter/subscribe', [
+        'email'    => 'user6@example.fr',
+        'consent'  => true,
+        'bot_trap' => '',
+    ]);
+
+    $sixth->assertStatus(429)->assertJson(['error' => 'rate_limit']);
+});
