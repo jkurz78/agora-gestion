@@ -8,7 +8,9 @@ use App\Models\Association;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Services\Newsletter\SubscriptionService;
 use App\Tenant\TenantContext;
+use App\Tenant\TenantScope;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
@@ -477,4 +479,25 @@ it('OPTIONS preflight from authorized origin returns 204 with CORS headers', fun
     expect($response->headers->get('Access-Control-Allow-Origin'))
         ->toBe('https://soigner-vivre-sourire.fr');
     expect($response->headers->get('Access-Control-Allow-Methods'))->toContain('POST');
+});
+
+// ─── Task 14 : Commande newsletter:forget ────────────────────────────────────
+
+it('newsletter:forget {email} hard-deletes all rows for that email', function () {
+    SubscriptionRequest::factory()->create(['email' => 'kate@example.fr', 'status' => SubscriptionRequestStatus::Pending]);
+    SubscriptionRequest::factory()->create(['email' => 'kate@example.fr', 'status' => SubscriptionRequestStatus::Confirmed]);
+    SubscriptionRequest::factory()->create(['email' => 'kate@example.fr', 'status' => SubscriptionRequestStatus::Unsubscribed]);
+    SubscriptionRequest::factory()->create(['email' => 'other@example.fr']);
+
+    $exitCode = Artisan::call('newsletter:forget', ['email' => 'kate@example.fr']);
+
+    expect($exitCode)->toBe(0);
+
+    // Désactive le scope tenant pour vérifier la suppression globale
+    $remaining = SubscriptionRequest::withoutGlobalScope(TenantScope::class)
+        ->where('email', 'kate@example.fr')
+        ->count();
+    expect($remaining)->toBe(0);
+
+    expect(SubscriptionRequest::where('email', 'other@example.fr')->count())->toBe(1);
 });
