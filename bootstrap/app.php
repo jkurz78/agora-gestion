@@ -21,6 +21,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Middleware\ThrottleRequests;
@@ -43,6 +44,10 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // HandleCors doit être en tête de pipeline pour traiter les requêtes
+        // OPTIONS preflight AVANT tout autre middleware (tenant, auth, throttle).
+        $middleware->prepend(HandleCors::class);
+
         $middleware->append(SecurityHeaders::class);
 
         $middleware->appendToGroup('web', [

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Newsletter\SubscriptionRequestStatus;
 use App\Mail\NewsletterConfirmation;
+use App\Models\Association;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Services\Newsletter\SubscriptionService;
 use App\Tenant\TenantContext;
@@ -436,4 +437,44 @@ it('GET /newsletter/unsubscribe/{token} from pending row marks unsubscribed (RGP
 it('GET /newsletter/unsubscribe/{unknown-token} returns 404', function () {
     $response = $this->get('/newsletter/unsubscribe/'.str_repeat('y', 48));
     $response->assertStatus(404);
+});
+
+// ─── Task 13 : Isolation cross-tenant + CORS preflight ────────────────────────
+
+it('cross-tenant isolation: tenant B cannot confirm a token issued for tenant A', function () {
+    Mail::fake();
+
+    // Tenant A déjà bootée par tests/Pest.php (slug "soigner-vivre-sourire")
+    $service = app(SubscriptionService::class);
+    $service->subscribe('jane@example.fr', 'Jane', '1.2.3.4', 'UA');
+
+    $clearToken = collect(Mail::sent(NewsletterConfirmation::class))->first()->confirmationToken;
+    $tenantAId = (int) TenantContext::currentId();
+
+    // Crée une 2ème asso et la boote
+    $assoB = Association::factory()->create(['slug' => 'autre-asso']);
+    TenantContext::clear();
+    TenantContext::boot($assoB);
+
+    // Le findByConfirmationToken doit re-booter le tenant A automatiquement
+    $row = $service->findByConfirmationToken($clearToken);
+
+    expect($row)->not->toBeNull();
+    expect((int) $row->association_id)->not->toBe((int) $assoB->id);
+    // Et TenantContext courant doit avoir basculé vers le tenant A (celui du token)
+    expect((int) TenantContext::currentId())->toBe((int) $row->association_id);
+    expect((int) TenantContext::currentId())->toBe($tenantAId);
+});
+
+it('OPTIONS preflight from authorized origin returns 204 with CORS headers', function () {
+    $response = $this->call('OPTIONS', '/api/newsletter/subscribe', [], [], [], [
+        'HTTP_ORIGIN' => 'https://soigner-vivre-sourire.fr',
+        'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'POST',
+        'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'Content-Type',
+    ]);
+
+    expect($response->getStatusCode())->toBe(204);
+    expect($response->headers->get('Access-Control-Allow-Origin'))
+        ->toBe('https://soigner-vivre-sourire.fr');
+    expect($response->headers->get('Access-Control-Allow-Methods'))->toContain('POST');
 });

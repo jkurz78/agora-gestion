@@ -11,7 +11,14 @@ return [
 
     'allowed_methods' => ['POST', 'OPTIONS'],
 
-    'allowed_origins' => array_keys((array) config('newsletter.origins', [])),
+    // Les origines doivent être listées statiquement ici car config/cors.php
+    // peut être résolu avant config/newsletter.php — config() n'est pas disponible
+    // à ce stade de l'initialisation du framework.
+    'allowed_origins' => [
+        'https://soigner-vivre-sourire.fr',
+        'https://dev.soigner-vivre-sourire.fr',
+        'http://localhost:4321',
+    ],
 
     'allowed_origins_patterns' => [],
 
