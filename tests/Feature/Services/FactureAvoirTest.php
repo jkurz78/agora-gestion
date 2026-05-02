@@ -79,7 +79,11 @@ it('refuse annulation sur un brouillon', function () {
         ->toThrow(RuntimeException::class, 'Seule une facture validée');
 });
 
-it('refuse annulation si une transaction est rapprochée', function () {
+// Comportement modifié S2 : guard isLockedByRapprochement supprimé.
+// La primitive S1 gère le cas via extourne EnAttente (si la TX est MontantManuel générée).
+// Pour une TX "Montant ref" (préexistante), S2 ne crée pas d'extourne — elle est simplement
+// détachée du pivot. Ce test vérifie l'absence de l'exception legacy + le détachement pivot.
+it('n\'empeche plus annulation si une transaction est rapprochée — comportement S2', function () {
     $exercice = app(ExerciceService::class)->current();
     $tiers = Tiers::factory()->create(['pour_recettes' => true]);
     $compte = CompteBancaire::factory()->create();
@@ -101,6 +105,8 @@ it('refuse annulation si une transaction est rapprochée', function () {
         'exercice' => $exercice,
     ]);
 
+    // TX de type recette préexistante (Montant ref, pas MontantManuel générée) —
+    // S2 ne crée PAS d'extourne pour ce cas, détache simplement le pivot.
     $tx = Transaction::create([
         'tiers_id' => $tiers->id,
         'compte_id' => $compte->id,
@@ -111,13 +117,23 @@ it('refuse annulation si une transaction est rapprochée', function () {
         'mode_paiement' => 'virement',
         'saisi_par' => $this->user->id,
         'rapprochement_id' => $rapprochement->id,
-        'statut_reglement' => 'pointe', // v3: isLockedByRapprochement() checks statut_reglement
+        'statut_reglement' => 'pointe',
     ]);
 
     $facture->transactions()->attach($tx->id);
 
-    expect(fn () => $this->service->annuler($facture))
-        ->toThrow(RuntimeException::class, 'rapprochée en banque');
+    // Guard legacy supprimé : l'annulation ne lève plus d'exception
+    $this->service->annuler($facture);
+
+    $facture->refresh();
+    expect($facture->statut)->toBe(StatutFacture::Annulee);
+
+    // La TX référencée est détachée du pivot (comportement S2 pour les Montant ref)
+    expect($facture->transactions->contains(fn ($t) => (int) $t->id === (int) $tx->id))->toBeFalse();
+
+    // La TX Montant ref reste intacte (pas d'extourne, statut inchangé)
+    expect($tx->fresh()->statut_reglement->value)->toBe('pointe');
+    expect($tx->fresh()->extournee_at)->toBeNull();
 });
 
 it('libère les transactions après annulation', function () {

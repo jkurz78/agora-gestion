@@ -54,6 +54,14 @@ final class TransactionUniverselleService
             ->when($searchNumeroPiece, fn ($q) => $q->where('t.numero_piece', 'like', "%{$searchNumeroPiece}%"))
             ->when($modePaiement, fn ($q) => $q->where('t.mode_paiement', $modePaiement))
             ->when($statutReglement, fn ($q) => $q->where('t.statut_reglement', $statutReglement))
+            // Exclure les recettes à montant négatif ou nul du filtre Créances à recevoir.
+            // Une recette à montant_total <= 0 est soit une extourne (Slice 1), soit invalide
+            // comme créance à encaisser. Le sens dépense est laissé tel quel.
+            // Préparation Slice 1 — voir docs/audit/2026-04-30-signe-negatif.md §3
+            ->when(
+                $statutReglement === 'en_attente',
+                fn ($q) => $q->whereNot(fn ($w) => $w->where('t.source_type', 'recette')->where('t.montant', '<=', 0))
+            )
             ->orderBy("t.{$sortColumn}", $sortDirection)
             ->orderBy('t.source_type')
             ->orderBy('t.id');
@@ -132,7 +140,8 @@ final class TransactionUniverselleService
                  NULL as categorie_label, 0 as nb_lignes, NULL as compte_id, NULL as compte_nom,
                  NULL as mode_paiement, 0 as montant, NULL as pointe,
                  NULL as statut_reglement, NULL as remise_id, NULL as rapprochement_id,
-                 NULL as notes, NULL as piece_jointe_path, NULL as piece_jointe_nom, 0 as is_helloasso"
+                 NULL as notes, NULL as piece_jointe_path, NULL as piece_jointe_nom, 0 as is_helloasso,
+                 NULL as extournee_at, 0 as is_extourne_miroir, NULL as reglement_id, 0 as is_locked_by_facture"
             );
         }
 
@@ -180,7 +189,11 @@ final class TransactionUniverselleService
                 tx.notes,
                 tx.piece_jointe_path,
                 tx.piece_jointe_nom,
-                (tx.helloasso_order_id IS NOT NULL) as is_helloasso
+                (tx.helloasso_order_id IS NOT NULL) as is_helloasso,
+                tx.extournee_at,
+                EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir,
+                tx.reglement_id,
+                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture
             ")
             ->where('tx.type', 'depense')
             ->whereNull('tx.deleted_at')
@@ -240,7 +253,11 @@ final class TransactionUniverselleService
                 tx.notes,
                 tx.piece_jointe_path,
                 tx.piece_jointe_nom,
-                (tx.helloasso_order_id IS NOT NULL) as is_helloasso
+                (tx.helloasso_order_id IS NOT NULL) as is_helloasso,
+                tx.extournee_at,
+                EXISTS(SELECT 1 FROM extournes e WHERE e.transaction_extourne_id = tx.id AND e.deleted_at IS NULL) as is_extourne_miroir,
+                tx.reglement_id,
+                EXISTS(SELECT 1 FROM facture_transaction ft JOIN factures f ON f.id = ft.facture_id WHERE ft.transaction_id = tx.id AND f.statut = 'validee') as is_locked_by_facture
             ")
             ->where('tx.type', 'recette')
             ->whereNull('tx.deleted_at')
@@ -296,7 +313,11 @@ final class TransactionUniverselleService
                 vi.notes,
                 NULL as piece_jointe_path,
                 NULL as piece_jointe_nom,
-                0 as is_helloasso
+                0 as is_helloasso,
+                NULL as extournee_at,
+                0 as is_extourne_miroir,
+                NULL as reglement_id,
+                0 as is_locked_by_facture
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))
@@ -338,7 +359,11 @@ final class TransactionUniverselleService
                 vi.notes,
                 NULL as piece_jointe_path,
                 NULL as piece_jointe_nom,
-                0 as is_helloasso
+                0 as is_helloasso,
+                NULL as extournee_at,
+                0 as is_extourne_miroir,
+                NULL as reglement_id,
+                0 as is_locked_by_facture
             ")
             ->whereNull('vi.deleted_at')
             ->when(TenantContext::hasBooted(), fn ($q) => $q->where('vi.association_id', TenantContext::currentId()))

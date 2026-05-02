@@ -10,6 +10,7 @@ use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
+use App\Livewire\Concerns\MontantValidation;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
 use App\Models\Operation;
@@ -346,11 +347,14 @@ final class FactureEdit extends Component
         $prixUnitaire = (float) $this->nouvelleLigneMontantPrixUnitaire;
         $quantite = (float) $this->nouvelleLigneMontantQuantite;
 
-        $this->validate([
-            'nouvelleLigneMontantLibelle' => ['required', 'string', 'max:255'],
-            'nouvelleLigneMontantPrixUnitaire' => ['required', 'numeric', 'gt:0'],
-            'nouvelleLigneMontantQuantite' => ['required', 'numeric', 'gt:0'],
-        ]);
+        $this->validate(
+            [
+                'nouvelleLigneMontantLibelle' => ['required', 'string', 'max:255'],
+                'nouvelleLigneMontantPrixUnitaire' => ['required', 'numeric', MontantValidation::RULE],
+                'nouvelleLigneMontantQuantite' => ['required', 'numeric', MontantValidation::RULE],
+            ],
+            MontantValidation::messages(['nouvelleLigneMontantPrixUnitaire', 'nouvelleLigneMontantQuantite'])
+        );
 
         try {
             app(FactureService::class)->ajouterLigneManuelle($this->facture, [
@@ -440,15 +444,15 @@ final class FactureEdit extends Component
     {
         $selectedIds = $this->facture->transactions()->pluck('transactions.id')->toArray();
 
-        $transactions = Transaction::where(function ($query) {
-            $query->where('type', TypeTransaction::Recette)
-                ->where('tiers_id', $this->facture->tiers_id)
-                ->whereDoesntHave('factures', fn ($q) => $q->whereIn('statut', [StatutFacture::Brouillon, StatutFacture::Validee])
-                );
-        })
+        $transactions = Transaction::query()
+            ->where(function ($query) {
+                $query->where('type', TypeTransaction::Recette)
+                    ->where('tiers_id', $this->facture->tiers_id)
+                    ->rattachableAFacture()
+                    ->whereDoesntHave('factures', fn ($q) => $q->whereIn('statut', [StatutFacture::Brouillon, StatutFacture::Validee]));
+            })
             ->orWhere(function ($q) {
-                $q->whereHas('factures', fn ($fq) => $fq->where('factures.id', $this->facture->id)
-                );
+                $q->whereHas('factures', fn ($fq) => $fq->where('factures.id', $this->facture->id));
             })
             ->orderByDesc('date')
             ->get();

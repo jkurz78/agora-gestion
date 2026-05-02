@@ -82,7 +82,7 @@
             @foreach ($section['data'] as $cat)
                 @php
                     $scVisibles = collect($cat['sous_categories'])->filter(fn($sc) =>
-                        $sc['montant_n'] > 0 || ($sc['montant_n1'] !== null && $sc['montant_n1'] > 0) || ($sc['budget'] !== null && $sc['budget'] > 0)
+                        $sc['montant_n'] != 0 || ($sc['montant_n1'] !== null && $sc['montant_n1'] != 0) || ($sc['budget'] !== null && $sc['budget'] != 0)
                     );
                 @endphp
                 @if (! $scVisibles->isEmpty())

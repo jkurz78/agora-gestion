@@ -10,7 +10,10 @@
 .env
 .env.backup
 .env.demo
+.env.demo-seed
+.env.dev
 .env.production
+/scripts/backup-demo-seed.sh
 .phpactor.json
 .phpunit.result.cache
 Homestead.json

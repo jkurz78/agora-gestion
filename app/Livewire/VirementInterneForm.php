@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
 use App\Models\VirementInterne;
@@ -70,7 +71,7 @@ final class VirementInterneForm extends Component
 
         $this->validate([
             'date' => ['required', 'date', 'after_or_equal:'.$dateDebut, 'before_or_equal:'.$dateFin],
-            'montant' => ['required', 'numeric', 'min:0.01'],
+            'montant' => ['required', 'numeric', MontantValidation::RULE],
             'compte_source_id' => ['required', 'exists:comptes_bancaires,id'],
             'compte_destination_id' => [
                 'required',
@@ -79,10 +80,13 @@ final class VirementInterneForm extends Component
             ],
             'reference' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:255'],
-        ], [
-            'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
-            'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
-        ]);
+        ], array_merge(
+            MontantValidation::messages(['montant']),
+            [
+                'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
+                'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
+            ]
+        ));
 
         $data = [
             'date' => $this->date,

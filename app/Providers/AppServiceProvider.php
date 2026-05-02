@@ -10,6 +10,7 @@ use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutNoteDeFrais;
 use App\Models\Association;
 use App\Models\AssociationUser;
+use App\Models\Extourne;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
 use App\Models\NoteDeFrais;
@@ -19,6 +20,7 @@ use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\TransactionObserver;
 use App\Observers\UserRoleObserver;
+use App\Policies\ExtournePolicy;
 use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
@@ -39,6 +41,7 @@ final class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(FacturePartenaireDeposee::class, FacturePartenaireDeposeePolicy::class);
         Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
+        Gate::policy(Extourne::class, ExtournePolicy::class);
 
         Association::observe(AssociationObserver::class);
         Association::observe(ImmutableSlugObserver::class);

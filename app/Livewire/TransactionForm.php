@@ -13,6 +13,7 @@ use App\Enums\StatutOperation;
 use App\Enums\UsageComptable;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
+use App\Livewire\Concerns\MontantValidation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\CompteBancaire;
 use App\Models\FacturePartenaireDeposee;
@@ -346,13 +347,16 @@ final class TransactionForm extends Component
             abort(403);
         }
 
-        $this->validate([
-            'affectations' => ['required', 'array', 'min:1'],
-            'affectations.*.montant' => ['required', 'numeric', 'min:0.01'],
-            'affectations.*.operation_id' => ['nullable'],
-            'affectations.*.seance' => ['nullable', 'integer', 'min:1'],
-            'affectations.*.notes' => ['nullable', 'string', 'max:255'],
-        ]);
+        $this->validate(
+            [
+                'affectations' => ['required', 'array', 'min:1'],
+                'affectations.*.montant' => ['required', 'numeric', MontantValidation::RULE],
+                'affectations.*.operation_id' => ['nullable'],
+                'affectations.*.seance' => ['nullable', 'integer', 'min:1'],
+                'affectations.*.notes' => ['nullable', 'string', 'max:255'],
+            ],
+            MontantValidation::messages(['affectations.*.montant'])
+        );
 
         $ligne = TransactionLigne::findOrFail($this->ventilationLigneId);
         $ligneMontantCents = (int) round((float) $ligne->montant * 100);
@@ -516,15 +520,18 @@ final class TransactionForm extends Component
                 'compte_id' => ['nullable', 'exists:comptes_bancaires,id'],
                 'lignes' => ['required', 'array', 'min:1'],
                 'lignes.*.sous_categorie_id' => ['required', 'exists:sous_categories,id'],
-                'lignes.*.montant' => ['required', 'numeric', 'min:0.01'],
+                'lignes.*.montant' => ['required', 'numeric', MontantValidation::RULE],
                 'lignes.*.operation_id' => ['nullable'],
                 'lignes.*.seance' => ['nullable', 'integer', 'min:1'],
                 'lignes.*.notes' => ['nullable', 'string', 'max:255'],
             ],
-            [
-                'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
-                'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
-            ]
+            array_merge(
+                [
+                    'date.after_or_equal' => 'La date doit être dans l\'exercice en cours (à partir du '.$range['start']->format('d/m/Y').').',
+                    'date.before_or_equal' => 'La date doit être dans l\'exercice en cours (jusqu\'au '.$range['end']->format('d/m/Y').').',
+                ],
+                MontantValidation::messages(['lignes.*.montant'])
+            )
         );
 
         if ($this->pieceJointe !== null && $this->type === 'depense') {

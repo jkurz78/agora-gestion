@@ -22,6 +22,7 @@ use App\Support\CurrentAssociation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 
@@ -189,11 +190,22 @@ final class FactureShow extends Component
             ? Operation::whereIn('id', $operationIds)->orderBy('nom')->get()
             : collect();
 
+        // Variables pour la modale d'annulation informative
+        $transactionsGenereesParLignesManuelles = $this->facture->transactionsGenereesParLignesManuelles();
+        $transactionsReferencees = $this->facture->transactionsReferencees();
+        $aTransactionMMPointee = $transactionsGenereesParLignesManuelles
+            ->contains(fn ($tx) => $tx->statut_reglement === StatutReglement::Pointe);
+        $peutAnnuler = Gate::allows('annuler', $this->facture);
+
         return view('livewire.facture-show', [
             'montantRegle' => $montantRegle,
             'isAcquittee' => $isAcquittee,
             'transactionsEnAttente' => $transactionsEnAttente,
             'operationsLiees' => $operationsLiees,
+            'transactionsGenereesParLignesManuelles' => $transactionsGenereesParLignesManuelles,
+            'transactionsReferencees' => $transactionsReferencees,
+            'aTransactionMMPointee' => $aTransactionMMPointee,
+            'peutAnnuler' => $peutAnnuler,
         ]);
     }
 

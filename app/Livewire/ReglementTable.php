@@ -11,6 +11,7 @@ use App\Enums\RoleAssociation;
 use App\Enums\StatutReglement;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Enums\TypeTransaction;
+use App\Livewire\Concerns\MontantValidation;
 use App\Mail\DocumentMail;
 use App\Models\CompteBancaire;
 use App\Models\DocumentPrevisionnel;
@@ -30,6 +31,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 
 final class ReglementTable extends Component
@@ -150,6 +152,18 @@ final class ReglementTable extends Component
         }
 
         $parsed = (float) str_replace(',', '.', $montant);
+
+        $validator = Validator::make(
+            ['montant' => $parsed],
+            ['montant' => ['required', 'numeric', MontantValidation::RULE]],
+            MontantValidation::messages(['montant'])
+        );
+
+        if ($validator->fails()) {
+            $this->addError('montant', $validator->errors()->first('montant'));
+
+            return;
+        }
 
         Reglement::updateOrCreate(
             ['participant_id' => $participantId, 'seance_id' => $seance->id],

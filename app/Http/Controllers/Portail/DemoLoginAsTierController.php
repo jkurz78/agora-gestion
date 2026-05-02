@@ -10,6 +10,7 @@ use App\Models\Tiers;
 use App\Support\Demo;
 use App\Support\PortailRoute;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -25,7 +26,7 @@ use Illuminate\Support\Facades\Log;
  */
 final class DemoLoginAsTierController extends Controller
 {
-    public function __invoke(\Illuminate\Http\Request $request): RedirectResponse
+    public function __invoke(Request $request): RedirectResponse
     {
         // ── GARDE STRICTE — doit rester en première position ──────────────────
         if (! Demo::isActive()) {

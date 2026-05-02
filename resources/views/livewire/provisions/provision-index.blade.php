@@ -246,6 +246,20 @@
             let currentCol = null;
             let ascending = true;
 
+            // Comparer deux valeurs data-sort : numérique si les deux sont des nombres,
+            // lexicographique (localeCompare fr) sinon. Nécessaire pour les colonnes
+            // montants qui contiennent des valeurs comme "-100.00" ou "50.00" —
+            // localeCompare traite ces chaînes comme du texte et produit un ordre incorrect
+            // (ex. "9" > "150" lexicographiquement alors que 9 < 150 numériquement).
+            function compareVals(aVal, bVal) {
+                const aNum = parseFloat(aVal);
+                const bNum = parseFloat(bVal);
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return aNum - bNum;
+                }
+                return aVal.localeCompare(bVal, 'fr');
+            }
+
             sortHeaders.forEach(function (th) {
                 th.addEventListener('click', function () {
                     const col = parseInt(this.dataset.col);
@@ -265,7 +279,7 @@
                         if (!aCell || !bCell) return 0;
                         const aVal = (aCell.dataset.sort || aCell.textContent || '').trim().toLowerCase();
                         const bVal = (bCell.dataset.sort || bCell.textContent || '').trim().toLowerCase();
-                        const result = aVal.localeCompare(bVal, 'fr');
+                        const result = compareVals(aVal, bVal);
                         return ascending ? result : -result;
                     });
 
@@ -292,7 +306,7 @@
                     if (!aCell || !bCell) return 0;
                     const aVal = (aCell.dataset.sort || aCell.textContent || '').trim().toLowerCase();
                     const bVal = (bCell.dataset.sort || bCell.textContent || '').trim().toLowerCase();
-                    const result = aVal.localeCompare(bVal, 'fr');
+                    const result = compareVals(aVal, bVal);
                     return ascending ? result : -result;
                 });
                 rows.forEach(function (row) { tbody.appendChild(row); });

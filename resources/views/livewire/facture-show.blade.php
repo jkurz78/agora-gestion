@@ -198,7 +198,7 @@
                             <i class="bi bi-file-earmark-pdf"></i> Télécharger PDF
                         </a>
                     @endif
-                    @if ($facture->statut === \App\Enums\StatutFacture::Validee && $this->canEdit)
+                    @if ($facture->statut === \App\Enums\StatutFacture::Validee && $peutAnnuler)
                         <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#annulationModal">
                             <i class="bi bi-x-circle"></i> Annuler avec avoir
                         </button>
@@ -228,27 +228,87 @@
         </div>
     </div>
 
-    {{-- Modale de confirmation d'annulation --}}
-    @if ($facture->statut === \App\Enums\StatutFacture::Validee)
+    {{-- Modale d'annulation informative — rendue uniquement si l'utilisateur peut annuler --}}
+    @if ($peutAnnuler && $facture->statut === \App\Enums\StatutFacture::Validee)
     <div class="modal fade" id="annulationModal" tabindex="-1" wire:ignore.self>
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle text-danger me-2"></i>Annuler cette facture</h5>
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+                        Annuler la facture {{ $facture->numero }}
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Êtes-vous sûr de vouloir annuler la facture <strong>{{ $facture->numero }}</strong> ?</p>
-                    <ul class="text-muted small">
-                        <li>Un avoir sera émis avec un numéro séquentiel</li>
-                        <li>Les transactions associées seront libérées</li>
-                        <li>Cette action est irréversible</li>
-                    </ul>
+                    {{-- Bandeau résumé --}}
+                    <p class="mb-3">
+                        Vous allez annuler la facture <strong>{{ $facture->numero }}</strong>
+                        de <strong>{{ $facture->tiers?->displayName() }}</strong>
+                        pour <strong>{{ number_format((float) $facture->montant_total, 2, ',', ' ') }} €</strong>.
+                        Un numéro d'avoir sera attribué automatiquement.
+                    </p>
+
+                    {{-- Bandeau d'avertissement banque --}}
+                    @if ($aTransactionMMPointee)
+                        <div class="alert alert-warning d-flex align-items-start" role="alert">
+                            <i class="bi bi-bank me-2 fs-5"></i>
+                            <div>
+                                L'extourne d'au moins une transaction devra être pointée
+                                lors d'un futur rapprochement bancaire.
+                            </div>
+                        </div>
+                    @endif
+
+                    {{-- Section 1 : transactions générées (MM forcées) --}}
+                    @if ($transactionsGenereesParLignesManuelles->isNotEmpty())
+                        <h6 class="mt-3">
+                            Transactions générées par cette facture
+                            <span class="text-danger small">(annulation comptable forcée)</span>
+                        </h6>
+                        <ul class="list-unstyled mb-3">
+                            @foreach ($transactionsGenereesParLignesManuelles as $tx)
+                                <li class="border rounded p-2 mb-1">
+                                    <div class="d-flex justify-content-between">
+                                        <span>{{ $tx->libelle }}</span>
+                                        <strong>{{ number_format((float) $tx->montant_total, 2, ',', ' ') }} €</strong>
+                                    </div>
+                                    <small class="text-muted">
+                                        Statut : {{ $tx->statut_reglement?->label() ?? $tx->statut_reglement }}
+                                        — une transaction miroir négative sera créée.
+                                    </small>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+
+                    {{-- Section 2 : transactions référencées (pivot détaché) --}}
+                    @if ($transactionsReferencees->isNotEmpty())
+                        <h6 class="mt-3">
+                            Transactions référencées
+                            <span class="text-muted small">(seront détachées et redeviendront disponibles)</span>
+                        </h6>
+                        <p class="text-muted small mb-2">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Ces transactions ne sont pas annulées, seulement libérées de cette facture.
+                            Pour rembourser un règlement référencé, utilisez le bouton « Annuler la transaction » sur sa fiche.
+                        </p>
+                        <ul class="list-unstyled mb-3">
+                            @foreach ($transactionsReferencees as $tx)
+                                <li class="border rounded p-2 mb-1">
+                                    <div class="d-flex justify-content-between">
+                                        <span>{{ $tx->libelle }}</span>
+                                        <strong>{{ number_format((float) $tx->montant_total, 2, ',', ' ') }} €</strong>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Non, conserver</button>
                     <button type="button" class="btn btn-danger" wire:click="annuler" data-bs-dismiss="modal">
-                        <i class="bi bi-x-circle me-1"></i>Oui, émettre l'avoir
+                        <i class="bi bi-x-circle me-1"></i>Confirmer l'annulation
                     </button>
                 </div>
             </div>

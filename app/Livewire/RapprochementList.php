@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\StatutRapprochement;
+use App\Enums\TypeRapprochement;
 use App\Enums\TypeTransaction;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Livewire\Concerns\WithPerPage;
@@ -29,6 +30,9 @@ final class RapprochementList extends Component
     protected string $paginationTheme = 'bootstrap';
 
     public ?int $compte_id = null;
+
+    /** Filtre par type : 'bancaire' (défaut), 'lettrage', 'tous'. */
+    public string $filterType = 'bancaire';
 
     public bool $showCreateForm = false;
 
@@ -55,6 +59,11 @@ final class RapprochementList extends Component
         $this->date_fin = '';
         $this->solde_fin = '';
         $this->resetValidation();
+        $this->resetPage();
+    }
+
+    public function updatedFilterType(): void
+    {
         $this->resetPage();
     }
 
@@ -165,9 +174,18 @@ final class RapprochementList extends Component
         if ($this->compte_id) {
             $aEnCours = RapprochementBancaire::where('compte_id', $this->compte_id)
                 ->whereNull('verrouille_at')
+                ->where('type', TypeRapprochement::Bancaire)
                 ->exists();
 
             $rapprochements = RapprochementBancaire::where('compte_id', $this->compte_id)
+                ->when(
+                    $this->filterType === 'bancaire',
+                    fn ($q) => $q->where('type', TypeRapprochement::Bancaire),
+                )
+                ->when(
+                    $this->filterType === 'lettrage',
+                    fn ($q) => $q->where('type', TypeRapprochement::Lettrage),
+                )
                 ->orderByDesc('date_fin')
                 ->paginate($this->effectivePerPage());
 
