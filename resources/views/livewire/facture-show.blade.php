@@ -285,9 +285,14 @@
                     {{-- Section 2 : transactions référencées (pivot détaché) --}}
                     @if ($transactionsReferencees->isNotEmpty())
                         <h6 class="mt-3">
-                            Règlements référencés
-                            <span class="text-muted small">(seront détachés et redeviendront disponibles)</span>
+                            Transactions référencées
+                            <span class="text-muted small">(seront détachées et redeviendront disponibles)</span>
                         </h6>
+                        <p class="text-muted small mb-2">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Ces transactions ne sont pas annulées, seulement libérées de cette facture.
+                            Pour rembourser un règlement référencé, utilisez le bouton « Annuler la transaction » sur sa fiche.
+                        </p>
                         <ul class="list-unstyled mb-3">
                             @foreach ($transactionsReferencees as $tx)
                                 <li class="border rounded p-2 mb-1">
@@ -298,11 +303,6 @@
                                 </li>
                             @endforeach
                         </ul>
-                        <p class="text-muted small mb-3">
-                            <i class="bi bi-info-circle me-1"></i>
-                            Ces transactions ne sont pas annulées, seulement libérées de cette facture.
-                            Pour rembourser un règlement référencé, utilisez le bouton « Annuler la transaction » sur sa fiche.
-                        </p>
                     @endif
                 </div>
                 <div class="modal-footer">
