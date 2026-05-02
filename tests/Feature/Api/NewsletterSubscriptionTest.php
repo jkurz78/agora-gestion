@@ -11,6 +11,7 @@ use App\Tenant\TenantContext;
 use App\Tenant\TenantScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
@@ -500,4 +501,35 @@ it('newsletter:forget {email} hard-deletes all rows for that email', function ()
     expect($remaining)->toBe(0);
 
     expect(SubscriptionRequest::where('email', 'other@example.fr')->count())->toBe(1);
+});
+
+// ─── Task 15 : Pas de PII dans les logs ──────────────────────────────────────
+
+it('does not log PII (email, IP) on subscribe', function () {
+    Mail::fake();
+
+    $logSpy = Log::spy();
+
+    $this->withHeaders([
+        'Origin' => 'https://soigner-vivre-sourire.fr',
+    ])->postJson('/api/newsletter/subscribe', [
+        'email' => 'larry@example.fr',
+        'consent' => true,
+        'bot_trap' => '',
+    ])->assertStatus(200);
+
+    // Inspecte tous les appels au logger préfixés newsletter.* :
+    // aucun ne doit contenir l'email ni l'IP locale.
+    // On cible uniquement les logs émis par notre code (préfixe newsletter.*)
+    // pour ne pas interférer avec les logs de contexte du framework.
+    $logSpy->shouldNotHaveReceived('info', function (string $message, array $context = []) {
+        if (! str_starts_with($message, 'newsletter.')) {
+            return false;
+        }
+
+        $haystack = $message.' '.json_encode($context);
+
+        return str_contains($haystack, 'larry@example.fr')
+            || str_contains($haystack, '127.0.0.1');
+    });
 });
