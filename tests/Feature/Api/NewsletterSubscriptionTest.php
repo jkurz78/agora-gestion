@@ -191,3 +191,35 @@ it('subscribe creates a NEW row for a previously unsubscribed email (preserves h
 
     Mail::assertSent(NewsletterConfirmation::class, 1);
 });
+
+// ─── Task 7 : Mailable — liens en clair (pas les hashes) ─────────────────────
+
+it('confirmation email contains clear-text confirm and unsubscribe URLs (not hashes)', function () {
+    Mail::fake();
+    $service = app(SubscriptionService::class);
+
+    $service->subscribe('erin@example.fr', 'Erin', '1.2.3.4', 'UA');
+
+    Mail::assertSent(NewsletterConfirmation::class, function (NewsletterConfirmation $mail) {
+        $row = SubscriptionRequest::where('email', 'erin@example.fr')->firstOrFail();
+
+        // Le mail expose les tokens en clair dans ses propriétés
+        expect($mail->confirmationToken)->toBeString();
+        expect($mail->unsubscribeToken)->toBeString();
+
+        // Les hash en DB doivent correspondre aux tokens clairs
+        expect($row->confirmation_token_hash)->toBe(hash('sha256', $mail->confirmationToken));
+        expect($row->unsubscribe_token_hash)->toBe(hash('sha256', $mail->unsubscribeToken));
+
+        // Le rendu HTML contient les liens clairs
+        $html = $mail->render();
+        expect($html)->toContain('/newsletter/confirm/' . $mail->confirmationToken);
+        expect($html)->toContain('/newsletter/unsubscribe/' . $mail->unsubscribeToken);
+
+        // Et NE contient PAS les hash
+        expect($html)->not->toContain($row->confirmation_token_hash);
+        expect($html)->not->toContain($row->unsubscribe_token_hash);
+
+        return true;
+    });
+});

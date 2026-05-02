@@ -405,6 +405,11 @@ Route::middleware(['auth', 'super-admin'])
             ->name('support.exit');
     });
 
+// ── Newsletter public (no auth, no tenant middleware — token embeds tenant context) ──
+// Full controller implemented in Task 11. Stubs keep route() helpers resolvable early.
+Route::get('/newsletter/confirm/{token}', fn (string $token) => response('OK'))->name('newsletter.confirm');
+Route::get('/newsletter/unsubscribe/{token}', fn (string $token) => response('OK'))->name('newsletter.unsubscribe');
+
 // Portail slug-less routes — must be registered BEFORE auth.php's
 // {association:slug}/login to avoid collision on /portail/login.
 require __DIR__.'/portail-mono.php';

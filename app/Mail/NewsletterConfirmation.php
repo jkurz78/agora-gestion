@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Models\Newsletter\SubscriptionRequest;
+use App\Support\TenantUrl;
+use App\Tenant\TenantContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -23,12 +25,24 @@ final class NewsletterConfirmation extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Confirmez votre inscription');
+        $assoNom = TenantContext::current()?->nom ?? 'AgoraGestion';
+
+        return new Envelope(
+            subject: "Confirmez votre inscription à la newsletter — {$assoNom}",
+        );
     }
 
     public function content(): Content
     {
-        // stub : sera enrichi en Task 7
-        return new Content(htmlString: '<p>Stub</p>');
+        return new Content(
+            view: 'emails.newsletter.confirmation',
+            text: 'emails.newsletter.confirmation-text',
+            with: [
+                'prenom' => $this->subscription->prenom,
+                'associationNom' => TenantContext::current()?->nom ?? 'AgoraGestion',
+                'confirmUrl' => TenantUrl::route('newsletter.confirm', ['token' => $this->confirmationToken]),
+                'unsubscribeUrl' => TenantUrl::route('newsletter.unsubscribe', ['token' => $this->unsubscribeToken]),
+            ],
+        );
     }
 }
