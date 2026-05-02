@@ -3,8 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\Newsletter\SubscriptionRequestStatus;
+use App\Mail\NewsletterConfirmation;
 use App\Models\Newsletter\SubscriptionRequest;
+use App\Services\Newsletter\SubscriptionService;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
 it('creates the newsletter_subscription_requests table with all expected columns', function () {
@@ -94,4 +97,27 @@ it('markUnsubscribed sets status and unsubscribed_at', function () {
 
     expect($r->status)->toBe(SubscriptionRequestStatus::Unsubscribed);
     expect($r->unsubscribed_at)->not->toBeNull();
+});
+
+// ─── Task 5 : Service subscribe (nouveau email) ───────────────────────────────
+
+it('subscribe creates a pending row and sends confirmation email for a new email', function () {
+    Mail::fake();
+
+    $service = app(SubscriptionService::class);
+    $service->subscribe('alice@example.fr', 'Alice', '1.2.3.4', 'Mozilla/5.0');
+
+    $row = SubscriptionRequest::where('email', 'alice@example.fr')->first();
+    expect($row)->not->toBeNull();
+    expect($row->status)->toBe(SubscriptionRequestStatus::Pending);
+    expect($row->prenom)->toBe('Alice');
+    expect($row->ip_address)->toBe('1.2.3.4');
+    expect($row->user_agent)->toBe('Mozilla/5.0');
+    expect($row->confirmation_token_hash)->not->toBeNull();
+    expect($row->unsubscribe_token_hash)->not->toBeNull();
+    expect($row->confirmation_expires_at->isFuture())->toBeTrue();
+
+    Mail::assertSent(NewsletterConfirmation::class, function (NewsletterConfirmation $mail) {
+        return $mail->hasTo('alice@example.fr');
+    });
 });
