@@ -47,3 +47,50 @@ it('scope active() returns only confirmed rows', function () {
     expect($active)->toHaveCount(1);
     expect($active->first()->id)->toBe($confirmed->id);
 });
+
+it('regenerateConfirmationToken returns clear token and stores hash + expiry', function () {
+    $r = SubscriptionRequest::factory()->create();
+
+    $clear = $r->regenerateConfirmationToken();
+    $r->save();
+
+    expect($clear)->toBeString();
+    expect(strlen($clear))->toBeGreaterThanOrEqual(40);
+    expect($r->confirmation_token_hash)->toBe(hash('sha256', $clear));
+    expect($r->confirmation_expires_at)->not->toBeNull();
+    expect($r->confirmation_expires_at->isFuture())->toBeTrue();
+});
+
+it('regenerateUnsubscribeToken returns clear token and stores hash', function () {
+    $r = SubscriptionRequest::factory()->create();
+
+    $clear = $r->regenerateUnsubscribeToken();
+    $r->save();
+
+    expect($clear)->toBeString();
+    expect($r->unsubscribe_token_hash)->toBe(hash('sha256', $clear));
+});
+
+it('markConfirmed sets status and confirmed_at', function () {
+    $r = SubscriptionRequest::factory()->create([
+        'status' => SubscriptionRequestStatus::Pending,
+    ]);
+
+    $r->markConfirmed();
+    $r->save();
+
+    expect($r->status)->toBe(SubscriptionRequestStatus::Confirmed);
+    expect($r->confirmed_at)->not->toBeNull();
+});
+
+it('markUnsubscribed sets status and unsubscribed_at', function () {
+    $r = SubscriptionRequest::factory()->create([
+        'status' => SubscriptionRequestStatus::Confirmed,
+    ]);
+
+    $r->markUnsubscribed();
+    $r->save();
+
+    expect($r->status)->toBe(SubscriptionRequestStatus::Unsubscribed);
+    expect($r->unsubscribed_at)->not->toBeNull();
+});

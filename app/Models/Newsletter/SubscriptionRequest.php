@@ -11,6 +11,7 @@ use Database\Factories\Newsletter\SubscriptionRequestFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 final class SubscriptionRequest extends TenantModel
 {
@@ -44,6 +45,37 @@ final class SubscriptionRequest extends TenantModel
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', SubscriptionRequestStatus::Confirmed);
+    }
+
+    public function regenerateConfirmationToken(): string
+    {
+        $clear = Str::random(48); // ~64 chars base64-url-safe
+        $this->confirmation_token_hash = hash('sha256', $clear);
+        $this->confirmation_expires_at = now()->addDays(
+            (int) config('newsletter.confirmation_ttl_days', 7)
+        );
+
+        return $clear;
+    }
+
+    public function regenerateUnsubscribeToken(): string
+    {
+        $clear = Str::random(48);
+        $this->unsubscribe_token_hash = hash('sha256', $clear);
+
+        return $clear;
+    }
+
+    public function markConfirmed(): void
+    {
+        $this->status = SubscriptionRequestStatus::Confirmed;
+        $this->confirmed_at = now();
+    }
+
+    public function markUnsubscribed(): void
+    {
+        $this->status = SubscriptionRequestStatus::Unsubscribed;
+        $this->unsubscribed_at = now();
     }
 
     protected static function newFactory(): SubscriptionRequestFactory
