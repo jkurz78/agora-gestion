@@ -103,38 +103,35 @@ Les tests utilisent **Pest PHP**. Il y a des tests Feature (auth, CRUD), Unit (s
 
 ## API publique — newsletter
 
-AgoraGestion expose un endpoint REST public pour collecter les inscriptions newsletter envoyées par un site web vitrine. L'asso reste maître de ses données : pas de prestataire tiers (Brevo / Mailchimp).
+AgoraGestion expose un endpoint REST pour collecter les inscriptions newsletter envoyées par un site web vitrine. Pas de prestataire tiers : l'asso reste maître de ses données.
 
-### Endpoint
+### Architecture
+
+Un site appelant héberge un petit shim PHP (fourni dans `clients/newsletter-php/`) qui signe la requête HMAC-SHA256 et la relaie à AgoraGestion. Le secret HMAC ne quitte jamais le serveur du site appelant. Pas de CORS, pas de Cloudflare, pas de dépendance externe.
 
 ```
-POST /api/newsletter/subscribe
-Content-Type: application/json
-Origin: <l'une des origines whitelistées dans config/newsletter.php>
+Navigateur → site vitrine (POST shim PHP) → AgoraGestion (HMAC verified) → buffer + email confirm
 ```
 
-### Exemple curl
+### Créer une clé pour un site appelant
 
 ```bash
-curl -X POST https://app.example.org/api/newsletter/subscribe \
-  -H "Origin: https://soigner-vivre-sourire.fr" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"alice@example.fr","prenom":"Alice","consent":true,"bot_trap":""}'
+./vendor/bin/sail artisan newsletter:keys:create --association=<id> --label="Site vitrine prod"
 ```
 
-Réponse : `200 {"status":"pending_double_optin"}`.
+Le secret est affiché UNE SEULE FOIS lors de la création (stocké chiffré ensuite, irrécupérable).
+
+### Côté site appelant
+
+Le dossier `clients/newsletter-php/` contient un shim PHP réutilisable + sa documentation. Voir [`clients/newsletter-php/README.md`](clients/newsletter-php/README.md).
 
 ### Double opt-in RGPD
 
-L'inscription est stockée dans la table buffer `newsletter_subscription_requests` avec un statut `pending`. Un email est envoyé à l'abonné contenant un lien `GET /newsletter/confirm/{token}` qui marque la ligne `confirmed`. Chaque email contient également le lien `GET /newsletter/unsubscribe/{token}` (présent dès le 1er message, conformité RGPD).
-
-### Tenant resolution
-
-L'asso destinataire est résolue à partir du header HTTP `Origin` via une whitelist dans `config/newsletter.php`. Pour ajouter une asso : ajouter une ligne origin → slug.
+Toute inscription crée une ligne `pending` dans `newsletter_subscription_requests`. Un email de confirmation contient un lien `GET /newsletter/confirm/{token}` (marque `confirmed`) et un lien `GET /newsletter/unsubscribe/{token}` (présent dès le 1er email, conformité RGPD).
 
 ### Hors-scope
 
-L'import des demandes confirmées vers la table `tiers` (déduplication, fusion) sera traité dans une PR ultérieure comme nouvel élément de la **Boîte de réception** unifiée.
+L'import des demandes confirmées vers la table `tiers` (déduplication, fusion) est traité dans une PR ultérieure comme nouvel élément de la **Boîte de réception** unifiée.
 
 ### Site web qui consomme l'endpoint
 
