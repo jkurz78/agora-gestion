@@ -17,6 +17,31 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
+// ─── Helper : signe une requête newsletter HMAC-SHA256 ───────────────────────
+
+function signNewsletterRequest(array $payload, ApiKey $apiKey, ?int $timestamp = null): array
+{
+    $timestamp ??= time();
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $signature = 'v1='.hash_hmac(
+        'sha256',
+        $timestamp.'.'.$body,
+        (string) $apiKey->secret_encrypted
+    );
+
+    return [
+        'headers' => [
+            'X-Key-Id' => $apiKey->key_id,
+            'X-Timestamp' => (string) $timestamp,
+            'X-Signature' => $signature,
+            'Content-Type' => 'application/json',
+        ],
+        'body' => $body,
+    ];
+}
+
+// ─── Task R1 : Schema association_api_keys ────────────────────────────────────
+
 it('creates the newsletter_subscription_requests table with all expected columns', function () {
     expect(Schema::hasTable('newsletter_subscription_requests'))->toBeTrue();
 
@@ -56,6 +81,8 @@ it('creates the association_api_keys table with all expected columns', function 
     ]))->toBeTrue();
 });
 
+// ─── Task R2 : Modèle ApiKey ──────────────────────────────────────────────────
+
 it('creates an ApiKey via factory belonging to the current tenant association', function () {
     $apiKey = ApiKey::factory()->create();
 
@@ -86,13 +113,15 @@ it('findByKeyId returns the active key, null if revoked or unknown', function ()
 it('secret is encrypted at rest (DB raw value differs from accessor)', function () {
     $apiKey = ApiKey::factory()->create();
 
-    $rawDb = \Illuminate\Support\Facades\DB::table('association_api_keys')
+    $rawDb = DB::table('association_api_keys')
         ->where('id', $apiKey->id)
         ->value('secret_encrypted');
 
     expect($rawDb)->not->toBe($apiKey->secret_encrypted);  // chiffré ≠ clair
     expect(strlen($rawDb))->toBeGreaterThan(64);            // overhead AES + base64
 });
+
+// ─── Tasks model : SubscriptionRequest ───────────────────────────────────────
 
 it('creates a SubscriptionRequest via factory with default pending status', function () {
     $r = SubscriptionRequest::factory()->create(['email' => 'alice@example.fr']);
@@ -285,134 +314,6 @@ it('confirmation email contains clear-text confirm and unsubscribe URLs (not has
     });
 });
 
-// ─── Tasks 9–11 : Middleware Origin + Controller HTTP ────────────────────────
-
-beforeEach(function () {
-    // Récupère l'asso bootée par tests/Pest.php et la rend résoluble par slug.
-    // allowSlugChange = true est nécessaire pour contourner ImmutableSlugObserver
-    // (le slug factory est auto-généré ; on l'écrase ici pour le test).
-    $association = TenantContext::current();
-    if ($association) {
-        $association->allowSlugChange = true;
-        $association->slug = 'soigner-vivre-sourire';
-        $association->save();
-    }
-
-    config(['newsletter.origins' => [
-        'https://soigner-vivre-sourire.fr' => 'soigner-vivre-sourire',
-        'http://localhost:4321' => 'soigner-vivre-sourire',
-    ]]);
-});
-
-it('rejects POST /api/newsletter/subscribe from an unauthorized origin (403)', function () {
-    Mail::fake();
-
-    $response = $this->withHeaders([
-        'Origin' => 'https://attaquant.example',
-        'Content-Type' => 'application/json',
-    ])->postJson('/api/newsletter/subscribe', [
-        'email' => 'alice@example.fr',
-        'consent' => true,
-        'bot_trap' => '',
-    ]);
-
-    $response->assertStatus(403);
-    expect(SubscriptionRequest::count())->toBe(0);
-    Mail::assertNothingSent();
-});
-
-it('POST /api/newsletter/subscribe with valid payload returns 200 and creates a pending row', function () {
-    Mail::fake();
-
-    $response = $this->withHeaders([
-        'Origin' => 'https://soigner-vivre-sourire.fr',
-    ])->postJson('/api/newsletter/subscribe', [
-        'email' => 'alice@example.fr',
-        'prenom' => 'Alice',
-        'consent' => true,
-        'bot_trap' => '',
-    ]);
-
-    $response->assertStatus(200)->assertJson(['status' => 'pending_double_optin']);
-
-    $row = SubscriptionRequest::where('email', 'alice@example.fr')->first();
-    expect($row)->not->toBeNull();
-    expect($row->status)->toBe(SubscriptionRequestStatus::Pending);
-    expect((int) $row->association_id)->toBe((int) TenantContext::currentId());
-
-    Mail::assertSent(NewsletterConfirmation::class);
-});
-
-it('POST with malformed email returns 422 with validation_failed shape', function () {
-    $response = $this->withHeaders([
-        'Origin' => 'https://soigner-vivre-sourire.fr',
-    ])->postJson('/api/newsletter/subscribe', [
-        'email' => 'pas-un-email',
-        'consent' => true,
-        'bot_trap' => '',
-    ]);
-
-    $response->assertStatus(422)
-        ->assertJsonStructure(['error', 'fields' => ['email']])
-        ->assertJson(['error' => 'validation_failed']);
-});
-
-it('POST without consent returns 422', function () {
-    $response = $this->withHeaders([
-        'Origin' => 'https://soigner-vivre-sourire.fr',
-    ])->postJson('/api/newsletter/subscribe', [
-        'email' => 'alice@example.fr',
-        'consent' => false,
-        'bot_trap' => '',
-    ]);
-
-    $response->assertStatus(422)
-        ->assertJsonPath('error', 'validation_failed')
-        ->assertJsonStructure(['fields' => ['consent']]);
-});
-
-it('POST with filled bot_trap returns 200 silently with no row and no mail', function () {
-    Mail::fake();
-
-    $response = $this->withHeaders([
-        'Origin' => 'https://soigner-vivre-sourire.fr',
-    ])->postJson('/api/newsletter/subscribe', [
-        'email' => 'bot@spam.com',
-        'consent' => true,
-        'bot_trap' => 'http://link-spam',
-    ]);
-
-    $response->assertStatus(200)->assertJson(['status' => 'pending_double_optin']);
-    expect(SubscriptionRequest::count())->toBe(0);
-    Mail::assertNothingSent();
-});
-
-it('rate-limits to 5 requests per IP per hour', function () {
-    Mail::fake();
-
-    for ($i = 1; $i <= 5; $i++) {
-        $this->withHeaders([
-            'Origin' => 'https://soigner-vivre-sourire.fr',
-            'X-Forwarded-For' => '1.2.3.4',
-        ])->postJson('/api/newsletter/subscribe', [
-            'email' => "user{$i}@example.fr",
-            'consent' => true,
-            'bot_trap' => '',
-        ])->assertStatus(200);
-    }
-
-    $sixth = $this->withHeaders([
-        'Origin' => 'https://soigner-vivre-sourire.fr',
-        'X-Forwarded-For' => '1.2.3.4',
-    ])->postJson('/api/newsletter/subscribe', [
-        'email' => 'user6@example.fr',
-        'consent' => true,
-        'bot_trap' => '',
-    ]);
-
-    $sixth->assertStatus(429)->assertJson(['error' => 'rate_limit']);
-});
-
 // ─── Task 12 : Routes web confirm/unsubscribe ─────────────────────────────────
 
 it('GET /newsletter/confirm/{token} with valid token marks confirmed and renders thank-you page', function () {
@@ -498,12 +399,12 @@ it('GET /newsletter/unsubscribe/{unknown-token} returns 404', function () {
     $response->assertStatus(404);
 });
 
-// ─── Task 13 : Isolation cross-tenant + CORS preflight ────────────────────────
+// ─── Task 13 : Isolation cross-tenant ────────────────────────────────────────
 
 it('cross-tenant isolation: tenant B cannot confirm a token issued for tenant A', function () {
     Mail::fake();
 
-    // Tenant A déjà bootée par tests/Pest.php (slug "soigner-vivre-sourire")
+    // Tenant A déjà bootée par tests/Pest.php
     $service = app(SubscriptionService::class);
     $service->subscribe('jane@example.fr', 'Jane', '1.2.3.4', 'UA');
 
@@ -523,19 +424,6 @@ it('cross-tenant isolation: tenant B cannot confirm a token issued for tenant A'
     // Et TenantContext courant doit avoir basculé vers le tenant A (celui du token)
     expect((int) TenantContext::currentId())->toBe((int) $row->association_id);
     expect((int) TenantContext::currentId())->toBe($tenantAId);
-});
-
-it('OPTIONS preflight from authorized origin returns 204 with CORS headers', function () {
-    $response = $this->call('OPTIONS', '/api/newsletter/subscribe', [], [], [], [
-        'HTTP_ORIGIN' => 'https://soigner-vivre-sourire.fr',
-        'HTTP_ACCESS_CONTROL_REQUEST_METHOD' => 'POST',
-        'HTTP_ACCESS_CONTROL_REQUEST_HEADERS' => 'Content-Type',
-    ]);
-
-    expect($response->getStatusCode())->toBe(204);
-    expect($response->headers->get('Access-Control-Allow-Origin'))
-        ->toBe('https://soigner-vivre-sourire.fr');
-    expect($response->headers->get('Access-Control-Allow-Methods'))->toContain('POST');
 });
 
 // ─── Task 14 : Commande newsletter:forget ────────────────────────────────────
@@ -559,55 +447,27 @@ it('newsletter:forget {email} hard-deletes all rows for that email', function ()
     expect(SubscriptionRequest::where('email', 'other@example.fr')->count())->toBe(1);
 });
 
-// ─── Task 15 : Pas de PII dans les logs ──────────────────────────────────────
-
-it('does not log PII (email, IP) on subscribe', function () {
-    Mail::fake();
-
-    $logSpy = Log::spy();
-
-    $this->withHeaders([
-        'Origin' => 'https://soigner-vivre-sourire.fr',
-    ])->postJson('/api/newsletter/subscribe', [
-        'email' => 'larry@example.fr',
-        'consent' => true,
-        'bot_trap' => '',
-    ])->assertStatus(200);
-
-    // Inspecte tous les appels au logger préfixés newsletter.* :
-    // aucun ne doit contenir l'email ni l'IP locale.
-    // On cible uniquement les logs émis par notre code (préfixe newsletter.*)
-    // pour ne pas interférer avec les logs de contexte du framework.
-    $logSpy->shouldNotHaveReceived('info', function (string $message, array $context = []) {
-        if (! str_starts_with($message, 'newsletter.')) {
-            return false;
-        }
-
-        $haystack = $message.' '.json_encode($context);
-
-        return str_contains($haystack, 'larry@example.fr')
-            || str_contains($haystack, '127.0.0.1');
-    });
-});
-
 // ─── Task R6 : Commande newsletter:keys:create ───────────────────────────────
 
 it('newsletter:keys:create generates a key, stores encrypted secret, displays clear secret once', function () {
     $association = TenantContext::current();
 
-    $exitCode = \Illuminate\Support\Facades\Artisan::call('newsletter:keys:create', [
+    $exitCode = Artisan::call('newsletter:keys:create', [
         '--association' => $association->id,
-        '--label'       => 'Test key from command',
+        '--label' => 'Test key from command',
     ]);
-    $output = \Illuminate\Support\Facades\Artisan::output();
+    $output = Artisan::output();
 
     expect($exitCode)->toBe(0);
     expect($output)->toContain('KEY_ID');
     expect($output)->toContain('SECRET');
     expect($output)->toContain('ak_');
 
-    // Une clé existe en DB pour cette asso
-    $apiKey = ApiKey::where('association_id', $association->id)->latest()->first();
+    // Une clé existe en DB pour cette asso (le plus récent qui porte ce label)
+    $apiKey = ApiKey::where('association_id', $association->id)
+        ->where('label', 'Test key from command')
+        ->latest()
+        ->first();
     expect($apiKey)->not->toBeNull();
     expect($apiKey->label)->toBe('Test key from command');
 
@@ -617,8 +477,349 @@ it('newsletter:keys:create generates a key, stores encrypted secret, displays cl
 });
 
 it('newsletter:keys:create fails (1) when association not found', function () {
-    $exitCode = \Illuminate\Support\Facades\Artisan::call('newsletter:keys:create', [
+    $exitCode = Artisan::call('newsletter:keys:create', [
         '--association' => 999999,
     ]);
     expect($exitCode)->not->toBe(0);
+});
+
+// ─── Tasks 9–11 + R5 : Middleware HMAC + Controller HTTP ─────────────────────
+// (Ces tests nécessitent une ApiKey ; le describe scope le beforeEach.)
+
+describe('HMAC middleware + HTTP controller', function () {
+    beforeEach(function () {
+        /** @var Association $association */
+        $association = TenantContext::current();
+        $this->apiKey = ApiKey::factory()->for($association)->create([
+            'label' => 'Test key',
+        ]);
+    });
+
+    it('POST /api/newsletter/subscribe with valid payload returns 200 and creates a pending row', function () {
+        Mail::fake();
+
+        $payload = [
+            'email' => 'alice@example.fr',
+            'prenom' => 'Alice',
+            'consent' => true,
+            'bot_trap' => '',
+        ];
+        $signed = signNewsletterRequest($payload, $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(200)->assertJson(['status' => 'pending_double_optin']);
+
+        $row = SubscriptionRequest::where('email', 'alice@example.fr')->first();
+        expect($row)->not->toBeNull();
+        expect($row->status)->toBe(SubscriptionRequestStatus::Pending);
+        expect((int) $row->association_id)->toBe((int) TenantContext::currentId());
+
+        Mail::assertSent(NewsletterConfirmation::class);
+    });
+
+    it('POST with malformed email returns 422 with validation_failed shape', function () {
+        $payload = [
+            'email' => 'pas-un-email',
+            'consent' => true,
+            'bot_trap' => '',
+        ];
+        $signed = signNewsletterRequest($payload, $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(422)
+            ->assertJsonStructure(['error', 'fields' => ['email']])
+            ->assertJson(['error' => 'validation_failed']);
+    });
+
+    it('POST without consent returns 422', function () {
+        $payload = [
+            'email' => 'alice@example.fr',
+            'consent' => false,
+            'bot_trap' => '',
+        ];
+        $signed = signNewsletterRequest($payload, $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('error', 'validation_failed')
+            ->assertJsonStructure(['fields' => ['consent']]);
+    });
+
+    it('POST with filled bot_trap returns 200 silently with no row and no mail', function () {
+        Mail::fake();
+
+        $payload = [
+            'email' => 'bot@spam.com',
+            'consent' => true,
+            'bot_trap' => 'http://link-spam',
+        ];
+        $signed = signNewsletterRequest($payload, $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(200)->assertJson(['status' => 'pending_double_optin']);
+        expect(SubscriptionRequest::count())->toBe(0);
+        Mail::assertNothingSent();
+    });
+
+    it('rate-limits to 5 requests per IP per hour', function () {
+        Mail::fake();
+
+        for ($i = 1; $i <= 5; $i++) {
+            $payload = [
+                'email' => "user{$i}@example.fr",
+                'consent' => true,
+                'bot_trap' => '',
+            ];
+            $signed = signNewsletterRequest($payload, $this->apiKey);
+
+            $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+                'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+                'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+                'HTTP_X_FORWARDED_FOR' => '1.2.3.4',
+            ], $signed['body'])->assertStatus(200);
+        }
+
+        $payload6 = [
+            'email' => 'user6@example.fr',
+            'consent' => true,
+            'bot_trap' => '',
+        ];
+        $signed6 = signNewsletterRequest($payload6, $this->apiKey);
+
+        $sixth = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed6['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed6['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed6['headers']['X-Signature'],
+            'HTTP_X_FORWARDED_FOR' => '1.2.3.4',
+        ], $signed6['body']);
+
+        $sixth->assertStatus(429)->assertJson(['error' => 'rate_limit']);
+    });
+
+    // ─── Task 15 : Pas de PII dans les logs ──────────────────────────────────
+
+    it('does not log PII (email, IP) on subscribe', function () {
+        Mail::fake();
+
+        $logSpy = Log::spy();
+
+        $payload = [
+            'email' => 'larry@example.fr',
+            'consent' => true,
+            'bot_trap' => '',
+        ];
+        $signed = signNewsletterRequest($payload, $this->apiKey);
+
+        $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body'])->assertStatus(200);
+
+        // Inspecte tous les appels au logger préfixés newsletter.* :
+        // aucun ne doit contenir l'email ni l'IP locale.
+        $logSpy->shouldNotHaveReceived('info', function (string $message, array $context = []) {
+            if (! str_starts_with($message, 'newsletter.')) {
+                return false;
+            }
+
+            $haystack = $message.' '.json_encode($context);
+
+            return str_contains($haystack, 'larry@example.fr')
+                || str_contains($haystack, '127.0.0.1');
+        });
+    });
+
+    // ─── Task R5 : Nouveaux tests HMAC failure-modes ─────────────────────────
+
+    it('rejects POST without X-Signature header (403)', function () {
+        Mail::fake();
+        $signed = signNewsletterRequest(['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''], $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            // X-Signature manquant
+        ], $signed['body']);
+
+        $response->assertStatus(403);
+        expect(SubscriptionRequest::count())->toBe(0);
+    });
+
+    it('rejects POST without X-Key-Id (403)', function () {
+        $signed = signNewsletterRequest(['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''], $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(403);
+    });
+
+    it('rejects POST without X-Timestamp (403)', function () {
+        $signed = signNewsletterRequest(['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''], $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(403);
+    });
+
+    it('rejects POST with forged signature (403)', function () {
+        $signed = signNewsletterRequest(['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''], $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => 'v1='.str_repeat('0', 64),
+        ], $signed['body']);
+
+        $response->assertStatus(403);
+    });
+
+    it('rejects POST with unknown X-Key-Id (403)', function () {
+        $signed = signNewsletterRequest(['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''], $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => 'ak_unknown_key_id_no_match',
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(403);
+    });
+
+    it('rejects POST with revoked key (403)', function () {
+        $this->apiKey->revoke();
+        $signed = signNewsletterRequest(['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''], $this->apiKey);
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(403);
+    });
+
+    it('rejects POST with stale timestamp (more than 5 minutes ago)', function () {
+        $stale = time() - 600;  // -10 min
+        $signed = signNewsletterRequest(
+            ['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''],
+            $this->apiKey,
+            $stale
+        );
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(403);
+    });
+
+    it('rejects POST with future timestamp (more than 5 minutes ahead)', function () {
+        $future = time() + 600;
+        $signed = signNewsletterRequest(
+            ['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''],
+            $this->apiKey,
+            $future
+        );
+
+        $response = $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body']);
+
+        $response->assertStatus(403);
+    });
+
+    it('valid POST updates last_used_at on the api key', function () {
+        Mail::fake();
+        expect($this->apiKey->fresh()->last_used_at)->toBeNull();
+
+        $signed = signNewsletterRequest(['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''], $this->apiKey);
+
+        $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body'])->assertStatus(200);
+
+        expect($this->apiKey->fresh()->last_used_at)->not->toBeNull();
+    });
+
+    it('cross-tenant: a key for asso A boots tenant A even if context was B', function () {
+        Mail::fake();
+
+        // Crée tenant B et boote-le
+        $assoB = Association::factory()->create();
+        TenantContext::clear();
+        TenantContext::boot($assoB);
+
+        // La clé $this->apiKey appartient à l'asso d'origine (avant ce test) —
+        // on la recharge pour s'assurer qu'elle existe toujours
+        $apiKeyForA = ApiKey::find($this->apiKey->id);
+        expect($apiKeyForA)->not->toBeNull();
+        expect((int) $apiKeyForA->association_id)->not->toBe((int) $assoB->id);
+
+        $signed = signNewsletterRequest(
+            ['email' => 'a@b.fr', 'consent' => true, 'bot_trap' => ''],
+            $apiKeyForA
+        );
+
+        $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body'])->assertStatus(200);
+
+        // La ligne créée appartient à l'asso A, pas B
+        $row = SubscriptionRequest::withoutGlobalScope(TenantScope::class)
+            ->where('email', 'a@b.fr')->first();
+        expect((int) $row->association_id)->toBe((int) $apiKeyForA->association_id);
+    });
 });
