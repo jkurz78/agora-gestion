@@ -50,6 +50,7 @@ use App\Livewire\BackOffice\NoteDeFrais\Index as NdfIndex;
 use App\Livewire\BackOffice\NoteDeFrais\Show as NdfShow;
 use App\Livewire\DevisManuel\DevisEdit;
 use App\Livewire\DevisManuel\DevisList;
+use App\Livewire\Newsletter\InscriptionsList;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
 use App\Models\Association;
 use App\Models\CompteBancaire;
@@ -288,6 +289,15 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         })->name('documents-en-attente');
         Route::get('/documents-en-attente/{document}/download', [IncomingDocumentsController::class, 'download'])
             ->name('documents-en-attente.download');
+    });
+
+// ── Newsletter (back-office) ──
+Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
+    ->prefix('newsletter')
+    ->name('newsletter.')
+    ->group(function (): void {
+        Route::get('/inscriptions', InscriptionsList::class)
+            ->name('inscriptions');
     });
 
 // ── Rapports ──
