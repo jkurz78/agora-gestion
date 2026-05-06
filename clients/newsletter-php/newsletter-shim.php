@@ -123,10 +123,7 @@ curl_setopt_array($ch, [
 $body = curl_exec($ch);
 $status = (int) (curl_getinfo($ch, CURLINFO_HTTP_CODE) ?: 0);
 $curlError = (string) curl_error($ch);
-// Note : pas de curl_close($ch) — depuis PHP 8.0 c'est un no-op silencieux,
-// depuis PHP 8.5+ ça lève un Deprecated warning. Le handle se ferme
-// automatiquement à la fin du scope.
-unset($ch);
+curl_close($ch);
 
 // ─── 6. Renvoi au navigateur ──────────────────────────────────────────────
 
