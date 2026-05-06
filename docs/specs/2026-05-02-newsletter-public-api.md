@@ -1,10 +1,36 @@
 # API publique newsletter — buffer d'inscriptions + double opt-in
 
-**Date** : 2026-05-02
+**Date** : 2026-05-02 (révisé 2026-05-03 — pivot HMAC)
 **Statut** : spec en revue
 **Programme** : Site web public SVS — formulaires d'inscription centralisés dans AgoraGestion
-**Périmètre** : slice 1 — endpoint REST public `POST /api/newsletter/subscribe`, table buffer `newsletter_subscription_requests`, double opt-in RGPD, désinscription. **L'import des demandes confirmées vers la table `tiers` est traité dans une PR ultérieure** comme nouvel élément de la Boîte de réception.
-**Préalables** : multi-tenant v4.0.0 en prod (S6 hardening livré). Site Astro `soigner-vivre-sourire.fr` (repo séparé) en cours de refonte.
+**Périmètre** : slice 1 — endpoint REST public `POST /api/newsletter/subscribe` authentifié par signature HMAC, table buffer `newsletter_subscription_requests`, double opt-in RGPD, désinscription. **L'import des demandes confirmées vers la table `tiers` est traité dans une PR ultérieure** comme nouvel élément de la Boîte de réception.
+**Préalables** : multi-tenant v4.0.0 en prod (S6 hardening livré). Site Astro `soigner-vivre-sourire.fr` (repo séparé) en cours de refonte. PHP disponible sur l'hébergeur du site appelant (O2Switch chez SVS, condition que toute autre asso utilisatrice devra remplir aussi).
+
+---
+
+## 0. Pivot architectural — 2026-05-03
+
+La première version de cette spec authentifiait les requêtes via le header `Origin` mappé en config (`config/newsletter.php`). Cette approche présente deux défauts critiques identifiés en revue :
+
+1. **`Origin` est forgeable** par tout client non-navigateur (curl, scripts) — ce n'est PAS une preuve d'identité côté serveur, juste une étiquette indicative.
+2. **Couplage du slug super-admin** avec l'identifiant de routage de l'API publique : un renommage côté super-admin casse silencieusement le formulaire public.
+
+**Décision** : on remplace l'auth `Origin` par un mécanisme **HMAC + clés API par asso** — pattern industriel standard (Stripe, AWS, Twilio, GitHub Apps) :
+
+- Chaque asso peut créer une ou plusieurs **paires `(key_id, secret)`** dans AgoraGestion.
+- Le **site appelant** héberge un petit shim PHP (publié dans le repo AgoraGestion, dossier `clients/newsletter-php/`) qui lit `KEY_ID + SECRET + ENDPOINT` depuis son `.env` local, signe la requête HMAC-SHA256 et la relaie à l'API AgoraGestion.
+- AgoraGestion vérifie la signature, identifie l'asso via le `key_id`, boote le tenant, et traite l'inscription.
+- **Plus de CORS** : le navigateur appelle le shim same-origin (sur son propre site), le shim appelle AgoraGestion server-to-server. Aucun appel cross-origin du navigateur.
+- **Plus de slug ni d'origine en config** : tout est data-driven dans la table `association_api_keys`.
+
+**Sections affectées** (lire avec ce préambule) :
+- §1 (Intent) — la mention "résolution via `Origin`" → "résolution via signature HMAC sur `X-Key-Id`"
+- §2 (BDD) — les scénarios CORS / Origin sont superseded par les scénarios HMAC en §2bis
+- §3.1, §3.2, §3.8 (3.8 sans changement) — superseded par §3.1bis et §3.2bis
+- §3.14 (test plan) — superseded par §3.14bis
+- Inventaire fichiers en §4 — adapté en §4bis
+
+Les sections inchangées (§3.3 migration buffer, §3.4 modèle SubscriptionRequest, §3.5 FormRequest honeypot, §3.6 service, §3.7 controller [signature de méthode adaptée], §3.9 Mailable, §3.10 vues web, §3.11 rate limiter, §3.12 logs, §3.13 forget command) restent telles quelles.
 
 ---
 
@@ -702,3 +728,260 @@ Section `## API publique — newsletter` ajoutée au `README.md` :
 - **Layout public minimaliste** : si un layout `public-minimal` réutilisable n'existe pas (utilisé par `email-optout` etc.), on le crée. Sinon on réutilise. À vérifier au build.
 - **Charte SVS dans l'email** : minimale (couleurs, logo si présent dans `public/` côté tenant SVS). Pas de design fancy. Le mail doit passer les filtres anti-spam (texte plain en parallèle du HTML, mentions légales explicites, lien désinscription au-dessus de la pliure).
 - **Test isolation tenant cross-token** : à inclure dans la suite (asso B ne doit pas pouvoir consommer un token de SVS). Repose sur l'unicité globale du `unsubscribe_token_hash` + le boot tenant à partir de `$row->association_id`.
+
+---
+
+## 8. Architecture HMAC (post-pivot 2026-05-03)
+
+Cette section remplace §3.1, §3.2 et §3.14 de la spec d'origine. Les autres sections de §3 (modèle SubscriptionRequest, service, controller logique métier, mailable, vues, rate limiter, forget command) restent valides à l'identique — seul le mécanisme d'auth/routage change.
+
+### 8.1 Authentification — signature HMAC-SHA256 par requête
+
+Chaque requête entrante porte 3 headers HTTP côté client :
+
+| Header | Contenu | Rôle |
+|---|---|---|
+| `X-Key-Id` | `ak_<32 chars hex>` | Identifiant publishable de la clé. Lookup direct sur `association_api_keys.key_id`. |
+| `X-Timestamp` | Unix timestamp seconds (entier) | Anti-replay : la requête est rejetée si `abs(now - timestamp) > 300` (fenêtre ±5 min). |
+| `X-Signature` | `v1=<hex hmac sha256>` | Preuve cryptographique : `hash_hmac('sha256', "{X-Timestamp}.{request body}", $secret)`. |
+
+Côté AgoraGestion, validation séquentielle :
+
+1. Lookup de la clé par `X-Key-Id` (où `revoked_at IS NULL`). Si absent → 403.
+2. Vérification timestamp dans la fenêtre. Si hors fenêtre → 403.
+3. Re-calcul HMAC avec le secret stocké, comparaison `hash_equals` (timing-safe). Si non match → 403.
+4. Tous les 403 sont **silencieux** : même réponse, pas de détail révélé. Pas de log de l'échec côté ressource publique.
+5. Si OK → `TenantContext::boot($apiKey->association)`, mise à jour `last_used_at`, traitement.
+
+### 8.2 Schéma `association_api_keys`
+
+```
+- id (bigInt PK)
+- association_id (bigInt FK → association ON DELETE CASCADE, INDEX)
+- key_id (string 64, UNIQUE INDEX)              ← "ak_<32 hex>"
+- secret_encrypted (text NOT NULL)              ← cast 'encrypted' Laravel (AES via APP_KEY)
+- label (string 120, nullable)                  ← libellé utilisateur ("Site vitrine prod")
+- scopes (json nullable)                        ← ["newsletter:subscribe"] (extensible)
+- last_used_at (timestamp nullable)
+- revoked_at (timestamp nullable, INDEX)
+- created_at, updated_at
+```
+
+**Important** : ce modèle n'étend **PAS** `TenantModel`. La query par `key_id` doit pouvoir résoudre la clé AVANT que le tenant ne soit booté. Conséquence : c'est un modèle "racine" comme `Association`, sans scope global. La tenant-isolation est portée par la FK + le `TenantContext::boot()` qui suit.
+
+### 8.3 Modèle `App\Models\Association\ApiKey`
+
+```php
+final class ApiKey extends Model
+{
+    protected $table = 'association_api_keys';
+    protected $fillable = ['association_id', 'key_id', 'secret_encrypted', 'label', 'scopes'];
+    protected $casts = [
+        'secret_encrypted' => 'encrypted',
+        'scopes' => 'array',
+        'last_used_at' => 'datetime',
+        'revoked_at' => 'datetime',
+    ];
+
+    public function association(): BelongsTo { return $this->belongsTo(Association::class); }
+    public function scopeActive(Builder $q): Builder { return $q->whereNull('revoked_at'); }
+
+    public function revoke(): void { $this->revoked_at = now(); $this->save(); }
+    public function touchLastUsed(): void { $this->last_used_at = now(); $this->saveQuietly(); }
+
+    public static function findByKeyId(string $keyId): ?self
+    {
+        return self::active()->where('key_id', $keyId)->first();
+    }
+}
+```
+
+Le `secret_encrypted` accédé via `$apiKey->secret_encrypted` est automatiquement déchiffré (cast Laravel). En DB, c'est du chiffré — un dump SQL sans `APP_KEY` est inexploitable.
+
+**Convention de nom** : namespace `App\Models\Association\ApiKey` (sous-namespace `Association` pour ranger la fonctionnalité, similaire à `Newsletter\SubscriptionRequest`).
+
+### 8.4 Middleware `App\Http\Middleware\Api\VerifyNewsletterHmacSignature`
+
+```php
+final class VerifyNewsletterHmacSignature
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        $keyId = (string) $request->headers->get('X-Key-Id', '');
+        $timestamp = (string) $request->headers->get('X-Timestamp', '');
+        $signature = (string) $request->headers->get('X-Signature', '');
+
+        if ($keyId === '' || $timestamp === '' || $signature === '') {
+            abort(403);
+        }
+
+        if (! ctype_digit($timestamp) || abs(time() - (int) $timestamp) > 300) {
+            abort(403);
+        }
+
+        $apiKey = ApiKey::findByKeyId($keyId);
+        if ($apiKey === null) {
+            abort(403);
+        }
+
+        $expected = 'v1=' . hash_hmac(
+            'sha256',
+            $timestamp . '.' . $request->getContent(),
+            $apiKey->secret_encrypted
+        );
+
+        if (! hash_equals($expected, $signature)) {
+            abort(403);
+        }
+
+        TenantContext::boot($apiKey->association);
+        $apiKey->touchLastUsed();
+
+        return $next($request);
+    }
+}
+```
+
+Pas de vérification de scope dans le slice 1 (`scopes` est juste persistant, exploité plus tard).
+
+### 8.5 Commande `newsletter:keys:create`
+
+```php
+final class CreateApiKeyCommand extends Command
+{
+    protected $signature = 'newsletter:keys:create
+        {--association= : ID de l\'asso (obligatoire)}
+        {--label= : Libellé descriptif (ex. "Site vitrine prod")}
+        {--scope=* : Scopes (ex. newsletter:subscribe — défaut)}';
+
+    protected $description = 'Crée une paire (key_id, secret) pour une asso. Affiche le secret UNE SEULE FOIS.';
+
+    public function handle(): int
+    {
+        // Validation, création, affichage du secret en clair UNE FOIS, return 0
+    }
+}
+```
+
+Sortie type :
+```
+✓ Clé API créée pour l'asso #1 (Soigner Vivre Sourire).
+
+  KEY_ID  : ak_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+  SECRET  : 7f8c2e9d4a1b6f3e8c5d9a2b7f4e1d6c3a9b5e2d7f4c1a8b6e3d5c9f2a7b4e1d
+
+⚠️  Le secret n'est affiché qu'une seule fois. Stocker en lieu sûr.
+   Pour le perdre = révoquer la clé et en créer une nouvelle.
+```
+
+Optionnel slice 1 mais cohérent : `newsletter:keys:list` (sans secret), `newsletter:keys:revoke {key_id}`.
+
+### 8.6 Plan de tests mis à jour
+
+Test feature unique : `tests/Feature/Api/NewsletterSubscriptionTest.php`. Helper signature dans le `beforeEach` :
+
+```php
+function signNewsletterRequest(array $payload, ApiKey $apiKey, ?int $timestamp = null): array
+{
+    $timestamp ??= time();
+    $body = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $signature = 'v1=' . hash_hmac('sha256', "{$timestamp}.{$body}", $apiKey->secret_encrypted);
+
+    return [
+        'headers' => [
+            'X-Key-Id' => $apiKey->key_id,
+            'X-Timestamp' => (string) $timestamp,
+            'X-Signature' => $signature,
+            'Content-Type' => 'application/json',
+        ],
+        'body' => $body,
+    ];
+}
+```
+
+`beforeEach` enrichi :
+```php
+$association = TenantContext::current();
+$apiKey = ApiKey::factory()->for($association)->create();  // factory génère key_id + secret aléatoires
+```
+
+**Tests à RÉÉCRIRE** (les requêtes doivent être signées) :
+- POST valide → 200 + ligne pending + Mail::sent
+- POST email malformé → 422 (signature OK mais payload KO)
+- POST consent absent → 422
+- POST avec bot_trap rempli → 200 silencieux
+- Doublon pending / confirmed / unsubscribed (idempotence)
+- Rate limit 5/h/IP
+
+**Tests SUPPRIMÉS** :
+- "rejects from unauthorized origin" → remplacé par tests HMAC ci-dessous
+- "OPTIONS preflight" → CORS supprimé, plus de preflight
+
+**Tests AJOUTÉS** (sécurité HMAC) :
+- POST sans header `X-Signature` → 403
+- POST sans header `X-Key-Id` → 403
+- POST sans header `X-Timestamp` → 403
+- POST avec signature forgée (random) → 403
+- POST avec `X-Key-Id` inconnu → 403
+- POST avec clé révoquée → 403
+- POST avec timestamp > 5 min dans le passé → 403
+- POST avec timestamp > 5 min dans le futur → 403
+- POST valide met à jour `last_used_at` sur la clé
+- Cross-tenant : signature avec clé asso A → boote asso A même si TenantContext bootait asso B
+- Le secret est bien chiffré en DB (assertion sur le contenu brut DB)
+
+**Tests INCHANGÉS** (les routes web confirm/unsubscribe ne sont pas concernées par HMAC — elles utilisent les tokens du buffer) :
+- GET confirm valide / expiré / unknown → 200/410/404
+- GET unsubscribe valide depuis pending / confirmed / unknown → 200/200/404
+- newsletter:forget command
+- no-PII in logs
+- Cross-tenant isolation via token (pas via HMAC, c'est l'autre dimension)
+
+### 8.7 Inventaire fichiers — delta vs §4
+
+**Ajouts** :
+- `database/migrations/<ts>_create_association_api_keys_table.php`
+- `app/Models/Association/ApiKey.php`
+- `database/factories/Association/ApiKeyFactory.php`
+- `app/Http/Middleware/Api/VerifyNewsletterHmacSignature.php`
+- `app/Console/Commands/Newsletter/CreateApiKeyCommand.php`
+- `clients/newsletter-php/newsletter-shim.php` ✅ déjà livré (commit `3318621d`)
+- `clients/newsletter-php/.env.example` ✅
+- `clients/newsletter-php/.htaccess` ✅
+- `clients/newsletter-php/README.md` ✅
+
+**Suppressions** :
+- `app/Http/Middleware/Api/BootTenantFromNewsletterOrigin.php`
+- `config/cors.php` (le fichier reste mais devient minimal/désactivé sur ce path)
+
+**Modifications** :
+- `config/newsletter.php` : retire la clé `origins`, garde `rate_limit` et `confirmation_ttl_days`
+- `routes/api.php` : remplace `BootTenantFromNewsletterOrigin` par `VerifyNewsletterHmacSignature` dans le middleware stack
+- `bootstrap/app.php` : retire `HandleCors::prepend` (CORS plus nécessaire)
+- `app/Http/Controllers/Api/NewsletterSubscriptionController.php` : signature de méthode peut rester identique (le middleware boote déjà le tenant) ; à vérifier que rien ne dépend de `Origin` côté controller
+- `tests/Feature/Api/NewsletterSubscriptionTest.php` : helper de signature + tous les tests HTTP signent leurs requêtes
+- `README.md` racine : section "API publique — newsletter" mise à jour pour décrire l'auth HMAC + lien vers `clients/newsletter-php/README.md`
+
+### 8.8 Contrat avec le shim PHP
+
+Le contrat est gelé et documenté dans `clients/newsletter-php/README.md`. Toute évolution rétrocompatible utilisera le préfixe `v1=` jusqu'à `v2=` pour une rupture explicite. Le côté serveur AgoraGestion doit honorer EXACTEMENT le contrat décrit dans ce README — toute divergence casse les sites clients déjà déployés.
+
+### 8.9 Consistency Gate (post-pivot)
+
+| Item | Vérifié |
+|---|---|
+| Auth via signature HMAC, pas Origin | ✅ |
+| Slug super-admin découplé de la résolution API | ✅ (lookup par `key_id`, pas par slug) |
+| Modèle `ApiKey` n'étend PAS `TenantModel` (lookup pré-boot) | ✅ |
+| Secret chiffré au repos (`encrypted` cast) | ✅ |
+| Anti-replay via fenêtre timestamp ±5 min | ✅ |
+| Comparaison signature `hash_equals` (timing-safe) | ✅ |
+| Révocation possible (`revoked_at`) | ✅ |
+| Multi-clés par asso (rotation, plusieurs sites) | ✅ (relation 1 asso → N clés) |
+| CORS supprimé (plus nécessaire) | ✅ |
+| 403 silencieux sur tous les échecs auth (anti-énumération) | ✅ |
+| Cohérence avec contrat `clients/newsletter-php/README.md` | ✅ |
+| Tests HMAC : tous les chemins d'échec couverts | ✅ |
+| Hors-scope inchangé (import vers tiers, campagnes, autres formulaires) | ✅ |
+
+**Statut : PASS** — prête pour le refactor de la PR #4.
