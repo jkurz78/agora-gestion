@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\Newsletter\SubscriptionRequestStatus;
 use App\Mail\NewsletterConfirmation;
 use App\Models\Association;
+use App\Models\Association\ApiKey;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Services\Newsletter\SubscriptionService;
 use App\Tenant\TenantContext;
@@ -33,6 +34,22 @@ it('creates the newsletter_subscription_requests table with all expected columns
         'ip_address',
         'user_agent',
         'tiers_id',
+        'created_at',
+        'updated_at',
+    ]))->toBeTrue();
+});
+
+it('creates the association_api_keys table with all expected columns', function () {
+    expect(Schema::hasTable('association_api_keys'))->toBeTrue();
+    expect(Schema::hasColumns('association_api_keys', [
+        'id',
+        'association_id',
+        'key_id',
+        'secret_encrypted',
+        'label',
+        'scopes',
+        'last_used_at',
+        'revoked_at',
         'created_at',
         'updated_at',
     ]))->toBeTrue();
