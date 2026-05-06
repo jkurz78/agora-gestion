@@ -12,7 +12,9 @@ use App\Tenant\TenantContext;
 use App\Tenant\TenantScope;
 use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 final class SubscriptionService
 {
@@ -124,7 +126,18 @@ final class SubscriptionService
         string $confirmationClear,
         string $unsubscribeClear,
     ): void {
-        $this->mailer->to($request->email)
-            ->send(new NewsletterConfirmation($request, $confirmationClear, $unsubscribeClear));
+        // L'endpoint /api/newsletter/subscribe est PUBLIC. Une indisponibilité
+        // SMTP (timeout, credentials, DNS, certificat) ne doit JAMAIS faire 500
+        // ni bloquer la requête HTTP : la ligne pending est déjà créée en DB,
+        // l'inscription est valide, le mail peut être renvoyé manuellement.
+        try {
+            $this->mailer->to($request->email)
+                ->send(new NewsletterConfirmation($request, $confirmationClear, $unsubscribeClear));
+        } catch (Throwable $e) {
+            Log::warning('newsletter.confirmation.email_failed', [
+                'subscription_request_id' => $request->id,
+                'error' => $e::class.': '.$e->getMessage(),
+            ]);
+        }
     }
 }
