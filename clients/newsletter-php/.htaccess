@@ -1,0 +1,50 @@
+# ─────────────────────────────────────────────────────────────────────────
+# AgoraGestion — Newsletter subscription shim (Apache config)
+# ─────────────────────────────────────────────────────────────────────────
+#
+# À déposer dans le même dossier que `newsletter-shim.php` (ex: `forms/`
+# dans le webroot du site vitrine).
+#
+# Rôle : durcir l'accès, restreindre les méthodes, bloquer le service du
+# fichier `.env` et de la doc.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+# ─── Bloquer l'accès direct au .env et aux fichiers sensibles ─────────────
+
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+
+<Files "README.md">
+    Require all denied
+</Files>
+
+
+# ─── Restreindre les méthodes HTTP autorisées sur le shim ─────────────────
+
+<Files "newsletter-shim.php">
+    <LimitExcept POST>
+        Require all denied
+    </LimitExcept>
+</Files>
+
+
+# ─── Désactiver l'indexation des dossiers ─────────────────────────────────
+
+Options -Indexes
+
+
+# ─── ALTERNATIVE — variables d'env via SetEnv au lieu de .env ────────────
+#
+# Si ton hébergeur ne permet pas de placer un .env hors webroot et que tu
+# préfères les définir au niveau Apache, décommente les 3 lignes ci-dessous
+# et renseigne les valeurs réelles. Le shim lira ces variables avec la même
+# priorité qu'un .env (via getenv()).
+#
+# /!\ Le secret apparaîtra dans la config Apache — un dump accidentel de la
+# config la plus récente l'expose. Préfère .env hors webroot quand possible.
+#
+# SetEnv NEWSLETTER_ENDPOINT https://agora.example.org/api/newsletter/subscribe
+# SetEnv NEWSLETTER_KEY_ID ak_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# SetEnv NEWSLETTER_HMAC_SECRET xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

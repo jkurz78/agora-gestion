@@ -101,6 +101,50 @@ Les tests utilisent **Pest PHP**. Il y a des tests Feature (auth, CRUD), Unit (s
 
 ---
 
+## API publique — newsletter
+
+AgoraGestion expose un endpoint REST pour collecter les inscriptions newsletter envoyées par un site web vitrine. Pas de prestataire tiers : l'asso reste maître de ses données.
+
+### Architecture
+
+Un site appelant héberge un petit shim PHP (fourni dans `clients/newsletter-php/`) qui signe la requête HMAC-SHA256 et la relaie à AgoraGestion. Le secret HMAC ne quitte jamais le serveur du site appelant. Pas de CORS, pas de Cloudflare, pas de dépendance externe.
+
+```
+Navigateur → site vitrine (POST shim PHP) → AgoraGestion (HMAC verified) → buffer + email confirm
+```
+
+### Créer une clé pour un site appelant
+
+```bash
+./vendor/bin/sail artisan newsletter:keys:create --association=<id> --label="Site vitrine prod"
+```
+
+Le secret est affiché UNE SEULE FOIS lors de la création (stocké chiffré ensuite, irrécupérable).
+
+### Côté site appelant
+
+Le dossier `clients/newsletter-php/` contient un shim PHP réutilisable + sa documentation. Voir [`clients/newsletter-php/README.md`](clients/newsletter-php/README.md).
+
+### Double opt-in RGPD
+
+Toute inscription crée une ligne `pending` dans `newsletter_subscription_requests`. Un email de confirmation contient un lien `GET /newsletter/confirm/{token}` (marque `confirmed`) et un lien `GET /newsletter/unsubscribe/{token}` (présent dès le 1er email, conformité RGPD).
+
+### Hors-scope
+
+L'import des demandes confirmées vers la table `tiers` (déduplication, fusion) est traité dans une PR ultérieure comme nouvel élément de la **Boîte de réception** unifiée.
+
+### Site web qui consomme l'endpoint
+
+[https://github.com/jkurz78/www.soigner-vivre-sourire.fr](https://github.com/jkurz78/www.soigner-vivre-sourire.fr)
+
+### Droit à l'effacement
+
+```bash
+./vendor/bin/sail artisan newsletter:forget alice@example.fr
+```
+
+---
+
 ## Architecture
 
 ### Structure

@@ -25,8 +25,11 @@ use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -47,6 +50,20 @@ final class AppServiceProvider extends ServiceProvider
         Association::observe(ImmutableSlugObserver::class);
         Transaction::observe(TransactionObserver::class);
         User::observe(UserRoleObserver::class);
+
+        // Rate limiter pour l'API newsletter publique : 5 requêtes / IP / heure.
+        // Réponse 429 normalisée {"error": "rate_limit"} pour le contrat API.
+        // Doit être enregistré ici (boot d'un Service Provider) et non dans
+        // bootstrap/app.php — à l'instant où la closure withMiddleware s'exécute,
+        // les facades ne sont pas encore bind, ce qui produit
+        // "RuntimeException: A facade root has not been set".
+        RateLimiter::for('newsletter', function (Request $request) {
+            return Limit::perHour(
+                (int) config('newsletter.rate_limit.max_attempts', 5)
+            )
+                ->by((string) $request->ip())
+                ->response(fn () => response()->json(['error' => 'rate_limit'], 429));
+        });
 
         if (! file_exists(config_path('version.php'))) {
             $data = VersionStampCommand::readGitVersion();

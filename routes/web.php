@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\NewsletterSubscriptionController;
 use App\Http\Controllers\AttestationPresencePdfController;
 use App\Http\Controllers\BackOffice\FacturePartenaireDepotPdfController;
 use App\Http\Controllers\BackOffice\NoteDeFraisPieceJointeController;
@@ -404,6 +405,15 @@ Route::middleware(['auth', 'super-admin'])
         Route::post('/support/exit', [SupportModeController::class, 'exit'])
             ->name('support.exit');
     });
+
+// ── Newsletter public (no auth, no tenant middleware — token embeds tenant context) ──
+Route::get('/newsletter/confirm/{token}', [NewsletterSubscriptionController::class, 'confirm'])
+    ->middleware('throttle:30,1')
+    ->name('newsletter.confirm');
+
+Route::get('/newsletter/unsubscribe/{token}', [NewsletterSubscriptionController::class, 'unsubscribe'])
+    ->middleware('throttle:30,1')
+    ->name('newsletter.unsubscribe');
 
 // Portail slug-less routes — must be registered BEFORE auth.php's
 // {association:slug}/login to avoid collision on /portail/login.
