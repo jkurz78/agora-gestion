@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Newsletter;
 
+use App\Enums\Newsletter\DesinscriptionAction;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\Tiers;
+use App\Services\Newsletter\Exceptions\TiersHasDependenciesException;
 use App\Services\TiersService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -66,6 +68,52 @@ final class BufferImportService
     {
         DB::transaction(function () use ($req) {
             $req->ignored_at = now();
+            $req->processed_by_user_id = (int) Auth::id();
+            $req->save();
+        });
+    }
+
+    public function applyUnsubscribeOptout(SubscriptionRequest $req): void
+    {
+        DB::transaction(function () use ($req) {
+            $tiers = $req->tiers;
+            if ($tiers !== null) {
+                $tiers->email_optout = true;
+                $tiers->save();
+            }
+            $req->desinscription_traitee_at = now();
+            $req->desinscription_action = DesinscriptionAction::Optout;
+            $req->processed_by_user_id = (int) Auth::id();
+            $req->save();
+        });
+    }
+
+    /** @throws TiersHasDependenciesException */
+    public function applyUnsubscribeDelete(SubscriptionRequest $req): void
+    {
+        DB::transaction(function () use ($req) {
+            $tiers = $req->tiers;
+            if ($tiers === null) {
+                throw new \LogicException('Désinscription sans Tiers lié — applyUnsubscribeDelete impossible.');
+            }
+            $deps = $this->tiersService->countDependentRecords($tiers);
+            if (array_sum($deps) > 0) {
+                throw new TiersHasDependenciesException($deps);
+            }
+            $tiers->delete();
+            $req->refresh(); // tiers_id devient null par cascade
+            $req->desinscription_traitee_at = now();
+            $req->desinscription_action = DesinscriptionAction::Deleted;
+            $req->processed_by_user_id = (int) Auth::id();
+            $req->save();
+        });
+    }
+
+    public function applyUnsubscribeNoop(SubscriptionRequest $req): void
+    {
+        DB::transaction(function () use ($req) {
+            $req->desinscription_traitee_at = now();
+            $req->desinscription_action = DesinscriptionAction::Noop;
             $req->processed_by_user_id = (int) Auth::id();
             $req->save();
         });

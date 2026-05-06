@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\Newsletter\DesinscriptionAction;
 use App\Enums\Newsletter\SubscriptionRequestStatus;
 use App\Enums\RoleAssociation;
 use App\Models\AssociationUser;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\Newsletter\BufferImportService;
+use App\Services\Newsletter\Exceptions\TiersHasDependenciesException;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Schema;
 
@@ -156,4 +159,94 @@ it('ignore marque ignored_at sans toucher tiers_id', function () {
     expect($req->ignored_at)->not->toBeNull();
     expect($req->tiers_id)->toBeNull();
     expect((int) $req->processed_by_user_id)->toBe((int) $user->id);
+});
+
+it('applyUnsubscribeOptout pose email_optout=true et marque desinscription_traitee_at', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create(['email_optout' => false]);
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    app(BufferImportService::class)->applyUnsubscribeOptout($req);
+
+    $tiers->refresh();
+    $req->refresh();
+    expect($tiers->email_optout)->toBeTrue();
+    expect($req->desinscription_traitee_at)->not->toBeNull();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Optout);
+    expect((int) $req->processed_by_user_id)->toBe((int) $user->id);
+});
+
+it('applyUnsubscribeDelete supprime le Tiers sans dépendances', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create();
+    $tiersId = $tiers->id;
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiersId)->create();
+
+    app(BufferImportService::class)->applyUnsubscribeDelete($req);
+
+    $req->refresh();
+    expect(Tiers::find($tiersId))->toBeNull();
+    expect($req->desinscription_traitee_at)->not->toBeNull();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Deleted);
+    expect($req->tiers_id)->toBeNull(); // cascade nullOnDelete
+});
+
+it('applyUnsubscribeDelete refuse si Tiers a des dépendances', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create();
+    Transaction::factory()->create(['tiers_id' => $tiers->id]);
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    expect(fn () => app(BufferImportService::class)->applyUnsubscribeDelete($req))
+        ->toThrow(TiersHasDependenciesException::class);
+
+    expect(Tiers::find($tiers->id))->not->toBeNull();
+    $req->refresh();
+    expect($req->desinscription_traitee_at)->toBeNull();
+});
+
+it('applyUnsubscribeNoop marque traitée sans rien modifier sur le Tiers', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create(['email_optout' => false]);
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    app(BufferImportService::class)->applyUnsubscribeNoop($req);
+
+    $tiers->refresh();
+    $req->refresh();
+    expect($tiers->email_optout)->toBeFalse();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Noop);
+    expect($req->desinscription_traitee_at)->not->toBeNull();
 });
