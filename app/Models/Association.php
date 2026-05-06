@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 
 final class Association extends Model
@@ -113,6 +114,25 @@ final class Association extends Model
         return $this->cachet_signature_path
             ? $this->storagePath('branding/'.basename($this->cachet_signature_path))
             : null;
+    }
+
+    /**
+     * Returns the association logo as a base64 data URI (e.g. "data:image/png;base64,...")
+     * or null if no logo is set / file missing. Used in public-facing views (newsletter
+     * confirmation pages) where the user is not authenticated — the standard
+     * `/tenant-assets/*` route requires auth + signed URL.
+     */
+    public function brandingLogoDataUri(): ?string
+    {
+        $path = $this->brandingLogoFullPath();
+        if (! $path || ! Storage::disk('local')->exists($path)) {
+            return null;
+        }
+
+        $contents = Storage::disk('local')->get($path);
+        $mime = Storage::disk('local')->mimeType($path) ?: 'image/png';
+
+        return 'data:'.$mime.';base64,'.base64_encode((string) $contents);
     }
 
     public function sousCategoriesFor(UsageComptable $usage): Collection

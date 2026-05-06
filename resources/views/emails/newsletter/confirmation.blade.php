@@ -11,10 +11,18 @@
         .btn { display: inline-block; background: #3d5473; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; }
         .footer { font-size: 13px; color: #6b7280; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
         a { color: #3d5473; }
+        .logo-header { text-align: center; margin: 0 0 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; }
+        .logo-header img { max-height: 80px; width: auto; max-width: 240px; }
     </style>
 </head>
 <body>
 <div class="container">
+    @if($hasLogo)
+        <div class="logo-header">
+            <img src="cid:{{ $logoCid }}" alt="{{ $associationNom }}">
+        </div>
+    @endif
+
     <h1>Bonjour{{ $prenom ? ' '.$prenom : '' }},</h1>
 
     <p>Vous avez demandé à recevoir la newsletter de <strong>{{ $associationNom }}</strong>.</p>

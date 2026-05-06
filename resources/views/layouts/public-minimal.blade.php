@@ -11,11 +11,20 @@
         .public-card h1 { font-size: 22px; color: #111827; margin-bottom: 16px; }
         .public-card p { color: #374151; line-height: 1.6; }
         .public-card .footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280; }
+        .public-card .logo-header { text-align: center; margin: 0 0 24px; padding-bottom: 24px; border-bottom: 1px solid #e5e7eb; }
+        .public-card .logo-header img { max-height: 96px; max-width: 240px; width: auto; height: auto; }
     </style>
 </head>
 <body>
 <main>
     <div class="public-card">
+        @php($logoDataUri = isset($association) ? $association?->brandingLogoDataUri() : null)
+        @if($logoDataUri)
+            <div class="logo-header">
+                <img src="{{ $logoDataUri }}" alt="{{ $association->nom }}">
+            </div>
+        @endif
+
         @yield('content')
     </div>
 </main>
