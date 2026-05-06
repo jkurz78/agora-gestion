@@ -70,6 +70,24 @@ final class AppServiceProvider extends ServiceProvider
             VersionStampCommand::writeVersionFile($data);
         }
 
+        Gate::define('access-newsletter-inbox', function (User $user): bool {
+            if (! TenantContext::hasBooted()) {
+                return false;
+            }
+            $assocUser = AssociationUser::where('user_id', $user->id)
+                ->where('association_id', TenantContext::currentId())
+                ->whereNull('revoked_at')
+                ->first();
+            if ($assocUser === null) {
+                return false;
+            }
+            $role = $assocUser->role instanceof RoleAssociation
+                ? $assocUser->role
+                : RoleAssociation::from((string) $assocUser->role);
+
+            return in_array($role, [RoleAssociation::Admin, RoleAssociation::Comptable], true);
+        });
+
         View::composer(['layouts.app', 'layouts.app-sidebar'], function (\Illuminate\View\View $view): void {
             $view->with('incomingDocumentsCount', IncomingDocument::count());
 

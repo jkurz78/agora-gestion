@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Newsletter\BufferImportService;
 use App\Services\Newsletter\Exceptions\TiersHasDependenciesException;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
 
 it('migration adds the 4 admin processing columns to newsletter buffer', function () {
@@ -249,4 +250,52 @@ it('applyUnsubscribeNoop marque traitée sans rien modifier sur le Tiers', funct
     expect($tiers->email_optout)->toBeFalse();
     expect($req->desinscription_action)->toBe(DesinscriptionAction::Noop);
     expect($req->desinscription_traitee_at)->not->toBeNull();
+});
+
+it('Gate access-newsletter-inbox autorise un Admin', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+
+    expect(Gate::forUser($user)->allows('access-newsletter-inbox'))->toBeTrue();
+});
+
+it('Gate access-newsletter-inbox autorise un Comptable', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Comptable->value,
+        'joined_at' => now(),
+    ]);
+
+    expect(Gate::forUser($user)->allows('access-newsletter-inbox'))->toBeTrue();
+});
+
+it('Gate access-newsletter-inbox refuse un Consultation', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Consultation->value,
+        'joined_at' => now(),
+    ]);
+
+    expect(Gate::forUser($user)->allows('access-newsletter-inbox'))->toBeFalse();
+});
+
+it('Gate access-newsletter-inbox refuse un Gestionnaire', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Gestionnaire->value,
+        'joined_at' => now(),
+    ]);
+
+    expect(Gate::forUser($user)->allows('access-newsletter-inbox'))->toBeFalse();
 });
