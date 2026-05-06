@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 use App\Enums\Newsletter\SubscriptionRequestStatus;
+use App\Enums\RoleAssociation;
+use App\Models\AssociationUser;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\Tiers;
+use App\Models\User;
 use App\Services\Newsletter\BufferImportService;
+use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Schema;
 
 it('migration adds the 4 admin processing columns to newsletter buffer', function () {
@@ -79,4 +83,77 @@ it('suggestMatch renvoie null si aucun match', function () {
     $match = app(BufferImportService::class)->suggestMatch($req);
 
     expect($match)->toBeNull();
+});
+
+it('createTiersFromBuffer crée le Tiers et lie le buffer', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create([
+        'email' => 'alice@nouveau.fr',
+        'prenom' => 'Alice',
+        'nom' => 'Dupont',
+    ]);
+
+    $tiers = app(BufferImportService::class)->createTiersFromBuffer($req, [
+        'type' => 'particulier',
+        'prenom' => 'Alice',
+        'nom' => 'Dupont',
+        'email' => 'alice@nouveau.fr',
+        'pour_recettes' => true,
+    ]);
+
+    $req->refresh();
+    expect($tiers->id)->toBeGreaterThan(0);
+    expect((int) $req->tiers_id)->toBe((int) $tiers->id);
+    expect((int) $req->processed_by_user_id)->toBe((int) $user->id);
+    expect($req->ignored_at)->toBeNull();
+});
+
+it('linkBufferToExistingTiers lie le buffer sans modifier le Tiers', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $bob = Tiers::factory()->create(['email' => 'bob@connu.fr', 'prenom' => 'Bob', 'nom' => 'MARTIN']);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'bob@connu.fr']);
+
+    app(BufferImportService::class)->linkBufferToExistingTiers($req, $bob);
+
+    $req->refresh();
+    $bob->refresh();
+    expect((int) $req->tiers_id)->toBe((int) $bob->id);
+    expect((int) $req->processed_by_user_id)->toBe((int) $user->id);
+    expect($bob->email)->toBe('bob@connu.fr'); // Tiers inchangé
+});
+
+it('ignore marque ignored_at sans toucher tiers_id', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create();
+
+    app(BufferImportService::class)->ignore($req);
+
+    $req->refresh();
+    expect($req->ignored_at)->not->toBeNull();
+    expect($req->tiers_id)->toBeNull();
+    expect((int) $req->processed_by_user_id)->toBe((int) $user->id);
 });
