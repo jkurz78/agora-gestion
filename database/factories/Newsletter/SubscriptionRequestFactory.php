@@ -27,4 +27,54 @@ final class SubscriptionRequestFactory extends Factory
             'user_agent' => 'Mozilla/5.0 (Test)',
         ];
     }
+
+    public function inscriptionAtraiter(): self
+    {
+        return $this->state(fn () => [
+            'status' => SubscriptionRequestStatus::Confirmed,
+            'tiers_id' => null,
+            'ignored_at' => null,
+            'confirmed_at' => now()->subHour(),
+        ]);
+    }
+
+    public function desinscriptionAtraiter(int $tiersId): self
+    {
+        return $this->state(fn () => [
+            'status' => SubscriptionRequestStatus::Unsubscribed,
+            'tiers_id' => $tiersId,
+            'desinscription_traitee_at' => null,
+            'unsubscribed_at' => now()->subHour(),
+        ]);
+    }
+
+    public function importee(int $tiersId): self
+    {
+        return $this->state(fn () => [
+            'status' => SubscriptionRequestStatus::Confirmed,
+            'tiers_id' => $tiersId,
+            'ignored_at' => null,
+            'confirmed_at' => now()->subDay(),
+        ]);
+    }
+
+    public function ignoree(): self
+    {
+        return $this->state(fn () => [
+            'status' => SubscriptionRequestStatus::Confirmed,
+            'tiers_id' => null,
+            'ignored_at' => now()->subHour(),
+            'confirmed_at' => now()->subDay(),
+        ]);
+    }
+
+    public function desinscriptionTraitee(int $tiersId): self
+    {
+        return $this->state(fn () => [
+            'status' => SubscriptionRequestStatus::Unsubscribed,
+            'tiers_id' => $tiersId,
+            'desinscription_traitee_at' => now()->subMinute(),
+            'desinscription_action' => 'optout',
+        ]);
+    }
 }
