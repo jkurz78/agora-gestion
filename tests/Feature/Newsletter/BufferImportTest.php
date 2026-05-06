@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\Newsletter\SubscriptionRequestStatus;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\Tiers;
+use App\Services\Newsletter\BufferImportService;
 use Illuminate\Support\Facades\Schema;
 
 it('migration adds the 4 admin processing columns to newsletter buffer', function () {
@@ -47,4 +48,35 @@ it('scope desinscriptionsAtraiter ne renvoie que les unsubscribed avec tiers_id 
         ->all();
 
     expect($emails)->toBe(['todo@x.fr']);
+});
+
+it('suggestMatch trouve un Tiers par email exact', function () {
+    $bob = Tiers::factory()->create(['email' => 'bob@x.fr', 'prenom' => 'Bob', 'nom' => 'MARTIN']);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'bob@x.fr', 'prenom' => 'Robert', 'nom' => 'autre']);
+
+    $match = app(BufferImportService::class)->suggestMatch($req);
+
+    expect($match?->id)->toBe($bob->id);
+});
+
+it('suggestMatch fallback sur (prenom, nom) si pas de match email', function () {
+    $alice = Tiers::factory()->create(['email' => 'autre@x.fr', 'prenom' => 'Alice', 'nom' => 'DUPONT']);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'inconnu@x.fr', 'prenom' => 'alice', 'nom' => 'dupont']);
+
+    $match = app(BufferImportService::class)->suggestMatch($req);
+
+    expect($match?->id)->toBe($alice->id);
+});
+
+it('suggestMatch renvoie null si aucun match', function () {
+    Tiers::factory()->create(['email' => 'autre@x.fr', 'prenom' => 'Zoe', 'nom' => 'INCONNUE']);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create([
+        'email' => 'nouveau@x.fr',
+        'prenom' => 'Nouveau',
+        'nom' => 'NOUVEAU',
+    ]);
+
+    $match = app(BufferImportService::class)->suggestMatch($req);
+
+    expect($match)->toBeNull();
 });
