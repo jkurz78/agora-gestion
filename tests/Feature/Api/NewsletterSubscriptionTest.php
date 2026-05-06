@@ -12,6 +12,7 @@ use App\Tenant\TenantContext;
 use App\Tenant\TenantScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -53,6 +54,44 @@ it('creates the association_api_keys table with all expected columns', function 
         'created_at',
         'updated_at',
     ]))->toBeTrue();
+});
+
+it('creates an ApiKey via factory belonging to the current tenant association', function () {
+    $apiKey = ApiKey::factory()->create();
+
+    expect($apiKey->key_id)->toStartWith('ak_');
+    expect(strlen($apiKey->key_id))->toBe(35);  // "ak_" + 32 hex
+    expect($apiKey->secret_encrypted)->toBeString();
+    expect(strlen($apiKey->secret_encrypted))->toBe(64);  // 32 bytes hex
+    expect($apiKey->revoked_at)->toBeNull();
+});
+
+it('scope active() filters out revoked keys', function () {
+    ApiKey::factory()->create();
+    $revoked = ApiKey::factory()->create(['revoked_at' => now()]);
+
+    expect(ApiKey::active()->count())->toBe(1);
+    expect(ApiKey::active()->where('id', $revoked->id)->exists())->toBeFalse();
+});
+
+it('findByKeyId returns the active key, null if revoked or unknown', function () {
+    $active = ApiKey::factory()->create();
+    $revoked = ApiKey::factory()->create(['revoked_at' => now()]);
+
+    expect(ApiKey::findByKeyId($active->key_id)?->id)->toBe($active->id);
+    expect(ApiKey::findByKeyId($revoked->key_id))->toBeNull();
+    expect(ApiKey::findByKeyId('ak_unknown'))->toBeNull();
+});
+
+it('secret is encrypted at rest (DB raw value differs from accessor)', function () {
+    $apiKey = ApiKey::factory()->create();
+
+    $rawDb = \Illuminate\Support\Facades\DB::table('association_api_keys')
+        ->where('id', $apiKey->id)
+        ->value('secret_encrypted');
+
+    expect($rawDb)->not->toBe($apiKey->secret_encrypted);  // chiffré ≠ clair
+    expect(strlen($rawDb))->toBeGreaterThan(64);            // overhead AES + base64
 });
 
 it('creates a SubscriptionRequest via factory with default pending status', function () {
