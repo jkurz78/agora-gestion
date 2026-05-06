@@ -2,7 +2,7 @@
 
 use App\Http\Controllers\Api\NewsletterSubscriptionController;
 use App\Http\Controllers\HelloAssoCallbackController;
-use App\Http\Middleware\Api\BootTenantFromNewsletterOrigin;
+use App\Http\Middleware\Api\VerifyNewsletterHmacSignature;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/helloasso/callback/{token}', HelloAssoCallbackController::class)
@@ -10,7 +10,7 @@ Route::post('/helloasso/callback/{token}', HelloAssoCallbackController::class)
     ->name('api.helloasso.callback');
 
 Route::middleware([
-    BootTenantFromNewsletterOrigin::class,
+    VerifyNewsletterHmacSignature::class,
     'throttle:newsletter',
 ])->group(function () {
     Route::post('/newsletter/subscribe', [NewsletterSubscriptionController::class, 'subscribe'])
