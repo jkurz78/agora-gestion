@@ -589,3 +589,36 @@ it('does not log PII (email, IP) on subscribe', function () {
             || str_contains($haystack, '127.0.0.1');
     });
 });
+
+// ─── Task R6 : Commande newsletter:keys:create ───────────────────────────────
+
+it('newsletter:keys:create generates a key, stores encrypted secret, displays clear secret once', function () {
+    $association = TenantContext::current();
+
+    $exitCode = \Illuminate\Support\Facades\Artisan::call('newsletter:keys:create', [
+        '--association' => $association->id,
+        '--label'       => 'Test key from command',
+    ]);
+    $output = \Illuminate\Support\Facades\Artisan::output();
+
+    expect($exitCode)->toBe(0);
+    expect($output)->toContain('KEY_ID');
+    expect($output)->toContain('SECRET');
+    expect($output)->toContain('ak_');
+
+    // Une clé existe en DB pour cette asso
+    $apiKey = ApiKey::where('association_id', $association->id)->latest()->first();
+    expect($apiKey)->not->toBeNull();
+    expect($apiKey->label)->toBe('Test key from command');
+
+    // Le KEY_ID affiché doit matcher celui en DB
+    preg_match('/KEY_ID\s*:\s*(ak_[a-f0-9]+)/', $output, $m);
+    expect($apiKey->key_id)->toBe($m[1]);
+});
+
+it('newsletter:keys:create fails (1) when association not found', function () {
+    $exitCode = \Illuminate\Support\Facades\Artisan::call('newsletter:keys:create', [
+        '--association' => 999999,
+    ]);
+    expect($exitCode)->not->toBe(0);
+});
