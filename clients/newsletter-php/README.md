@@ -95,7 +95,7 @@ NEWSLETTER_HMAC_SECRET=7f8c2e9d4a1b6f3e8c5d9a2b7f4e1d6c3a9b5e2d7f4c1a8b6e3d5c9f2
 ```bash
 curl -X POST https://votre-site.org/forms/newsletter-shim.php \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@example.fr","prenom":"Test","consent":true,"bot_trap":""}'
+  -d '{"email":"test@example.fr","prenom":"Test","nom":"Dupont","consent":true,"bot_trap":""}'
 ```
 
 Réponse attendue : `200` avec `{"status":"pending_double_optin"}`.
@@ -120,6 +120,10 @@ Le shim accepte deux formats : `application/x-www-form-urlencoded` (formulaire H
         <input type="text" name="prenom">
     </label>
 
+    <label>Nom (optionnel)
+        <input type="text" name="nom">
+    </label>
+
     <label>
         <input type="checkbox" name="consent" value="1" required>
         J'accepte de recevoir la newsletter (RGPD)
@@ -142,6 +146,7 @@ Le shim accepte deux formats : `application/x-www-form-urlencoded` (formulaire H
 <form id="newsletter-form">
     <label>Email <input type="email" name="email" required></label>
     <label>Prénom <input type="text" name="prenom"></label>
+    <label>Nom <input type="text" name="nom"></label>
     <label>
         <input type="checkbox" name="consent" required>
         J'accepte de recevoir la newsletter
@@ -208,7 +213,7 @@ X-Key-Id: ak_<32 hex chars>
 X-Timestamp: <Unix timestamp seconds>
 X-Signature: v1=<hex HMAC-SHA256 of "{X-Timestamp}.{request body}" using SECRET>
 
-{"email":"alice@example.fr","prenom":"Alice","consent":true,"bot_trap":""}
+{"email":"alice@example.fr","prenom":"Alice","nom":"Dupont","consent":true,"bot_trap":""}
 ```
 
 AgoraGestion vérifie :

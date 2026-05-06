@@ -30,6 +30,7 @@ final class NewsletterSubscriptionController extends Controller
             prenom: $request->validated('prenom'),
             ip: (string) $request->ip(),
             userAgent: (string) $request->userAgent(),
+            nom: $request->validated('nom'),
         );
 
         return response()->json(['status' => 'pending_double_optin']);

@@ -501,6 +501,7 @@ describe('HMAC middleware + HTTP controller', function () {
         $payload = [
             'email' => 'alice@example.fr',
             'prenom' => 'Alice',
+            'nom' => 'Martin',
             'consent' => true,
             'bot_trap' => '',
         ];
@@ -519,6 +520,7 @@ describe('HMAC middleware + HTTP controller', function () {
         expect($row)->not->toBeNull();
         expect($row->status)->toBe(SubscriptionRequestStatus::Pending);
         expect((int) $row->association_id)->toBe((int) TenantContext::currentId());
+        expect($row->nom)->toBe('Martin');
 
         Mail::assertSent(NewsletterConfirmation::class);
     });
@@ -789,6 +791,62 @@ describe('HMAC middleware + HTTP controller', function () {
         ], $signed['body'])->assertStatus(200);
 
         expect($this->apiKey->fresh()->last_used_at)->not->toBeNull();
+    });
+
+    // ─── Champ nom (optionnel) ────────────────────────────────────────────────
+
+    it('accepts and persists nom (optional)', function () {
+        Mail::fake();
+        $signed = signNewsletterRequest([
+            'email' => 'jean.dupont@example.fr',
+            'prenom' => 'Jean',
+            'nom' => 'Dupont',
+            'consent' => true,
+            'bot_trap' => '',
+        ], $this->apiKey);
+        $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body'])->assertStatus(200);
+
+        $row = SubscriptionRequest::where('email', 'jean.dupont@example.fr')->firstOrFail();
+        expect($row->prenom)->toBe('Jean');
+        expect($row->nom)->toBe('Dupont');
+    });
+
+    it('accepts payload without nom (nullable)', function () {
+        Mail::fake();
+        $signed = signNewsletterRequest([
+            'email' => 'no.surname@example.fr',
+            'consent' => true,
+            'bot_trap' => '',
+        ], $this->apiKey);
+        $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body'])->assertStatus(200);
+
+        $row = SubscriptionRequest::where('email', 'no.surname@example.fr')->firstOrFail();
+        expect($row->nom)->toBeNull();
+    });
+
+    it('rejects nom longer than 100 chars (422)', function () {
+        $signed = signNewsletterRequest([
+            'email' => 'longname@example.fr',
+            'nom' => str_repeat('A', 101),
+            'consent' => true,
+            'bot_trap' => '',
+        ], $this->apiKey);
+        $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body'])->assertStatus(422)->assertJsonStructure(['fields' => ['nom']]);
     });
 
     it('cross-tenant: a key for asso A boots tenant A even if context was B', function () {

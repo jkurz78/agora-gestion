@@ -37,6 +37,7 @@ final class SubscribeNewsletterRequest extends FormRequest
         return [
             'email' => ['required', 'email', 'max:255'],
             'prenom' => ['nullable', 'string', 'max:100'],
+            'nom' => ['nullable', 'string', 'max:100'],
             'consent' => ['required', 'accepted'],
         ];
     }

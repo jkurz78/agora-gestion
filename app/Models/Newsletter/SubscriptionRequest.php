@@ -23,6 +23,7 @@ final class SubscriptionRequest extends TenantModel
     protected $fillable = [
         'email',
         'prenom',
+        'nom',
         'status',
         'subscribed_at',
         'ip_address',

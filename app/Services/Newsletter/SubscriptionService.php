@@ -20,9 +20,9 @@ final class SubscriptionService
         private readonly Mailer $mailer,
     ) {}
 
-    public function subscribe(string $email, ?string $prenom, string $ip, string $userAgent): void
+    public function subscribe(string $email, ?string $prenom, string $ip, string $userAgent, ?string $nom = null): void
     {
-        DB::transaction(function () use ($email, $prenom, $ip, $userAgent): void {
+        DB::transaction(function () use ($email, $prenom, $nom, $ip, $userAgent): void {
             // Cherche une ligne pending OU confirmed pour cet email dans le tenant courant
             $existing = SubscriptionRequest::where('email', $email)
                 ->whereIn('status', [
@@ -55,6 +55,7 @@ final class SubscriptionService
             $request = new SubscriptionRequest([
                 'email' => $email,
                 'prenom' => $prenom,
+                'nom' => $nom,
                 'status' => SubscriptionRequestStatus::Pending,
                 'subscribed_at' => now(),
                 'ip_address' => $ip,

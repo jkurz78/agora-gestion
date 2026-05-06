@@ -75,6 +75,7 @@ if (str_contains($contentType, 'application/json')) {
 $payload = [
     'email'    => isset($input['email']) ? trim((string) $input['email']) : '',
     'prenom'   => isset($input['prenom']) && $input['prenom'] !== '' ? (string) $input['prenom'] : null,
+    'nom'      => isset($input['nom']) && $input['nom'] !== '' ? (string) $input['nom'] : null,
     'consent'  => filter_var($input['consent'] ?? false, FILTER_VALIDATE_BOOLEAN),
     'bot_trap' => isset($input['bot_trap']) ? (string) $input['bot_trap'] : '',
 ];

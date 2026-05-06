@@ -20,6 +20,7 @@ final class SubscriptionRequestFactory extends Factory
         return [
             'email' => $this->faker->unique()->safeEmail(),
             'prenom' => $this->faker->firstName(),
+            'nom' => $this->faker->lastName(),
             'status' => SubscriptionRequestStatus::Pending,
             'subscribed_at' => now(),
             'ip_address' => $this->faker->ipv4(),
