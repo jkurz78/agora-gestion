@@ -13,6 +13,7 @@ use App\Models\AssociationUser;
 use App\Models\Extourne;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
+use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\NoteDeFrais;
 use App\Models\Transaction;
 use App\Models\User;
@@ -94,6 +95,8 @@ final class AppServiceProvider extends ServiceProvider
             $canSeeNdf = false;
             $ndfPendingCount = 0;
             $facturesPartenairesPendingCount = 0;
+            $canSeeNewsletter = false;
+            $newsletterPendingCount = 0;
 
             if (Auth::check() && TenantContext::hasBooted()) {
                 $assocUser = AssociationUser::where('user_id', (int) Auth::id())
@@ -110,6 +113,9 @@ final class AppServiceProvider extends ServiceProvider
                         $canSeeNdf = true;
                         $ndfPendingCount = NoteDeFrais::where('statut', StatutNoteDeFrais::Soumise->value)->count();
                         $facturesPartenairesPendingCount = FacturePartenaireDeposee::where('statut', StatutFactureDeposee::Soumise->value)->count();
+                        $canSeeNewsletter = true;
+                        $newsletterPendingCount = SubscriptionRequest::query()->inscriptionsAtraiter()->count()
+                            + SubscriptionRequest::query()->desinscriptionsAtraiter()->count();
                     }
                 }
             }
@@ -121,6 +127,8 @@ final class AppServiceProvider extends ServiceProvider
                 'ndfPendingCount' => $ndfPendingCount,
                 'canSeeFacturesPartenaires' => $canSeeFacturesPartenaires,
                 'facturesPartenairesPendingCount' => $facturesPartenairesPendingCount,
+                'canSeeNewsletter' => $canSeeNewsletter,
+                'newsletterPendingCount' => $newsletterPendingCount,
             ]);
         });
     }

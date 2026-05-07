@@ -269,3 +269,34 @@ it('action applyNoop marque traitée sans muter le Tiers', function () {
     expect($tiers->email_optout)->toBeFalse();
     expect($req->desinscription_action)->toBe(DesinscriptionAction::Noop);
 });
+
+it('topbar n affiche pas l entrée newsletter si compteur vaut 0', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+
+    $response = $this->get('/dashboard');
+
+    $response->assertDontSee('Inscriptions newsletter');
+});
+
+it('topbar affiche l entrée newsletter avec le compteur cumul', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+
+    SubscriptionRequest::factory()->inscriptionAtraiter()->count(2)->create();
+    $tiers = Tiers::factory()->create();
+    SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    $response = $this->get('/dashboard');
+
+    $response->assertSee('Inscriptions newsletter');
+    $response->assertSeeText('3'); // 2 + 1
+});
+
+it('topbar n affiche pas l entrée newsletter pour un Consultation', function () {
+    newsletterInboxLogin(RoleAssociation::Consultation->value);
+
+    SubscriptionRequest::factory()->inscriptionAtraiter()->create();
+
+    $response = $this->get('/dashboard');
+
+    $response->assertDontSee('Inscriptions newsletter');
+});
