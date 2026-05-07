@@ -23,6 +23,10 @@ final class Association extends Model
     /** Flag to allow a one-shot slug change; not persisted to DB. */
     public ?bool $allowSlugChange = null;
 
+    protected $attributes = [
+        'eligible_recu_fiscal' => false,
+    ];
+
     protected $fillable = [
         'nom',
         'slug',
@@ -48,6 +52,13 @@ final class Association extends Model
         'wizard_state',
         'wizard_current_step',
         'devis_validite_jours',
+        'eligible_recu_fiscal',
+        'regime_fiscal_don',
+        'objet_recu_fiscal',
+        'rescrit_fiscal_numero',
+        'rescrit_fiscal_date',
+        'signataire_nom',
+        'signataire_qualite',
     ];
 
     protected function casts(): array
@@ -73,6 +84,8 @@ final class Association extends Model
             'wizard_state' => 'array',
             'wizard_current_step' => 'integer',
             'devis_validite_jours' => 'integer',
+            'eligible_recu_fiscal' => 'boolean',
+            'rescrit_fiscal_date' => 'date',
         ];
     }
 
