@@ -81,4 +81,6 @@
             <div class="text-muted">Liste des désinscriptions à traiter (à venir).</div>
         @endif
     </div>
+
+    <livewire:newsletter.create-tiers-modal />
 </div>

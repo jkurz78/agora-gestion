@@ -12,6 +12,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 final class InscriptionsList extends Component
@@ -44,6 +45,17 @@ final class InscriptionsList extends Component
                 'request' => $req,
                 'match' => $service->suggestMatch($req),
             ]);
+    }
+
+    public function openCreateModal(int $requestId): void
+    {
+        $this->dispatch('open-newsletter-create-tiers', requestId: $requestId);
+    }
+
+    #[On('newsletter-tiers-created')]
+    public function onTiersCreated(): void
+    {
+        unset($this->inscriptionsRows);
     }
 
     public function ignore(int $requestId): void

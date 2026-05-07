@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\RoleAssociation;
+use App\Livewire\Newsletter\CreateTiersModal;
 use App\Livewire\Newsletter\InscriptionsList;
 use App\Models\Association;
 use App\Models\AssociationUser;
@@ -110,4 +111,50 @@ it('action ignore retire la ligne de la liste', function () {
 
     $req->refresh();
     expect($req->ignored_at)->not->toBeNull();
+});
+
+it('openCreateModal dispatch un évènement vers CreateTiersModal', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create();
+
+    Livewire::test(InscriptionsList::class)
+        ->call('openCreateModal', $req->id)
+        ->assertDispatched('open-newsletter-create-tiers', requestId: $req->id);
+});
+
+it('CreateTiersModal pré-remplit depuis le buffer et crée le Tiers', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create([
+        'email' => 'alice@nouveau.fr',
+        'prenom' => 'Alice',
+        'nom' => 'Dupont',
+    ]);
+
+    Livewire::test(CreateTiersModal::class)
+        ->call('open', $req->id)
+        ->assertSet('email', 'alice@nouveau.fr')
+        ->assertSet('prenom', 'Alice')
+        ->assertSet('nom', 'Dupont')
+        ->assertSet('type', 'particulier')
+        ->assertSet('pour_recettes', true)
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertSet('showModal', false);
+
+    $req->refresh();
+    expect($req->tiers_id)->not->toBeNull();
+    $tiers = Tiers::find($req->tiers_id);
+    expect($tiers->email)->toBe('alice@nouveau.fr');
+    expect($tiers->nom)->toBe('DUPONT'); // accesseur uppercase
+});
+
+it('CreateTiersModal valide email obligatoire', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create();
+
+    Livewire::test(CreateTiersModal::class)
+        ->call('open', $req->id)
+        ->set('email', '')
+        ->call('save')
+        ->assertHasErrors(['email']);
 });
