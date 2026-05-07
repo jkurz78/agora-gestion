@@ -10,6 +10,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Services\ExerciceService;
+use App\Services\RecuFiscalService;
 use App\Services\TiersQuickViewService;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
@@ -25,6 +26,12 @@ final class TiersQuickView extends Component
 
     /** @var array<string, mixed> */
     public array $summary = [];
+
+    public ?int $recuAAnnuler = null;
+
+    public string $motifAnnulation = '';
+
+    public bool $showModaleAnnulation = false;
 
     #[On('open-tiers-quick-view')]
     public function loadTiers(int $tiersId): void
@@ -45,6 +52,34 @@ final class TiersQuickView extends Component
         $this->visible = false;
         $this->tiersId = null;
         $this->summary = [];
+    }
+
+    public function ouvrirModaleAnnulation(int $recuId): void
+    {
+        $this->recuAAnnuler = $recuId;
+        $this->motifAnnulation = '';
+        $this->showModaleAnnulation = true;
+    }
+
+    public function confirmerReEmission(RecuFiscalService $service): void
+    {
+        if ($this->recuAAnnuler === null) {
+            return;
+        }
+
+        $recu = RecuFiscalEmis::findOrFail($this->recuAAnnuler);
+        $service->reemettre($recu, $this->motifAnnulation, auth()->user());
+
+        $this->recuAAnnuler = null;
+        $this->motifAnnulation = '';
+        $this->showModaleAnnulation = false;
+    }
+
+    public function fermerModaleAnnulation(): void
+    {
+        $this->recuAAnnuler = null;
+        $this->motifAnnulation = '';
+        $this->showModaleAnnulation = false;
     }
 
     public function render(): View

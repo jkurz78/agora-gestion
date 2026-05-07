@@ -52,3 +52,21 @@ it('affiche le numéro du reçu déjà émis', function () {
         ->dispatch('open-tiers-quick-view', tiersId: $tiersId)
         ->assertSeeText($recu->numero);
 });
+
+it('annule + ré-émet un reçu via la modale', function () {
+    [$asso, $user] = setupAssoUser17();
+    $ligne = $this->ligneDonValide();
+    $tiersId = $ligne->transaction->tiers_id;
+
+    $ancien = app(\App\Services\RecuFiscalService::class)->obtenirOuGenerer($ligne, $user);
+
+    \Livewire\Livewire::actingAs($user)->test(\App\Livewire\TiersQuickView::class)
+        ->dispatch('open-tiers-quick-view', tiersId: $tiersId)
+        ->call('ouvrirModaleAnnulation', $ancien->id)
+        ->set('motifAnnulation', 'Adresse corrigée')
+        ->call('confirmerReEmission');
+
+    $ancien->refresh();
+    expect($ancien->isAnnule())->toBeTrue();
+    expect($ancien->remplace_par_id)->not->toBeNull();
+});

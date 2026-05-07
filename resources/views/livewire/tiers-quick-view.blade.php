@@ -2,6 +2,35 @@
     x-data="{}"
     x-on:keydown.escape.window="$wire.close()"
 >
+    {{-- Modale annulation + ré-émission reçu fiscal --}}
+    @if($showModaleAnnulation)
+        <div class="modal fade show d-block" tabindex="-1" style="z-index:2060;background-color:rgba(0,0,0,.5)">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Annuler et ré-émettre</h5>
+                        <button type="button" class="btn-close" wire:click="fermerModaleAnnulation"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted">Le reçu actuel sera annulé et un nouveau sera généré avec les coordonnées actuelles du tiers.</p>
+                        <label for="motif-annulation" class="form-label">Motif</label>
+                        <input type="text"
+                               id="motif-annulation"
+                               class="form-control"
+                               wire:model="motifAnnulation"
+                               placeholder="Ex : Adresse corrigée">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="fermerModaleAnnulation">Annuler</button>
+                        <button type="button" class="btn btn-primary" wire:click="confirmerReEmission">
+                            Confirmer la ré-émission
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if($visible && $tiers !== null)
         {{-- Backdrop --}}
         <div
@@ -295,6 +324,11 @@
                                                    target="_blank">
                                                     n° {{ $recu->numero }}
                                                 </a>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary ms-1 py-0 lh-1"
+                                                        style="font-size:.65rem"
+                                                        wire:click="ouvrirModaleAnnulation({{ $recu->id }})"
+                                                        title="Annuler et ré-émettre">⋯</button>
                                             @else
                                                 <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
                                                    class="btn btn-sm btn-primary py-0"
