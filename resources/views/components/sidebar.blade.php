@@ -685,7 +685,9 @@ $activeGroup = match(true) {
         <div class="text-muted" style="font-size:.65rem;">
             &copy; {{ config('version.year', date('Y')) }} AgoraGestion &middot; {{ config('version.tag', '') }}
         </div>
-        <img src="{{ asset('images/agora-gestion.svg') }}" alt="AgoraGestion" height="45" class="mt-1">
+        <a href="https://agoragestion.org/" target="_blank" rel="noopener" title="Site AgoraGestion">
+            <img src="{{ asset('images/agora-gestion.svg') }}" alt="AgoraGestion" height="45" class="mt-1">
+        </a>
     </div>
 
 </nav>
