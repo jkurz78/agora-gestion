@@ -336,6 +336,16 @@
                     <div class="mb-3">
                         @if($showSaveTemplate)
                             <div class="border rounded p-2 bg-light">
+                                {{-- Affiche TOUTES les erreurs de validation (templateNom, objet, corps).
+                                     Sans ça, une erreur sur 'objet' ou 'corps' rend le bouton
+                                     Enregistrer apparemment inerte ("ne fait rien"). --}}
+                                @if ($errors->any())
+                                    <div class="alert alert-danger small py-2 mb-2">
+                                        @foreach ($errors->all() as $error)
+                                            <div>{{ $error }}</div>
+                                        @endforeach
+                                    </div>
+                                @endif
                                 <div class="row g-2 align-items-end">
                                     <div class="col-md-7">
                                         <label class="form-label small">Nom du modèle</label>
@@ -718,7 +728,11 @@
                     menubar: 'edit insert format table',
                     statusbar: true,
                     promotion: false,
-                    plugins: 'lists link noneditable table image media code fullscreen',
+                    {{-- TinyMCE 6.x : 'noneditable' est intégré au core (n'est plus un plugin
+                         externe). Le référencer dans 'plugins' cause un 404 sur
+                         /vendor/tinymce/plugins/noneditable/plugin.min.js. La directive
+                         noneditable_class plus bas suffit pour activer le comportement. --}}
+                    plugins: 'lists link table image media code fullscreen',
                     // --- Préservation HTML rich (newsletter pasting) ---
                     // Sans ces options, TinyMCE 6 strip les styles inline, attributs HTML
                     // (bgcolor, cellpadding, cellspacing, border, width="600"...) et classes,
