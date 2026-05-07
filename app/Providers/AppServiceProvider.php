@@ -22,6 +22,7 @@ use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\TransactionLigneRecuFiscalObserver;
 use App\Observers\TransactionObserver;
+use App\Observers\TransactionRecuFiscalObserver;
 use App\Observers\UserRoleObserver;
 use App\Policies\ExtournePolicy;
 use App\Policies\FacturePartenaireDeposeePolicy;
@@ -52,6 +53,7 @@ final class AppServiceProvider extends ServiceProvider
         Association::observe(AssociationObserver::class);
         Association::observe(ImmutableSlugObserver::class);
         Transaction::observe(TransactionObserver::class);
+        Transaction::observe(TransactionRecuFiscalObserver::class);
         TransactionLigne::observe(TransactionLigneRecuFiscalObserver::class);
         User::observe(UserRoleObserver::class);
 
