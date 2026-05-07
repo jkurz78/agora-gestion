@@ -109,6 +109,32 @@ final class RecuFiscalService
         });
     }
 
+    public function annuler(RecuFiscalEmis $recu, string $motif, ?User $user = null): void
+    {
+        if ($recu->isAnnule()) {
+            return;
+        }
+
+        $recu->update([
+            'annule_at' => now(),
+            'annule_motif' => $motif,
+        ]);
+    }
+
+    public function reemettre(RecuFiscalEmis $ancien, string $motif, ?User $user = null): RecuFiscalEmis
+    {
+        return DB::transaction(function () use ($ancien, $motif, $user) {
+            $this->annuler($ancien, $motif, $user);
+
+            $ligne = $ancien->transactionLigne;
+            $nouveau = $this->obtenirOuGenerer($ligne, $user);
+
+            $ancien->update(['remplace_par_id' => $nouveau->id]);
+
+            return $nouveau;
+        });
+    }
+
     public function streamPdf(RecuFiscalEmis $recu): StreamedResponse
     {
         if (! $recu->verifierIntegrite()) {
