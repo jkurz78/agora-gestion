@@ -17,6 +17,7 @@ use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class RecuFiscalService
 {
@@ -106,6 +107,17 @@ final class RecuFiscalService
                 'emitted_by_user_id' => $user?->id,
             ]);
         });
+    }
+
+    public function streamPdf(RecuFiscalEmis $recu): StreamedResponse
+    {
+        if (! $recu->verifierIntegrite()) {
+            throw new \RuntimeException("Intégrité du PDF reçu n°{$recu->numero} compromise — hash incorrect");
+        }
+
+        $filename = "recu-fiscal-{$recu->numero}.pdf";
+
+        return Storage::disk('local')->download($recu->pdfFullPath(), $filename);
     }
 
     private function allouerNumero(int $annee): string
