@@ -70,3 +70,25 @@ it('annule + ré-émet un reçu via la modale', function () {
     expect($ancien->isAnnule())->toBeTrue();
     expect($ancien->remplace_par_id)->not->toBeNull();
 });
+
+it('affiche un avertissement HelloAsso si le don provient d\'HelloAsso', function () {
+    [$asso, $user] = setupAssoUser17();
+    $ligne = $this->ligneDonValide();
+    $ligne->transaction->update(['helloasso_payment_id' => 99999]);
+    $tiersId = $ligne->transaction->tiers_id;
+
+    \Livewire\Livewire::actingAs($user)->test(\App\Livewire\TiersQuickView::class)
+        ->dispatch('open-tiers-quick-view', tiersId: $tiersId)
+        ->assertSeeText('HelloAsso');
+});
+
+it('affiche un avertissement si l\'asso a été modifiée depuis le don', function () {
+    [$asso, $user] = setupAssoUser17();
+    $ligne = $this->ligneDonValide(transactionOverrides: ['date' => now()->subYear()->toDateString()]);
+    $asso->update(['signataire_nom' => 'Mise à jour']);
+    $tiersId = $ligne->transaction->tiers_id;
+
+    \Livewire\Livewire::actingAs($user)->test(\App\Livewire\TiersQuickView::class)
+        ->dispatch('open-tiers-quick-view', tiersId: $tiersId)
+        ->assertSeeText('coordonnées');
+});

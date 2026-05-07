@@ -2,6 +2,38 @@
     x-data="{}"
     x-on:keydown.escape.window="$wire.close()"
 >
+    {{-- Modale avertissement avant première émission reçu fiscal --}}
+    @if($showModaleAvertissement)
+        <div class="modal fade show d-block" tabindex="-1" style="z-index:2060;background-color:rgba(0,0,0,.5)">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Vérifications avant émission</h5>
+                        <button type="button" class="btn-close" wire:click="fermerModaleAvertissement"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if(in_array('helloasso', $avertissementsActifs))
+                            <div class="alert alert-warning">
+                                <strong>HelloAsso peut avoir déjà émis un reçu fiscal pour ce don.</strong>
+                                Le donateur ne doit pas déduire deux fois le même montant.
+                            </div>
+                        @endif
+                        @if(in_array('donnees_modifiees', $avertissementsActifs))
+                            <div class="alert alert-info">
+                                Les coordonnées du donateur ou de l'association ont été modifiées depuis le don.
+                                Le reçu portera les coordonnées actuelles.
+                            </div>
+                        @endif
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="fermerModaleAvertissement">Annuler</button>
+                        <button type="button" class="btn btn-primary" wire:click="continuerTelechargement">Continuer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Modale annulation + ré-émission reçu fiscal --}}
     @if($showModaleAnnulation)
         <div class="modal fade show d-block" tabindex="-1" style="z-index:2060;background-color:rgba(0,0,0,.5)">
@@ -330,12 +362,34 @@
                                                         wire:click="ouvrirModaleAnnulation({{ $recu->id }})"
                                                         title="Annuler et ré-émettre">⋯</button>
                                             @else
-                                                <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
-                                                   class="btn btn-sm btn-primary py-0"
-                                                   style="font-size:.65rem"
-                                                   target="_blank">
-                                                    Télécharger reçu fiscal
-                                                </a>
+                                                @php $alertes = $alertesParLigne[$don->id] ?? []; @endphp
+                                                @if(!empty($alertes))
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-primary py-0"
+                                                            style="font-size:.65rem"
+                                                            wire:click="afficherAvertissements({{ $don->id }})">
+                                                        Télécharger reçu fiscal
+                                                    </button>
+                                                    <div class="mt-1 d-flex flex-wrap gap-1">
+                                                        @if(in_array('helloasso', $alertes))
+                                                            <span class="badge bg-warning text-dark" style="font-size:.55rem" title="HelloAsso peut avoir déjà émis un reçu fiscal">
+                                                                ⚠ HelloAsso
+                                                            </span>
+                                                        @endif
+                                                        @if(in_array('donnees_modifiees', $alertes))
+                                                            <span class="badge bg-info text-dark" style="font-size:.55rem" title="Les coordonnées ont été modifiées depuis le don">
+                                                                ⚠ coordonnées modifiées
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                @else
+                                                    <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
+                                                       class="btn btn-sm btn-primary py-0"
+                                                       style="font-size:.65rem"
+                                                       target="_blank">
+                                                        Télécharger reçu fiscal
+                                                    </a>
+                                                @endif
                                             @endif
                                         </td>
                                     </tr>

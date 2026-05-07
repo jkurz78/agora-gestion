@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\UsageComptable;
+use App\Models\Association;
 use App\Models\RecuFiscalEmis;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
@@ -12,6 +13,7 @@ use App\Models\TransactionLigne;
 use App\Services\ExerciceService;
 use App\Services\RecuFiscalService;
 use App\Services\TiersQuickViewService;
+use App\Tenant\TenantContext;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -32,6 +34,13 @@ final class TiersQuickView extends Component
     public string $motifAnnulation = '';
 
     public bool $showModaleAnnulation = false;
+
+    public ?int $ligneAvecAvertissement = null;
+
+    /** @var array<int, string> */
+    public array $avertissementsActifs = [];
+
+    public bool $showModaleAvertissement = false;
 
     #[On('open-tiers-quick-view')]
     public function loadTiers(int $tiersId): void
@@ -82,6 +91,47 @@ final class TiersQuickView extends Component
         $this->showModaleAnnulation = false;
     }
 
+    public function afficherAvertissements(int $ligneId): void
+    {
+        $this->ligneAvecAvertissement = $ligneId;
+        $don = TransactionLigne::with('transaction')->findOrFail($ligneId);
+        $tiers = Tiers::findOrFail($this->tiersId);
+        $asso = Association::findOrFail(TenantContext::currentId());
+
+        $alertes = [];
+
+        if ($don->transaction->helloasso_payment_id !== null) {
+            $alertes[] = 'helloasso';
+        }
+
+        if (
+            ($asso->updated_at !== null && $asso->updated_at->gt($don->transaction->date))
+            || ($tiers->updated_at !== null && $tiers->updated_at->gt($don->transaction->date))
+        ) {
+            $alertes[] = 'donnees_modifiees';
+        }
+
+        $this->avertissementsActifs = $alertes;
+        $this->showModaleAvertissement = true;
+    }
+
+    public function continuerTelechargement(): void
+    {
+        $tiers = Tiers::findOrFail($this->tiersId);
+        $url = route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $this->ligneAvecAvertissement]);
+        $this->showModaleAvertissement = false;
+        $this->ligneAvecAvertissement = null;
+        $this->avertissementsActifs = [];
+        $this->redirect($url);
+    }
+
+    public function fermerModaleAvertissement(): void
+    {
+        $this->showModaleAvertissement = false;
+        $this->ligneAvecAvertissement = null;
+        $this->avertissementsActifs = [];
+    }
+
     public function render(): View
     {
         $tiers = $this->tiersId !== null ? Tiers::find($this->tiersId) : null;
@@ -89,6 +139,7 @@ final class TiersQuickView extends Component
 
         $dons = collect();
         $recusParLigne = collect();
+        $alertesParLigne = collect();
 
         if ($tiers !== null) {
             $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
@@ -104,9 +155,27 @@ final class TiersQuickView extends Component
                 ->whereNull('annule_at')
                 ->get()
                 ->keyBy('transaction_ligne_id');
+
+            $asso = Association::findOrFail(TenantContext::currentId());
+            $alertesParLigne = $dons->mapWithKeys(function (TransactionLigne $don) use ($asso, $tiers): array {
+                $alertes = [];
+
+                if ($don->transaction->helloasso_payment_id !== null) {
+                    $alertes[] = 'helloasso';
+                }
+
+                if (
+                    ($asso->updated_at !== null && $asso->updated_at->gt($don->transaction->date))
+                    || ($tiers->updated_at !== null && $tiers->updated_at->gt($don->transaction->date))
+                ) {
+                    $alertes[] = 'donnees_modifiees';
+                }
+
+                return [$don->id => $alertes];
+            });
         }
 
-        return view('livewire.tiers-quick-view', compact('tiers', 'availableYears', 'dons', 'recusParLigne'));
+        return view('livewire.tiers-quick-view', compact('tiers', 'availableYears', 'dons', 'recusParLigne', 'alertesParLigne'));
     }
 
     private function fetchSummary(): void
