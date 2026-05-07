@@ -52,6 +52,45 @@ final class InscriptionsList extends Component
         $this->dispatch('open-newsletter-create-tiers', requestId: $requestId);
     }
 
+    public function openMergeModal(int $requestId, int $matchId): void
+    {
+        $req = SubscriptionRequest::findOrFail($requestId);
+        $tiers = Tiers::findOrFail($matchId);
+
+        $this->dispatch('open-tiers-merge',
+            sourceData: [
+                'email' => $req->email,
+                'prenom' => $req->prenom,
+                'nom' => $req->nom,
+                'type' => 'particulier',
+            ],
+            tiersId: $tiers->id,
+            sourceLabel: 'Inscription newsletter — '.$req->email,
+            targetLabel: 'Tiers existant — '.$tiers->displayName(),
+            confirmLabel: "Fusionner et lier l'inscription",
+            context: 'newsletter_import',
+            contextData: ['subscription_request_id' => $req->id],
+        );
+    }
+
+    #[On('tiers-merge-confirmed')]
+    public function onMergeConfirmed(int $tiersId, string $context, array $contextData): void
+    {
+        if ($context !== 'newsletter_import') {
+            return;
+        }
+        if (! isset($contextData['subscription_request_id'])) {
+            return;
+        }
+
+        $req = SubscriptionRequest::findOrFail((int) $contextData['subscription_request_id']);
+        $tiers = Tiers::findOrFail($tiersId);
+        app(BufferImportService::class)->linkBufferToExistingTiers($req, $tiers);
+
+        unset($this->inscriptionsRows);
+        $this->dispatch('toast', message: 'Inscription liée à '.$tiers->displayName().'.');
+    }
+
     #[On('newsletter-tiers-created')]
     public function onTiersCreated(): void
     {

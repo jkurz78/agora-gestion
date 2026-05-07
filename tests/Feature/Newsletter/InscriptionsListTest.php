@@ -158,3 +158,37 @@ it('CreateTiersModal valide email obligatoire', function () {
         ->call('save')
         ->assertHasErrors(['email']);
 });
+
+it('openMergeModal dispatch open-tiers-merge avec context newsletter_import', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $bob = Tiers::factory()->create(['prenom' => 'Bob', 'nom' => 'MARTIN', 'email' => 'bob@x.fr']);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'bob@x.fr']);
+
+    Livewire::test(InscriptionsList::class)
+        ->call('openMergeModal', $req->id, $bob->id)
+        ->assertDispatched('open-tiers-merge', context: 'newsletter_import');
+});
+
+it('handler tiers-merge-confirmed lie le buffer au Tiers', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $bob = Tiers::factory()->create();
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create();
+
+    Livewire::test(InscriptionsList::class)
+        ->call('onMergeConfirmed', $bob->id, 'newsletter_import', ['subscription_request_id' => $req->id]);
+
+    $req->refresh();
+    expect((int) $req->tiers_id)->toBe((int) $bob->id);
+});
+
+it('handler tiers-merge-confirmed ignore les autres contexts', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $bob = Tiers::factory()->create();
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create();
+
+    Livewire::test(InscriptionsList::class)
+        ->call('onMergeConfirmed', $bob->id, 'csv_import', ['merge_data' => []]);
+
+    $req->refresh();
+    expect($req->tiers_id)->toBeNull();
+});

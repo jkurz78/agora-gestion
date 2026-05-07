@@ -83,4 +83,5 @@
     </div>
 
     <livewire:newsletter.create-tiers-modal />
+    <livewire:tiers-merge-modal />
 </div>
