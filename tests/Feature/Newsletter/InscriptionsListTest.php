@@ -300,3 +300,22 @@ it('topbar n affiche pas l entrée newsletter pour un Consultation', function ()
 
     $response->assertDontSee('Inscriptions newsletter');
 });
+
+it('isolation tenant : ne voit pas les buffers d une autre asso', function () {
+    // Asso A booted by default via beforeEach
+    $assoA = Association::find(TenantContext::currentId());
+    $assoB = Association::factory()->create();
+
+    // Crée une ligne sur asso B en bootant temporairement
+    TenantContext::boot($assoB);
+    SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'on-asso-b@x.fr']);
+
+    // Reboot asso A
+    TenantContext::boot($assoA);
+
+    // L'admin connecté à l'asso A ne doit pas voir la ligne de l'asso B
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+
+    Livewire::test(InscriptionsList::class)
+        ->assertDontSee('on-asso-b@x.fr');
+});
