@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Newsletter\DesinscriptionAction;
 use App\Enums\RoleAssociation;
 use App\Livewire\Newsletter\CreateTiersModal;
 use App\Livewire\Newsletter\InscriptionsList;
@@ -9,6 +10,7 @@ use App\Models\Association;
 use App\Models\AssociationUser;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -191,4 +193,79 @@ it('handler tiers-merge-confirmed ignore les autres contexts', function () {
 
     $req->refresh();
     expect($req->tiers_id)->toBeNull();
+});
+
+it('onglet desinscriptions liste les unsubscribed avec tiers_id non traités', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $tiers1 = Tiers::factory()->create(['email' => 'todo@x.fr']);
+    $tiers2 = Tiers::factory()->create(['email' => 'done@x.fr']);
+
+    SubscriptionRequest::factory()->desinscriptionAtraiter($tiers1->id)->create(['email' => 'todo@x.fr']);
+    SubscriptionRequest::factory()->desinscriptionTraitee($tiers2->id)->create(['email' => 'done@x.fr']);
+
+    Livewire::test(InscriptionsList::class)
+        ->call('setTab', 'desinscriptions')
+        ->assertSee('todo@x.fr')
+        ->assertDontSee('done@x.fr');
+});
+
+it('action applyOptout positionne email_optout sur le Tiers', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $tiers = Tiers::factory()->create(['email_optout' => false]);
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    Livewire::test(InscriptionsList::class)
+        ->call('setTab', 'desinscriptions')
+        ->call('applyOptout', $req->id);
+
+    $tiers->refresh();
+    $req->refresh();
+    expect($tiers->email_optout)->toBeTrue();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Optout);
+});
+
+it('action applyDelete supprime un Tiers sans dépendance', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $tiers = Tiers::factory()->create();
+    $tiersId = $tiers->id;
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiersId)->create();
+
+    Livewire::test(InscriptionsList::class)
+        ->call('setTab', 'desinscriptions')
+        ->call('applyDelete', $req->id);
+
+    expect(Tiers::find($tiersId))->toBeNull();
+    $req->refresh();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Deleted);
+});
+
+it('action applyDelete affiche une erreur si Tiers a des dépendances', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $tiers = Tiers::factory()->create();
+    Transaction::factory()->create(['tiers_id' => $tiers->id]);
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    Livewire::test(InscriptionsList::class)
+        ->call('setTab', 'desinscriptions')
+        ->call('applyDelete', $req->id)
+        ->assertHasErrors('delete');
+
+    expect(Tiers::find($tiers->id))->not->toBeNull();
+    $req->refresh();
+    expect($req->desinscription_traitee_at)->toBeNull();
+});
+
+it('action applyNoop marque traitée sans muter le Tiers', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $tiers = Tiers::factory()->create(['email_optout' => false]);
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    Livewire::test(InscriptionsList::class)
+        ->call('setTab', 'desinscriptions')
+        ->call('applyNoop', $req->id);
+
+    $tiers->refresh();
+    $req->refresh();
+    expect($tiers->email_optout)->toBeFalse();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Noop);
 });

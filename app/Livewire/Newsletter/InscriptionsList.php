@@ -7,6 +7,8 @@ namespace App\Livewire\Newsletter;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\Tiers;
 use App\Services\Newsletter\BufferImportService;
+use App\Services\Newsletter\Exceptions\TiersHasDependenciesException;
+use App\Services\TiersService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -45,6 +47,54 @@ final class InscriptionsList extends Component
                 'request' => $req,
                 'match' => $service->suggestMatch($req),
             ]);
+    }
+
+    /** @return Collection<int, array{request: SubscriptionRequest, tiers: ?Tiers, deps: int}> */
+    #[Computed]
+    public function desinscriptionsRows(): Collection
+    {
+        $tiersService = app(TiersService::class);
+
+        return SubscriptionRequest::query()
+            ->desinscriptionsAtraiter()
+            ->with('tiers')
+            ->orderByDesc('unsubscribed_at')
+            ->get()
+            ->map(fn (SubscriptionRequest $req) => [
+                'request' => $req,
+                'tiers' => $req->tiers,
+                'deps' => $req->tiers ? array_sum($tiersService->countDependentRecords($req->tiers)) : 0,
+            ]);
+    }
+
+    public function applyOptout(int $requestId): void
+    {
+        $req = SubscriptionRequest::findOrFail($requestId);
+        app(BufferImportService::class)->applyUnsubscribeOptout($req);
+        unset($this->desinscriptionsRows);
+        $this->dispatch('toast', message: 'Tiers désabonné.');
+    }
+
+    public function applyDelete(int $requestId): void
+    {
+        $req = SubscriptionRequest::findOrFail($requestId);
+        try {
+            app(BufferImportService::class)->applyUnsubscribeDelete($req);
+        } catch (TiersHasDependenciesException $e) {
+            $this->addError('delete', 'Suppression impossible : '.$e->getMessage());
+
+            return;
+        }
+        unset($this->desinscriptionsRows);
+        $this->dispatch('toast', message: 'Tiers supprimé.');
+    }
+
+    public function applyNoop(int $requestId): void
+    {
+        $req = SubscriptionRequest::findOrFail($requestId);
+        app(BufferImportService::class)->applyUnsubscribeNoop($req);
+        unset($this->desinscriptionsRows);
+        $this->dispatch('toast', message: 'Désinscription actée.');
     }
 
     public function openCreateModal(int $requestId): void

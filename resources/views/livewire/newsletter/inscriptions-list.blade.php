@@ -78,7 +78,67 @@
                 </table>
             @endif
         @else
-            <div class="text-muted">Liste des désinscriptions à traiter (à venir).</div>
+            @error('delete') <div class="alert alert-danger">{{ $message }}</div> @enderror
+            @if ($this->desinscriptionsRows->isEmpty())
+                <div class="alert alert-secondary">Aucune désinscription en attente.</div>
+            @else
+                <table class="table table-hover">
+                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                        <tr>
+                            <th>Date désinscription</th>
+                            <th>Email</th>
+                            <th>Tiers lié</th>
+                            <th>Dépendances</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($this->desinscriptionsRows as $row)
+                            @php($req = $row['request'])
+                            @php($tiers = $row['tiers'])
+                            @php($deps = $row['deps'])
+                            <tr wire:key="des-{{ $req->id }}">
+                                <td data-sort="{{ optional($req->unsubscribed_at)->format('Y-m-d') }}">
+                                    {{ optional($req->unsubscribed_at)->format('d/m/Y') }}
+                                </td>
+                                <td>{{ $req->email }}</td>
+                                <td>
+                                    @if ($tiers)
+                                        <a href="{{ route('tiers.transactions', $tiers->id) }}">{{ $tiers->displayName() }}</a>
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if ($deps > 0)
+                                        <span class="badge bg-secondary">{{ $deps }}</span>
+                                    @else
+                                        <span class="text-muted">aucune</span>
+                                    @endif
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-warning"
+                                            wire:click="applyOptout({{ $req->id }})"
+                                            wire:confirm="Désabonner {{ $tiers?->displayName() }} ? Le Tiers ne recevra plus d'emails.">
+                                        Désabonner
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger"
+                                            @if ($deps > 0) disabled title="{{ $deps }} dépendance(s) — suppression impossible" @endif
+                                            wire:click="applyDelete({{ $req->id }})"
+                                            wire:confirm="Supprimer le tiers {{ $tiers?->displayName() }} ?">
+                                        Supprimer Tiers
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            wire:click="applyNoop({{ $req->id }})"
+                                            wire:confirm="Acter cette désinscription sans modifier le Tiers ?">
+                                        Acter sans action
+                                    </button>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
         @endif
     </div>
 
