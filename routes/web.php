@@ -27,6 +27,7 @@ use App\Http\Controllers\ParticipantPdfController;
 use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\RapprochementPieceJointeController;
+use App\Http\Controllers\RecuFiscalController;
 use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeanceFeuilleController;
@@ -260,6 +261,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::view('/dons', 'dons.index')->name('dons');
         Route::view('/cotisations', 'cotisations.index')->name('cotisations');
         Route::view('/communication', 'tiers.communication')->name('communication');
+        Route::get('/{tiers}/dons/{ligne}/recu-fiscal', [RecuFiscalController::class, 'download'])
+            ->name('dons.recu-fiscal');
     });
 
 // ── Devis libres ──
