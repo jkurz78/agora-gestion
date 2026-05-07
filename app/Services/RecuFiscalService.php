@@ -6,8 +6,10 @@ namespace App\Services;
 
 use App\Exceptions\RecuFiscalException;
 use App\Models\Association;
+use App\Models\RecuFiscalEmis;
 use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\DB;
 
 final class RecuFiscalService
 {
@@ -45,5 +47,27 @@ final class RecuFiscalService
                 throw RecuFiscalException::adresseDonateurManquante($libelle);
             }
         }
+    }
+
+    private function allouerNumero(int $annee): string
+    {
+        return DB::transaction(function () use ($annee) {
+            $associationId = TenantContext::currentId();
+
+            $dernier = RecuFiscalEmis::query()
+                ->where('association_id', $associationId)
+                ->where('annee_civile', $annee)
+                ->lockForUpdate()
+                ->orderByDesc('id')
+                ->first();
+
+            $sequence = 1;
+            if ($dernier !== null) {
+                $parts = explode('-', $dernier->numero);
+                $sequence = (int) end($parts) + 1;
+            }
+
+            return sprintf('%d-%04d', $annee, $sequence);
+        });
     }
 }
