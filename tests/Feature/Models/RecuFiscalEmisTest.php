@@ -6,6 +6,7 @@ use App\Models\Association;
 use App\Models\RecuFiscalEmis;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
+use Illuminate\Database\QueryException;
 
 it('persiste un reçu fiscal avec ses champs', function () {
     /** @var Association $asso */
@@ -66,5 +67,5 @@ it('garantit l\'unicité du numéro par association', function () {
     RecuFiscalEmis::factory()->create(['numero' => '2026-0001', 'tiers_id' => $tiers->id]);
 
     expect(fn () => RecuFiscalEmis::factory()->create(['numero' => '2026-0001', 'tiers_id' => $tiers->id]))
-        ->toThrow(\Illuminate\Database\QueryException::class);
+        ->toThrow(QueryException::class);
 });

@@ -28,6 +28,7 @@ function setupAssoUser17(): array
         'role' => RoleAssociation::Admin->value,
         'joined_at' => now(),
     ]);
+
     return [$asso, $user];
 }
 
@@ -58,9 +59,9 @@ it('annule + ré-émet un reçu via la modale', function () {
     $ligne = $this->ligneDonValide();
     $tiersId = $ligne->transaction->tiers_id;
 
-    $ancien = app(\App\Services\RecuFiscalService::class)->obtenirOuGenerer($ligne, $user);
+    $ancien = app(RecuFiscalService::class)->obtenirOuGenerer($ligne, $user);
 
-    \Livewire\Livewire::actingAs($user)->test(\App\Livewire\TiersQuickView::class)
+    Livewire::actingAs($user)->test(TiersQuickView::class)
         ->dispatch('open-tiers-quick-view', tiersId: $tiersId)
         ->call('ouvrirModaleAnnulation', $ancien->id)
         ->set('motifAnnulation', 'Adresse corrigée')
@@ -77,7 +78,7 @@ it('affiche un avertissement HelloAsso si le don provient d\'HelloAsso', functio
     $ligne->transaction->update(['helloasso_payment_id' => 99999]);
     $tiersId = $ligne->transaction->tiers_id;
 
-    \Livewire\Livewire::actingAs($user)->test(\App\Livewire\TiersQuickView::class)
+    Livewire::actingAs($user)->test(TiersQuickView::class)
         ->dispatch('open-tiers-quick-view', tiersId: $tiersId)
         ->assertSeeText('HelloAsso');
 });
@@ -88,7 +89,7 @@ it('affiche un avertissement si l\'asso a été modifiée depuis le don', functi
     $asso->update(['signataire_nom' => 'Mise à jour']);
     $tiersId = $ligne->transaction->tiers_id;
 
-    \Livewire\Livewire::actingAs($user)->test(\App\Livewire\TiersQuickView::class)
+    Livewire::actingAs($user)->test(TiersQuickView::class)
         ->dispatch('open-tiers-quick-view', tiersId: $tiersId)
         ->assertSeeText('coordonnées');
 });

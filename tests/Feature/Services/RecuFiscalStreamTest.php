@@ -45,5 +45,5 @@ it('throw si l\'intégrité est compromise (fichier modifié)', function () {
     Storage::disk('local')->put($recu->pdfFullPath(), 'corrupted-content');
 
     expect(fn () => $service->streamPdf($recu))
-        ->toThrow(\RuntimeException::class, 'Intégrité');
+        ->toThrow(RuntimeException::class, 'Intégrité');
 });

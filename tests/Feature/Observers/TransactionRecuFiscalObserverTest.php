@@ -6,6 +6,7 @@ use App\Models\Association;
 use App\Models\Tiers;
 use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -20,6 +21,7 @@ function setupAssoEligible13(): Association
         'signataire_qualite' => 'P',
     ]);
     TenantContext::boot($asso);
+
     return $asso;
 }
 
@@ -58,7 +60,7 @@ it('n\'annule PAS le reçu si seul un champ cosmétique change sur la transactio
 
     $recu = app(RecuFiscalService::class)->obtenirOuGenerer($ligne);
 
-    if (\Illuminate\Support\Facades\Schema::hasColumn('transactions', 'libelle')) {
+    if (Schema::hasColumn('transactions', 'libelle')) {
         $ligne->transaction->update(['libelle' => 'Nouveau libellé']);
         $recu->refresh();
         expect($recu->isActif())->toBeTrue();
