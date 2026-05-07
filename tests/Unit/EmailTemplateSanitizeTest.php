@@ -85,3 +85,65 @@ it('préserve simultanément variables texte et href', function () {
     expect($result)->toContain('href="{lien_optout}"');
     expect($result)->toContain('{lien_desinscription}');
 });
+
+// --- v4.2.9: HTML email allowlist élargie ---
+
+it('conserve le style inline sur les balises p, h2, a et table', function () {
+    $html = '<table style="background: #f7f4f1; padding: 32px 0;" bgcolor="#f7f4f1" width="100%">'
+        .'<tr><td bgcolor="#fff" style="padding: 24px;">'
+        .'<h2 style="color: #A6145A; font-size: 22px;">Titre</h2>'
+        .'<p style="color: #444; font-family: Arial;">Texte</p>'
+        .'<a href="https://example.com" style="color: #712C8D;">Lien</a>'
+        .'</td></tr></table>';
+
+    $result = EmailTemplate::sanitizeCorps($html);
+
+    // HTMLPurifier minifie les espaces autour des `:` — on tolère les deux formes.
+    expect($result)->toMatch('/background:\s*#f7f4f1/');
+    expect($result)->toMatch('/padding:\s*32px/');
+    expect($result)->toMatch('/color:\s*#A6145A/');
+    expect($result)->toMatch('/font-family:\s*Arial/');
+    expect($result)->toMatch('/color:\s*#712C8D/');
+    expect($result)->toContain('bgcolor="#f7f4f1"');
+    expect($result)->toContain('width="100%"');
+});
+
+it('conserve les attributs legacy de tableau (cellpadding, cellspacing, border, role)', function () {
+    $html = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600">'
+        .'<tr valign="top"><td align="center" colspan="2">cell</td></tr></table>';
+
+    $result = EmailTemplate::sanitizeCorps($html);
+
+    expect($result)->toContain('cellpadding="0"');
+    expect($result)->toContain('cellspacing="0"');
+    expect($result)->toContain('border="0"');
+    expect($result)->toContain('width="600"');
+    expect($result)->toContain('valign="top"');
+    expect($result)->toContain('align="center"');
+    expect($result)->toContain('colspan="2"');
+});
+
+it('conserve les classes CSS', function () {
+    $html = '<table class="email-container body-bg"><tr><td class="px-40">contenu</td></tr></table>';
+
+    $result = EmailTemplate::sanitizeCorps($html);
+
+    expect($result)->toContain('class="email-container body-bg"');
+    expect($result)->toContain('class="px-40"');
+});
+
+it('conserve les propriétés CSS étendues utilisées dans les emails', function () {
+    $html = '<div style="display: inline-block; max-width: 600px; border-radius: 6px; '
+        .'line-height: 1.6; letter-spacing: 0.12em; text-transform: uppercase; '
+        .'box-shadow: 0 2px 8px rgba(0,0,0,0.05);">Email-friendly</div>';
+
+    $result = EmailTemplate::sanitizeCorps($html);
+
+    expect($result)->toMatch('/display:\s*inline-block/');
+    expect($result)->toMatch('/max-width:\s*600px/');
+    expect($result)->toMatch('/border-radius:\s*6px/');
+    expect($result)->toMatch('/line-height:\s*1\.6/');
+    expect($result)->toContain('letter-spacing');
+    expect($result)->toContain('text-transform');
+    expect($result)->toContain('box-shadow');
+});
