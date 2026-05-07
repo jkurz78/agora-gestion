@@ -880,4 +880,20 @@ describe('HMAC middleware + HTTP controller', function () {
             ->where('email', 'a@b.fr')->first();
         expect((int) $row->association_id)->toBe((int) $apiKeyForA->association_id);
     });
+
+    it('persiste l api_key_id sur la ligne buffer après une inscription valide', function () {
+        Mail::fake();
+        $payload = ['email' => 'tracked@x.fr', 'prenom' => 'Tracked', 'consent' => true, 'bot_trap' => ''];
+        $signed = signNewsletterRequest($payload, $this->apiKey);
+
+        $this->call('POST', '/api/newsletter/subscribe', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_KEY_ID' => $signed['headers']['X-Key-Id'],
+            'HTTP_X_TIMESTAMP' => $signed['headers']['X-Timestamp'],
+            'HTTP_X_SIGNATURE' => $signed['headers']['X-Signature'],
+        ], $signed['body'])->assertOk();
+
+        $req = SubscriptionRequest::where('email', 'tracked@x.fr')->first();
+        expect((int) $req->api_key_id)->toBe((int) $this->apiKey->id);
+    });
 });

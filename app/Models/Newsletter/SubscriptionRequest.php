@@ -6,6 +6,7 @@ namespace App\Models\Newsletter;
 
 use App\Enums\Newsletter\DesinscriptionAction;
 use App\Enums\Newsletter\SubscriptionRequestStatus;
+use App\Models\Association\ApiKey;
 use App\Models\TenantModel;
 use App\Models\Tiers;
 use App\Models\User;
@@ -30,6 +31,7 @@ final class SubscriptionRequest extends TenantModel
         'subscribed_at',
         'ip_address',
         'user_agent',
+        'api_key_id',
     ];
 
     protected $casts = [
@@ -46,6 +48,11 @@ final class SubscriptionRequest extends TenantModel
     public function tiers(): BelongsTo
     {
         return $this->belongsTo(Tiers::class);
+    }
+
+    public function apiKey(): BelongsTo
+    {
+        return $this->belongsTo(ApiKey::class, 'api_key_id');
     }
 
     public function scopeActive(Builder $query): Builder

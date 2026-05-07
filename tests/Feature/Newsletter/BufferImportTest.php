@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Enums\Newsletter\DesinscriptionAction;
 use App\Enums\Newsletter\SubscriptionRequestStatus;
 use App\Enums\RoleAssociation;
+use App\Models\Association;
+use App\Models\Association\ApiKey;
 use App\Models\AssociationUser;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\Tiers;
@@ -325,4 +327,16 @@ it('Gate access-newsletter-inbox refuse un Gestionnaire', function () {
     ]);
 
     expect(Gate::forUser($user)->allows('access-newsletter-inbox'))->toBeFalse();
+});
+
+it('migration ajoute la colonne api_key_id', function () {
+    expect(Schema::hasColumn('newsletter_subscription_requests', 'api_key_id'))->toBeTrue();
+});
+
+it('SubscriptionRequest expose la relation apiKey', function () {
+    $association = Association::find(TenantContext::currentId());
+    $apiKey = ApiKey::factory()->for($association)->create();
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['api_key_id' => $apiKey->id]);
+
+    expect($req->apiKey?->id)->toBe($apiKey->id);
 });

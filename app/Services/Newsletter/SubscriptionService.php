@@ -22,9 +22,9 @@ final class SubscriptionService
         private readonly Mailer $mailer,
     ) {}
 
-    public function subscribe(string $email, ?string $prenom, string $ip, string $userAgent, ?string $nom = null): void
+    public function subscribe(string $email, ?string $prenom, string $ip, string $userAgent, ?string $nom = null, ?int $apiKeyId = null): void
     {
-        DB::transaction(function () use ($email, $prenom, $nom, $ip, $userAgent): void {
+        DB::transaction(function () use ($email, $prenom, $nom, $ip, $userAgent, $apiKeyId): void {
             // Cherche une ligne pending OU confirmed pour cet email dans le tenant courant
             $existing = SubscriptionRequest::where('email', $email)
                 ->whereIn('status', [
@@ -35,7 +35,7 @@ final class SubscriptionService
                 ->first();
 
             if ($existing?->status === SubscriptionRequestStatus::Confirmed) {
-                // anti-énumération : silence
+                // anti-énumération : silence — pas de mutation
                 return;
             }
 
@@ -46,6 +46,7 @@ final class SubscriptionService
                 // devient invalide. Acceptable : un seul email actif à la fois par adresse.
                 $confirmation = $existing->regenerateConfirmationToken();
                 $unsubscribe = $existing->regenerateUnsubscribeToken();
+                $existing->api_key_id = $apiKeyId;
                 $existing->save();
 
                 $this->sendConfirmation($existing, $confirmation, $unsubscribe);
@@ -62,6 +63,7 @@ final class SubscriptionService
                 'subscribed_at' => now(),
                 'ip_address' => $ip,
                 'user_agent' => Str::limit($userAgent, 250, ''),
+                'api_key_id' => $apiKeyId,
             ]);
             $confirmation = $request->regenerateConfirmationToken();
             $unsubscribe = $request->regenerateUnsubscribeToken();

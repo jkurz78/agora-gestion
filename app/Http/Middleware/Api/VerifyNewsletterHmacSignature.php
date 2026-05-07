@@ -48,6 +48,7 @@ final class VerifyNewsletterHmacSignature
 
         TenantContext::boot($apiKey->association);
         $apiKey->touchLastUsed();
+        $request->attributes->set('newsletter_api_key_id', $apiKey->id);
 
         return $next($request);
     }
