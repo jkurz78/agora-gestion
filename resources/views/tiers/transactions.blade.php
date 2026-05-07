@@ -87,6 +87,57 @@
                 @endif
             </div>
         </div>
+        {{-- Historique newsletter --}}
+        @php
+            $newsletterLines = $tiers->newsletterSubscriptions()
+                ->with('apiKey')
+                ->orderByDesc('created_at')
+                ->get();
+        @endphp
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-envelope-heart me-1"></i> Newsletter
+            </div>
+            <div class="card-body p-0">
+                @if ($newsletterLines->isEmpty())
+                    <p class="text-muted p-3 mb-0">Jamais abonné·e à la newsletter.</p>
+                @else
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                            <tr>
+                                <th>Date d'inscription</th>
+                                <th>Statut</th>
+                                <th>Source</th>
+                                <th>Date désinscription</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($newsletterLines as $line)
+                                <tr>
+                                    <td data-sort="{{ optional($line->subscribed_at)->format('Y-m-d') }}">
+                                        {{ optional($line->subscribed_at)->format('d/m/Y') ?? '—' }}
+                                    </td>
+                                    <td>
+                                        @if ($line->status === \App\Enums\Newsletter\SubscriptionRequestStatus::Confirmed)
+                                            <span class="badge bg-success">Confirmé</span>
+                                        @elseif ($line->status === \App\Enums\Newsletter\SubscriptionRequestStatus::Unsubscribed)
+                                            <span class="badge bg-warning text-dark">Désinscrit</span>
+                                        @else
+                                            <span class="badge bg-secondary">En attente</span>
+                                        @endif
+                                    </td>
+                                    <td>{{ $line->apiKey?->label ?? '—' }}</td>
+                                    <td data-sort="{{ optional($line->unsubscribed_at)->format('Y-m-d') }}">
+                                        {{ optional($line->unsubscribed_at)->format('d/m/Y') ?? '—' }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+        </div>
     </div>
 
     <livewire:tiers-merge-modal />

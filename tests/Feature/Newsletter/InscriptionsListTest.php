@@ -7,6 +7,7 @@ use App\Enums\RoleAssociation;
 use App\Livewire\Newsletter\CreateTiersModal;
 use App\Livewire\Newsletter\InscriptionsList;
 use App\Models\Association;
+use App\Models\Association\ApiKey;
 use App\Models\AssociationUser;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\Tiers;
@@ -315,6 +316,37 @@ it('topbar n affiche pas l entrée newsletter pour un Consultation', function ()
     $response = $this->get('/dashboard');
 
     $response->assertDontSee('Inscriptions newsletter');
+});
+
+it('fiche Tiers affiche un encart Newsletter avec source et statut', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+
+    $apiKey = ApiKey::factory()
+        ->for(Association::find(TenantContext::currentId()))
+        ->create(['label' => 'Site vitrine prod']);
+
+    $tiers = Tiers::factory()->create();
+    SubscriptionRequest::factory()->importee($tiers->id)->create([
+        'email' => 'fiche@x.fr',
+        'api_key_id' => $apiKey->id,
+    ]);
+
+    $response = $this->get('/tiers/'.$tiers->id.'/transactions');
+
+    $response->assertOk();
+    $response->assertSee('Newsletter');
+    $response->assertSee('Site vitrine prod');
+    $response->assertSee('Confirmé');
+});
+
+it('fiche Tiers affiche aucune ligne newsletter si jamais abonné', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    $tiers = Tiers::factory()->create();
+
+    $response = $this->get('/tiers/'.$tiers->id.'/transactions');
+
+    $response->assertOk();
+    $response->assertSee('Jamais abonné');
 });
 
 it('isolation tenant : ne voit pas les buffers d une autre asso', function () {
