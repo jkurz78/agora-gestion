@@ -172,10 +172,10 @@ Structure A4, charte AgoraGestion (cohérente avec `pdf.facture` / `pdf.attestat
 
 ### 5.2 Comportement d'un reçu annulé
 
-Le PDF original n'est **jamais modifié** après émission (intégrité du `pdf_hash`, preuve historique). L'annulation est portée :
+Le PDF original n'est **jamais modifié** après émission (intégrité du `pdf_hash`, preuve historique). Le binaire reste sur disque tenant (preuve en cas de besoin futur d'audit). L'annulation est portée :
 - **côté UI** : badge gris « Annulé n°X » remplace le bouton de téléchargement principal ; menu contextuel avec lien vers le reçu de remplacement s'il existe.
 - **côté route** : `GET /tiers/{tiers}/dons/{ligne}/recu-fiscal` redirige automatiquement vers le reçu de remplacement actif (`remplace_par_id`) s'il existe ; sinon retourne 410 Gone avec message « Reçu annulé le {date} — motif : {motif} ».
-- **téléchargement direct** d'un reçu annulé : disponible pour les administrateurs uniquement via un endpoint dédié (audit / traçabilité), retourne le binaire intact avec un en-tête `X-Recu-Fiscal-Statut: annule`.
+- **téléchargement applicatif d'un PDF annulé** : non disponible dans le MVP. Le binaire reste accessible si besoin par un futur écran admin (hors-scope).
 
 ### 5.3 Montant en lettres
 
@@ -276,6 +276,7 @@ Documentés ici pour cadrer la suite et éviter les dérives :
 - **Reçu fiscal portail tiers** : auto-service, le donateur télécharge ses propres reçus depuis `/portail/mes-dons` — slice futur, mêmes services réutilisés.
 - **Bouton ZIP « Tous les reçus de l'année »** sur quick view tiers — phase 2.
 - **Notifications email** automatiques à émission — slice futur.
+- **Écran admin de téléchargement des PDF annulés** (audit/traçabilité) — non MVP. Le binaire est conservé sur disque, accessible directement par un administrateur système si besoin.
 - **Dématérialisation officielle** (signature électronique qualifiée RGS, horodatage) — non requis pour reçu fiscal, mais réservé si évolution réglementaire.
 
 ## 10. Dette technique consignée
