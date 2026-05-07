@@ -460,10 +460,12 @@
                     @php
                         $cumulCount = ($incomingDocumentsCount ?? 0)
                             + (($canSeeNdf ?? false) ? ($ndfPendingCount ?? 0) : 0)
-                            + (($canSeeFacturesPartenaires ?? false) ? ($facturesPartenairesPendingCount ?? 0) : 0);
+                            + (($canSeeFacturesPartenaires ?? false) ? ($facturesPartenairesPendingCount ?? 0) : 0)
+                            + (($canSeeNewsletter ?? false) ? ($newsletterPendingCount ?? 0) : 0);
                         $hasVisibleSource = ($incomingDocumentsCount ?? 0) > 0
                             || (($canSeeNdf ?? false) && ($ndfPendingCount ?? 0) > 0)
-                            || (($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0);
+                            || (($canSeeFacturesPartenaires ?? false) && ($facturesPartenairesPendingCount ?? 0) > 0)
+                            || (($canSeeNewsletter ?? false) && ($newsletterPendingCount ?? 0) > 0);
                     @endphp
                     @if($hasVisibleSource)
                     <li class="nav-item dropdown" style="font-size:.8rem;">
@@ -498,6 +500,15 @@
                                        href="{{ route('facturation.documents-en-attente') }}">
                                         <span><i class="bi bi-envelope-paper me-2"></i> Documents reçus</span>
                                         <span class="badge bg-warning text-dark ms-3">{{ $incomingDocumentsCount }}</span>
+                                    </a>
+                                </li>
+                            @endif
+                            @if(($canSeeNewsletter ?? false) && ($newsletterPendingCount ?? 0) > 0)
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center justify-content-between"
+                                       href="{{ route('newsletter.inscriptions') }}">
+                                        <span><i class="bi bi-envelope-heart me-2"></i> Inscriptions newsletter</span>
+                                        <span class="badge bg-warning text-dark ms-3">{{ $newsletterPendingCount }}</span>
                                     </a>
                                 </li>
                             @endif

@@ -1,0 +1,383 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\Newsletter\DesinscriptionAction;
+use App\Enums\Newsletter\SubscriptionRequestStatus;
+use App\Enums\RoleAssociation;
+use App\Models\Association;
+use App\Models\Association\ApiKey;
+use App\Models\AssociationUser;
+use App\Models\Newsletter\SubscriptionRequest;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\User;
+use App\Services\Newsletter\BufferImportService;
+use App\Services\Newsletter\Exceptions\TiersHasDependenciesException;
+use App\Tenant\TenantContext;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
+
+it('migration adds the 4 admin processing columns to newsletter buffer', function () {
+    expect(Schema::hasColumn('newsletter_subscription_requests', 'ignored_at'))->toBeTrue();
+    expect(Schema::hasColumn('newsletter_subscription_requests', 'desinscription_traitee_at'))->toBeTrue();
+    expect(Schema::hasColumn('newsletter_subscription_requests', 'desinscription_action'))->toBeTrue();
+    expect(Schema::hasColumn('newsletter_subscription_requests', 'processed_by_user_id'))->toBeTrue();
+});
+
+it('scope inscriptionsAtraiter ne renvoie que les confirmed sans tiers_id ni ignored_at', function () {
+    $tiers = Tiers::factory()->create();
+
+    SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'pending@x.fr']);
+    SubscriptionRequest::factory()->importee($tiers->id)->create(['email' => 'imported@x.fr']);
+    SubscriptionRequest::factory()->ignoree()->create(['email' => 'ignored@x.fr']);
+
+    $emails = SubscriptionRequest::query()
+        ->inscriptionsAtraiter()
+        ->pluck('email')
+        ->all();
+
+    expect($emails)->toBe(['pending@x.fr']);
+});
+
+it('scope desinscriptionsAtraiter ne renvoie que les unsubscribed avec tiers_id et sans desinscription_traitee_at', function () {
+    $tiers1 = Tiers::factory()->create();
+    $tiers2 = Tiers::factory()->create();
+
+    SubscriptionRequest::factory()->desinscriptionAtraiter($tiers1->id)->create(['email' => 'todo@x.fr']);
+    SubscriptionRequest::factory()->desinscriptionTraitee($tiers2->id)->create(['email' => 'done@x.fr']);
+    SubscriptionRequest::factory()->create([
+        'status' => SubscriptionRequestStatus::Unsubscribed,
+        'tiers_id' => null,
+        'email' => 'orphan@x.fr',
+    ]);
+
+    $emails = SubscriptionRequest::query()
+        ->desinscriptionsAtraiter()
+        ->pluck('email')
+        ->all();
+
+    expect($emails)->toBe(['todo@x.fr']);
+});
+
+it('suggestMatch trouve un Tiers par email exact et retourne kind=email', function () {
+    $bob = Tiers::factory()->create(['email' => 'bob@x.fr', 'prenom' => 'Bob', 'nom' => 'MARTIN']);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'bob@x.fr', 'prenom' => 'Robert', 'nom' => 'autre']);
+
+    $result = app(BufferImportService::class)->suggestMatch($req);
+
+    expect($result)->not->toBeNull();
+    expect((int) $result['tiers']->id)->toBe((int) $bob->id);
+    expect($result['kind'])->toBe('email');
+});
+
+it('suggestMatch fallback sur (prenom, nom) si pas de match email et retourne kind=fuzzy', function () {
+    $alice = Tiers::factory()->create(['email' => 'autre@x.fr', 'prenom' => 'Alice', 'nom' => 'DUPONT']);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'inconnu@x.fr', 'prenom' => 'alice', 'nom' => 'dupont']);
+
+    $result = app(BufferImportService::class)->suggestMatch($req);
+
+    expect($result)->not->toBeNull();
+    expect((int) $result['tiers']->id)->toBe((int) $alice->id);
+    expect($result['kind'])->toBe('fuzzy');
+});
+
+it('suggestMatch renvoie null si aucun match', function () {
+    Tiers::factory()->create(['email' => 'autre@x.fr', 'prenom' => 'Zoe', 'nom' => 'INCONNUE']);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create([
+        'email' => 'nouveau@x.fr',
+        'prenom' => 'Nouveau',
+        'nom' => 'NOUVEAU',
+    ]);
+
+    $result = app(BufferImportService::class)->suggestMatch($req);
+
+    expect($result)->toBeNull();
+});
+
+it('createTiersFromBuffer crée le Tiers et lie le buffer', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create([
+        'email' => 'alice@nouveau.fr',
+        'prenom' => 'Alice',
+        'nom' => 'Dupont',
+    ]);
+
+    $tiers = app(BufferImportService::class)->createTiersFromBuffer($req, [
+        'type' => 'particulier',
+        'prenom' => 'Alice',
+        'nom' => 'Dupont',
+        'email' => 'alice@nouveau.fr',
+        'pour_recettes' => true,
+    ]);
+
+    $req->refresh();
+    expect($tiers->id)->toBeGreaterThan(0);
+    expect((int) $req->tiers_id)->toBe((int) $tiers->id);
+    expect((int) $req->processed_by_user_id)->toBe((int) $user->id);
+    expect($req->ignored_at)->toBeNull();
+});
+
+it('linkBufferToExistingTiers lie le buffer sans modifier le Tiers', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $bob = Tiers::factory()->create(['email' => 'bob@connu.fr', 'prenom' => 'Bob', 'nom' => 'MARTIN']);
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'bob@connu.fr']);
+
+    app(BufferImportService::class)->linkBufferToExistingTiers($req, $bob);
+
+    $req->refresh();
+    $bob->refresh();
+    expect((int) $req->tiers_id)->toBe((int) $bob->id);
+    expect((int) $req->processed_by_user_id)->toBe((int) $user->id);
+    expect($bob->email)->toBe('bob@connu.fr'); // Tiers inchangé
+});
+
+it('ignore marque ignored_at sans toucher tiers_id', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create();
+
+    app(BufferImportService::class)->ignore($req);
+
+    $req->refresh();
+    expect($req->ignored_at)->not->toBeNull();
+    expect($req->tiers_id)->toBeNull();
+    expect((int) $req->processed_by_user_id)->toBe((int) $user->id);
+});
+
+it('applyUnsubscribeOptout pose email_optout=true et marque desinscription_traitee_at', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create(['email_optout' => false]);
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    app(BufferImportService::class)->applyUnsubscribeOptout($req);
+
+    $tiers->refresh();
+    $req->refresh();
+    expect($tiers->email_optout)->toBeTrue();
+    expect($req->desinscription_traitee_at)->not->toBeNull();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Optout);
+    expect((int) $req->processed_by_user_id)->toBe((int) $user->id);
+});
+
+it('applyUnsubscribeDelete supprime le Tiers sans dépendances', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create();
+    $tiersId = $tiers->id;
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiersId)->create();
+
+    app(BufferImportService::class)->applyUnsubscribeDelete($req);
+
+    $req->refresh();
+    expect(Tiers::find($tiersId))->toBeNull();
+    expect($req->desinscription_traitee_at)->not->toBeNull();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Deleted);
+    expect($req->tiers_id)->toBeNull(); // cascade nullOnDelete
+});
+
+it('applyUnsubscribeDelete refuse si Tiers a des dépendances', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create();
+    Transaction::factory()->create(['tiers_id' => $tiers->id]);
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    expect(fn () => app(BufferImportService::class)->applyUnsubscribeDelete($req))
+        ->toThrow(TiersHasDependenciesException::class);
+
+    expect(Tiers::find($tiers->id))->not->toBeNull();
+    $req->refresh();
+    expect($req->desinscription_traitee_at)->toBeNull();
+});
+
+it('applyUnsubscribeDelete sur un buffer dont le Tiers a déjà été supprimé marque traitée', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create();
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+    $tiers->delete(); // un autre admin l'a supprimé entre temps
+    $req->refresh();
+    expect($req->tiers_id)->toBeNull(); // cascade nullOnDelete a déjà nettoyé
+
+    app(BufferImportService::class)->applyUnsubscribeDelete($req);
+
+    $req->refresh();
+    expect($req->desinscription_traitee_at)->not->toBeNull();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Deleted);
+});
+
+it('applyUnsubscribeNoop marque traitée sans rien modifier sur le Tiers', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create(['email_optout' => false]);
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+
+    app(BufferImportService::class)->applyUnsubscribeNoop($req);
+
+    $tiers->refresh();
+    $req->refresh();
+    expect($tiers->email_optout)->toBeFalse();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Noop);
+    expect($req->desinscription_traitee_at)->not->toBeNull();
+});
+
+it('Gate access-newsletter-inbox autorise un Admin', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+
+    expect(Gate::forUser($user)->allows('access-newsletter-inbox'))->toBeTrue();
+});
+
+it('Gate access-newsletter-inbox autorise un Comptable', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Comptable->value,
+        'joined_at' => now(),
+    ]);
+
+    expect(Gate::forUser($user)->allows('access-newsletter-inbox'))->toBeTrue();
+});
+
+it('Gate access-newsletter-inbox refuse un Consultation', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Consultation->value,
+        'joined_at' => now(),
+    ]);
+
+    expect(Gate::forUser($user)->allows('access-newsletter-inbox'))->toBeFalse();
+});
+
+it('Gate access-newsletter-inbox refuse un Gestionnaire', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Gestionnaire->value,
+        'joined_at' => now(),
+    ]);
+
+    expect(Gate::forUser($user)->allows('access-newsletter-inbox'))->toBeFalse();
+});
+
+it('migration ajoute la colonne api_key_id', function () {
+    expect(Schema::hasColumn('newsletter_subscription_requests', 'api_key_id'))->toBeTrue();
+});
+
+it('SubscriptionRequest expose la relation apiKey', function () {
+    $association = Association::find(TenantContext::currentId());
+    $apiKey = ApiKey::factory()->for($association)->create();
+    $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['api_key_id' => $apiKey->id]);
+
+    expect($req->apiKey?->id)->toBe($apiKey->id);
+});
+
+it('Tiers::newsletterSubscriptions retourne les lignes liées', function () {
+    $tiers = Tiers::factory()->create();
+    SubscriptionRequest::factory()->importee($tiers->id)->create(['email' => 'a@x.fr']);
+    SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create(['email' => 'a@x.fr']);
+    // Une ligne sans tiers_id (autre asso ou non liée) ne doit PAS apparaître
+    SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'autre@x.fr']);
+
+    expect($tiers->newsletterSubscriptions()->count())->toBe(2);
+});
+
+it('scope abonnesNewsletter renvoie les Tiers avec au moins 1 ligne confirmed', function () {
+    $abonne = Tiers::factory()->create(['email' => 'abonne@x.fr']);
+    $desabonne = Tiers::factory()->create(['email' => 'desabonne@x.fr']);
+    $jamais = Tiers::factory()->create(['email' => 'jamais@x.fr']);
+
+    SubscriptionRequest::factory()->importee($abonne->id)->create(['email' => 'abonne@x.fr']);
+    SubscriptionRequest::factory()->desinscriptionAtraiter($desabonne->id)->create(['email' => 'desabonne@x.fr']);
+    // jamais : pas de ligne buffer
+
+    $emails = Tiers::query()
+        ->abonnesNewsletter()
+        ->pluck('email')
+        ->all();
+
+    expect($emails)->toContain('abonne@x.fr');
+    expect($emails)->not->toContain('desabonne@x.fr');
+    expect($emails)->not->toContain('jamais@x.fr');
+});
+
+it('scope abonnesNewsletter inclut un Tiers ayant 1 ligne unsubscribed et 1 ligne confirmed (re-inscription)', function () {
+    $tiers = Tiers::factory()->create(['email' => 'reinscrit@x.fr']);
+    // Ancienne désinscription
+    SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create(['email' => 'reinscrit@x.fr']);
+    // Réinscription confirmée et re-liée
+    SubscriptionRequest::factory()->importee($tiers->id)->create(['email' => 'reinscrit@x.fr']);
+
+    $emails = Tiers::query()->abonnesNewsletter()->pluck('email')->all();
+
+    expect($emails)->toContain('reinscrit@x.fr');
+});

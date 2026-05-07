@@ -51,6 +51,16 @@
                                 <i class="bi bi-telephone me-1"></i>{{ $summary['contact']['telephone'] }}
                             </a>
                         @endif
+                        @if(!empty($summary['contact']['is_abonne_newsletter']))
+                            <span class="badge bg-success" style="font-size:.55rem" title="Abonné·e à la newsletter">
+                                <i class="bi bi-envelope-heart me-1"></i>Newsletter
+                            </span>
+                        @endif
+                        @if(!empty($summary['contact']['is_optout']))
+                            <span class="badge bg-warning text-dark" style="font-size:.55rem" title="Le tiers s'est désinscrit des communications (RGPD)">
+                                <i class="bi bi-envelope-slash me-1"></i>Opt-out
+                            </span>
+                        @endif
                     </div>
                     @isset($summary['cotisations'])
                         <span style="color:#4a1060">

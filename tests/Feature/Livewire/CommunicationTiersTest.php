@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\CommunicationTiers;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -144,6 +145,44 @@ it('combines filters in OR mode', function () {
         ->assertSee('FOURN')
         ->assertSee('CLIENT')
         ->assertDontSee('NEITHER');
+});
+
+// --- Abonnés newsletter filter ---
+
+it('filtreAbonnesNewsletter restreint la liste aux abonnés', function () {
+    $abonne = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'abonne@x.fr', 'pour_recettes' => true]);
+    Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'autre@x.fr', 'pour_recettes' => true]);
+    SubscriptionRequest::factory()->importee($abonne->id)->create(['email' => 'abonne@x.fr']);
+
+    Livewire::test(CommunicationTiers::class)
+        ->set('filtreAbonnesNewsletter', true)
+        ->assertSee('abonne@x.fr')
+        ->assertDontSee('autre@x.fr');
+});
+
+it('filtreAbonnesNewsletter à false ne restreint pas', function () {
+    $abonne = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'abonne@x.fr', 'pour_recettes' => true]);
+    Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'autre@x.fr', 'pour_recettes' => true]);
+    SubscriptionRequest::factory()->importee($abonne->id)->create(['email' => 'abonne@x.fr']);
+
+    Livewire::test(CommunicationTiers::class)
+        ->set('filtreAbonnesNewsletter', false)
+        ->assertSee('abonne@x.fr')
+        ->assertSee('autre@x.fr');
+});
+
+it('filtreAbonnesNewsletter combiné avec filtreFournisseurs en mode AND', function () {
+    $abonneFournisseur = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'af@x.fr', 'pour_depenses' => true, 'pour_recettes' => false]);
+    $abonneClient = Tiers::factory()->create(['association_id' => $this->association->id, 'email' => 'ac@x.fr', 'pour_recettes' => true, 'pour_depenses' => false]);
+    SubscriptionRequest::factory()->importee($abonneFournisseur->id)->create(['email' => 'af@x.fr']);
+    SubscriptionRequest::factory()->importee($abonneClient->id)->create(['email' => 'ac@x.fr']);
+
+    Livewire::test(CommunicationTiers::class)
+        ->set('modeFiltres', 'et')
+        ->set('filtreAbonnesNewsletter', true)
+        ->set('filtreFournisseurs', true)
+        ->assertSee('af@x.fr')
+        ->assertDontSee('ac@x.fr');
 });
 
 // --- Selection ---

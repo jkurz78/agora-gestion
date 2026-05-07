@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Newsletter\SubscriptionRequestStatus;
+use App\Models\Newsletter\SubscriptionRequest;
 use Illuminate\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
@@ -208,5 +211,25 @@ final class Tiers extends TenantModel implements AuthenticatableContract
     public function emailLogs(): HasMany
     {
         return $this->hasMany(EmailLog::class);
+    }
+
+    public function newsletterSubscriptions(): HasMany
+    {
+        return $this->hasMany(SubscriptionRequest::class, 'tiers_id');
+    }
+
+    /**
+     * Tiers ayant au moins une demande newsletter en statut confirmed.
+     * Si la personne se désinscrit ensuite (status passe à unsubscribed), elle sort du scope.
+     * Si elle se réinscrit, une NOUVELLE ligne est créée et liée → le Tiers est de nouveau abonné.
+     */
+    public function scopeAbonnesNewsletter(Builder $query): Builder
+    {
+        return $query->whereExists(function ($sub): void {
+            $sub->selectRaw('1')
+                ->from('newsletter_subscription_requests')
+                ->whereColumn('newsletter_subscription_requests.tiers_id', 'tiers.id')
+                ->where('newsletter_subscription_requests.status', SubscriptionRequestStatus::Confirmed->value);
+        });
     }
 }

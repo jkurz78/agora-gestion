@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\Newsletter\SubscriptionRequestStatus;
 use App\Enums\StatutDevis;
 use App\Enums\StatutFacture;
 use App\Enums\TypeTransaction;
@@ -81,6 +82,10 @@ final class TiersQuickViewService
         return [
             'email' => $tiers->email,
             'telephone' => $tiers->telephone,
+            'is_abonne_newsletter' => $tiers->newsletterSubscriptions()
+                ->where('status', SubscriptionRequestStatus::Confirmed->value)
+                ->exists(),
+            'is_optout' => (bool) $tiers->email_optout,
         ];
     }
 

@@ -61,10 +61,17 @@
                     </div>
 
                     {{-- Clients --}}
-                    <div class="form-check mb-3">
+                    <div class="form-check mb-2">
                         <input class="form-check-input" type="checkbox"
                                wire:model.live="filtreClients" id="filtreClients">
                         <label class="form-check-label small" for="filtreClients">Clients / payeurs</label>
+                    </div>
+
+                    {{-- Abonnés newsletter --}}
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox"
+                               wire:model.live="filtreAbonnesNewsletter" id="filtreNewsletter">
+                        <label class="form-check-label small" for="filtreNewsletter">Abonnés newsletter</label>
                     </div>
 
                     <hr class="my-2">

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models\Newsletter;
 
+use App\Enums\Newsletter\DesinscriptionAction;
 use App\Enums\Newsletter\SubscriptionRequestStatus;
+use App\Models\Association\ApiKey;
 use App\Models\TenantModel;
 use App\Models\Tiers;
+use App\Models\User;
 use Database\Factories\Newsletter\SubscriptionRequestFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,6 +31,7 @@ final class SubscriptionRequest extends TenantModel
         'subscribed_at',
         'ip_address',
         'user_agent',
+        'api_key_id',
     ];
 
     protected $casts = [
@@ -36,11 +40,19 @@ final class SubscriptionRequest extends TenantModel
         'subscribed_at' => 'datetime',
         'confirmed_at' => 'datetime',
         'unsubscribed_at' => 'datetime',
+        'ignored_at' => 'datetime',
+        'desinscription_traitee_at' => 'datetime',
+        'desinscription_action' => DesinscriptionAction::class,
     ];
 
     public function tiers(): BelongsTo
     {
         return $this->belongsTo(Tiers::class);
+    }
+
+    public function apiKey(): BelongsTo
+    {
+        return $this->belongsTo(ApiKey::class, 'api_key_id');
     }
 
     public function scopeActive(Builder $query): Builder
@@ -77,6 +89,25 @@ final class SubscriptionRequest extends TenantModel
     {
         $this->status = SubscriptionRequestStatus::Unsubscribed;
         $this->unsubscribed_at = now();
+    }
+
+    public function processedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'processed_by_user_id');
+    }
+
+    public function scopeInscriptionsAtraiter(Builder $query): Builder
+    {
+        return $query->where('status', SubscriptionRequestStatus::Confirmed)
+            ->whereNull('tiers_id')
+            ->whereNull('ignored_at');
+    }
+
+    public function scopeDesinscriptionsAtraiter(Builder $query): Builder
+    {
+        return $query->where('status', SubscriptionRequestStatus::Unsubscribed)
+            ->whereNotNull('tiers_id')
+            ->whereNull('desinscription_traitee_at');
     }
 
     protected static function newFactory(): SubscriptionRequestFactory

@@ -31,6 +31,7 @@ final class NewsletterSubscriptionController extends Controller
             ip: (string) $request->ip(),
             userAgent: (string) $request->userAgent(),
             nom: $request->validated('nom'),
+            apiKeyId: (int) $request->attributes->get('newsletter_api_key_id'),
         );
 
         return response()->json(['status' => 'pending_double_optin']);
