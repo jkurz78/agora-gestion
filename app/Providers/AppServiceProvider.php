@@ -15,6 +15,7 @@ use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\NoteDeFrais;
+use App\Models\RecuFiscalEmis;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
@@ -27,6 +28,7 @@ use App\Observers\UserRoleObserver;
 use App\Policies\ExtournePolicy;
 use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
+use App\Policies\RecuFiscalPolicy;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -49,6 +51,7 @@ final class AppServiceProvider extends ServiceProvider
         Gate::policy(FacturePartenaireDeposee::class, FacturePartenaireDeposeePolicy::class);
         Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
         Gate::policy(Extourne::class, ExtournePolicy::class);
+        Gate::policy(RecuFiscalEmis::class, RecuFiscalPolicy::class);
 
         Association::observe(AssociationObserver::class);
         Association::observe(ImmutableSlugObserver::class);
