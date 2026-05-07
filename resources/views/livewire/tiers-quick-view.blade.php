@@ -258,6 +258,59 @@
                     @endisset
 
                 @endif
+
+                {{-- Dons détaillés avec reçus fiscaux --}}
+                @if(isset($dons) && $dons->isNotEmpty())
+                    <div class="mt-3">
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <i class="bi bi-heart-fill small text-warning"></i>
+                            <span class="fw-semibold small">Dons du tiers</span>
+                        </div>
+                        <table class="table table-sm table-hover mb-0" style="font-size:.75rem">
+                            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Sous-catégorie</th>
+                                    <th>Mode</th>
+                                    <th class="text-end">Montant</th>
+                                    <th>Reçu fiscal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($dons as $don)
+                                    <tr>
+                                        <td data-sort="{{ $don->transaction->date->format('Y-m-d') }}">
+                                            {{ $don->transaction->date->format('d/m/Y') }}
+                                        </td>
+                                        <td>{{ $don->sousCategorie->nom }}</td>
+                                        <td>{{ ucfirst($don->transaction->mode_paiement?->value ?? '—') }}</td>
+                                        <td class="text-end" data-sort="{{ $don->montant }}">
+                                            {{ number_format((float) $don->montant, 2, ',', ' ') }} €
+                                        </td>
+                                        <td>
+                                            @if(isset($recusParLigne[$don->id]))
+                                                @php $recu = $recusParLigne[$don->id]; @endphp
+                                                <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
+                                                   class="badge bg-success text-decoration-none"
+                                                   target="_blank">
+                                                    n° {{ $recu->numero }}
+                                                </a>
+                                            @else
+                                                <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
+                                                   class="btn btn-sm btn-primary py-0"
+                                                   style="font-size:.65rem"
+                                                   target="_blank">
+                                                    Télécharger reçu fiscal
+                                                </a>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
             </div>
 
             {{-- Footer --}}

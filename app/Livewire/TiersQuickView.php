@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\UsageComptable;
+use App\Models\RecuFiscalEmis;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Models\TransactionLigne;
 use App\Services\ExerciceService;
 use App\Services\TiersQuickViewService;
 use Illuminate\View\View;
@@ -48,7 +52,26 @@ final class TiersQuickView extends Component
         $tiers = $this->tiersId !== null ? Tiers::find($this->tiersId) : null;
         $availableYears = app(ExerciceService::class)->availableYears();
 
-        return view('livewire.tiers-quick-view', compact('tiers', 'availableYears'));
+        $dons = collect();
+        $recusParLigne = collect();
+
+        if ($tiers !== null) {
+            $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
+            $dons = TransactionLigne::query()
+                ->whereHas('transaction', fn ($q) => $q->where('tiers_id', $tiers->id))
+                ->whereIn('sous_categorie_id', $donSousCategorieIds)
+                ->with(['transaction', 'sousCategorie'])
+                ->orderByDesc('id')
+                ->get();
+
+            $recusParLigne = RecuFiscalEmis::query()
+                ->whereIn('transaction_ligne_id', $dons->pluck('id'))
+                ->whereNull('annule_at')
+                ->get()
+                ->keyBy('transaction_ligne_id');
+        }
+
+        return view('livewire.tiers-quick-view', compact('tiers', 'availableYears', 'dons', 'recusParLigne'));
     }
 
     private function fetchSummary(): void
