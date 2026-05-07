@@ -718,7 +718,11 @@
                     menubar: 'edit insert format table',
                     statusbar: true,
                     promotion: false,
-                    plugins: 'lists link noneditable table image media code fullscreen',
+                    {{-- TinyMCE 6.x : 'noneditable' est intégré au core (n'est plus un plugin
+                         externe). Le référencer dans 'plugins' cause un 404 sur
+                         /vendor/tinymce/plugins/noneditable/plugin.min.js. La directive
+                         noneditable_class plus bas suffit pour activer le comportement. --}}
+                    plugins: 'lists link table image media code fullscreen',
                     // --- Préservation HTML rich (newsletter pasting) ---
                     // Sans ces options, TinyMCE 6 strip les styles inline, attributs HTML
                     // (bgcolor, cellpadding, cellspacing, border, width="600"...) et classes,
