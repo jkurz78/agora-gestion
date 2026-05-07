@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\CommunicationTiers;
 use App\Models\Association;
 use App\Models\Categorie;
+use App\Models\MessageTemplate;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
@@ -197,4 +198,42 @@ it('toggleSelectAll selects all filtered tiers with email', function () {
         ->call('toggleSelectAll')
         ->assertSet('selectAll', true)
         ->assertCount('selectedTiersIds', 2); // only A and B
+});
+
+// --- Save template (Bug 6 — updateOrCreate) ---
+
+it('saveAsTemplate updates existing template with same name instead of creating duplicate', function () {
+    $existing = MessageTemplate::create([
+        'categorie' => 'communication',
+        'nom' => 'Newsletter mensuelle',
+        'objet' => 'Ancien objet',
+        'corps' => '<p>Ancien corps</p>',
+        'type_operation_id' => null,
+    ]);
+
+    Livewire::test(CommunicationTiers::class)
+        ->set('objet', 'Nouvel objet')
+        ->set('corps', '<p>Nouveau corps</p>')
+        ->set('templateNom', 'Newsletter mensuelle')
+        ->call('saveAsTemplate')
+        ->assertHasNoErrors();
+
+    $count = MessageTemplate::where('nom', 'Newsletter mensuelle')->count();
+    expect($count)->toBe(1); // pas de duplicat
+
+    $existing->refresh();
+    expect($existing->objet)->toBe('Nouvel objet');
+    expect($existing->corps)->toContain('Nouveau corps');
+});
+
+it('saveAsTemplate creates a new template if name is unique', function () {
+    Livewire::test(CommunicationTiers::class)
+        ->set('objet', 'Mon objet')
+        ->set('corps', '<p>Mon corps</p>')
+        ->set('templateNom', 'Premier modèle')
+        ->call('saveAsTemplate')
+        ->assertHasNoErrors();
+
+    $count = MessageTemplate::where('nom', 'Premier modèle')->count();
+    expect($count)->toBe(1);
 });

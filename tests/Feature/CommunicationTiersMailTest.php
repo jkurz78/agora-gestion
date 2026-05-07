@@ -6,6 +6,7 @@ use App\Mail\CommunicationTiersMail;
 use App\Models\Association;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -132,4 +133,67 @@ it('handles file attachments', function () {
     );
 
     expect($mail->attachments())->toBeEmpty();
+});
+
+// --- Bug 3: logo attachment conditional on body reference ---
+
+it('does not attach association logo when body does not reference it', function () {
+    // Configure asso with a logo file on the fake storage
+    Storage::fake('local');
+    $assoc = TenantContext::current();
+    $assoc->logo_path = 'logo.png';
+    $assoc->save();
+    $logoPath = $assoc->brandingLogoFullPath();
+    Storage::disk('local')->put($logoPath, 'fake-png-bytes');
+
+    $mail = new CommunicationTiersMail(
+        prenom: 'Jean',
+        nom: 'DUPONT',
+        email: 'jean@example.com',
+        objet: 'Test',
+        corps: '<p>Pas de logo ici</p>',
+        trackingToken: 'abc',
+    );
+
+    expect($mail->attachments())->toBeEmpty();
+});
+
+it('attaches association logo when body uses {logo} variable', function () {
+    Storage::fake('local');
+    $assoc = TenantContext::current();
+    $assoc->logo_path = 'logo.png';
+    $assoc->save();
+    $logoPath = $assoc->brandingLogoFullPath();
+    Storage::disk('local')->put($logoPath, 'fake-png-bytes');
+
+    $mail = new CommunicationTiersMail(
+        prenom: 'Jean',
+        nom: 'DUPONT',
+        email: 'jean@example.com',
+        objet: 'Test',
+        corps: '<p>{logo}</p>',
+        trackingToken: 'abc',
+    );
+
+    expect($mail->attachments())->not->toBeEmpty();
+});
+
+it('attaches association logo when body references cid:logo-asso directly', function () {
+    Storage::fake('local');
+    $assoc = TenantContext::current();
+    $assoc->logo_path = 'logo.png';
+    $assoc->save();
+    $logoPath = $assoc->brandingLogoFullPath();
+    Storage::disk('local')->put($logoPath, 'fake-png-bytes');
+
+    $mail = new CommunicationTiersMail(
+        prenom: 'Jean',
+        nom: 'DUPONT',
+        email: 'jean@example.com',
+        objet: 'Test',
+        corps: '<p><img src="cid:logo-asso"></p>',
+        trackingToken: 'abc',
+    );
+
+    expect($mail->attachments())->not->toBeEmpty();
 });

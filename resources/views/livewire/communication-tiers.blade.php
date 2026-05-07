@@ -159,9 +159,13 @@
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th style="width:36px;">
+                                {{-- Bug fix: wire:model.live + wire:click sur la même checkbox = race condition.
+                                     wire:model écrit selectAll et wire:click appelle toggleSelectAll qui
+                                     l'inverse → effet annulé. On garde seulement wire:click et on rend
+                                     l'état coché côté serveur. --}}
                                 <input type="checkbox" class="form-check-input"
-                                       wire:model.live="selectAll"
-                                       wire:click="toggleSelectAll">
+                                       wire:click="toggleSelectAll"
+                                       @if($selectAll) checked @endif>
                             </th>
                             <th>Nom</th>
                             <th>Prénom</th>
@@ -413,9 +417,15 @@
                                 {{ $objet === '' ? 'disabled' : '' }}>
                             <i class="bi bi-eye me-1"></i>Aperçu
                         </button>
+                        @php
+                            $testDisabled = count($selectedTiersIds) === 0 || ! $emailFrom;
+                            $testTooltip = ! $emailFrom
+                                ? "Adresse d'expédition non configurée — voir Paramètres"
+                                : (count($selectedTiersIds) === 0 ? 'Sélectionner au moins un tiers' : '');
+                        @endphp
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 onclick="window.tiersSyncAndShowTestModal()"
-                                {{ count($selectedTiersIds) === 0 ? 'disabled' : '' }}>
+                                @if($testDisabled) disabled title="{{ $testTooltip }}" @endif>
                             <i class="bi bi-send me-1"></i>Envoyer un test
                         </button>
                         <button type="button" class="btn btn-sm btn-primary"
@@ -595,7 +605,14 @@
 <script>
     // --- Alpine component for TinyMCE (registered once, before Alpine init) ---
     function _tiersMsgStripVarSpans(html) {
-        return html.replace(/<span class="mce-variable[^"]*">(\{[^}]+\})<\/span>/g, '$1');
+        // Plus tolérant : accepte n'importe quels attributs avant/après class,
+        // ainsi que les attributs ajoutés par TinyMCE (contenteditable, data-mce-*).
+        // L'ancienne regex /class="mce-variable[^"]*">/ échouait dès qu'un autre
+        // attribut quoté suivait (le [^"]* s'arrêtait au premier guillemet).
+        return html.replace(
+            /<span\b[^>]*\bmce-variable\b[^>]*>(\{[^}]+\})<\/span>/g,
+            '$1'
+        );
     }
 
     window._tiersMsgVariableGroups = [
@@ -685,6 +702,17 @@
                     statusbar: true,
                     promotion: false,
                     plugins: 'lists link noneditable table image media code fullscreen',
+                    // --- Préservation HTML rich (newsletter pasting) ---
+                    // Sans ces options, TinyMCE 6 strip les styles inline, attributs HTML
+                    // (bgcolor, cellpadding, cellspacing, border, width="600"...) et classes,
+                    // ce qui détruit la mise en page d'un email préparé en externe.
+                    valid_elements: '*[*]',
+                    valid_styles: { '*': '*' },
+                    extended_valid_elements: '*[*]',
+                    verify_html: false,
+                    entity_encoding: 'raw',
+                    convert_urls: false,
+                    paste_data_images: true,
                     toolbar: [
                         'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough forecolor backcolor',
                         'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table image media link | variablesButton insertElementButton | code fullscreen',

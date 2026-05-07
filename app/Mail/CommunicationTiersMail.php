@@ -85,11 +85,21 @@ final class CommunicationTiersMail extends Mailable
             $this->attachmentPaths
         );
 
-        $logo = EmailLogo::resolve();
-        if ($logo) {
-            $attachments[] = Attachment::fromPath($logo['path'])
-                ->as(EmailLogo::CID_ASSO)
-                ->withMime($logo['mime']);
+        // Only attach the association logo if the body actually references it.
+        // Without this guard, the logo is attached to every mail, and clients
+        // (Gmail, Apple Mail) display unreferenced inline attachments at the bottom
+        // of the message — producing an unwanted "huge logo" in newsletters that
+        // bring their own image hosting.
+        $bodyReferencesLogo = str_contains($this->corps, '{logo}')
+            || str_contains($this->corps, 'cid:'.EmailLogo::CID_ASSO);
+
+        if ($bodyReferencesLogo) {
+            $logo = EmailLogo::resolve();
+            if ($logo) {
+                $attachments[] = Attachment::fromPath($logo['path'])
+                    ->as(EmailLogo::CID_ASSO)
+                    ->withMime($logo['mime']);
+            }
         }
 
         return $attachments;
