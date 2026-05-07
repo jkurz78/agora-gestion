@@ -632,13 +632,19 @@
 <script>
     // --- Alpine component for TinyMCE (registered once, before Alpine init) ---
     function _tiersMsgStripVarSpans(html) {
-        // Plus tolérant : accepte n'importe quels attributs avant/après class,
+        // Tolérance large : accepte n'importe quels attributs avant/après class,
         // ainsi que les attributs ajoutés par TinyMCE (contenteditable, data-mce-*).
-        // L'ancienne regex /class="mce-variable[^"]*">/ échouait dès qu'un autre
-        // attribut quoté suivait (le [^"]* s'arrêtait au premier guillemet).
+        //
+        // ⚠️ Ne PAS utiliser une string '$1' comme replacement.
+        // Livewire injecte les @assets via PHP preg_replace dans
+        // SupportAutoInjectedAssets, dont la regex capture </head>. PHP traite
+        // '$1' dans la replacement string comme une backreference et le remplace
+        // par '</head>' avant que le JS n'arrive au navigateur. Du coup les
+        // variables sont remplacées par '</head>' au lieu du token capturé.
+        // La forme callback (m, group1) => group1 est immune.
         return html.replace(
             /<span\b[^>]*\bmce-variable\b[^>]*>(\{[^}]+\})<\/span>/g,
-            '$1'
+            function (_match, token) { return token; }
         );
     }
 

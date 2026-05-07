@@ -545,7 +545,13 @@
 <script>
     // --- Alpine component for TinyMCE (registered once, before Alpine init) ---
     function _msgStripVarSpans(html) {
-        return html.replace(/<span class="mce-variable[^"]*">(\{[^}]+\})<\/span>/g, '$1');
+        // ⚠️ Forme callback obligatoire — la string '$1' serait corrompue par
+        // le PHP preg_replace de Livewire SupportAutoInjectedAssets ($1 = </head>).
+        // Cf. communication-tiers.blade.php pour le commentaire détaillé.
+        return html.replace(
+            /<span\b[^>]*\bmce-variable\b[^>]*>(\{[^}]+\})<\/span>/g,
+            function (_match, token) { return token; }
+        );
     }
 
     window._msgVariableGroups = {
