@@ -50,6 +50,8 @@ final class CommunicationTiers extends Component
 
     public bool $filtreClients = false;
 
+    public bool $filtreAbonnesNewsletter = false;
+
     /** @var array<int> */
     public array $filtreTypeOperationIds = [];
 
@@ -174,6 +176,10 @@ final class CommunicationTiers extends Component
 
         if ($this->filtreClients) {
             $filters[] = fn (Builder $q) => $q->where('pour_recettes', true);
+        }
+
+        if ($this->filtreAbonnesNewsletter) {
+            $filters[] = fn (Builder $q) => $q->abonnesNewsletter();
         }
 
         if ($this->filtreDonateurs !== null && $this->filtreDonateurs !== '') {
