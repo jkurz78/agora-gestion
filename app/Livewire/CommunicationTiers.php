@@ -315,13 +315,17 @@ final class CommunicationTiers extends Component
             'corps' => 'required|string',
         ]);
 
-        MessageTemplate::create([
-            'categorie' => 'communication',
-            'nom' => $this->templateNom,
-            'objet' => $this->objet,
-            'corps' => EmailTemplate::sanitizeCorps($this->corps),
-            'type_operation_id' => null,
-        ]);
+        MessageTemplate::updateOrCreate(
+            [
+                'categorie' => 'communication',
+                'nom' => $this->templateNom,
+                'type_operation_id' => null,
+            ],
+            [
+                'objet' => $this->objet,
+                'corps' => EmailTemplate::sanitizeCorps($this->corps),
+            ],
+        );
 
         $this->showSaveTemplate = false;
         $this->templateNom = '';
