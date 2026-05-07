@@ -32,6 +32,19 @@ final class EmailTemplate extends TenantModel
 
     public static function sanitizeCorps(string $html): string
     {
+        // Protéger les variables {var} dans les attributs href/src AVANT le purify :
+        // HTMLPurifier URL-encode les caractères { } en %7B %7D quand ils apparaissent
+        // dans une URI, ce qui casse le matching côté str_replace dans le mailer.
+        // On remplace temporairement par une URL syntaxiquement valide qu'HTMLPurifier
+        // accepte, puis on restaure après purify.
+        // Hostname syntaxiquement valide (pas d'underscore — rejetés par HTMLPurifier).
+        $hrefSentinel = 'https://var.placeholder.local/';
+        $html = preg_replace_callback(
+            '/(href|src)="(\{[a-z_]+\})"/i',
+            fn ($m) => $m[1].'="'.$hrefSentinel.trim($m[2], '{}').'"',
+            $html
+        ) ?? $html;
+
         $cacheDir = storage_path('app/htmlpurifier');
         if (! is_dir($cacheDir)) {
             mkdir($cacheDir, 0755, true);
@@ -50,6 +63,17 @@ final class EmailTemplate extends TenantModel
         $config->set('Attr.AllowedFrameTargets', ['_blank', '_self']);
         $config->set('Cache.SerializerPath', $cacheDir);
 
-        return (new \HTMLPurifier($config))->purify($html);
+        $purified = (new \HTMLPurifier($config))->purify($html);
+
+        // Restaurer les variables protégées dans href/src.
+        // HTMLPurifier peut convertir l'URL en relative ou en chemin si elle paraît
+        // étrange — on couvre les deux formes possibles.
+        $sentinelRegex = '/(href|src)="(?:'.preg_quote($hrefSentinel, '/').'|\/)([a-z_]+)"/i';
+
+        return preg_replace_callback(
+            $sentinelRegex,
+            fn ($m) => $m[1].'="{'.$m[2].'}"',
+            $purified
+        ) ?? $purified;
     }
 }
