@@ -340,3 +340,44 @@ it('SubscriptionRequest expose la relation apiKey', function () {
 
     expect($req->apiKey?->id)->toBe($apiKey->id);
 });
+
+it('Tiers::newsletterSubscriptions retourne les lignes liées', function () {
+    $tiers = Tiers::factory()->create();
+    SubscriptionRequest::factory()->importee($tiers->id)->create(['email' => 'a@x.fr']);
+    SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create(['email' => 'a@x.fr']);
+    // Une ligne sans tiers_id (autre asso ou non liée) ne doit PAS apparaître
+    SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'autre@x.fr']);
+
+    expect($tiers->newsletterSubscriptions()->count())->toBe(2);
+});
+
+it('scope abonnesNewsletter renvoie les Tiers avec au moins 1 ligne confirmed', function () {
+    $abonne = Tiers::factory()->create(['email' => 'abonne@x.fr']);
+    $desabonne = Tiers::factory()->create(['email' => 'desabonne@x.fr']);
+    $jamais = Tiers::factory()->create(['email' => 'jamais@x.fr']);
+
+    SubscriptionRequest::factory()->importee($abonne->id)->create(['email' => 'abonne@x.fr']);
+    SubscriptionRequest::factory()->desinscriptionAtraiter($desabonne->id)->create(['email' => 'desabonne@x.fr']);
+    // jamais : pas de ligne buffer
+
+    $emails = Tiers::query()
+        ->abonnesNewsletter()
+        ->pluck('email')
+        ->all();
+
+    expect($emails)->toContain('abonne@x.fr');
+    expect($emails)->not->toContain('desabonne@x.fr');
+    expect($emails)->not->toContain('jamais@x.fr');
+});
+
+it('scope abonnesNewsletter inclut un Tiers ayant 1 ligne unsubscribed et 1 ligne confirmed (re-inscription)', function () {
+    $tiers = Tiers::factory()->create(['email' => 'reinscrit@x.fr']);
+    // Ancienne désinscription
+    SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create(['email' => 'reinscrit@x.fr']);
+    // Réinscription confirmée et re-liée
+    SubscriptionRequest::factory()->importee($tiers->id)->create(['email' => 'reinscrit@x.fr']);
+
+    $emails = Tiers::query()->abonnesNewsletter()->pluck('email')->all();
+
+    expect($emails)->toContain('reinscrit@x.fr');
+});
