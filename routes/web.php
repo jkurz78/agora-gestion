@@ -53,6 +53,7 @@ use App\Livewire\DevisManuel\DevisEdit;
 use App\Livewire\DevisManuel\DevisList;
 use App\Livewire\Newsletter\InscriptionsList;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
+use App\Livewire\Parametres\RecusFiscaux;
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -85,6 +86,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
         Route::get('/comptabilite/usages', UsagesComptables::class)
             ->name('comptabilite.usages');
+        Route::get('/recus-fiscaux', RecusFiscaux::class)
+            ->name('recus-fiscaux');
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
