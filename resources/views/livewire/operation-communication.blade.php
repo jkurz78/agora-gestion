@@ -545,9 +545,9 @@
 <script>
     // --- Alpine component for TinyMCE (registered once, before Alpine init) ---
     function _msgStripVarSpans(html) {
-        // ⚠️ Forme callback obligatoire — la string '$1' serait corrompue par
-        // le PHP preg_replace de Livewire SupportAutoInjectedAssets ($1 = </head>).
-        // Cf. communication-tiers.blade.php pour le commentaire détaillé.
+        // Forme callback obligatoire — les replacement strings dollar-N sont
+        // corrompues par le PHP preg_replace de Livewire SupportAutoInjectedAssets.
+        // Cf. commit message v4.2.10 et communication-tiers.blade.php.
         return html.replace(
             /<span\b[^>]*\bmce-variable\b[^>]*>(\{[^}]+\})<\/span>/g,
             function (_match, token) { return token; }

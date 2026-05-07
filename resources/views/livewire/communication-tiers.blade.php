@@ -634,14 +634,9 @@
     function _tiersMsgStripVarSpans(html) {
         // Tolérance large : accepte n'importe quels attributs avant/après class,
         // ainsi que les attributs ajoutés par TinyMCE (contenteditable, data-mce-*).
-        //
-        // ⚠️ Ne PAS utiliser une string '$1' comme replacement.
-        // Livewire injecte les @assets via PHP preg_replace dans
-        // SupportAutoInjectedAssets, dont la regex capture </head>. PHP traite
-        // '$1' dans la replacement string comme une backreference et le remplace
-        // par '</head>' avant que le JS n'arrive au navigateur. Du coup les
-        // variables sont remplacées par '</head>' au lieu du token capturé.
-        // La forme callback (m, group1) => group1 est immune.
+        // Forme callback (m, token) => token obligatoire — les replacement
+        // strings de la forme dollar-N sont corrompues par le PHP preg_replace
+        // de Livewire SupportAutoInjectedAssets. Voir commit message v4.2.10.
         return html.replace(
             /<span\b[^>]*\bmce-variable\b[^>]*>(\{[^}]+\})<\/span>/g,
             function (_match, token) { return token; }
