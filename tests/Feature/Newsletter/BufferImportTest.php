@@ -58,22 +58,26 @@ it('scope desinscriptionsAtraiter ne renvoie que les unsubscribed avec tiers_id 
     expect($emails)->toBe(['todo@x.fr']);
 });
 
-it('suggestMatch trouve un Tiers par email exact', function () {
+it('suggestMatch trouve un Tiers par email exact et retourne kind=email', function () {
     $bob = Tiers::factory()->create(['email' => 'bob@x.fr', 'prenom' => 'Bob', 'nom' => 'MARTIN']);
     $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'bob@x.fr', 'prenom' => 'Robert', 'nom' => 'autre']);
 
-    $match = app(BufferImportService::class)->suggestMatch($req);
+    $result = app(BufferImportService::class)->suggestMatch($req);
 
-    expect($match?->id)->toBe($bob->id);
+    expect($result)->not->toBeNull();
+    expect((int) $result['tiers']->id)->toBe((int) $bob->id);
+    expect($result['kind'])->toBe('email');
 });
 
-it('suggestMatch fallback sur (prenom, nom) si pas de match email', function () {
+it('suggestMatch fallback sur (prenom, nom) si pas de match email et retourne kind=fuzzy', function () {
     $alice = Tiers::factory()->create(['email' => 'autre@x.fr', 'prenom' => 'Alice', 'nom' => 'DUPONT']);
     $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'inconnu@x.fr', 'prenom' => 'alice', 'nom' => 'dupont']);
 
-    $match = app(BufferImportService::class)->suggestMatch($req);
+    $result = app(BufferImportService::class)->suggestMatch($req);
 
-    expect($match?->id)->toBe($alice->id);
+    expect($result)->not->toBeNull();
+    expect((int) $result['tiers']->id)->toBe((int) $alice->id);
+    expect($result['kind'])->toBe('fuzzy');
 });
 
 it('suggestMatch renvoie null si aucun match', function () {
@@ -84,9 +88,9 @@ it('suggestMatch renvoie null si aucun match', function () {
         'nom' => 'NOUVEAU',
     ]);
 
-    $match = app(BufferImportService::class)->suggestMatch($req);
+    $result = app(BufferImportService::class)->suggestMatch($req);
 
-    expect($match)->toBeNull();
+    expect($result)->toBeNull();
 });
 
 it('createTiersFromBuffer crée le Tiers et lie le buffer', function () {
@@ -228,6 +232,29 @@ it('applyUnsubscribeDelete refuse si Tiers a des dépendances', function () {
     expect(Tiers::find($tiers->id))->not->toBeNull();
     $req->refresh();
     expect($req->desinscription_traitee_at)->toBeNull();
+});
+
+it('applyUnsubscribeDelete sur un buffer dont le Tiers a déjà été supprimé marque traitée', function () {
+    $user = User::factory()->create();
+    AssociationUser::create([
+        'user_id' => $user->id,
+        'association_id' => TenantContext::currentId(),
+        'role' => RoleAssociation::Admin->value,
+        'joined_at' => now(),
+    ]);
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create();
+    $req = SubscriptionRequest::factory()->desinscriptionAtraiter($tiers->id)->create();
+    $tiers->delete(); // un autre admin l'a supprimé entre temps
+    $req->refresh();
+    expect($req->tiers_id)->toBeNull(); // cascade nullOnDelete a déjà nettoyé
+
+    app(BufferImportService::class)->applyUnsubscribeDelete($req);
+
+    $req->refresh();
+    expect($req->desinscription_traitee_at)->not->toBeNull();
+    expect($req->desinscription_action)->toBe(DesinscriptionAction::Deleted);
 });
 
 it('applyUnsubscribeNoop marque traitée sans rien modifier sur le Tiers', function () {

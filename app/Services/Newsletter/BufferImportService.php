@@ -20,23 +20,28 @@ final class BufferImportService
 
     /**
      * Match email exact d'abord, puis (prenom, nom) en case-insensitive.
-     * Renvoie null si aucun.
+     * Renvoie null si aucun, sinon ['tiers' => Tiers, 'kind' => 'email'|'fuzzy'].
+     *
+     * @return array{tiers: Tiers, kind: string}|null
      */
-    public function suggestMatch(SubscriptionRequest $req): ?Tiers
+    public function suggestMatch(SubscriptionRequest $req): ?array
     {
         if ($req->email !== null && $req->email !== '') {
             $byEmail = Tiers::where('email', $req->email)->first();
             if ($byEmail !== null) {
-                return $byEmail;
+                return ['tiers' => $byEmail, 'kind' => 'email'];
             }
         }
 
         $prenom = (string) ($req->prenom ?? '');
         $nom = (string) ($req->nom ?? '');
         if ($prenom !== '' && $nom !== '') {
-            return Tiers::whereRaw('LOWER(prenom) = ?', [mb_strtolower($prenom)])
+            $byName = Tiers::whereRaw('LOWER(prenom) = ?', [mb_strtolower($prenom)])
                 ->whereRaw('LOWER(nom) = ?', [mb_strtolower($nom)])
                 ->first();
+            if ($byName !== null) {
+                return ['tiers' => $byName, 'kind' => 'fuzzy'];
+            }
         }
 
         return null;
@@ -94,7 +99,13 @@ final class BufferImportService
         DB::transaction(function () use ($req) {
             $tiers = $req->tiers;
             if ($tiers === null) {
-                throw new \LogicException('Désinscription sans Tiers lié — applyUnsubscribeDelete impossible.');
+                // Tiers déjà supprimé (concurrence) — marquer simplement la ligne comme traitée
+                $req->desinscription_traitee_at = now();
+                $req->desinscription_action = DesinscriptionAction::Deleted;
+                $req->processed_by_user_id = (int) Auth::id();
+                $req->save();
+
+                return;
             }
             $deps = $this->tiersService->countDependentRecords($tiers);
             if (array_sum($deps) > 0) {

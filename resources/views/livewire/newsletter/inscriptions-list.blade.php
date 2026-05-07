@@ -40,6 +40,7 @@
                         @foreach ($this->inscriptionsRows as $row)
                             @php($req = $row['request'])
                             @php($match = $row['match'])
+                            @php($matchKind = $row['matchKind'])
                             <tr wire:key="ins-{{ $req->id }}">
                                 <td data-sort="{{ optional($req->confirmed_at)->format('Y-m-d') }}">
                                     {{ optional($req->confirmed_at)->format('d/m/Y') }}
@@ -49,7 +50,11 @@
                                 <td>{{ $req->nom }}</td>
                                 <td>
                                     @if ($match)
-                                        <span class="badge bg-warning text-dark">Match : {{ $match->displayName() }}</span>
+                                        @if ($matchKind === 'email')
+                                            <span class="badge bg-warning text-dark">Match : {{ $match->displayName() }}</span>
+                                        @else
+                                            <span class="badge bg-info text-dark">Match possible : {{ $match->displayName() }}</span>
+                                        @endif
                                     @else
                                         <span class="text-muted small">Aucun</span>
                                     @endif

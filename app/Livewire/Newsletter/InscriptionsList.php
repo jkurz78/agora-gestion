@@ -33,7 +33,7 @@ final class InscriptionsList extends Component
         $this->tab = in_array($tab, ['inscriptions', 'desinscriptions'], true) ? $tab : 'inscriptions';
     }
 
-    /** @return Collection<int, array{request: SubscriptionRequest, match: ?Tiers}> */
+    /** @return Collection<int, array{request: SubscriptionRequest, match: ?Tiers, matchKind: ?string}> */
     #[Computed]
     public function inscriptionsRows(): Collection
     {
@@ -43,10 +43,15 @@ final class InscriptionsList extends Component
             ->inscriptionsAtraiter()
             ->orderByDesc('confirmed_at')
             ->get()
-            ->map(fn (SubscriptionRequest $req) => [
-                'request' => $req,
-                'match' => $service->suggestMatch($req),
-            ]);
+            ->map(function (SubscriptionRequest $req) use ($service) {
+                $suggestion = $service->suggestMatch($req);
+
+                return [
+                    'request' => $req,
+                    'match' => $suggestion !== null ? $suggestion['tiers'] : null,
+                    'matchKind' => $suggestion !== null ? $suggestion['kind'] : null,
+                ];
+            });
     }
 
     /** @return Collection<int, array{request: SubscriptionRequest, tiers: ?Tiers, deps: int}> */

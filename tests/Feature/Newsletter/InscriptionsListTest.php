@@ -103,6 +103,20 @@ it('onglet inscriptions affiche le bouton Fusionner si match email', function ()
         ->assertSee('Fusionner avec Bob MARTIN');
 });
 
+it('onglet inscriptions affiche le badge Match possible si match flou', function () {
+    newsletterInboxLogin(RoleAssociation::Admin->value);
+    Tiers::factory()->create(['email' => 'autre@x.fr', 'prenom' => 'Alice', 'nom' => 'DUPONT']);
+    SubscriptionRequest::factory()->inscriptionAtraiter()->create([
+        'email' => 'inconnu@x.fr',
+        'prenom' => 'alice',
+        'nom' => 'dupont',
+    ]);
+
+    Livewire::test(InscriptionsList::class)
+        ->assertSee('Match possible')
+        ->assertSee('Fusionner avec Alice DUPONT');
+});
+
 it('action ignore retire la ligne de la liste', function () {
     newsletterInboxLogin(RoleAssociation::Admin->value);
     $req = SubscriptionRequest::factory()->inscriptionAtraiter()->create(['email' => 'spam@x.fr']);
@@ -288,7 +302,9 @@ it('topbar affiche l entrée newsletter avec le compteur cumul', function () {
     $response = $this->get('/dashboard');
 
     $response->assertSee('Inscriptions newsletter');
-    $response->assertSeeText('3'); // 2 + 1
+    // Vérifier que le compteur newsletter est bien 3 (2 inscriptions + 1 désinscription).
+    // Le badge sur l'entrée newsletter du dropdown porte la valeur exacte.
+    expect($response->getContent())->toMatch('/Inscriptions newsletter[\s\S]*?>3</');
 });
 
 it('topbar n affiche pas l entrée newsletter pour un Consultation', function () {

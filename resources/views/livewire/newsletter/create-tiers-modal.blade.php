@@ -41,8 +41,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" wire:click="close">Annuler</button>
-                        <button type="button" class="btn btn-success" wire:click="save">Créer</button>
+                        <button type="button" class="btn btn-secondary" wire:click="close" wire:loading.attr="disabled">Annuler</button>
+                        <button type="button" class="btn btn-success" wire:click="save" wire:loading.attr="disabled">Créer</button>
                     </div>
                 </div>
             </div>
