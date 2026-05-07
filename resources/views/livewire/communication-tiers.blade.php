@@ -418,10 +418,17 @@
                             <i class="bi bi-eye me-1"></i>Aperçu
                         </button>
                         @php
-                            $testDisabled = count($selectedTiersIds) === 0 || ! $emailFrom;
-                            $testTooltip = ! $emailFrom
-                                ? "Adresse d'expédition non configurée — voir Paramètres"
-                                : (count($selectedTiersIds) === 0 ? 'Sélectionner au moins un tiers' : '');
+                            $testDisabled = count($selectedTiersIds) === 0
+                                || ! $emailFrom
+                                || $objet === ''
+                                || $corps === '';
+                            $testTooltip = match (true) {
+                                ! $emailFrom => "Adresse d'expédition non configurée — voir Paramètres",
+                                $objet === '' => "Renseigner l'objet du message",
+                                $corps === '' => 'Renseigner le corps du message',
+                                count($selectedTiersIds) === 0 => 'Sélectionner au moins un tiers',
+                                default => '',
+                            };
                         @endphp
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 onclick="window.tiersSyncAndShowTestModal()"
@@ -527,6 +534,16 @@
             <p class="small text-muted mb-2">
                 Variables substituées pour le 1er tiers sélectionné.
             </p>
+            {{-- Affiche TOUTES les erreurs de validation (pas juste testEmail).
+                 Sans ça, une erreur sur 'objet' ou 'corps' est silencieuse — la
+                 modale reste ouverte sans feedback visible. --}}
+            @if ($errors->any())
+                <div class="alert alert-danger small py-2 mb-2">
+                    @foreach ($errors->all() as $error)
+                        <div>{{ $error }}</div>
+                    @endforeach
+                </div>
+            @endif
             <div class="mb-3">
                 <label class="form-label small">Adresse destinataire</label>
                 <input type="email" wire:model="testEmail"
@@ -706,11 +723,13 @@
                     // Sans ces options, TinyMCE 6 strip les styles inline, attributs HTML
                     // (bgcolor, cellpadding, cellspacing, border, width="600"...) et classes,
                     // ce qui détruit la mise en page d'un email préparé en externe.
+                    //
+                    // IMPORTANT : NE PAS définir valid_styles. Quand valid_styles est défini,
+                    // TinyMCE n'autorise que les propriétés CSS listées. Sans la directive,
+                    // toutes les propriétés sont conservées (comportement par défaut).
+                    // Idem pour extended_valid_elements : redondant avec valid_elements: '*[*]'.
                     valid_elements: '*[*]',
-                    valid_styles: { '*': '*' },
-                    extended_valid_elements: '*[*]',
                     verify_html: false,
-                    entity_encoding: 'raw',
                     convert_urls: false,
                     paste_data_images: true,
                     toolbar: [
