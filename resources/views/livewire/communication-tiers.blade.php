@@ -428,14 +428,17 @@
                             <i class="bi bi-eye me-1"></i>Aperçu
                         </button>
                         @php
+                            // NB : on NE PEUT PAS vérifier $corps !== '' ici car le contenu
+                            // TinyMCE n'est synchronisé vers Livewire qu'au CLIC sur le bouton
+                            // (via tiersSyncAndShowTestModal). Si on l'incluait dans la condition,
+                            // le bouton resterait toujours grisé. La validation côté envoyerTest
+                            // attrape le cas (errors->any() rendu dans la modale).
                             $testDisabled = count($selectedTiersIds) === 0
                                 || ! $emailFrom
-                                || $objet === ''
-                                || $corps === '';
+                                || $objet === '';
                             $testTooltip = match (true) {
                                 ! $emailFrom => "Adresse d'expédition non configurée — voir Paramètres",
                                 $objet === '' => "Renseigner l'objet du message",
-                                $corps === '' => 'Renseigner le corps du message',
                                 count($selectedTiersIds) === 0 => 'Sélectionner au moins un tiers',
                                 default => '',
                             };
