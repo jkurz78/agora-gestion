@@ -41,7 +41,7 @@
             <tbody style="color:#555">
                 @forelse($membres as $membre)
                     @php $cot = $membre->derniereCotisation; @endphp
-                    <tr>
+                    <tr style="cursor:pointer" data-tiers-href="{{ route('tiers.show', $membre->id) }}" onclick="if (!event.target.closest('button,a,input,select,textarea')) { window.location = this.dataset.tiersHref; }">
                         <td class="small">
                             @if($membre->type === 'entreprise')
                                 <i class="bi bi-building text-muted me-1" style="font-size:.7rem"></i>
@@ -82,6 +82,7 @@
                         </td>
                         <td class="text-end">
                             <div class="d-flex gap-1 justify-content-end">
+                                <x-tiers-row-trigger :tiersId="$membre->id" />
                                 <a href="{{ route('tiers.transactions', $membre->id) }}"
                                    class="btn btn-sm btn-outline-secondary"
                                    title="Voir les transactions">

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
@@ -28,7 +27,7 @@ afterEach(function () {
 it('affiche un bouton Voir sur tiers.index', function (): void {
     $tiers = Tiers::factory()->create([
         'association_id' => $this->association->id,
-        'nom'            => 'Durand',
+        'nom' => 'Durand',
     ]);
 
     $this->actingAs($this->user)
@@ -40,7 +39,7 @@ it('affiche un bouton Voir sur tiers.index', function (): void {
 it('rend la ligne cliquable sur tiers.index (data-tiers-href)', function (): void {
     $tiers = Tiers::factory()->create([
         'association_id' => $this->association->id,
-        'nom'            => 'Durand',
+        'nom' => 'Durand',
     ]);
 
     $this->actingAs($this->user)
@@ -54,27 +53,24 @@ it('rend la ligne cliquable sur tiers.index (data-tiers-href)', function (): voi
 it('affiche un bouton Voir sur la liste des adhérents', function (): void {
     $tiers = Tiers::factory()->create([
         'association_id' => $this->association->id,
-        'nom'            => 'Lebrun',
+        'nom' => 'Lebrun',
     ]);
 
-    // Créer une cotisation pour que ce tiers apparaisse dans AdherentList
-    $cotSousCategorie = SousCategorie::forUsage(UsageComptable::Cotisation)->first();
-    if (! $cotSousCategorie) {
-        $cotSousCategorie = SousCategorie::factory()->create([
-            'association_id' => $this->association->id,
-        ]);
-        $cotSousCategorie->usages()->attach(UsageComptable::Cotisation);
-    }
-
-    $transaction = Transaction::factory()->create([
+    // Créer une cotisation pour que ce tiers apparaisse dans AdherentList (filtre a_jour)
+    $cotSousCategorie = SousCategorie::factory()->pourCotisations()->create([
         'association_id' => $this->association->id,
-        'tiers_id'       => $tiers->id,
-        'type'           => 'recette',
     ]);
+
+    $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'tiers_id' => $tiers->id,
+        'date' => now()->format('Y-m-d'),
+    ]);
+    $transaction->lignes()->forceDelete();
     TransactionLigne::factory()->create([
-        'transaction_id'   => $transaction->id,
+        'transaction_id' => $transaction->id,
         'sous_categorie_id' => $cotSousCategorie->id,
-        'montant'          => 50,
+        'montant' => 50,
     ]);
 
     $this->actingAs($this->user)
@@ -88,13 +84,29 @@ it('affiche un bouton Voir sur la liste des adhérents', function (): void {
 it('affiche un bouton Voir sur la liste des dons', function (): void {
     $tiers = Tiers::factory()->create([
         'association_id' => $this->association->id,
-        'nom'            => 'Donateur',
+        'nom' => 'Donateur',
+    ]);
+
+    $donSousCategorie = SousCategorie::factory()->pourDons()->create([
+        'association_id' => $this->association->id,
+    ]);
+
+    $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'tiers_id' => $tiers->id,
+        'date' => now()->format('Y-m-d'),
+    ]);
+    $transaction->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $transaction->id,
+        'sous_categorie_id' => $donSousCategorie->id,
+        'montant' => 100,
     ]);
 
     $this->actingAs($this->user)
         ->get(route('tiers.dons'))
         ->assertOk()
-        ->assertSee('bi-eye', false);
+        ->assertSee(route('tiers.show', $tiers->id));
 });
 
 // ── tiers.cotisations ────────────────────────────────────────────────────────
@@ -102,13 +114,28 @@ it('affiche un bouton Voir sur la liste des dons', function (): void {
 it('affiche un bouton Voir sur la liste des cotisations', function (): void {
     $tiers = Tiers::factory()->create([
         'association_id' => $this->association->id,
-        'nom'            => 'Cotisant',
+        'nom' => 'Cotisant',
+    ]);
+
+    $cotSousCategorie = SousCategorie::factory()->pourCotisations()->create([
+        'association_id' => $this->association->id,
+    ]);
+
+    $transaction = Transaction::factory()->asRecette()->create([
+        'association_id' => $this->association->id,
+        'tiers_id' => $tiers->id,
+    ]);
+    $transaction->lignes()->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $transaction->id,
+        'sous_categorie_id' => $cotSousCategorie->id,
+        'montant' => 50,
     ]);
 
     $this->actingAs($this->user)
         ->get(route('tiers.cotisations'))
         ->assertOk()
-        ->assertSee('bi-eye', false);
+        ->assertSee(route('tiers.show', $tiers->id));
 });
 
 // ── tiers.communication ──────────────────────────────────────────────────────
@@ -116,8 +143,8 @@ it('affiche un bouton Voir sur la liste des cotisations', function (): void {
 it('affiche un bouton Voir sur la liste communication tiers', function (): void {
     $tiers = Tiers::factory()->create([
         'association_id' => $this->association->id,
-        'nom'            => 'Communicant',
-        'email'          => 'communicant@example.org',
+        'nom' => 'Communicant',
+        'email' => 'communicant@example.org',
     ]);
 
     $this->actingAs($this->user)
