@@ -230,7 +230,8 @@
             @endif
             @if ($asso->regime_fiscal_don ?? null)
                 <div class="adresse-ligne" style="margin-top:3px;">
-                    <span class="label">Régime fiscal :</span> {{ $asso->regime_fiscal_don }}
+                    <span class="label">Régime fiscal :</span>
+                    {{ $asso->regime_fiscal_don instanceof \App\Enums\RegimeFiscalDon ? $asso->regime_fiscal_don->label() : $asso->regime_fiscal_don }}
                 </div>
             @endif
             @if ($asso->objet_recu_fiscal ?? null)
@@ -309,6 +310,23 @@
         à la réduction d'impôt prévue à l'<strong>{{ $articleCgiLibelle }}</strong>
         du Code général des impôts.
     </div>
+
+    @if (($asso->loi_coluche_eligible ?? false) && $articleCgi === 'art_200')
+        <div class="mention-legale">
+            Cette association entre dans le champ d'application des dispositions du
+            <strong>2° de l'article 200-1 ter du CGI</strong> (aide aux personnes en difficulté).
+            Le donateur particulier bénéficie d'une réduction d'impôt à hauteur de 75 % du montant versé,
+            dans la limite annuelle prévue par la loi.
+        </div>
+    @endif
+
+    @if ($asso->ifi_eligible ?? false)
+        <div class="mention-legale">
+            Ce don ouvre également droit, le cas échéant, à la réduction d'<strong>impôt sur la fortune
+            immobilière (IFI) prévue à l'article 978 du CGI</strong> à hauteur de 75 % du versement,
+            dans la limite annuelle de 50 000 €.
+        </div>
+    @endif
 
     {{-- ===== SIGNATURE ===== --}}
     <div class="signature-block">
