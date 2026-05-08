@@ -49,3 +49,13 @@ it('redirige les guests vers login', function (): void {
     $tiers = Tiers::factory()->create();
     $this->get(route('tiers.show', $tiers))->assertRedirect('/login');
 });
+
+it('sélectionne l\'onglet via la query string ?onglet=coordonnees', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    $response = $this->actingAs($this->user)->get(route('tiers.show', $tiers).'?onglet=coordonnees');
+
+    $response->assertOk();
+    // Vérification souple : le composant Coordonnees est monté (sa vue contient "À venir.")
+    $response->assertSee('À venir.');
+});
