@@ -26,6 +26,7 @@ it('stream le PDF binaire stocké', function () {
     $response = $service->streamPdf($recu);
 
     expect($response->headers->get('Content-Type'))->toContain('application/pdf');
+    expect($response->headers->get('Content-Disposition'))->toContain('inline');
     expect($response->headers->get('Content-Disposition'))->toContain($recu->numero);
 });
 
