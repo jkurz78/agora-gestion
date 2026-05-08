@@ -257,13 +257,16 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/template/csv', [TiersTemplateController::class, 'csv'])->name('template.csv');
         Route::get('/template/xlsx', [TiersTemplateController::class, 'xlsx'])->name('template.xlsx');
         Route::get('/export', TiersExportController::class)->name('export');
-        Route::get('/{tiers}/transactions', function (Tiers $tiers) {
-            return view('tiers.transactions', compact('tiers'));
-        })->name('transactions');
         Route::view('/adherents', 'gestion.adherents')->name('adherents');
         Route::view('/dons', 'dons.index')->name('dons');
         Route::view('/cotisations', 'cotisations.index')->name('cotisations');
         Route::view('/communication', 'tiers.communication')->name('communication');
+        Route::get('/{tiers}', function (Tiers $tiers) {
+            return view('tiers.show', compact('tiers'));
+        })->name('show');
+        Route::get('/{tiers}/transactions', function (Tiers $tiers) {
+            return view('tiers.transactions', compact('tiers'));
+        })->name('transactions');
         Route::get('/{tiers}/dons/{ligne}/recu-fiscal', [RecuFiscalController::class, 'download'])
             ->name('dons.recu-fiscal');
     });

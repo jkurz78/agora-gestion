@@ -1,0 +1,48 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire\Tiers;
+
+use App\Models\Tiers;
+use App\Services\Tiers\TiersDonsTimelineService;
+use Illuminate\View\View;
+use Livewire\Attributes\Url;
+use Livewire\Component;
+
+final class FicheTiers extends Component
+{
+    public Tiers $tiers;
+
+    #[Url(as: 'onglet')]
+    public ?string $onglet = null;
+
+    public function mount(Tiers $tiers): void
+    {
+        $this->tiers = $tiers;
+    }
+
+    public function render(): View
+    {
+        $donsCount = app(TiersDonsTimelineService::class)
+            ->forTiers($this->tiers)
+            ->totalCount;
+
+        $onglets = [
+            ['key' => 'coordonnees', 'label' => 'Coordonnées', 'count' => null],
+        ];
+
+        if ($donsCount > 0) {
+            $onglets[] = ['key' => 'dons', 'label' => 'Dons', 'count' => $donsCount];
+        }
+
+        $current = in_array($this->onglet, array_column($onglets, 'key'), true)
+            ? $this->onglet
+            : 'coordonnees';
+
+        return view('livewire.tiers.fiche-tiers', [
+            'onglets' => $onglets,
+            'currentOnglet' => $current,
+        ]);
+    }
+}
