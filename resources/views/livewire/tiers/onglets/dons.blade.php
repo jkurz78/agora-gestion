@@ -98,6 +98,9 @@
                         <tr>
                             <td data-sort="{{ optional($don->transaction->date)->format('Y-m-d') }}">
                                 {{ optional($don->transaction->date)->format('d/m/Y') }}
+                                @if(in_array('helloasso', $ligneDto->alertes, true))
+                                    <span class="badge text-bg-info ms-1" style="font-size:.6rem" title="Don importé depuis HelloAsso">HA</span>
+                                @endif
                             </td>
                             <td>{{ $don->sousCategorie->nom ?? '—' }}</td>
                             <td>{{ $don->operation->nom ?? '—' }}</td>
