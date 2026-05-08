@@ -13,6 +13,10 @@
         @if($tiers->email_optout)
             <span class="badge text-bg-warning"><i class="bi bi-envelope-slash me-1"></i>Désinscrit</span>
         @endif
+
+        @if($tiers->est_helloasso)
+            <span class="badge text-bg-info" title="Tiers synchronisé depuis HelloAsso">HelloAsso</span>
+        @endif
     </div>
 
     @if($tiers->email || $tiers->telephone || $tiers->ville)
