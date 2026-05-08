@@ -124,6 +124,7 @@ it('affiche un bouton Voir sur la liste des cotisations', function (): void {
     $transaction = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
+        'date' => now()->format('Y-m-d'),
     ]);
     $transaction->lignes()->forceDelete();
     TransactionLigne::factory()->create([
