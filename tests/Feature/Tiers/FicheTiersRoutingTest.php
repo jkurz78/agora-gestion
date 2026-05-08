@@ -56,6 +56,7 @@ it('sélectionne l\'onglet via la query string ?onglet=coordonnees', function ()
     $response = $this->actingAs($this->user)->get(route('tiers.show', $tiers).'?onglet=coordonnees');
 
     $response->assertOk();
-    // Vérification souple : le composant Coordonnees est monté (sa vue contient "À venir.")
-    $response->assertSee('À venir.');
+    // Vérification souple : le composant Coordonnees est monté (sa vue contient les cartes "Identité" et "Adresse")
+    $response->assertSee('Identité');
+    $response->assertSee('Adresse');
 });
