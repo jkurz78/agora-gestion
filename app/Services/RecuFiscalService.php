@@ -13,11 +13,10 @@ use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
-use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 final class RecuFiscalService
 {
@@ -135,15 +134,19 @@ final class RecuFiscalService
         });
     }
 
-    public function streamPdf(RecuFiscalEmis $recu): StreamedResponse
+    public function streamPdf(RecuFiscalEmis $recu): Response
     {
         if (! $recu->verifierIntegrite()) {
             throw new \RuntimeException("Intégrité du PDF reçu n°{$recu->numero} compromise — hash incorrect");
         }
 
         $filename = "recu-fiscal-{$recu->numero}.pdf";
+        $contents = Storage::disk('local')->get($recu->pdfFullPath());
 
-        return Storage::disk('local')->download($recu->pdfFullPath(), $filename);
+        return response($contents, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+        ]);
     }
 
     private function allouerNumero(int $annee): string
@@ -273,43 +276,6 @@ final class RecuFiscalService
             'footerLogoMime' => null,
         ])->setPaper('a4', 'portrait');
 
-        $pdfContent = $pdf->output();
-        $xml = $this->genererMetadataXml($numero, $ligne, $asso, $donateur);
-        $writer = new FacturXWriter;
-
-        return $writer->generate($pdfContent, $xml, 'minimum', false);
-    }
-
-    private function genererMetadataXml(string $numero, TransactionLigne $ligne, Association $asso, Tiers $donateur): string
-    {
-        $date = now()->format('Ymd');
-        $montant = number_format((float) $ligne->montant, 2, '.', '');
-        $sellerName = htmlspecialchars($asso->nom ?? '', ENT_XML1, 'UTF-8');
-        $siret = htmlspecialchars($asso->siret ?? '', ENT_XML1, 'UTF-8');
-        $buyerName = htmlspecialchars($donateur->displayName(), ENT_XML1, 'UTF-8');
-        $numeroXml = htmlspecialchars($numero, ENT_XML1, 'UTF-8');
-
-        return <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
-  <rsm:ExchangedDocument>
-    <ram:ID>{$numeroXml}</ram:ID>
-    <ram:TypeCode>325</ram:TypeCode>
-    <ram:IssueDateTime><udt:DateTimeString format="102">{$date}</udt:DateTimeString></ram:IssueDateTime>
-  </rsm:ExchangedDocument>
-  <rsm:SupplyChainTradeTransaction>
-    <ram:ApplicableHeaderTradeAgreement>
-      <ram:SellerTradeParty><ram:Name>{$sellerName}</ram:Name><ram:SpecifiedLegalOrganization><ram:ID>{$siret}</ram:ID></ram:SpecifiedLegalOrganization></ram:SellerTradeParty>
-      <ram:BuyerTradeParty><ram:Name>{$buyerName}</ram:Name></ram:BuyerTradeParty>
-    </ram:ApplicableHeaderTradeAgreement>
-    <ram:ApplicableHeaderTradeSettlement>
-      <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
-      <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-        <ram:GrandTotalAmount currencyID="EUR">{$montant}</ram:GrandTotalAmount>
-      </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-    </ram:ApplicableHeaderTradeSettlement>
-  </rsm:SupplyChainTradeTransaction>
-</rsm:CrossIndustryInvoice>
-XML;
+        return $pdf->output();
     }
 }
