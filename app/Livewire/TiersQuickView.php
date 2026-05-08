@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
-use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Services\ExerciceService;
 use App\Services\RecuFiscalService;
+use App\Services\Tiers\TiersDonsTimelineService;
 use App\Services\TiersQuickViewService;
 use App\Tenant\TenantContext;
 use Illuminate\View\View;
@@ -137,95 +136,31 @@ final class TiersQuickView extends Component
         $tiers = $this->tiersId !== null ? Tiers::find($this->tiersId) : null;
         $availableYears = app(ExerciceService::class)->availableYears();
 
+        $dto = $tiers !== null
+            ? app(TiersDonsTimelineService::class)->forTiers($tiers)
+            : null;
+
+        // Aplatir le DTO vers les variables que la vue connaît déjà
+        // (cohabitation : on évite un refacto blade trop gros sur ce slice).
         $dons = collect();
         $recusParLigne = collect();
         $alertesParLigne = collect();
         $peutTelechargerParLigne = collect();
         $raisonsBlocageParLigne = collect();
-        $raisonBlocageGlobal = null;
+        $raisonBlocageGlobal = $dto?->raisonBlocageGlobal;
 
-        if ($tiers !== null) {
-            $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
-            $dons = TransactionLigne::query()
-                ->whereHas('transaction', fn ($q) => $q->where('tiers_id', $tiers->id))
-                ->whereIn('sous_categorie_id', $donSousCategorieIds)
-                ->with(['transaction', 'sousCategorie'])
-                ->orderByDesc('id')
-                ->get();
-
-            $recusParLigne = RecuFiscalEmis::query()
-                ->whereIn('transaction_ligne_id', $dons->pluck('id'))
-                ->whereNull('annule_at')
-                ->get()
-                ->keyBy('transaction_ligne_id');
-
-            $asso = Association::findOrFail(TenantContext::currentId());
-
-            // Blocages globaux (liés à la configuration de l'asso)
-            if (! $asso->eligible_recu_fiscal) {
-                $raisonBlocageGlobal = "Cette association n'est pas configurée pour émettre des reçus fiscaux.";
-            } elseif (empty($asso->signataire_nom) || empty($asso->signataire_qualite)) {
-                $raisonBlocageGlobal = 'Le signataire des reçus fiscaux n\'est pas configuré (nom et qualité requis).';
+        if ($dto !== null) {
+            foreach ($dto->annees as $annee) {
+                foreach ($annee->lignes as $ligneDto) {
+                    $dons->push($ligneDto->ligne);
+                    if ($ligneDto->recu !== null) {
+                        $recusParLigne->put($ligneDto->ligne->id, $ligneDto->recu);
+                    }
+                    $alertesParLigne->put($ligneDto->ligne->id, $ligneDto->alertes);
+                    $peutTelechargerParLigne->put($ligneDto->ligne->id, $ligneDto->peutTelecharger);
+                    $raisonsBlocageParLigne->put($ligneDto->ligne->id, $ligneDto->raisonBlocage);
+                }
             }
-
-            // Adresse tiers complète ?
-            $adresseTiersOk = ! empty($tiers->adresse_ligne1)
-                && ! empty($tiers->code_postal)
-                && ! empty($tiers->ville);
-
-            $alertesParLigne = $dons->mapWithKeys(function (TransactionLigne $don) use ($asso, $tiers): array {
-                $alertes = [];
-
-                if ($don->transaction->helloasso_payment_id !== null) {
-                    $alertes[] = 'helloasso';
-                }
-
-                if (
-                    ($asso->updated_at !== null && $asso->updated_at->gt($don->transaction->created_at))
-                    || ($tiers->updated_at !== null && $tiers->updated_at->gt($don->transaction->created_at))
-                ) {
-                    $alertes[] = 'donnees_modifiees';
-                }
-
-                return [$don->id => $alertes];
-            });
-
-            $peutTelechargerParLigne = $dons->mapWithKeys(function (TransactionLigne $don) use ($asso, $adresseTiersOk): array {
-                if (! $asso->eligible_recu_fiscal) {
-                    return [$don->id => false];
-                }
-
-                if (empty($asso->signataire_nom) || empty($asso->signataire_qualite)) {
-                    return [$don->id => false];
-                }
-
-                if (! $don->transaction->statut_reglement->isEncaisse()) {
-                    return [$don->id => false];
-                }
-
-                if (! $adresseTiersOk) {
-                    return [$don->id => false];
-                }
-
-                return [$don->id => true];
-            });
-
-            $raisonsBlocageParLigne = $dons->mapWithKeys(function (TransactionLigne $don) use ($asso, $adresseTiersOk): array {
-                // Blocages globaux sont affichés dans l'encart, pas en tooltip par ligne
-                if (! $asso->eligible_recu_fiscal || empty($asso->signataire_nom) || empty($asso->signataire_qualite)) {
-                    return [$don->id => 'Configuration association incomplète'];
-                }
-
-                if (! $don->transaction->statut_reglement->isEncaisse()) {
-                    return [$don->id => 'Don non encaissé'];
-                }
-
-                if (! $adresseTiersOk) {
-                    return [$don->id => 'Adresse du donateur incomplète'];
-                }
-
-                return [$don->id => null];
-            });
         }
 
         return view('livewire.tiers-quick-view', compact(
