@@ -27,6 +27,7 @@ use App\Http\Controllers\ParticipantPdfController;
 use App\Http\Controllers\RapportExportController;
 use App\Http\Controllers\RapprochementPdfController;
 use App\Http\Controllers\RapprochementPieceJointeController;
+use App\Http\Controllers\RecuFiscalController;
 use App\Http\Controllers\RemiseBancairePdfController;
 use App\Http\Controllers\SeanceExportController;
 use App\Http\Controllers\SeanceFeuilleController;
@@ -52,6 +53,7 @@ use App\Livewire\DevisManuel\DevisEdit;
 use App\Livewire\DevisManuel\DevisList;
 use App\Livewire\Newsletter\InscriptionsList;
 use App\Livewire\Parametres\Comptabilite\UsagesComptables;
+use App\Livewire\Parametres\RecusFiscaux;
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\Facture;
@@ -84,6 +86,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
         Route::get('/comptabilite/usages', UsagesComptables::class)
             ->name('comptabilite.usages');
+        Route::get('/recus-fiscaux', RecusFiscaux::class)
+            ->name('recus-fiscaux');
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
     });
 
@@ -260,6 +264,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::view('/dons', 'dons.index')->name('dons');
         Route::view('/cotisations', 'cotisations.index')->name('cotisations');
         Route::view('/communication', 'tiers.communication')->name('communication');
+        Route::get('/{tiers}/dons/{ligne}/recu-fiscal', [RecuFiscalController::class, 'download'])
+            ->name('dons.recu-fiscal');
     });
 
 // ── Devis libres ──

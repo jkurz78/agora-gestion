@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\RegimeFiscalDon;
 use App\Enums\UsageComptable;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Collection;
@@ -22,6 +23,12 @@ final class Association extends Model
 
     /** Flag to allow a one-shot slug change; not persisted to DB. */
     public ?bool $allowSlugChange = null;
+
+    protected $attributes = [
+        'eligible_recu_fiscal' => false,
+        'loi_coluche_eligible' => false,
+        'ifi_eligible' => false,
+    ];
 
     protected $fillable = [
         'nom',
@@ -48,6 +55,15 @@ final class Association extends Model
         'wizard_state',
         'wizard_current_step',
         'devis_validite_jours',
+        'eligible_recu_fiscal',
+        'regime_fiscal_don',
+        'loi_coluche_eligible',
+        'ifi_eligible',
+        'objet_recu_fiscal',
+        'rescrit_fiscal_numero',
+        'rescrit_fiscal_date',
+        'signataire_nom',
+        'signataire_qualite',
     ];
 
     protected function casts(): array
@@ -73,6 +89,11 @@ final class Association extends Model
             'wizard_state' => 'array',
             'wizard_current_step' => 'integer',
             'devis_validite_jours' => 'integer',
+            'eligible_recu_fiscal' => 'boolean',
+            'regime_fiscal_don' => RegimeFiscalDon::class,
+            'loi_coluche_eligible' => 'boolean',
+            'ifi_eligible' => 'boolean',
+            'rescrit_fiscal_date' => 'date',
         ];
     }
 

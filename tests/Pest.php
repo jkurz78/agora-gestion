@@ -4,6 +4,7 @@ use App\Models\Association;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Tests\Support\LigneDonHelper;
 use Tests\TestCase;
 
 /*
@@ -33,6 +34,7 @@ use Tests\TestCase;
  */
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->use(LigneDonHelper::class)
     ->beforeEach(function () {
         // Boot a default tenant context so that tenant-scoped models work out of the box.
         // Tests that manage their own context (e.g. isolation tests, explicit boot/clear)

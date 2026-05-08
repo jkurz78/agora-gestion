@@ -35,7 +35,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 // ─── 2. Chargement de la configuration ────────────────────────────────────
 
 // Source 1 : fichier .env dans le même dossier que ce shim
-$envFile = __DIR__ . '/.env';
+$envFile = __DIR__.'/.env';
 if (is_file($envFile) && is_readable($envFile)) {
     foreach ((array) parse_ini_file($envFile, false, INI_SCANNER_RAW) as $key => $value) {
         if (getenv((string) $key) === false) {
@@ -47,8 +47,8 @@ if (is_file($envFile) && is_readable($envFile)) {
 // variables système — utilisées en fallback si .env absent.
 
 $endpoint = (string) (getenv('NEWSLETTER_ENDPOINT') ?: '');
-$keyId    = (string) (getenv('NEWSLETTER_KEY_ID') ?: '');
-$secret   = (string) (getenv('NEWSLETTER_HMAC_SECRET') ?: '');
+$keyId = (string) (getenv('NEWSLETTER_KEY_ID') ?: '');
+$secret = (string) (getenv('NEWSLETTER_HMAC_SECRET') ?: '');
 
 if ($endpoint === '' || $keyId === '' || $secret === '') {
     http_response_code(500);
@@ -73,10 +73,10 @@ if (str_contains($contentType, 'application/json')) {
 // On normalise vers le contrat exact attendu par AgoraGestion.
 // Tout champ supplémentaire est ignoré (anti-pollution du payload).
 $payload = [
-    'email'    => isset($input['email']) ? trim((string) $input['email']) : '',
-    'prenom'   => isset($input['prenom']) && $input['prenom'] !== '' ? (string) $input['prenom'] : null,
-    'nom'      => isset($input['nom']) && $input['nom'] !== '' ? (string) $input['nom'] : null,
-    'consent'  => filter_var($input['consent'] ?? false, FILTER_VALIDATE_BOOLEAN),
+    'email' => isset($input['email']) ? trim((string) $input['email']) : '',
+    'prenom' => isset($input['prenom']) && $input['prenom'] !== '' ? (string) $input['prenom'] : null,
+    'nom' => isset($input['nom']) && $input['nom'] !== '' ? (string) $input['nom'] : null,
+    'consent' => filter_var($input['consent'] ?? false, FILTER_VALIDATE_BOOLEAN),
     'bot_trap' => isset($input['bot_trap']) ? (string) $input['bot_trap'] : '',
 ];
 
@@ -95,28 +95,28 @@ if ($payloadJson === false) {
 // ─── 4. Signature HMAC ────────────────────────────────────────────────────
 
 $timestamp = time();
-$stringToSign = $timestamp . '.' . $payloadJson;
-$signature = 'v1=' . hash_hmac('sha256', $stringToSign, $secret);
+$stringToSign = $timestamp.'.'.$payloadJson;
+$signature = 'v1='.hash_hmac('sha256', $stringToSign, $secret);
 
 // ─── 5. Relai HTTP vers AgoraGestion ──────────────────────────────────────
 
 $ch = curl_init($endpoint);
 curl_setopt_array($ch, [
-    CURLOPT_POST           => true,
-    CURLOPT_POSTFIELDS     => $payloadJson,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => $payloadJson,
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT        => 10,
+    CURLOPT_TIMEOUT => 10,
     CURLOPT_CONNECTTIMEOUT => 5,
     CURLOPT_FOLLOWLOCATION => false,
     CURLOPT_SSL_VERIFYPEER => true,
     CURLOPT_SSL_VERIFYHOST => 2,
-    CURLOPT_HTTPHEADER     => [
+    CURLOPT_HTTPHEADER => [
         'Content-Type: application/json',
         'Accept: application/json',
         'User-Agent: AgoraGestion-Newsletter-Shim/1.0 (PHP)',
-        'X-Key-Id: ' . $keyId,
-        'X-Timestamp: ' . $timestamp,
-        'X-Signature: ' . $signature,
+        'X-Key-Id: '.$keyId,
+        'X-Timestamp: '.$timestamp,
+        'X-Signature: '.$signature,
     ],
 ]);
 
@@ -134,7 +134,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 if ($body === false || $status === 0) {
     http_response_code(502);
-    error_log('[newsletter-shim] Upstream unreachable: ' . $curlError);
+    error_log('[newsletter-shim] Upstream unreachable: '.$curlError);
     echo json_encode(['error' => 'upstream_unavailable']);
     exit;
 }

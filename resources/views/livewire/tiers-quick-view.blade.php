@@ -2,6 +2,67 @@
     x-data="{}"
     x-on:keydown.escape.window="$wire.close()"
 >
+    {{-- Modale avertissement avant première émission reçu fiscal --}}
+    @if($showModaleAvertissement)
+        <div class="modal fade show d-block" tabindex="-1" style="z-index:2060;background-color:rgba(0,0,0,.5)">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Vérifications avant émission</h5>
+                        <button type="button" class="btn-close" wire:click="fermerModaleAvertissement"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if(in_array('helloasso', $avertissementsActifs))
+                            <div class="alert alert-warning">
+                                <strong>HelloAsso peut avoir déjà émis un reçu fiscal pour ce don.</strong>
+                                Le donateur ne doit pas déduire deux fois le même montant.
+                            </div>
+                        @endif
+                        @if(in_array('donnees_modifiees', $avertissementsActifs))
+                            <div class="alert alert-info">
+                                Les coordonnées du donateur ou de l'association ont été modifiées depuis le don.
+                                Le reçu portera les coordonnées actuelles.
+                            </div>
+                        @endif
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="fermerModaleAvertissement">Annuler</button>
+                        <button type="button" class="btn btn-primary" wire:click="continuerTelechargement">Continuer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Modale annulation + ré-émission reçu fiscal --}}
+    @if($showModaleAnnulation)
+        <div class="modal fade show d-block" tabindex="-1" style="z-index:2060;background-color:rgba(0,0,0,.5)">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Annuler et ré-émettre</h5>
+                        <button type="button" class="btn-close" wire:click="fermerModaleAnnulation"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted">Le reçu actuel sera annulé et un nouveau sera généré avec les coordonnées actuelles du tiers.</p>
+                        <label for="motif-annulation" class="form-label">Motif</label>
+                        <input type="text"
+                               id="motif-annulation"
+                               class="form-control"
+                               wire:model="motifAnnulation"
+                               placeholder="Ex : Adresse corrigée">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="fermerModaleAnnulation">Annuler</button>
+                        <button type="button" class="btn btn-primary" wire:click="confirmerReEmission">
+                            Confirmer la ré-émission
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if($visible && $tiers !== null)
         {{-- Backdrop --}}
         <div
@@ -258,6 +319,106 @@
                     @endisset
 
                 @endif
+
+                {{-- Dons détaillés avec reçus fiscaux --}}
+                @if(isset($dons) && $dons->isNotEmpty())
+                    <div class="mt-3">
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            <i class="bi bi-heart-fill small text-warning"></i>
+                            <span class="fw-semibold small">Dons du tiers</span>
+                        </div>
+
+                        @if(session('error'))
+                            <div class="alert alert-danger py-2 small mb-2">{{ session('error') }}</div>
+                        @endif
+
+                        @if(isset($raisonBlocageGlobal) && $raisonBlocageGlobal !== null)
+                            <div class="alert alert-warning py-2 small mb-2">
+                                {{ $raisonBlocageGlobal }}
+                                <a href="{{ route('parametres.recus-fiscaux') }}" class="alert-link">Configurer dans Paramètres → Reçus fiscaux</a>
+                            </div>
+                        @endif
+
+                        <table class="table table-sm table-hover mb-0" style="font-size:.75rem">
+                            <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Sous-catégorie</th>
+                                    <th>Mode</th>
+                                    <th class="text-end">Montant</th>
+                                    <th>Reçu fiscal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($dons as $don)
+                                    <tr>
+                                        <td data-sort="{{ $don->transaction->date->format('Y-m-d') }}">
+                                            {{ $don->transaction->date->format('d/m/Y') }}
+                                        </td>
+                                        <td>{{ $don->sousCategorie->nom }}</td>
+                                        <td>{{ ucfirst($don->transaction->mode_paiement?->value ?? '—') }}</td>
+                                        <td class="text-end" data-sort="{{ $don->montant }}">
+                                            {{ number_format((float) $don->montant, 2, ',', ' ') }} €
+                                        </td>
+                                        <td>
+                                            @php $peutTelecharger = $peutTelechargerParLigne[$don->id] ?? false; @endphp
+                                            @if(isset($recusParLigne[$don->id]))
+                                                @php $recu = $recusParLigne[$don->id]; @endphp
+                                                <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
+                                                   class="badge bg-success text-decoration-none"
+                                                   target="_blank" rel="noopener">
+                                                    n° {{ $recu->numero }}
+                                                </a>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary ms-1 py-0 lh-1"
+                                                        style="font-size:.65rem"
+                                                        wire:click="ouvrirModaleAnnulation({{ $recu->id }})"
+                                                        title="Annuler et ré-émettre">⋯</button>
+                                            @elseif(! $peutTelecharger)
+                                                @php $raisonLigne = $raisonsBlocageParLigne[$don->id] ?? 'Configuration incomplète'; @endphp
+                                                <button type="button" class="btn btn-sm btn-outline-secondary py-0"
+                                                        style="font-size:.65rem" disabled
+                                                        title="{{ $raisonLigne }}">
+                                                    Reçu indisponible
+                                                </button>
+                                            @else
+                                                @php $alertes = $alertesParLigne[$don->id] ?? []; @endphp
+                                                @if(!empty($alertes))
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-primary py-0"
+                                                            style="font-size:.65rem"
+                                                            wire:click="afficherAvertissements({{ $don->id }})">
+                                                        Télécharger reçu fiscal
+                                                    </button>
+                                                    <div class="mt-1 d-flex flex-wrap gap-1">
+                                                        @if(in_array('helloasso', $alertes))
+                                                            <span class="badge bg-warning text-dark" style="font-size:.55rem" title="HelloAsso peut avoir déjà émis un reçu fiscal">
+                                                                ⚠ HelloAsso
+                                                            </span>
+                                                        @endif
+                                                        @if(in_array('donnees_modifiees', $alertes))
+                                                            <span class="badge bg-info text-dark" style="font-size:.55rem" title="Les coordonnées ont été modifiées depuis le don">
+                                                                ⚠ coordonnées modifiées
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                @else
+                                                    <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
+                                                       class="btn btn-sm btn-primary py-0"
+                                                       style="font-size:.65rem"
+                                                       target="_blank" rel="noopener">
+                                                        Télécharger reçu fiscal
+                                                    </a>
+                                                @endif
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
             </div>
 
             {{-- Footer --}}
@@ -270,3 +431,11 @@
         </div>
     @endif
 </div>
+
+<script>
+    document.addEventListener('livewire:init', () => {
+        Livewire.on('open-new-tab', (event) => {
+            window.open(event.url ?? event[0]?.url, '_blank', 'noopener');
+        });
+    });
+</script>

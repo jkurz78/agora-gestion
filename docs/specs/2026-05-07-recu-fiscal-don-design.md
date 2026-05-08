@@ -17,7 +17,7 @@ Le reçu :
 | Décision | Choix retenu | Justification |
 |---|---|---|
 | Format légal | Attestation libre (modèle asso), pas le CERFA 11580*05 | BOI-IR-RICI-250-30 : modèle libre admis si mentions obligatoires présentes. Aligné sur la pratique HelloAsso. |
-| Format technique | PDF/A-3 via `Atgp\FacturX\Writer::generate(..., 'minimum', false)` avec XML métadonnées minimal | Réutilisation du pipeline `FactureService` / `DocumentPrevisionnelService`, aucune dépendance nouvelle. Probant + pérenne. |
+| Format technique | PDF standard (DomPDF), pas PDF/A-3. Probance assurée par numérotation + SHA256 + horodatage. | **Revirement post-livraison MVP (2026-05-08)** : le wrap `Atgp\FacturX\Writer` a été retiré au profit de DomPDF brut. Raison : DomPDF ne produit pas de PDF/A-3 conforme nativement (polices/colorspace), le wrap FacturX produisait un fichier qui « se prétend » PDF/A-3 mais que les lecteurs stricts (Adobe Reader, Preview) rejettent. Le besoin légal n'exige pas PDF/A-3 pour un reçu fiscal. |
 | Granularité MVP | 1 reçu par transaction de don | Récap annuel agrégé = phase 2. |
 | Période fiscale (phase 2) | Année civile (jamais exercice comptable) | Obligation fiscale : déclaration 2042 RICI sur année civile. |
 | Stockage | PDF binaire stocké sur disque tenant + `pdf_hash` SHA256 en base | Fige le rendu (immunise contre une évolution future du template Blade). Vérification d'intégrité à chaque téléchargement. |
@@ -34,17 +34,21 @@ Le reçu :
 
 ## 3. Modèle de données
 
-### 3.1 Migration `associations` — ajout de 7 colonnes
+### 3.1 Migration `associations` — colonnes
 
 ```php
 $table->boolean('eligible_recu_fiscal')->default(false);
-$table->string('regime_fiscal_don')->nullable();        // libre : "RUP", "intérêt général", "cultuelle", ...
+$table->string('regime_fiscal_don')->nullable();        // valeur enum App\Enums\RegimeFiscalDon (validation côté app)
+$table->boolean('loi_coluche_eligible')->default(false);  // article 200-1 ter (réduction 75 % au lieu de 66 %)
+$table->boolean('ifi_eligible')->default(false);          // article 978 du CGI (réduction IFI 75 %, plafond 50 000 €)
 $table->text('objet_recu_fiscal')->nullable();          // ex: "Œuvre d'intérêt général à caractère social"
 $table->string('rescrit_fiscal_numero')->nullable();
 $table->date('rescrit_fiscal_date')->nullable();
 $table->string('signataire_nom')->nullable();
 $table->string('signataire_qualite')->nullable();       // ex: "Président·e", "Trésorier·e"
 ```
+
+Enum `App\Enums\RegimeFiscalDon` : `interet_general` | `reconnue_utilite_publique` | `cultuelle` | `enseignement_superieur_recherche` | `autre`.
 
 L'asso configure ces champs dans **Paramètres → Association → Reçus fiscaux** (nouvel encart).
 
@@ -167,6 +171,9 @@ Structure A4, charte AgoraGestion (cohérente avec `pdf.facture` / `pdf.attestat
      - `numeraire` → « Don manuel en numéraire ».
      - `abandon_revenus` → « Le donateur renonce expressément au remboursement des frais engagés dans le cadre de son activité bénévole et entend en faire don à l'association » (formulation BOFiP).
 7. **Mention légale** : « Le bénéficiaire certifie sur l'honneur que les dons et versements qu'il reçoit ouvrent droit à la réduction d'impôt prévue à l'article {200 | 238 bis} du CGI. »
+7bis. **Mentions complémentaires conditionnelles** :
+   - Si `loi_coluche_eligible` et donateur particulier (`art_200`) → mention 200-1 ter (réduction 75 % au lieu de 66 %, plafond légal annuel).
+   - Si `ifi_eligible` → mention article 978 CGI (réduction IFI 75 %, plafond 50 000 €).
 8. **Signature** : « Fait à {ville_asso}, le {date} » + nom + qualité du signataire + image cachet/signature (champ existant `Association.cachet_signature`).
 9. **Footer** : `PdfFooterRenderer` (réutilisé du reste de l'app).
 

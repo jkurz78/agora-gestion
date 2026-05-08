@@ -661,6 +661,15 @@ $activeGroup = match(true) {
                             </li>
                             @endif
 
+                            @if (Route::has('parametres.recus-fiscaux'))
+                            <li class="nav-item">
+                                <a href="{{ route('parametres.recus-fiscaux') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.recus-fiscaux') ? 'active' : '' }}">
+                                    <i class="bi bi-receipt me-2"></i> Reçus fiscaux
+                                </a>
+                            </li>
+                            @endif
+
                             @if (Route::has('parametres.utilisateurs.index'))
                             <li class="nav-item">
                                 <a href="{{ route('parametres.utilisateurs.index') }}"

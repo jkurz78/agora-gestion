@@ -15,15 +15,20 @@ use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
 use App\Models\Newsletter\SubscriptionRequest;
 use App\Models\NoteDeFrais;
+use App\Models\RecuFiscalEmis;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
+use App\Observers\TransactionLigneRecuFiscalObserver;
 use App\Observers\TransactionObserver;
+use App\Observers\TransactionRecuFiscalObserver;
 use App\Observers\UserRoleObserver;
 use App\Policies\ExtournePolicy;
 use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
+use App\Policies\RecuFiscalPolicy;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -46,10 +51,13 @@ final class AppServiceProvider extends ServiceProvider
         Gate::policy(FacturePartenaireDeposee::class, FacturePartenaireDeposeePolicy::class);
         Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
         Gate::policy(Extourne::class, ExtournePolicy::class);
+        Gate::policy(RecuFiscalEmis::class, RecuFiscalPolicy::class);
 
         Association::observe(AssociationObserver::class);
         Association::observe(ImmutableSlugObserver::class);
         Transaction::observe(TransactionObserver::class);
+        Transaction::observe(TransactionRecuFiscalObserver::class);
+        TransactionLigne::observe(TransactionLigneRecuFiscalObserver::class);
         User::observe(UserRoleObserver::class);
 
         // Rate limiter pour l'API newsletter publique : 5 requêtes / IP / heure.
