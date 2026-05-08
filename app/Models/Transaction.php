@@ -109,6 +109,11 @@ final class Transaction extends TenantModel
         return $this->hasMany(TransactionLigne::class);
     }
 
+    public function adhesions(): HasMany
+    {
+        return $this->hasMany(Adhesion::class);
+    }
+
     public function noteDeFrais(): HasOne
     {
         return $this->hasOne(NoteDeFrais::class);
