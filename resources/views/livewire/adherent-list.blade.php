@@ -30,7 +30,8 @@
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                 <tr>
                     <th>Nom</th>
-                    <th>Dernière cotisation</th>
+                    <th>Dernière adhésion</th>
+                    <th>Type</th>
                     <th>Montant</th>
                     <th>Mode</th>
                     <th>Compte</th>
@@ -40,7 +41,7 @@
             </thead>
             <tbody style="color:#555">
                 @forelse($membres as $membre)
-                    @php $cot = $membre->derniereCotisation; @endphp
+                    @php $adh = $membre->derniereAdhesion; @endphp
                     <tr style="cursor:pointer" data-tiers-href="{{ route('tiers.show', $membre->id) }}" onclick="if (!event.target.closest('button,a,input,select,textarea')) { window.location = this.dataset.tiersHref; }">
                         <td class="small">
                             @if($membre->type === 'entreprise')
@@ -51,30 +52,44 @@
                             {{ $membre->displayName() }}
                         </td>
                         <td class="small text-nowrap">
-                            @if($cot)
-                                {{ $cot->transaction->date->format('d/m/Y') }}
-                                <span class="text-muted">({{ app(\App\Services\ExerciceService::class)->anneeForDate($cot->transaction->date) }})</span>
+                            @if($adh && ! $adh->gratuite && $adh->transaction)
+                                {{ $adh->transaction->date->format('d/m/Y') }}
+                                <span class="text-muted">({{ app(\App\Services\ExerciceService::class)->anneeForDate($adh->transaction->date) }})</span>
+                            @elseif($adh)
+                                <span class="text-muted">Ex. {{ $adh->exercice }}</span>
                             @else
                                 <span class="text-muted">—</span>
                             @endif
                         </td>
+                        <td class="small">
+                            @if($adh && $adh->gratuite)
+                                <span class="badge text-bg-warning">Offerte</span>
+                                @if($adh->motif_gratuite)
+                                    <span class="text-muted ms-1" style="font-size:.75rem">{{ $adh->motif_gratuite }}</span>
+                                @endif
+                            @elseif($adh)
+                                <span class="badge text-bg-success">Cotisation</span>
+                            @else
+                                —
+                            @endif
+                        </td>
                         <td class="small fw-semibold text-nowrap">
-                            @if($cot)
-                                {{ number_format((float) $cot->montant, 2, ',', ' ') }} €
+                            @if($adh && ! $adh->gratuite && $adh->transaction)
+                                {{ number_format((float) $adh->transaction->lignes->sum('montant'), 2, ',', ' ') }} €
                             @else
                                 —
                             @endif
                         </td>
                         <td>
-                            @if($cot && $cot->transaction->mode_paiement)
-                                <span class="badge bg-secondary" style="font-size:.7rem">{{ $cot->transaction->mode_paiement->label() }}</span>
+                            @if($adh && ! $adh->gratuite && $adh->transaction?->mode_paiement)
+                                <span class="badge bg-secondary" style="font-size:.7rem">{{ $adh->transaction->mode_paiement->label() }}</span>
                             @else
                                 —
                             @endif
                         </td>
-                        <td class="small text-muted">{{ $cot?->transaction?->compte?->nom ?? '—' }}</td>
+                        <td class="small text-muted">{{ $adh?->transaction?->compte?->nom ?? '—' }}</td>
                         <td class="small">
-                            @if($cot && $cot->transaction->statut_reglement === \App\Enums\StatutReglement::Pointe)
+                            @if($adh && ! $adh->gratuite && $adh->transaction?->statut_reglement === \App\Enums\StatutReglement::Pointe)
                                 <i class="bi bi-check-lg text-success"></i>
                             @else
                                 <span class="text-muted">—</span>
@@ -98,7 +113,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-4">Aucun adhérent trouvé.</td>
+                        <td colspan="8" class="text-center text-muted py-4">Aucun adhérent trouvé.</td>
                     </tr>
                 @endforelse
             </tbody>
