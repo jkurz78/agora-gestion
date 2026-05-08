@@ -26,6 +26,10 @@ final class AdhesionService
             return null;
         }
 
+        if (empty($tx->tiers_id)) {
+            return null;
+        }
+
         $aUneLigneCotisation = $tx->lignes()
             ->whereHas('sousCategorie.usages', function ($q): void {
                 $q->where('usage', UsageComptable::Cotisation->value);
