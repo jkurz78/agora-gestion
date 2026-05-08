@@ -105,8 +105,8 @@ final class TiersQuickView extends Component
         }
 
         if (
-            ($asso->updated_at !== null && $asso->updated_at->gt($don->transaction->date))
-            || ($tiers->updated_at !== null && $tiers->updated_at->gt($don->transaction->date))
+            ($asso->updated_at !== null && $asso->updated_at->gt($don->transaction->created_at))
+            || ($tiers->updated_at !== null && $tiers->updated_at->gt($don->transaction->created_at))
         ) {
             $alertes[] = 'donnees_modifiees';
         }
@@ -122,7 +122,7 @@ final class TiersQuickView extends Component
         $this->showModaleAvertissement = false;
         $this->ligneAvecAvertissement = null;
         $this->avertissementsActifs = [];
-        $this->redirect($url);
+        $this->dispatch('open-new-tab', url: $url);
     }
 
     public function fermerModaleAvertissement(): void
@@ -181,8 +181,8 @@ final class TiersQuickView extends Component
                 }
 
                 if (
-                    ($asso->updated_at !== null && $asso->updated_at->gt($don->transaction->date))
-                    || ($tiers->updated_at !== null && $tiers->updated_at->gt($don->transaction->date))
+                    ($asso->updated_at !== null && $asso->updated_at->gt($don->transaction->created_at))
+                    || ($tiers->updated_at !== null && $tiers->updated_at->gt($don->transaction->created_at))
                 ) {
                     $alertes[] = 'donnees_modifiees';
                 }

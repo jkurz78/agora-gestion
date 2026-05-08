@@ -366,7 +366,7 @@
                                                 @php $recu = $recusParLigne[$don->id]; @endphp
                                                 <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
                                                    class="badge bg-success text-decoration-none"
-                                                   target="_blank">
+                                                   target="_blank" rel="noopener">
                                                     n° {{ $recu->numero }}
                                                 </a>
                                                 <button type="button"
@@ -406,7 +406,7 @@
                                                     <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
                                                        class="btn btn-sm btn-primary py-0"
                                                        style="font-size:.65rem"
-                                                       target="_blank">
+                                                       target="_blank" rel="noopener">
                                                         Télécharger reçu fiscal
                                                     </a>
                                                 @endif
@@ -431,3 +431,11 @@
         </div>
     @endif
 </div>
+
+<script>
+    document.addEventListener('livewire:init', () => {
+        Livewire.on('open-new-tab', (event) => {
+            window.open(event.url ?? event[0]?.url, '_blank', 'noopener');
+        });
+    });
+</script>
