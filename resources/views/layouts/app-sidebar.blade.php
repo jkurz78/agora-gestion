@@ -348,6 +348,7 @@
     <livewire:transaction-form />
     <livewire:virement-interne-form />
     <livewire:tiers-quick-view />
+    <livewire:offrir-adhesion-modal />
 
     @livewireScripts
     @include('partials.confirm-modal')

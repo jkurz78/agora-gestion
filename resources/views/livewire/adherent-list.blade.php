@@ -18,10 +18,23 @@
                style="max-width:250px"
                placeholder="Rechercher un adhérent…">
 
-        <a href="{{ route('comptabilite.transactions') }}"
-           class="btn btn-primary btn-sm ms-auto">
-            <i class="bi bi-plus-lg"></i> Nouvelle cotisation
-        </a>
+        <div class="dropdown ms-auto">
+            <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-plus-lg"></i> Nouvelle adhésion
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <a class="dropdown-item" href="{{ route('comptabilite.transactions') }}">
+                        <i class="bi bi-cash-coin me-1"></i> Nouvelle cotisation (avec paiement)
+                    </a>
+                </li>
+                <li>
+                    <button type="button" class="dropdown-item" onclick="window.Livewire.dispatch('offrir-adhesion')">
+                        <i class="bi bi-gift me-1"></i> Adhésion gratuite (offerte)
+                    </button>
+                </li>
+            </ul>
+        </div>
     </div>
 
     {{-- Tableau --}}
