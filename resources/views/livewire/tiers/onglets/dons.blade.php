@@ -85,7 +85,8 @@
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Date</th>
-                            <th>Sous-catégorie</th>
+                            <th>Nature du don</th>
+                            <th>Opération</th>
                             <th class="text-end">Montant</th>
                             <th>Reçu fiscal</th>
                             <th></th>
@@ -99,6 +100,7 @@
                                 {{ optional($don->transaction->date)->format('d/m/Y') }}
                             </td>
                             <td>{{ $don->sousCategorie->nom ?? '—' }}</td>
+                            <td>{{ $don->operation->nom ?? '—' }}</td>
                             <td class="text-end" data-sort="{{ $don->montant }}">
                                 {{ number_format((float) $don->montant, 2, ',', ' ') }} €
                             </td>

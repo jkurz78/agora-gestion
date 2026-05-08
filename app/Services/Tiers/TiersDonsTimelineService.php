@@ -31,7 +31,7 @@ final class TiersDonsTimelineService
             ->whereHas('sousCategorie.usages', function ($q): void {
                 $q->where('usage', UsageComptable::Don->value);
             })
-            ->with(['transaction', 'sousCategorie'])
+            ->with(['transaction', 'sousCategorie', 'operation'])
             ->orderByDesc('id');
 
         $dons = $query->get();
