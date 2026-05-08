@@ -327,6 +327,18 @@
                             <i class="bi bi-heart-fill small text-warning"></i>
                             <span class="fw-semibold small">Dons du tiers</span>
                         </div>
+
+                        @if(session('error'))
+                            <div class="alert alert-danger py-2 small mb-2">{{ session('error') }}</div>
+                        @endif
+
+                        @if(isset($raisonBlocageGlobal) && $raisonBlocageGlobal !== null)
+                            <div class="alert alert-warning py-2 small mb-2">
+                                {{ $raisonBlocageGlobal }}
+                                <a href="{{ route('parametres.recus-fiscaux') }}" class="alert-link">Configurer dans Paramètres → Reçus fiscaux</a>
+                            </div>
+                        @endif
+
                         <table class="table table-sm table-hover mb-0" style="font-size:.75rem">
                             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                                 <tr>
@@ -349,6 +361,7 @@
                                             {{ number_format((float) $don->montant, 2, ',', ' ') }} €
                                         </td>
                                         <td>
+                                            @php $peutTelecharger = $peutTelechargerParLigne[$don->id] ?? false; @endphp
                                             @if(isset($recusParLigne[$don->id]))
                                                 @php $recu = $recusParLigne[$don->id]; @endphp
                                                 <a href="{{ route('tiers.dons.recu-fiscal', ['tiers' => $tiers, 'ligne' => $don]) }}"
@@ -361,6 +374,13 @@
                                                         style="font-size:.65rem"
                                                         wire:click="ouvrirModaleAnnulation({{ $recu->id }})"
                                                         title="Annuler et ré-émettre">⋯</button>
+                                            @elseif(! $peutTelecharger)
+                                                @php $raisonLigne = $raisonsBlocageParLigne[$don->id] ?? 'Configuration incomplète'; @endphp
+                                                <button type="button" class="btn btn-sm btn-outline-secondary py-0"
+                                                        style="font-size:.65rem" disabled
+                                                        title="{{ $raisonLigne }}">
+                                                    Reçu indisponible
+                                                </button>
                                             @else
                                                 @php $alertes = $alertesParLigne[$don->id] ?? []; @endphp
                                                 @if(!empty($alertes))

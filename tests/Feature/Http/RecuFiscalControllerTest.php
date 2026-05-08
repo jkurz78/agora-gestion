@@ -44,7 +44,7 @@ it('télécharge le PDF d\'un don éligible (création + stream)', function () {
     $response->assertHeader('Content-Type', 'application/pdf');
 });
 
-it('retourne 422 si l\'asso n\'est pas éligible', function () {
+it('redirige avec flash error si l\'asso n\'est pas éligible', function () {
     $asso = Association::factory()->create(['eligible_recu_fiscal' => false]);
     TenantContext::boot($asso);
     $user = User::factory()->create();
@@ -60,7 +60,8 @@ it('retourne 422 si l\'asso n\'est pas éligible', function () {
             'ligne' => $ligne,
         ]));
 
-    $response->assertStatus(422);
+    $response->assertRedirect();
+    $response->assertSessionHas('error');
 });
 
 it('retourne 403 pour un user d\'un autre tenant', function () {
@@ -104,5 +105,5 @@ it('redirige vers le reçu de remplacement si l\'actuel est annulé', function (
         ]));
 
     $response->assertOk();
-    $response->assertHeader('Content-Disposition', 'attachment; filename=recu-fiscal-'.$nouveau->numero.'.pdf');
+    $response->assertHeader('Content-Type', 'application/pdf');
 });

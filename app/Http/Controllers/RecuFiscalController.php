@@ -26,15 +26,15 @@ final class RecuFiscalController extends Controller
         try {
             $recu = $this->service->obtenirOuGenerer($ligne, $request->user());
         } catch (RecuFiscalException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            return redirect()->back()->with('error', $e->getMessage());
         }
 
         $this->authorize('download', $recu);
 
         if ($recu->isAnnule() && $recu->remplace_par_id === null) {
-            return response()->json([
-                'message' => "Reçu annulé le {$recu->annule_at->format('d/m/Y')} — motif : {$recu->annule_motif}",
-            ], 410);
+            $message = "Reçu annulé le {$recu->annule_at->format('d/m/Y')} — motif : {$recu->annule_motif}";
+
+            return redirect()->back()->with('error', $message);
         }
 
         return $this->service->streamPdf($recu);

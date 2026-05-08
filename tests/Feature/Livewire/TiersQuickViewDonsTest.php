@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\RoleAssociation;
+use App\Enums\StatutReglement;
 use App\Livewire\TiersQuickView;
 use App\Models\Association;
 use App\Models\User;
@@ -92,4 +93,32 @@ it('affiche un avertissement si l\'asso a été modifiée depuis le don', functi
     Livewire::actingAs($user)->test(TiersQuickView::class)
         ->dispatch('open-tiers-quick-view', tiersId: $tiersId)
         ->assertSeeText('coordonnées');
+});
+
+it('désactive le bouton télécharger si l\'asso n\'est pas éligible', function () {
+    $asso = Association::factory()->create([
+        'eligible_recu_fiscal' => false,
+        'signataire_nom' => 'J',
+        'signataire_qualite' => 'P',
+    ]);
+    TenantContext::boot($asso);
+    $user = User::factory()->create();
+    $user->associations()->attach($asso, ['role' => RoleAssociation::Admin->value, 'joined_at' => now()]);
+    $ligne = $this->ligneDonValide();
+
+    Livewire::actingAs($user)->test(TiersQuickView::class)
+        ->dispatch('open-tiers-quick-view', tiersId: $ligne->transaction->tiers_id)
+        ->assertSeeText('Reçu indisponible')
+        ->assertSeeText('Configurer dans Paramètres');
+});
+
+it('désactive le bouton si la transaction n\'est pas encaissée', function () {
+    [$asso, $user] = setupAssoUser17();
+    $ligne = $this->ligneDonValide(transactionOverrides: [
+        'statut_reglement' => StatutReglement::EnAttente,
+    ]);
+
+    Livewire::actingAs($user)->test(TiersQuickView::class)
+        ->dispatch('open-tiers-quick-view', tiersId: $ligne->transaction->tiers_id)
+        ->assertSee('Don non encaissé');
 });
