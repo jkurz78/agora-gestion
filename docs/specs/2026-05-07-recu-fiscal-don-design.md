@@ -17,7 +17,7 @@ Le reçu :
 | Décision | Choix retenu | Justification |
 |---|---|---|
 | Format légal | Attestation libre (modèle asso), pas le CERFA 11580*05 | BOI-IR-RICI-250-30 : modèle libre admis si mentions obligatoires présentes. Aligné sur la pratique HelloAsso. |
-| Format technique | PDF/A-3 via `Atgp\FacturX\Writer::generate(..., 'minimum', false)` avec XML métadonnées minimal | Réutilisation du pipeline `FactureService` / `DocumentPrevisionnelService`, aucune dépendance nouvelle. Probant + pérenne. |
+| Format technique | PDF standard (DomPDF), pas PDF/A-3. Probance assurée par numérotation + SHA256 + horodatage. | **Revirement post-livraison MVP (2026-05-08)** : le wrap `Atgp\FacturX\Writer` a été retiré au profit de DomPDF brut. Raison : DomPDF ne produit pas de PDF/A-3 conforme nativement (polices/colorspace), le wrap FacturX produisait un fichier qui « se prétend » PDF/A-3 mais que les lecteurs stricts (Adobe Reader, Preview) rejettent. Le besoin légal n'exige pas PDF/A-3 pour un reçu fiscal. |
 | Granularité MVP | 1 reçu par transaction de don | Récap annuel agrégé = phase 2. |
 | Période fiscale (phase 2) | Année civile (jamais exercice comptable) | Obligation fiscale : déclaration 2042 RICI sur année civile. |
 | Stockage | PDF binaire stocké sur disque tenant + `pdf_hash` SHA256 en base | Fige le rendu (immunise contre une évolution future du template Blade). Vérification d'intégrité à chaque téléchargement. |
