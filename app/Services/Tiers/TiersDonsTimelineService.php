@@ -8,7 +8,6 @@ use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
 use App\Models\Association;
 use App\Models\RecuFiscalEmis;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Services\Tiers\DTO\AnneeCivileDTO;
@@ -21,8 +20,6 @@ final class TiersDonsTimelineService
 {
     public function forTiers(Tiers $tiers, ?int $anneeCivile = null): DonsTimelineDTO
     {
-        $sousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
-
         $query = TransactionLigne::query()
             ->whereHas('transaction', function ($q) use ($tiers, $anneeCivile) {
                 $q->where('tiers_id', (int) $tiers->id)
@@ -31,7 +28,9 @@ final class TiersDonsTimelineService
                     $q->whereYear('date', $anneeCivile);
                 }
             })
-            ->whereIn('sous_categorie_id', $sousCategorieIds)
+            ->whereHas('sousCategorie.usages', function ($q): void {
+                $q->where('usage', UsageComptable::Don->value);
+            })
             ->with(['transaction', 'sousCategorie'])
             ->orderByDesc('id');
 
@@ -43,7 +42,10 @@ final class TiersDonsTimelineService
             ->get()
             ->keyBy('transaction_ligne_id');
 
-        $asso = Association::findOrFail(TenantContext::currentId());
+        $asso = TenantContext::current();
+        if ($asso === null) {
+            throw new \RuntimeException('TenantContext not booted in TiersDonsTimelineService::forTiers()');
+        }
 
         $raisonBlocageGlobal = $this->raisonBlocageGlobal($asso);
         $adresseTiersOk = ! empty($tiers->adresse_ligne1)
@@ -65,18 +67,21 @@ final class TiersDonsTimelineService
         $annees = [];
         foreach ($groupes as $annee => $items) {
             /** @var Collection<int, DonLigneDTO> $items */
+            $totalAnnee = $items->sum(fn (DonLigneDTO $d): float => (float) $d->ligne->montant);
             $annees[(int) $annee] = new AnneeCivileDTO(
                 annee: (int) $annee,
                 count: $items->count(),
-                total: (string) $items->sum(fn (DonLigneDTO $d): float => (float) $d->ligne->montant),
+                total: number_format($totalAnnee, 2, '.', ''),
                 lignes: $items->values()->all(),
             );
         }
 
+        $totalMontantFloat = $lignesDto->sum(fn (DonLigneDTO $d): float => (float) $d->ligne->montant);
+
         return new DonsTimelineDTO(
             annees: $annees,
             totalCount: $lignesDto->count(),
-            totalMontant: (string) $lignesDto->sum(fn (DonLigneDTO $d): float => (float) $d->ligne->montant),
+            totalMontant: number_format($totalMontantFloat, 2, '.', ''),
             raisonBlocageGlobal: $raisonBlocageGlobal,
         );
     }

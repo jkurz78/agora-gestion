@@ -137,6 +137,8 @@ it('bloque le téléchargement si l\'adresse du tiers est incomplète', function
         'signataire_nom' => 'Jean Dupont',
         'signataire_qualite' => 'Président',
     ]);
+    // Re-boot TenantContext so TenantContext::current() returns the fresh instance.
+    TenantContext::boot($asso->fresh());
 
     $tiers = Tiers::factory()->create([
         'adresse_ligne1' => null,
@@ -172,6 +174,8 @@ it('expose un raisonBlocageGlobal si signataire de l\'asso est absent', function
         'signataire_nom' => null,
         'signataire_qualite' => null,
     ]);
+    // Re-boot TenantContext so TenantContext::current() returns the fresh instance.
+    TenantContext::boot($asso->fresh());
 
     $tiers = Tiers::factory()->create();
 
