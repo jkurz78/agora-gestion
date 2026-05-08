@@ -5,6 +5,9 @@
     /** @var string $montantFormate */
     /** @var string $montantEnLettres */
     /** @var string $articleCgiLibelle */
+    /** @var string $numeroCgi */
+    /** @var string $titreDocument */
+    /** @var string|null $contexteSpecifique */
     /** @var string $formeLibelle */
     /** @var string $modeLibelle */
     /** @var string|null $headerLogoBase64 */
@@ -168,11 +171,7 @@
     <div class="header">
         <table class="layout">
             <tr>
-                <td style="width:60%">
-                    @if (! empty($headerLogoBase64))
-                        <img src="data:{{ $headerLogoMime }};base64,{{ $headerLogoBase64 }}"
-                             class="logo" alt="Logo {{ $asso->nom }}">
-                    @endif
+                <td style="width:75%; vertical-align:top;">
                     <div class="association-name">{{ $asso->nom }}</div>
                     @if ($asso->forme_juridique ?? null)
                         <div class="association-subtitle">{{ $asso->forme_juridique }}</div>
@@ -192,19 +191,18 @@
                         </div>
                     @endif
                 </td>
-                <td style="width:40%; text-align:right; vertical-align:top;">
-                    <div style="font-size:9px; color:#6c757d; margin-bottom:2px;">
-                        Association loi 1901
-                    </div>
+                <td style="width:25%; text-align:right; vertical-align:top;">
+                    @if (! empty($headerLogoBase64))
+                        <img src="data:{{ $headerLogoMime }};base64,{{ $headerLogoBase64 }}"
+                             class="logo" alt="Logo {{ $asso->nom }}">
+                    @endif
                 </td>
             </tr>
         </table>
     </div>
 
     {{-- ===== TITRE ===== --}}
-    <div class="doc-title">
-        Reçu au titre des dons à certains organismes d'intérêt général
-    </div>
+    <div class="doc-title">{{ $titreDocument }}</div>
     <div class="doc-numero">
         Reçu n° <strong>{{ $recu->numero }}</strong>
         &mdash;
@@ -304,10 +302,16 @@
         </table>
     </div>
 
+    @if (! empty($contexteSpecifique))
+        <p style="font-size:10px; font-style:italic; color:#3d5473; margin: 8px 0;">
+            {{ $contexteSpecifique }}
+        </p>
+    @endif
+
     {{-- ===== MENTION LÉGALE ===== --}}
     <div class="mention-legale">
         Le bénéficiaire certifie sur l'honneur que les dons et versements qu'il reçoit ouvrent droit
-        à la réduction d'impôt prévue à l'<strong>{{ $articleCgiLibelle }}</strong>
+        à la réduction d'impôt prévue à l'article <strong>{{ $numeroCgi }}</strong>
         du Code général des impôts.
     </div>
 
@@ -331,7 +335,11 @@
     {{-- ===== SIGNATURE ===== --}}
     <div class="signature-block">
         <div class="fait-a">
-            Fait à {{ $asso->ville ?? '' }}, le {{ $recu->emitted_at->translatedFormat('j F Y') }}
+            @if (! empty($asso->ville))
+                Fait à {{ $asso->ville }}, le {{ $recu->emitted_at->translatedFormat('j F Y') }}
+            @else
+                Le {{ $recu->emitted_at->translatedFormat('j F Y') }}
+            @endif
         </div>
         @if ($asso->signataire_nom ?? null)
             <div class="signataire-nom">{{ $asso->signataire_nom }}</div>

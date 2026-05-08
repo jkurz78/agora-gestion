@@ -202,6 +202,22 @@ final class RecuFiscalService
             default => $articleCgi,
         };
 
+        $numeroCgi = match ($articleCgi) {
+            'art_200' => '200',
+            'art_238_bis' => '238 bis',
+            default => $articleCgi,
+        };
+
+        $estMecenatEntreprise = $articleCgi === 'art_238_bis' && $donateur->type === 'entreprise';
+
+        $titreDocument = $estMecenatEntreprise
+            ? "Reçu au titre du mécénat d'entreprise"
+            : "Reçu au titre des dons à certains organismes d'intérêt général";
+
+        $contexteSpecifique = $estMecenatEntreprise
+            ? "Versement effectué dans le cadre du mécénat d'entreprise prévu à l'article 238 bis du CGI."
+            : null;
+
         $formeLibelle = match ($formeDon) {
             'numeraire' => 'Don manuel en numéraire',
             'abandon_revenus' => "Le donateur renonce expressément au remboursement des frais engagés dans le cadre de son activité bénévole et entend en faire don à l'association.",
@@ -265,6 +281,9 @@ final class RecuFiscalService
             'montantFormate' => $montantFormate,
             'montantEnLettres' => $montantEnLettres,
             'articleCgiLibelle' => $articleCgiLibelle,
+            'numeroCgi' => $numeroCgi,
+            'titreDocument' => $titreDocument,
+            'contexteSpecifique' => $contexteSpecifique,
             'formeLibelle' => $formeLibelle,
             'modeLibelle' => $modeLibelle,
             'headerLogoBase64' => $headerLogoBase64,

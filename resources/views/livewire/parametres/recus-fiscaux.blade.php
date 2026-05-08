@@ -66,12 +66,18 @@
                 <div class="col-md-6">
                     <label for="sigNom" class="form-label">Signataire — Nom</label>
                     <input type="text" id="sigNom" class="form-control" wire:model="signataireNom">
+                    <div class="form-text">
+                        Prénom et nom du signataire qui paraîtront sur le reçu.
+                    </div>
                     @error('signataireNom') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                 </div>
                 <div class="col-md-6">
                     <label for="sigQual" class="form-label">Signataire — Qualité</label>
                     <input type="text" id="sigQual" class="form-control" wire:model="signataireQualite"
                            placeholder="Ex: Président·e, Trésorier·e">
+                    <div class="form-text">
+                        Saisissez la fonction telle qu'elle apparaîtra sur le reçu (Président, Présidente, Trésorier, Trésorière, etc.). Vérifiez l'orthographe avant d'enregistrer.
+                    </div>
                     @error('signataireQualite') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
                 </div>
             </div>
