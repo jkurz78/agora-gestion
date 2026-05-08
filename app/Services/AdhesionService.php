@@ -43,10 +43,13 @@ final class AdhesionService
         $exercice = $this->exerciceFromDate($tx->date);
 
         return DB::transaction(function () use ($tx, $exercice): Adhesion {
+            // Une seule adhésion par tiers/exercice (contrainte unique métier).
+            // Si plusieurs transactions cotisations existent sur le même exercice
+            // (paiement échelonné, correction…), la première transaction "porte"
+            // l'adhésion et les suivantes sont absorbées en idempotence.
             $adhesion = Adhesion::withTrashed()
                 ->where('tiers_id', (int) $tx->tiers_id)
                 ->where('exercice', $exercice)
-                ->where('transaction_id', (int) $tx->id)
                 ->first();
 
             if ($adhesion?->trashed()) {
@@ -56,7 +59,7 @@ final class AdhesionService
             }
 
             if ($adhesion !== null) {
-                return $adhesion; // idempotence
+                return $adhesion; // idempotence : ne pas écraser transaction_id
             }
 
             return Adhesion::create([
