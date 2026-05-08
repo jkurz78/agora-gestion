@@ -19,6 +19,8 @@ use App\Models\RecuFiscalEmis;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Observers\AdhesionObserver;
+use App\Observers\AdhesionTransactionLigneObserver;
 use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\TransactionLigneRecuFiscalObserver;
@@ -57,7 +59,9 @@ final class AppServiceProvider extends ServiceProvider
         Association::observe(ImmutableSlugObserver::class);
         Transaction::observe(TransactionObserver::class);
         Transaction::observe(TransactionRecuFiscalObserver::class);
+        Transaction::observe(AdhesionObserver::class);
         TransactionLigne::observe(TransactionLigneRecuFiscalObserver::class);
+        TransactionLigne::observe(AdhesionTransactionLigneObserver::class);
         User::observe(UserRoleObserver::class);
 
         // Rate limiter pour l'API newsletter publique : 5 requêtes / IP / heure.
