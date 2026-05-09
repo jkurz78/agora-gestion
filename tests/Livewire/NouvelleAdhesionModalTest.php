@@ -105,7 +105,7 @@ it('mode durée affiche date_debut + date_fin readonly', function (): void {
         ->set('tiersId', $this->tiers->id)
         ->set('formuleId', $formuleDuree->id)
         ->set('dateDebut', '2025-10-15')
-        ->assertSet('dateFinCalculee', '2026-10-15');
+        ->assertSet('dateFinCalculee', '2026-10-14');
 });
 
 it('refuse un doublon avec un message d\'erreur fr', function (): void {

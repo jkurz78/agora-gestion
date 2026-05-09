@@ -106,7 +106,7 @@ it('crée une adhésion mode durée avec date_debut/date_fin calculées', functi
     $adhesion = $service->creerDepuisWizard($dto, $this->user);
 
     expect($adhesion->date_debut->toDateString())->toBe('2025-10-15');
-    expect($adhesion->date_fin->toDateString())->toBe('2026-10-15');
+    expect($adhesion->date_fin->toDateString())->toBe('2026-10-14');
     expect($adhesion->exercice)->toBeNull();
 });
 

@@ -126,7 +126,7 @@ final class AdhesionService
     {
         if ($formule !== null && $formule->isModeDuree()) {
             $debut = CarbonImmutable::parse($tx->date);
-            $fin = $debut->addMonths((int) $formule->duree_mois);
+            $fin = $debut->addMonths((int) $formule->duree_mois)->subDay();
 
             return [
                 'exercice' => null,
@@ -202,7 +202,7 @@ final class AdhesionService
             // 1. Calcul dates / exercice
             if ($formule->isModeDuree()) {
                 $dateDebut = $dto->dateDebut ?? Carbon::today();
-                $dateFin = $dateDebut->copy()->addMonths((int) $formule->duree_mois);
+                $dateFin = $dateDebut->copy()->addMonths((int) $formule->duree_mois)->subDay();
                 $exercice = null;
             } else {
                 $dateDebut = null;

@@ -59,7 +59,7 @@ it('observer en mode durée pose date_debut + date_fin et exercice null', functi
     $adhesion = Adhesion::first();
     expect($adhesion->formule_adhesion_id)->toBe($formule->id);
     expect($adhesion->date_debut?->toDateString())->toBe('2025-10-15');
-    expect($adhesion->date_fin?->toDateString())->toBe('2026-10-15');
+    expect($adhesion->date_fin?->toDateString())->toBe('2026-10-14');
     expect($adhesion->exercice)->toBeNull();
 });
 
@@ -98,7 +98,7 @@ it('observer applique la formule depuis le mapping HelloAsso (priorité 1)', fun
     $adhesion = Adhesion::first();
     expect($adhesion->formule_adhesion_id)->toBe($formuleHelloAsso->id);
     expect($adhesion->date_debut?->toDateString())->toBe('2025-10-15');
-    expect($adhesion->date_fin?->toDateString())->toBe('2026-10-15');
+    expect($adhesion->date_fin?->toDateString())->toBe('2026-10-14');
 });
 
 it('observer crée une adhésion legacy si pas de formule paramétrée', function (): void {

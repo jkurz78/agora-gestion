@@ -95,7 +95,7 @@ it('crée une adhésion avec la formule mappée (mode durée → date_fin = +12 
     $adhesion = Adhesion::first();
     expect($adhesion->formule_adhesion_id)->toBe($this->formule->id);
     expect($adhesion->date_debut?->toDateString())->toBe('2025-10-15');
-    expect($adhesion->date_fin?->toDateString())->toBe('2026-10-15');
+    expect($adhesion->date_fin?->toDateString())->toBe('2026-10-14');
 });
 
 it('crée une adhésion legacy si tier non mappé', function (): void {

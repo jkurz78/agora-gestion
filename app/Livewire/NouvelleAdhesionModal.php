@@ -97,6 +97,7 @@ final class NouvelleAdhesionModal extends Component
 
         return Carbon::parse($this->dateDebut)
             ->addMonths((int) $formule->duree_mois)
+            ->subDay()
             ->toDateString();
     }
 
