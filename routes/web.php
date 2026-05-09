@@ -188,7 +188,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
     ->name('comptabilite.')
     ->group(function (): void {
         Route::view('/transactions', 'transactions.index')->name('transactions');
-        Route::view('/transactions/all', 'transactions.all')->name('transactions.all');
+        Route::view('/cotisations', 'cotisations.index')->name('cotisations');
+        Route::view('/dons', 'dons.index')->name('dons');
         Route::get('/transactions/import/template/{type}', [CsvImportController::class, 'template'])
             ->whereIn('type', ['depense', 'recette'])
             ->name('transactions.import.template');
@@ -258,8 +259,6 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         Route::get('/template/xlsx', [TiersTemplateController::class, 'xlsx'])->name('template.xlsx');
         Route::get('/export', TiersExportController::class)->name('export');
         Route::view('/adherents', 'gestion.adherents')->name('adherents');
-        Route::view('/dons', 'dons.index')->name('dons');
-        Route::view('/cotisations', 'cotisations.index')->name('cotisations');
         Route::view('/communication', 'tiers.communication')->name('communication');
         Route::get('/{tiers}', function (Tiers $tiers) {
             return view('tiers.show', compact('tiers'));
@@ -339,12 +338,8 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/compta/dashboard', '/dashboard');
     Route::permanentRedirect('/gestion/dashboard', '/dashboard');
     Route::permanentRedirect('/compta/transactions', '/comptabilite/transactions');
-    Route::permanentRedirect('/compta/transactions/all', '/comptabilite/transactions/all');
     Route::permanentRedirect('/compta/budget', '/comptabilite/budget');
     Route::permanentRedirect('/transactions', '/comptabilite/transactions');
-    Route::permanentRedirect('/transactions/all', '/comptabilite/transactions/all');
-    Route::permanentRedirect('/dons', '/tiers/dons');
-    Route::permanentRedirect('/cotisations', '/tiers/cotisations');
     Route::permanentRedirect('/budget', '/comptabilite/budget');
     Route::permanentRedirect('/rapprochement', '/banques/rapprochement');
     Route::permanentRedirect('/virements', '/banques/virements');
@@ -358,8 +353,6 @@ Route::middleware('auth')->group(function (): void {
     Route::permanentRedirect('/membres', '/tiers/adherents');
     Route::permanentRedirect('/compta/tiers', '/tiers');
     Route::permanentRedirect('/gestion/adherents', '/tiers/adherents');
-    Route::permanentRedirect('/compta/dons', '/tiers/dons');
-    Route::permanentRedirect('/compta/cotisations', '/tiers/cotisations');
     Route::permanentRedirect('/compta/banques/comptes', '/banques/comptes');
     Route::permanentRedirect('/compta/banques/rapprochement', '/banques/rapprochement');
     Route::permanentRedirect('/compta/banques/virements', '/banques/virements');

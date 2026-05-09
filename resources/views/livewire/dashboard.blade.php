@@ -160,7 +160,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0"><a href="{{ route('tiers.dons') }}" class="text-decoration-none text-dark">Derniers dons</a></h5>
+                    <h5 class="mb-0"><a href="{{ route('comptabilite.dons') }}" class="text-decoration-none text-dark">Derniers dons</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -193,7 +193,7 @@
         <div class="col-md-6">
             <div class="card h-100">
                 <div class="card-header">
-                    <h5 class="mb-0"><a href="{{ route('tiers.cotisations') }}" class="text-decoration-none text-dark"><i class="bi bi-person-check"></i> Dernières adhésions</a></h5>
+                    <h5 class="mb-0"><a href="{{ route('comptabilite.cotisations') }}" class="text-decoration-none text-dark"><i class="bi bi-person-check"></i> Dernières adhésions</a></h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">

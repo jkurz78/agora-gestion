@@ -105,7 +105,7 @@
 
 @php
 $activeGroup = match(true) {
-    request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*') => 'comptabilite',
+    request()->routeIs('comptabilite.transactions*', 'comptabilite.budget*', 'comptabilite.ndf.*', 'comptabilite.dons', 'comptabilite.cotisations') => 'comptabilite',
     request()->routeIs('banques.rapprochement.*', 'banques.virements.*', 'banques.helloasso-sync',
         'banques.comptes.*', 'banques.remises*') => 'banques',
     request()->routeIs('tiers.*') => 'tiers',
@@ -175,12 +175,23 @@ $activeGroup = match(true) {
                                 </a>
                             </li>
 
+                            @if (Route::has('comptabilite.dons'))
                             <li class="nav-item">
-                                <a href="{{ route('comptabilite.transactions.all') }}"
-                                   class="nav-link {{ request()->routeIs('comptabilite.transactions.all') ? 'active' : '' }}">
-                                    <i class="bi bi-collection me-1"></i> Toutes les transactions
+                                <a href="{{ route('comptabilite.dons') }}"
+                                   class="nav-link {{ request()->routeIs('comptabilite.dons') ? 'active' : '' }}">
+                                    <i class="bi bi-heart me-1"></i> Dons
                                 </a>
                             </li>
+                            @endif
+
+                            @if (Route::has('comptabilite.cotisations'))
+                            <li class="nav-item">
+                                <a href="{{ route('comptabilite.cotisations') }}"
+                                   class="nav-link {{ request()->routeIs('comptabilite.cotisations') ? 'active' : '' }}">
+                                    <i class="bi bi-person-check me-1"></i> Cotisations
+                                </a>
+                            </li>
+                            @endif
 
                             @if(($canSeeNdf && Route::has('comptabilite.ndf.index')) || ($canSeeFacturesPartenaires && Route::has('comptabilite.factures-fournisseurs.index')))
                             @php
@@ -348,24 +359,6 @@ $activeGroup = match(true) {
                                     <i class="bi bi-person-badge me-1"></i> Adhérents
                                 </a>
                             </li>
-
-                            @if (Route::has('tiers.dons'))
-                            <li class="nav-item">
-                                <a href="{{ route('tiers.dons') }}"
-                                   class="nav-link {{ request()->routeIs('tiers.dons') ? 'active' : '' }}">
-                                    <i class="bi bi-heart me-1"></i> Dons
-                                </a>
-                            </li>
-                            @endif
-
-                            @if (Route::has('tiers.cotisations'))
-                            <li class="nav-item">
-                                <a href="{{ route('tiers.cotisations') }}"
-                                   class="nav-link {{ request()->routeIs('tiers.cotisations') ? 'active' : '' }}">
-                                    <i class="bi bi-person-check me-1"></i> Cotisations
-                                </a>
-                            </li>
-                            @endif
 
                             @if (Route::has('tiers.communication'))
                             <li class="nav-item">

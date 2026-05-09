@@ -104,7 +104,7 @@ it('affiche un bouton Voir sur la liste des dons', function (): void {
     ]);
 
     $this->actingAs($this->user)
-        ->get(route('tiers.dons'))
+        ->get(route('comptabilite.dons'))
         ->assertOk()
         ->assertSee(route('tiers.show', $tiers->id));
 });
@@ -134,7 +134,7 @@ it('affiche un bouton Voir sur la liste des cotisations', function (): void {
     ]);
 
     $this->actingAs($this->user)
-        ->get(route('tiers.cotisations'))
+        ->get(route('comptabilite.cotisations'))
         ->assertOk()
         ->assertSee(route('tiers.show', $tiers->id));
 });

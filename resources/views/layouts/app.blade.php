@@ -166,7 +166,7 @@
                     @if(($espace ?? null) === \App\Enums\Espace::Compta)
                     {{-- Dropdown Transactions --}}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {{ request()->routeIs('comptabilite.transactions*') || request()->routeIs('tiers.dons') || request()->routeIs('tiers.cotisations') ? 'active' : '' }}"
+                        <a class="nav-link dropdown-toggle {{ request()->routeIs('comptabilite.transactions*', 'comptabilite.dons', 'comptabilite.cotisations') ? 'active' : '' }}"
                            href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-arrow-down-up"></i> Transactions
                         </a>
@@ -178,29 +178,22 @@
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
-                            @if (Route::has('tiers.dons'))
+                            @if (Route::has('comptabilite.dons'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('tiers.dons') ? 'active' : '' }}"
-                                   href="{{ route('tiers.dons') }}">
+                                <a class="dropdown-item {{ request()->routeIs('comptabilite.dons') ? 'active' : '' }}"
+                                   href="{{ route('comptabilite.dons') }}">
                                     <i class="bi bi-heart"></i> Dons
                                 </a>
                             </li>
                             @endif
-                            @if (Route::has('tiers.cotisations'))
+                            @if (Route::has('comptabilite.cotisations'))
                             <li>
-                                <a class="dropdown-item {{ request()->routeIs('tiers.cotisations') ? 'active' : '' }}"
-                                   href="{{ route('tiers.cotisations') }}">
+                                <a class="dropdown-item {{ request()->routeIs('comptabilite.cotisations') ? 'active' : '' }}"
+                                   href="{{ route('comptabilite.cotisations') }}">
                                     <i class="bi bi-person-check"></i> Cotisations
                                 </a>
                             </li>
                             @endif
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item {{ request()->routeIs('comptabilite.transactions.all') ? 'active' : '' }}"
-                                   href="{{ route('comptabilite.transactions.all') }}">
-                                    <i class="bi bi-collection"></i> Toutes les transactions
-                                </a>
-                            </li>
                         </ul>
                     </li>
 
