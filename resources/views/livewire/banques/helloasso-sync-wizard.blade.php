@@ -125,6 +125,14 @@
                                                             style="padding:.15rem .5rem">
                                                         <i class="bi bi-plus-lg"></i>
                                                     </button>
+                                                    @if ($fm->form_type === 'Membership')
+                                                        <button wire:click="chargerPaliers({{ $fm->id }})"
+                                                                class="btn btn-sm btn-outline-info"
+                                                                title="Configurer les paliers d'adhésion"
+                                                                style="padding:.15rem .5rem">
+                                                            <i class="bi bi-stars"></i>
+                                                        </button>
+                                                    @endif
                                                 </div>
                                             </td>
                                         </tr>
@@ -167,6 +175,67 @@
                                                                 </button>
                                                             </div>
                                                         </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endif
+                                        @if ($showPaliersFor === $fm->id)
+                                            <tr wire:key="paliers-{{ $fm->id }}">
+                                                <td colspan="5">
+                                                    <div class="bg-light rounded p-3">
+                                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                                            <h6 class="mb-0"><i class="bi bi-stars me-1"></i> Paliers d'adhésion — {{ $fm->form_title ?? $fm->form_slug }}</h6>
+                                                            <button wire:click="fermerPaliers" class="btn btn-sm btn-outline-secondary" title="Fermer">
+                                                                <i class="bi bi-x-lg"></i>
+                                                            </button>
+                                                        </div>
+
+                                                        @if ($paliersErreur)
+                                                            <div class="alert alert-warning py-2 small">{{ $paliersErreur }}</div>
+                                                        @endif
+
+                                                        @if (! empty($paliersForms[$fm->id]))
+                                                            <p class="text-muted small mb-2">
+                                                                Associez chaque palier HelloAsso à une formule d'adhésion AgoraGestion.
+                                                                Le sync utilisera ce mapping pour appliquer la bonne formule lors de l'import des cotisations.
+                                                            </p>
+                                                            <table class="table table-sm mb-0">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>Palier HelloAsso</th>
+                                                                        <th class="text-end">Prix</th>
+                                                                        <th>Formule cible</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    @foreach ($paliersForms[$fm->id] as $palier)
+                                                                        <tr>
+                                                                            <td class="small">{{ $palier['label'] }}</td>
+                                                                            <td class="small text-end">
+                                                                                {{ $palier['price'] !== null ? number_format($palier['price'] / 100, 2, ',', ' ').' €' : '—' }}
+                                                                            </td>
+                                                                            <td>
+                                                                                <select
+                                                                                    wire:change="sauvegarderPalierMapping({{ $fm->id }}, {{ $palier['id'] }}, $event.target.value)"
+                                                                                    class="form-select form-select-sm">
+                                                                                    <option value="">— Pas de mapping —</option>
+                                                                                    @foreach ($formulesActives as $formule)
+                                                                                        <option value="{{ $formule->id }}"
+                                                                                            @selected(($paliersFormulesMap[$fm->id][$palier['id']] ?? null) === $formule->id)>
+                                                                                            {{ $formule->nom }}
+                                                                                        </option>
+                                                                                    @endforeach
+                                                                                </select>
+                                                                            </td>
+                                                                        </tr>
+                                                                    @endforeach
+                                                                </tbody>
+                                                            </table>
+                                                        @elseif (! $paliersErreur)
+                                                            <p class="text-muted small mb-0">
+                                                                <em>Aucun palier trouvé pour ce formulaire.</em>
+                                                            </p>
+                                                        @endif
                                                     </div>
                                                 </td>
                                             </tr>
