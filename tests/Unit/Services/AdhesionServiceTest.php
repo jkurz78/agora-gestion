@@ -34,6 +34,7 @@ it('creerDepuisTransaction crée une adhésion pour une transaction cotisation',
     expect($adhesion->exercice)->toBe(2025);
     expect($adhesion->estGratuite())->toBeFalse();
     expect($adhesion->transaction_id)->toBe($tx->id);
+    expect($adhesion->formule_adhesion_id)->toBeNull();
     expect(Adhesion::count())->toBe(1);
 });
 
