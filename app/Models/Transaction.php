@@ -44,6 +44,7 @@ final class Transaction extends TenantModel
         'helloasso_order_id',
         'helloasso_cashout_id',
         'helloasso_payment_id',
+        'helloasso_form_slug',
         'statut_reglement',
         'extournee_at',
     ];

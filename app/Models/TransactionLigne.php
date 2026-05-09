@@ -27,6 +27,7 @@ final class TransactionLigne extends Model
         'notes',
         'piece_jointe_path',
         'helloasso_item_id',
+        'helloasso_tier_id',
     ];
 
     protected function casts(): array
@@ -38,6 +39,7 @@ final class TransactionLigne extends Model
             'operation_id' => 'integer',
             'seance' => 'integer',
             'helloasso_item_id' => 'integer',
+            'helloasso_tier_id' => 'integer',
         ];
     }
 
