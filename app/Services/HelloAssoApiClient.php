@@ -59,6 +59,25 @@ final class HelloAssoApiClient
     }
 
     /**
+     * Fetch the detail of a single form, including its tiers.
+     *
+     * @return array<string, mixed>
+     */
+    public function fetchFormDetail(string $formType, string $formSlug): array
+    {
+        $this->authenticate();
+
+        $response = Http::withToken($this->accessToken)
+            ->get("{$this->baseUrl}/v5/organizations/{$this->organisationSlug}/forms/{$formType}/{$formSlug}");
+
+        if ($response->failed()) {
+            throw new RuntimeException("Échec récupération formulaire {$formType}/{$formSlug} : {$response->status()}");
+        }
+
+        return $response->json();
+    }
+
+    /**
      * Fetch all payments for a date range.
      *
      * The /payments endpoint returns idCashOut, cashOutDate, cashOutState
