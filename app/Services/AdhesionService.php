@@ -242,10 +242,17 @@ final class AdhesionService
     private function guardAgainstOverlap(int $tiersId, ?int $exercice, ?Carbon $dateDebut, ?Carbon $dateFin): void
     {
         if ($exercice !== null) {
-            $existante = Adhesion::query()
+            $existante = Adhesion::withTrashed()
                 ->where('tiers_id', $tiersId)
                 ->where('exercice', $exercice)
                 ->first();
+
+            if ($existante !== null && $existante->trashed()) {
+                throw new DomainException(
+                    "Ce tiers a une adhésion annulée sur l'exercice {$exercice}-".($exercice + 1).". Restaurez-la depuis la fiche tiers avant d'en créer une nouvelle."
+                );
+            }
+
             if ($existante !== null) {
                 throw new DomainException(
                     "Ce tiers a déjà une adhésion sur l'exercice {$exercice}-".($exercice + 1).'.'
@@ -278,6 +285,10 @@ final class AdhesionService
 
     private function creerTransactionPaiement(NouvelleAdhesionDTO $dto, FormuleAdhesion $formule, User $createur): int
     {
+        if ($dto->datePaiement === null) {
+            throw new \InvalidArgumentException('datePaiement est requis lorsque le montant est positif.');
+        }
+
         $tx = Transaction::create([
             'type' => TypeTransaction::Recette->value,
             'date' => $dto->datePaiement,

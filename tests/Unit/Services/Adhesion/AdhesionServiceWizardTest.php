@@ -203,3 +203,54 @@ it('création atomique : si la transaction échoue, pas d\'adhésion orpheline',
     expect(Adhesion::count())->toBe(0);
     expect(Transaction::count())->toBe(0);
 });
+
+it('lève une InvalidArgumentException si montant > 0 et datePaiement est null', function (): void {
+    $formule = FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $this->sc->id,
+    ]);
+
+    $dto = new NouvelleAdhesionDTO(
+        tiersId: (int) $this->tiers->id,
+        formuleId: (int) $formule->id,
+        exercice: 2025,
+        dateDebut: null,
+        montant: 30.00,
+        notes: null,
+        datePaiement: null, // manquant intentionnellement
+        modePaiement: ModePaiement::Cb,
+        compteId: (int) $this->compte->id,
+        reference: null,
+    );
+
+    expect(fn () => app(AdhesionService::class)->creerDepuisWizard($dto, $this->user))
+        ->toThrow(InvalidArgumentException::class, 'datePaiement');
+});
+
+it('refuse une adhésion si une adhésion soft-deleted existe pour le même exercice', function (): void {
+    $formule = FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $this->sc->id,
+    ]);
+
+    // Créer puis soft-deleter une adhésion sur 2025
+    $existante = Adhesion::factory()->create([
+        'tiers_id' => $this->tiers->id,
+        'exercice' => 2025,
+    ]);
+    $existante->delete();
+
+    $dto = new NouvelleAdhesionDTO(
+        tiersId: (int) $this->tiers->id,
+        formuleId: (int) $formule->id,
+        exercice: 2025,
+        dateDebut: null,
+        montant: 0.00,
+        notes: 'Tentative de re-création',
+        datePaiement: null,
+        modePaiement: null,
+        compteId: null,
+        reference: null,
+    );
+
+    expect(fn () => app(AdhesionService::class)->creerDepuisWizard($dto, $this->user))
+        ->toThrow(DomainException::class, 'annulée');
+});
