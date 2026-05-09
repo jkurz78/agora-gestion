@@ -14,7 +14,11 @@ final class AdhesionLigneDTO
 
     public function libelleExercice(): string
     {
-        return $this->adhesion->exercice.' – '.($this->adhesion->exercice + 1);
+        if ($this->adhesion->exercice !== null) {
+            return 'Ex. '.$this->adhesion->exercice.'-'.($this->adhesion->exercice + 1);
+        }
+
+        return '—'; // mode durée → la colonne Formule/Validité affichera l'intervalle
     }
 
     public function libelleType(): string

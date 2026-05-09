@@ -12,6 +12,7 @@
                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
                         <tr>
                             <th>Exercice</th>
+                            <th>Formule / Validité</th>
                             <th>Type</th>
                             <th>Date</th>
                             <th class="text-end">Montant / Motif</th>
@@ -24,6 +25,16 @@
                         @php $adhesion = $ligneDto->adhesion; @endphp
                         <tr>
                             <td>{{ $ligneDto->libelleExercice() }}</td>
+                            <td class="small">
+                                @if($adhesion->formuleAdhesion)
+                                    <span class="badge text-bg-info">{{ $adhesion->formuleAdhesion->nom }}</span>
+                                @endif
+                                @if($adhesion->date_debut && $adhesion->date_fin)
+                                    <div class="text-muted text-nowrap" style="font-size:.7rem">
+                                        {{ $adhesion->date_debut->format('d/m/Y') }} → {{ $adhesion->date_fin->format('d/m/Y') }}
+                                    </div>
+                                @endif
+                            </td>
                             <td>
                                 @if($adhesion->estGratuite())
                                     <span class="badge text-bg-warning">Offerte</span>

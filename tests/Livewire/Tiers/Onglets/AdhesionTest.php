@@ -21,7 +21,7 @@ it('Vue affiche les adhésions dans l\'ordre exercice desc', function (): void {
     $html = Livewire::test(Adhesion::class, ['tiers' => $tiers])->html();
 
     // 2025 doit apparaître avant 2024
-    expect(strpos($html, '2025 –'))->toBeLessThan(strpos($html, '2024 –'));
+    expect(strpos($html, 'Ex. 2025-'))->toBeLessThan(strpos($html, 'Ex. 2024-'));
 });
 
 it('Badge "Cotisation" sur ligne payée', function (): void {

@@ -14,7 +14,7 @@ final class TiersAdhesionTimelineService
     public function forTiers(Tiers $tiers): AdhesionTimelineDTO
     {
         $adhesions = $tiers->adhesions()
-            ->with(['transaction.compte'])
+            ->with(['transaction.compte', 'formuleAdhesion'])
             ->orderByDesc('exercice')
             ->orderByDesc('id')
             ->get();
