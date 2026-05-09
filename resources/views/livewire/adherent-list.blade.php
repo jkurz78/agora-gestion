@@ -116,11 +116,6 @@
                                    title="Voir les transactions">
                                     <i class="bi bi-clock-history"></i>
                                 </a>
-                                <a href="{{ route('comptabilite.transactions') }}"
-                                   class="btn btn-sm btn-outline-primary"
-                                   title="Nouvelle cotisation">
-                                    <i class="bi bi-plus-circle"></i>
-                                </a>
                             </div>
                         </td>
                     </tr>

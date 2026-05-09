@@ -16,7 +16,7 @@
                             <th>Date</th>
                             <th class="text-end">Montant / Motif</th>
                             <th>Compte</th>
-                            <th></th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -56,9 +56,9 @@
                                 @if(! $adhesion->gratuite && $adhesion->transaction_id)
                                     <a href="{{ route('tiers.transactions', $adhesion->tiers_id) }}?edit={{ $adhesion->transaction_id }}"
                                        target="_blank"
-                                       class="btn btn-sm btn-link p-0"
-                                       title="Ouvrir cette transaction">
-                                        <i class="bi bi-link-45deg"></i>
+                                       class="btn btn-sm btn-outline-primary"
+                                       title="Modifier la transaction">
+                                        <i class="bi bi-pencil"></i>
                                     </a>
                                 @endif
                             </td>
