@@ -127,6 +127,7 @@ final class HelloAssoSyncService
                         'date' => $orderDate,
                         'mode_paiement' => $modePaiement,
                         'libelle' => $this->buildLibelle($order),
+                        'helloasso_form_slug' => $order['formSlug'] ?? null,
                     ];
                     if (empty($existing->reference)) {
                         $data['reference'] = $this->buildReference($order);
@@ -150,6 +151,7 @@ final class HelloAssoSyncService
                         'compte_id' => $this->resolveCompteId($modePaiement),
                         'helloasso_order_id' => $order['id'],
                         'helloasso_payment_id' => $order['payments'][0]['id'] ?? null,
+                        'helloasso_form_slug' => $order['formSlug'] ?? null,
                         'saisi_par' => auth()->id(),
                         'numero_piece' => app(NumeroPieceService::class)->assign(Carbon::parse($orderDate)),
                     ]);
@@ -175,6 +177,7 @@ final class HelloAssoSyncService
                             'sous_categorie_id' => $resolved['sous_categorie_id'],
                             'operation_id' => $resolved['operation_id'],
                             'montant' => $montantEuros,
+                            'helloasso_tier_id' => $resolved['helloasso_tier_id'],
                         ]);
                         $result['lignes_updated']++;
                     } else {
@@ -184,6 +187,7 @@ final class HelloAssoSyncService
                             'operation_id' => $resolved['operation_id'],
                             'montant' => $montantEuros,
                             'helloasso_item_id' => $item['id'],
+                            'helloasso_tier_id' => $resolved['helloasso_tier_id'],
                         ]);
                         $result['lignes_created']++;
                     }
@@ -285,6 +289,7 @@ final class HelloAssoSyncService
             'item' => $item,
             'sous_categorie_id' => $sousCategorieId,
             'operation_id' => $operationId,
+            'helloasso_tier_id' => isset($item['tierId']) ? (int) $item['tierId'] : null,
         ];
     }
 
