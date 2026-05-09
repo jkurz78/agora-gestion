@@ -65,7 +65,7 @@
                             {{ $membre->displayName() }}
                         </td>
                         <td class="small text-nowrap">
-                            @if($adh && ! $adh->gratuite && $adh->transaction)
+                            @if($adh && ! $adh->estGratuite() && $adh->transaction)
                                 {{ $adh->transaction->date->format('d/m/Y') }}
                                 <span class="text-muted">({{ app(\App\Services\ExerciceService::class)->anneeForDate($adh->transaction->date) }})</span>
                             @elseif($adh)
@@ -75,10 +75,10 @@
                             @endif
                         </td>
                         <td class="small">
-                            @if($adh && $adh->gratuite)
+                            @if($adh && $adh->estGratuite())
                                 <span class="badge text-bg-warning">Offerte</span>
-                                @if($adh->motif_gratuite)
-                                    <span class="text-muted ms-1" style="font-size:.75rem">{{ $adh->motif_gratuite }}</span>
+                                @if($adh->notes)
+                                    <span class="text-muted ms-1" style="font-size:.75rem">{{ $adh->notes }}</span>
                                 @endif
                             @elseif($adh)
                                 <span class="badge text-bg-success">Cotisation</span>
@@ -87,14 +87,14 @@
                             @endif
                         </td>
                         <td class="small fw-semibold text-nowrap">
-                            @if($adh && ! $adh->gratuite && $adh->transaction)
+                            @if($adh && ! $adh->estGratuite() && $adh->transaction)
                                 {{ number_format((float) $adh->transaction->lignes->sum('montant'), 2, ',', ' ') }} €
                             @else
                                 —
                             @endif
                         </td>
                         <td>
-                            @if($adh && ! $adh->gratuite && $adh->transaction?->mode_paiement)
+                            @if($adh && ! $adh->estGratuite() && $adh->transaction?->mode_paiement)
                                 <span class="badge bg-secondary" style="font-size:.7rem">{{ $adh->transaction->mode_paiement->label() }}</span>
                             @else
                                 —
@@ -102,7 +102,7 @@
                         </td>
                         <td class="small text-muted">{{ $adh?->transaction?->compte?->nom ?? '—' }}</td>
                         <td class="small">
-                            @if($adh && ! $adh->gratuite && $adh->transaction?->statut_reglement === \App\Enums\StatutReglement::Pointe)
+                            @if($adh && ! $adh->estGratuite() && $adh->transaction?->statut_reglement === \App\Enums\StatutReglement::Pointe)
                                 <i class="bi bi-check-lg text-success"></i>
                             @else
                                 <span class="text-muted">—</span>

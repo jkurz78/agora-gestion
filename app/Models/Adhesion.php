@@ -19,14 +19,19 @@ final class Adhesion extends TenantModel
         'tiers_id',
         'exercice',
         'transaction_id',
-        'gratuite',
-        'motif_gratuite',
+        'formule_adhesion_id',
+        'date_debut',
+        'date_fin',
+        'notes',
         'saisi_par',
     ];
 
     protected $casts = [
         'exercice' => 'integer',
-        'gratuite' => 'boolean',
+        'transaction_id' => 'integer',
+        'formule_adhesion_id' => 'integer',
+        'date_debut' => 'date',
+        'date_fin' => 'date',
         'saisi_par' => 'integer',
     ];
 
@@ -40,6 +45,11 @@ final class Adhesion extends TenantModel
         return $this->belongsTo(Transaction::class);
     }
 
+    public function formuleAdhesion(): BelongsTo
+    {
+        return $this->belongsTo(FormuleAdhesion::class, 'formule_adhesion_id');
+    }
+
     public function saisiPar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'saisi_par');
@@ -48,5 +58,15 @@ final class Adhesion extends TenantModel
     public function scopeForExercice(Builder $query, int $annee): Builder
     {
         return $query->where('exercice', $annee);
+    }
+
+    /**
+     * Une adhésion est "gratuite" / "offerte" lorsqu'elle n'est pas adossée à
+     * une transaction (la transaction porte le paiement). Slice 3 : la colonne
+     * dédiée a été supprimée, on dérive l'état du transaction_id.
+     */
+    public function estGratuite(): bool
+    {
+        return $this->transaction_id === null;
     }
 }

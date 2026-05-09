@@ -65,7 +65,7 @@ it('créer une transaction recette avec ligne cotisation crée une adhésion aut
 
     expect(Adhesion::count())->toBe(1);
     $adhesion = Adhesion::first();
-    expect($adhesion->gratuite)->toBeFalse();
+    expect($adhesion->estGratuite())->toBeFalse();
     expect($adhesion->transaction_id)->toBe($this->tx->id);
     expect($adhesion->tiers_id)->toBe($this->tiers->id);
     expect($adhesion->exercice)->toBe(2025);

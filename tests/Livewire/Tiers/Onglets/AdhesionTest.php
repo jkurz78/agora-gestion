@@ -15,8 +15,8 @@ beforeEach(function () {
 it('Vue affiche les adhésions dans l\'ordre exercice desc', function (): void {
     $tiers = Tiers::factory()->create();
 
-    AdhesionModel::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2024, 'gratuite' => true]);
-    AdhesionModel::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2025, 'gratuite' => true]);
+    AdhesionModel::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2024]);
+    AdhesionModel::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2025]);
 
     $html = Livewire::test(Adhesion::class, ['tiers' => $tiers])->html();
 
@@ -37,8 +37,7 @@ it('Badge "Offerte" + motif sur ligne gratuite', function (): void {
     $tiers = Tiers::factory()->create();
     AdhesionModel::factory()->create([
         'tiers_id' => $tiers->id,
-        'gratuite' => true,
-        'motif_gratuite' => 'Membre d\'honneur',
+        'notes' => 'Membre d\'honneur',
     ]);
 
     Livewire::test(Adhesion::class, ['tiers' => $tiers])

@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends Factory<Adhesion>
+ *
+ * Par défaut : adhésion offerte (transaction_id null), exercice 2025.
  */
 final class AdhesionFactory extends Factory
 {
@@ -25,17 +27,18 @@ final class AdhesionFactory extends Factory
             'tiers_id' => Tiers::factory(),
             'exercice' => 2025,
             'transaction_id' => null,
-            'gratuite' => true,
-            'motif_gratuite' => $this->faker->sentence(3),
+            'formule_adhesion_id' => null,
+            'date_debut' => null,
+            'date_fin' => null,
+            'notes' => $this->faker->optional()->sentence(3),
         ];
     }
 
     public function payee(): static
     {
         return $this->state(fn () => [
-            'gratuite' => false,
-            'motif_gratuite' => null,
             'transaction_id' => Transaction::factory(),
+            'notes' => null,
         ]);
     }
 }

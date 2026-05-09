@@ -45,7 +45,7 @@ final class AdhesionTransactionLigneObserver
 
         if ($stillHasCotisation === null) {
             Adhesion::where('transaction_id', $tx->id)
-                ->where('gratuite', false)
+                ->whereNotNull('transaction_id')
                 ->delete();
         }
     }

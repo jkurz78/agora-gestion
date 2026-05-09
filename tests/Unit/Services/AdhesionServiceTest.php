@@ -32,7 +32,7 @@ it('creerDepuisTransaction crée une adhésion pour une transaction cotisation',
     expect($adhesion)->not->toBeNull();
     expect($adhesion->tiers_id)->toBe($tiers->id);
     expect($adhesion->exercice)->toBe(2025);
-    expect($adhesion->gratuite)->toBeFalse();
+    expect($adhesion->estGratuite())->toBeFalse();
     expect($adhesion->transaction_id)->toBe($tx->id);
     expect(Adhesion::count())->toBe(1);
 });
@@ -85,9 +85,9 @@ it('creerGratuite crée une adhésion sans transaction', function (): void {
 
     $adhesion = $service->creerGratuite($tiers, 2025, 'Membre d\'honneur', $user);
 
-    expect($adhesion->gratuite)->toBeTrue();
+    expect($adhesion->estGratuite())->toBeTrue();
     expect($adhesion->transaction_id)->toBeNull();
-    expect($adhesion->motif_gratuite)->toBe('Membre d\'honneur');
+    expect($adhesion->notes)->toBe('Membre d\'honneur');
     expect($adhesion->exercice)->toBe(2025);
     expect($adhesion->tiers_id)->toBe($tiers->id);
     expect(Adhesion::count())->toBe(1);
@@ -122,6 +122,6 @@ it('creerGratuite restore une adhésion soft-deleted plutôt que d\'en créer un
     expect(Adhesion::count())->toBe(1);
     expect(Adhesion::withTrashed()->count())->toBe(1);
     expect($restored->id)->toBe($adhesion->id);
-    expect($restored->motif_gratuite)->toBe('Nouveau motif');
-    expect($restored->gratuite)->toBeTrue();
+    expect($restored->notes)->toBe('Nouveau motif');
+    expect($restored->estGratuite())->toBeTrue();
 });

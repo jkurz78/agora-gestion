@@ -13,9 +13,9 @@ use App\Tenant\TenantContext;
 it('groupe les adhésions par ordre exercice desc puis id desc', function (): void {
     $tiers = Tiers::factory()->create();
 
-    $oldest = Adhesion::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2023, 'gratuite' => true]);
-    Adhesion::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2024, 'gratuite' => true]);
-    $latest = Adhesion::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2025, 'gratuite' => true]);
+    $oldest = Adhesion::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2023]);
+    Adhesion::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2024]);
+    $latest = Adhesion::factory()->create(['tiers_id' => $tiers->id, 'exercice' => 2025]);
 
     $dto = app(TiersAdhesionTimelineService::class)->forTiers($tiers);
 

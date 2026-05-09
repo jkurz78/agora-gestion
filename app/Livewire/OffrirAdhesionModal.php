@@ -72,14 +72,15 @@ final class OffrirAdhesionModal extends Component
         $availableYears = app(ExerciceService::class)->openYears();
 
         // Suggestions de motifs : valeurs distinctes déjà saisies (auto-convergence
-        // sans paramétrage). Limité à 50 suggestions pour rester léger.
+        // sans paramétrage). Limité à 20 suggestions pour rester léger.
         $motifsSuggestions = Adhesion::query()
-            ->whereNotNull('motif_gratuite')
-            ->where('motif_gratuite', '!=', '')
+            ->whereNotNull('notes')
+            ->where('notes', '!=', '')
+            ->whereNull('transaction_id')
             ->distinct()
-            ->orderBy('motif_gratuite')
-            ->limit(50)
-            ->pluck('motif_gratuite')
+            ->orderBy('notes')
+            ->limit(20)
+            ->pluck('notes')
             ->all();
 
         return view('livewire.offrir-adhesion-modal', compact('availableYears', 'motifsSuggestions'));

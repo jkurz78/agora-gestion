@@ -49,8 +49,7 @@ it('liste les tiers avec adhésion gratuite pour l\'exercice courant (filtre a_j
         'association_id' => $this->association->id,
         'tiers_id' => $honneur->id,
         'exercice' => 2025,
-        'gratuite' => true,
-        'motif_gratuite' => 'Membre d\'honneur',
+        'notes' => 'Membre d\'honneur',
     ]);
 
     Livewire::actingAs($this->user)
@@ -114,8 +113,7 @@ it('affiche un badge Offerte et le motif sur ligne adhésion gratuite', function
         'association_id' => $this->association->id,
         'tiers_id' => $honneur->id,
         'exercice' => 2025,
-        'gratuite' => true,
-        'motif_gratuite' => 'Bénévole historique',
+        'notes' => 'Bénévole historique',
     ]);
 
     Livewire::actingAs($this->user)

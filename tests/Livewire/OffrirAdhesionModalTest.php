@@ -72,8 +72,8 @@ it('Soumission valide crée une adhésion gratuite via le service', function ():
         ->first();
 
     expect($adhesion)->not->toBeNull()
-        ->and($adhesion->gratuite)->toBeTrue()
-        ->and($adhesion->motif_gratuite)->toBe('Membre d\'honneur')
+        ->and($adhesion->estGratuite())->toBeTrue()
+        ->and($adhesion->notes)->toBe('Membre d\'honneur')
         ->and($adhesion->transaction_id)->toBeNull();
 });
 
@@ -84,8 +84,7 @@ it('Doublon refusé : flash error si une adhésion existe déjà sur le tiers/ex
         'association_id' => $this->association->id,
         'tiers_id' => $tiers->id,
         'exercice' => 2025,
-        'gratuite' => true,
-        'motif_gratuite' => 'Bénévole',
+        'notes' => 'Bénévole',
     ]);
 
     $countBefore = Adhesion::where('tiers_id', $tiers->id)->where('exercice', 2025)->count();

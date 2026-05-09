@@ -19,6 +19,6 @@ final class AdhesionLigneDTO
 
     public function libelleType(): string
     {
-        return $this->adhesion->gratuite ? 'Offerte' : 'Cotisation';
+        return $this->adhesion->estGratuite() ? 'Offerte' : 'Cotisation';
     }
 }

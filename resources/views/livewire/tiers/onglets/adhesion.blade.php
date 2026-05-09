@@ -25,35 +25,35 @@
                         <tr>
                             <td>{{ $ligneDto->libelleExercice() }}</td>
                             <td>
-                                @if($adhesion->gratuite)
+                                @if($adhesion->estGratuite())
                                     <span class="badge text-bg-warning">Offerte</span>
                                 @else
                                     <span class="badge text-bg-success">Cotisation</span>
                                 @endif
                             </td>
-                            <td data-sort="{{ $adhesion->gratuite ? optional($adhesion->created_at)->format('Y-m-d') : optional(optional($adhesion->transaction)->date)->format('Y-m-d') }}">
-                                @if($adhesion->gratuite)
+                            <td data-sort="{{ $adhesion->estGratuite() ? optional($adhesion->created_at)->format('Y-m-d') : optional(optional($adhesion->transaction)->date)->format('Y-m-d') }}">
+                                @if($adhesion->estGratuite())
                                     {{ optional($adhesion->created_at)->format('d/m/Y') }}
                                 @else
                                     {{ optional(optional($adhesion->transaction)->date)->format('d/m/Y') }}
                                 @endif
                             </td>
                             <td class="text-end">
-                                @if($adhesion->gratuite)
-                                    <span class="text-muted small">{{ $adhesion->motif_gratuite ?? '—' }}</span>
+                                @if($adhesion->estGratuite())
+                                    <span class="text-muted small">{{ $adhesion->notes ?? '—' }}</span>
                                 @else
                                     {{ number_format((float) optional($adhesion->transaction)->montant_total, 2, ',', ' ') }} €
                                 @endif
                             </td>
                             <td>
-                                @if(! $adhesion->gratuite && $adhesion->transaction?->compte)
+                                @if(! $adhesion->estGratuite() && $adhesion->transaction?->compte)
                                     <span class="small">{{ $adhesion->transaction->compte->nom }}</span>
                                 @else
                                     <span class="text-muted">—</span>
                                 @endif
                             </td>
                             <td class="text-end">
-                                @if(! $adhesion->gratuite && $adhesion->transaction_id)
+                                @if(! $adhesion->estGratuite() && $adhesion->transaction_id)
                                     <a href="{{ route('tiers.transactions', $adhesion->tiers_id) }}?edit={{ $adhesion->transaction_id }}"
                                        target="_blank"
                                        class="btn btn-sm btn-outline-primary"

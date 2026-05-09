@@ -50,7 +50,7 @@ it('backfill génère les adhésions manquantes pour les transactions cotisation
 
     expect(Adhesion::count())->toBe(1);
     $adhesion = Adhesion::first();
-    expect($adhesion->gratuite)->toBeFalse();
+    expect($adhesion->estGratuite())->toBeFalse();
     expect($adhesion->tiers_id)->toBe($tiers->id);
     expect($adhesion->exercice)->toBe(2025);
 });

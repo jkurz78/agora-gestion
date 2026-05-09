@@ -32,7 +32,7 @@ final class AdhesionObserver
     public function deleted(Transaction $tx): void
     {
         Adhesion::where('transaction_id', $tx->id)
-            ->where('gratuite', false)
+            ->whereNotNull('transaction_id')
             ->delete();
     }
 
@@ -43,7 +43,7 @@ final class AdhesionObserver
     {
         Adhesion::onlyTrashed()
             ->where('transaction_id', $tx->id)
-            ->where('gratuite', false)
+            ->whereNotNull('transaction_id')
             ->restore();
     }
 }

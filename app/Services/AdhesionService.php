@@ -67,7 +67,6 @@ final class AdhesionService
                 'tiers_id' => (int) $tx->tiers_id,
                 'exercice' => $exercice,
                 'transaction_id' => (int) $tx->id,
-                'gratuite' => false,
                 'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
             ]);
         });
@@ -90,8 +89,7 @@ final class AdhesionService
             if ($existante !== null && $existante->trashed()) {
                 $existante->restore();
                 $existante->update([
-                    'gratuite' => true,
-                    'motif_gratuite' => $motif,
+                    'notes' => $motif,
                     'transaction_id' => null,
                     'saisi_par' => (int) $createur->id,
                 ]);
@@ -104,8 +102,7 @@ final class AdhesionService
                 'tiers_id' => (int) $tiers->id,
                 'exercice' => $exercice,
                 'transaction_id' => null,
-                'gratuite' => true,
-                'motif_gratuite' => $motif,
+                'notes' => $motif,
                 'saisi_par' => (int) $createur->id,
             ]);
         });

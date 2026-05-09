@@ -17,11 +17,10 @@ it('persiste une adhésion payée avec sa transaction', function (): void {
         'tiers_id' => $tiers->id,
         'exercice' => 2025,
         'transaction_id' => $tx->id,
-        'gratuite' => false,
     ]);
 
     expect($adhesion->fresh()->exercice)->toBe(2025);
-    expect($adhesion->fresh()->gratuite)->toBeFalse();
+    expect($adhesion->fresh()->transaction_id)->not->toBeNull();
     expect($adhesion->tiers->id)->toBe($tiers->id);
     expect($adhesion->transaction->id)->toBe($tx->id);
 });
@@ -34,12 +33,11 @@ it('persiste une adhésion gratuite avec motif', function (): void {
         'tiers_id' => $tiers->id,
         'exercice' => 2025,
         'transaction_id' => null,
-        'gratuite' => true,
-        'motif_gratuite' => 'Membre d\'honneur',
+        'notes' => 'Membre d\'honneur',
     ]);
 
-    expect($adhesion->fresh()->gratuite)->toBeTrue();
-    expect($adhesion->fresh()->motif_gratuite)->toBe('Membre d\'honneur');
+    expect($adhesion->fresh()->estGratuite())->toBeTrue();
+    expect($adhesion->fresh()->notes)->toBe('Membre d\'honneur');
     expect($adhesion->transaction)->toBeNull();
 });
 
@@ -49,8 +47,7 @@ it('respecte le scope tenant fail-closed', function (): void {
         'association_id' => TenantContext::currentId(),
         'tiers_id' => $tiers->id,
         'exercice' => 2025,
-        'gratuite' => true,
-        'motif_gratuite' => 'Test',
+        'notes' => 'Test',
     ]);
 
     TenantContext::clear();
@@ -66,17 +63,15 @@ it('scope forExercice filtre correctement', function (): void {
         'association_id' => TenantContext::currentId(),
         'tiers_id' => $tiers->id,
         'exercice' => 2024,
-        'gratuite' => true,
-        'motif_gratuite' => '2024',
+        'notes' => '2024',
     ]);
     Adhesion::create([
         'association_id' => TenantContext::currentId(),
         'tiers_id' => $tiers->id,
         'exercice' => 2025,
-        'gratuite' => true,
-        'motif_gratuite' => '2025',
+        'notes' => '2025',
     ]);
 
     expect(Adhesion::forExercice(2025)->count())->toBe(1);
-    expect(Adhesion::forExercice(2024)->first()->motif_gratuite)->toBe('2024');
+    expect(Adhesion::forExercice(2024)->first()->notes)->toBe('2024');
 });
