@@ -139,3 +139,24 @@ it('observer reste idempotent (multi-cotisations même exercice)', function (): 
 
     expect(Adhesion::count())->toBe(1);
 });
+
+it('observer reste idempotent en mode durée (même date_debut)', function (): void {
+    FormuleAdhesion::factory()->modeDuree(12)->create([
+        'sous_categorie_id' => $this->sc->id,
+        'actif' => true,
+    ]);
+
+    foreach (['2025-10-15', '2025-10-15'] as $date) {
+        $tx = Transaction::factory()->asRecette()->create([
+            'tiers_id' => $this->tiers->id,
+            'date' => $date,
+        ]);
+        TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
+        TransactionLigne::factory()->create([
+            'transaction_id' => $tx->id,
+            'sous_categorie_id' => $this->sc->id,
+        ]);
+    }
+
+    expect(Adhesion::count())->toBe(1);
+});

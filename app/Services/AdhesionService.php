@@ -148,9 +148,11 @@ final class AdhesionService
             return $query->where('exercice', $exercice)->first();
         }
 
+        assert($dateDebut !== null && $dateFin !== null, 'Mode durée requires both dates');
+
         return $query
-            ->whereDate('date_debut', $dateDebut?->toDateString())
-            ->whereDate('date_fin', $dateFin?->toDateString())
+            ->whereDate('date_debut', $dateDebut->toDateString())
+            ->whereDate('date_fin', $dateFin->toDateString())
             ->first();
     }
 
