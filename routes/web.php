@@ -86,6 +86,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class, CheckEspaceAccess
         Route::get('sous-categories', [SousCategorieController::class, 'index'])->name('sous-categories.index');
         Route::get('/comptabilite/usages', UsagesComptables::class)
             ->name('comptabilite.usages');
+        Route::view('/adhesions/formules', 'parametres.adhesions.formules')
+            ->name('adhesions.formules');
         Route::get('/recus-fiscaux', RecusFiscaux::class)
             ->name('recus-fiscaux');
         Route::resource('utilisateurs', UserController::class)->only(['index', 'store', 'update', 'destroy']);
