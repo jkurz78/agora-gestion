@@ -1,7 +1,7 @@
 # Fiche tiers 360 — Slice 3 (Formules d'adhésion + durée + mapping HelloAsso)
 
 **Date** : 2026-05-09
-**Statut** : DRAFT — relecture utilisateur en attente
+**Statut** : SLICE 3a LIVRÉ (backend) — slice 3b (UI) à enchaîner après validation
 **Branche cible** : `feat/fiche-tiers-slice3-formules-adhesions` (créée depuis `feat/fiche-tiers-slice2-adhesions`, qui n'est pas encore mergée)
 
 ## 1. Contexte
@@ -77,7 +77,7 @@ CREATE TABLE helloasso_tier_mappings (
     helloasso_form_slug VARCHAR(255) NOT NULL,
     helloasso_tier_id INT UNSIGNED NOT NULL,
     helloasso_tier_label VARCHAR(255) NOT NULL,    -- cache pour reconnaissance UI
-    target_type VARCHAR(50) NOT NULL,                -- 'formule_adhesion' | 'type_operation_tarif'
+    target_type VARCHAR(100) NOT NULL,               -- FQCN: App\Models\FormuleAdhesion | App\Models\TypeOperationTarif (pas d'alias morphMap)
     target_id BIGINT UNSIGNED NOT NULL,
     created_at, updated_at,
 
