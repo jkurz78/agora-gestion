@@ -38,6 +38,29 @@ final class FormuleAdhesion extends TenantModel
         'actif' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        self::saving(function (FormuleAdhesion $formule): void {
+            if (! $formule->actif) {
+                return;
+            }
+
+            $existante = static::query()
+                ->where('sous_categorie_id', $formule->sous_categorie_id)
+                ->where('actif', true)
+                ->when($formule->exists, fn ($q) => $q->where('id', '!=', $formule->id))
+                ->exists();
+
+            if ($existante) {
+                throw new \DomainException(
+                    "La sous-catégorie a déjà une formule active. Désactivez-la avant d'en activer une nouvelle."
+                );
+            }
+        });
+    }
+
     public function sousCategorie(): BelongsTo
     {
         return $this->belongsTo(SousCategorie::class, 'sous_categorie_id');
