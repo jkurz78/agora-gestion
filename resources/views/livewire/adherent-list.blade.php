@@ -45,6 +45,8 @@
                     <th>Nom</th>
                     <th>Dernière adhésion</th>
                     <th>Type</th>
+                    <th>Formule</th>
+                    <th>Validité</th>
                     <th>Montant</th>
                     <th>Mode</th>
                     <th>Compte</th>
@@ -86,6 +88,22 @@
                                 —
                             @endif
                         </td>
+                        <td class="small">
+                            @if($adh && $adh->formuleAdhesion)
+                                <span class="badge text-bg-info">{{ $adh->formuleAdhesion->nom }}</span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                        <td class="small text-nowrap">
+                            @if($adh && $adh->date_debut && $adh->date_fin)
+                                {{ $adh->date_debut->format('d/m/Y') }} → {{ $adh->date_fin->format('d/m/Y') }}
+                            @elseif($adh && $adh->exercice)
+                                Ex. {{ $adh->exercice }}-{{ $adh->exercice + 1 }}
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
                         <td class="small fw-semibold text-nowrap">
                             @if($adh && ! $adh->estGratuite() && $adh->transaction)
                                 {{ number_format((float) $adh->transaction->lignes->sum('montant'), 2, ',', ' ') }} €
@@ -121,7 +139,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-4">Aucun adhérent trouvé.</td>
+                        <td colspan="10" class="text-center text-muted py-4">Aucun adhérent trouvé.</td>
                     </tr>
                 @endforelse
             </tbody>

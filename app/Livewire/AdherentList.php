@@ -45,14 +45,43 @@ final class AdherentList extends Component
 
         $query = Tiers::query();
 
-        // TODO slice-3b: étendre les filtres a_jour/en_retard au mode durée
-        // (exercice null, lookup via date_debut/date_fin et now() — voir spec section 4.10).
-        // Aujourd'hui, une adhésion mode durée n'apparaîtra pas dans `a_jour` car son `exercice` est NULL.
+        $today = now()->toDateString();
+        $days30Ago = now()->subDays(30)->toDateString();
+
         match ($this->filtre) {
-            'a_jour' => $query->whereHas('adhesions', fn ($q) => $q->where('exercice', $exercice)),
+            'a_jour' => $query->whereHas('adhesions', function ($q) use ($exercice, $today): void {
+                $q->where(function ($s) use ($exercice, $today): void {
+                    $s->where('exercice', $exercice)
+                        ->orWhere(function ($d) use ($today): void {
+                            $d->whereNotNull('date_debut')
+                                ->whereNotNull('date_fin')
+                                ->whereDate('date_debut', '<=', $today)
+                                ->whereDate('date_fin', '>=', $today);
+                        });
+                });
+            }),
             'en_retard' => $query
-                ->whereHas('adhesions', fn ($q) => $q->where('exercice', $exercice - 1))
-                ->whereDoesntHave('adhesions', fn ($q) => $q->where('exercice', $exercice)),
+                ->whereHas('adhesions', function ($q) use ($exercice, $days30Ago, $today): void {
+                    $q->where(function ($s) use ($exercice, $days30Ago, $today): void {
+                        $s->where('exercice', $exercice - 1)
+                            ->orWhere(function ($d) use ($days30Ago, $today): void {
+                                $d->whereNotNull('date_fin')
+                                    ->whereDate('date_fin', '>=', $days30Ago)
+                                    ->whereDate('date_fin', '<', $today);
+                            });
+                    });
+                })
+                ->whereDoesntHave('adhesions', function ($q) use ($exercice, $today): void {
+                    $q->where(function ($s) use ($exercice, $today): void {
+                        $s->where('exercice', $exercice)
+                            ->orWhere(function ($d) use ($today): void {
+                                $d->whereNotNull('date_debut')
+                                    ->whereNotNull('date_fin')
+                                    ->whereDate('date_debut', '<=', $today)
+                                    ->whereDate('date_fin', '>=', $today);
+                            });
+                    });
+                }),
             default => $query->whereHas('adhesions'),
         };
 
@@ -67,8 +96,9 @@ final class AdherentList extends Component
 
         $membres->getCollection()->each(function (Tiers $tiers): void {
             $derniereAdhesion = $tiers->adhesions()
-                ->with('transaction.compte')
+                ->with(['transaction.compte', 'formuleAdhesion'])
                 ->orderByDesc('exercice')
+                ->orderByDesc('date_fin')
                 ->orderByDesc('id')
                 ->first();
             $tiers->setAttribute('derniereAdhesion', $derniereAdhesion);
