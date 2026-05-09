@@ -28,6 +28,8 @@ it('persiste une formule en mode exercice', function (): void {
     expect((float) $formule->fresh()->montant_par_defaut)->toBe(30.00);
     expect($formule->fresh()->actif)->toBeTrue();
     expect($formule->fresh()->deductible_fiscal)->toBeFalse();
+    expect($formule->isModeExercice())->toBeTrue();
+    expect($formule->isModeDuree())->toBeFalse();
 });
 
 it('persiste une formule en mode durée 12 mois', function (): void {
@@ -47,6 +49,8 @@ it('persiste une formule en mode durée 12 mois', function (): void {
     expect($formule->fresh()->mode)->toBe('duree');
     expect($formule->fresh()->duree_mois)->toBe(12);
     expect($formule->fresh()->deductible_fiscal)->toBeTrue();
+    expect($formule->isModeDuree())->toBeTrue();
+    expect($formule->isModeExercice())->toBeFalse();
 });
 
 it('expose la relation sous-catégorie', function (): void {
@@ -83,6 +87,21 @@ it('soft-delete préserve les données pour historique', function (): void {
 
     expect(FormuleAdhesion::count())->toBe(0);
     expect(FormuleAdhesion::withTrashed()->count())->toBe(1);
+});
+
+it('formuleAdhesionActive sur SousCategorie retourne uniquement la formule active', function (): void {
+    $sc = SousCategorie::factory()->pourCotisations()->create();
+    FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id, 'actif' => false]);
+    $active = FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id, 'actif' => true]);
+
+    expect($sc->formuleAdhesionActive()?->id)->toBe($active->id);
+});
+
+it('formuleAdhesionActive retourne null si aucune formule active', function (): void {
+    $sc = SousCategorie::factory()->pourCotisations()->create();
+    FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id, 'actif' => false]);
+
+    expect($sc->formuleAdhesionActive())->toBeNull();
 });
 
 it('caste duree_mois en int', function (): void {
