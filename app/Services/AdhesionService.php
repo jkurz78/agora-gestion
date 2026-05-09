@@ -68,13 +68,14 @@ final class AdhesionService
                 'exercice' => $exercice,
                 'transaction_id' => (int) $tx->id,
                 'gratuite' => false,
+                'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
             ]);
         });
     }
 
     public function creerGratuite(Tiers $tiers, int $exercice, string $motif, User $createur): Adhesion
     {
-        return DB::transaction(function () use ($tiers, $exercice, $motif): Adhesion {
+        return DB::transaction(function () use ($tiers, $exercice, $motif, $createur): Adhesion {
             $existante = Adhesion::withTrashed()
                 ->where('tiers_id', (int) $tiers->id)
                 ->where('exercice', $exercice)
@@ -92,6 +93,7 @@ final class AdhesionService
                     'gratuite' => true,
                     'motif_gratuite' => $motif,
                     'transaction_id' => null,
+                    'saisi_par' => (int) $createur->id,
                 ]);
 
                 return $existante;
@@ -104,6 +106,7 @@ final class AdhesionService
                 'transaction_id' => null,
                 'gratuite' => true,
                 'motif_gratuite' => $motif,
+                'saisi_par' => (int) $createur->id,
             ]);
         });
     }

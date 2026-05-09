@@ -44,6 +44,14 @@ final class OffrirAdhesionModal extends Component
             'motif' => ['required', 'string', 'min:3', 'max:255'],
         ]);
 
+        // Garde-fou : refuser les exercices clos
+        $exerciceService = app(ExerciceService::class);
+        if (! in_array((int) $this->exercice, $exerciceService->openYears(), true)) {
+            session()->flash('error', "L'exercice sélectionné est clos. Aucune adhésion ne peut y être ajoutée.");
+
+            return;
+        }
+
         $tiers = Tiers::findOrFail((int) $this->tiersId);
 
         try {
@@ -61,7 +69,7 @@ final class OffrirAdhesionModal extends Component
 
     public function render(): View
     {
-        $availableYears = app(ExerciceService::class)->availableYears();
+        $availableYears = app(ExerciceService::class)->openYears();
 
         // Suggestions de motifs : valeurs distinctes déjà saisies (auto-convergence
         // sans paramétrage). Limité à 50 suggestions pour rester léger.
