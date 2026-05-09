@@ -19,17 +19,13 @@
 
                         {{-- Tiers --}}
                         <div class="mb-3">
-                            <label class="form-label fw-semibold" for="offrir-tiers">Adhérent</label>
-                            <select id="offrir-tiers"
-                                    class="form-select form-select-sm @error('tiersId') is-invalid @enderror"
-                                    wire:model="tiersId">
-                                <option value="">— Choisir un tiers —</option>
-                                @foreach($tiersList as $t)
-                                    <option value="{{ $t->id }}">{{ $t->nom }}{{ $t->prenom ? ' ' . $t->prenom : '' }}</option>
-                                @endforeach
-                            </select>
+                            <label class="form-label fw-semibold">Adhérent</label>
+                            <livewire:tiers-autocomplete
+                                wire:model="tiersId"
+                                :key="'offrir-adhesion-tiers-'.($visible ? '1' : '0')"
+                                context="adhesion" />
                             @error('tiersId')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
                         </div>
 
@@ -49,15 +45,22 @@
                             @enderror
                         </div>
 
-                        {{-- Motif --}}
+                        {{-- Motif (avec auto-suggestion sur les motifs déjà saisis) --}}
                         <div class="mb-3">
                             <label class="form-label fw-semibold" for="offrir-motif">Motif</label>
-                            <textarea id="offrir-motif"
-                                      class="form-control form-control-sm @error('motif') is-invalid @enderror"
-                                      wire:model="motif"
-                                      rows="2"
-                                      maxlength="255"
-                                      placeholder="Ex : Membre d'honneur, bénévole…"></textarea>
+                            <input id="offrir-motif"
+                                   type="text"
+                                   list="offrir-motif-suggestions"
+                                   class="form-control form-control-sm @error('motif') is-invalid @enderror"
+                                   wire:model="motif"
+                                   maxlength="255"
+                                   autocomplete="off"
+                                   placeholder="Ex : Membre d'honneur, bénévole…">
+                            <datalist id="offrir-motif-suggestions">
+                                @foreach($motifsSuggestions as $suggestion)
+                                    <option value="{{ $suggestion }}"></option>
+                                @endforeach
+                            </datalist>
                             @error('motif')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

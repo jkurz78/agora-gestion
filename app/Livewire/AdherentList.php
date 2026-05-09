@@ -8,6 +8,7 @@ use App\Livewire\Concerns\WithPerPage;
 use App\Models\Tiers;
 use App\Services\ExerciceService;
 use Illuminate\View\View;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -28,6 +29,12 @@ final class AdherentList extends Component
     }
 
     public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    #[On('adhesion-creee')]
+    public function onAdhesionCreee(): void
     {
         $this->resetPage();
     }

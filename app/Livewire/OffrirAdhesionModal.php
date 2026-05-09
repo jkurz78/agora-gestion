@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Models\Adhesion;
 use App\Models\Tiers;
 use App\Services\AdhesionService;
 use App\Services\ExerciceService;
@@ -61,8 +62,18 @@ final class OffrirAdhesionModal extends Component
     public function render(): View
     {
         $availableYears = app(ExerciceService::class)->availableYears();
-        $tiersList = Tiers::query()->orderBy('nom')->limit(200)->get();
 
-        return view('livewire.offrir-adhesion-modal', compact('availableYears', 'tiersList'));
+        // Suggestions de motifs : valeurs distinctes déjà saisies (auto-convergence
+        // sans paramétrage). Limité à 50 suggestions pour rester léger.
+        $motifsSuggestions = Adhesion::query()
+            ->whereNotNull('motif_gratuite')
+            ->where('motif_gratuite', '!=', '')
+            ->distinct()
+            ->orderBy('motif_gratuite')
+            ->limit(50)
+            ->pluck('motif_gratuite')
+            ->all();
+
+        return view('livewire.offrir-adhesion-modal', compact('availableYears', 'motifsSuggestions'));
     }
 }
