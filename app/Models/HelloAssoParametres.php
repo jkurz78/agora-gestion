@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\HelloAssoEnvironnement;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class HelloAssoParametres extends Model
 {
+    use HasFactory;
+
     protected $table = 'helloasso_parametres';
 
     protected $hidden = [
