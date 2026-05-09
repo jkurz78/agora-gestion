@@ -129,7 +129,38 @@ it('refuse un doublon avec un message d\'erreur fr', function (): void {
     expect(Adhesion::count())->toBe(1);
 });
 
-it('valide les champs obligatoires', function (): void {
+it('updatedFormuleId pré-remplit le montant depuis montant_par_defaut quand non gratuite', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->assertSet('montant', 0.0)
+        ->set('formuleId', $this->formuleExercice->id)
+        ->assertSet('montant', 30.00); // formule.montant_par_defaut = 30.00 dans le beforeEach
+});
+
+it('updatedFormuleId NE pré-remplit PAS le montant en mode gratuite', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('formuleId', $this->formuleExercice->id)
+        ->assertSet('montant', 0.0);
+});
+
+it('updatedFormuleId initialise dateDebut à today en mode durée', function (): void {
+    $this->formuleExercice->update(['actif' => false]);
+    $formuleDuree = FormuleAdhesion::factory()->modeDuree(12)->create([
+        'sous_categorie_id' => $this->sc->id,
+    ]);
+
+    $today = now()->toDateString();
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->set('formuleId', $formuleDuree->id)
+        ->assertSet('dateDebut', $today);
+});
+
+it('valide les champs obligatoires (avec paid fields lorsque montant > 0)', function (): void {
     Livewire::actingAs($this->user)
         ->test(NouvelleAdhesionModal::class)
         ->dispatch('nouvelle-adhesion')
@@ -137,6 +168,8 @@ it('valide les champs obligatoires', function (): void {
         ->set('formuleId', null)
         ->set('montant', 30.00)
         ->set('datePaiement', null)
+        ->set('modePaiement', null)
+        ->set('compteId', null)
         ->call('submit')
-        ->assertHasErrors(['tiersId', 'formuleId']);
+        ->assertHasErrors(['tiersId', 'formuleId', 'datePaiement', 'modePaiement', 'compteId']);
 });

@@ -13,6 +13,7 @@ use App\Services\AdhesionService;
 use App\Services\ExerciceService;
 use DomainException;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
@@ -110,7 +111,7 @@ final class NouvelleAdhesionModal extends Component
         ];
         if ($this->montant > 0) {
             $rules['datePaiement'] = ['required', 'date'];
-            $rules['modePaiement'] = ['required', 'string'];
+            $rules['modePaiement'] = ['required', 'string', Rule::in(array_column(ModePaiement::cases(), 'value'))];
             $rules['compteId'] = ['required', 'integer'];
         }
         $this->validate($rules);
