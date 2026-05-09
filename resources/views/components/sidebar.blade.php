@@ -654,6 +654,15 @@ $activeGroup = match(true) {
                             </li>
                             @endif
 
+                            @if (Route::has('parametres.adhesions.formules'))
+                            <li class="nav-item">
+                                <a href="{{ route('parametres.adhesions.formules') }}"
+                                   class="nav-link {{ request()->routeIs('parametres.adhesions.*') ? 'active' : '' }}">
+                                    <i class="bi bi-card-checklist me-1"></i> Adhésions
+                                </a>
+                            </li>
+                            @endif
+
                             @if (Route::has('parametres.recus-fiscaux'))
                             <li class="nav-item">
                                 <a href="{{ route('parametres.recus-fiscaux') }}"
