@@ -1,7 +1,7 @@
 # Fiche tiers 360 — Slice 3 (Formules d'adhésion + durée + mapping HelloAsso)
 
 **Date** : 2026-05-09
-**Statut** : SLICE 3a LIVRÉ (backend) — slice 3b (UI) à enchaîner après validation
+**Statut** : SLICE 3 LIVRÉ (3a backend + 3b UI) — prêt pour test manuel + PR
 **Branche cible** : `feat/fiche-tiers-slice3-formules-adhesions` (créée depuis `feat/fiche-tiers-slice2-adhesions`, qui n'est pas encore mergée)
 
 ## 1. Contexte
