@@ -24,12 +24,12 @@
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
                 <li>
-                    <a class="dropdown-item" href="{{ route('comptabilite.transactions') }}">
+                    <button type="button" class="dropdown-item" onclick="window.Livewire.dispatch('nouvelle-adhesion')">
                         <i class="bi bi-cash-coin me-1"></i> Nouvelle cotisation (avec paiement)
-                    </a>
+                    </button>
                 </li>
                 <li>
-                    <button type="button" class="dropdown-item" onclick="window.Livewire.dispatch('offrir-adhesion')">
+                    <button type="button" class="dropdown-item" onclick="window.Livewire.dispatch('nouvelle-adhesion', { gratuite: true })">
                         <i class="bi bi-gift me-1"></i> Adhésion gratuite (offerte)
                     </button>
                 </li>

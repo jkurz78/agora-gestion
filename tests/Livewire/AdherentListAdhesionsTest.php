@@ -141,3 +141,13 @@ it('affiche le montant et le compte sur ligne adhésion payée', function (): vo
         ->assertSee('PAYANT')
         ->assertDontSee('Offerte');
 });
+
+it('le rendu de la blade référence l\'event nouvelle-adhesion (et plus offrir-adhesion)', function (): void {
+    $rendered = Livewire::actingAs($this->user)
+        ->test(AdherentList::class)
+        ->html();
+
+    expect($rendered)->toContain("Livewire.dispatch('nouvelle-adhesion')");
+    expect($rendered)->toContain("Livewire.dispatch('nouvelle-adhesion', { gratuite: true })");
+    expect($rendered)->not->toContain("Livewire.dispatch('offrir-adhesion')");
+});
