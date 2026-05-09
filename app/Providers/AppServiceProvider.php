@@ -31,6 +31,7 @@ use App\Policies\ExtournePolicy;
 use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
 use App\Policies\RecuFiscalPolicy;
+use App\Services\Adhesion\SousCategorieFormuleResolver;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -46,6 +47,7 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(LigneTypeRegistry::class);
+        $this->app->singleton(SousCategorieFormuleResolver::class);
     }
 
     public function boot(): void
