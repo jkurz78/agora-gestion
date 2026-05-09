@@ -48,10 +48,9 @@ class DevisManuelSeeder extends Seeder
             'libelle' => 'Mission conseil stratégique',
             'statut' => StatutDevis::Brouillon,
             'montant_total' => '0.00',
+            'exercice' => $exercice,
             'saisi_par_user_id' => $admin?->id,
         ]);
-        $devis1->exercice = $exercice;
-        $devis1->save();
 
         DevisLigne::create([
             'devis_id' => $devis1->id,
@@ -81,11 +80,10 @@ class DevisManuelSeeder extends Seeder
             'libelle' => 'Formation sécurité incendie',
             'statut' => StatutDevis::Valide,
             'montant_total' => '1200.00',
+            'exercice' => $exercice,
+            'numero' => 'D-'.$exercice.'-001',
             'saisi_par_user_id' => $admin?->id,
         ]);
-        $devis2->numero = 'D-'.$exercice.'-001';
-        $devis2->exercice = $exercice;
-        $devis2->save();
 
         DevisLigne::create([
             'devis_id' => $devis2->id,
@@ -104,13 +102,12 @@ class DevisManuelSeeder extends Seeder
             'libelle' => 'Prestation communication',
             'statut' => StatutDevis::Accepte,
             'montant_total' => '2400.00',
+            'exercice' => $exercice,
+            'numero' => 'D-'.$exercice.'-002',
+            'accepte_par_user_id' => $admin?->id,
+            'accepte_le' => Carbon::today()->subDays(20),
             'saisi_par_user_id' => $admin?->id,
         ]);
-        $devis3->numero = 'D-'.$exercice.'-002';
-        $devis3->exercice = $exercice;
-        $devis3->accepte_par_user_id = $admin?->id;
-        $devis3->accepte_le = Carbon::today()->subDays(20);
-        $devis3->save();
 
         DevisLigne::create([
             'devis_id' => $devis3->id,
@@ -138,13 +135,12 @@ class DevisManuelSeeder extends Seeder
             'libelle' => 'Maintenance informatique annuelle',
             'statut' => StatutDevis::Refuse,
             'montant_total' => '3600.00',
+            'exercice' => $exercice,
+            'numero' => 'D-'.$exercice.'-003',
+            'refuse_par_user_id' => $admin?->id,
+            'refuse_le' => Carbon::today()->subDays(35),
             'saisi_par_user_id' => $admin?->id,
         ]);
-        $devis4->numero = 'D-'.$exercice.'-003';
-        $devis4->exercice = $exercice;
-        $devis4->refuse_par_user_id = $admin?->id;
-        $devis4->refuse_le = Carbon::today()->subDays(35);
-        $devis4->save();
 
         DevisLigne::create([
             'devis_id' => $devis4->id,
