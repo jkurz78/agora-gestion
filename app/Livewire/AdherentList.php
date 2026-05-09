@@ -45,6 +45,9 @@ final class AdherentList extends Component
 
         $query = Tiers::query();
 
+        // TODO slice-3b: étendre les filtres a_jour/en_retard au mode durée
+        // (exercice null, lookup via date_debut/date_fin et now() — voir spec section 4.10).
+        // Aujourd'hui, une adhésion mode durée n'apparaîtra pas dans `a_jour` car son `exercice` est NULL.
         match ($this->filtre) {
             'a_jour' => $query->whereHas('adhesions', fn ($q) => $q->where('exercice', $exercice)),
             'en_retard' => $query

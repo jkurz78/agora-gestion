@@ -21,6 +21,7 @@ it('persiste une adhésion payée avec sa transaction', function (): void {
 
     expect($adhesion->fresh()->exercice)->toBe(2025);
     expect($adhesion->fresh()->transaction_id)->not->toBeNull();
+    expect($adhesion->fresh()->estGratuite())->toBeFalse();
     expect($adhesion->tiers->id)->toBe($tiers->id);
     expect($adhesion->transaction->id)->toBe($tx->id);
 });

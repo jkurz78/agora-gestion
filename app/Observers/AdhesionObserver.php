@@ -27,7 +27,7 @@ final class AdhesionObserver
 
     /**
      * Soft-delete the adhesion in mirror of the transaction.
-     * Only affects non-gratuite adhesions (gratuite ones have no transaction_id).
+     * Only affects adhesions backed by a transaction (offered adhesions have no transaction_id, so the where clause naturally excludes them).
      */
     public function deleted(Transaction $tx): void
     {

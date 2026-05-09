@@ -31,7 +31,7 @@ final class AdhesionTransactionLigneObserver
 
     /**
      * A TransactionLigne was soft-deleted: if the parent transaction no longer has
-     * any cotisation ligne, soft-delete the associated non-gratuite adhesion.
+     * any cotisation ligne, soft-delete the associated adhesion (only those backed by a transaction).
      */
     public function deleted(TransactionLigne $ligne): void
     {
