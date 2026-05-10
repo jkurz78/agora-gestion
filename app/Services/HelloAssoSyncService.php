@@ -366,15 +366,15 @@ final class HelloAssoSyncService
 
         // Cas spécial : un don additionnel (item.type='Donation') dans un form NON Donation
         // (Membership ou Event) ne suit PAS la sous-cat de la cotisation/opération — il
-        // atterrit dans la sous-cat fallback "don additionnel" et n'est pas rattaché à
-        // l'opération (fiscalement indépendant). Doit passer AVANT la résolution opération
-        // sinon Event mappé à une opération masquerait le fallback (le don tombait dans la
-        // sous-cat de l'opération — bug observé sur HA-52045).
+        // atterrit dans la sous-cat fallback "don additionnel" (fiscalement indépendant).
+        // Doit passer AVANT la résolution opération sinon Event mappé à une opération
+        // masquerait le fallback (bug observé sur HA-52045).
+        // Note : on garde le rattachement à l'opération (operation_id) pour la traçabilité ;
+        // la catégorisation fiscale est portée par sous_categorie_id.
         if ($type === 'Donation') {
             $formMapping = HelloAssoFormMapping::where('form_slug', $formSlug)->first();
             if ($formMapping?->form_type !== 'Donation') {
                 $sousCategorieId = $this->parametres->sous_categorie_don_id;
-                $operationId = null;
             }
         }
 

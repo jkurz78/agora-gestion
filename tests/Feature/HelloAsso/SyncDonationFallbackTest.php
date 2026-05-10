@@ -95,10 +95,12 @@ it('un don additionnel dans un order Membership tombe dans la sous-cat fallback 
     expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scDon->id);
 });
 
-it('un don additionnel dans un order Event tombe dans la sous-cat fallback Don (pas formation) et est détaché de l\'opération', function (): void {
+it('un don additionnel dans un order Event tombe dans la sous-cat fallback Don (pas formation) tout en restant rattaché à l\'opération pour la traçabilité', function (): void {
     // Reproduit le bug observé sur HA-52045 : un don de 20€ joint à une inscription
     // formation tombait dans la sous-cat de l'opération (formation), alors qu'il
-    // devrait suivre la sous-cat fallback Don.
+    // devrait suivre la sous-cat fallback Don. La catégorisation fiscale est portée
+    // par sous_categorie_id ; operation_id reste setté pour conserver la traçabilité
+    // (le don est venu via cette opération).
     $scFormation = SousCategorie::factory()->create();
     $typeFormation = TypeOperation::factory()->create(['sous_categorie_id' => $scFormation->id]);
     $operation = Operation::factory()->create(['type_operation_id' => $typeFormation->id]);
@@ -136,8 +138,8 @@ it('un don additionnel dans un order Event tombe dans la sous-cat fallback Don (
         ->and((int) $ligneInscription->operation_id)->toBe((int) $operation->id);
 
     $ligneDon = $tx->lignes()->where('helloasso_item_id', 2002)->first();
-    expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scDon->id)
-        ->and($ligneDon->operation_id)->toBeNull(); // détaché de l'opération
+    expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scDon->id) // fallback Don
+        ->and((int) $ligneDon->operation_id)->toBe((int) $operation->id); // traçabilité conservée
 });
 
 it('échoue si fallback Don non configuré et un don additionnel apparaît sans sous-cat form', function (): void {
