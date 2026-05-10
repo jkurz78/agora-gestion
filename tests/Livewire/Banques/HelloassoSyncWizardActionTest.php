@@ -77,14 +77,14 @@ it('sauvegarderEtSuite persiste souscat: pour Membership', function (): void {
     expect($this->formMembership->sous_categorie_id)->toBe($this->scCotisation->id);
 });
 
-it('sauvegarderEtSuite persiste operation: pour Registration', function (): void {
+it('sauvegarderEtSuite persiste operation: pour Event (form d\'inscription HelloAsso)', function (): void {
     $typeOp = TypeOperation::factory()->create();
     $operation = Operation::factory()->create(['type_operation_id' => $typeOp->id]);
 
     $formEvent = HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,
         'form_slug' => 'event-2025',
-        'form_type' => 'Registration',
+        'form_type' => 'Event',
         'form_title' => 'Event 2025',
     ]);
 
@@ -99,7 +99,7 @@ it('sauvegarderEtSuite persiste operation: pour Registration', function (): void
     expect($formEvent->sous_categorie_id)->toBeNull();
 });
 
-it('étape 1 : sépare les forms Membership/Donation et Registration en 2 tableaux distincts', function (): void {
+it('étape 1 : sépare les forms Membership/Donation et Event en 2 tableaux distincts', function (): void {
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,
         'form_slug' => 'don-2025',
@@ -109,7 +109,7 @@ it('étape 1 : sépare les forms Membership/Donation et Registration en 2 tablea
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,
         'form_slug' => 'event-2025',
-        'form_type' => 'Registration',
+        'form_type' => 'Event',
         'form_title' => 'Stage Reiki octobre',
     ]);
 
@@ -119,17 +119,17 @@ it('étape 1 : sépare les forms Membership/Donation et Registration en 2 tablea
 
     $html = $component->html();
     expect($html)->toContain('Adhésions et dons')
-        ->and($html)->toContain('Événements (inscriptions)')
+        ->and($html)->toContain('Opérations')
         ->and($html)->toContain('Cotisation 2025') // Membership row
         ->and($html)->toContain('Dons 2025') // Donation row
-        ->and($html)->toContain('Stage Reiki octobre'); // Registration row
+        ->and($html)->toContain('Stage Reiki octobre'); // Event row
 });
 
-it('étape 1 : seuls les forms Registration ont le bouton "créer opération"', function (): void {
+it('étape 1 : seuls les forms Event ont le bouton "créer opération"', function (): void {
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,
         'form_slug' => 'event-2025',
-        'form_type' => 'Registration',
+        'form_type' => 'Event',
         'form_title' => 'Stage Reiki',
     ]);
 

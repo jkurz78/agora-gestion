@@ -161,15 +161,15 @@
                                 </table>
                             @endif
 
-                            {{-- Tableau 2 : Événements (Registration) --}}
-                            @if ($evenementsForms->isNotEmpty())
+                            {{-- Tableau 2 : Opérations (form_type='Event' côté HelloAsso) --}}
+                            @if ($operationsForms->isNotEmpty())
                                 <h6 class="fw-semibold mt-3 mb-1">
-                                    <i class="bi bi-calendar-event me-1"></i> Événements (inscriptions)
+                                    <i class="bi bi-calendar-event me-1"></i> Opérations
                                 </h6>
                                 <p class="text-muted small mb-2">
-                                    Liez chaque formulaire d'inscription à une opération existante,
-                                    ou créez-en une à la volée. La sync importera les inscrits comme
-                                    participants de l'opération.
+                                    Liez chaque formulaire d'inscription HelloAsso à une opération
+                                    existante, ou créez-en une à la volée. La sync importera les
+                                    inscrits comme participants de l'opération.
                                 </p>
                                 <table class="table table-sm">
                                     <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
@@ -181,7 +181,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @foreach ($evenementsForms as $fm)
+                                        @foreach ($operationsForms as $fm)
                                             <tr wire:key="fm-ev-{{ $fm->id }}">
                                                 <td class="small">{{ $fm->form_title ?? $fm->form_slug }}</td>
                                                 <td class="small text-nowrap">

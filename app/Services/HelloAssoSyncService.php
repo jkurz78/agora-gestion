@@ -114,9 +114,10 @@ final class HelloAssoSyncService
             return $result;
         }
 
-        // Skip si form Registration sans operation_id configurée
+        // Skip si form Event sans operation_id configurée. Note : 'Event' est le
+        // form_type renvoyé par HelloAsso v5 (pas 'Registration' — c'est item.type).
         if ($formMapping !== null
-            && $formMapping->form_type === 'Registration'
+            && $formMapping->form_type === 'Event'
             && $formMapping->operation_id === null) {
             $result['skipped']++;
 

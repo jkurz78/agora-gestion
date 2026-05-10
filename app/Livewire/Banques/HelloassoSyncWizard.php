@@ -575,17 +575,20 @@ final class HelloassoSyncWizard extends Component
 
         $formMappings = $query?->get() ?? collect();
 
-        // Split par usage métier : Adhésions/Dons (Membership+Donation) vs Événements (Registration)
-        // vs Autres (autres types — rare). Le bouton "créer opération inline" n'existe que pour
-        // Événements ; le sélecteur sous-catégorie n'existe que pour Adhésions/Dons.
+        // Split par usage métier : Adhésions/Dons (Membership+Donation) vs Opérations
+        // (form_type='Event' côté HelloAsso) vs Autres (autres types — rare). Le bouton
+        // "créer opération inline" n'existe que pour Opérations ; le sélecteur sous-cat
+        // n'existe que pour Adhésions/Dons. Note : `form_type` est au niveau form ('Event'
+        // chez HelloAsso v5), à distinguer de `item.type='Registration'` qui est au niveau
+        // ligne d'order (utilisé par HelloAssoSyncService::resolveItem).
         $adhesionsDonsForms = $formMappings->whereIn('form_type', ['Membership', 'Donation'])->values();
-        $evenementsForms = $formMappings->where('form_type', 'Registration')->values();
-        $autresForms = $formMappings->whereNotIn('form_type', ['Membership', 'Donation', 'Registration'])->values();
+        $operationsForms = $formMappings->where('form_type', 'Event')->values();
+        $autresForms = $formMappings->whereNotIn('form_type', ['Membership', 'Donation', 'Event'])->values();
 
         return view('livewire.banques.helloasso-sync-wizard', [
             'formMappings' => $formMappings,
             'adhesionsDonsForms' => $adhesionsDonsForms,
-            'evenementsForms' => $evenementsForms,
+            'operationsForms' => $operationsForms,
             'autresForms' => $autresForms,
             'operations' => Operation::with('typeOperation')->orderBy('nom')->get(),
             'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
