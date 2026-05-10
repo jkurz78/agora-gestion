@@ -65,11 +65,14 @@ function adhesionCotisationValide(array $adhesionOverrides = []): Adhesion
         'montant' => 50.00,
     ]);
 
+    // Supprimer les adhésions auto-créées par AdhesionTransactionLigneObserver
+    Adhesion::withTrashed()->where('tiers_id', $tiers->id)->forceDelete();
+
     return Adhesion::factory()->create(array_merge([
         'transaction_id' => $transaction->id,
         'tiers_id' => $tiers->id,
         'deductible_fiscal' => true,
-        'exercice' => fake()->unique()->numberBetween(2020, 2030),
+        'exercice' => mt_rand(2020, 2099),
     ], $adhesionOverrides));
 }
 

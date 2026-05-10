@@ -9,6 +9,7 @@ use App\Enums\UsageComptable;
 use App\Livewire\Tiers\Onglets\Adhesion as AdhesionComponent;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\FormuleAdhesion;
 use App\Models\RecuFiscalEmis;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
@@ -81,7 +82,7 @@ function creerAdhesionDeductiblePayee(array $tiersOverrides = [], array $adhesio
         'transaction_id' => $transaction->id,
         'tiers_id' => $tiers->id,
         'deductible_fiscal' => true,
-        'exercice' => fake()->unique()->numberBetween(2020, 2030),
+        'exercice' => mt_rand(2020, 2099),
     ], $adhesionOverrides));
 }
 
@@ -112,7 +113,7 @@ it('n\'affiche pas le bouton "Émettre" pour une adhésion gratuite', function (
         'tiers_id' => $tiers->id,
         'transaction_id' => null,
         'deductible_fiscal' => true,
-        'exercice' => 2025,
+        'exercice' => 2099,
     ]);
 
     Livewire::test(AdhesionComponent::class, ['tiers' => $tiers])
@@ -155,4 +156,122 @@ it('click sur "Émettre" crée le reçu et redirige vers le téléchargement', f
     expect(RecuFiscalEmis::count())->toBe(1);
     $recu = RecuFiscalEmis::first();
     expect($recu->annule_at)->toBeNull();
+});
+
+// ══════════════════════════════════════════════════════
+// Phase 6 — Modale d'avertissement HelloAsso
+// ══════════════════════════════════════════════════════
+
+/**
+ * Crée une adhésion payée + déductible liée à une formule HelloAsso.
+ */
+function creerAdhesionHelloAsso(): Adhesion
+{
+    $tiers = Tiers::factory()->create([
+        'type' => 'particulier',
+        'nom' => fake()->unique()->lastName(),
+        'prenom' => 'HelloAsso',
+        'adresse_ligne1' => '10 rue de Rivoli',
+        'code_postal' => '75001',
+        'ville' => 'Paris',
+    ]);
+
+    $sousCat = SousCategorie::query()
+        ->whereHas('usages', fn ($q) => $q->where('usage', UsageComptable::Cotisation->value))
+        ->first()
+        ?? SousCategorie::factory()->pourCotisations()->create();
+
+    $formule = FormuleAdhesion::factory()->helloasso('form-slug-test', 42)->create([
+        'sous_categorie_id' => $sousCat->id,
+        'deductible_fiscal' => true,
+    ]);
+
+    $transaction = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'type' => TypeTransaction::Recette,
+        'statut_reglement' => StatutReglement::Recu,
+        'mode_paiement' => ModePaiement::Virement,
+        'date' => now()->subMonths(1),
+    ]);
+
+    TransactionLigne::where('transaction_id', $transaction->id)->delete();
+
+    TransactionLigne::factory()->create([
+        'transaction_id' => $transaction->id,
+        'sous_categorie_id' => $sousCat->id,
+        'montant' => 50.00,
+    ]);
+
+    Adhesion::withTrashed()->where('tiers_id', $tiers->id)->forceDelete();
+
+    return Adhesion::factory()->create([
+        'transaction_id' => $transaction->id,
+        'tiers_id' => $tiers->id,
+        'formule_adhesion_id' => $formule->id,
+        'deductible_fiscal' => true,
+        'exercice' => mt_rand(2031, 2099),
+    ]);
+}
+
+// ── Phase 6, Cas 1 : click "Émettre" sur adhésion HelloAsso → modale affichée, aucun reçu créé ──
+it('affiche la modale d\'avertissement HelloAsso sans créer de reçu', function () {
+    $adhesion = creerAdhesionHelloAsso();
+
+    expect(RecuFiscalEmis::count())->toBe(0);
+
+    Livewire::test(AdhesionComponent::class, ['tiers' => $adhesion->tiers])
+        ->call('emettreRecuFiscalAdhesion', $adhesion->id)
+        ->assertSet('showHelloAssoWarning', true)
+        ->assertSet('pendingAdhesionId', $adhesion->id)
+        ->assertNoRedirect();
+
+    expect(RecuFiscalEmis::count())->toBe(0);
+});
+
+// ── Phase 6, Cas 2 : confirmEmettreRecuApresAvertissement → reçu créé + redirect ──
+it('crée le reçu et redirige après confirmation de la modale HelloAsso', function () {
+    $adhesion = creerAdhesionHelloAsso();
+
+    expect(RecuFiscalEmis::count())->toBe(0);
+
+    Livewire::test(AdhesionComponent::class, ['tiers' => $adhesion->tiers])
+        ->set('pendingAdhesionId', $adhesion->id)
+        ->set('showHelloAssoWarning', true)
+        ->call('confirmEmettreRecuApresAvertissement')
+        ->assertRedirect();
+
+    expect(RecuFiscalEmis::count())->toBe(1);
+    expect(RecuFiscalEmis::first()->annule_at)->toBeNull();
+});
+
+// ── Phase 6, Cas 3 : cancelEmettreRecuApresAvertissement → modale fermée, aucun reçu créé ──
+it('ferme la modale sans créer de reçu après annulation', function () {
+    $adhesion = creerAdhesionHelloAsso();
+
+    expect(RecuFiscalEmis::count())->toBe(0);
+
+    Livewire::test(AdhesionComponent::class, ['tiers' => $adhesion->tiers])
+        ->set('pendingAdhesionId', $adhesion->id)
+        ->set('showHelloAssoWarning', true)
+        ->call('cancelEmettreRecuApresAvertissement')
+        ->assertSet('showHelloAssoWarning', false)
+        ->assertSet('pendingAdhesionId', null)
+        ->assertNoRedirect();
+
+    expect(RecuFiscalEmis::count())->toBe(0);
+});
+
+// ── Phase 6, Cas 4 : adhésion manuelle → pas de modale, génération directe ──
+it('génère directement le reçu sans modale pour une adhésion manuelle (est_helloasso=false)', function () {
+    $adhesion = creerAdhesionDeductiblePayee();
+
+    expect(RecuFiscalEmis::count())->toBe(0);
+
+    Livewire::test(AdhesionComponent::class, ['tiers' => $adhesion->tiers])
+        ->call('emettreRecuFiscalAdhesion', $adhesion->id)
+        ->assertSet('showHelloAssoWarning', false)
+        ->assertSet('pendingAdhesionId', null)
+        ->assertRedirect();
+
+    expect(RecuFiscalEmis::count())->toBe(1);
 });

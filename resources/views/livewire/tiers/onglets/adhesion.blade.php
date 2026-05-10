@@ -1,4 +1,29 @@
 <div>
+    {{-- Modale avertissement doublon HelloAsso --}}
+    @if($showHelloAssoWarning)
+        <div class="modal fade show d-block" tabindex="-1" style="z-index:2060;background-color:rgba(0,0,0,.5)">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Avertissement avant émission</h5>
+                        <button type="button" class="btn-close" wire:click="cancelEmettreRecuApresAvertissement"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning mb-0">
+                            <strong>HelloAsso peut déjà avoir émis son propre reçu fiscal pour cette cotisation.</strong>
+                            Confirmer l'émission peut créer un doublon côté donateur
+                            (responsabilité du donateur de ne pas déduire deux fois).
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" wire:click="cancelEmettreRecuApresAvertissement">Annuler</button>
+                        <button type="button" class="btn btn-primary" wire:click="confirmEmettreRecuApresAvertissement">Confirmer l'émission</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="card">
         <div class="card-header py-2 d-flex justify-content-between align-items-center">
             <span class="fw-semibold">Adhésions</span>
