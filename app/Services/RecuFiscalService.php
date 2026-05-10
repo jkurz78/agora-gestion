@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\UsageComptable;
 use App\Exceptions\RecuFiscalException;
+use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\RecuFiscalEmis;
 use App\Models\SousCategorie;
@@ -108,6 +109,18 @@ final class RecuFiscalService
         });
     }
 
+    public function validerEligibiliteAdhesion(Adhesion $adhesion): void
+    {
+        if ($adhesion->transaction_id === null) {
+            throw RecuFiscalException::adhesionGratuite();
+        }
+        if (! $adhesion->deductible_fiscal) {
+            throw RecuFiscalException::adhesionNonDeductible();
+        }
+        $ligne = $this->resoudreLigneCotisation($adhesion);
+        $this->validerEligibilite($ligne);
+    }
+
     public function annuler(RecuFiscalEmis $recu, string $motif, ?User $user = null): void
     {
         if ($recu->isAnnule()) {
@@ -147,6 +160,34 @@ final class RecuFiscalService
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$filename.'"',
         ]);
+    }
+
+    private function resoudreLigneCotisation(Adhesion $adhesion): TransactionLigne
+    {
+        if ($adhesion->transaction_id === null) {
+            throw RecuFiscalException::adhesionGratuite();
+        }
+        $lignes = $adhesion->transaction->lignes()->get();
+
+        if ($adhesion->formuleAdhesion?->est_helloasso) {
+            $ligne = $lignes->firstWhere('helloasso_tier_id', $adhesion->formuleAdhesion->helloasso_tier_id);
+            if ($ligne !== null) {
+                return $ligne;
+            }
+        }
+
+        if ($lignes->count() === 1) {
+            return $lignes->first();
+        }
+
+        if ($adhesion->formuleAdhesion !== null) {
+            $ligne = $lignes->firstWhere('sous_categorie_id', $adhesion->formuleAdhesion->sous_categorie_id);
+            if ($ligne !== null) {
+                return $ligne;
+            }
+        }
+
+        throw new RecuFiscalException("Impossible d'identifier la ligne cotisation de l'adhésion #{$adhesion->id}.");
     }
 
     private function allouerNumero(int $annee): string

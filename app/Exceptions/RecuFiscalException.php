@@ -32,4 +32,14 @@ final class RecuFiscalException extends RuntimeException
     {
         return new self('La transaction n\'a pas de sous-catégorie associée.');
     }
+
+    public static function adhesionGratuite(): self
+    {
+        return new self('Cette adhésion est gratuite (sans paiement) — aucun reçu fiscal possible.');
+    }
+
+    public static function adhesionNonDeductible(): self
+    {
+        return new self('Cette adhésion n\'est pas marquée comme déductible fiscalement.');
+    }
 }
