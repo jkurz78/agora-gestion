@@ -241,7 +241,17 @@ final class HelloAssoSyncService
                 // Upsert TransactionLignes
                 foreach ($resolvedItems as $resolved) {
                     $item = $resolved['item'];
-                    $montantEuros = round($item['amount'] / 100, 2);
+                    // Le montant de l'item peut être 0 si HelloAsso a déjà appliqué un
+                    // discount qui annule le tarif. Les options (`item.options[]`) sont
+                    // imbriquées et leur amount n'est PAS inclus dans `item.amount` —
+                    // il faut les additionner pour refléter le montant réellement payé.
+                    // Cas observé HA-55698 : Cotisation 35€ - discount 35€ + option 12€
+                    // → item.amount=0, options.amount=1200c, payment=12€.
+                    $optionsTotal = 0;
+                    foreach ($item['options'] ?? [] as $opt) {
+                        $optionsTotal += (int) ($opt['amount'] ?? 0);
+                    }
+                    $montantEuros = round(((int) $item['amount'] + $optionsTotal) / 100, 2);
 
                     $existingLigne = TransactionLigne::withTrashed()
                         ->where('helloasso_item_id', $item['id'])
