@@ -173,3 +173,50 @@ it('valide les champs obligatoires (avec paid fields lorsque montant > 0)', func
         ->call('submit')
         ->assertHasErrors(['tiersId', 'formuleId', 'datePaiement', 'modePaiement', 'compteId']);
 });
+
+it('le dropdown formules est groupé en optgroup Manuelles / HelloAsso', function (): void {
+    // $this->formuleExercice (est_helloasso=false) est déjà active sur $this->sc
+    // Créer une formule HelloAsso sur une sous-cat distincte
+    $scHa = SousCategorie::factory()->pourCotisations()->create();
+    FormuleAdhesion::factory()->helloasso('cotisation-2025', 1)->create([
+        'sous_categorie_id' => $scHa->id,
+        'nom' => 'Adhésion HA test',
+        'actif' => true,
+    ]);
+
+    $rendered = Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->html();
+
+    expect($rendered)->toContain('Formules manuelles');
+    expect($rendered)->toContain('Formules HelloAsso');
+});
+
+it('mode illimite affiche le bandeau permanente et crée l\'adhésion sans date_fin', function (): void {
+    // Désactiver la formule du beforeEach pour libérer la sous-cat
+    $this->formuleExercice->update(['actif' => false]);
+
+    $formuleIllimite = FormuleAdhesion::factory()->modeIllimite()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'actif' => true,
+        'nom' => 'Membre à vie',
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $formuleIllimite->id);
+
+    expect($component->html())->toContain('Adhésion permanente');
+
+    $component->set('montant', 0.0)
+        ->set('notes', 'Membre fondateur')
+        ->call('submit');
+
+    expect(Adhesion::count())->toBe(1);
+    $adhesion = Adhesion::first();
+    expect($adhesion->mode)->toBe('illimite');
+    expect($adhesion->date_fin)->toBeNull();
+});

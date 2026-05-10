@@ -147,10 +147,19 @@ final class NouvelleAdhesionModal extends Component
 
     public function render(): View
     {
-        $formules = FormuleAdhesion::query()
+        $formulesManuelles = FormuleAdhesion::query()
             ->where('actif', true)
+            ->where('est_helloasso', false)
             ->orderBy('nom')
             ->get();
+
+        $formulesHelloAsso = FormuleAdhesion::query()
+            ->where('actif', true)
+            ->where('est_helloasso', true)
+            ->orderBy('nom')
+            ->get();
+
+        $formules = $formulesManuelles->merge($formulesHelloAsso);
 
         $availableYears = app(ExerciceService::class)->openYears();
         $comptes = CompteBancaire::query()
@@ -168,6 +177,6 @@ final class NouvelleAdhesionModal extends Component
             ->pluck('notes')
             ->all();
 
-        return view('livewire.nouvelle-adhesion-modal', compact('formules', 'availableYears', 'comptes', 'modesPaiement', 'notesSuggestions'));
+        return view('livewire.nouvelle-adhesion-modal', compact('formules', 'formulesManuelles', 'formulesHelloAsso', 'availableYears', 'comptes', 'modesPaiement', 'notesSuggestions'));
     }
 }

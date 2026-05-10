@@ -37,24 +37,49 @@
                                     class="form-select form-select-sm @error('formuleId') is-invalid @enderror"
                                     wire:model.live="formuleId">
                                 <option value="">— Choisir une formule —</option>
-                                @foreach($formules as $formule)
-                                    <option value="{{ $formule->id }}">
-                                        {{ $formule->nom }}
-                                        @if($formule->isModeDuree())
-                                            ({{ $formule->duree_mois }} mois)
-                                        @else
-                                            (par exercice)
-                                        @endif
-                                        @if($formule->montant_par_defaut !== null)
-                                            — {{ number_format((float) $formule->montant_par_defaut, 2, ',', ' ') }} €
-                                        @endif
-                                    </option>
-                                @endforeach
+                                @if ($formulesManuelles->isNotEmpty())
+                                    <optgroup label="Formules manuelles">
+                                        @foreach($formulesManuelles as $formule)
+                                            <option value="{{ $formule->id }}">
+                                                {{ $formule->nom }}
+                                                @if ($formule->isModeDuree())
+                                                    ({{ $formule->duree_mois }} mois)
+                                                @elseif ($formule->isModeIllimite())
+                                                    (permanente)
+                                                @else
+                                                    (par exercice)
+                                                @endif
+                                                @if ($formule->montant_par_defaut !== null)
+                                                    — {{ number_format((float) $formule->montant_par_defaut, 2, ',', ' ') }} €
+                                                @endif
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
+                                @if ($formulesHelloAsso->isNotEmpty())
+                                    <optgroup label="Formules HelloAsso">
+                                        @foreach($formulesHelloAsso as $formule)
+                                            <option value="{{ $formule->id }}">
+                                                {{ $formule->nom }}
+                                                @if ($formule->isModeDuree())
+                                                    ({{ $formule->duree_mois }} mois)
+                                                @elseif ($formule->isModeIllimite())
+                                                    (permanente)
+                                                @else
+                                                    (par exercice)
+                                                @endif
+                                                @if ($formule->montant_par_defaut !== null)
+                                                    — {{ number_format((float) $formule->montant_par_defaut, 2, ',', ' ') }} €
+                                                @endif
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
                             </select>
                             @error('formuleId')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
-                            @if($formules->isEmpty())
+                            @if($formulesManuelles->isEmpty() && $formulesHelloAsso->isEmpty())
                                 <div class="form-text text-warning">
                                     <i class="bi bi-exclamation-triangle me-1"></i>
                                     Aucune formule active.
@@ -95,6 +120,11 @@
                                            value="{{ $this->dateFinCalculee }}"
                                            readonly>
                                 </div>
+                            </div>
+                        @elseif($selectedFormule && $selectedFormule->isModeIllimite())
+                            <div class="alert alert-info py-2 small mb-3">
+                                <i class="bi bi-infinity me-1"></i>
+                                Adhésion permanente — pas d'expiration. Date de début : aujourd'hui.
                             </div>
                         @endif
 
