@@ -7,6 +7,8 @@ namespace App\Services;
 use App\Enums\ModePaiement;
 use App\Enums\StatutReglement;
 use App\Models\CompteBancaire;
+use App\Models\FormuleAdhesion;
+use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -14,6 +16,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -24,6 +27,9 @@ final class HelloAssoSyncService
 
     /** @var array<int, ?int> operation_id => sous_categorie_id */
     private array $operationSousCategorieCache = [];
+
+    /** @var array<string, ?array<string, mixed>> Cache form_slug → fetchFormDetail result */
+    private array $formDetailsCache = [];
 
     public function __construct(
         private readonly HelloAssoParametres $parametres,
@@ -82,9 +88,42 @@ final class HelloAssoSyncService
      */
     private function processOrder(array $order, int $exercice): array
     {
+        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'participants_created' => 0, 'skipped' => 0];
+
+        $formSlug = $order['formSlug'] ?? '';
+
+        // Load form mapping for skip guards and auto-creation
+        $formMapping = HelloAssoFormMapping::query()
+            ->where('form_slug', $formSlug)
+            ->first();
+
+        // Skip si form ignoré
+        if ($formMapping !== null && $formMapping->ignore) {
+            $result['skipped']++;
+
+            return $result;
+        }
+
+        // Skip si form Membership/Donation sans sous_categorie_id configurée
+        if ($formMapping !== null
+            && in_array($formMapping->form_type, ['Membership', 'Donation'], true)
+            && $formMapping->sous_categorie_id === null) {
+            $result['skipped']++;
+
+            return $result;
+        }
+
+        // Skip si form Registration sans operation_id configurée
+        if ($formMapping !== null
+            && $formMapping->form_type === 'Registration'
+            && $formMapping->operation_id === null) {
+            $result['skipped']++;
+
+            return $result;
+        }
+
         // Group items by beneficiary nom+prénom
         $groups = $this->groupItemsByBeneficiary($order);
-        $result = ['tx_created' => 0, 'tx_updated' => 0, 'lignes_created' => 0, 'lignes_updated' => 0, 'participants_created' => 0, 'skipped' => 0];
 
         $orderDate = Carbon::parse($order['date'])->toDateString();
         $modePaiement = $this->resolveModePaiement($order['payments'] ?? []);
@@ -103,13 +142,44 @@ final class HelloAssoSyncService
             }
 
             // Pre-validate: resolve sous-catégories and opérations for all items
+            // For Membership items, auto-create formule before creating lignes
+            // (so the AdhesionTransactionLigneObserver can find it)
             $resolvedItems = [];
             foreach ($items as $item) {
                 $resolved = $this->resolveItem($item, $order['formSlug']);
+
+                // Auto-création formule pour Membership
+                if ($formMapping !== null
+                    && $formMapping->form_type === 'Membership'
+                    && isset($item['tierId'])
+                    && $formMapping->sous_categorie_id !== null) {
+                    $itemFormSlug = $formMapping->form_slug;
+                    if (! isset($this->formDetailsCache[$itemFormSlug])) {
+                        try {
+                            $client = new HelloAssoApiClient($this->parametres);
+                            $this->formDetailsCache[$itemFormSlug] = $client->fetchFormDetail($formMapping->form_type, $itemFormSlug);
+                        } catch (\Throwable) {
+                            $this->formDetailsCache[$itemFormSlug] = null;
+                        }
+                    }
+                    $formDetail = $this->formDetailsCache[$itemFormSlug];
+                    if ($formDetail !== null) {
+                        $tier = collect($formDetail['tiers'] ?? [])->firstWhere('id', (int) $item['tierId']);
+                        if ($tier !== null) {
+                            $this->firstOrCreateFormule(
+                                $itemFormSlug,
+                                $tier,
+                                $formDetail['validityType'] ?? null,
+                                (int) $formMapping->sous_categorie_id,
+                            );
+                        }
+                    }
+                }
+
                 $resolvedItems[] = $resolved;
             }
 
-            DB::transaction(function () use ($order, $orderDate, $modePaiement, $tiers, $resolvedItems, &$result) {
+            DB::transaction(function () use ($order, $orderDate, $modePaiement, $tiers, $resolvedItems, $formMapping, &$result) {
                 // Upsert Transaction (montant_total recalculated after lignes)
                 $existing = Transaction::withTrashed()
                     ->where('helloasso_order_id', $order['id'])
@@ -221,6 +291,11 @@ final class HelloAssoSyncService
                 $tx->update([
                     'montant_total' => round((float) $tx->lignes()->sum('montant'), 2),
                 ]);
+
+                // Poser imported_at à la 1re importation réussie
+                if ($formMapping !== null && $formMapping->imported_at === null && $result['tx_created'] > 0) {
+                    $formMapping->update(['imported_at' => now()]);
+                }
             });
         }
 
@@ -358,6 +433,57 @@ final class HelloAssoSyncService
             ModePaiement::Prelevement => StatutReglement::Recu,
             default => StatutReglement::EnAttente,
         };
+    }
+
+    /**
+     * Désactive les formules HelloAsso dont le form_slug n'apparaît plus dans la liste active.
+     * Appelé après synchronisation pour nettoyer les formules orphelines.
+     */
+    public function desactiverFormulesOrphelines(array $formSlugsActifs): int
+    {
+        return FormuleAdhesion::query()
+            ->where('est_helloasso', true)
+            ->where('actif', true)
+            ->whereNotIn('helloasso_form_slug', $formSlugsActifs)
+            ->update(['actif' => false]);
+    }
+
+    /**
+     * Crée ou met à jour une FormuleAdhesion pour un couple (form_slug, tier_id) HelloAsso.
+     *
+     * @param  array<string, mixed>  $tier
+     */
+    private function firstOrCreateFormule(string $formSlug, array $tier, ?string $validityType, int $sousCategorieId): ?FormuleAdhesion
+    {
+        $tierId = (int) ($tier['id'] ?? 0);
+        if ($tierId === 0) {
+            return null;
+        }
+
+        $mode = match ($validityType) {
+            'MovingYear' => 'duree',
+            'Custom' => 'exercice',
+            'Illimited' => 'illimite',
+            default => 'exercice',
+        };
+
+        return FormuleAdhesion::updateOrCreate(
+            [
+                'helloasso_form_slug' => $formSlug,
+                'helloasso_tier_id' => $tierId,
+            ],
+            [
+                'association_id' => TenantContext::currentId(),
+                'nom' => $tier['label'] ?? "Tier {$tierId}",
+                'mode' => $mode,
+                'duree_mois' => $mode === 'duree' ? 12 : null,
+                'montant_par_defaut' => isset($tier['price']) ? round($tier['price'] / 100, 2) : null,
+                'deductible_fiscal' => (bool) ($tier['isEligibleTaxReceipt'] ?? false),
+                'sous_categorie_id' => $sousCategorieId,
+                'actif' => true,
+                'est_helloasso' => true,
+            ]
+        );
     }
 
     private function buildReference(array $order): string

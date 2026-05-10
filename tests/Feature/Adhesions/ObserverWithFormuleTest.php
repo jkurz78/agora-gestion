@@ -26,7 +26,7 @@ it('observer applique la formule active de la sous-catégorie (priorité 2)', fu
         'date' => '2025-10-15',
     ]);
     TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
-    TransactionLigne::factory()->create([
+    $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
         'sous_categorie_id' => $this->sc->id,
     ]);
@@ -37,7 +37,8 @@ it('observer applique la formule active de la sous-catégorie (priorité 2)', fu
     expect($adhesion->exercice)->toBe(2025);
     expect($adhesion->date_debut)->toBeNull();
     expect($adhesion->date_fin)->toBeNull();
-    expect((float) $adhesion->montant_facial)->toBe((float) $tx->montant_total);
+    // montant_facial est capturé depuis la somme des lignes (pas montant_total de la tx)
+    expect((float) $adhesion->montant_facial)->toBe(round((float) $ligne->montant, 2));
     expect($adhesion->deductible_fiscal)->toBe($formule->deductible_fiscal);
     expect($adhesion->mode)->toBe('exercice');
     expect($adhesion->label_formule)->toBe($formule->nom);

@@ -79,8 +79,9 @@ final class AdhesionService
                 'date_debut' => $datesEtExercice['date_debut'],
                 'date_fin' => $datesEtExercice['date_fin'],
                 'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
-                // SNAPSHOT
-                'montant_facial' => (float) $tx->montant_total,
+                // SNAPSHOT — utilise la somme réelle des lignes (montant_total
+                // peut ne pas encore être à jour si appelé depuis un observer TransactionLigne)
+                'montant_facial' => round((float) $tx->lignes()->sum('montant'), 2),
                 'deductible_fiscal' => $formule?->deductible_fiscal ?? false,
                 'mode' => $formule?->mode ?? 'exercice',
                 'duree_mois' => $formule?->duree_mois,
