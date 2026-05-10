@@ -49,9 +49,9 @@ beforeEach(function (): void {
     ]);
 });
 
-it('sync agrège item.amount + options.amount (régression HA-55698)', function (): void {
-    // Reproduit exactement HA-55698 : Cotisation 35€ + discount 35€ + option 12€
-    // → item.amount=0, options=1200c, payment=12€. La ligne doit valoir 12€.
+it('split HA-55698 : 1 item + 1 option → 2 lignes séparées (cotisation 0€ + option 12€)', function (): void {
+    // B1 : l'agrégation est remplacée par le split — la cotisation 0€ et l'option 12€
+    // sont des lignes distinctes. Le montant_total de la tx = 12€ (somme des lignes).
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
         '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/un-an-glissant/public' => Http::response([
@@ -95,12 +95,16 @@ it('sync agrège item.amount + options.amount (régression HA-55698)', function 
 
     $tx = Transaction::first();
     expect($tx)->not->toBeNull();
-    expect((float) $tx->montant_total)->toBe(12.00); // payment réel
-    expect($tx->lignes()->count())->toBe(1);
+    expect((float) $tx->montant_total)->toBe(12.00); // somme des 2 lignes
+    expect($tx->lignes()->count())->toBe(2);
 
-    $ligne = $tx->lignes()->first();
-    expect((float) $ligne->montant)->toBe(12.00); // item.amount (0) + options.amount (12)
-    expect((int) $ligne->helloasso_item_id)->toBe(87070);
+    $parent = $tx->lignes()->whereNull('helloasso_option_id')->first();
+    expect((float) $parent->montant)->toBe(0.00); // item.amount = 0 (discount total)
+    expect((int) $parent->helloasso_item_id)->toBe(87070);
+
+    $option = $tx->lignes()->whereNotNull('helloasso_option_id')->first();
+    expect((float) $option->montant)->toBe(12.00); // option.amount = 1200c
+    expect((int) $option->helloasso_option_id)->toBe(18596);
 });
 
 it('sync sans options garde item.amount tel quel (non-régression)', function (): void {

@@ -238,48 +238,31 @@ final class HelloAssoSyncService
                     $result['tx_created']++;
                 }
 
-                // Upsert TransactionLignes
+                // Upsert TransactionLignes — 1 ligne parent par item + 1 ligne par option
                 foreach ($resolvedItems as $resolved) {
                     $item = $resolved['item'];
-                    // Le montant de l'item peut être 0 si HelloAsso a déjà appliqué un
-                    // discount qui annule le tarif. Les options (`item.options[]`) sont
-                    // imbriquées et leur amount n'est PAS inclus dans `item.amount` —
-                    // il faut les additionner pour refléter le montant réellement payé.
-                    // Cas observé HA-55698 : Cotisation 35€ - discount 35€ + option 12€
-                    // → item.amount=0, options.amount=1200c, payment=12€.
-                    $optionsTotal = 0;
+
+                    // Ligne parent (cotisation/inscription/don) — montant = item.amount
+                    // (peut être 0 si discount total, ex. HA-55698)
+                    $this->upsertLigne(
+                        tx: $tx,
+                        resolved: $resolved,
+                        optionId: null,
+                        montantCentimes: (int) $item['amount'],
+                        notes: $this->buildParentNotes($item),
+                        result: $result,
+                    );
+
+                    // Lignes options — 1 ligne par option imbriquée
                     foreach ($item['options'] ?? [] as $opt) {
-                        $optionsTotal += (int) ($opt['amount'] ?? 0);
-                    }
-                    $montantEuros = round(((int) $item['amount'] + $optionsTotal) / 100, 2);
-
-                    $existingLigne = TransactionLigne::withTrashed()
-                        ->where('helloasso_item_id', $item['id'])
-                        ->first();
-
-                    if ($existingLigne?->trashed()) {
-                        $existingLigne->restore();
-                    }
-
-                    if ($existingLigne) {
-                        $existingLigne->update([
-                            'transaction_id' => $tx->id,
-                            'sous_categorie_id' => $resolved['sous_categorie_id'],
-                            'operation_id' => $resolved['operation_id'],
-                            'montant' => $montantEuros,
-                            'helloasso_tier_id' => $resolved['helloasso_tier_id'],
-                        ]);
-                        $result['lignes_updated']++;
-                    } else {
-                        TransactionLigne::create([
-                            'transaction_id' => $tx->id,
-                            'sous_categorie_id' => $resolved['sous_categorie_id'],
-                            'operation_id' => $resolved['operation_id'],
-                            'montant' => $montantEuros,
-                            'helloasso_item_id' => $item['id'],
-                            'helloasso_tier_id' => $resolved['helloasso_tier_id'],
-                        ]);
-                        $result['lignes_created']++;
+                        $this->upsertLigne(
+                            tx: $tx,
+                            resolved: $resolved,
+                            optionId: (int) $opt['optionId'],
+                            montantCentimes: (int) ($opt['amount'] ?? 0),
+                            notes: 'Option : '.($opt['name'] ?? '?'),
+                            result: $result,
+                        );
                     }
                 }
 
@@ -547,6 +530,85 @@ final class HelloAssoSyncService
         $formType = $order['formType'] ?? '';
 
         return "HelloAsso — {$formType} ({$formSlug})";
+    }
+
+    /**
+     * Upsert une ligne de transaction HelloAsso.
+     *
+     * La clé d'idempotence est le couple (helloasso_item_id, helloasso_option_id) :
+     *  - option_id = null  → ligne parent (item)
+     *  - option_id = X     → ligne option X
+     *
+     * NB : MySQL traite NULL comme distinct dans les uniques, donc la garde
+     * "1 seule ligne parent par item" est faite ici via le lookup explicite
+     * WHERE item_id = X AND option_id IS NULL.
+     *
+     * @param  array{tx_created: int, tx_updated: int, lignes_created: int, lignes_updated: int, participants_created: int, skipped: int}  $result
+     */
+    private function upsertLigne(
+        Transaction $tx,
+        array $resolved,
+        ?int $optionId,
+        int $montantCentimes,
+        ?string $notes,
+        array &$result,
+    ): void {
+        $item = $resolved['item'];
+        $montantEuros = round($montantCentimes / 100, 2);
+
+        $query = TransactionLigne::withTrashed()
+            ->where('helloasso_item_id', $item['id']);
+
+        if ($optionId === null) {
+            $query->whereNull('helloasso_option_id');
+        } else {
+            $query->where('helloasso_option_id', $optionId);
+        }
+
+        $existingLigne = $query->first();
+
+        if ($existingLigne?->trashed()) {
+            $existingLigne->restore();
+        }
+
+        if ($existingLigne) {
+            $existingLigne->update([
+                'transaction_id' => $tx->id,
+                'sous_categorie_id' => $resolved['sous_categorie_id'],
+                'operation_id' => $resolved['operation_id'],
+                'montant' => $montantEuros,
+                'helloasso_tier_id' => $resolved['helloasso_tier_id'],
+                'notes' => $notes,
+            ]);
+            $result['lignes_updated']++;
+        } else {
+            TransactionLigne::create([
+                'transaction_id' => $tx->id,
+                'sous_categorie_id' => $resolved['sous_categorie_id'],
+                'operation_id' => $resolved['operation_id'],
+                'montant' => $montantEuros,
+                'helloasso_item_id' => (int) $item['id'],
+                'helloasso_option_id' => $optionId,
+                'helloasso_tier_id' => $resolved['helloasso_tier_id'],
+                'notes' => $notes,
+            ]);
+            $result['lignes_created']++;
+        }
+    }
+
+    /**
+     * Construit les notes de la ligne parent d'un item HelloAsso.
+     * Retourne null si aucun discount (pas de note nécessaire).
+     */
+    private function buildParentNotes(array $item): ?string
+    {
+        if ((int) $item['amount'] === 0 && isset($item['discount']['code'])) {
+            $code = $item['discount']['code'];
+
+            return "Cotisation offerte par code promo : {$code}";
+        }
+
+        return null;
     }
 
     /**
