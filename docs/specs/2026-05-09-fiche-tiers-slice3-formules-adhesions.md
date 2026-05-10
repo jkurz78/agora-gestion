@@ -350,39 +350,43 @@ Avantage : recette intermédiaire en local après 3a (le système fonctionne en 
 - ✅ Test manuel localhost : créer une formule, mapper un tier HelloAsso, déclencher un sync → adhésion avec formule appliquée correcte ; saisir une transaction cotisation directement → adhésion avec formule appliquée via lookup sous-cat ; offrir une adhésion gratuite via wizard → adhésion sans transaction
 - ✅ Mémoire projet à jour (`project_fiche_tiers_360.md`, nouveau `project_formules_adhesion.md`)
 
-## 11. Migration des memberships existants (post-déploiement)
+## 11. Migration des memberships existants (post-déploiement v3d)
 
-Les transactions HelloAsso synchronisées **avant le déploiement de la slice 3** ont déjà :
-- `helloasso_payment_id`, `helloasso_order_id`, `helloasso_cashout_id` (slice antérieur — préservés, le rapprochement bancaire via cashout continue de fonctionner)
+Le modèle a été refondu en slice 3d :
+- Les valeurs fiscales (`montant_facial`, `deductible_fiscal`, `mode`, `duree_mois`, `label_formule`) sont **snapshot** sur `adhesions` à la création.
+- Les formules HelloAsso sont **auto-créées** par la sync (plus de mapping manuel — `helloasso_tier_mappings` dropé).
+- Les sous-cats globales sur `HelloAssoParametres` ont été **supprimées** (remplacées par `helloasso_form_mappings.sous_categorie_id` par form).
+- Mode `illimite` ajouté pour les forms HelloAsso `validity_type=Illimited` (adhésion permanente).
+- Wizard sync HelloAsso : **sélecteur Action unique par form** (Ignorer / Importer dans sous-cat X / Lier à opération Y) avec verrouillage post-import.
 
-Mais elles n'ont **pas** :
-- `transactions.helloasso_form_slug` (colonne ajoutée slice 3a Phase 4, **valeurs NULL** sur les anciennes lignes)
-- `transaction_lignes.helloasso_tier_id` (idem)
-- d'`Adhesion` associée si le backfill slice 2 n'a pas été lancé
+### Procédure post-MEP (à faire **une seule fois**)
 
-Sans ces deux colonnes peuplées, la résolution de formule via priorité 1 (HelloAsso mapping) ne s'applique pas — les memberships existants tomberaient en priorité 2 (sous-cat formule active) ou en legacy null.
-
-### Procédure de reprise (à faire **une seule fois** en post-déploiement)
-
-1. **Paramétrer** au moins une formule active dans Paramètres → Adhésions → Formules.
-2. (Optionnel) **Mapper** les paliers HelloAsso aux formules dans le wizard sync HelloAsso (`/banques/helloasso-sync` → étape 1 → bouton « Paliers » sur les formulaires Membership).
-3. **Re-synchroniser** depuis HelloAsso via le wizard sync (étape 3). Le service `HelloAssoSyncService` est idempotent (slice 3a Phase 8) :
-   - Les transactions existantes sont **mises à jour** avec `helloasso_form_slug` (transaction) et `helloasso_tier_id` (lignes).
-   - Aucune transaction n'est dupliquée (idempotence par `helloasso_order_id`).
-4. **Backfill** les adhésions :
+1. **Connexion à AgoraGestion** → naviguer vers `/banques/helloasso-sync` (wizard sync HelloAsso).
+2. **Étape 1 — Configurer chaque formulaire** :
+   - Pour chaque form en état "À configurer" : choisir l'action ("Ignorer" ou "Importer dans <sous-catégorie>" pour Membership/Donation, ou "Lier à <opération>" pour Registration).
+   - Les forms déjà importés (état "✓ Importé") sont verrouillés — leur configuration peut rester éditable (sous-cat / opération) mais l'import est considéré effectué.
+3. **Lancer la synchronisation** (étapes 2 et 3 du wizard).
+   - Pour les forms Membership configurés non encore importés : les formules sont **auto-créées** (`est_helloasso=true`), les adhésions sont posées avec snapshot fiscal.
+   - Pour les forms `validity_type=Illimited` : adhésions mode permanente (`date_fin = NULL`).
+   - Les formules orphelines (forms HelloAsso disparus) sont **automatiquement désactivées** (`actif = false`).
+   - Les transactions existantes sont enrichies avec `helloasso_form_slug` + `helloasso_tier_id`.
+4. **Backfill** des adhésions issues de transactions HelloAsso pré-existantes :
    ```bash
-   ./vendor/bin/sail artisan adhesions:backfill --dry-run   # vérifier le compte
-   ./vendor/bin/sail artisan adhesions:backfill              # exécuter
+   php artisan adhesions:backfill --dry-run   # vérifier le compte
+   php artisan adhesions:backfill              # exécuter
    ```
-   La commande crée les `Adhesion` manquantes pour toute transaction cotisation, en appliquant la formule selon la priorité observer (HelloAsso mapping → sous-cat formule active → null legacy).
+   La commande crée les `Adhesion` manquantes pour toute transaction cotisation, en consommant les formules HelloAsso désormais auto-créées + appliquant le snapshot fiscal.
 
 ### Garanties
 
 - **Pas de perte de données** : aucun champ existant n'est écrasé.
 - **Idempotent** : la procédure peut être relancée plusieurs fois sans effet de bord.
-- **Pas de duplication** : ni transactions, ni adhésions ne sont dupliquées (contraintes uniques + restore depuis trashed).
+- **Pas de duplication** : ni transactions, ni adhésions, ni formules HelloAsso ne sont dupliquées (contraintes uniques + restore depuis trashed).
 - **Rapprochement bancaire** : les transactions HelloAsso conservent leur `helloasso_payment_id` / `helloasso_cashout_id` ; le marquage "payé" via cashout fonctionne exactement comme avant.
+- **Snapshot fiscal historique** : les anciennes adhésions (le cas échéant) sont backfillées par la migration `2026_05_10_100000_alter_adhesions_add_snapshot_fields` au moment du déploiement (no-op sur prod SVS car `adhesions` est vide).
 
-### En cas d'erreur
+### Au cas où
 
-Si le backfill rencontre une transaction sans formule applicable (cas legacy), elle créera une adhésion **legacy** avec `formule_adhesion_id = null`. C'est le comportement attendu — l'admin peut compléter ou ignorer.
+Si la sync rencontre un form non configuré (`sous_categorie_id` null + non ignoré), elle skip silencieusement et continue les autres forms. L'admin peut configurer plus tard et relancer.
+
+Si le backfill rencontre une transaction cotisation sans formule applicable (cas legacy avant tout setup HelloAsso), elle créera une adhésion **legacy** avec `formule_adhesion_id = null`, snapshot fiscal neutre (label "Adhésion legacy", deductible_fiscal=false). L'admin peut compléter ou ignorer.
