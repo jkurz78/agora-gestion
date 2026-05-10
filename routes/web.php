@@ -270,6 +270,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
         })->name('transactions');
         Route::get('/{tiers}/dons/{ligne}/recu-fiscal', [RecuFiscalController::class, 'download'])
             ->name('dons.recu-fiscal');
+        Route::get('/recus-fiscaux/{recu}/download', [RecuFiscalController::class, 'downloadByRecu'])
+            ->name('recu-fiscal.download');
     });
 
 // ── Devis libres ──

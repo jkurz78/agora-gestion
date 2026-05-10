@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Exceptions\RecuFiscalException;
+use App\Models\RecuFiscalEmis;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Services\RecuFiscalService;
@@ -29,6 +30,19 @@ final class RecuFiscalController extends Controller
             return redirect()->back()->with('error', $e->getMessage());
         }
 
+        $this->authorize('download', $recu);
+
+        if ($recu->isAnnule() && $recu->remplace_par_id === null) {
+            $message = "Reçu annulé le {$recu->annule_at->format('d/m/Y')} — motif : {$recu->annule_motif}";
+
+            return redirect()->back()->with('error', $message);
+        }
+
+        return $this->service->streamPdf($recu);
+    }
+
+    public function downloadByRecu(Request $request, RecuFiscalEmis $recu): mixed
+    {
         $this->authorize('download', $recu);
 
         if ($recu->isAnnule() && $recu->remplace_par_id === null) {

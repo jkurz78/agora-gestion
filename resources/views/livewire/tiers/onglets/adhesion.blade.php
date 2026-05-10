@@ -17,6 +17,7 @@
                             <th>Date</th>
                             <th class="text-end">Montant / Motif</th>
                             <th>Compte</th>
+                            <th>Reçu fiscal</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
@@ -68,6 +69,25 @@
                             <td>
                                 @if(! $adhesion->estGratuite() && $adhesion->transaction?->compte)
                                     <span class="small">{{ $adhesion->transaction->compte->nom }}</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                @php $recuActif = $ligneDto->recuFiscalActif(); @endphp
+                                @if($recuActif !== null)
+                                    <a href="{{ route('tiers.recu-fiscal.download', ['recu' => $recuActif]) }}"
+                                       target="_blank"
+                                       class="badge text-bg-primary text-decoration-none"
+                                       title="Télécharger le reçu fiscal">
+                                        <i class="bi bi-receipt"></i> {{ $recuActif->numero }}
+                                    </a>
+                                @elseif($ligneDto->peutEmettreRecu($asso))
+                                    <button wire:click="emettreRecuFiscalAdhesion({{ $adhesion->id }})"
+                                            class="btn btn-sm btn-outline-primary"
+                                            title="Émettre un reçu fiscal">
+                                        <i class="bi bi-receipt-cutoff"></i> Émettre
+                                    </button>
                                 @else
                                     <span class="text-muted">—</span>
                                 @endif

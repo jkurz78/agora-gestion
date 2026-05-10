@@ -12,9 +12,18 @@ return new class extends Migration
     {
         Schema::table('helloasso_parametres', function (Blueprint $table): void {
             // Drop FK first if present, then column
-            try { $table->dropForeign(['sous_categorie_don_id']); } catch (\Throwable $e) {}
-            try { $table->dropForeign(['sous_categorie_cotisation_id']); } catch (\Throwable $e) {}
-            try { $table->dropForeign(['sous_categorie_inscription_id']); } catch (\Throwable $e) {}
+            try {
+                $table->dropForeign(['sous_categorie_don_id']);
+            } catch (Throwable $e) {
+            }
+            try {
+                $table->dropForeign(['sous_categorie_cotisation_id']);
+            } catch (Throwable $e) {
+            }
+            try {
+                $table->dropForeign(['sous_categorie_inscription_id']);
+            } catch (Throwable $e) {
+            }
             $table->dropColumn(['sous_categorie_don_id', 'sous_categorie_cotisation_id', 'sous_categorie_inscription_id']);
         });
     }
