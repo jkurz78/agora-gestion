@@ -109,6 +109,14 @@ final class RecuFiscalService
         });
     }
 
+    public function obtenirOuGenererPourAdhesion(Adhesion $adhesion, ?User $user = null): RecuFiscalEmis
+    {
+        $this->validerEligibiliteAdhesion($adhesion);
+        $ligne = $this->resoudreLigneCotisation($adhesion);
+
+        return $this->obtenirOuGenerer($ligne, $user);
+    }
+
     public function validerEligibiliteAdhesion(Adhesion $adhesion): void
     {
         if ($adhesion->transaction_id === null) {
