@@ -29,6 +29,9 @@ final class FormuleAdhesionFactory extends Factory
             'deductible_fiscal' => false,
             'sous_categorie_id' => SousCategorie::factory()->pourCotisations(),
             'actif' => true,
+            'est_helloasso' => false,
+            'helloasso_form_slug' => null,
+            'helloasso_tier_id' => null,
         ];
     }
 
@@ -48,5 +51,22 @@ final class FormuleAdhesionFactory extends Factory
     public function deductible(): static
     {
         return $this->state(fn () => ['deductible_fiscal' => true]);
+    }
+
+    public function modeIllimite(): static
+    {
+        return $this->state(fn () => [
+            'mode' => 'illimite',
+            'duree_mois' => null,
+        ]);
+    }
+
+    public function helloasso(string $formSlug, int $tierId): static
+    {
+        return $this->state(fn () => [
+            'est_helloasso' => true,
+            'helloasso_form_slug' => $formSlug,
+            'helloasso_tier_id' => $tierId,
+        ]);
     }
 }

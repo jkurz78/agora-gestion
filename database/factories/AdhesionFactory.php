@@ -31,6 +31,11 @@ final class AdhesionFactory extends Factory
             'date_debut' => null,
             'date_fin' => null,
             'notes' => $this->faker->optional()->sentence(3),
+            'montant_facial' => 0,
+            'deductible_fiscal' => false,
+            'mode' => 'exercice',
+            'duree_mois' => null,
+            'label_formule' => 'Adhésion factory',
         ];
     }
 

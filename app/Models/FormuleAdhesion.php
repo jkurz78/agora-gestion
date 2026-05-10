@@ -27,6 +27,9 @@ final class FormuleAdhesion extends TenantModel
         'deductible_fiscal',
         'sous_categorie_id',
         'actif',
+        'est_helloasso',
+        'helloasso_form_slug',
+        'helloasso_tier_id',
     ];
 
     protected $casts = [
@@ -36,6 +39,8 @@ final class FormuleAdhesion extends TenantModel
         'deductible_fiscal' => 'boolean',
         'sous_categorie_id' => 'integer',
         'actif' => 'boolean',
+        'est_helloasso' => 'boolean',
+        'helloasso_tier_id' => 'integer',
     ];
 
     protected static function booted(): void
@@ -84,5 +89,10 @@ final class FormuleAdhesion extends TenantModel
     public function isModeDuree(): bool
     {
         return $this->mode === 'duree';
+    }
+
+    public function isModeIllimite(): bool
+    {
+        return $this->mode === 'illimite';
     }
 }

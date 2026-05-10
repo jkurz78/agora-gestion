@@ -20,6 +20,9 @@ final class HelloAssoFormMapping extends Model
         'end_date',
         'state',
         'operation_id',
+        'ignore',
+        'imported_at',
+        'sous_categorie_id',
     ];
 
     protected function casts(): array
@@ -29,6 +32,9 @@ final class HelloAssoFormMapping extends Model
             'operation_id' => 'integer',
             'start_date' => 'date',
             'end_date' => 'date',
+            'ignore' => 'boolean',
+            'imported_at' => 'datetime',
+            'sous_categorie_id' => 'integer',
         ];
     }
 
@@ -40,5 +46,10 @@ final class HelloAssoFormMapping extends Model
     public function operation(): BelongsTo
     {
         return $this->belongsTo(Operation::class);
+    }
+
+    public function sousCategorie(): BelongsTo
+    {
+        return $this->belongsTo(SousCategorie::class);
     }
 }

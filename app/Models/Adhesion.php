@@ -24,6 +24,11 @@ final class Adhesion extends TenantModel
         'date_fin',
         'notes',
         'saisi_par',
+        'montant_facial',
+        'deductible_fiscal',
+        'mode',
+        'duree_mois',
+        'label_formule',
     ];
 
     protected $casts = [
@@ -33,6 +38,9 @@ final class Adhesion extends TenantModel
         'date_debut' => 'date',
         'date_fin' => 'date',
         'saisi_par' => 'integer',
+        'montant_facial' => 'decimal:2',
+        'deductible_fiscal' => 'boolean',
+        'duree_mois' => 'integer',
     ];
 
     public function tiers(): BelongsTo
@@ -68,5 +76,20 @@ final class Adhesion extends TenantModel
     public function estGratuite(): bool
     {
         return $this->transaction_id === null;
+    }
+
+    public function isModeIllimite(): bool
+    {
+        return $this->mode === 'illimite';
+    }
+
+    public function isModeDuree(): bool
+    {
+        return $this->mode === 'duree';
+    }
+
+    public function isModeExercice(): bool
+    {
+        return $this->mode === 'exercice';
     }
 }
