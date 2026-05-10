@@ -29,6 +29,7 @@
                 <tr>
                     <th>Nom</th>
                     <th>Sous-catégorie</th>
+                    <th>Origine</th>
                     <th>Mode</th>
                     <th>Durée</th>
                     <th class="text-end">Montant par défaut</th>
@@ -43,8 +44,17 @@
                         <td class="small fw-semibold">{{ $formule->nom }}</td>
                         <td class="small">{{ $formule->sousCategorie?->nom ?? '—' }}</td>
                         <td class="small">
+                            @if ($formule->est_helloasso)
+                                <span class="badge text-bg-info"><i class="bi bi-link-45deg"></i> HelloAsso</span>
+                            @else
+                                <span class="badge text-bg-secondary">Manuelle</span>
+                            @endif
+                        </td>
+                        <td class="small">
                             @if($formule->isModeExercice())
                                 <span class="badge text-bg-secondary">Exercice</span>
+                            @elseif($formule->mode === 'illimite')
+                                <span class="badge text-bg-primary">Permanente</span>
                             @else
                                 <span class="badge text-bg-info">Durée</span>
                             @endif
@@ -84,7 +94,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center text-muted small py-3">
+                        <td colspan="9" class="text-center text-muted small py-3">
                             Aucune formule. Créez-en une avec « Nouvelle formule ».
                         </td>
                     </tr>
@@ -106,6 +116,14 @@
                             <button type="button" class="btn-close" wire:click="close"></button>
                         </div>
                         <div class="modal-body">
+                            @if($this->isEditingHelloasso())
+                                <div class="alert alert-info py-2 small mb-3">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Cette formule est <strong>synchronisée depuis HelloAsso</strong>. Seul son état (active/inactive) peut être modifié manuellement.
+                                    Les autres champs sont mis à jour automatiquement par la synchronisation HelloAsso.
+                                </div>
+                            @endif
+
                             @if($errorMessage)
                                 <div class="alert alert-danger py-2">{{ $errorMessage }}</div>
                             @endif
@@ -116,7 +134,8 @@
                                        type="text"
                                        class="form-control form-control-sm @error('nom') is-invalid @enderror"
                                        wire:model="nom"
-                                       maxlength="120">
+                                       maxlength="120"
+                                       @if($this->isEditingHelloasso()) disabled @endif>
                                 @error('nom')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
 
@@ -125,14 +144,16 @@
                                 <textarea id="formule-description"
                                           class="form-control form-control-sm"
                                           rows="2"
-                                          wire:model="description"></textarea>
+                                          wire:model="description"
+                                          @if($this->isEditingHelloasso()) disabled @endif></textarea>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label fw-semibold" for="formule-souscat">Sous-catégorie (usage Cotisation)</label>
                                 <select id="formule-souscat"
                                         class="form-select form-select-sm @error('sousCategorieId') is-invalid @enderror"
-                                        wire:model="sousCategorieId">
+                                        wire:model="sousCategorieId"
+                                        @if($this->isEditingHelloasso()) disabled @endif>
                                     <option value="">— Choisir —</option>
                                     @foreach($sousCategoriesCotisation as $sc)
                                         <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
@@ -144,9 +165,11 @@
                             <div class="row g-2 mb-3">
                                 <div class="col-md-6">
                                     <label class="form-label fw-semibold" for="formule-mode">Mode</label>
-                                    <select id="formule-mode" class="form-select form-select-sm" wire:model.live="mode">
+                                    <select id="formule-mode" class="form-select form-select-sm" wire:model.live="mode"
+                                            @if($this->isEditingHelloasso()) disabled @endif>
                                         <option value="exercice">Par exercice</option>
                                         <option value="duree">Durée fixe</option>
+                                        <option value="illimite">Permanente</option>
                                     </select>
                                 </div>
                                 @if($mode === 'duree')
@@ -157,7 +180,8 @@
                                                min="1"
                                                max="36"
                                                class="form-control form-control-sm @error('dureeMois') is-invalid @enderror"
-                                               wire:model="dureeMois">
+                                               wire:model="dureeMois"
+                                               @if($this->isEditingHelloasso()) disabled @endif>
                                         @error('dureeMois')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                     </div>
                                 @endif
@@ -171,7 +195,8 @@
                                            step="0.01"
                                            min="0"
                                            class="form-control form-control-sm @error('montantParDefaut') is-invalid @enderror"
-                                           wire:model="montantParDefaut">
+                                           wire:model="montantParDefaut"
+                                           @if($this->isEditingHelloasso()) disabled @endif>
                                     @error('montantParDefaut')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                 </div>
                                 <div class="col-md-6 d-flex align-items-end gap-3">
@@ -179,7 +204,8 @@
                                         <input class="form-check-input"
                                                type="checkbox"
                                                id="formule-deductible"
-                                               wire:model="deductibleFiscal">
+                                               wire:model="deductibleFiscal"
+                                               @if($this->isEditingHelloasso()) disabled @endif>
                                         <label class="form-check-label" for="formule-deductible">Déductible fiscal</label>
                                     </div>
                                     <div class="form-check">

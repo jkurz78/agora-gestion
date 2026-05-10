@@ -59,13 +59,44 @@ final class FormulesList extends Component
         $this->showModal = true;
     }
 
+    public function isEditingHelloasso(): bool
+    {
+        if ($this->editingId === null) {
+            return false;
+        }
+        $formule = FormuleAdhesion::find($this->editingId);
+
+        return $formule?->est_helloasso ?? false;
+    }
+
     public function save(): void
     {
         $this->errorMessage = null;
+
+        // Cas spécial : édition d'une formule HelloAsso → seul `actif` est modifiable
+        if ($this->editingId !== null) {
+            $existante = FormuleAdhesion::findOrFail($this->editingId);
+            if ($existante->est_helloasso) {
+                try {
+                    $existante->update(['actif' => $this->actif]);
+                } catch (DomainException $e) {
+                    $this->errorMessage = $e->getMessage();
+
+                    return;
+                }
+                session()->flash('success', 'Formule mise à jour.');
+                $this->showModal = false;
+                $this->resetForm();
+
+                return;
+            }
+        }
+
+        // Validation standard (formules manuelles)
         $rules = [
             'nom' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'mode' => ['required', 'in:exercice,duree'],
+            'mode' => ['required', 'in:exercice,duree,illimite'],
             'sousCategorieId' => ['required', 'integer', 'exists:sous_categories,id'],
             'montantParDefaut' => ['nullable', 'numeric', 'min:0'],
             'actif' => ['boolean'],
@@ -139,7 +170,7 @@ final class FormulesList extends Component
             'inactives' => $query->where('actif', false),
             default => null,
         };
-        $formules = $query->orderBy('nom')->get();
+        $formules = $query->orderBy('est_helloasso')->orderBy('nom')->get();
 
         $sousCategoriesCotisation = SousCategorie::forUsage(UsageComptable::Cotisation)
             ->orderBy('nom')

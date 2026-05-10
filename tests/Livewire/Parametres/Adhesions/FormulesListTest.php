@@ -131,3 +131,45 @@ it('refuse une sous-cat dont l\'usage n\'est pas Cotisation', function (): void 
         ->call('save')
         ->assertHasErrors(['sousCategorieId']);
 });
+
+it('édition d\'une formule HelloAsso : seul le flag actif est modifiable', function (): void {
+    $formule = FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'nom' => 'Adhésion HA',
+        'est_helloasso' => true,
+        'helloasso_form_slug' => 'cotisation-2025',
+        'helloasso_tier_id' => 1,
+        'actif' => true,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(FormulesList::class)
+        ->call('openEdit', $formule->id)
+        ->set('nom', 'Tentative renommage')
+        ->set('actif', false)
+        ->call('save');
+
+    $formule->refresh();
+    expect($formule->nom)->toBe('Adhésion HA'); // PAS modifié
+    expect($formule->actif)->toBeFalse(); // modifié
+});
+
+it('création d\'une formule mode illimite OK', function (): void {
+    // Désactiver toute formule active existante sur la sous-cat pour éviter la contrainte
+    FormuleAdhesion::query()->update(['actif' => false]);
+
+    Livewire::actingAs($this->user)
+        ->test(FormulesList::class)
+        ->call('openCreate')
+        ->set('nom', 'Membre à vie')
+        ->set('mode', 'illimite')
+        ->set('sousCategorieId', $this->sc->id)
+        ->set('actif', true)
+        ->call('save')
+        ->assertSet('showModal', false);
+
+    $formule = FormuleAdhesion::where('nom', 'Membre à vie')->first();
+    expect($formule)->not->toBeNull();
+    expect($formule->mode)->toBe('illimite');
+    expect($formule->duree_mois)->toBeNull();
+});
