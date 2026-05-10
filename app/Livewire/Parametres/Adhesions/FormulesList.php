@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Parametres\Adhesions;
 
 use App\Enums\UsageComptable;
+use App\Models\Categorie;
 use App\Models\FormuleAdhesion;
 use App\Models\SousCategorie;
+use App\Models\UsageSousCategorie;
 use DomainException;
 use Illuminate\View\View;
 use Livewire\Component;
@@ -36,6 +38,16 @@ final class FormulesList extends Component
     public string $filtre = 'toutes'; // 'toutes' | 'actives' | 'inactives'
 
     public ?string $errorMessage = null;
+
+    public bool $showCreateSousCat = false;
+
+    public string $newSousCatNom = '';
+
+    public ?string $newSousCatCodeCerfa = null;
+
+    public ?int $newSousCatCategorieId = null;
+
+    public ?string $newSousCatErreur = null;
 
     public function openCreate(): void
     {
@@ -155,6 +167,47 @@ final class FormulesList extends Component
         $this->resetForm();
     }
 
+    public function openCreateSousCat(): void
+    {
+        $this->newSousCatNom = '';
+        $this->newSousCatCodeCerfa = null;
+        $this->newSousCatCategorieId = null;
+        $this->newSousCatErreur = null;
+        $this->showCreateSousCat = true;
+    }
+
+    public function cancelCreateSousCat(): void
+    {
+        $this->showCreateSousCat = false;
+        $this->newSousCatNom = '';
+        $this->newSousCatCodeCerfa = null;
+        $this->newSousCatCategorieId = null;
+        $this->newSousCatErreur = null;
+    }
+
+    public function saveNewSousCat(): void
+    {
+        $this->validate([
+            'newSousCatNom' => ['required', 'string', 'max:255'],
+            'newSousCatCodeCerfa' => ['nullable', 'string', 'max:10'],
+            'newSousCatCategorieId' => ['required', 'integer', 'exists:categories,id'],
+        ]);
+
+        $sc = SousCategorie::create([
+            'nom' => $this->newSousCatNom,
+            'code_cerfa' => $this->newSousCatCodeCerfa,
+            'categorie_id' => $this->newSousCatCategorieId,
+        ]);
+
+        UsageSousCategorie::create([
+            'sous_categorie_id' => $sc->id,
+            'usage' => UsageComptable::Cotisation->value,
+        ]);
+
+        $this->sousCategorieId = $sc->id;
+        $this->showCreateSousCat = false;
+    }
+
     private function resetForm(): void
     {
         $this->reset(['editingId', 'nom', 'description', 'dureeMois', 'montantParDefaut', 'deductibleFiscal', 'sousCategorieId', 'errorMessage']);
@@ -176,6 +229,8 @@ final class FormulesList extends Component
             ->orderBy('nom')
             ->get();
 
-        return view('livewire.parametres.adhesions.formules-list', compact('formules', 'sousCategoriesCotisation'));
+        $categories = Categorie::orderBy('nom')->get();
+
+        return view('livewire.parametres.adhesions.formules-list', compact('formules', 'sousCategoriesCotisation', 'categories'));
     }
 }

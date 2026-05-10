@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Enums\UsageComptable;
 use App\Livewire\Parametres\Adhesions\FormulesList;
+use App\Models\Categorie;
 use App\Models\FormuleAdhesion;
 use App\Models\SousCategorie;
 use App\Models\User;
@@ -172,4 +174,45 @@ it('création d\'une formule mode illimite OK', function (): void {
     expect($formule)->not->toBeNull();
     expect($formule->mode)->toBe('illimite');
     expect($formule->duree_mois)->toBeNull();
+});
+
+it('openCreateSousCat ouvre le sub-bloc et reset les champs', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(FormulesList::class)
+        ->call('openCreate')
+        ->call('openCreateSousCat')
+        ->assertSet('showCreateSousCat', true)
+        ->assertSet('newSousCatNom', '')
+        ->assertSet('newSousCatCodeCerfa', '');
+});
+
+it('saveNewSousCat crée la sous-cat avec usage Cotisation et la pré-sélectionne', function (): void {
+    $categorie = Categorie::factory()->create();
+
+    Livewire::actingAs($this->user)
+        ->test(FormulesList::class)
+        ->call('openCreate')
+        ->call('openCreateSousCat')
+        ->set('newSousCatNom', 'Cotisations 2026')
+        ->set('newSousCatCodeCerfa', '751')
+        ->set('newSousCatCategorieId', $categorie->id)
+        ->call('saveNewSousCat')
+        ->assertSet('showCreateSousCat', false);
+
+    $sc = SousCategorie::where('nom', 'Cotisations 2026')->first();
+    expect($sc)->not->toBeNull();
+    expect($sc->code_cerfa)->toBe('751');
+    expect($sc->categorie_id)->toBe($categorie->id);
+    expect($sc->hasUsage(UsageComptable::Cotisation))->toBeTrue();
+});
+
+it('saveNewSousCat valide les champs obligatoires', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(FormulesList::class)
+        ->call('openCreate')
+        ->call('openCreateSousCat')
+        ->set('newSousCatNom', '')
+        ->set('newSousCatCategorieId', null)
+        ->call('saveNewSousCat')
+        ->assertHasErrors(['newSousCatNom', 'newSousCatCategorieId']);
 });

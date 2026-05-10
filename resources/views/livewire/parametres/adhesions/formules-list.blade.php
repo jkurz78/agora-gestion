@@ -150,16 +150,81 @@
 
                             <div class="mb-3">
                                 <label class="form-label fw-semibold" for="formule-souscat">Sous-catégorie (usage Cotisation)</label>
-                                <select id="formule-souscat"
-                                        class="form-select form-select-sm @error('sousCategorieId') is-invalid @enderror"
-                                        wire:model="sousCategorieId"
-                                        @if($this->isEditingHelloasso()) disabled @endif>
-                                    <option value="">— Choisir —</option>
-                                    @foreach($sousCategoriesCotisation as $sc)
-                                        <option value="{{ $sc->id }}">{{ $sc->nom }}</option>
-                                    @endforeach
-                                </select>
-                                @error('sousCategorieId')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                <div class="d-flex gap-1">
+                                    <select id="formule-souscat"
+                                            class="form-select form-select-sm @error('sousCategorieId') is-invalid @enderror"
+                                            wire:model="sousCategorieId"
+                                            @if($this->isEditingHelloasso()) disabled @endif>
+                                        <option value="">— Choisir —</option>
+                                        @foreach($sousCategoriesCotisation as $sc)
+                                            <option value="{{ $sc->id }}">{{ $sc->nom }}@if($sc->code_cerfa) ({{ $sc->code_cerfa }})@endif</option>
+                                        @endforeach
+                                    </select>
+                                    @if(! $this->isEditingHelloasso())
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                title="Créer une nouvelle sous-catégorie"
+                                                wire:click="openCreateSousCat"
+                                                style="padding:.15rem .5rem">
+                                            <i class="bi bi-plus-lg"></i>
+                                        </button>
+                                    @endif
+                                </div>
+                                @error('sousCategorieId')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+
+                                {{-- Sub-bloc inline : création nouvelle sous-cat --}}
+                                @if($showCreateSousCat)
+                                    <div class="bg-light rounded p-3 mt-2 border">
+                                        <h6 class="mb-2"><i class="bi bi-plus-circle me-1"></i> Nouvelle sous-catégorie</h6>
+                                        <p class="text-muted small mb-2">L'usage <strong>Cotisation</strong> sera automatiquement attaché.</p>
+
+                                        @if($newSousCatErreur)
+                                            <div class="alert alert-danger py-2 small">{{ $newSousCatErreur }}</div>
+                                        @endif
+
+                                        <div class="row g-2 mb-2">
+                                            <div class="col-md-6">
+                                                <label class="form-label small mb-1" for="new-sc-nom">Nom *</label>
+                                                <input id="new-sc-nom"
+                                                       type="text"
+                                                       class="form-control form-control-sm @error('newSousCatNom') is-invalid @enderror"
+                                                       wire:model="newSousCatNom"
+                                                       maxlength="255"
+                                                       placeholder="Ex : Cotisations 2026">
+                                                @error('newSousCatNom')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small mb-1" for="new-sc-cerfa">Code CERFA</label>
+                                                <input id="new-sc-cerfa"
+                                                       type="text"
+                                                       class="form-control form-control-sm"
+                                                       wire:model="newSousCatCodeCerfa"
+                                                       maxlength="10"
+                                                       placeholder="751">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small mb-1" for="new-sc-cat">Catégorie *</label>
+                                                <select id="new-sc-cat"
+                                                        class="form-select form-select-sm @error('newSousCatCategorieId') is-invalid @enderror"
+                                                        wire:model="newSousCatCategorieId">
+                                                    <option value="">— Choisir —</option>
+                                                    @foreach($categories as $cat)
+                                                        <option value="{{ $cat->id }}">{{ $cat->nom }}</option>
+                                                    @endforeach
+                                                </select>
+                                                @error('newSousCatCategorieId')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                            </div>
+                                        </div>
+                                        <div class="d-flex gap-1 justify-content-end">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" wire:click="cancelCreateSousCat">
+                                                Annuler
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-success" wire:click="saveNewSousCat">
+                                                <i class="bi bi-check-lg"></i> Créer et sélectionner
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
 
                             <div class="row g-2 mb-3">
