@@ -96,6 +96,10 @@ it('sync auto-crée une formule HelloAsso (mode durée pour MovingYear)', functi
     expect($formule->mode)->toBe('duree');
     expect($formule->duree_mois)->toBe(12);
     expect((float) $formule->montant_par_defaut)->toBe(50.00);
+    // Le nom préfixe le label du palier par le titre du form (form_title persisté
+    // sur HelloAssoFormMapping). Permet de disambiguer 2 formules de même label
+    // sur 2 forms différents.
+    expect($formule->nom)->toBe('Cotisation 2025 — Adulte');
 
     $adhesion = Adhesion::first();
     expect($adhesion->formule_adhesion_id)->toBe($formule->id);

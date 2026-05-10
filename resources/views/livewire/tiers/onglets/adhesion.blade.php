@@ -43,11 +43,6 @@
                                         {{ $adhesion->date_debut->format('d/m/Y') }} → {{ $adhesion->date_fin->format('d/m/Y') }}
                                     </div>
                                 @endif
-                                @if($adhesion->formuleAdhesion?->est_helloasso)
-                                    <div class="text-muted text-nowrap" style="font-size:.7rem" title="Form HelloAsso → palier">
-                                        <i class="bi bi-link-45deg"></i> {{ $adhesion->formuleAdhesion->helloasso_form_slug }} / palier #{{ $adhesion->formuleAdhesion->helloasso_tier_id }}
-                                    </div>
-                                @endif
                             </td>
                             <td>
                                 @if($adhesion->estGratuite())

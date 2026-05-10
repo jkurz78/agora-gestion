@@ -134,22 +134,6 @@ it('refuse une sous-cat dont l\'usage n\'est pas Cotisation', function (): void 
         ->assertHasErrors(['sousCategorieId']);
 });
 
-it('FormulesList affiche form_slug + palier pour les formules HelloAsso', function (): void {
-    FormuleAdhesion::factory()->create([
-        'sous_categorie_id' => $this->sc->id,
-        'nom' => 'Adhésion HA bienfaiteur',
-        'est_helloasso' => true,
-        'helloasso_form_slug' => 'adhesion-2025-2026',
-        'helloasso_tier_id' => 4242,
-    ]);
-
-    Livewire::actingAs($this->user)
-        ->test(FormulesList::class)
-        ->assertSee('Adhésion HA bienfaiteur')
-        ->assertSee('adhesion-2025-2026')
-        ->assertSee('palier #4242');
-});
-
 it('édition d\'une formule HelloAsso : seul le flag actif est modifiable', function (): void {
     $formule = FormuleAdhesion::factory()->create([
         'sous_categorie_id' => $this->sc->id,

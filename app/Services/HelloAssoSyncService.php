@@ -19,6 +19,7 @@ use App\Models\VirementInterne;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 final class HelloAssoSyncService
 {
@@ -161,7 +162,7 @@ final class HelloAssoSyncService
                         } catch (\Throwable $e) {
                             // Log explicite : sans ça, l'auto-création de formule échoue silencieusement
                             // et la priorité 2 du resolver fallback sur la sous-cat → mauvaise formule appliquée.
-                            \Illuminate\Support\Facades\Log::warning(
+                            Log::warning(
                                 "HelloAsso fetchFormDetail failed for form {$itemFormSlug}: ".$e->getMessage()
                             );
                             $this->formDetailsCache[$itemFormSlug] = null;
@@ -178,6 +179,7 @@ final class HelloAssoSyncService
                                 (int) $formMapping->sous_categorie_id,
                                 $formDetail['startDate'] ?? null,
                                 $formDetail['endDate'] ?? null,
+                                $formMapping->form_title ?? $formDetail['title'] ?? null,
                             );
                         }
                     }
@@ -466,6 +468,7 @@ final class HelloAssoSyncService
         int $sousCategorieId,
         ?string $startDate = null,
         ?string $endDate = null,
+        ?string $formTitle = null,
     ): ?FormuleAdhesion {
         $tierId = (int) ($tier['id'] ?? 0);
         if ($tierId === 0) {
@@ -483,6 +486,14 @@ final class HelloAssoSyncService
         // Pour MovingYear : 12 mois glissants. Pour Custom : durée fixe via dates, pas de duree_mois.
         $dureeMois = ($validityType === 'MovingYear') ? 12 : null;
 
+        // Le nom préfixe le label du palier par le titre du formulaire pour
+        // disambiguer les formules issues de plusieurs forms HelloAsso (ex.
+        // "Cotisation 2025-2026 — Bienfaiteur"). Sans préfixe si pas de titre.
+        $tierLabel = $tier['label'] ?? "Palier {$tierId}";
+        $nom = $formTitle !== null && $formTitle !== ''
+            ? $formTitle.' — '.$tierLabel
+            : $tierLabel;
+
         return FormuleAdhesion::updateOrCreate(
             [
                 'helloasso_form_slug' => $formSlug,
@@ -490,7 +501,7 @@ final class HelloAssoSyncService
             ],
             [
                 'association_id' => TenantContext::currentId(),
-                'nom' => $tier['label'] ?? "Tier {$tierId}",
+                'nom' => $nom,
                 'mode' => $mode,
                 'duree_mois' => $dureeMois,
                 'helloasso_start_date' => $validityType === 'Custom' ? $startDate : null,
