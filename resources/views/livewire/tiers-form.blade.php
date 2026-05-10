@@ -2,8 +2,11 @@
 <div>
     {{-- Formulaire --}}
     @if ($showForm)
+        {{-- z-index 2200 : TiersForm est mounté globalement (layouts) et peut être ouvert
+             en surcouche depuis n'importe quelle modale (NouvelleAdhesionModal=2055,
+             quickview/dons=2060, modales secondaires diverses=2100). Doit dominer tout. --}}
         <div class="position-fixed top-0 start-0 w-100 h-100"
-             style="background:rgba(0,0,0,.5);z-index:2000;overflow-y:auto">
+             style="background:rgba(0,0,0,.5);z-index:2200;overflow-y:auto">
         <div class="container py-4">
         <div class="card mb-4 shadow-sm border-0">
             <div class="card-header fw-semibold" style="background:#722281;color:white">
@@ -160,7 +163,7 @@
         {{-- Modal confirmation déréférencement --}}
         @if ($showDereferenceConfirm)
             <div class="modal show d-block" tabindex="-1"
-                 style="background:rgba(0,0,0,.5);z-index:2100" wire:key="dereference-modal">
+                 style="background:rgba(0,0,0,.5);z-index:2300" wire:key="dereference-modal">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
                         <div class="modal-header">

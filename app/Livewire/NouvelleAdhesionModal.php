@@ -162,8 +162,9 @@ final class NouvelleAdhesionModal extends Component
         $formules = $formulesManuelles->merge($formulesHelloAsso);
 
         $availableYears = app(ExerciceService::class)->openYears();
-        $comptes = CompteBancaire::query()
-            ->where('actif_recettes_depenses', true)
+        // Saisie manuelle : exclut les comptes alimentés par intégration externe
+        // (HelloAsso etc.) — les adhésions HelloAsso passent par la sync, pas le wizard.
+        $comptes = CompteBancaire::saisieManuelle()
             ->orderBy('nom')
             ->get();
         $modesPaiement = ModePaiement::cases();

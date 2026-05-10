@@ -220,3 +220,21 @@ it('mode illimite affiche le bandeau permanente et crée l\'adhésion sans date_
     expect($adhesion->mode)->toBe('illimite');
     expect($adhesion->date_fin)->toBeNull();
 });
+
+it('le sélecteur Compte exclut les comptes HelloAsso (saisie automatisée)', function (): void {
+    $compteHa = CompteBancaire::factory()->create([
+        'nom' => 'HelloAsso SVS',
+        'saisie_automatisee' => true,
+    ]);
+
+    $html = Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $this->formuleExercice->id)
+        ->set('montant', 30.00)
+        ->html();
+
+    expect($html)->toContain($this->compte->nom);
+    expect($html)->not->toContain('HelloAsso SVS');
+});
