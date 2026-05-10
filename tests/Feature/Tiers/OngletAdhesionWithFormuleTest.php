@@ -92,3 +92,60 @@ it('onglet Adhésion fiche tiers affiche Permanente pour les adhésions illimite
         ->assertSee('Membre à vie')
         ->assertSee('Permanente');
 });
+
+it('onglet Adhésion fiche tiers affiche le badge Déductible si snapshot fiscal', function (): void {
+    $tiers = Tiers::factory()->create();
+    $formule = FormuleAdhesion::factory()->deductible()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'nom' => 'Adhésion bienfaiteur',
+    ]);
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'formule_adhesion_id' => $formule->id,
+        'exercice' => 2025,
+        'deductible_fiscal' => true,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(FicheTiers::class, ['tiers' => $tiers])
+        ->set('onglet', 'adhesion')
+        ->assertSee('Déductible');
+});
+
+it('onglet Adhésion fiche tiers n\'affiche pas le badge Déductible si snapshot non déductible', function (): void {
+    $tiers = Tiers::factory()->create();
+    $formule = FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'nom' => 'Adhésion classique',
+    ]);
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'formule_adhesion_id' => $formule->id,
+        'exercice' => 2025,
+        'deductible_fiscal' => false,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(FicheTiers::class, ['tiers' => $tiers])
+        ->set('onglet', 'adhesion')
+        ->assertDontSee('Déductible');
+});
+
+it('onglet Adhésion fiche tiers affiche form_slug + palier pour formule HelloAsso', function (): void {
+    $tiers = Tiers::factory()->create();
+    $formule = FormuleAdhesion::factory()->helloasso('cotisation-2025', 4242)->create([
+        'sous_categorie_id' => $this->sc->id,
+        'nom' => 'Adhésion HelloAsso',
+    ]);
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'formule_adhesion_id' => $formule->id,
+        'exercice' => 2025,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(FicheTiers::class, ['tiers' => $tiers])
+        ->set('onglet', 'adhesion')
+        ->assertSee('cotisation-2025')
+        ->assertSee('palier #4242');
+});

@@ -46,6 +46,9 @@
                         <td class="small">
                             @if ($formule->est_helloasso)
                                 <span class="badge text-bg-info"><i class="bi bi-link-45deg"></i> HelloAsso</span>
+                                <div class="text-muted text-nowrap" style="font-size:.7rem" title="Form HelloAsso → palier">
+                                    {{ $formule->helloasso_form_slug }} / palier #{{ $formule->helloasso_tier_id }}
+                                </div>
                             @else
                                 <span class="badge text-bg-secondary">Manuelle</span>
                             @endif

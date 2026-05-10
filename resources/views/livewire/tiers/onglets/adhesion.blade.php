@@ -29,6 +29,11 @@
                                 @if($adhesion->formuleAdhesion)
                                     <span class="badge text-bg-info">{{ $adhesion->formuleAdhesion->nom }}</span>
                                 @endif
+                                @if($adhesion->deductible_fiscal)
+                                    <span class="badge text-bg-success" title="Snapshot fiscal figé à la création de l'adhésion">
+                                        <i class="bi bi-receipt"></i> Déductible
+                                    </span>
+                                @endif
                                 @if($adhesion->isModeIllimite())
                                     <div class="text-success text-nowrap" style="font-size:.7rem">
                                         <i class="bi bi-infinity"></i> Permanente
@@ -36,6 +41,11 @@
                                 @elseif($adhesion->date_debut && $adhesion->date_fin)
                                     <div class="text-muted text-nowrap" style="font-size:.7rem">
                                         {{ $adhesion->date_debut->format('d/m/Y') }} → {{ $adhesion->date_fin->format('d/m/Y') }}
+                                    </div>
+                                @endif
+                                @if($adhesion->formuleAdhesion?->est_helloasso)
+                                    <div class="text-muted text-nowrap" style="font-size:.7rem" title="Form HelloAsso → palier">
+                                        <i class="bi bi-link-45deg"></i> {{ $adhesion->formuleAdhesion->helloasso_form_slug }} / palier #{{ $adhesion->formuleAdhesion->helloasso_tier_id }}
                                     </div>
                                 @endif
                             </td>
