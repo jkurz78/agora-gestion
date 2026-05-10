@@ -7,7 +7,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class FormuleAdhesion extends TenantModel
@@ -69,11 +68,6 @@ final class FormuleAdhesion extends TenantModel
     public function sousCategorie(): BelongsTo
     {
         return $this->belongsTo(SousCategorie::class, 'sous_categorie_id');
-    }
-
-    public function helloAssoTierMappings(): MorphMany
-    {
-        return $this->morphMany(HelloAssoTierMapping::class, 'target');
     }
 
     public function scopeActif(Builder $query): Builder
