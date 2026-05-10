@@ -69,6 +69,11 @@ function adhesionPayeeDeductible(array $adhesionOverrides = []): Adhesion
         'montant' => 75.00,
     ]);
 
+    // L'observer AdhesionTransactionLigneObserver peut avoir auto-créé une adhésion
+    // à la création de la TransactionLigne. On la supprime avant de créer l'adhésion de test
+    // pour éviter la violation de contrainte unique (association_id, tiers_id, exercice).
+    Adhesion::withTrashed()->where('tiers_id', $tiers->id)->forceDelete();
+
     return Adhesion::factory()->create(array_merge([
         'transaction_id' => $transaction->id,
         'tiers_id' => $tiers->id,

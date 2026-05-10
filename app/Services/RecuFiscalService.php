@@ -82,8 +82,9 @@ final class RecuFiscalService
             $formeDon = $this->determinerFormeDon($sousCat);
             $modeVersement = $ligne->transaction->mode_paiement?->value ?? 'autre';
             $numero = $this->allouerNumero($anneeCivile);
+            $objet = $this->determinerObjetRecu($sousCat);
 
-            $pdfBinaire = $this->genererPdfBinaire($asso, $tiers, $ligne, $numero, $articleCgi, $formeDon, $modeVersement);
+            $pdfBinaire = $this->genererPdfBinaire($asso, $tiers, $ligne, $numero, $articleCgi, $formeDon, $modeVersement, $objet);
             $relativePath = "recus_fiscaux/{$anneeCivile}/{$numero}.pdf";
             $fullPath = "associations/{$asso->id}/{$relativePath}";
             Storage::disk('local')->put($fullPath, $pdfBinaire);
@@ -232,6 +233,11 @@ final class RecuFiscalService
             : 'numeraire';
     }
 
+    private function determinerObjetRecu(SousCategorie $sc): string
+    {
+        return $sc->hasUsage(UsageComptable::Cotisation) ? 'cotisation' : 'don';
+    }
+
     private function genererPdfBinaire(
         Association $asso,
         Tiers $donateur,
@@ -240,6 +246,7 @@ final class RecuFiscalService
         string $articleCgi,
         string $formeDon,
         string $modeVersement,
+        string $objet = 'don',
     ): string {
         $montantFloat = (float) $ligne->montant;
         $montantFormate = number_format($montantFloat, 2, ',', ' ').' €';
@@ -258,19 +265,22 @@ final class RecuFiscalService
         };
 
         $estMecenatEntreprise = $articleCgi === 'art_238_bis' && $donateur->type === 'entreprise';
+        $estCotisation = $objet === 'cotisation';
 
-        $titreDocument = $estMecenatEntreprise
-            ? "Reçu au titre du mécénat d'entreprise"
-            : "Reçu au titre des dons à certains organismes d'intérêt général";
+        $titreDocument = match (true) {
+            $estCotisation => "Reçu au titre d'une cotisation à un organisme d'intérêt général",
+            $estMecenatEntreprise => "Reçu au titre du mécénat d'entreprise",
+            default => "Reçu au titre des dons à certains organismes d'intérêt général",
+        };
 
         $contexteSpecifique = $estMecenatEntreprise
             ? "Versement effectué dans le cadre du mécénat d'entreprise prévu à l'article 238 bis du CGI."
             : null;
 
-        $formeLibelle = match ($formeDon) {
-            'numeraire' => 'Don manuel en numéraire',
-            'abandon_revenus' => "Le donateur renonce expressément au remboursement des frais engagés dans le cadre de son activité bénévole et entend en faire don à l'association.",
-            default => $formeDon,
+        $formeLibelle = match (true) {
+            $estCotisation => 'Cotisation versée par le membre',
+            $formeDon === 'abandon_revenus' => "Le donateur renonce expressément au remboursement des frais engagés dans le cadre de son activité bénévole et entend en faire don à l'association.",
+            default => 'Don manuel en numéraire',
         };
 
         $modeLibelle = match ($modeVersement) {
@@ -342,6 +352,7 @@ final class RecuFiscalService
             'appLogoBase64' => $appLogoBase64,
             'footerLogoBase64' => null,
             'footerLogoMime' => null,
+            'objet' => $objet,
         ])->setPaper('a4', 'portrait');
 
         return $pdf->output();

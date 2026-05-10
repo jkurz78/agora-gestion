@@ -17,6 +17,9 @@
     /** @var string|null $appLogoBase64 */
     /** @var string|null $footerLogoBase64 */
     /** @var string|null $footerLogoMime */
+    /** @var string $objet 'don' ou 'cotisation' */
+    $objet = $objet ?? 'don';
+    $estCotisation = $objet === 'cotisation';
 @endphp
 <!DOCTYPE html>
 <html lang="fr">
@@ -277,11 +280,12 @@
         </div>
     </div>
 
-    {{-- ===== DESCRIPTION DU DON ===== --}}
+    {{-- ===== DESCRIPTION DU DON / COTISATION ===== --}}
     <div class="description-don">
         <p style="margin-bottom:8px;">
             L'association <strong>{{ $asso->nom }}</strong> reconnaît avoir reçu
             de <strong>{{ $donateur->displayName() }}</strong>
+            à titre de <strong>{{ $estCotisation ? 'cotisation déductible' : 'don' }}</strong>
             la somme de <span class="montant-principal">{{ $montantFormate }}</span>
             <span class="montant-lettres">({{ $montantEnLettres }})</span>.
         </p>
@@ -296,7 +300,7 @@
                 <td class="dl-value">{{ $modeLibelle }}</td>
             </tr>
             <tr>
-                <td class="dl-label">Forme du don</td>
+                <td class="dl-label">{{ $estCotisation ? 'Forme de la cotisation' : 'Forme du don' }}</td>
                 <td class="dl-value">{{ $formeLibelle }}</td>
             </tr>
         </table>
