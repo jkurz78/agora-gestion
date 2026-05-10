@@ -182,7 +182,8 @@ final class RecuFiscalService
         if ($adhesion->transaction_id === null) {
             throw RecuFiscalException::adhesionGratuite();
         }
-        $lignes = $adhesion->transaction->lignes()->get();
+        // Exclure les lignes options HelloAsso (B1) — on cherche la ligne parent
+        $lignes = $adhesion->transaction->lignes()->whereNull('helloasso_option_id')->get();
 
         if ($adhesion->formuleAdhesion?->est_helloasso) {
             $ligne = $lignes->firstWhere('helloasso_tier_id', $adhesion->formuleAdhesion->helloasso_tier_id);

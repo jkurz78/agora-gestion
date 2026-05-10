@@ -38,6 +38,7 @@ final class AdhesionService
         }
 
         $ligneCotisation = $tx->lignes()
+            ->whereNull('helloasso_option_id')  // exclure les lignes options HA (B1)
             ->whereHas('sousCategorie.usages', function ($q): void {
                 $q->where('usage', UsageComptable::Cotisation->value);
             })

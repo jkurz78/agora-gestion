@@ -21,6 +21,7 @@ final class AdhesionRecuFiscalObserver
 
             $ligne = $adhesion->transaction->lignes()
                 ->whereNull('deleted_at')
+                ->whereNull('helloasso_option_id')  // cherche la ligne parent HA (B1)
                 ->first();
 
             if ($ligne === null) {

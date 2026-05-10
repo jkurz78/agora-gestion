@@ -147,6 +147,57 @@ it('throws adhesionGratuite si transaction_id est null', function () {
         ->toThrow(RecuFiscalException::class, 'gratuite');
 });
 
+it('résout la ligne parent (option_id IS NULL) dans une transaction avec lignes options (B1)', function () {
+    // Post-B1 : transaction HA avec 2 lignes (parent 0€ + option 12€)
+    // resoudreLigneCotisation doit retourner la ligne parent (option_id IS NULL)
+    $tierId = 42;
+    $sousCat = SousCategorie::factory()->pourCotisations()->create();
+    $formule = FormuleAdhesion::factory()->helloasso('mon-form', $tierId)->create([
+        'sous_categorie_id' => $sousCat->id,
+    ]);
+
+    $tiers = Tiers::factory()->create();
+    $transaction = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'helloasso_form_slug' => 'mon-form',
+    ]);
+
+    TransactionLigne::where('transaction_id', $transaction->id)->delete();
+
+    // Ligne parent (cotisation 0€)
+    $ligneParent = TransactionLigne::factory()->create([
+        'transaction_id' => $transaction->id,
+        'sous_categorie_id' => $sousCat->id,
+        'montant' => 0.00,
+        'helloasso_item_id' => 87070,
+        'helloasso_option_id' => null,
+        'helloasso_tier_id' => $tierId,
+    ]);
+
+    // Ligne option (12€) — même sous-cat
+    TransactionLigne::factory()->create([
+        'transaction_id' => $transaction->id,
+        'sous_categorie_id' => $sousCat->id,
+        'montant' => 12.00,
+        'helloasso_item_id' => 87070,
+        'helloasso_option_id' => 18596,
+        'helloasso_tier_id' => null,
+    ]);
+
+    $adhesion = Adhesion::factory()->create([
+        'transaction_id' => $transaction->id,
+        'formule_adhesion_id' => $formule->id,
+        'tiers_id' => $tiers->id,
+        'deductible_fiscal' => true,
+        'exercice' => 2026,
+    ]);
+
+    $ligne = invokeResoudre($this->service, $adhesion);
+
+    expect($ligne->id)->toBe($ligneParent->id);
+    expect($ligne->helloasso_option_id)->toBeNull();
+});
+
 it('throws générique si aucune ligne ne correspond (cas dégénéré multi-lignes sans formule)', function () {
     $sousCat1 = SousCategorie::factory()->create();
     $sousCat2 = SousCategorie::factory()->create();
