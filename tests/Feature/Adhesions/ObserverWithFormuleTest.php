@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Models\Adhesion;
 use App\Models\FormuleAdhesion;
-use App\Models\HelloAssoTierMapping;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -38,6 +37,10 @@ it('observer applique la formule active de la sous-catégorie (priorité 2)', fu
     expect($adhesion->exercice)->toBe(2025);
     expect($adhesion->date_debut)->toBeNull();
     expect($adhesion->date_fin)->toBeNull();
+    expect((float) $adhesion->montant_facial)->toBe((float) $tx->montant_total);
+    expect($adhesion->deductible_fiscal)->toBe($formule->deductible_fiscal);
+    expect($adhesion->mode)->toBe('exercice');
+    expect($adhesion->label_formule)->toBe($formule->nom);
 });
 
 it('observer en mode durée pose date_debut + date_fin et exercice null', function (): void {
@@ -64,22 +67,20 @@ it('observer en mode durée pose date_debut + date_fin et exercice null', functi
 });
 
 it('observer applique la formule depuis le mapping HelloAsso (priorité 1)', function (): void {
-    $formuleSousCat = FormuleAdhesion::factory()->create([
+    // Formule active sur la sous-cat : ne doit PAS être choisie (priorité 2 < priorité 1)
+    FormuleAdhesion::factory()->create([
         'sous_categorie_id' => $this->sc->id,
         'actif' => true,
         'nom' => 'Adhésion sous-cat fallback',
     ]);
+
+    // Formule HelloAsso : auto-créée par la sync avec helloasso_form_slug + helloasso_tier_id
     $formuleHelloAsso = FormuleAdhesion::factory()->modeDuree(12)->create([
         'sous_categorie_id' => $this->sc->id,
-        'actif' => false, // pas active : ne doit pas être prise via priorité 2
+        'actif' => false, // pas active via priorité 2 — choisie via priorité 1 (lookup direct)
         'nom' => 'Adhésion HelloAsso',
-    ]);
-
-    HelloAssoTierMapping::factory()->create([
         'helloasso_form_slug' => 'cotisation-2025',
         'helloasso_tier_id' => 999,
-        'target_type' => FormuleAdhesion::class,
-        'target_id' => $formuleHelloAsso->id,
     ]);
 
     $tx = Transaction::factory()->asRecette()->create([
@@ -159,4 +160,29 @@ it('observer reste idempotent en mode durée (même date_debut)', function (): v
     }
 
     expect(Adhesion::count())->toBe(1);
+});
+
+it('observer pose mode illimite avec date_fin null', function (): void {
+    $formule = FormuleAdhesion::factory()->modeIllimite()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'actif' => true,
+        'nom' => 'Adhésion à vie',
+    ]);
+
+    $tx = Transaction::factory()->asRecette()->create([
+        'tiers_id' => $this->tiers->id,
+        'date' => '2025-10-15',
+    ]);
+    TransactionLigne::where('transaction_id', $tx->id)->forceDelete();
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'sous_categorie_id' => $this->sc->id,
+    ]);
+
+    $adhesion = Adhesion::first();
+    expect($adhesion->mode)->toBe('illimite');
+    expect($adhesion->date_debut?->toDateString())->toBe('2025-10-15');
+    expect($adhesion->date_fin)->toBeNull();
+    expect($adhesion->exercice)->toBeNull();
+    expect($adhesion->label_formule)->toBe('Adhésion à vie');
 });

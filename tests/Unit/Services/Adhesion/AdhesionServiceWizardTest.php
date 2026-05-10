@@ -226,6 +226,33 @@ it('lève une InvalidArgumentException si montant > 0 et datePaiement est null',
         ->toThrow(InvalidArgumentException::class, 'datePaiement');
 });
 
+it('crée une adhésion mode illimite (permanente)', function (): void {
+    $formule = FormuleAdhesion::factory()->modeIllimite()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'nom' => 'Membre à vie',
+    ]);
+
+    $dto = new NouvelleAdhesionDTO(
+        tiersId: (int) $this->tiers->id,
+        formuleId: (int) $formule->id,
+        exercice: null,
+        dateDebut: Carbon::parse('2025-10-15'),
+        montant: 0.00,
+        notes: 'Membre fondateur',
+        datePaiement: null,
+        modePaiement: null,
+        compteId: null,
+        reference: null,
+    );
+
+    $adhesion = app(AdhesionService::class)->creerDepuisWizard($dto, $this->user);
+
+    expect($adhesion->mode)->toBe('illimite');
+    expect($adhesion->date_debut?->toDateString())->toBe('2025-10-15');
+    expect($adhesion->date_fin)->toBeNull();
+    expect($adhesion->exercice)->toBeNull();
+});
+
 it('refuse une adhésion si une adhésion soft-deleted existe pour le même exercice', function (): void {
     $formule = FormuleAdhesion::factory()->create([
         'sous_categorie_id' => $this->sc->id,

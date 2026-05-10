@@ -8,7 +8,6 @@ use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
 use App\Models\Adhesion;
 use App\Models\FormuleAdhesion;
-use App\Models\HelloAssoTierMapping;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -80,34 +79,35 @@ final class AdhesionService
                 'date_debut' => $datesEtExercice['date_debut'],
                 'date_fin' => $datesEtExercice['date_fin'],
                 'saisi_par' => $tx->saisi_par !== null ? (int) $tx->saisi_par : null,
+                // SNAPSHOT
+                'montant_facial' => (float) $tx->montant_total,
+                'deductible_fiscal' => $formule?->deductible_fiscal ?? false,
+                'mode' => $formule?->mode ?? 'exercice',
+                'duree_mois' => $formule?->duree_mois,
+                'label_formule' => $formule?->nom ?? 'Adhésion legacy',
             ]);
         });
     }
 
     /**
      * Résout la formule applicable selon priorité :
-     *   1. Mapping HelloAsso (form_slug, tier_id) si transaction est HelloAsso
+     *   1. HelloAsso — formule auto-créée par la sync (lookup direct helloasso_form_slug + helloasso_tier_id)
      *   2. Formule active sur la sous-catégorie de la ligne cotisation
      *   3. null (adhésion legacy)
      */
     private function resolveFormule(Transaction $tx, TransactionLigne $ligneCotisation): ?FormuleAdhesion
     {
-        // Priorité 1 : HelloAsso
+        // Priorité 1 : HelloAsso — formule auto-créée par la sync
         if ($tx->helloasso_payment_id !== null
             && $tx->helloasso_form_slug !== null
             && $ligneCotisation->helloasso_tier_id !== null) {
-            $mapping = HelloAssoTierMapping::query()
+            $formule = FormuleAdhesion::query()
                 ->where('helloasso_form_slug', $tx->helloasso_form_slug)
                 ->where('helloasso_tier_id', $ligneCotisation->helloasso_tier_id)
-                ->where('target_type', FormuleAdhesion::class)
                 ->first();
 
-            if ($mapping !== null) {
-                $target = $mapping->target;
-
-                if ($target instanceof FormuleAdhesion) {
-                    return $target;
-                }
+            if ($formule !== null) {
+                return $formule;
             }
         }
 
@@ -135,6 +135,16 @@ final class AdhesionService
             ];
         }
 
+        if ($formule !== null && $formule->isModeIllimite()) {
+            $debut = CarbonImmutable::parse($tx->date);
+
+            return [
+                'exercice' => null,
+                'date_debut' => $debut,
+                'date_fin' => null,
+            ];
+        }
+
         return [
             'exercice' => $this->exerciceFromDate($tx->date),
             'date_debut' => null,
@@ -150,12 +160,22 @@ final class AdhesionService
             return $query->where('exercice', $exercice)->first();
         }
 
-        assert($dateDebut !== null && $dateFin !== null, 'Mode durée requires both dates');
+        // Mode durée : lookup par (date_debut, date_fin)
+        if ($dateDebut !== null && $dateFin !== null) {
+            return $query
+                ->whereDate('date_debut', $dateDebut->toDateString())
+                ->whereDate('date_fin', $dateFin->toDateString())
+                ->first();
+        }
 
-        return $query
-            ->whereDate('date_debut', $dateDebut->toDateString())
-            ->whereDate('date_fin', $dateFin->toDateString())
-            ->first();
+        // Mode illimite : 1 seule adhésion permanente possible par tiers
+        if ($dateDebut !== null && $dateFin === null) {
+            return $query
+                ->where('mode', 'illimite')
+                ->first();
+        }
+
+        return null;
     }
 
     public function creerGratuite(Tiers $tiers, int $exercice, string $motif, User $createur): Adhesion
@@ -204,6 +224,10 @@ final class AdhesionService
                 $dateDebut = $dto->dateDebut ?? Carbon::today();
                 $dateFin = $dateDebut->copy()->addMonths((int) $formule->duree_mois)->subDay();
                 $exercice = null;
+            } elseif ($formule->isModeIllimite()) {
+                $dateDebut = $dto->dateDebut ?? Carbon::today();
+                $dateFin = null;
+                $exercice = null;
             } else {
                 $dateDebut = null;
                 $dateFin = null;
@@ -235,6 +259,12 @@ final class AdhesionService
                 'date_fin' => $dateFin?->toDateString(),
                 'notes' => $dto->notes,
                 'saisi_par' => (int) $createur->id,
+                // SNAPSHOT
+                'montant_facial' => $dto->montant,
+                'deductible_fiscal' => $formule->deductible_fiscal,
+                'mode' => $formule->mode,
+                'duree_mois' => $formule->duree_mois,
+                'label_formule' => $formule->nom,
             ]);
         });
     }

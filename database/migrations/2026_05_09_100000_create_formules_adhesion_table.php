@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('association_id')->constrained('association')->cascadeOnDelete();
             $table->string('nom', 120);
             $table->text('description')->nullable();
-            $table->enum('mode', ['exercice', 'duree']);
+            $table->enum('mode', ['exercice', 'duree', 'illimite']);
             $table->unsignedSmallInteger('duree_mois')->nullable();
             $table->decimal('montant_par_defaut', 10, 2)->nullable();
             $table->boolean('deductible_fiscal')->default(false);
