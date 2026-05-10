@@ -6,11 +6,9 @@ namespace App\Livewire\Banques;
 
 use App\Enums\StatutOperation;
 use App\Livewire\Concerns\RespectsExerciceCloture;
-use App\Models\FormuleAdhesion;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
-use App\Models\HelloAssoTierMapping;
 use App\Models\Operation;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
@@ -54,17 +52,6 @@ final class HelloassoSyncWizard extends Component
     public array $formOperations = [];
 
     public ?string $formErreur = null;
-
-    // Étape 1 — Paliers (sous-bloc des forms Membership)
-    public ?int $showPaliersFor = null;
-
-    /** @var array<int, list<array{id: int, label: string, price: int|null}>> */
-    public array $paliersForms = [];
-
-    /** @var array<int, array<int, ?int>> formMappingId → [tierId => formuleId|null] */
-    public array $paliersFormulesMap = [];
-
-    public ?string $paliersErreur = null;
 
     // Étape 2 — Tiers
     public bool $tiersFetched = false;
@@ -165,117 +152,6 @@ final class HelloassoSyncWizard extends Component
 
         $this->formsLoaded = true;
         $this->formsLoading = false;
-    }
-
-    public function chargerPaliers(int $formMappingId): void
-    {
-        $this->paliersErreur = null;
-        $this->showPaliersFor = $formMappingId;
-
-        $mapping = HelloAssoFormMapping::find($formMappingId);
-        if ($mapping === null) {
-            $this->paliersErreur = 'Formulaire introuvable.';
-
-            return;
-        }
-
-        if (($mapping->form_type ?? '') !== 'Membership') {
-            $this->paliersErreur = 'Le mapping de paliers n\'est disponible que pour les formulaires de type Membership.';
-
-            return;
-        }
-
-        // Charger les paliers depuis HelloAsso (cachés s'ils ont déjà été fetchés)
-        if (! isset($this->paliersForms[$formMappingId])) {
-            $p = HelloAssoParametres::where('association_id', 1)->first();
-            if ($p === null || $p->client_id === null) {
-                $this->paliersErreur = 'Paramètres HelloAsso non configurés.';
-
-                return;
-            }
-
-            try {
-                $client = new HelloAssoApiClient($p);
-                $form = $client->fetchFormDetail($mapping->form_type, $mapping->form_slug);
-            } catch (\Throwable $e) {
-                $this->paliersErreur = 'Erreur API HelloAsso : '.$e->getMessage();
-
-                return;
-            }
-
-            $this->paliersForms[$formMappingId] = collect($form['tiers'] ?? [])
-                ->map(fn (array $t) => [
-                    'id' => (int) $t['id'],
-                    'label' => $t['label'] ?? '—',
-                    'price' => $t['price'] ?? null,
-                ])
-                ->all();
-        }
-
-        // Charger l'état actuel des mappings tier_id → formule_id
-        $current = HelloAssoTierMapping::query()
-            ->where('helloasso_form_slug', $mapping->form_slug)
-            ->where('target_type', FormuleAdhesion::class)
-            ->get();
-
-        $this->paliersFormulesMap[$formMappingId] = [];
-        foreach ($this->paliersForms[$formMappingId] as $palier) {
-            $tierId = $palier['id'];
-            $existing = $current->firstWhere('helloasso_tier_id', $tierId);
-            $this->paliersFormulesMap[$formMappingId][$tierId] = $existing?->target_id;
-        }
-    }
-
-    public function fermerPaliers(): void
-    {
-        $this->showPaliersFor = null;
-        $this->paliersErreur = null;
-    }
-
-    public function sauvegarderPalierMapping(int $formMappingId, int $tierId, $formuleId): void
-    {
-        $mapping = HelloAssoFormMapping::find($formMappingId);
-        if ($mapping === null) {
-            return;
-        }
-
-        $palier = collect($this->paliersForms[$formMappingId] ?? [])->firstWhere('id', $tierId);
-        if ($palier === null) {
-            return;
-        }
-
-        $formuleId = $formuleId === '' || $formuleId === null ? null : (int) $formuleId;
-
-        $existing = HelloAssoTierMapping::query()
-            ->where('helloasso_form_slug', $mapping->form_slug)
-            ->where('helloasso_tier_id', $tierId)
-            ->first();
-
-        if ($formuleId === null) {
-            // Supprimer le mapping s'il existe
-            $existing?->delete();
-            $this->paliersFormulesMap[$formMappingId][$tierId] = null;
-
-            return;
-        }
-
-        if ($existing !== null) {
-            $existing->update([
-                'helloasso_tier_label' => $palier['label'],
-                'target_type' => FormuleAdhesion::class,
-                'target_id' => $formuleId,
-            ]);
-        } else {
-            HelloAssoTierMapping::create([
-                'helloasso_form_slug' => $mapping->form_slug,
-                'helloasso_tier_id' => $tierId,
-                'helloasso_tier_label' => $palier['label'],
-                'target_type' => FormuleAdhesion::class,
-                'target_id' => $formuleId,
-            ]);
-        }
-
-        $this->paliersFormulesMap[$formMappingId][$tierId] = $formuleId;
     }
 
     public function openCreateOperation(int $mappingId): void
@@ -672,7 +548,6 @@ final class HelloassoSyncWizard extends Component
             'formMappings' => $formMappings,
             'operations' => Operation::with('typeOperation')->orderBy('nom')->get(),
             'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
-            'formulesActives' => FormuleAdhesion::where('actif', true)->orderBy('nom')->get(),
         ]);
     }
 }
