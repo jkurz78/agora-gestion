@@ -7,7 +7,6 @@ namespace Database\Factories;
 use App\Enums\HelloAssoEnvironnement;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -28,9 +27,6 @@ final class HelloAssoParametresFactory extends Factory
             'environnement' => HelloAssoEnvironnement::Sandbox,
             'compte_helloasso_id' => CompteBancaire::factory(),
             'compte_versement_id' => CompteBancaire::factory(),
-            'sous_categorie_cotisation_id' => SousCategorie::factory(),
-            'sous_categorie_don_id' => SousCategorie::factory(),
-            'sous_categorie_inscription_id' => SousCategorie::factory(),
         ];
     }
 }

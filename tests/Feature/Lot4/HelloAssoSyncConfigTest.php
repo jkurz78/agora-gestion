@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Livewire\Parametres\HelloassoSyncConfig;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -30,15 +29,13 @@ it('renders the component', function () {
 
 it('saves sync config', function () {
     $compte = CompteBancaire::factory()->create(['nom' => 'HA']);
-    $scDon = SousCategorie::factory()->pourDons()->create();
 
     Livewire::test(HelloassoSyncConfig::class)
         ->set('compteHelloassoId', $compte->id)
-        ->set('sousCategorieDonId', $scDon->id)
         ->call('sauvegarder')
         ->assertHasNoErrors();
 
     $this->parametres->refresh();
     expect($this->parametres->compte_helloasso_id)->toBe($compte->id);
-    expect($this->parametres->sous_categorie_don_id)->toBe($scDon->id);
+    // Sous-catégories portées par helloasso_form_mappings depuis slice 3d
 });

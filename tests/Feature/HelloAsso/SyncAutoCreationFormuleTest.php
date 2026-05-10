@@ -33,7 +33,6 @@ beforeEach(function (): void {
         'organisation_slug' => 'mon-asso',
         'compte_helloasso_id' => $compte->id,
         'compte_versement_id' => $compte->id,
-        'sous_categorie_cotisation_id' => $sc->id,
     ]);
 
     $this->sc = $sc;

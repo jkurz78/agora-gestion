@@ -40,8 +40,22 @@ beforeEach(function () {
         'organisation_slug' => 'test',
         'environnement' => 'sandbox',
         'compte_helloasso_id' => $this->compte->id,
-        'sous_categorie_don_id' => $this->scDon->id,
-        'sous_categorie_cotisation_id' => $this->scCot->id,
+    ]);
+
+    // Form mappings portent maintenant les sous-catégories par formulaire
+    HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => $this->parametres->id,
+        'form_slug' => 'dons-libres',
+        'form_type' => 'Donation',
+        'form_title' => 'Dons libres',
+        'sous_categorie_id' => $this->scDon->id,
+    ]);
+    HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => $this->parametres->id,
+        'form_slug' => 'adhesion-2025',
+        'form_type' => 'Membership',
+        'form_title' => 'Adhésion 2025',
+        'sous_categorie_id' => $this->scCot->id,
     ]);
 
     $this->tiers = Tiers::factory()->avecHelloasso()->create([
@@ -210,7 +224,6 @@ it('is idempotent — re-importing same order updates instead of duplicating', f
 
 it('resolves operation from form mapping for Registration items', function () {
     $scInscr = SousCategorie::factory()->pourInscriptions()->create(['nom' => 'Inscription']);
-    $this->parametres->update(['sous_categorie_inscription_id' => $scInscr->id]);
 
     $typeOp = TypeOperation::factory()->create(['sous_categorie_id' => $scInscr->id]);
     $operation = Operation::factory()->create(['nom' => 'Stage été 2026', 'type_operation_id' => $typeOp->id]);
@@ -257,9 +270,7 @@ it('resolves operation from form mapping for Registration items', function () {
 });
 
 it('reports error for Registration item without mapped operation', function () {
-    $scInscr = SousCategorie::factory()->pourInscriptions()->create(['nom' => 'Inscription']);
-    $this->parametres->update(['sous_categorie_inscription_id' => $scInscr->id]);
-    // No form mapping created
+    // No form mapping created — Registration items sans mapping → erreur
 
     $orders = [
         [
@@ -445,9 +456,6 @@ it('does not create participant for Donation items', function () {
 });
 
 it('does not duplicate participant on re-sync', function () {
-    $scInscr = SousCategorie::factory()->pourInscriptions()->create(['nom' => 'Inscription']);
-    $this->parametres->update(['sous_categorie_inscription_id' => $scInscr->id]);
-
     $operation = Operation::factory()->create(['nom' => 'Stage']);
     HelloAssoFormMapping::create([
         'helloasso_parametres_id' => $this->parametres->id,

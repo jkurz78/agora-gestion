@@ -514,15 +514,6 @@ final class HelloassoSyncWizard extends Component
         if ($p->compte_versement_id === null) {
             $this->configWarnings[] = 'Le compte de versement n\'est pas configuré — les versements (cashouts) ne seront pas traités.';
         }
-        if ($p->sous_categorie_don_id === null) {
-            $this->configWarnings[] = 'La sous-catégorie Dons n\'est pas configurée — les dons ne seront pas importés.';
-        }
-        if ($p->sous_categorie_cotisation_id === null) {
-            $this->configWarnings[] = 'La sous-catégorie Cotisations n\'est pas configurée — les cotisations ne seront pas importées.';
-        }
-        if ($p->sous_categorie_inscription_id === null) {
-            $this->configWarnings[] = 'La sous-catégorie Inscriptions n\'est pas configurée — les inscriptions ne seront pas importées.';
-        }
     }
 
     public function render(): View

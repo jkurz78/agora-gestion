@@ -351,13 +351,18 @@ final class HelloAssoSyncService
             throw new \RuntimeException("Formulaire '{$formSlug}' non mappé — impossible d'importer un item Registration sans opération");
         }
 
-        // Use operation's sous-catégorie if set, otherwise fall back to default
+        // Use operation's sous-catégorie if set, otherwise fall back to form mapping sous-catégorie
         $sousCategorieId = null;
         if ($operationId !== null) {
             $sousCategorieId = $this->getOperationSousCategorieId($operationId);
         }
         if ($sousCategorieId === null) {
-            $sousCategorieId = $this->resolveSousCategorie($type);
+            $formMapping = HelloAssoFormMapping::where('form_slug', $formSlug)->first();
+            $sousCategorieId = $formMapping?->sous_categorie_id;
+        }
+
+        if ($sousCategorieId === null) {
+            throw new \RuntimeException("Sous-catégorie non configurée pour le formulaire '{$formSlug}' (type item : '{$type}') — configurez la sous-catégorie sur le mapping de formulaire.");
         }
 
         return [
@@ -378,22 +383,6 @@ final class HelloAssoSyncService
         }
 
         return $this->operationSousCategorieCache[$operationId];
-    }
-
-    private function resolveSousCategorie(string $itemType): int
-    {
-        $id = match ($itemType) {
-            'Donation' => $this->parametres->sous_categorie_don_id,
-            'Membership' => $this->parametres->sous_categorie_cotisation_id,
-            'Registration' => $this->parametres->sous_categorie_inscription_id,
-            default => $this->parametres->sous_categorie_don_id, // Fallback pour types inconnus (PaymentForm, etc.)
-        };
-
-        if ($id === null) {
-            throw new \RuntimeException("Sous-catégorie non configurée pour le type '{$itemType}'");
-        }
-
-        return $id;
     }
 
     private function resolveModePaiement(array $payments): ModePaiement
