@@ -109,23 +109,66 @@
                                                 @endif
                                             </td>
                                             <td>
-                                                <div class="d-flex gap-1">
-                                                    <select wire:model="formOperations.{{ $fm->id }}" class="form-select form-select-sm">
-                                                        <option value="">Ne pas suivre</option>
-                                                        @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
-                                                            <optgroup label="{{ $typeName }}">
-                                                                @foreach ($ops as $op)
-                                                                    <option value="{{ $op->id }}">{{ $op->nom }}</option>
-                                                                @endforeach
-                                                            </optgroup>
-                                                        @endforeach
-                                                    </select>
-                                                    <button wire:click="openCreateOperation({{ $fm->id }})"
-                                                            class="btn btn-sm btn-outline-primary" title="Créer une opération"
-                                                            style="padding:.15rem .5rem">
-                                                        <i class="bi bi-plus-lg"></i>
-                                                    </button>
-                                                </div>
+                                                @if ($fm->imported_at !== null)
+                                                    {{-- Verrouillé --}}
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span class="badge text-bg-success"><i class="bi bi-lock-fill"></i> Importé</span>
+                                                        <span class="small text-muted">
+                                                            @if ($fm->sous_categorie_id)
+                                                                dans {{ $fm->sousCategorie?->nom ?? '—' }}
+                                                            @elseif ($fm->operation_id)
+                                                                lié à {{ $fm->operation?->nom ?? '—' }}
+                                                            @endif
+                                                        </span>
+                                                    </div>
+                                                @else
+                                                    <div class="d-flex gap-1 align-items-center">
+                                                        <select wire:change="mettreAJourAction({{ $fm->id }}, $event.target.value)"
+                                                                class="form-select form-select-sm">
+                                                            <option value="">— À configurer —</option>
+                                                            <option value="ignore" @selected(($formActions[$fm->id] ?? '') === 'ignore')>Ignorer ce formulaire</option>
+
+                                                            @if (in_array($fm->form_type, ['Membership', 'Donation'], true))
+                                                                @php
+                                                                    $scs = $fm->form_type === 'Membership'
+                                                                        ? ($sousCategoriesParUsage['Cotisation'] ?? collect())
+                                                                        : ($sousCategoriesParUsage['Don'] ?? collect());
+                                                                @endphp
+                                                                @if ($scs->isNotEmpty())
+                                                                    <optgroup label="Importer dans (sous-catégorie)">
+                                                                        @foreach ($scs as $sc)
+                                                                            <option value="souscat:{{ $sc->id }}"
+                                                                                @selected(($formActions[$fm->id] ?? '') === 'souscat:'.$sc->id)>
+                                                                                {{ $sc->nom }}
+                                                                            </option>
+                                                                        @endforeach
+                                                                    </optgroup>
+                                                                @endif
+                                                            @elseif ($fm->form_type === 'Registration')
+                                                                <optgroup label="Lier à l'opération">
+                                                                    @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
+                                                                        <optgroup label="{{ $typeName }}">
+                                                                            @foreach ($ops as $op)
+                                                                                <option value="operation:{{ $op->id }}"
+                                                                                    @selected(($formActions[$fm->id] ?? '') === 'operation:'.$op->id)>
+                                                                                    {{ $op->nom }}
+                                                                                </option>
+                                                                            @endforeach
+                                                                        </optgroup>
+                                                                    @endforeach
+                                                                </optgroup>
+                                                            @endif
+                                                        </select>
+
+                                                        @if ($fm->form_type === 'Registration')
+                                                            <button wire:click="openCreateOperation({{ $fm->id }})"
+                                                                    class="btn btn-sm btn-outline-primary" title="Créer une opération"
+                                                                    style="padding:.15rem .5rem">
+                                                                <i class="bi bi-plus-lg"></i>
+                                                            </button>
+                                                        @endif
+                                                    </div>
+                                                @endif
                                             </td>
                                         </tr>
                                         @if ($creatingOperationForMapping === $fm->id)

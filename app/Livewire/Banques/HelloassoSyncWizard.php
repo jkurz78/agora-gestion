@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire\Banques;
 
 use App\Enums\StatutOperation;
+use App\Enums\UsageComptable;
 use App\Livewire\Concerns\RespectsExerciceCloture;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoNotification;
 use App\Models\HelloAssoParametres;
 use App\Models\Operation;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Services\ExerciceService;
@@ -48,8 +50,8 @@ final class HelloassoSyncWizard extends Component
 
     public bool $formsLoaded = false;
 
-    /** @var array<int, ?int> mapping_id → operation_id */
-    public array $formOperations = [];
+    /** @var array<int, string> mapping_id → "ignore" | "souscat:42" | "operation:7" | "" */
+    public array $formActions = [];
 
     public ?string $formErreur = null;
 
@@ -145,9 +147,17 @@ final class HelloassoSyncWizard extends Component
             );
         }
 
-        $this->formOperations = [];
+        $this->formActions = [];
         foreach ($p->formMappings()->get() as $m) {
-            $this->formOperations[$m->id] = $m->operation_id;
+            if ($m->ignore) {
+                $this->formActions[$m->id] = 'ignore';
+            } elseif ($m->sous_categorie_id !== null) {
+                $this->formActions[$m->id] = 'souscat:'.$m->sous_categorie_id;
+            } elseif ($m->operation_id !== null) {
+                $this->formActions[$m->id] = 'operation:'.$m->operation_id;
+            } else {
+                $this->formActions[$m->id] = '';
+            }
         }
 
         $this->formsLoaded = true;
@@ -169,6 +179,11 @@ final class HelloassoSyncWizard extends Component
         $this->reset('newOperationNom', 'newOperationDateDebut', 'newOperationDateFin', 'newOperationTypeOperationId');
     }
 
+    public function mettreAJourAction(int $mappingId, string $action): void
+    {
+        $this->formActions[$mappingId] = $action;
+    }
+
     public function storeOperation(): void
     {
         $this->validate([
@@ -188,7 +203,7 @@ final class HelloassoSyncWizard extends Component
 
         // Auto-select in the dropdown
         if ($this->creatingOperationForMapping !== null) {
-            $this->formOperations[$this->creatingOperationForMapping] = $operation->id;
+            $this->formActions[$this->creatingOperationForMapping] = 'operation:'.$operation->id;
         }
 
         $this->cancelCreateOperation();
@@ -199,13 +214,38 @@ final class HelloassoSyncWizard extends Component
         $p = HelloAssoParametres::where('association_id', 1)->first();
         $validIds = $p?->formMappings()->pluck('id')->all() ?? [];
 
-        foreach ($this->formOperations as $mappingId => $operationId) {
+        foreach ($this->formActions as $mappingId => $action) {
             if (! in_array((int) $mappingId, $validIds, true)) {
                 continue;
             }
-            HelloAssoFormMapping::where('id', $mappingId)->update([
-                'operation_id' => $operationId ?: null,
-            ]);
+
+            $mapping = HelloAssoFormMapping::find($mappingId);
+            if ($mapping === null || $mapping->imported_at !== null) {
+                continue; // verrouillé
+            }
+
+            if ($action === 'ignore') {
+                $mapping->update([
+                    'ignore' => true,
+                    'sous_categorie_id' => null,
+                    'operation_id' => null,
+                ]);
+            } elseif (str_starts_with($action, 'souscat:')) {
+                $scId = (int) substr($action, 8);
+                $mapping->update([
+                    'ignore' => false,
+                    'sous_categorie_id' => $scId,
+                    'operation_id' => null,
+                ]);
+            } elseif (str_starts_with($action, 'operation:')) {
+                $opId = (int) substr($action, 10);
+                $mapping->update([
+                    'ignore' => false,
+                    'sous_categorie_id' => null,
+                    'operation_id' => $opId,
+                ]);
+            }
+            // Si action vide '' : pas de modification, le mapping reste "À configurer"
         }
 
         $this->updateStepOneSummary();
@@ -539,6 +579,10 @@ final class HelloassoSyncWizard extends Component
             'formMappings' => $formMappings,
             'operations' => Operation::with('typeOperation')->orderBy('nom')->get(),
             'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
+            'sousCategoriesParUsage' => [
+                'Cotisation' => SousCategorie::forUsage(UsageComptable::Cotisation)->orderBy('nom')->get(),
+                'Don' => SousCategorie::forUsage(UsageComptable::Don)->orderBy('nom')->get(),
+            ],
         ]);
     }
 }
