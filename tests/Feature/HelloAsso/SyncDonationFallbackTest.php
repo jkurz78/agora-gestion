@@ -54,7 +54,7 @@ beforeEach(function (): void {
 it('un don additionnel dans un order Membership tombe dans la sous-cat fallback Don', function (): void {
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
-        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025' => Http::response([
+        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025/public' => Http::response([
             'formSlug' => 'cotisation-2025',
             'formType' => 'Membership',
             'validityType' => 'Custom',
@@ -98,7 +98,7 @@ it('échoue si fallback Don non configuré et un don additionnel apparaît sans 
 
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
-        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025' => Http::response([
+        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025/public' => Http::response([
             'formSlug' => 'cotisation-2025',
             'tiers' => [['id' => 1, 'label' => 'Adulte', 'price' => 2500]],
         ]),

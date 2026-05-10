@@ -158,7 +158,12 @@ final class HelloAssoSyncService
                         try {
                             $client = new HelloAssoApiClient($this->parametres);
                             $this->formDetailsCache[$itemFormSlug] = $client->fetchFormDetail($formMapping->form_type, $itemFormSlug);
-                        } catch (\Throwable) {
+                        } catch (\Throwable $e) {
+                            // Log explicite : sans ça, l'auto-création de formule échoue silencieusement
+                            // et la priorité 2 du resolver fallback sur la sous-cat → mauvaise formule appliquée.
+                            \Illuminate\Support\Facades\Log::warning(
+                                "HelloAsso fetchFormDetail failed for form {$itemFormSlug}: ".$e->getMessage()
+                            );
                             $this->formDetailsCache[$itemFormSlug] = null;
                         }
                     }

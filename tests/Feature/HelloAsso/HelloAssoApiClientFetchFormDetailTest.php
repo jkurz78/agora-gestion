@@ -20,7 +20,7 @@ beforeEach(function (): void {
 it('retourne le détail du form avec ses tiers', function (): void {
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
-        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025' => Http::response([
+        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025/public' => Http::response([
             'formSlug' => 'cotisation-2025',
             'formType' => 'Membership',
             'validityType' => 'MovingYear',

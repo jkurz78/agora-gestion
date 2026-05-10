@@ -67,8 +67,12 @@ final class HelloAssoApiClient
     {
         $this->authenticate();
 
+        // L'endpoint /public est accessible avec ou sans token et retourne les infos
+        // publiques du form (validityType, startDate, endDate, tiers avec id/label/price/
+        // isEligibleTaxReceipt). L'endpoint sans /public peut renvoyer 403 selon les
+        // scopes du token OAuth — /public est donc plus robuste pour ce cas d'usage.
         $response = Http::withToken($this->accessToken)
-            ->get("{$this->baseUrl}/v5/organizations/{$this->organisationSlug}/forms/{$formType}/{$formSlug}");
+            ->get("{$this->baseUrl}/v5/organizations/{$this->organisationSlug}/forms/{$formType}/{$formSlug}/public");
 
         if ($response->failed()) {
             throw new RuntimeException("Échec récupération formulaire {$formType}/{$formSlug} : {$response->status()}");

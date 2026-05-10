@@ -76,7 +76,7 @@ function buildOrder3d(string $formSlug, int $tierId, int $itemId): array
 it('sync auto-crée une formule HelloAsso (mode durée pour MovingYear)', function (): void {
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
-        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025' => Http::response([
+        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025/public' => Http::response([
             'formSlug' => 'cotisation-2025',
             'formType' => 'Membership',
             'validityType' => 'MovingYear',
@@ -106,7 +106,7 @@ it('sync auto-crée une formule HelloAsso (mode durée pour MovingYear)', functi
 it('sync mode illimite (validity_type Illimited)', function (): void {
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
-        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025' => Http::response([
+        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025/public' => Http::response([
             'formSlug' => 'cotisation-2025',
             'validityType' => 'Illimited',
             'tiers' => [
@@ -131,7 +131,7 @@ it('sync mode illimite (validity_type Illimited)', function (): void {
 it('sync pose imported_at à la 1re importation', function (): void {
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
-        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025' => Http::response([
+        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-2025/public' => Http::response([
             'formSlug' => 'cotisation-2025',
             'validityType' => 'Custom',
             'tiers' => [['id' => 1, 'label' => 'Adulte', 'price' => 3000]],

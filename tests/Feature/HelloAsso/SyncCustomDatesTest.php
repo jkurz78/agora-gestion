@@ -49,7 +49,7 @@ beforeEach(function (): void {
 it('Custom utilise les dates du form HelloAsso (pas l\'exercice asso)', function (): void {
     Http::fake([
         '*api.helloasso-sandbox.com/oauth2/token' => Http::response(['access_token' => 'tok', 'expires_in' => 3600]),
-        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-custom' => Http::response([
+        '*api.helloasso-sandbox.com/v5/organizations/mon-asso/forms/Membership/cotisation-custom/public' => Http::response([
             'formSlug' => 'cotisation-custom',
             'validityType' => 'Custom',
             'startDate' => '2025-03-01',
