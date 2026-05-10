@@ -8,6 +8,7 @@ use App\Console\Commands\VersionStampCommand;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutNoteDeFrais;
+use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\AssociationUser;
 use App\Models\Extourne;
@@ -20,6 +21,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Observers\AdhesionObserver;
+use App\Observers\AdhesionRecuFiscalObserver;
 use App\Observers\AdhesionTransactionLigneObserver;
 use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
@@ -64,6 +66,7 @@ final class AppServiceProvider extends ServiceProvider
         Transaction::observe(AdhesionObserver::class);
         TransactionLigne::observe(TransactionLigneRecuFiscalObserver::class);
         TransactionLigne::observe(AdhesionTransactionLigneObserver::class);
+        Adhesion::observe(AdhesionRecuFiscalObserver::class);
         User::observe(UserRoleObserver::class);
 
         // Rate limiter pour l'API newsletter publique : 5 requêtes / IP / heure.
