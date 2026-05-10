@@ -275,3 +275,44 @@ it('génère directement le reçu sans modale pour une adhésion manuelle (est_h
 
     expect(RecuFiscalEmis::count())->toBe(1);
 });
+
+// ── UX erreur : adresse incomplète → propriété recuFiscalError, pas d'exception 500 ──
+it('expose un message d\'erreur plutôt qu\'une exception quand l\'adresse du donateur est incomplète', function () {
+    // Adhésion déductible mais tiers sans adresse_ligne1 → RecuFiscalException
+    // doit être catchée et exposée via $recuFiscalError (propriété publique).
+    $adhesion = creerAdhesionDeductiblePayee(['adresse_ligne1' => null]);
+
+    expect(RecuFiscalEmis::count())->toBe(0);
+
+    Livewire::test(AdhesionComponent::class, ['tiers' => $adhesion->tiers])
+        ->call('emettreRecuFiscalAdhesion', $adhesion->id)
+        ->assertNoRedirect()
+        ->assertSet('recuFiscalError', fn ($msg) => is_string($msg) && str_contains($msg, 'Adresse'));
+
+    expect(RecuFiscalEmis::count())->toBe(0);
+});
+
+it('réinitialise recuFiscalError au prochain clic Émettre réussi', function () {
+    // Première tentative : adresse manquante → erreur exposée
+    $adhesion = creerAdhesionDeductiblePayee(['adresse_ligne1' => null]);
+
+    $component = Livewire::test(AdhesionComponent::class, ['tiers' => $adhesion->tiers])
+        ->call('emettreRecuFiscalAdhesion', $adhesion->id)
+        ->assertSet('recuFiscalError', fn ($msg) => is_string($msg) && str_contains($msg, 'Adresse'));
+
+    // Compléter l'adresse puis réessayer → reçu généré, error remis à null
+    $adhesion->tiers->update(['adresse_ligne1' => '5 avenue de la République']);
+
+    $component->call('emettreRecuFiscalAdhesion', $adhesion->id)
+        ->assertSet('recuFiscalError', null)
+        ->assertRedirect();
+
+    expect(RecuFiscalEmis::count())->toBe(1);
+});
+
+it('dismissRecuFiscalError efface le message', function () {
+    Livewire::test(AdhesionComponent::class, ['tiers' => Tiers::factory()->create()])
+        ->set('recuFiscalError', 'un message d\'erreur')
+        ->call('dismissRecuFiscalError')
+        ->assertSet('recuFiscalError', null);
+});

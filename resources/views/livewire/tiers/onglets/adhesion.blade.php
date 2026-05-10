@@ -1,4 +1,12 @@
 <div>
+    @if($recuFiscalError !== null)
+        <div class="alert alert-danger alert-dismissible fade show py-2 small mb-2" role="alert">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <strong>Émission du reçu fiscal impossible :</strong> {{ $recuFiscalError }}
+            <button type="button" class="btn-close" wire:click="dismissRecuFiscalError" aria-label="Fermer"></button>
+        </div>
+    @endif
+
     {{-- Modale avertissement doublon HelloAsso --}}
     @if($showHelloAssoWarning)
         <div class="modal fade show d-block" tabindex="-1" style="z-index:2060;background-color:rgba(0,0,0,.5)">
