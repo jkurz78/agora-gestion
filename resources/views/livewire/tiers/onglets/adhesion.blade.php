@@ -29,7 +29,11 @@
                                 @if($adhesion->formuleAdhesion)
                                     <span class="badge text-bg-info">{{ $adhesion->formuleAdhesion->nom }}</span>
                                 @endif
-                                @if($adhesion->date_debut && $adhesion->date_fin)
+                                @if($adhesion->isModeIllimite())
+                                    <div class="text-success text-nowrap" style="font-size:.7rem">
+                                        <i class="bi bi-infinity"></i> Permanente
+                                    </div>
+                                @elseif($adhesion->date_debut && $adhesion->date_fin)
                                     <div class="text-muted text-nowrap" style="font-size:.7rem">
                                         {{ $adhesion->date_debut->format('d/m/Y') }} → {{ $adhesion->date_fin->format('d/m/Y') }}
                                     </div>

@@ -111,3 +111,45 @@ it('affiche l\'intervalle de validité en mode durée', function (): void {
         ->assertSee('15/10/2025')
         ->assertSee('15/10/2026');
 });
+
+it('filtre a_jour inclut les adhésions mode illimite', function (): void {
+    $tiers = Tiers::factory()->create(['nom' => 'PERMANENT']);
+    $formule = FormuleAdhesion::factory()->modeIllimite()->create([
+        'sous_categorie_id' => SousCategorie::factory()->pourCotisations()->create()->id,
+    ]);
+
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'formule_adhesion_id' => $formule->id,
+        'exercice' => null,
+        'date_debut' => now()->subYears(5)->toDateString(),
+        'date_fin' => null,
+        'mode' => 'illimite',
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(AdherentList::class)
+        ->set('filtre', 'a_jour')
+        ->assertSee('PERMANENT');
+});
+
+it('AdherentList affiche le badge Permanente pour les adhésions illimite', function (): void {
+    $tiers = Tiers::factory()->create(['nom' => 'BADGE_PERM']);
+    $formule = FormuleAdhesion::factory()->modeIllimite()->create([
+        'sous_categorie_id' => SousCategorie::factory()->pourCotisations()->create()->id,
+    ]);
+
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'formule_adhesion_id' => $formule->id,
+        'exercice' => null,
+        'date_debut' => now()->subYears(2)->toDateString(),
+        'date_fin' => null,
+        'mode' => 'illimite',
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(AdherentList::class)
+        ->set('filtre', 'a_jour')
+        ->assertSee('Permanente');
+});

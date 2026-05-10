@@ -70,3 +70,25 @@ it('reste fonctionnel pour une adhésion legacy sans formule', function (): void
         ->set('onglet', 'adhesion')
         ->assertOk();
 });
+
+it('onglet Adhésion fiche tiers affiche Permanente pour les adhésions illimite', function (): void {
+    $tiers = Tiers::factory()->create();
+    $formule = FormuleAdhesion::factory()->modeIllimite()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'nom' => 'Membre à vie',
+    ]);
+    Adhesion::factory()->create([
+        'tiers_id' => $tiers->id,
+        'formule_adhesion_id' => $formule->id,
+        'exercice' => null,
+        'date_debut' => '2020-01-15',
+        'date_fin' => null,
+        'mode' => 'illimite',
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(FicheTiers::class, ['tiers' => $tiers])
+        ->set('onglet', 'adhesion')
+        ->assertSee('Membre à vie')
+        ->assertSee('Permanente');
+});

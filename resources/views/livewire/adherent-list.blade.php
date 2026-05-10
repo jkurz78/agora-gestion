@@ -96,7 +96,9 @@
                             @endif
                         </td>
                         <td class="small text-nowrap">
-                            @if($adh && $adh->date_debut && $adh->date_fin)
+                            @if($adh && $adh->isModeIllimite())
+                                <span class="badge text-bg-success"><i class="bi bi-infinity"></i> Permanente</span>
+                            @elseif($adh && $adh->date_debut && $adh->date_fin)
                                 {{ $adh->date_debut->format('d/m/Y') }} → {{ $adh->date_fin->format('d/m/Y') }}
                             @elseif($adh && $adh->exercice)
                                 Ex. {{ $adh->exercice }}-{{ $adh->exercice + 1 }}

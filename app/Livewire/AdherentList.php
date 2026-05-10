@@ -57,7 +57,8 @@ final class AdherentList extends Component
                                 ->whereNotNull('date_fin')
                                 ->whereDate('date_debut', '<=', $today)
                                 ->whereDate('date_fin', '>=', $today);
-                        });
+                        })
+                        ->orWhere('mode', 'illimite');
                 });
             }),
             'en_retard' => $query
@@ -79,7 +80,8 @@ final class AdherentList extends Component
                                     ->whereNotNull('date_fin')
                                     ->whereDate('date_debut', '<=', $today)
                                     ->whereDate('date_fin', '>=', $today);
-                            });
+                            })
+                            ->orWhere('mode', 'illimite');
                     });
                 }),
             default => $query->whereHas('adhesions'),
