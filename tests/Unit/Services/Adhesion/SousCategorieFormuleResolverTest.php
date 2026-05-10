@@ -36,6 +36,32 @@ it('retourne null si la sous-cat n\'a aucune formule', function (): void {
     expect($result)->toBeNull();
 });
 
+it('ignore les formules HelloAsso (priorité 2 = formules manuelles uniquement)', function (): void {
+    $sc = SousCategorie::factory()->pourCotisations()->create();
+
+    // Formule HelloAsso active sur la sous-cat → ignorée par priorité 2
+    FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $sc->id,
+        'actif' => true,
+        'est_helloasso' => true,
+        'helloasso_form_slug' => 'cotisation-2026',
+        'helloasso_tier_id' => 1,
+    ]);
+
+    $resolver = new SousCategorieFormuleResolver;
+    expect($resolver->resolve($sc->id))->toBeNull();
+
+    // Ajout d'une formule manuelle → c'est elle qui doit être retournée
+    $manuelle = FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $sc->id,
+        'actif' => true,
+        'est_helloasso' => false,
+    ]);
+
+    $resolver2 = new SousCategorieFormuleResolver;
+    expect($resolver2->resolve($sc->id)?->id)->toBe($manuelle->id);
+});
+
 it('cache le résultat sur la même instance (pas de double query)', function (): void {
     $sc = SousCategorie::factory()->pourCotisations()->create();
     $formule = FormuleAdhesion::factory()->create(['sous_categorie_id' => $sc->id, 'actif' => true]);

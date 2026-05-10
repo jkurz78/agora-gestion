@@ -51,9 +51,18 @@ final class FormuleAdhesion extends TenantModel
                 return;
             }
 
+            // La contrainte "1 active par sous-cat" ne s'applique qu'aux formules MANUELLES.
+            // Les formules HelloAsso peuvent être plusieurs sur la même sous-cat (4 paliers
+            // d'un form Membership = 4 formules) — la priorité 1 du resolver utilise
+            // (helloasso_form_slug, helloasso_tier_id), pas la sous-cat.
+            if ($formule->est_helloasso) {
+                return;
+            }
+
             $existante = static::query()
                 ->where('sous_categorie_id', $formule->sous_categorie_id)
                 ->where('actif', true)
+                ->where('est_helloasso', false)
                 ->when($formule->exists, fn ($q) => $q->where('id', '!=', $formule->id))
                 ->exists();
 

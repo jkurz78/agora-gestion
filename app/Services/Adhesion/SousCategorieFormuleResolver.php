@@ -14,9 +14,13 @@ final class SousCategorieFormuleResolver
     public function resolve(int $sousCategorieId): ?FormuleAdhesion
     {
         if (! array_key_exists($sousCategorieId, $this->cache)) {
+            // Priorité 2 du resolver : ne retourne QUE des formules manuelles.
+            // Les formules HelloAsso sont résolues en priorité 1 via
+            // (helloasso_form_slug, helloasso_tier_id) — voir AdhesionService::resolveFormule.
             $this->cache[$sousCategorieId] = FormuleAdhesion::query()
                 ->where('sous_categorie_id', $sousCategorieId)
                 ->where('actif', true)
+                ->where('est_helloasso', false)
                 ->first();
         }
 
