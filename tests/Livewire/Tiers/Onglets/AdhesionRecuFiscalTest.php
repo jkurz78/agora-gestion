@@ -82,6 +82,8 @@ function creerAdhesionDeductiblePayee(array $tiersOverrides = [], array $adhesio
         'transaction_id' => $transaction->id,
         'tiers_id' => $tiers->id,
         'deductible_fiscal' => true,
+        'montant_facial' => 75.00, // aligné sur le montant de la ligne ; les tests qui veulent
+        // tester la garde montant=0 doivent l'override explicitement
         'exercice' => mt_rand(2020, 2099),
     ], $adhesionOverrides));
 }
@@ -274,6 +276,16 @@ it('génère directement le reçu sans modale pour une adhésion manuelle (est_h
         ->assertRedirect();
 
     expect(RecuFiscalEmis::count())->toBe(1);
+});
+
+// ── Garde montant 0€ : pas de bouton "Émettre" même si déductible ──
+it('n\'affiche pas le bouton "Émettre" pour une adhésion à montant 0 (palier HelloAsso offert)', function () {
+    // Cas régression Georges SAND : palier "Cotisation offerte" HelloAsso à 0€,
+    // adhésion avec deductible_fiscal=true mais montant_facial=0 → pas de reçu possible.
+    $adhesion = creerAdhesionDeductiblePayee([], ['montant_facial' => 0]);
+
+    Livewire::test(AdhesionComponent::class, ['tiers' => $adhesion->tiers])
+        ->assertDontSee('Émettre');
 });
 
 // ── UX erreur : adresse incomplète → propriété recuFiscalError, pas d'exception 500 ──

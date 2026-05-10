@@ -37,6 +37,12 @@ final class RecuFiscalService
             throw RecuFiscalException::sansSousCategorie();
         }
 
+        // Garde montant > 0 : un don ou une cotisation à 0€ (palier HelloAsso "offert"
+        // par exemple) ne peut pas donner droit à un reçu fiscal — pas de versement.
+        if ((float) $ligne->montant <= 0) {
+            throw RecuFiscalException::montantNul();
+        }
+
         $transaction = $ligne->transaction;
 
         if (! $transaction->statut_reglement->isEncaisse()) {

@@ -98,9 +98,15 @@ final class AdhesionService
      */
     private function resolveFormule(Transaction $tx, TransactionLigne $ligneCotisation): ?FormuleAdhesion
     {
-        // Priorité 1 : HelloAsso — formule auto-créée par la sync
-        if ($tx->helloasso_payment_id !== null
-            && $tx->helloasso_form_slug !== null
+        // Priorité 1 : HelloAsso — formule auto-créée par la sync.
+        // helloasso_form_slug n'est posé QUE par HelloAssoSyncService → la présence des
+        // 2 colonnes (form_slug sur transaction, tier_id sur ligne) suffit à garantir
+        // que cette transaction vient de HelloAsso. Ne PAS conditionner sur
+        // helloasso_payment_id : les paliers HelloAsso à 0€ (cotisations offertes,
+        // par ex. tier "Cotisation offerte" sur un form Membership) n'ont pas de
+        // payment_id côté HA → la garde précédente faisait tomber ces cas en prio 2
+        // (formule manuelle), avec un mauvais snapshot fiscal.
+        if ($tx->helloasso_form_slug !== null
             && $ligneCotisation->helloasso_tier_id !== null) {
             $formule = FormuleAdhesion::query()
                 ->where('helloasso_form_slug', $tx->helloasso_form_slug)

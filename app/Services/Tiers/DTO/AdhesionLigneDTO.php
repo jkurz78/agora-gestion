@@ -45,9 +45,14 @@ final class AdhesionLigneDTO
 
     public function peutEmettreRecu(Association $asso): bool
     {
+        // Garde montant > 0 : un palier HelloAsso "offert" ou une cotisation manuelle
+        // à 0€ ne peut jamais donner droit à un reçu fiscal (pas de versement).
+        $montantFacial = (float) ($this->adhesion->montant_facial ?? 0);
+
         return $asso->eligible_recu_fiscal
             && $this->adhesion->transaction_id !== null
             && $this->adhesion->deductible_fiscal
+            && $montantFacial > 0
             && $this->recuFiscalActif() === null;
     }
 }

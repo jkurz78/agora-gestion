@@ -42,4 +42,9 @@ final class RecuFiscalException extends RuntimeException
     {
         return new self('Cette adhésion n\'est pas marquée comme déductible fiscalement.');
     }
+
+    public static function montantNul(): self
+    {
+        return new self('Le montant doit être strictement positif pour donner droit à un reçu fiscal.');
+    }
 }
