@@ -99,6 +99,51 @@ it('sauvegarderEtSuite persiste operation: pour Registration', function (): void
     expect($formEvent->sous_categorie_id)->toBeNull();
 });
 
+it('étape 1 : sépare les forms Membership/Donation et Registration en 2 tableaux distincts', function (): void {
+    HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => $this->parametres->id,
+        'form_slug' => 'don-2025',
+        'form_type' => 'Donation',
+        'form_title' => 'Dons 2025',
+    ]);
+    HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => $this->parametres->id,
+        'form_slug' => 'event-2025',
+        'form_type' => 'Registration',
+        'form_title' => 'Stage Reiki octobre',
+    ]);
+
+    $component = Livewire::actingAs($this->user)
+        ->test(HelloassoSyncWizard::class)
+        ->set('formsLoaded', true);
+
+    $html = $component->html();
+    expect($html)->toContain('Adhésions et dons')
+        ->and($html)->toContain('Événements (inscriptions)')
+        ->and($html)->toContain('Cotisation 2025') // Membership row
+        ->and($html)->toContain('Dons 2025') // Donation row
+        ->and($html)->toContain('Stage Reiki octobre'); // Registration row
+});
+
+it('étape 1 : seuls les forms Registration ont le bouton "créer opération"', function (): void {
+    HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => $this->parametres->id,
+        'form_slug' => 'event-2025',
+        'form_type' => 'Registration',
+        'form_title' => 'Stage Reiki',
+    ]);
+
+    $html = Livewire::actingAs($this->user)
+        ->test(HelloassoSyncWizard::class)
+        ->set('formsLoaded', true)
+        ->html();
+
+    // Le bouton "Créer opération" n'a pas de texte distinctif → on cible son
+    // titre + l'action openCreateOperation. Il existe au moins une occurrence
+    // (le form Registration), pas plus pour le Membership de beforeEach.
+    expect(substr_count($html, 'openCreateOperation'))->toBe(1);
+});
+
 it('un form imported_at est verrouillé : son action ne peut plus être changée', function (): void {
     $this->formMembership->update([
         'imported_at' => now(),

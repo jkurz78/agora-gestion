@@ -575,8 +575,18 @@ final class HelloassoSyncWizard extends Component
 
         $formMappings = $query?->get() ?? collect();
 
+        // Split par usage métier : Adhésions/Dons (Membership+Donation) vs Événements (Registration)
+        // vs Autres (autres types — rare). Le bouton "créer opération inline" n'existe que pour
+        // Événements ; le sélecteur sous-catégorie n'existe que pour Adhésions/Dons.
+        $adhesionsDonsForms = $formMappings->whereIn('form_type', ['Membership', 'Donation'])->values();
+        $evenementsForms = $formMappings->where('form_type', 'Registration')->values();
+        $autresForms = $formMappings->whereNotIn('form_type', ['Membership', 'Donation', 'Registration'])->values();
+
         return view('livewire.banques.helloasso-sync-wizard', [
             'formMappings' => $formMappings,
+            'adhesionsDonsForms' => $adhesionsDonsForms,
+            'evenementsForms' => $evenementsForms,
+            'autresForms' => $autresForms,
             'operations' => Operation::with('typeOperation')->orderBy('nom')->get(),
             'typeOperations' => TypeOperation::actif()->orderBy('nom')->get(),
             'sousCategoriesParUsage' => [

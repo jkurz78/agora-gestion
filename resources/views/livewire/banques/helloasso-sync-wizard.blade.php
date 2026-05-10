@@ -69,82 +69,161 @@
                         @if ($formMappings->isEmpty())
                             <p class="text-muted">Aucun formulaire trouvé pour cet exercice.</p>
                         @else
-                            <table class="table table-sm">
-                                <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
-                                    <tr>
-                                        <th>Formulaire</th>
-                                        <th>Type</th>
-                                        <th>Période</th>
-                                        <th>Statut</th>
-                                        <th>Opération locale</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($formMappings as $fm)
-                                        <tr wire:key="fm-{{ $fm->id }}">
-                                            <td class="small">{{ $fm->form_title ?? $fm->form_slug }}</td>
-                                            <td class="small"><span class="badge text-bg-secondary">{{ $fm->form_type }}</span></td>
-                                            <td class="small text-nowrap">
-                                                @if ($fm->start_date || $fm->end_date)
-                                                    {{ $fm->start_date?->format('d/m/Y') ?? '—' }}
-                                                    → {{ $fm->end_date?->format('d/m/Y') ?? '…' }}
-                                                @else
-                                                    <span class="text-muted">—</span>
-                                                @endif
-                                            </td>
-                                            <td class="small">
-                                                @if ($fm->state)
-                                                    @php
-                                                        $badgeClass = match($fm->state) {
-                                                            'Public' => 'text-bg-success',
-                                                            'Draft' => 'text-bg-warning',
-                                                            'Private' => 'text-bg-info',
-                                                            'Disabled' => 'text-bg-danger',
-                                                            default => 'text-bg-secondary',
-                                                        };
-                                                    @endphp
-                                                    <span class="badge {{ $badgeClass }}">{{ $fm->state }}</span>
-                                                @else
-                                                    <span class="text-muted">—</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if ($fm->imported_at !== null)
-                                                    {{-- Verrouillé --}}
-                                                    <div class="d-flex align-items-center gap-2">
-                                                        <span class="badge text-bg-success"><i class="bi bi-lock-fill"></i> Importé</span>
-                                                        <span class="small text-muted">
-                                                            @if ($fm->sous_categorie_id)
-                                                                dans {{ $fm->sousCategorie?->nom ?? '—' }}
-                                                            @elseif ($fm->operation_id)
-                                                                lié à {{ $fm->operation?->nom ?? '—' }}
-                                                            @endif
-                                                        </span>
-                                                    </div>
-                                                @else
-                                                    <div class="d-flex gap-1 align-items-center">
+                            {{-- Tableau 1 : Adhésions et dons --}}
+                            @if ($adhesionsDonsForms->isNotEmpty())
+                                <h6 class="fw-semibold mt-2 mb-1">
+                                    <i class="bi bi-people me-1"></i> Adhésions et dons
+                                </h6>
+                                <p class="text-muted small mb-2">
+                                    Sélectionnez la sous-catégorie qui recevra les recettes de chaque
+                                    formulaire. Les paliers HelloAsso (formules d'adhésion) seront
+                                    auto-créés à la synchronisation.
+                                </p>
+                                <table class="table table-sm">
+                                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                        <tr>
+                                            <th>Formulaire</th>
+                                            <th>Type</th>
+                                            <th>Période</th>
+                                            <th>Statut</th>
+                                            <th>Sous-catégorie cible</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($adhesionsDonsForms as $fm)
+                                            <tr wire:key="fm-ad-{{ $fm->id }}">
+                                                <td class="small">{{ $fm->form_title ?? $fm->form_slug }}</td>
+                                                <td class="small">
+                                                    <span class="badge {{ $fm->form_type === 'Membership' ? 'text-bg-primary' : 'text-bg-info' }}">
+                                                        {{ $fm->form_type === 'Membership' ? 'Adhésion' : 'Don' }}
+                                                    </span>
+                                                </td>
+                                                <td class="small text-nowrap">
+                                                    @if ($fm->start_date || $fm->end_date)
+                                                        {{ $fm->start_date?->format('d/m/Y') ?? '—' }}
+                                                        → {{ $fm->end_date?->format('d/m/Y') ?? '…' }}
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
+                                                <td class="small">
+                                                    @if ($fm->state)
+                                                        @php
+                                                            $badgeClass = match($fm->state) {
+                                                                'Public' => 'text-bg-success',
+                                                                'Draft' => 'text-bg-warning',
+                                                                'Private' => 'text-bg-info',
+                                                                'Disabled' => 'text-bg-danger',
+                                                                default => 'text-bg-secondary',
+                                                            };
+                                                        @endphp
+                                                        <span class="badge {{ $badgeClass }}">{{ $fm->state }}</span>
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if ($fm->imported_at !== null)
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <span class="badge text-bg-success"><i class="bi bi-lock-fill"></i> Importé</span>
+                                                            <span class="small text-muted">
+                                                                @if ($fm->sous_categorie_id)
+                                                                    dans {{ $fm->sousCategorie?->nom ?? '—' }}
+                                                                @endif
+                                                            </span>
+                                                        </div>
+                                                    @else
+                                                        @php
+                                                            $scs = $fm->form_type === 'Membership'
+                                                                ? ($sousCategoriesParUsage['Cotisation'] ?? collect())
+                                                                : ($sousCategoriesParUsage['Don'] ?? collect());
+                                                        @endphp
                                                         <select wire:change="mettreAJourAction({{ $fm->id }}, $event.target.value)"
                                                                 class="form-select form-select-sm">
                                                             <option value="">— À configurer —</option>
                                                             <option value="ignore" @selected(($formActions[$fm->id] ?? '') === 'ignore')>Ignorer ce formulaire</option>
+                                                            @if ($scs->isNotEmpty())
+                                                                <optgroup label="Importer dans la sous-catégorie">
+                                                                    @foreach ($scs as $sc)
+                                                                        <option value="souscat:{{ $sc->id }}"
+                                                                            @selected(($formActions[$fm->id] ?? '') === 'souscat:'.$sc->id)>
+                                                                            {{ $sc->nom }}
+                                                                        </option>
+                                                                    @endforeach
+                                                                </optgroup>
+                                                            @endif
+                                                        </select>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            @endif
 
-                                                            @if (in_array($fm->form_type, ['Membership', 'Donation'], true))
-                                                                @php
-                                                                    $scs = $fm->form_type === 'Membership'
-                                                                        ? ($sousCategoriesParUsage['Cotisation'] ?? collect())
-                                                                        : ($sousCategoriesParUsage['Don'] ?? collect());
-                                                                @endphp
-                                                                @if ($scs->isNotEmpty())
-                                                                    <optgroup label="Importer dans (sous-catégorie)">
-                                                                        @foreach ($scs as $sc)
-                                                                            <option value="souscat:{{ $sc->id }}"
-                                                                                @selected(($formActions[$fm->id] ?? '') === 'souscat:'.$sc->id)>
-                                                                                {{ $sc->nom }}
-                                                                            </option>
-                                                                        @endforeach
-                                                                    </optgroup>
+                            {{-- Tableau 2 : Événements (Registration) --}}
+                            @if ($evenementsForms->isNotEmpty())
+                                <h6 class="fw-semibold mt-3 mb-1">
+                                    <i class="bi bi-calendar-event me-1"></i> Événements (inscriptions)
+                                </h6>
+                                <p class="text-muted small mb-2">
+                                    Liez chaque formulaire d'inscription à une opération existante,
+                                    ou créez-en une à la volée. La sync importera les inscrits comme
+                                    participants de l'opération.
+                                </p>
+                                <table class="table table-sm">
+                                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                        <tr>
+                                            <th>Formulaire</th>
+                                            <th>Période</th>
+                                            <th>Statut</th>
+                                            <th>Opération liée</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($evenementsForms as $fm)
+                                            <tr wire:key="fm-ev-{{ $fm->id }}">
+                                                <td class="small">{{ $fm->form_title ?? $fm->form_slug }}</td>
+                                                <td class="small text-nowrap">
+                                                    @if ($fm->start_date || $fm->end_date)
+                                                        {{ $fm->start_date?->format('d/m/Y') ?? '—' }}
+                                                        → {{ $fm->end_date?->format('d/m/Y') ?? '…' }}
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
+                                                <td class="small">
+                                                    @if ($fm->state)
+                                                        @php
+                                                            $badgeClass = match($fm->state) {
+                                                                'Public' => 'text-bg-success',
+                                                                'Draft' => 'text-bg-warning',
+                                                                'Private' => 'text-bg-info',
+                                                                'Disabled' => 'text-bg-danger',
+                                                                default => 'text-bg-secondary',
+                                                            };
+                                                        @endphp
+                                                        <span class="badge {{ $badgeClass }}">{{ $fm->state }}</span>
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if ($fm->imported_at !== null)
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <span class="badge text-bg-success"><i class="bi bi-lock-fill"></i> Importé</span>
+                                                            <span class="small text-muted">
+                                                                @if ($fm->operation_id)
+                                                                    lié à {{ $fm->operation?->nom ?? '—' }}
                                                                 @endif
-                                                            @elseif ($fm->form_type === 'Registration')
+                                                            </span>
+                                                        </div>
+                                                    @else
+                                                        <div class="d-flex gap-1 align-items-center">
+                                                            <select wire:change="mettreAJourAction({{ $fm->id }}, $event.target.value)"
+                                                                    class="form-select form-select-sm">
+                                                                <option value="">— À configurer —</option>
+                                                                <option value="ignore" @selected(($formActions[$fm->id] ?? '') === 'ignore')>Ignorer ce formulaire</option>
                                                                 <optgroup label="Lier à l'opération">
                                                                     @foreach ($operations->groupBy(fn ($op) => $op->typeOperation?->nom ?? 'Sans type') as $typeName => $ops)
                                                                         <optgroup label="{{ $typeName }}">
@@ -157,66 +236,111 @@
                                                                         </optgroup>
                                                                     @endforeach
                                                                 </optgroup>
-                                                            @endif
-                                                        </select>
-
-                                                        @if ($fm->form_type === 'Registration')
+                                                            </select>
                                                             <button wire:click="openCreateOperation({{ $fm->id }})"
                                                                     class="btn btn-sm btn-outline-primary" title="Créer une opération"
                                                                     style="padding:.15rem .5rem">
                                                                 <i class="bi bi-plus-lg"></i>
                                                             </button>
-                                                        @endif
-                                                    </div>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                        @if ($creatingOperationForMapping === $fm->id)
-                                            <tr wire:key="create-op-{{ $fm->id }}">
-                                                <td colspan="5">
-                                                    <div class="bg-light rounded p-3">
-                                                        <h6 class="mb-2"><i class="bi bi-plus-circle me-1"></i> Nouvelle opération</h6>
-                                                        <div class="row g-2 align-items-end">
-                                                            <div class="col-md-3">
-                                                                <label class="form-label small">Nom *</label>
-                                                                <input type="text" wire:model="newOperationNom" class="form-control form-control-sm @error('newOperationNom') is-invalid @enderror">
-                                                                @error('newOperationNom') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                                                            </div>
-                                                            <div class="col-md-2">
-                                                                <label class="form-label small">Date début *</label>
-                                                                <x-date-input name="new_op_debut" wire:model="newOperationDateDebut" :value="$newOperationDateDebut" />
-                                                                @error('newOperationDateDebut') <div class="text-danger small">{{ $message }}</div> @enderror
-                                                            </div>
-                                                            <div class="col-md-2">
-                                                                <label class="form-label small">Date fin</label>
-                                                                <x-date-input name="new_op_fin" wire:model="newOperationDateFin" :value="$newOperationDateFin" />
-                                                            </div>
-                                                            <div class="col-md-3">
-                                                                <label class="form-label small">Type d'opération <span class="text-danger">*</span></label>
-                                                                <select wire:model="newOperationTypeOperationId" class="form-select form-select-sm @error('newOperationTypeOperationId') is-invalid @enderror">
-                                                                    <option value="">— Sélectionner —</option>
-                                                                    @foreach ($typeOperations as $type)
-                                                                        <option value="{{ $type->id }}">{{ $type->nom }}</option>
-                                                                    @endforeach
-                                                                </select>
-                                                                @error('newOperationTypeOperationId') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                                                            </div>
-                                                            <div class="col-md-2 d-flex gap-1">
-                                                                <button wire:click="storeOperation" class="btn btn-sm btn-success">
-                                                                    <i class="bi bi-check-lg"></i> Créer
-                                                                </button>
-                                                                <button wire:click="cancelCreateOperation" class="btn btn-sm btn-outline-secondary">
-                                                                    <i class="bi bi-x-lg"></i>
-                                                                </button>
-                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    @endif
                                                 </td>
                                             </tr>
-                                        @endif
-                                    @endforeach
-                                </tbody>
-                            </table>
+                                            @if ($creatingOperationForMapping === $fm->id)
+                                                <tr wire:key="create-op-{{ $fm->id }}">
+                                                    <td colspan="4">
+                                                        <div class="bg-light rounded p-3">
+                                                            <h6 class="mb-2"><i class="bi bi-plus-circle me-1"></i> Nouvelle opération</h6>
+                                                            <div class="row g-2 align-items-end">
+                                                                <div class="col-md-3">
+                                                                    <label class="form-label small">Nom *</label>
+                                                                    <input type="text" wire:model="newOperationNom" class="form-control form-control-sm @error('newOperationNom') is-invalid @enderror">
+                                                                    @error('newOperationNom') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                                                </div>
+                                                                <div class="col-md-2">
+                                                                    <label class="form-label small">Date début *</label>
+                                                                    <x-date-input name="new_op_debut" wire:model="newOperationDateDebut" :value="$newOperationDateDebut" />
+                                                                    @error('newOperationDateDebut') <div class="text-danger small">{{ $message }}</div> @enderror
+                                                                </div>
+                                                                <div class="col-md-2">
+                                                                    <label class="form-label small">Date fin</label>
+                                                                    <x-date-input name="new_op_fin" wire:model="newOperationDateFin" :value="$newOperationDateFin" />
+                                                                </div>
+                                                                <div class="col-md-3">
+                                                                    <label class="form-label small">Type d'opération <span class="text-danger">*</span></label>
+                                                                    <select wire:model="newOperationTypeOperationId" class="form-select form-select-sm @error('newOperationTypeOperationId') is-invalid @enderror">
+                                                                        <option value="">— Sélectionner —</option>
+                                                                        @foreach ($typeOperations as $type)
+                                                                            <option value="{{ $type->id }}">{{ $type->nom }}</option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                    @error('newOperationTypeOperationId') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                                                </div>
+                                                                <div class="col-md-2 d-flex gap-1">
+                                                                    <button wire:click="storeOperation" class="btn btn-sm btn-success">
+                                                                        <i class="bi bi-check-lg"></i> Créer
+                                                                    </button>
+                                                                    <button wire:click="cancelCreateOperation" class="btn btn-sm btn-outline-secondary">
+                                                                        <i class="bi bi-x-lg"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            @endif
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            @endif
+
+                            {{-- Tableau 3 : Autres types (rare — Shop, CrowdFunding, …) --}}
+                            @if ($autresForms->isNotEmpty())
+                                <h6 class="fw-semibold mt-3 mb-1">
+                                    <i class="bi bi-three-dots me-1"></i> Autres formulaires
+                                </h6>
+                                <p class="text-muted small mb-2">
+                                    Types non gérés par AgoraGestion. Ignorez-les pour qu'ils ne
+                                    soient pas synchronisés.
+                                </p>
+                                <table class="table table-sm">
+                                    <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">
+                                        <tr>
+                                            <th>Formulaire</th>
+                                            <th>Type</th>
+                                            <th>Période</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($autresForms as $fm)
+                                            <tr wire:key="fm-au-{{ $fm->id }}">
+                                                <td class="small">{{ $fm->form_title ?? $fm->form_slug }}</td>
+                                                <td class="small"><span class="badge text-bg-secondary">{{ $fm->form_type }}</span></td>
+                                                <td class="small text-nowrap">
+                                                    @if ($fm->start_date || $fm->end_date)
+                                                        {{ $fm->start_date?->format('d/m/Y') ?? '—' }}
+                                                        → {{ $fm->end_date?->format('d/m/Y') ?? '…' }}
+                                                    @else
+                                                        <span class="text-muted">—</span>
+                                                    @endif
+                                                </td>
+                                                <td>
+                                                    @if ($fm->imported_at !== null)
+                                                        <span class="badge text-bg-success"><i class="bi bi-lock-fill"></i> Importé</span>
+                                                    @else
+                                                        <select wire:change="mettreAJourAction({{ $fm->id }}, $event.target.value)"
+                                                                class="form-select form-select-sm">
+                                                            <option value="">— À configurer —</option>
+                                                            <option value="ignore" @selected(($formActions[$fm->id] ?? '') === 'ignore')>Ignorer ce formulaire</option>
+                                                        </select>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            @endif
                         @endif
 
                         <div class="d-flex justify-content-end mt-3">
