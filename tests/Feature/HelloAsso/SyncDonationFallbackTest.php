@@ -7,9 +7,11 @@ use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoFormMapping;
 use App\Models\HelloAssoParametres;
+use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\TypeOperation;
 use App\Services\HelloAssoSyncService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Http;
@@ -91,6 +93,51 @@ it('un don additionnel dans un order Membership tombe dans la sous-cat fallback 
 
     $ligneDon = $tx->lignes()->where('helloasso_item_id', 1235)->first();
     expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scDon->id);
+});
+
+it('un don additionnel dans un order Event tombe dans la sous-cat fallback Don (pas formation) et est détaché de l\'opération', function (): void {
+    // Reproduit le bug observé sur HA-52045 : un don de 20€ joint à une inscription
+    // formation tombait dans la sous-cat de l'opération (formation), alors qu'il
+    // devrait suivre la sous-cat fallback Don.
+    $scFormation = SousCategorie::factory()->create();
+    $typeFormation = TypeOperation::factory()->create(['sous_categorie_id' => $scFormation->id]);
+    $operation = Operation::factory()->create(['type_operation_id' => $typeFormation->id]);
+
+    $formEvent = HelloAssoFormMapping::create([
+        'helloasso_parametres_id' => $this->parametres->id,
+        'form_slug' => 'stage-reiki',
+        'form_type' => 'Event',
+        'form_title' => 'Stage Reiki',
+        'operation_id' => $operation->id,
+    ]);
+
+    $order = [
+        'id' => 52045,
+        'date' => '2025-10-15T10:00:00Z',
+        'formSlug' => 'stage-reiki',
+        'formType' => 'Event',
+        'payments' => [['id' => 8001, 'paymentMeans' => 'Card']],
+        'user' => null,
+        'payer' => ['firstName' => 'Jean', 'lastName' => 'DUPONT'],
+        'items' => [
+            ['id' => 2001, 'amount' => 8000, 'type' => 'Registration', 'user' => ['firstName' => 'Jean', 'lastName' => 'DUPONT']],
+            ['id' => 2002, 'amount' => 2000, 'type' => 'Donation', 'user' => ['firstName' => 'Jean', 'lastName' => 'DUPONT']],
+        ],
+    ];
+
+    $service = new HelloAssoSyncService($this->parametres);
+    $service->synchroniser([$order], 2025);
+
+    $tx = Transaction::first();
+    expect($tx->lignes()->count())->toBe(2);
+
+    $ligneInscription = $tx->lignes()->where('helloasso_item_id', 2001)->first();
+    expect((int) $ligneInscription->sous_categorie_id)->toBe((int) $scFormation->id)
+        ->and((int) $ligneInscription->operation_id)->toBe((int) $operation->id);
+
+    $ligneDon = $tx->lignes()->where('helloasso_item_id', 2002)->first();
+    expect((int) $ligneDon->sous_categorie_id)->toBe((int) $this->scDon->id)
+        ->and($ligneDon->operation_id)->toBeNull(); // détaché de l'opération
 });
 
 it('échoue si fallback Don non configuré et un don additionnel apparaît sans sous-cat form', function (): void {

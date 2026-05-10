@@ -355,27 +355,35 @@ final class HelloAssoSyncService
     {
         $type = $item['type'] ?? 'Donation';
         $operationId = $this->formMappingCache[$formSlug] ?? null;
+        $formMapping = null;
 
         // Registration items require an operation
         if ($type === 'Registration' && $operationId === null) {
             throw new \RuntimeException("Formulaire '{$formSlug}' non mappé — impossible d'importer un item Registration sans opération");
         }
 
-        // Use operation's sous-catégorie if set, otherwise fall back to form mapping sous-catégorie
         $sousCategorieId = null;
-        if ($operationId !== null) {
-            $sousCategorieId = $this->getOperationSousCategorieId($operationId);
-        }
 
-        // Fallback : si l'item est un Donation dans un form qui n'est pas de type Donation,
-        // utiliser la sous-catégorie de fallback "don additionnel" configurée dans les paramètres.
-        if ($sousCategorieId === null && $type === 'Donation') {
+        // Cas spécial : un don additionnel (item.type='Donation') dans un form NON Donation
+        // (Membership ou Event) ne suit PAS la sous-cat de la cotisation/opération — il
+        // atterrit dans la sous-cat fallback "don additionnel" et n'est pas rattaché à
+        // l'opération (fiscalement indépendant). Doit passer AVANT la résolution opération
+        // sinon Event mappé à une opération masquerait le fallback (le don tombait dans la
+        // sous-cat de l'opération — bug observé sur HA-52045).
+        if ($type === 'Donation') {
             $formMapping = HelloAssoFormMapping::where('form_slug', $formSlug)->first();
             if ($formMapping?->form_type !== 'Donation') {
                 $sousCategorieId = $this->parametres->sous_categorie_don_id;
+                $operationId = null;
             }
         }
 
+        // Sinon : sous-cat de l'opération si form mappé à une opération
+        if ($sousCategorieId === null && $operationId !== null) {
+            $sousCategorieId = $this->getOperationSousCategorieId($operationId);
+        }
+
+        // Sinon : fallback sur la sous-cat configurée au niveau du form mapping
         if ($sousCategorieId === null) {
             $formMapping ??= HelloAssoFormMapping::where('form_slug', $formSlug)->first();
             $sousCategorieId = $formMapping?->sous_categorie_id;
