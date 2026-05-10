@@ -26,8 +26,9 @@ afterEach(function () {
 it('has sync config columns on helloasso_parametres', function () {
     expect(Schema::hasColumn('helloasso_parametres', 'compte_helloasso_id'))->toBeTrue();
     expect(Schema::hasColumn('helloasso_parametres', 'compte_versement_id'))->toBeTrue();
-    // Colonnes sous_categorie_*_id globales supprimées en Phase 6 (slice 3d) — portées par helloasso_form_mappings
-    expect(Schema::hasColumn('helloasso_parametres', 'sous_categorie_don_id'))->toBeFalse();
+    // sous_categorie_don_id réintroduit en Lot A (fallback Donation hors form Donation)
+    expect(Schema::hasColumn('helloasso_parametres', 'sous_categorie_don_id'))->toBeTrue();
+    // Colonnes sous_categorie_cotisation_id / inscription_id restent supprimées (portées par helloasso_form_mappings)
     expect(Schema::hasColumn('helloasso_parametres', 'sous_categorie_cotisation_id'))->toBeFalse();
     expect(Schema::hasColumn('helloasso_parametres', 'sous_categorie_inscription_id'))->toBeFalse();
 });

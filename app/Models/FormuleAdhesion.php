@@ -29,6 +29,8 @@ final class FormuleAdhesion extends TenantModel
         'est_helloasso',
         'helloasso_form_slug',
         'helloasso_tier_id',
+        'helloasso_start_date',
+        'helloasso_end_date',
     ];
 
     protected $casts = [
@@ -40,6 +42,8 @@ final class FormuleAdhesion extends TenantModel
         'actif' => 'boolean',
         'est_helloasso' => 'boolean',
         'helloasso_tier_id' => 'integer',
+        'helloasso_start_date' => 'date',
+        'helloasso_end_date' => 'date',
     ];
 
     protected static function booted(): void

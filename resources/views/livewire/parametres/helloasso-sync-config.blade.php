@@ -54,6 +54,25 @@
                 </div>
             </div>
 
+            {{-- Fallback Don additionnel --}}
+            <h6 class="mt-4">Sous-catégorie de fallback</h6>
+            <p class="text-muted small mb-2">
+                Utilisée pour les <strong>dons additionnels</strong> (montant libre ajouté au paiement
+                d'une cotisation). Pas nécessaire si tes adhérents ne peuvent pas ajouter de don sur tes
+                formulaires HelloAsso.
+            </p>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label class="form-label small">Don additionnel (Donation libre)</label>
+                    <select wire:model="sousCategorieDonId" class="form-select form-select-sm">
+                        <option value="">— Aucun —</option>
+                        @foreach($sousCategoriesDon as $sc)
+                            <option value="{{ $sc->id }}">{{ $sc->nom }}@if($sc->code_cerfa) ({{ $sc->code_cerfa }})@endif</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
             <button wire:click="sauvegarder" class="btn btn-sm btn-primary">
                 <i class="bi bi-check-lg me-1"></i> Enregistrer la configuration
             </button>

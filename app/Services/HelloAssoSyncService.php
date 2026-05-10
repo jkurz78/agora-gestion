@@ -171,6 +171,8 @@ final class HelloAssoSyncService
                                 $tier,
                                 $formDetail['validityType'] ?? null,
                                 (int) $formMapping->sous_categorie_id,
+                                $formDetail['startDate'] ?? null,
+                                $formDetail['endDate'] ?? null,
                             );
                         }
                     }
@@ -356,8 +358,18 @@ final class HelloAssoSyncService
         if ($operationId !== null) {
             $sousCategorieId = $this->getOperationSousCategorieId($operationId);
         }
-        if ($sousCategorieId === null) {
+
+        // Fallback : si l'item est un Donation dans un form qui n'est pas de type Donation,
+        // utiliser la sous-catégorie de fallback "don additionnel" configurée dans les paramètres.
+        if ($sousCategorieId === null && $type === 'Donation') {
             $formMapping = HelloAssoFormMapping::where('form_slug', $formSlug)->first();
+            if ($formMapping?->form_type !== 'Donation') {
+                $sousCategorieId = $this->parametres->sous_categorie_don_id;
+            }
+        }
+
+        if ($sousCategorieId === null) {
+            $formMapping ??= HelloAssoFormMapping::where('form_slug', $formSlug)->first();
             $sousCategorieId = $formMapping?->sous_categorie_id;
         }
 
@@ -442,19 +454,29 @@ final class HelloAssoSyncService
      *
      * @param  array<string, mixed>  $tier
      */
-    private function firstOrCreateFormule(string $formSlug, array $tier, ?string $validityType, int $sousCategorieId): ?FormuleAdhesion
-    {
+    private function firstOrCreateFormule(
+        string $formSlug,
+        array $tier,
+        ?string $validityType,
+        int $sousCategorieId,
+        ?string $startDate = null,
+        ?string $endDate = null,
+    ): ?FormuleAdhesion {
         $tierId = (int) ($tier['id'] ?? 0);
         if ($tierId === 0) {
             return null;
         }
 
+        // Custom → durée avec dates fixes du form HelloAsso (pas de duree_mois)
         $mode = match ($validityType) {
             'MovingYear' => 'duree',
-            'Custom' => 'exercice',
+            'Custom' => 'duree',
             'Illimited' => 'illimite',
             default => 'exercice',
         };
+
+        // Pour MovingYear : 12 mois glissants. Pour Custom : durée fixe via dates, pas de duree_mois.
+        $dureeMois = ($validityType === 'MovingYear') ? 12 : null;
 
         return FormuleAdhesion::updateOrCreate(
             [
@@ -465,7 +487,9 @@ final class HelloAssoSyncService
                 'association_id' => TenantContext::currentId(),
                 'nom' => $tier['label'] ?? "Tier {$tierId}",
                 'mode' => $mode,
-                'duree_mois' => $mode === 'duree' ? 12 : null,
+                'duree_mois' => $dureeMois,
+                'helloasso_start_date' => $validityType === 'Custom' ? $startDate : null,
+                'helloasso_end_date' => $validityType === 'Custom' ? $endDate : null,
                 'montant_par_defaut' => isset($tier['price']) ? round($tier['price'] / 100, 2) : null,
                 'deductible_fiscal' => (bool) ($tier['isEligibleTaxReceipt'] ?? false),
                 'sous_categorie_id' => $sousCategorieId,

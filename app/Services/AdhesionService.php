@@ -125,7 +125,19 @@ final class AdhesionService
      */
     private function computeDatesEtExercice(Transaction $tx, ?FormuleAdhesion $formule): array
     {
-        if ($formule !== null && $formule->isModeDuree()) {
+        // Mode durée avec dates HelloAsso explicites (Custom) → utiliser les dates du form
+        if ($formule !== null && $formule->isModeDuree() && $formule->helloasso_start_date !== null) {
+            return [
+                'exercice' => null,
+                'date_debut' => CarbonImmutable::parse($formule->helloasso_start_date),
+                'date_fin' => $formule->helloasso_end_date !== null
+                    ? CarbonImmutable::parse($formule->helloasso_end_date)
+                    : null,
+            ];
+        }
+
+        // Mode durée avec duree_mois → calcul depuis tx.date
+        if ($formule !== null && $formule->isModeDuree() && $formule->duree_mois !== null) {
             $debut = CarbonImmutable::parse($tx->date);
             $fin = $debut->addMonths((int) $formule->duree_mois)->subDay();
 
@@ -146,10 +158,16 @@ final class AdhesionService
             ];
         }
 
+        // Mode exercice (ou pas de formule = legacy) → exercice + dates calculées depuis exercice asso
+        $exercice = $this->exerciceFromDate($tx->date);
+        $exerciceMoisDebut = TenantContext::current()?->exercice_mois_debut ?? 9;
+        $debutExercice = CarbonImmutable::create($exercice, $exerciceMoisDebut, 1);
+        $finExercice = $debutExercice->addYear()->subDay();
+
         return [
-            'exercice' => $this->exerciceFromDate($tx->date),
-            'date_debut' => null,
-            'date_fin' => null,
+            'exercice' => $exercice,
+            'date_debut' => $debutExercice,
+            'date_fin' => $finExercice,
         ];
     }
 
@@ -221,7 +239,14 @@ final class AdhesionService
 
         return DB::transaction(function () use ($dto, $createur, $formule): Adhesion {
             // 1. Calcul dates / exercice
-            if ($formule->isModeDuree()) {
+            if ($formule->isModeDuree() && $formule->helloasso_start_date !== null) {
+                // Durée avec dates HelloAsso explicites (Custom)
+                $dateDebut = Carbon::parse($formule->helloasso_start_date);
+                $dateFin = $formule->helloasso_end_date !== null
+                    ? Carbon::parse($formule->helloasso_end_date)
+                    : null;
+                $exercice = null;
+            } elseif ($formule->isModeDuree()) {
                 $dateDebut = $dto->dateDebut ?? Carbon::today();
                 $dateFin = $dateDebut->copy()->addMonths((int) $formule->duree_mois)->subDay();
                 $exercice = null;
@@ -230,9 +255,10 @@ final class AdhesionService
                 $dateFin = null;
                 $exercice = null;
             } else {
-                $dateDebut = null;
-                $dateFin = null;
                 $exercice = $dto->exercice ?? $this->exerciceFromDate(Carbon::today());
+                $exerciceMoisDebut = TenantContext::current()?->exercice_mois_debut ?? 9;
+                $dateDebut = Carbon::create($exercice, $exerciceMoisDebut, 1);
+                $dateFin = $dateDebut->copy()->addYear()->subDay();
             }
 
             // 2. Validation doublon (exercice) ou recouvrement (durée)

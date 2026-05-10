@@ -27,6 +27,7 @@ final class HelloAssoParametresFactory extends Factory
             'environnement' => HelloAssoEnvironnement::Sandbox,
             'compte_helloasso_id' => CompteBancaire::factory(),
             'compte_versement_id' => CompteBancaire::factory(),
+            'sous_categorie_don_id' => null,
         ];
     }
 }

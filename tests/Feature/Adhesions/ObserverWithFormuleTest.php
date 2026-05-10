@@ -35,8 +35,9 @@ it('observer applique la formule active de la sous-catégorie (priorité 2)', fu
     expect($adhesion)->not->toBeNull();
     expect($adhesion->formule_adhesion_id)->toBe($formule->id);
     expect($adhesion->exercice)->toBe(2025);
-    expect($adhesion->date_debut)->toBeNull();
-    expect($adhesion->date_fin)->toBeNull();
+    // Mode exercice : date_debut/date_fin snapshotées depuis les bornes de l'exercice (1er sept → 31 août)
+    expect($adhesion->date_debut?->toDateString())->toBe('2025-09-01');
+    expect($adhesion->date_fin?->toDateString())->toBe('2026-08-31');
     // montant_facial est capturé depuis la somme des lignes (pas montant_total de la tx)
     expect((float) $adhesion->montant_facial)->toBe(round((float) $ligne->montant, 2));
     expect($adhesion->deductible_fiscal)->toBe($formule->deductible_fiscal);
@@ -118,6 +119,9 @@ it('observer crée une adhésion legacy si pas de formule paramétrée', functio
     expect($adhesion)->not->toBeNull();
     expect($adhesion->formule_adhesion_id)->toBeNull();
     expect($adhesion->exercice)->toBe(2025);
+    // Mode exercice legacy : dates calculées depuis les bornes de l'exercice
+    expect($adhesion->date_debut?->toDateString())->toBe('2025-09-01');
+    expect($adhesion->date_fin?->toDateString())->toBe('2026-08-31');
 });
 
 it('observer reste idempotent (multi-cotisations même exercice)', function (): void {
