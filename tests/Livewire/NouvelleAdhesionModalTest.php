@@ -238,3 +238,67 @@ it('le sélecteur Compte exclut les comptes HelloAsso (saisie automatisée)', fu
     expect($html)->toContain($this->compte->nom);
     expect($html)->not->toContain('HelloAsso SVS');
 });
+
+// ─── Tests extension duree_jours (Phase 4) ───────────────────────────────────
+
+it('mode duree_jours=10 : dateFinCalculee affiche la bonne date', function (): void {
+    $this->formuleExercice->update(['actif' => false]);
+    $formuleDureeJours = FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'mode' => 'duree',
+        'duree_mois' => null,
+        'duree_jours' => 10,
+        'montant_par_defaut' => 50.00,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $formuleDureeJours->id)
+        ->set('dateDebut', '2025-09-01')
+        ->assertSet('dateFinCalculee', '2025-09-10'); // 10 jours inclusifs : 01 + 10j - 1j = 10
+});
+
+it('mode duree_jours=10 : submit crée adhésion avec dates correctes', function (): void {
+    $this->formuleExercice->update(['actif' => false]);
+    $formuleDureeJours = FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'mode' => 'duree',
+        'duree_mois' => null,
+        'duree_jours' => 10,
+        'montant_par_defaut' => 0.00,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion', gratuite: true)
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $formuleDureeJours->id)
+        ->set('dateDebut', '2025-09-01')
+        ->set('montant', 0.0)
+        ->call('submit')
+        ->assertSet('visible', false);
+
+    expect(Adhesion::count())->toBe(1);
+    $adhesion = Adhesion::first();
+    expect($adhesion->date_debut->toDateString())->toBe('2025-09-01');
+    expect($adhesion->date_fin->toDateString())->toBe('2025-09-10');
+    expect($adhesion->exercice)->toBeNull();
+});
+
+it('régression : mode duree_mois=12, dateDebut=2025-10-15 → date_fin=2026-10-14 (inchangé)', function (): void {
+    $this->formuleExercice->update(['actif' => false]);
+    $formuleDureeMois = FormuleAdhesion::factory()->modeDuree(12)->create([
+        'sous_categorie_id' => $this->sc->id,
+        'montant_par_defaut' => 50.00,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(NouvelleAdhesionModal::class)
+        ->dispatch('nouvelle-adhesion')
+        ->set('tiersId', $this->tiers->id)
+        ->set('formuleId', $formuleDureeMois->id)
+        ->set('dateDebut', '2025-10-15')
+        ->assertSet('dateFinCalculee', '2026-10-14');
+});

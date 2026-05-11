@@ -82,7 +82,7 @@ final class NouvelleAdhesionModal extends Component
     }
 
     /**
-     * Computed : date_fin = date_debut + duree_mois si formule mode durée.
+     * Computed : date_fin calculée depuis date_debut selon l'unité de la formule (mois ou jours).
      */
     #[Computed]
     public function dateFinCalculee(): ?string
@@ -95,10 +95,17 @@ final class NouvelleAdhesionModal extends Component
             return null;
         }
 
-        return Carbon::parse($this->dateDebut)
-            ->addMonths((int) $formule->duree_mois)
-            ->subDay()
-            ->toDateString();
+        $debut = Carbon::parse($this->dateDebut);
+
+        if ($formule->duree_jours !== null) {
+            return $debut->addDays((int) $formule->duree_jours)->subDay()->toDateString();
+        }
+
+        if ($formule->duree_mois !== null) {
+            return $debut->addMonths((int) $formule->duree_mois)->subDay()->toDateString();
+        }
+
+        return null;
     }
 
     public function submit(AdhesionService $service): void
