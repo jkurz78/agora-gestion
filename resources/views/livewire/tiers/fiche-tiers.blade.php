@@ -48,6 +48,8 @@
         <livewire:tiers.onglets.dons :tiers="$tiers" :key="'dons-'.$tiers->id" wire:lazy />
     @elseif($currentOnglet === 'adhesion')
         <livewire:tiers.onglets.adhesion :tiers="$tiers" :key="'adhesion-'.$tiers->id" wire:lazy />
+    @elseif($currentOnglet === 'operations')
+        <livewire:tiers.onglets.operations :tiers="$tiers" :key="'operations-'.$tiers->id" wire:lazy />
     @else
         <livewire:tiers.onglets.coordonnees :tiers="$tiers" :key="'coord-'.$tiers->id" wire:lazy />
     @endif

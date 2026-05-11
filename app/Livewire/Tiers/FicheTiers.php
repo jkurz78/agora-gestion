@@ -7,6 +7,7 @@ namespace App\Livewire\Tiers;
 use App\Models\Tiers;
 use App\Services\Tiers\TiersAdhesionTimelineService;
 use App\Services\Tiers\TiersDonsTimelineService;
+use App\Services\Tiers\TiersOperationsTimelineService;
 use Illuminate\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -43,6 +44,11 @@ final class FicheTiers extends Component
 
         if ($adhesionsCount > 0) {
             $onglets[] = ['key' => 'adhesion', 'label' => 'Adhésion', 'count' => $adhesionsCount];
+        }
+
+        $nbParticipations = app(TiersOperationsTimelineService::class)->forTiers($this->tiers)->totalCount;
+        if ($nbParticipations > 0) {
+            $onglets[] = ['key' => 'operations', 'label' => 'Opérations', 'count' => $nbParticipations];
         }
 
         $current = in_array($this->onglet, array_column($onglets, 'key'), true)
