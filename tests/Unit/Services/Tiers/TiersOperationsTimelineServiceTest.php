@@ -15,8 +15,12 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
+use App\Services\Tiers\DTO\AReferreLigneDTO;
+use App\Services\Tiers\DTO\AReferreTimelineDTO;
 use App\Services\Tiers\DTO\ParticipationLigneDTO;
 use App\Services\Tiers\DTO\ParticipationsTimelineDTO;
+use App\Services\Tiers\DTO\SuitLigneDTO;
+use App\Services\Tiers\DTO\SuitTimelineDTO;
 use App\Services\Tiers\TiersOperationsTimelineService;
 use App\Tenant\TenantContext;
 
@@ -482,4 +486,233 @@ it('exclut les paiements EnAttente du calcul', function (): void {
 
     $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
     expect($dto->lignes[0]->montantPaye())->toBe(0.0);
+});
+
+// ── Phase 7b : section "A référé" ───────────────────────────────────────────
+
+it('aReferreForTiers retourne DTO vide si tiers n\'a référé personne', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    $dto = app(TiersOperationsTimelineService::class)->aReferreForTiers($tiers);
+
+    expect($dto)->toBeInstanceOf(AReferreTimelineDTO::class)
+        ->and($dto->totalCount)->toBe(0)
+        ->and($dto->lignes)->toBe([]);
+});
+
+it('aReferreForTiers totalCount = nb de tiers DISTINCTS (pas lignes)', function (): void {
+    $referent = Tiers::factory()->create();
+    $marie = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Martin']);
+    $op1 = Operation::factory()->create();
+    $op2 = Operation::factory()->create();
+    $op3 = Operation::factory()->create();
+
+    Participant::factory()->create(['tiers_id' => $marie->id, 'operation_id' => $op1->id, 'refere_par_id' => $referent->id]);
+    Participant::factory()->create(['tiers_id' => $marie->id, 'operation_id' => $op2->id, 'refere_par_id' => $referent->id]);
+    Participant::factory()->create(['tiers_id' => $marie->id, 'operation_id' => $op3->id, 'refere_par_id' => $referent->id]);
+
+    $dto = app(TiersOperationsTimelineService::class)->aReferreForTiers($referent);
+
+    // totalCount = 1 (Marie est 1 tiers distinct), lignes = 3 (1 par lien)
+    expect($dto->totalCount)->toBe(1)
+        ->and(count($dto->lignes))->toBe(3);
+});
+
+it('aReferreForTiers trie par tiers.nom ASC', function (): void {
+    $referent = Tiers::factory()->create();
+    $tiersC = Tiers::factory()->create(['prenom' => 'Charles', 'nom' => 'Zulu']);
+    $tiersA = Tiers::factory()->create(['prenom' => 'Alice', 'nom' => 'Alpha']);
+    $tiersB = Tiers::factory()->create(['prenom' => 'Bob', 'nom' => 'Martin']);
+    $op = Operation::factory()->create();
+    $op2 = Operation::factory()->create();
+    $op3 = Operation::factory()->create();
+
+    Participant::factory()->create(['tiers_id' => $tiersC->id, 'operation_id' => $op->id, 'refere_par_id' => $referent->id]);
+    Participant::factory()->create(['tiers_id' => $tiersA->id, 'operation_id' => $op2->id, 'refere_par_id' => $referent->id]);
+    Participant::factory()->create(['tiers_id' => $tiersB->id, 'operation_id' => $op3->id, 'refere_par_id' => $referent->id]);
+
+    $dto = app(TiersOperationsTimelineService::class)->aReferreForTiers($referent);
+
+    expect($dto->lignes[0]->tiersReferreId())->toBe((int) $tiersA->id)
+        ->and($dto->lignes[1]->tiersReferreId())->toBe((int) $tiersB->id)
+        ->and($dto->lignes[2]->tiersReferreId())->toBe((int) $tiersC->id);
+});
+
+it('aReferreForTiers isole les autres tiers', function (): void {
+    $referentX = Tiers::factory()->create();
+    $referentZ = Tiers::factory()->create();
+    $tiersReferreParX = Tiers::factory()->create();
+    $tiersReferreParZ = Tiers::factory()->create();
+    $op1 = Operation::factory()->create();
+    $op2 = Operation::factory()->create();
+
+    Participant::factory()->create(['tiers_id' => $tiersReferreParX->id, 'operation_id' => $op1->id, 'refere_par_id' => $referentX->id]);
+    Participant::factory()->create(['tiers_id' => $tiersReferreParZ->id, 'operation_id' => $op2->id, 'refere_par_id' => $referentZ->id]);
+
+    $dto = app(TiersOperationsTimelineService::class)->aReferreForTiers($referentX);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and($dto->lignes[0]->tiersReferreId())->toBe((int) $tiersReferreParX->id);
+});
+
+it('aReferreForTiers isole multi-tenant', function (): void {
+    $assoB = Association::factory()->create();
+
+    // Créer des participants côté assoB
+    TenantContext::boot($assoB);
+    $referentB = Tiers::factory()->create();
+    $tiersReferreB = Tiers::factory()->create();
+    $opB = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiersReferreB->id, 'operation_id' => $opB->id, 'refere_par_id' => $referentB->id]);
+
+    // Revenir sur le tenant par défaut
+    TenantContext::boot(Association::first()->fresh());
+
+    $referentA = Tiers::factory()->create();
+    $tiersReferreA = Tiers::factory()->create();
+    $opA = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiersReferreA->id, 'operation_id' => $opA->id, 'refere_par_id' => $referentA->id]);
+
+    $dto = app(TiersOperationsTimelineService::class)->aReferreForTiers($referentA);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and($dto->lignes[0]->tiersReferreId())->toBe((int) $tiersReferreA->id);
+});
+
+it('AReferreLigneDTO expose tiersReferreNomComplet en "Prenom NOM"', function (): void {
+    $referent = Tiers::factory()->create();
+    $marie = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Dupont']);
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $marie->id, 'operation_id' => $op->id, 'refere_par_id' => $referent->id]);
+
+    $dto = app(TiersOperationsTimelineService::class)->aReferreForTiers($referent);
+
+    // accesseur Tiers::getNomAttribute applique mb_strtoupper
+    expect($dto->lignes[0]->tiersReferreNomComplet())->toBe('Marie DUPONT');
+});
+
+// ── Phase 7b : section "Suit" ────────────────────────────────────────────────
+
+it('suitForTiers retourne DTO vide si tiers ne suit personne', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    $dto = app(TiersOperationsTimelineService::class)->suitForTiers($tiers);
+
+    expect($dto)->toBeInstanceOf(SuitTimelineDTO::class)
+        ->and($dto->totalCount)->toBe(0)
+        ->and($dto->lignes)->toBe([]);
+});
+
+it('suitForTiers totalCount = tiers distincts (un tiers suivi en médecin sur 2 opérations)', function (): void {
+    $medecin = Tiers::factory()->create();
+    $patient = Tiers::factory()->create();
+    $op1 = Operation::factory()->create();
+    $op2 = Operation::factory()->create();
+
+    Participant::factory()->create(['tiers_id' => $patient->id, 'operation_id' => $op1->id, 'medecin_tiers_id' => $medecin->id]);
+    Participant::factory()->create(['tiers_id' => $patient->id, 'operation_id' => $op2->id, 'medecin_tiers_id' => $medecin->id]);
+
+    $dto = app(TiersOperationsTimelineService::class)->suitForTiers($medecin);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and(count($dto->lignes))->toBe(2);
+});
+
+it('suitForTiers cas double rôle : 1 tiers en médecin ET en thérapeute sur même opération → 2 lignes, totalCount=1', function (): void {
+    $suivi = Tiers::factory()->create();
+    $patient = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+
+    Participant::factory()->create([
+        'tiers_id' => $patient->id,
+        'operation_id' => $op->id,
+        'medecin_tiers_id' => $suivi->id,
+        'therapeute_tiers_id' => $suivi->id,
+    ]);
+
+    $dto = app(TiersOperationsTimelineService::class)->suitForTiers($suivi);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and(count($dto->lignes))->toBe(2);
+});
+
+it('suitForTiers distinct sur 2 FKs : Marie est médecin de X, Pierre est thérapeute de X → totalCount=2', function (): void {
+    $suivi = Tiers::factory()->create(); // le tiers consulté (le "praticien")
+    $patientX = Tiers::factory()->create(['prenom' => 'Patient', 'nom' => 'X']);
+    $patientY = Tiers::factory()->create(['prenom' => 'Patient', 'nom' => 'Y']);
+    $op1 = Operation::factory()->create();
+    $op2 = Operation::factory()->create();
+
+    // $suivi est médecin de patientX
+    Participant::factory()->create(['tiers_id' => $patientX->id, 'operation_id' => $op1->id, 'medecin_tiers_id' => $suivi->id]);
+    // $suivi est thérapeute de patientY
+    Participant::factory()->create(['tiers_id' => $patientY->id, 'operation_id' => $op2->id, 'therapeute_tiers_id' => $suivi->id]);
+
+    $dto = app(TiersOperationsTimelineService::class)->suitForTiers($suivi);
+
+    expect($dto->totalCount)->toBe(2)
+        ->and(count($dto->lignes))->toBe(2);
+});
+
+it('SuitLigneDTO qualiteLabel retourne Médecin ou Thérapeute', function (): void {
+    $suivi = Tiers::factory()->create();
+    $patient = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+
+    Participant::factory()->create([
+        'tiers_id' => $patient->id,
+        'operation_id' => $op->id,
+        'medecin_tiers_id' => $suivi->id,
+        'therapeute_tiers_id' => $suivi->id,
+    ]);
+
+    $dto = app(TiersOperationsTimelineService::class)->suitForTiers($suivi);
+
+    $labels = array_map(fn (SuitLigneDTO $l) => $l->qualiteLabel(), $dto->lignes);
+    expect($labels)->toContain('Médecin')
+        ->and($labels)->toContain('Thérapeute');
+});
+
+it('suitForTiers trie par tiers.nom ASC', function (): void {
+    $suivi = Tiers::factory()->create();
+    $tiersC = Tiers::factory()->create(['prenom' => 'Charles', 'nom' => 'Zulu']);
+    $tiersA = Tiers::factory()->create(['prenom' => 'Alice', 'nom' => 'Alpha']);
+    $tiersB = Tiers::factory()->create(['prenom' => 'Bob', 'nom' => 'Martin']);
+    $op1 = Operation::factory()->create();
+    $op2 = Operation::factory()->create();
+    $op3 = Operation::factory()->create();
+
+    Participant::factory()->create(['tiers_id' => $tiersC->id, 'operation_id' => $op1->id, 'medecin_tiers_id' => $suivi->id]);
+    Participant::factory()->create(['tiers_id' => $tiersA->id, 'operation_id' => $op2->id, 'therapeute_tiers_id' => $suivi->id]);
+    Participant::factory()->create(['tiers_id' => $tiersB->id, 'operation_id' => $op3->id, 'medecin_tiers_id' => $suivi->id]);
+
+    $dto = app(TiersOperationsTimelineService::class)->suitForTiers($suivi);
+
+    expect($dto->lignes[0]->tiersSuiviId())->toBe((int) $tiersA->id)
+        ->and($dto->lignes[1]->tiersSuiviId())->toBe((int) $tiersB->id)
+        ->and($dto->lignes[2]->tiersSuiviId())->toBe((int) $tiersC->id);
+});
+
+it('suitForTiers isole multi-tenant', function (): void {
+    $assoB = Association::factory()->create();
+
+    // Créer des participants côté assoB
+    TenantContext::boot($assoB);
+    $suiviB = Tiers::factory()->create();
+    $patientB = Tiers::factory()->create();
+    $opB = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $patientB->id, 'operation_id' => $opB->id, 'medecin_tiers_id' => $suiviB->id]);
+
+    // Revenir sur le tenant par défaut
+    TenantContext::boot(Association::first()->fresh());
+
+    $suiviA = Tiers::factory()->create();
+    $patientA = Tiers::factory()->create();
+    $opA = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $patientA->id, 'operation_id' => $opA->id, 'medecin_tiers_id' => $suiviA->id]);
+
+    $dto = app(TiersOperationsTimelineService::class)->suitForTiers($suiviA);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and($dto->lignes[0]->tiersSuiviId())->toBe((int) $patientA->id);
 });
