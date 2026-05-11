@@ -143,6 +143,18 @@ final class AdhesionService
             ];
         }
 
+        // Mode durée avec duree_jours → calcul depuis tx.date (branche avant duree_mois)
+        if ($formule !== null && $formule->isModeDuree() && $formule->duree_jours !== null) {
+            $debut = CarbonImmutable::parse($tx->date);
+            $fin = $debut->addDays((int) $formule->duree_jours)->subDay();
+
+            return [
+                'exercice' => null,
+                'date_debut' => $debut,
+                'date_fin' => $fin,
+            ];
+        }
+
         // Mode durée avec duree_mois → calcul depuis tx.date
         if ($formule !== null && $formule->isModeDuree() && $formule->duree_mois !== null) {
             $debut = CarbonImmutable::parse($tx->date);
@@ -252,6 +264,11 @@ final class AdhesionService
                 $dateFin = $formule->helloasso_end_date !== null
                     ? Carbon::parse($formule->helloasso_end_date)
                     : null;
+                $exercice = null;
+            } elseif ($formule->isModeDuree() && $formule->duree_jours !== null) {
+                // Durée en jours (branche avant duree_mois)
+                $dateDebut = $dto->dateDebut ?? Carbon::today();
+                $dateFin = $dateDebut->copy()->addDays((int) $formule->duree_jours)->subDay();
                 $exercice = null;
             } elseif ($formule->isModeDuree()) {
                 $dateDebut = $dto->dateDebut ?? Carbon::today();
