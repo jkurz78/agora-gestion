@@ -136,3 +136,32 @@ it('affiche le lien vers le tiers référent si présent', function (): void {
         ->assertSee('Marie DUPONT')
         ->assertSee(route('tiers.show', $referent->id));
 });
+
+it('affiche la pastille Partiel pour statut partiel', function (): void {
+    $tiers = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    $seances = Seance::factory()->count(2)->create(['operation_id' => $op->id]);
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
+
+    $reglEncaisse = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[0]->id, 'montant_prevu' => 30]);
+    Transaction::factory()->create(['reglement_id' => $reglEncaisse->id, 'statut_reglement' => StatutReglement::Recu]);
+
+    $reglEnAttente = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[1]->id, 'montant_prevu' => 30]);
+    Transaction::factory()->create(['reglement_id' => $reglEnAttente->id, 'statut_reglement' => StatutReglement::EnAttente]);
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertSee('Partiel');
+});
+
+it('affiche la pastille Non payé pour statut non_paye', function (): void {
+    $tiers = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    $seance = Seance::factory()->create(['operation_id' => $op->id]);
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
+
+    $regl = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seance->id, 'montant_prevu' => 50]);
+    Transaction::factory()->create(['reglement_id' => $regl->id, 'statut_reglement' => StatutReglement::EnAttente]);
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertSee('Non payé');
+});
