@@ -324,9 +324,10 @@ Pas de tri client en 7a (tri serveur unique par date d'inscription desc).
 
 ## 9. Définition de "fait"
 
-- ✅ Migration : **aucune** (pas de modification BD).
+- ✅ Migration : ~~aucune~~ **Amendement 2026-05-11** : 1 migration soft-add `add_soft_deletes_to_operations` (colonne `deleted_at` nullable, default null) + `use SoftDeletes` sur le modèle `Operation`. Nécessaire pour rendre le cas L1 testable et fonctionnel. Réversible. **Dette dormante connue** : 3 queries existantes dans `app/Livewire/FactureShow.php` (lignes 190, 305, 346) ignorent désormais les opérations soft-deleted ; cliquer sur une ligne d'opération archivée mène à 404 (route model binding sans `withTrashed`). Non actionnable tant qu'aucune UI d'archivage n'existe — à traiter au moment où on ajoutera la fonctionnalité « archiver une opération ».
 - ✅ Code : service + 2 DTOs + composant Livewire + vue + composant blade `section-card` + partial tableau + extension `FicheTiers`.
-- ✅ Tests : 15-20 tests Pest verts, suite globale 0 failed.
+- ✅ Trait `HasFactory` ajouté à `Participant`, `Seance`, `Presence`, `Reglement` (modèles qui avaient des factories non câblées).
+- ✅ Tests : 36 tests Pest verts (22 unit + 11 Livewire + 3 feature), suite globale 0 failed.
 - ✅ Pint clean.
 - ✅ Recette manuelle locale OK (8 scénarios §8).
 - ✅ Spec relue par utilisateur, commit du spec dans la branche.
