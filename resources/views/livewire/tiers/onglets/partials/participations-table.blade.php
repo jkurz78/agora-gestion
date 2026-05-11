@@ -27,14 +27,14 @@
                 @endif
             </td>
             <td class="text-muted small">{{ $ligne->typeOperationNom() }}</td>
-            <td class="small text-nowrap">
+            <td class="small text-nowrap" data-sort="{{ $ligne->dateDebut()?->format('Y-m-d') ?? '' }}">
                 @if($ligne->dateDebut() && $ligne->dateFin())
                     {{ $ligne->dateDebut()->format('d/m/Y') }} → {{ $ligne->dateFin()->format('d/m/Y') }}
                 @else
                     —
                 @endif
             </td>
-            <td class="small">
+            <td class="small" data-sort="{{ $ligne->tarifMontant() }}">
                 @if($ligne->tarifLibelle())
                     {{ $ligne->tarifLibelle() }}
                     <span class="text-muted">({{ number_format($ligne->tarifMontant(), 2, ',', ' ') }} €)</span>
@@ -42,14 +42,14 @@
                     —
                 @endif
             </td>
-            <td class="text-center">
+            <td class="text-center" data-sort="{{ $ligne->seancesSuivies() }}">
                 @if($ligne->seancesTotal() !== null)
                     {{ $ligne->seancesSuivies() }} / {{ $ligne->seancesTotal() }}
                 @else
                     —
                 @endif
             </td>
-            <td class="text-end small">
+            <td class="text-end small" data-sort="{{ $ligne->montantPaye() }}">
                 @if($ligne->statut() === 'gratuit')
                     <span class="badge text-bg-info">Gratuit</span>
                 @else
