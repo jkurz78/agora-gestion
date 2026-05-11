@@ -14,7 +14,9 @@ use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
 use App\Models\User;
+use App\Services\Tiers\DTO\AReferreTimelineDTO;
 use App\Services\Tiers\DTO\ParticipationsTimelineDTO;
+use App\Services\Tiers\DTO\SuitTimelineDTO;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -167,4 +169,117 @@ it('affiche la pastille Non payé pour statut non_paye', function (): void {
 
     Livewire::test(Operations::class, ['tiers' => $tiers])
         ->assertSee('Non payé');
+});
+
+// ── Phase 7b : section "A référé" ────────────────────────────────────────────
+
+it('monte avec les 3 DTOs aReferre et suit', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertStatus(200)
+        ->assertViewHas('aReferre', fn ($d) => $d instanceof AReferreTimelineDTO)
+        ->assertViewHas('suit', fn ($d) => $d instanceof SuitTimelineDTO);
+});
+
+it('affiche la section "A référé" si tiers a référé', function (): void {
+    $referent = Tiers::factory()->create();
+    $tiersReferre = Tiers::factory()->create(['prenom' => 'Alice', 'nom' => 'Martin']);
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiersReferre->id, 'operation_id' => $op->id, 'refere_par_id' => $referent->id]);
+
+    Livewire::test(Operations::class, ['tiers' => $referent])
+        ->assertSee('A référé')
+        ->assertSee('Alice MARTIN');
+});
+
+it('cache la section "A référé" si vide', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertDontSee('A référé');
+});
+
+it('affiche le lien vers le tiers référé', function (): void {
+    $referent = Tiers::factory()->create();
+    $tiersReferre = Tiers::factory()->create(['prenom' => 'Paul', 'nom' => 'Durand']);
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiersReferre->id, 'operation_id' => $op->id, 'refere_par_id' => $referent->id]);
+
+    Livewire::test(Operations::class, ['tiers' => $referent])
+        ->assertSee(route('tiers.show', $tiersReferre->id));
+});
+
+it('affiche 3 lignes si même tiers référé sur 3 opérations', function (): void {
+    $referent = Tiers::factory()->create();
+    $marie = Tiers::factory()->create(['prenom' => 'Marie', 'nom' => 'Curie']);
+    $op1 = Operation::factory()->create(['nom' => 'Op Alpha']);
+    $op2 = Operation::factory()->create(['nom' => 'Op Beta']);
+    $op3 = Operation::factory()->create(['nom' => 'Op Gamma']);
+
+    Participant::factory()->create(['tiers_id' => $marie->id, 'operation_id' => $op1->id, 'refere_par_id' => $referent->id]);
+    Participant::factory()->create(['tiers_id' => $marie->id, 'operation_id' => $op2->id, 'refere_par_id' => $referent->id]);
+    Participant::factory()->create(['tiers_id' => $marie->id, 'operation_id' => $op3->id, 'refere_par_id' => $referent->id]);
+
+    Livewire::test(Operations::class, ['tiers' => $referent])
+        ->assertSee('Op Alpha')
+        ->assertSee('Op Beta')
+        ->assertSee('Op Gamma');
+});
+
+// ── Phase 7b : section "Suit" ────────────────────────────────────────────────
+
+it('affiche la section "Suit" si tiers suit des personnes', function (): void {
+    $medecin = Tiers::factory()->create();
+    $patient = Tiers::factory()->create(['prenom' => 'Jean', 'nom' => 'Valjean']);
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $patient->id, 'operation_id' => $op->id, 'medecin_tiers_id' => $medecin->id]);
+
+    Livewire::test(Operations::class, ['tiers' => $medecin])
+        ->assertSee('Suit')
+        ->assertSee('Jean VALJEAN');
+});
+
+it('cache la section "Suit" si vide', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertDontSee('Suit');
+});
+
+it('affiche le badge Qualité Médecin', function (): void {
+    $medecin = Tiers::factory()->create();
+    $patient = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $patient->id, 'operation_id' => $op->id, 'medecin_tiers_id' => $medecin->id]);
+
+    Livewire::test(Operations::class, ['tiers' => $medecin])
+        ->assertSee('Médecin');
+});
+
+it('affiche le badge Qualité Thérapeute', function (): void {
+    $therapeute = Tiers::factory()->create();
+    $patient = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $patient->id, 'operation_id' => $op->id, 'therapeute_tiers_id' => $therapeute->id]);
+
+    Livewire::test(Operations::class, ['tiers' => $therapeute])
+        ->assertSee('Thérapeute');
+});
+
+it('affiche 2 lignes pour double rôle médecin+thérapeute sur même opération', function (): void {
+    $suivi = Tiers::factory()->create();
+    $patient = Tiers::factory()->create(['prenom' => 'Anne', 'nom' => 'Brun']);
+    $op = Operation::factory()->create(['nom' => 'Op Double Role']);
+
+    Participant::factory()->create([
+        'tiers_id' => $patient->id,
+        'operation_id' => $op->id,
+        'medecin_tiers_id' => $suivi->id,
+        'therapeute_tiers_id' => $suivi->id,
+    ]);
+
+    Livewire::test(Operations::class, ['tiers' => $suivi])
+        ->assertSee('Médecin')
+        ->assertSee('Thérapeute');
 });

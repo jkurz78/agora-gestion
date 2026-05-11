@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Tiers;
 
+use App\Models\Participant;
 use App\Models\Tiers;
 use App\Services\Tiers\TiersAdhesionTimelineService;
 use App\Services\Tiers\TiersDonsTimelineService;
@@ -46,8 +47,15 @@ final class FicheTiers extends Component
         }
 
         $nbParticipations = $this->tiers->participants()->count();
-        if ($nbParticipations > 0) {
-            $onglets[] = ['key' => 'operations', 'label' => 'Opérations', 'count' => $nbParticipations];
+        $nbReferre = Participant::where('refere_par_id', $this->tiers->id)
+            ->distinct()->count('tiers_id');
+        $nbSuit = Participant::where(fn ($q) => $q
+            ->where('medecin_tiers_id', $this->tiers->id)
+            ->orWhere('therapeute_tiers_id', $this->tiers->id)
+        )->distinct()->count('tiers_id');
+        $totalOperations = $nbParticipations + $nbReferre + $nbSuit;
+        if ($totalOperations > 0) {
+            $onglets[] = ['key' => 'operations', 'label' => 'Opérations', 'count' => $totalOperations];
         }
 
         $current = in_array($this->onglet, array_column($onglets, 'key'), true)

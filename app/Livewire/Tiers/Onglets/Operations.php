@@ -20,8 +20,11 @@ final class Operations extends Component
 
     public function render(): View
     {
-        $participations = app(TiersOperationsTimelineService::class)->forTiers($this->tiers);
+        $service = app(TiersOperationsTimelineService::class);
+        $participations = $service->forTiers($this->tiers);
+        $aReferre = $service->aReferreForTiers($this->tiers);
+        $suit = $service->suitForTiers($this->tiers);
 
-        return view('livewire.tiers.onglets.operations', compact('participations'));
+        return view('livewire.tiers.onglets.operations', compact('participations', 'aReferre', 'suit'));
     }
 }
