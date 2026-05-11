@@ -10,6 +10,7 @@ use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
 use App\Models\User;
@@ -116,7 +117,8 @@ it('affiche la pastille Soldé pour statut solde', function (): void {
     $seance = Seance::factory()->create(['operation_id' => $op->id]);
     $participant = Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
     $regl = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seance->id, 'montant_prevu' => 50]);
-    Transaction::factory()->create(['reglement_id' => $regl->id, 'statut_reglement' => StatutReglement::Recu]);
+    $tr = Transaction::factory()->create(['tiers_id' => $tiers->id, 'reglement_id' => $regl->id, 'statut_reglement' => StatutReglement::Recu]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr->id, 'operation_id' => $op->id, 'montant' => 50.00]);
 
     Livewire::test(Operations::class, ['tiers' => $tiers])
         ->assertSee('Soldé');
@@ -144,10 +146,11 @@ it('affiche la pastille Partiel pour statut partiel', function (): void {
     $participant = Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
 
     $reglEncaisse = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[0]->id, 'montant_prevu' => 30]);
-    Transaction::factory()->create(['reglement_id' => $reglEncaisse->id, 'statut_reglement' => StatutReglement::Recu]);
+    $trEncaisse = Transaction::factory()->create(['tiers_id' => $tiers->id, 'reglement_id' => $reglEncaisse->id, 'statut_reglement' => StatutReglement::Recu]);
+    TransactionLigne::factory()->create(['transaction_id' => $trEncaisse->id, 'operation_id' => $op->id, 'montant' => 30.00]);
 
     $reglEnAttente = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[1]->id, 'montant_prevu' => 30]);
-    Transaction::factory()->create(['reglement_id' => $reglEnAttente->id, 'statut_reglement' => StatutReglement::EnAttente]);
+    Transaction::factory()->create(['tiers_id' => $tiers->id, 'reglement_id' => $reglEnAttente->id, 'statut_reglement' => StatutReglement::EnAttente]);
 
     Livewire::test(Operations::class, ['tiers' => $tiers])
         ->assertSee('Partiel');

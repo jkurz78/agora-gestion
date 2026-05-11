@@ -12,6 +12,7 @@ use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
 use App\Services\Tiers\DTO\ParticipationLigneDTO;
@@ -223,9 +224,13 @@ it('calcule montantPaye en excluant transactions en attente', function (): void 
     $regl2 = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[1]->id, 'montant_prevu' => 30.00]);
     $regl3 = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[2]->id, 'montant_prevu' => 30.00]);
 
-    Transaction::factory()->create(['reglement_id' => $regl1->id, 'statut_reglement' => StatutReglement::Recu]);
-    Transaction::factory()->create(['reglement_id' => $regl2->id, 'statut_reglement' => StatutReglement::Pointe]);
-    Transaction::factory()->create(['reglement_id' => $regl3->id, 'statut_reglement' => StatutReglement::EnAttente]);
+    $tr1 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'reglement_id' => $regl1->id, 'statut_reglement' => StatutReglement::Recu]);
+    $tr2 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'reglement_id' => $regl2->id, 'statut_reglement' => StatutReglement::Pointe]);
+    $tr3 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'reglement_id' => $regl3->id, 'statut_reglement' => StatutReglement::EnAttente]);
+
+    TransactionLigne::factory()->create(['transaction_id' => $tr1->id, 'operation_id' => $op->id, 'montant' => 30.00, 'seance' => $seances[0]->numero ?? null]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr2->id, 'operation_id' => $op->id, 'montant' => 30.00, 'seance' => $seances[1]->numero ?? null]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr3->id, 'operation_id' => $op->id, 'montant' => 30.00, 'seance' => $seances[2]->numero ?? null]);
 
     $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
 
@@ -279,8 +284,9 @@ it('retourne statut=partiel si 0 < montantPaye < montantPrevu', function (): voi
     $participant = Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
     $regl1 = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[0]->id, 'montant_prevu' => 30.00]);
     $regl2 = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[1]->id, 'montant_prevu' => 30.00]);
-    Transaction::factory()->create(['reglement_id' => $regl1->id, 'statut_reglement' => StatutReglement::Recu]);
-    Transaction::factory()->create(['reglement_id' => $regl2->id, 'statut_reglement' => StatutReglement::EnAttente]);
+    $tr1 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'reglement_id' => $regl1->id, 'statut_reglement' => StatutReglement::Recu]);
+    Transaction::factory()->create(['tiers_id' => $tiers->id, 'reglement_id' => $regl2->id, 'statut_reglement' => StatutReglement::EnAttente]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr1->id, 'operation_id' => $op->id, 'montant' => 30.00]);
 
     $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
 
@@ -293,7 +299,8 @@ it('retourne statut=solde si montantPaye>=montantPrevu>0', function (): void {
     $seance = Seance::factory()->create(['operation_id' => $op->id]);
     $participant = Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
     $regl = Reglement::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seance->id, 'montant_prevu' => 50.00]);
-    Transaction::factory()->create(['reglement_id' => $regl->id, 'statut_reglement' => StatutReglement::Recu]);
+    $tr = Transaction::factory()->create(['tiers_id' => $tiers->id, 'reglement_id' => $regl->id, 'statut_reglement' => StatutReglement::Recu]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr->id, 'operation_id' => $op->id, 'montant' => 50.00]);
 
     $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
 
@@ -372,4 +379,107 @@ it('retourne null pour refereParNomComplet si pas de référent', function (): v
     $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
 
     expect($dto->lignes[0]->refereParNomComplet())->toBeNull();
+});
+
+// ── Phase 7a-fix : paiements hors séance via TransactionLigne ────────────────
+
+it('calcule montantPaye via TransactionLigne et inclut les paiements hors séance', function (): void {
+    $tiers = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
+
+    $tr = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'statut_reglement' => StatutReglement::Recu,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tr->id,
+        'operation_id' => $op->id,
+        'seance' => null,
+        'montant' => 80.00,
+    ]);
+
+    $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
+    expect($dto->lignes[0]->montantPaye())->toBe(80.00);
+});
+
+it('exclut les paiements d\'un autre tiers même si operation_id correspond', function (): void {
+    $tiersA = Tiers::factory()->create();
+    $tiersB = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiersA->id, 'operation_id' => $op->id]);
+
+    $tr = Transaction::factory()->create([
+        'tiers_id' => $tiersB->id,
+        'statut_reglement' => StatutReglement::Recu,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tr->id,
+        'operation_id' => $op->id,
+        'montant' => 50.00,
+    ]);
+
+    $dto = app(TiersOperationsTimelineService::class)->forTiers($tiersA);
+    expect($dto->lignes[0]->montantPaye())->toBe(0.0);
+});
+
+it('exclut les paiements d\'une autre opération', function (): void {
+    $tiers = Tiers::factory()->create();
+    $op1 = Operation::factory()->create();
+    $op2 = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op1->id]);
+
+    $tr = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'statut_reglement' => StatutReglement::Recu,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tr->id,
+        'operation_id' => $op2->id,
+        'montant' => 50.00,
+    ]);
+
+    $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
+    expect($dto->lignes[0]->montantPaye())->toBe(0.0);
+});
+
+it('retourne statut=solde quand W=0 et Z>0 (paiement forfaitaire hors séance)', function (): void {
+    $tiers = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
+    // Pas de Reglement créé → W=0
+
+    $tr = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'statut_reglement' => StatutReglement::Recu,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tr->id,
+        'operation_id' => $op->id,
+        'montant' => 80.00,
+    ]);
+
+    $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
+    expect($dto->lignes[0]->montantPaye())->toBe(80.00);
+    expect($dto->lignes[0]->montantPrevu())->toBe(0.0);
+    expect($dto->lignes[0]->statut())->toBe('solde');
+});
+
+it('exclut les paiements EnAttente du calcul', function (): void {
+    $tiers = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
+
+    $tr = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'statut_reglement' => StatutReglement::EnAttente,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tr->id,
+        'operation_id' => $op->id,
+        'montant' => 80.00,
+    ]);
+
+    $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
+    expect($dto->lignes[0]->montantPaye())->toBe(0.0);
 });

@@ -13,6 +13,7 @@ final class ParticipationLigneDTO
 {
     public function __construct(
         public readonly Participant $participant,
+        public readonly float $montantPayePrecalcule = 0.0,
     ) {}
 
     public function operationId(): int
@@ -92,9 +93,7 @@ final class ParticipationLigneDTO
 
     public function montantPaye(): float
     {
-        return (float) $this->participant->reglements
-            ->filter(fn ($r) => $r->transaction?->statut_reglement?->isEncaisse() === true)
-            ->sum('montant_prevu');
+        return $this->montantPayePrecalcule;
     }
 
     public function statut(): string
@@ -102,8 +101,12 @@ final class ParticipationLigneDTO
         $w = $this->montantPrevu();
         $z = $this->montantPaye();
 
-        if ($w === 0.0) {
+        if ($w === 0.0 && $z === 0.0) {
             return 'gratuit';
+        }
+
+        if ($w === 0.0 && $z > 0.0) {
+            return 'solde'; // paiement forfaitaire hors-séance, pas de W matérialisé
         }
 
         if ($z === 0.0) {
