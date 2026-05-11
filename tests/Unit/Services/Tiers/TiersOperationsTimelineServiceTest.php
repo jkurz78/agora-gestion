@@ -184,10 +184,10 @@ it('compte les présences positives uniquement (statut present)', function (): v
     $seances = Seance::factory()->count(5)->create(['operation_id' => $op->id]);
     $participant = Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op->id]);
 
-    Presence::create(['participant_id' => $participant->id, 'seance_id' => $seances[0]->id, 'statut' => StatutPresence::Present->value]);
-    Presence::create(['participant_id' => $participant->id, 'seance_id' => $seances[1]->id, 'statut' => StatutPresence::Present->value]);
-    Presence::create(['participant_id' => $participant->id, 'seance_id' => $seances[2]->id, 'statut' => StatutPresence::Excuse->value]);
-    Presence::create(['participant_id' => $participant->id, 'seance_id' => $seances[3]->id, 'statut' => StatutPresence::AbsenceNonJustifiee->value]);
+    Presence::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[0]->id, 'statut' => StatutPresence::Present->value]);
+    Presence::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[1]->id, 'statut' => StatutPresence::Present->value]);
+    Presence::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[2]->id, 'statut' => StatutPresence::Excuse->value]);
+    Presence::factory()->create(['participant_id' => $participant->id, 'seance_id' => $seances[3]->id, 'statut' => StatutPresence::AbsenceNonJustifiee->value]);
     // 5e séance : pas de Presence créée → ni présent ni absent
 
     $dto = app(TiersOperationsTimelineService::class)->forTiers($tiers);
