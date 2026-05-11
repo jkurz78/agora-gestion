@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\StatutPresence;
 use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
 use App\Models\Association;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -16,6 +17,7 @@ use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
 use App\Services\Tiers\DTO\AReferreTimelineDTO;
+use App\Services\Tiers\DTO\EncadrementTimelineDTO;
 use App\Services\Tiers\DTO\ParticipationLigneDTO;
 use App\Services\Tiers\DTO\ParticipationsTimelineDTO;
 use App\Services\Tiers\DTO\SuitLigneDTO;
@@ -770,4 +772,200 @@ it('suitForTiers isole multi-tenant', function (): void {
 
     expect($dto->totalCount)->toBe(1)
         ->and($dto->lignes[0]->tiersSuiviId())->toBe((int) $patientA->id);
+});
+
+// ── Phase 7c : section "Encadrement" ────────────────────────────────────────
+
+it('encadrementForTiers retourne DTO vide si pas d\'opération encadrée', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiers);
+
+    expect($dto)->toBeInstanceOf(EncadrementTimelineDTO::class)
+        ->and($dto->totalCount)->toBe(0)
+        ->and($dto->lignes)->toBe([]);
+});
+
+it('encadrementForTiers totalCount = nb opérations distinctes encadrées', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Formation']);
+    $op1 = Operation::factory()->create(['type_operation_id' => $type->id]);
+    $op2 = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    $tr1 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    $tr2 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+
+    TransactionLigne::factory()->create(['transaction_id' => $tr1->id, 'operation_id' => $op1->id, 'montant' => 100.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr2->id, 'operation_id' => $op2->id, 'montant' => 200.00]);
+
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiers);
+
+    expect($dto->totalCount)->toBe(2)
+        ->and(count($dto->lignes))->toBe(2);
+});
+
+it('encadrementForTiers AGRÈGE le montant : 3 paiements sur même opération → 1 ligne avec montantTotal = somme', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Yoga']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    $tr1 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    $tr2 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    $tr3 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+
+    TransactionLigne::factory()->create(['transaction_id' => $tr1->id, 'operation_id' => $op->id, 'montant' => 100.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr2->id, 'operation_id' => $op->id, 'montant' => 150.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr3->id, 'operation_id' => $op->id, 'montant' => 50.00]);
+
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiers);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and($dto->lignes[0]->montantTotal())->toBe(300.00);
+});
+
+it('encadrementForTiers nbSeances = count distinct séances numérotées', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Kiné']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    // 3 paiements sur séances 1, 2, 1 → nbSeances=2
+    $tr1 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    $tr2 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    $tr3 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+
+    TransactionLigne::factory()->create(['transaction_id' => $tr1->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 50.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr2->id, 'operation_id' => $op->id, 'seance' => 2, 'montant' => 50.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr3->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 50.00]);
+
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiers);
+
+    expect($dto->lignes[0]->nbSeances())->toBe(2);
+});
+
+it('encadrementForTiers nbSeances = 0 si paiement forfaitaire (seance null)', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Forfait']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    $tr = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr->id, 'operation_id' => $op->id, 'seance' => null, 'montant' => 300.00]);
+
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiers);
+
+    expect($dto->lignes[0]->nbSeances())->toBe(0)
+        ->and($dto->lignes[0]->montantTotal())->toBe(300.00);
+});
+
+it('encadrementForTiers inclut tous statuts de règlement', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Sport']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    // EnAttente
+    $tr1 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense, 'statut_reglement' => StatutReglement::EnAttente]);
+    // Recu
+    $tr2 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense, 'statut_reglement' => StatutReglement::Recu]);
+    // Pointe
+    $tr3 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense, 'statut_reglement' => StatutReglement::Pointe]);
+
+    TransactionLigne::factory()->create(['transaction_id' => $tr1->id, 'operation_id' => $op->id, 'montant' => 100.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr2->id, 'operation_id' => $op->id, 'montant' => 200.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr3->id, 'operation_id' => $op->id, 'montant' => 50.00]);
+
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiers);
+
+    // Tous statuts comptés → montantTotal = 100+200+50 = 350
+    expect($dto->totalCount)->toBe(1)
+        ->and($dto->lignes[0]->montantTotal())->toBe(350.00);
+});
+
+it('encadrementForTiers EXCLUT les transactions de type Recette', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Cours']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    // Transaction Recette avec operation_id → NE DOIT PAS apparaître dans Encadrement
+    $trRecette = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Recette]);
+    TransactionLigne::factory()->create(['transaction_id' => $trRecette->id, 'operation_id' => $op->id, 'montant' => 50.00]);
+
+    // Pas de transaction Depense
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiers);
+
+    expect($dto->totalCount)->toBe(0)
+        ->and($dto->lignes)->toBe([]);
+});
+
+it('encadrementForTiers trie par dateDebut DESC', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Danse']);
+
+    $opAncienne = Operation::factory()->create(['type_operation_id' => $type->id, 'nom' => 'Op Ancienne']);
+    Seance::factory()->create(['operation_id' => $opAncienne->id, 'date' => '2024-01-15']);
+
+    $opRecente = Operation::factory()->create(['type_operation_id' => $type->id, 'nom' => 'Op Recente']);
+    Seance::factory()->create(['operation_id' => $opRecente->id, 'date' => '2026-03-20']);
+
+    $opSansSeance = Operation::factory()->create(['type_operation_id' => $type->id, 'nom' => 'Op Sans Seance']);
+
+    $tr1 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    $tr2 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    $tr3 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+
+    TransactionLigne::factory()->create(['transaction_id' => $tr1->id, 'operation_id' => $opAncienne->id, 'montant' => 100.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr2->id, 'operation_id' => $opRecente->id, 'montant' => 100.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr3->id, 'operation_id' => $opSansSeance->id, 'montant' => 100.00]);
+
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiers);
+
+    expect($dto->totalCount)->toBe(3)
+        // Récente en premier, ancienne ensuite, sans séance en queue
+        ->and($dto->lignes[0]->operationId())->toBe((int) $opRecente->id)
+        ->and($dto->lignes[1]->operationId())->toBe((int) $opAncienne->id)
+        ->and($dto->lignes[2]->operationId())->toBe((int) $opSansSeance->id);
+});
+
+it('encadrementForTiers isole les autres tiers', function (): void {
+    $tiersA = Tiers::factory()->create();
+    $tiersB = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Pilates']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    // tiersA est payé sur op
+    $trA = Transaction::factory()->create(['tiers_id' => $tiersA->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $trA->id, 'operation_id' => $op->id, 'montant' => 200.00]);
+
+    // tiersB est aussi payé sur la même op → ne doit pas fuiter pour tiersA
+    $trB = Transaction::factory()->create(['tiers_id' => $tiersB->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $trB->id, 'operation_id' => $op->id, 'montant' => 300.00]);
+
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiersA);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and($dto->lignes[0]->montantTotal())->toBe(200.00);
+});
+
+it('encadrementForTiers isole multi-tenant', function (): void {
+    $assoB = Association::factory()->create();
+
+    // Créer des données côté assoB
+    TenantContext::boot($assoB);
+    $tiersIntrus = Tiers::factory()->create();
+    $typeB = TypeOperation::factory()->create(['nom' => 'Type B']);
+    $opIntrus = Operation::factory()->create(['type_operation_id' => $typeB->id]);
+    $trIntrus = Transaction::factory()->create(['tiers_id' => $tiersIntrus->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $trIntrus->id, 'operation_id' => $opIntrus->id, 'montant' => 999.00]);
+
+    // Revenir sur le tenant par défaut
+    TenantContext::boot(Association::first()->fresh());
+
+    $tiersCourant = Tiers::factory()->create();
+    $typeA = TypeOperation::factory()->create(['nom' => 'Type A']);
+    $opCourant = Operation::factory()->create(['type_operation_id' => $typeA->id]);
+    $trCourant = Transaction::factory()->create(['tiers_id' => $tiersCourant->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $trCourant->id, 'operation_id' => $opCourant->id, 'montant' => 100.00]);
+
+    $dto = app(TiersOperationsTimelineService::class)->encadrementForTiers($tiersCourant);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and($dto->lignes[0]->montantTotal())->toBe(100.00);
 });

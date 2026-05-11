@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Services\Tiers;
 
 use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
+use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Services\Tiers\DTO\AReferreLigneDTO;
 use App\Services\Tiers\DTO\AReferreTimelineDTO;
+use App\Services\Tiers\DTO\EncadrementLigneDTO;
+use App\Services\Tiers\DTO\EncadrementTimelineDTO;
 use App\Services\Tiers\DTO\ParticipationLigneDTO;
 use App\Services\Tiers\DTO\ParticipationsTimelineDTO;
 use App\Services\Tiers\DTO\SuitLigneDTO;
@@ -184,5 +188,72 @@ final class TiersOperationsTimelineService
         $lignes = $sorted->map(fn ($e) => new SuitLigneDTO(participant: $e['p'], qualite: $e['qualite']))->all();
 
         return new SuitTimelineDTO(lignes: $lignes, totalCount: $totalCount);
+    }
+
+    public function encadrementForTiers(Tiers $tiers): EncadrementTimelineDTO
+    {
+        // 1. Identifier les operation_id distinctes encadrées
+        $operationIds = TransactionLigne::query()
+            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->where('transactions.tiers_id', $tiers->id)
+            ->where('transactions.type', TypeTransaction::Depense->value)
+            ->whereNotNull('transaction_lignes.operation_id')
+            ->distinct()
+            ->pluck('transaction_lignes.operation_id')
+            ->all();
+
+        if (empty($operationIds)) {
+            return new EncadrementTimelineDTO(lignes: [], totalCount: 0);
+        }
+
+        // 2. Précalculer agrégats (nb séances distinctes + sum montant) par operation_id
+        $aggregats = TransactionLigne::query()
+            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->where('transactions.tiers_id', $tiers->id)
+            ->where('transactions.type', TypeTransaction::Depense->value)
+            ->whereIn('transaction_lignes.operation_id', $operationIds)
+            ->groupBy('transaction_lignes.operation_id')
+            ->select(
+                'transaction_lignes.operation_id',
+                DB::raw('COUNT(DISTINCT CASE WHEN transaction_lignes.seance IS NOT NULL THEN transaction_lignes.seance END) as nb_seances'),
+                DB::raw('SUM(transaction_lignes.montant) as montant_total'),
+            )
+            ->get()
+            ->keyBy('operation_id');
+
+        // 3. Charger les opérations avec eager loading (withTrashed pour archivées)
+        $operations = Operation::withTrashed()
+            ->whereIn('id', $operationIds)
+            ->with(['typeOperation:id,nom', 'seances:id,operation_id,date'])
+            ->get();
+
+        // 4. Tri par dateDebut DESC (min séance.date), nulls en queue
+        $sorted = $operations->sort(function (Operation $a, Operation $b): int {
+            $da = $a->seances->pluck('date')->min();
+            $db = $b->seances->pluck('date')->min();
+            if ($da === null && $db === null) {
+                return 0;
+            }
+            if ($da === null) {
+                return 1;
+            }
+            if ($db === null) {
+                return -1;
+            }
+
+            return $db <=> $da;
+        })->values();
+
+        // 5. Construire les DTOs
+        $lignes = $sorted->map(fn (Operation $op) => new EncadrementLigneDTO(
+            operation: $op,
+            nbSeances: (int) ($aggregats[$op->id]->nb_seances ?? 0),
+            montantTotal: (float) ($aggregats[$op->id]->montant_total ?? 0.0),
+        ))->all();
+
+        return new EncadrementTimelineDTO(
+            lignes: $lignes,
+            totalCount: count($lignes),
+        );
     }
 }
