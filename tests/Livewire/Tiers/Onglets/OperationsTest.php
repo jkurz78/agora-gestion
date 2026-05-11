@@ -389,8 +389,8 @@ it('affiche les colonnes Nb séances et Montant dans la section Encadrement', fu
     TransactionLigne::factory()->create(['transaction_id' => $tr2->id, 'operation_id' => $op->id, 'seance' => 2, 'montant' => 150.00]);
 
     Livewire::test(Operations::class, ['tiers' => $tiers])
-        ->assertSee('2')       // Nb séances
-        ->assertSee('250,00'); // Montant formaté
+        ->assertSeeHtml('data-sort="2"') // Nb séances distinct
+        ->assertSee('250,00');           // Montant formaté
 });
 
 it('affiche le badge Archivée dans la section Encadrement', function (): void {
@@ -419,4 +419,23 @@ it('n\'affiche PAS de badge HelloAsso dans la section Encadrement', function ():
     Livewire::test(Operations::class, ['tiers' => $tiers])
         ->assertSee('Encadrement')
         ->assertDontSee('HelloAsso');
+});
+
+it('n\'affiche pas la section Encadrement si le tiers a seulement des transactions de type Recette avec operation_id', function (): void {
+    $tiers = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+
+    // Une transaction RECETTE (pas Depense) avec operation_id : paiement participant, pas encadrement
+    $tr = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'type' => TypeTransaction::Recette,
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tr->id,
+        'operation_id' => $op->id,
+        'montant' => 50.00,
+    ]);
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertDontSeeHtml('id="section-encadrement-body"');
 });
