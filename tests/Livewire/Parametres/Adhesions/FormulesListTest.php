@@ -216,3 +216,73 @@ it('saveNewSousCat valide les champs obligatoires', function (): void {
         ->call('saveNewSousCat')
         ->assertHasErrors(['newSousCatNom', 'newSousCatCategorieId']);
 });
+
+// ─── Tests extension duree_jours (Phase 3) ───────────────────────────────────
+
+it('crée une formule mode duree avec unité jours (duree_jours=10)', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(FormulesList::class)
+        ->call('openCreate')
+        ->set('nom', 'Stage 10 jours')
+        ->set('mode', 'duree')
+        ->set('uniteDuree', 'jours')
+        ->set('dureeJours', 10)
+        ->set('sousCategorieId', $this->sc->id)
+        ->call('save')
+        ->assertSet('showModal', false);
+
+    $formule = FormuleAdhesion::where('nom', 'Stage 10 jours')->first();
+    expect($formule)->not->toBeNull();
+    expect($formule->duree_mois)->toBeNull();
+    expect($formule->duree_jours)->toBe(10);
+});
+
+it('la liste affiche "N jours" dans la colonne Durée pour une formule en jours', function (): void {
+    FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'nom' => 'Saison 300j',
+        'mode' => 'duree',
+        'duree_mois' => null,
+        'duree_jours' => 300,
+    ]);
+
+    $html = Livewire::actingAs($this->user)
+        ->test(FormulesList::class)
+        ->html();
+
+    expect($html)->toContain('300 jours');
+});
+
+it('openEdit d\'une formule duree_jours=300 pré-remplit uniteDuree=jours et dureeJours=300', function (): void {
+    // Désactiver la formule du beforeEach pour libérer la sous-cat
+    FormuleAdhesion::query()->update(['actif' => false]);
+
+    $formule = FormuleAdhesion::factory()->create([
+        'sous_categorie_id' => $this->sc->id,
+        'nom' => 'Saison sportive',
+        'mode' => 'duree',
+        'duree_mois' => null,
+        'duree_jours' => 300,
+        'actif' => true,
+    ]);
+
+    Livewire::actingAs($this->user)
+        ->test(FormulesList::class)
+        ->call('openEdit', $formule->id)
+        ->assertSet('uniteDuree', 'jours')
+        ->assertSet('dureeJours', 300)
+        ->assertSet('dureeMois', null);
+});
+
+it('validation refuse mode=duree sans valeur (uniteDuree=jours, dureeJours=null)', function (): void {
+    Livewire::actingAs($this->user)
+        ->test(FormulesList::class)
+        ->call('openCreate')
+        ->set('nom', 'Test sans durée')
+        ->set('mode', 'duree')
+        ->set('uniteDuree', 'jours')
+        ->set('dureeJours', null)
+        ->set('sousCategorieId', $this->sc->id)
+        ->call('save')
+        ->assertHasErrors(['dureeJours']);
+});

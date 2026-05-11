@@ -60,7 +60,13 @@
                             @endif
                         </td>
                         <td class="small">
-                            {{ $formule->duree_mois ? $formule->duree_mois.' mois' : '—' }}
+                            @if($formule->duree_jours)
+                                {{ $formule->duree_jours }} jours
+                            @elseif($formule->duree_mois)
+                                {{ $formule->duree_mois }} mois
+                            @else
+                                —
+                            @endif
                         </td>
                         <td class="text-end small">
                             {{ $formule->montant_par_defaut !== null ? number_format((float) $formule->montant_par_defaut, 2, ',', ' ').' €' : '—' }}
@@ -238,16 +244,37 @@
                                     </select>
                                 </div>
                                 @if($mode === 'duree')
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold" for="formule-duree">Durée (mois)</label>
-                                        <input id="formule-duree"
-                                               type="number"
-                                               min="1"
-                                               max="36"
-                                               class="form-control form-control-sm @error('dureeMois') is-invalid @enderror"
-                                               wire:model="dureeMois"
-                                               @if($this->isEditingHelloasso()) disabled @endif>
-                                        @error('dureeMois')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-semibold" for="formule-unite">Unité</label>
+                                        <select id="formule-unite"
+                                                class="form-select form-select-sm"
+                                                wire:model.live="uniteDuree"
+                                                @if($this->isEditingHelloasso()) disabled @endif>
+                                            <option value="mois">Mois</option>
+                                            <option value="jours">Jours</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        @if($uniteDuree === 'jours')
+                                            <label class="form-label fw-semibold" for="formule-duree-jours">Durée (jours)</label>
+                                            <input id="formule-duree-jours"
+                                                   type="number"
+                                                   min="1"
+                                                   class="form-control form-control-sm @error('dureeJours') is-invalid @enderror"
+                                                   wire:model="dureeJours"
+                                                   @if($this->isEditingHelloasso()) disabled @endif>
+                                            @error('dureeJours')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        @else
+                                            <label class="form-label fw-semibold" for="formule-duree-mois">Durée (mois)</label>
+                                            <input id="formule-duree-mois"
+                                                   type="number"
+                                                   min="1"
+                                                   max="36"
+                                                   class="form-control form-control-sm @error('dureeMois') is-invalid @enderror"
+                                                   wire:model="dureeMois"
+                                                   @if($this->isEditingHelloasso()) disabled @endif>
+                                            @error('dureeMois')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                        @endif
                                     </div>
                                 @endif
                             </div>

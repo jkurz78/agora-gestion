@@ -27,6 +27,10 @@ final class FormulesList extends Component
 
     public ?int $dureeMois = null;
 
+    public string $uniteDuree = 'mois'; // 'mois' | 'jours'
+
+    public ?int $dureeJours = null;
+
     public ?float $montantParDefaut = null;
 
     public bool $deductibleFiscal = false;
@@ -62,7 +66,16 @@ final class FormulesList extends Component
         $this->nom = $formule->nom;
         $this->description = $formule->description;
         $this->mode = $formule->mode;
-        $this->dureeMois = $formule->duree_mois;
+        // Initialisation unité durée selon ce qui est set sur la formule
+        if ($formule->duree_jours !== null) {
+            $this->uniteDuree = 'jours';
+            $this->dureeJours = $formule->duree_jours;
+            $this->dureeMois = null;
+        } else {
+            $this->uniteDuree = 'mois';
+            $this->dureeMois = $formule->duree_mois;
+            $this->dureeJours = null;
+        }
         $this->montantParDefaut = $formule->montant_par_defaut !== null ? (float) $formule->montant_par_defaut : null;
         $this->deductibleFiscal = $formule->deductible_fiscal;
         $this->sousCategorieId = $formule->sous_categorie_id;
@@ -114,7 +127,11 @@ final class FormulesList extends Component
             'actif' => ['boolean'],
         ];
         if ($this->mode === 'duree') {
-            $rules['dureeMois'] = ['required', 'integer', 'between:1,36'];
+            if ($this->uniteDuree === 'jours') {
+                $rules['dureeJours'] = ['required', 'integer', 'min:1'];
+            } else {
+                $rules['dureeMois'] = ['required', 'integer', 'between:1,36'];
+            }
         }
         $this->validate($rules);
 
@@ -130,7 +147,8 @@ final class FormulesList extends Component
             'nom' => $this->nom,
             'description' => $this->description,
             'mode' => $this->mode,
-            'duree_mois' => $this->mode === 'duree' ? $this->dureeMois : null,
+            'duree_mois' => ($this->mode === 'duree' && $this->uniteDuree === 'mois') ? $this->dureeMois : null,
+            'duree_jours' => ($this->mode === 'duree' && $this->uniteDuree === 'jours') ? $this->dureeJours : null,
             'montant_par_defaut' => $this->montantParDefaut,
             'deductible_fiscal' => $this->deductibleFiscal,
             'sous_categorie_id' => $this->sousCategorieId,
@@ -210,8 +228,9 @@ final class FormulesList extends Component
 
     private function resetForm(): void
     {
-        $this->reset(['editingId', 'nom', 'description', 'dureeMois', 'montantParDefaut', 'deductibleFiscal', 'sousCategorieId', 'errorMessage']);
+        $this->reset(['editingId', 'nom', 'description', 'dureeMois', 'dureeJours', 'montantParDefaut', 'deductibleFiscal', 'sousCategorieId', 'errorMessage']);
         $this->mode = 'exercice';
+        $this->uniteDuree = 'mois';
         $this->actif = true;
     }
 
