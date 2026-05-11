@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
 use App\Livewire\Tiers\Onglets\Operations;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -15,6 +16,7 @@ use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
 use App\Models\User;
 use App\Services\Tiers\DTO\AReferreTimelineDTO;
+use App\Services\Tiers\DTO\EncadrementTimelineDTO;
 use App\Services\Tiers\DTO\ParticipationsTimelineDTO;
 use App\Services\Tiers\DTO\SuitTimelineDTO;
 use Livewire\Livewire;
@@ -342,4 +344,79 @@ it('affiche 2 lignes pour double rôle médecin+thérapeute sur même opération
     Livewire::test(Operations::class, ['tiers' => $suivi])
         ->assertSee('Médecin')
         ->assertSee('Thérapeute');
+});
+
+// ── Phase 7c : section "Encadrement" ────────────────────────────────────────
+
+it('monte avec le DTO encadrement', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertStatus(200)
+        ->assertViewHas('encadrement', fn ($d) => $d instanceof EncadrementTimelineDTO);
+});
+
+it('affiche la section Encadrement si tiers encadre des opérations', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Animation']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id, 'nom' => 'Op Animation 2026']);
+
+    $tr = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr->id, 'operation_id' => $op->id, 'montant' => 250.00]);
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertSee('Encadrement')
+        ->assertSee('Op Animation 2026')
+        ->assertSee('Animation');
+});
+
+it('cache la section Encadrement si vide', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertDontSee('Encadrement');
+});
+
+it('affiche les colonnes Nb séances et Montant dans la section Encadrement', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Cours']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    $tr1 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    $tr2 = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+
+    TransactionLigne::factory()->create(['transaction_id' => $tr1->id, 'operation_id' => $op->id, 'seance' => 1, 'montant' => 100.00]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr2->id, 'operation_id' => $op->id, 'seance' => 2, 'montant' => 150.00]);
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertSee('2')       // Nb séances
+        ->assertSee('250,00'); // Montant formaté
+});
+
+it('affiche le badge Archivée dans la section Encadrement', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Sport']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    $tr = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr->id, 'operation_id' => $op->id, 'montant' => 80.00]);
+
+    $op->delete(); // soft delete
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertSee('Archivée');
+});
+
+it('n\'affiche PAS de badge HelloAsso dans la section Encadrement', function (): void {
+    $tiers = Tiers::factory()->create();
+    $type = TypeOperation::factory()->create(['nom' => 'Méditation']);
+    $op = Operation::factory()->create(['type_operation_id' => $type->id]);
+
+    // Tiers strictement intervenant (dépense) : pas de participant HelloAsso
+    $tr = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $tr->id, 'operation_id' => $op->id, 'montant' => 120.00]);
+
+    Livewire::test(Operations::class, ['tiers' => $tiers])
+        ->assertSee('Encadrement')
+        ->assertDontSee('HelloAsso');
 });

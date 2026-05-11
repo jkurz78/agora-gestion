@@ -38,5 +38,16 @@
         </x-tiers.operations.section-card>
     @endif
 
-    {{-- Slice 7c : Encadrement --}}
+    {{-- Section Encadrement (slice 7c) --}}
+    @if ($encadrement->totalCount > 0)
+        <x-tiers.operations.section-card
+            id="encadrement"
+            titre="Encadrement"
+            :compteur="$encadrement->totalCount"
+        >
+            @include('livewire.tiers.onglets.partials.encadrement-table', [
+                'lignes' => $encadrement->lignes,
+            ])
+        </x-tiers.operations.section-card>
+    @endif
 </div>

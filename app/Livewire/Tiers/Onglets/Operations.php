@@ -24,7 +24,10 @@ final class Operations extends Component
         $participations = $service->forTiers($this->tiers);
         $aReferre = $service->aReferreForTiers($this->tiers);
         $suit = $service->suitForTiers($this->tiers);
+        $encadrement = $service->encadrementForTiers($this->tiers);
 
-        return view('livewire.tiers.onglets.operations', compact('participations', 'aReferre', 'suit'));
+        return view('livewire.tiers.onglets.operations', compact(
+            'participations', 'aReferre', 'suit', 'encadrement'
+        ));
     }
 }

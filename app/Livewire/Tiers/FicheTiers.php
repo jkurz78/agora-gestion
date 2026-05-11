@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Tiers;
 
+use App\Enums\TypeTransaction;
 use App\Models\Participant;
 use App\Models\Tiers;
+use App\Models\TransactionLigne;
 use App\Services\Tiers\TiersAdhesionTimelineService;
 use App\Services\Tiers\TiersDonsTimelineService;
 use Illuminate\View\View;
@@ -53,7 +55,14 @@ final class FicheTiers extends Component
             ->where('medecin_tiers_id', $this->tiers->id)
             ->orWhere('therapeute_tiers_id', $this->tiers->id)
         )->distinct()->count('tiers_id');
-        $totalOperations = $nbParticipations + $nbReferre + $nbSuit;
+        $nbEnc = TransactionLigne::query()
+            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->where('transactions.tiers_id', $this->tiers->id)
+            ->where('transactions.type', TypeTransaction::Depense->value)
+            ->whereNotNull('transaction_lignes.operation_id')
+            ->distinct()
+            ->count('transaction_lignes.operation_id');
+        $totalOperations = $nbParticipations + $nbReferre + $nbSuit + $nbEnc;
         if ($totalOperations > 0) {
             $onglets[] = ['key' => 'operations', 'label' => 'Opérations', 'count' => $totalOperations];
         }
