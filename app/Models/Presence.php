@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 final class Presence extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'seance_id',
         'participant_id',

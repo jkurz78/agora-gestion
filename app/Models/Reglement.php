@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 final class Reglement extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'participant_id',
         'seance_id',
