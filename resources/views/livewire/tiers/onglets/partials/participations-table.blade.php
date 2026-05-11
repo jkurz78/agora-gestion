@@ -51,7 +51,7 @@
             </td>
             <td class="text-end small" data-sort="{{ $ligne->montantPaye() }}">
                 @if($ligne->statut() === 'gratuit')
-                    <span class="badge text-bg-info">Gratuit</span>
+                    —
                 @else
                     {{ number_format($ligne->montantPaye(), 2, ',', ' ') }} €
                     <span class="text-muted">/ {{ number_format($ligne->montantPrevu(), 2, ',', ' ') }} €</span>
