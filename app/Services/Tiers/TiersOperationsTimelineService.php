@@ -52,7 +52,6 @@ final class TiersOperationsTimelineService
                     StatutReglement::Recu->value,
                     StatutReglement::Pointe->value,
                 ])
-                ->whereNull('transaction_lignes.deleted_at')
                 ->groupBy('transaction_lignes.operation_id')
                 ->select('transaction_lignes.operation_id', DB::raw('SUM(transaction_lignes.montant) as total'))
                 ->pluck('total', 'transaction_lignes.operation_id')
