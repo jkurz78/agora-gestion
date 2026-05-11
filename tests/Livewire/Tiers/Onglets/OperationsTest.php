@@ -267,6 +267,66 @@ it('affiche le badge Qualité Thérapeute', function (): void {
         ->assertSee('Thérapeute');
 });
 
+it('affiche le badge HelloAsso dans la section A référé', function (): void {
+    $referent = Tiers::factory()->create();
+    $patient = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create([
+        'tiers_id' => $patient->id,
+        'operation_id' => $op->id,
+        'refere_par_id' => $referent->id,
+        'est_helloasso' => true,
+    ]);
+
+    Livewire::test(Operations::class, ['tiers' => $referent])
+        ->assertSee('HelloAsso');
+});
+
+it('affiche le badge Archivée dans la section A référé si opération soft-deleted', function (): void {
+    $referent = Tiers::factory()->create();
+    $patient = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create([
+        'tiers_id' => $patient->id,
+        'operation_id' => $op->id,
+        'refere_par_id' => $referent->id,
+    ]);
+    $op->delete();
+
+    Livewire::test(Operations::class, ['tiers' => $referent])
+        ->assertSee('Archivée');
+});
+
+it('affiche le badge HelloAsso dans la section Suit', function (): void {
+    $medecin = Tiers::factory()->create();
+    $patient = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create([
+        'tiers_id' => $patient->id,
+        'operation_id' => $op->id,
+        'medecin_tiers_id' => $medecin->id,
+        'est_helloasso' => true,
+    ]);
+
+    Livewire::test(Operations::class, ['tiers' => $medecin])
+        ->assertSee('HelloAsso');
+});
+
+it('affiche le badge Archivée dans la section Suit si opération soft-deleted', function (): void {
+    $medecin = Tiers::factory()->create();
+    $patient = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+    Participant::factory()->create([
+        'tiers_id' => $patient->id,
+        'operation_id' => $op->id,
+        'medecin_tiers_id' => $medecin->id,
+    ]);
+    $op->delete();
+
+    Livewire::test(Operations::class, ['tiers' => $medecin])
+        ->assertSee('Archivée');
+});
+
 it('affiche 2 lignes pour double rôle médecin+thérapeute sur même opération', function (): void {
     $suivi = Tiers::factory()->create();
     $patient = Tiers::factory()->create(['prenom' => 'Anne', 'nom' => 'Brun']);

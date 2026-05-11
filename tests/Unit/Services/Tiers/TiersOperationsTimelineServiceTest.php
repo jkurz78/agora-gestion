@@ -537,6 +537,36 @@ it('aReferreForTiers trie par tiers.nom ASC', function (): void {
         ->and($dto->lignes[2]->tiersReferreId())->toBe((int) $tiersC->id);
 });
 
+it('aReferreForTiers trie par dateDebut opération DESC en secondaire (même nom)', function (): void {
+    $referent = Tiers::factory()->create();
+    $patient = Tiers::factory()->create(['nom' => 'Dupont', 'prenom' => 'Marie']);
+
+    // Même patient sur 2 opérations
+    $opRecente = Operation::factory()->create();
+    Seance::factory()->create(['operation_id' => $opRecente->id, 'date' => '2026-03-15']);
+    Participant::factory()->create([
+        'tiers_id' => $patient->id,
+        'operation_id' => $opRecente->id,
+        'refere_par_id' => $referent->id,
+    ]);
+
+    $opAncienne = Operation::factory()->create();
+    Seance::factory()->create(['operation_id' => $opAncienne->id, 'date' => '2024-09-10']);
+    Participant::factory()->create([
+        'tiers_id' => $patient->id,
+        'operation_id' => $opAncienne->id,
+        'refere_par_id' => $referent->id,
+    ]);
+
+    $dto = app(TiersOperationsTimelineService::class)->aReferreForTiers($referent);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and(count($dto->lignes))->toBe(2);
+    // L'opération qui a démarré le plus récemment en premier (dateDebut DESC)
+    expect($dto->lignes[0]->operationId())->toBe((int) $opRecente->id)
+        ->and($dto->lignes[1]->operationId())->toBe((int) $opAncienne->id);
+});
+
 it('aReferreForTiers isole les autres tiers', function (): void {
     $referentX = Tiers::factory()->create();
     $referentZ = Tiers::factory()->create();
@@ -690,6 +720,32 @@ it('suitForTiers trie par tiers.nom ASC', function (): void {
     expect($dto->lignes[0]->tiersSuiviId())->toBe((int) $tiersA->id)
         ->and($dto->lignes[1]->tiersSuiviId())->toBe((int) $tiersB->id)
         ->and($dto->lignes[2]->tiersSuiviId())->toBe((int) $tiersC->id);
+});
+
+it('suitForTiers isole les autres tiers (même tenant)', function (): void {
+    $medecinA = Tiers::factory()->create();
+    $medecinB = Tiers::factory()->create();
+    $patientA = Tiers::factory()->create();
+    $patientB = Tiers::factory()->create();
+    $op = Operation::factory()->create();
+
+    Participant::factory()->create([
+        'tiers_id' => $patientA->id,
+        'operation_id' => $op->id,
+        'medecin_tiers_id' => $medecinA->id,
+    ]);
+
+    $op2 = Operation::factory()->create();
+    Participant::factory()->create([
+        'tiers_id' => $patientB->id,
+        'operation_id' => $op2->id,
+        'medecin_tiers_id' => $medecinB->id,
+    ]);
+
+    $dto = app(TiersOperationsTimelineService::class)->suitForTiers($medecinA);
+
+    expect($dto->totalCount)->toBe(1)
+        ->and($dto->lignes[0]->tiersSuiviId())->toBe((int) $patientA->id);
 });
 
 it('suitForTiers isole multi-tenant', function (): void {
