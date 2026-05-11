@@ -103,9 +103,9 @@ final class TiersOperationsTimelineService
             if ($cmp !== 0) {
                 return $cmp;
             }
-            // Tri secondaire : date opération desc (max séance, nulls en queue)
-            $da = $a->operation->seances->pluck('date')->max();
-            $db = $b->operation->seances->pluck('date')->max();
+            // Tri secondaire : dateDebut opération desc (min séance, nulls en queue)
+            $da = $a->operation->seances->pluck('date')->min();
+            $db = $b->operation->seances->pluck('date')->min();
             if ($da === null && $db === null) {
                 return 0;
             }
@@ -165,9 +165,9 @@ final class TiersOperationsTimelineService
             if ($cmp !== 0) {
                 return $cmp;
             }
-            // Tri secondaire : date opération desc (max séance, nulls en queue)
-            $da = $a['p']->operation->seances->pluck('date')->max();
-            $db = $b['p']->operation->seances->pluck('date')->max();
+            // Tri secondaire : dateDebut opération desc (min séance, nulls en queue)
+            $da = $a['p']->operation->seances->pluck('date')->min();
+            $db = $b['p']->operation->seances->pluck('date')->min();
             if ($da === null && $db === null) {
                 return 0;
             }
