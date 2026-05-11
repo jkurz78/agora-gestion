@@ -15,7 +15,6 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
 use App\Models\TypeOperationTarif;
-use App\Services\Tiers\DTO\AReferreLigneDTO;
 use App\Services\Tiers\DTO\AReferreTimelineDTO;
 use App\Services\Tiers\DTO\ParticipationLigneDTO;
 use App\Services\Tiers\DTO\ParticipationsTimelineDTO;

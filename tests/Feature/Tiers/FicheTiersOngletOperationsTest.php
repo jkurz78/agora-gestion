@@ -6,7 +6,6 @@ use App\Livewire\Tiers\FicheTiers;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Tiers;
-use App\Models\TypeOperation;
 use App\Models\User;
 use Livewire\Livewire;
 
