@@ -22,6 +22,7 @@ final class FormuleAdhesion extends TenantModel
         'description',
         'mode',
         'duree_mois',
+        'duree_jours',
         'montant_par_defaut',
         'deductible_fiscal',
         'sous_categorie_id',
@@ -36,6 +37,7 @@ final class FormuleAdhesion extends TenantModel
     protected $casts = [
         'association_id' => 'integer',
         'duree_mois' => 'integer',
+        'duree_jours' => 'integer',
         'montant_par_defaut' => 'decimal:2',
         'deductible_fiscal' => 'boolean',
         'sous_categorie_id' => 'integer',
@@ -51,6 +53,19 @@ final class FormuleAdhesion extends TenantModel
         parent::booted();
 
         self::saving(function (FormuleAdhesion $formule): void {
+            // Contrainte XOR : mode=duree doit avoir exactement une unité (mois OU jours).
+            // Exception : formules HelloAsso en mode Custom — elles utilisent helloasso_start_date
+            // et helloasso_end_date à la place, pas duree_mois ni duree_jours.
+            if ($formule->mode === 'duree' && ! $formule->est_helloasso) {
+                $hasMois = $formule->duree_mois !== null;
+                $hasJours = $formule->duree_jours !== null;
+                if ($hasMois === $hasJours) {
+                    throw new \DomainException(
+                        'Une formule en mode "durée" doit avoir exactement une unité : mois OU jours.'
+                    );
+                }
+            }
+
             if (! $formule->actif) {
                 return;
             }
@@ -101,5 +116,11 @@ final class FormuleAdhesion extends TenantModel
     public function isModeIllimite(): bool
     {
         return $this->mode === 'illimite';
+    }
+
+    /** Retourne true si la formule est en mode durée avec une unité en jours. */
+    public function isUniteJours(): bool
+    {
+        return $this->mode === 'duree' && $this->duree_jours !== null;
     }
 }

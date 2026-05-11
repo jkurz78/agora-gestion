@@ -25,6 +25,7 @@ final class FormuleAdhesionFactory extends Factory
             'description' => $this->faker->optional()->sentence(),
             'mode' => 'exercice',
             'duree_mois' => null,
+            'duree_jours' => null,
             'montant_par_defaut' => $this->faker->randomFloat(2, 10, 100),
             'deductible_fiscal' => false,
             'sous_categorie_id' => SousCategorie::factory()->pourCotisations(),
