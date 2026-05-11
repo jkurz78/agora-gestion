@@ -11,7 +11,7 @@ final class SuitLigneDTO
 {
     public function __construct(
         public readonly Participant $participant,
-        public readonly string $qualite, // 'medecin' | 'therapeute' — injecté par le service
+        private readonly string $qualite, // 'medecin' | 'therapeute' — injecté par le service
     ) {}
 
     public function tiersSuiviId(): int
