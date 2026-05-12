@@ -131,3 +131,22 @@ it('liste les pièces jointes au niveau transaction', function (): void {
         ->and($result->piecesJointes[0]->ligneId)->toBeNull()
         ->and($result->piecesJointes[0]->libelle)->toBe('Facture EDF');
 });
+
+it('liste les pièces jointes au niveau ligne', function (): void {
+    $tiers = Tiers::factory()->create();
+    $tx = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'piece_jointe_path' => null,
+        'libelle' => 'Note de frais Q1',
+    ]);
+    TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'piece_jointe_path' => 'ndf/1/ticket.pdf',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->piecesJointes)->toHaveCount(1)
+        ->and($result->piecesJointes[0]->niveau)->toBe('ligne')
+        ->and($result->piecesJointes[0]->ligneId)->not->toBeNull();
+});
