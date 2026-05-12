@@ -114,3 +114,24 @@ it('pagine à 50 lignes/page', function (): void {
         ->and($page2->emails->count())->toBe(1)
         ->and($page1->total)->toBe(51);
 });
+
+it('filtre par catégorie', function (): void {
+    $tiers = Tiers::factory()->create();
+    EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+        'categorie' => CategorieEmail::Attestation->value,
+    ]);
+    EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+        'categorie' => CategorieEmail::Message->value,
+    ]);
+
+    $filtered = $this->service->forTiers($tiers, filtreCategorie: CategorieEmail::Attestation->value);
+
+    expect($filtered->emails->count())->toBe(1)
+        ->and($filtered->emails->getCollection()->first()->categorie)
+            ->toBe(CategorieEmail::Attestation->value)
+        ->and($filtered->total)->toBe(2); // total non filtré conservé
+});
