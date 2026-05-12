@@ -8,7 +8,6 @@ use App\Models\EmailLog;
 use App\Models\Tiers;
 use App\Services\Tiers\DTO\CommunicationsTimelineDTO;
 use App\Services\Tiers\DTO\EmailLogLigneDTO;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
 final class TiersCommunicationsTimelineService
