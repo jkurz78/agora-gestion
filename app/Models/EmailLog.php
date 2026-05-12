@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 final class EmailLog extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'tiers_id',
         'participant_id',
