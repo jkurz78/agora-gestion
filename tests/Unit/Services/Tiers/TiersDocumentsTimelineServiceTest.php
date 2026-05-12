@@ -89,3 +89,29 @@ it('liste les factures partenaires déposées', function (): void {
 
     expect($result->facturesDeposees)->toHaveCount(1);
 });
+
+it('liste les justificatifs des participants du tiers', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    ParticipantDocument::factory()->create([
+        'participant_id' => $participant->id,
+        'label' => 'Attestation médicale',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->justificatifsParticipants)->toHaveCount(1)
+        ->and($result->justificatifsParticipants[0]->label)->toBe('Attestation médicale')
+        ->and($result->justificatifsParticipants[0]->participantId)->toBe($participant->id);
+});
+
+it('exclut les justificatifs des participants d\'autres tiers', function (): void {
+    $tiers = Tiers::factory()->create();
+    $autre = Tiers::factory()->create();
+    $autreParticipant = Participant::factory()->create(['tiers_id' => $autre->id]);
+    ParticipantDocument::factory()->create(['participant_id' => $autreParticipant->id]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->justificatifsParticipants)->toHaveCount(0);
+});
