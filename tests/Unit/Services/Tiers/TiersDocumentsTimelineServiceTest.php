@@ -150,3 +150,26 @@ it('liste les pièces jointes au niveau ligne', function (): void {
         ->and($result->piecesJointes[0]->niveau)->toBe('ligne')
         ->and($result->piecesJointes[0]->ligneId)->not->toBeNull();
 });
+
+it('isole les documents par tenant (asso B ne voit pas les docs de asso A)', function (): void {
+    $tiersA = Tiers::factory()->create();
+    Facture::factory()->create(['tiers_id' => $tiersA->id]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiersA->id,
+        'annule_at' => null,
+    ]);
+
+    // Bascule sur une autre association
+    $assoB = Association::factory()->create();
+    TenantContext::boot($assoB);
+    $tiersB = Tiers::factory()->create();
+
+    $result = $this->service->forTiers($tiersB);
+
+    expect($result->totalGlobal)->toBe(0);
+
+    // Re-test : même service appelé sur tiersA depuis le tenant B → doit aussi retourner 0
+    // car TenantModel scope global filtre sur association_id
+    $resultCross = $this->service->forTiers($tiersA);
+    expect($resultCross->totalGlobal)->toBe(0);
+});
