@@ -18,3 +18,21 @@ beforeEach(function (): void {
     TenantContext::boot($this->association);
     $this->service = app(TiersCommunicationsTimelineService::class);
 });
+
+it('liste un email lié au tiers via tiers_id direct', function (): void {
+    $tiers = Tiers::factory()->create();
+    EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+        'objet' => 'Hello',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result)->toBeInstanceOf(CommunicationsTimelineDTO::class)
+        ->and($result->total)->toBe(1)
+        ->and($result->emails->total())->toBe(1)
+        ->and($result->emails->getCollection()->first())
+            ->toBeInstanceOf(EmailLogLigneDTO::class)
+        ->and($result->emails->getCollection()->first()->objet)->toBe('Hello');
+});
