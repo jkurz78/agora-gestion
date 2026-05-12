@@ -135,3 +135,23 @@ it('filtre par catégorie', function (): void {
             ->toBe(CategorieEmail::Attestation->value)
         ->and($filtered->total)->toBe(2); // total non filtré conservé
 });
+
+it('expose les compteurs par catégorie', function (): void {
+    $tiers = Tiers::factory()->create();
+    EmailLog::factory()->count(3)->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+        'categorie' => CategorieEmail::Attestation->value,
+    ]);
+    EmailLog::factory()->count(2)->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+        'categorie' => CategorieEmail::Message->value,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->compteursParCategorie)
+        ->toHaveKey(CategorieEmail::Attestation->value, 3)
+        ->toHaveKey(CategorieEmail::Message->value, 2);
+});
