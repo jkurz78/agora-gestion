@@ -99,3 +99,18 @@ it('trie les emails par created_at DESC', function (): void {
 
     expect($objets)->toBe(['Recent', 'Vieux']);
 });
+
+it('pagine à 50 lignes/page', function (): void {
+    $tiers = Tiers::factory()->create();
+    EmailLog::factory()->count(51)->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+    ]);
+
+    $page1 = $this->service->forTiers($tiers, page: 1);
+    $page2 = $this->service->forTiers($tiers, page: 2);
+
+    expect($page1->emails->count())->toBe(50)
+        ->and($page2->emails->count())->toBe(1)
+        ->and($page1->total)->toBe(51);
+});
