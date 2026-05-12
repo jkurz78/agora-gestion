@@ -133,11 +133,11 @@ final class TiersDocumentsTimelineService
     {
         return ParticipantDocument::query()
             ->whereIn('participant_id', $tiers->participants()->select('id'))
-            ->with('participant:id,nom,prenom')
+            ->with('participant.tiers:id,nom,prenom')
             ->latest()
             ->get()
             ->map(function (ParticipantDocument $d): DocumentParticipantLigneDTO {
-                $nom = trim((string) ($d->participant->prenom ?? '').' '.($d->participant->nom ?? ''));
+                $nom = trim((string) ($d->participant->tiers->prenom ?? '').' '.($d->participant->tiers->nom ?? ''));
                 $filename = basename((string) $d->storage_path);
 
                 return new DocumentParticipantLigneDTO(
