@@ -33,7 +33,7 @@ it('liste un email lié au tiers via tiers_id direct', function (): void {
         ->and($result->total)->toBe(1)
         ->and($result->emails->total())->toBe(1)
         ->and($result->emails->getCollection()->first())
-            ->toBeInstanceOf(EmailLogLigneDTO::class)
+        ->toBeInstanceOf(EmailLogLigneDTO::class)
         ->and($result->emails->getCollection()->first()->objet)->toBe('Hello');
 });
 
@@ -132,7 +132,7 @@ it('filtre par catégorie', function (): void {
 
     expect($filtered->emails->count())->toBe(1)
         ->and($filtered->emails->getCollection()->first()->categorie)
-            ->toBe(CategorieEmail::Attestation->value)
+        ->toBe(CategorieEmail::Attestation->value)
         ->and($filtered->total)->toBe(2); // total non filtré conservé
 });
 
