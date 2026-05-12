@@ -100,7 +100,7 @@ final class TiersDocumentsTimelineService
                     numero: (string) $f->numero,
                     date: Carbon::parse($f->date),
                     type: (string) ($f->type ?? 'facture'),
-                    statut: (string) $f->statut,
+                    statut: $f->statut instanceof \BackedEnum ? $f->statut->value : (string) $f->statut,
                     montantTtc: (float) ($f->montant_total ?? 0),
                     ficheUrl: route('facturation.factures.show', ['facture' => $f->id]),
                 );

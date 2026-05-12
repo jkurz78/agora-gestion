@@ -70,3 +70,13 @@ it('exclut les reçus fiscaux annulés', function (): void {
 
     expect($result->recusFiscaux)->toHaveCount(0);
 });
+
+it('liste les factures émises tous statuts', function (): void {
+    $tiers = Tiers::factory()->create();
+    Facture::factory()->create(['tiers_id' => $tiers->id, 'statut' => 'brouillon']);
+    Facture::factory()->create(['tiers_id' => $tiers->id, 'statut' => 'validee']);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->facturesEmises)->toHaveCount(2);
+});
