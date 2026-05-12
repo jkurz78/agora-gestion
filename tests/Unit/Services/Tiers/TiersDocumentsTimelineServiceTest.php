@@ -80,3 +80,12 @@ it('liste les factures émises tous statuts', function (): void {
 
     expect($result->facturesEmises)->toHaveCount(2);
 });
+
+it('liste les factures partenaires déposées', function (): void {
+    $tiers = Tiers::factory()->create();
+    FacturePartenaireDeposee::factory()->create(['tiers_id' => $tiers->id]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->facturesDeposees)->toHaveCount(1);
+});
