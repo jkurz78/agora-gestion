@@ -15,7 +15,7 @@
         <tbody>
             @foreach($lignes as $email)
                 <tr>
-                    <td data-sort="{{ $email->dateEnvoi->toIso8601String() }}">
+                    <td data-sort="{{ $email->dateEnvoi->format('Y-m-d H:i:s') }}">
                         {{ $email->dateEnvoi->format('d/m/Y H:i') }}
                     </td>
                     <td>

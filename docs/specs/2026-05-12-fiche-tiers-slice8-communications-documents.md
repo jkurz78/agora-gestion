@@ -75,7 +75,7 @@ Livrer 2 nouveaux onglets sur `/tiers/{tiers}` :
 
 Les deux signatures ne dépendent ni de `Auth`, ni du rôle. Réutilisables depuis un futur composant portail.
 
-### 5.3 DTOs (tous `readonly`, dans `App\Services\Tiers\DTOs\`)
+### 5.3 DTOs (tous `readonly`, dans `App\Services\Tiers\DTO\` — namespace singulier, cohérent slice 7)
 
 ```php
 final readonly class CommunicationsTimelineDTO {

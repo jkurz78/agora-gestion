@@ -118,5 +118,7 @@ it("affiche le compteur d'ouvertures", function (): void {
     EmailOpen::factory()->count(2)->create(['email_log_id' => $log->id]);
 
     Livewire::test(Communications::class, ['tiers' => $tiers])
-        ->assertSeeInOrder(['bi-eye', '2']);
+        ->assertSeeHtml('bi-eye')
+        ->assertSeeHtml('<i class="bi bi-eye"')
+        ->assertSee('2');
 });
