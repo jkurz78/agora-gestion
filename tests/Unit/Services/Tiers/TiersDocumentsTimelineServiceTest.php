@@ -13,7 +13,6 @@ use App\Models\RecuFiscalEmis;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Services\Tiers\DTO\DocumentsTimelineDTO;
 use App\Services\Tiers\TiersDocumentsTimelineService;
 use App\Tenant\TenantContext;
 
@@ -172,4 +171,21 @@ it('isole les documents par tenant (asso B ne voit pas les docs de asso A)', fun
     // car TenantModel scope global filtre sur association_id
     $resultCross = $this->service->forTiers($tiersA);
     expect($resultCross->totalGlobal)->toBe(0);
+});
+
+it('countTotal somme les 5 sources', function (): void {
+    $tiers = Tiers::factory()->create();
+    $tx = Transaction::factory()->create(['tiers_id' => $tiers->id, 'piece_jointe_path' => 'a.pdf']);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => null,
+    ]);
+    Facture::factory()->create(['tiers_id' => $tiers->id]);
+    FacturePartenaireDeposee::factory()->create(['tiers_id' => $tiers->id]);
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    ParticipantDocument::factory()->create(['participant_id' => $participant->id]);
+
+    expect($this->service->countTotal($tiers))->toBe(5);
 });
