@@ -162,9 +162,10 @@ it('expose nbOuvertures et premiereOuvertureAt', function (): void {
         'tiers_id' => $tiers->id,
         'participant_id' => null,
     ]);
+    $expected = now()->subHour();
     EmailOpen::factory()->create([
         'email_log_id' => $log->id,
-        'opened_at' => now()->subHour(),
+        'opened_at' => $expected,
     ]);
     EmailOpen::factory()->create([
         'email_log_id' => $log->id,
@@ -175,7 +176,8 @@ it('expose nbOuvertures et premiereOuvertureAt', function (): void {
     $dto = $result->emails->getCollection()->first();
 
     expect($dto->nbOuvertures)->toBe(2)
-        ->and($dto->premiereOuvertureAt)->not->toBeNull();
+        ->and($dto->premiereOuvertureAt)->not->toBeNull()
+        ->and($dto->premiereOuvertureAt->format('Y-m-d H:i'))->toBe($expected->format('Y-m-d H:i'));
 });
 
 it('détecte une pièce jointe et expose le nom de fichier', function (): void {
@@ -192,4 +194,46 @@ it('détecte une pièce jointe et expose le nom de fichier', function (): void {
 
     expect($dto->aPieceJointe)->toBeTrue()
         ->and($dto->attachmentNom)->toBe('attestation-2025.pdf');
+});
+
+it('retourne un DTO vide si le tiers n\'a aucun email', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->total)->toBe(0)
+        ->and($result->emails->total())->toBe(0)
+        ->and($result->emails->count())->toBe(0)
+        ->and($result->compteursParCategorie)->toBe([]);
+});
+
+it('isole les emails par tenant (asso B ne voit pas les emails de asso A)', function (): void {
+    // Création d'un email pour le tiers de asso A (TenantContext déjà booté sur $this->association)
+    $tiersA = Tiers::factory()->create();
+    EmailLog::factory()->create([
+        'tiers_id' => $tiersA->id,
+        'participant_id' => null,
+    ]);
+
+    // Création d'un participant de asso A lié au tiers + email via participant_id
+    $participantA = Participant::factory()->create(['tiers_id' => $tiersA->id]);
+    EmailLog::factory()->create([
+        'tiers_id' => null,
+        'participant_id' => $participantA->id,
+    ]);
+
+    // Bascule sur asso B
+    $assoB = Association::factory()->create();
+    TenantContext::boot($assoB);
+    $tiersB = Tiers::factory()->create();
+
+    // forTiers sur tiersB ne doit rien retourner (pas d'emails créés pour B)
+    $resultB = $this->service->forTiers($tiersB);
+    expect($resultB->total)->toBe(0);
+
+    // forTiers sur tiersA depuis tenant B doit aussi retourner 0 (Tiers::find filtré par scope global)
+    // Note : on passe l'instance déjà chargée — la requête EmailLog elle-même reste filtrée via participant_id sub-query
+    // qui inclut le scope global TenantModel sur Participant
+    $resultCross = $this->service->forTiers($tiersA);
+    expect($resultCross->total)->toBe(0);
 });

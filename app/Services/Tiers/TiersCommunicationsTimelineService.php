@@ -65,7 +65,10 @@ final class TiersCommunicationsTimelineService
     {
         return EmailLog::query()
             ->where(function (Builder $q) use ($tiers): void {
-                $q->where('tiers_id', $tiers->id)
+                $q->where(function (Builder $inner) use ($tiers): void {
+                    $inner->where('tiers_id', $tiers->id)
+                        ->whereIn('tiers_id', Tiers::select('id'));
+                })
                     ->orWhereIn(
                         'participant_id',
                         $tiers->participants()->select('id')
