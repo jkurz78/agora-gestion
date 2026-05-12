@@ -36,3 +36,19 @@ it('liste un email lié au tiers via tiers_id direct', function (): void {
             ->toBeInstanceOf(EmailLogLigneDTO::class)
         ->and($result->emails->getCollection()->first()->objet)->toBe('Hello');
 });
+
+it('liste un email envoyé via un participant du tiers (UNION)', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    EmailLog::factory()->create([
+        'tiers_id' => null,
+        'participant_id' => $participant->id,
+        'objet' => 'Via participant',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->total)->toBe(1)
+        ->and($result->emails->getCollection()->first()->objet)->toBe('Via participant')
+        ->and($result->emails->getCollection()->first()->participantId)->toBe($participant->id);
+});
