@@ -66,3 +66,15 @@ it('ne duplique pas un email cumulant tiers_id ET participant_id du tiers', func
 
     expect($result->total)->toBe(1);
 });
+
+it('exclut les emails d\'autres tiers', function (): void {
+    $tiers = Tiers::factory()->create();
+    $autre = Tiers::factory()->create();
+    EmailLog::factory()->create(['tiers_id' => $autre->id, 'participant_id' => null]);
+    EmailLog::factory()->create(['tiers_id' => $tiers->id, 'participant_id' => null, 'objet' => 'OK']);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->total)->toBe(1)
+        ->and($result->emails->getCollection()->first()->objet)->toBe('OK');
+});
