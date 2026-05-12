@@ -79,7 +79,7 @@ final class TiersDocumentsTimelineService
                 type: $type,
                 dateEmission: Carbon::parse($recu->emitted_at),
                 montant: (float) $recu->montant_centimes / 100,
-                downloadUrl: route('recu-fiscal.download', ['recu' => $recu->id]),
+                downloadUrl: route('tiers.recu-fiscal.download', ['recu' => $recu->id]),
                 sourceUrl: $estCotisation
                     ? route('tiers.show', ['tiers' => $tiers->id]).'?onglet=adhesion'
                     : route('tiers.show', ['tiers' => $tiers->id]).'?onglet=dons',
@@ -102,7 +102,7 @@ final class TiersDocumentsTimelineService
                     type: (string) ($f->type ?? 'facture'),
                     statut: (string) $f->statut,
                     montantTtc: (float) ($f->montant_total ?? 0),
-                    ficheUrl: route('factures.show', ['facture' => $f->id]),
+                    ficheUrl: route('facturation.factures.show', ['facture' => $f->id]),
                 );
             })->all();
     }
@@ -147,7 +147,7 @@ final class TiersDocumentsTimelineService
                     participantNom: $nom,
                     source: (string) $d->source,
                     dateDepot: Carbon::parse($d->created_at),
-                    downloadUrl: route('participants.documents.download', [
+                    downloadUrl: route('operations.participants.documents.download', [
                         'participant' => $d->participant_id,
                         'filename' => $filename,
                     ]),
@@ -159,16 +159,9 @@ final class TiersDocumentsTimelineService
     private function piecesJointes(Tiers $tiers): array
     {
         $txLignes = TransactionLigne::query()
-            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
-            ->where('transactions.tiers_id', $tiers->id)
-            ->whereNotNull('transaction_lignes.piece_jointe_path')
-            ->select([
-                'transaction_lignes.id as ligne_id',
-                'transaction_lignes.transaction_id',
-                'transactions.type as tx_type',
-                'transactions.date as tx_date',
-                'transactions.libelle as tx_libelle',
-            ])
+            ->whereHas('transaction', fn ($q) => $q->where('tiers_id', $tiers->id))
+            ->whereNotNull('piece_jointe_path')
+            ->with('transaction:id,type,date,libelle,tiers_id')
             ->get();
 
         $tx = Transaction::query()
@@ -176,16 +169,16 @@ final class TiersDocumentsTimelineService
             ->whereNotNull('piece_jointe_path')
             ->get(['id', 'type', 'date', 'libelle']);
 
-        $lignesDtos = $txLignes->map(fn ($row) => new PieceJointeLigneDTO(
-            transactionId: (int) $row->transaction_id,
-            ligneId: (int) $row->ligne_id,
-            dateTransaction: Carbon::parse($row->tx_date),
-            type: (string) $row->tx_type,
-            libelle: (string) $row->tx_libelle,
+        $lignesDtos = $txLignes->map(fn (TransactionLigne $ligne) => new PieceJointeLigneDTO(
+            transactionId: (int) $ligne->transaction_id,
+            ligneId: (int) $ligne->id,
+            dateTransaction: Carbon::parse($ligne->transaction->date),
+            type: (string) $ligne->transaction->type,
+            libelle: (string) $ligne->transaction->libelle,
             niveau: 'ligne',
-            downloadUrl: route('transactions.piece-jointe-ligne', [
-                'transaction' => $row->transaction_id,
-                'ligne' => $row->ligne_id,
+            downloadUrl: route('comptabilite.transactions.piece-jointe-ligne', [
+                'transaction' => $ligne->transaction_id,
+                'ligne' => $ligne->id,
             ]),
         ));
 
