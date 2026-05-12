@@ -52,3 +52,17 @@ it('liste un email envoyé via un participant du tiers (UNION)', function (): vo
         ->and($result->emails->getCollection()->first()->objet)->toBe('Via participant')
         ->and($result->emails->getCollection()->first()->participantId)->toBe($participant->id);
 });
+
+it('ne duplique pas un email cumulant tiers_id ET participant_id du tiers', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => $participant->id,
+        'objet' => 'Cumul',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->total)->toBe(1);
+});
