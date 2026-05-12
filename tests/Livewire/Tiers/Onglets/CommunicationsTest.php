@@ -7,7 +7,6 @@ use App\Livewire\Tiers\Onglets\Communications;
 use App\Models\Association;
 use App\Models\EmailLog;
 use App\Models\EmailOpen;
-use App\Models\Participant;
 use App\Models\Tiers;
 use App\Models\User;
 use App\Tenant\TenantContext;
