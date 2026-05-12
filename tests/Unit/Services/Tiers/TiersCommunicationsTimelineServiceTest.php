@@ -78,3 +78,24 @@ it('exclut les emails d\'autres tiers', function (): void {
     expect($result->total)->toBe(1)
         ->and($result->emails->getCollection()->first()->objet)->toBe('OK');
 });
+
+it('trie les emails par created_at DESC', function (): void {
+    $tiers = Tiers::factory()->create();
+    EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+        'objet' => 'Vieux',
+        'created_at' => now()->subDays(10),
+    ]);
+    EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+        'objet' => 'Recent',
+        'created_at' => now(),
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+    $objets = $result->emails->getCollection()->pluck('objet')->all();
+
+    expect($objets)->toBe(['Recent', 'Vieux']);
+});
