@@ -173,7 +173,9 @@ final class TiersDocumentsTimelineService
             transactionId: (int) $ligne->transaction_id,
             ligneId: (int) $ligne->id,
             dateTransaction: Carbon::parse($ligne->transaction->date),
-            type: (string) $ligne->transaction->type,
+            type: $ligne->transaction->type instanceof \BackedEnum
+                ? $ligne->transaction->type->value
+                : (string) $ligne->transaction->type,
             libelle: (string) $ligne->transaction->libelle,
             niveau: 'ligne',
             downloadUrl: route('comptabilite.transactions.piece-jointe-ligne', [
@@ -186,7 +188,7 @@ final class TiersDocumentsTimelineService
             transactionId: (int) $t->id,
             ligneId: null,
             dateTransaction: Carbon::parse($t->date),
-            type: (string) $t->type,
+            type: $t->type instanceof \BackedEnum ? $t->type->value : (string) $t->type,
             libelle: (string) $t->libelle,
             niveau: 'transaction',
             downloadUrl: route('transactions.piece-jointe', ['transaction' => $t->id]),

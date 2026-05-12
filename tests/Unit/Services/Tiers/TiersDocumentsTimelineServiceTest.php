@@ -115,3 +115,19 @@ it('exclut les justificatifs des participants d\'autres tiers', function (): voi
 
     expect($result->justificatifsParticipants)->toHaveCount(0);
 });
+
+it('liste les pièces jointes au niveau transaction', function (): void {
+    $tiers = Tiers::factory()->create();
+    Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'piece_jointe_path' => 'tx/1/scan.pdf',
+        'libelle' => 'Facture EDF',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->piecesJointes)->toHaveCount(1)
+        ->and($result->piecesJointes[0]->niveau)->toBe('transaction')
+        ->and($result->piecesJointes[0]->ligneId)->toBeNull()
+        ->and($result->piecesJointes[0]->libelle)->toBe('Facture EDF');
+});
