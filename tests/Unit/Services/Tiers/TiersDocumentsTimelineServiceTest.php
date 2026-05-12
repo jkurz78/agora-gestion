@@ -55,3 +55,18 @@ it('détecte un reçu fiscal de type cotisation via adhésion liée', function (
     expect($result->recusFiscaux)->toHaveCount(1)
         ->and($result->recusFiscaux[0]->type)->toBe('cotisation');
 });
+
+it('exclut les reçus fiscaux annulés', function (): void {
+    $tiers = Tiers::factory()->create();
+    $tx = Transaction::factory()->create(['tiers_id' => $tiers->id]);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => now(),
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->recusFiscaux)->toHaveCount(0);
+});
