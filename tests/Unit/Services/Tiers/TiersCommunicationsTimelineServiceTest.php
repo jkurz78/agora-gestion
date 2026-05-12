@@ -177,3 +177,19 @@ it('expose nbOuvertures et premiereOuvertureAt', function (): void {
     expect($dto->nbOuvertures)->toBe(2)
         ->and($dto->premiereOuvertureAt)->not->toBeNull();
 });
+
+it('détecte une pièce jointe et expose le nom de fichier', function (): void {
+    $tiers = Tiers::factory()->create();
+    EmailLog::factory()
+        ->avecPieceJointe('emails/12/attestation-2025.pdf')
+        ->create([
+            'tiers_id' => $tiers->id,
+            'participant_id' => null,
+        ]);
+
+    $result = $this->service->forTiers($tiers);
+    $dto = $result->emails->getCollection()->first();
+
+    expect($dto->aPieceJointe)->toBeTrue()
+        ->and($dto->attachmentNom)->toBe('attestation-2025.pdf');
+});
