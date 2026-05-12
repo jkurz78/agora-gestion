@@ -155,3 +155,25 @@ it('expose les compteurs par catégorie', function (): void {
         ->toHaveKey(CategorieEmail::Attestation->value, 3)
         ->toHaveKey(CategorieEmail::Message->value, 2);
 });
+
+it('expose nbOuvertures et premiereOuvertureAt', function (): void {
+    $tiers = Tiers::factory()->create();
+    $log = EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+    ]);
+    EmailOpen::factory()->create([
+        'email_log_id' => $log->id,
+        'opened_at' => now()->subHour(),
+    ]);
+    EmailOpen::factory()->create([
+        'email_log_id' => $log->id,
+        'opened_at' => now(),
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+    $dto = $result->emails->getCollection()->first();
+
+    expect($dto->nbOuvertures)->toBe(2)
+        ->and($dto->premiereOuvertureAt)->not->toBeNull();
+});
