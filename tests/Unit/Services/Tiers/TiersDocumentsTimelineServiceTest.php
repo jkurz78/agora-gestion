@@ -22,3 +22,19 @@ beforeEach(function (): void {
     TenantContext::boot($this->association);
     $this->service = app(TiersDocumentsTimelineService::class);
 });
+
+it('liste un reçu fiscal don (pas d\'adhésion liée)', function (): void {
+    $tiers = Tiers::factory()->create();
+    $tx = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Recette->value]);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => null,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->recusFiscaux)->toHaveCount(1)
+        ->and($result->recusFiscaux[0]->type)->toBe('don');
+});
