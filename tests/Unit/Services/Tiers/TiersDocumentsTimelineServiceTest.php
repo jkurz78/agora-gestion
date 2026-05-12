@@ -138,7 +138,7 @@ it('liste les pièces jointes au niveau ligne', function (): void {
         'piece_jointe_path' => null,
         'libelle' => 'Note de frais Q1',
     ]);
-    TransactionLigne::factory()->create([
+    $ligne = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
         'piece_jointe_path' => 'ndf/1/ticket.pdf',
     ]);
@@ -147,7 +147,7 @@ it('liste les pièces jointes au niveau ligne', function (): void {
 
     expect($result->piecesJointes)->toHaveCount(1)
         ->and($result->piecesJointes[0]->niveau)->toBe('ligne')
-        ->and($result->piecesJointes[0]->ligneId)->not->toBeNull();
+        ->and($result->piecesJointes[0]->ligneId)->toBe((int) $ligne->id);
 });
 
 it('isole les documents par tenant (asso B ne voit pas les docs de asso A)', function (): void {
@@ -175,8 +175,9 @@ it('isole les documents par tenant (asso B ne voit pas les docs de asso A)', fun
 
 it('countTotal somme les 5 sources', function (): void {
     $tiers = Tiers::factory()->create();
+    // 1 PJ niveau transaction (la ligne ci-dessous n'en a pas → ne double pas le compte)
     $tx = Transaction::factory()->create(['tiers_id' => $tiers->id, 'piece_jointe_path' => 'a.pdf']);
-    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id]);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id, 'piece_jointe_path' => null]);
     RecuFiscalEmis::factory()->create([
         'tiers_id' => $tiers->id,
         'transaction_ligne_id' => $ligne->id,
