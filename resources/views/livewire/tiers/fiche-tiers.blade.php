@@ -50,6 +50,10 @@
         <livewire:tiers.onglets.adhesion :tiers="$tiers" :key="'adhesion-'.$tiers->id" wire:lazy />
     @elseif($currentOnglet === 'operations')
         <livewire:tiers.onglets.operations :tiers="$tiers" :key="'operations-'.$tiers->id" wire:lazy />
+    @elseif($currentOnglet === 'communications')
+        <livewire:tiers.onglets.communications :tiers="$tiers" :key="'communications-'.$tiers->id" wire:lazy />
+    @elseif($currentOnglet === 'documents')
+        <livewire:tiers.onglets.documents :tiers="$tiers" :key="'documents-'.$tiers->id" wire:lazy />
     @else
         <livewire:tiers.onglets.coordonnees :tiers="$tiers" :key="'coord-'.$tiers->id" wire:lazy />
     @endif

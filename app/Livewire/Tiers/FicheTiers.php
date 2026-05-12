@@ -9,6 +9,8 @@ use App\Models\Participant;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use App\Services\Tiers\TiersAdhesionTimelineService;
+use App\Services\Tiers\TiersCommunicationsTimelineService;
+use App\Services\Tiers\TiersDocumentsTimelineService;
 use App\Services\Tiers\TiersDonsTimelineService;
 use Illuminate\View\View;
 use Livewire\Attributes\Url;
@@ -65,6 +67,16 @@ final class FicheTiers extends Component
         $totalOperations = $nbParticipations + $nbReferre + $nbSuit + $nbEnc;
         if ($totalOperations > 0) {
             $onglets[] = ['key' => 'operations', 'label' => 'Opérations', 'count' => $totalOperations];
+        }
+
+        $nbCommunications = app(TiersCommunicationsTimelineService::class)->countTotal($this->tiers);
+        if ($nbCommunications > 0) {
+            $onglets[] = ['key' => 'communications', 'label' => 'Communications', 'count' => $nbCommunications];
+        }
+
+        $nbDocuments = app(TiersDocumentsTimelineService::class)->countTotal($this->tiers);
+        if ($nbDocuments > 0) {
+            $onglets[] = ['key' => 'documents', 'label' => 'Documents', 'count' => $nbDocuments];
         }
 
         $current = in_array($this->onglet, array_column($onglets, 'key'), true)
