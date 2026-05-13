@@ -193,11 +193,74 @@
                     . '<div style="color:' . $couleurEcart . ';font-size:10px">' . $e . '</div>'
                     . '</div>';
             };
+
+            // Fusionne l'arbre réalisé avec l'arbre prévisionnel pour que les
+            // catégories / sous-catégories / tiers présents uniquement en
+            // prévisions apparaissent aussi dans le rendu (avec réalisé=0).
+            $mergeForDisplay = function (array $realise, array $previsions) {
+                $byCatId = [];
+                foreach ($realise as $cat) {
+                    $byCatId[(int) $cat['categorie_id']] = $cat;
+                }
+                foreach ($previsions as $prevCat) {
+                    $catId = (int) $prevCat['categorie_id'];
+                    if (! isset($byCatId[$catId])) {
+                        $byCatId[$catId] = [
+                            'categorie_id' => $catId,
+                            'label' => $prevCat['label'],
+                            'sous_categories' => [],
+                            'seances' => [],
+                            'total' => 0.0,
+                            'montant' => 0.0,
+                        ];
+                    }
+                    $byScId = [];
+                    foreach ($byCatId[$catId]['sous_categories'] as $sc) {
+                        $byScId[(int) $sc['sous_categorie_id']] = $sc;
+                    }
+                    foreach ($prevCat['sous_categories'] as $prevSc) {
+                        $scId = (int) $prevSc['sous_categorie_id'];
+                        if (! isset($byScId[$scId])) {
+                            $byScId[$scId] = [
+                                'sous_categorie_id' => $scId,
+                                'label' => $prevSc['label'],
+                                'tiers' => [],
+                                'seances' => [],
+                                'total' => 0.0,
+                                'montant' => 0.0,
+                            ];
+                        }
+                        $byTId = [];
+                        foreach (($byScId[$scId]['tiers'] ?? []) as $t) {
+                            $byTId[(int) $t['tiers_id']] = $t;
+                        }
+                        foreach (($prevSc['tiers'] ?? []) as $prevT) {
+                            $tId = (int) $prevT['tiers_id'];
+                            if (! isset($byTId[$tId])) {
+                                $byTId[$tId] = [
+                                    'tiers_id' => $tId,
+                                    'label' => $prevT['label'],
+                                    'type' => $prevT['type'] ?? null,
+                                    'seances' => [],
+                                    'total' => 0.0,
+                                    'montant' => 0.0,
+                                ];
+                            }
+                        }
+                        $byScId[$scId]['tiers'] = array_values($byTId);
+                    }
+                    $byCatId[$catId]['sous_categories'] = array_values($byScId);
+                }
+                return array_values($byCatId);
+            };
+
+            $chargesDisplay  = $previsionnel ? $mergeForDisplay($charges, $previsionsCharges)   : $charges;
+            $produitsDisplay = $previsionnel ? $mergeForDisplay($produits, $previsionsProduits) : $produits;
         @endphp
 
         @foreach ([
-            ['data' => $charges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges],
-            ['data' => $produits, 'label' => 'RECETTES', 'totalMontant' => $totalProduits],
+            ['data' => $chargesDisplay, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges],
+            ['data' => $produitsDisplay, 'label' => 'RECETTES', 'totalMontant' => $totalProduits],
         ] as $section)
         <div class="card mb-3 border-0 shadow-sm">
             <div class="card-body p-0">
@@ -235,9 +298,16 @@
 
                         @foreach ($section['data'] as $cat)
                             @php
-                                $scVisibles = collect($cat['sous_categories'])->filter(fn($sc) =>
-                                    ($parSeances ? ($sc['total'] ?? 0) : ($sc['montant'] ?? 0)) > 0
-                                );
+                                $scVisibles = collect($cat['sous_categories'])->filter(function ($sc) use ($parSeances, $previsionnel, $sectionIdx) {
+                                    $realise = $parSeances ? ($sc['total'] ?? 0) : ($sc['montant'] ?? 0);
+                                    if ($realise > 0) {
+                                        return true;
+                                    }
+                                    if (! $previsionnel) {
+                                        return false;
+                                    }
+                                    return ((float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0)) > 0;
+                                });
                             @endphp
                             @if (! $scVisibles->isEmpty())
                                 {{-- Ligne catégorie --}}
@@ -344,7 +414,12 @@
                                     {{-- Lignes tiers (si activé) --}}
                                     @if ($parTiers && ! empty($sc['tiers']))
                                         @foreach ($sc['tiers'] as $t)
-                                            @if (($parSeances ? ($t['total'] ?? 0) : ($t['montant'] ?? 0)) > 0)
+                                            @php
+                                                $tRealise = $parSeances ? ($t['total'] ?? 0) : ($t['montant'] ?? 0);
+                                                $tPrev = (float) ($sectionIdx['tiers'][$sc['sous_categorie_id']][$t['tiers_id']] ?? 0);
+                                                $tVisible = $tRealise > 0 || ($previsionnel && $tPrev > 0);
+                                            @endphp
+                                            @if ($tVisible)
                                             <tr style="background:#fff;">
                                                 <td></td>
                                                 <td style="padding:4px 12px 4px 52px;color:#666;font-size:12px;">
