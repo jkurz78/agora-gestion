@@ -44,6 +44,7 @@ final class Transaction extends TenantModel
         'helloasso_order_id',
         'helloasso_cashout_id',
         'helloasso_payment_id',
+        'helloasso_form_slug',
         'statut_reglement',
         'extournee_at',
     ];
@@ -107,6 +108,11 @@ final class Transaction extends TenantModel
     public function lignes(): HasMany
     {
         return $this->hasMany(TransactionLigne::class);
+    }
+
+    public function adhesions(): HasMany
+    {
+        return $this->hasMany(Adhesion::class);
     }
 
     public function noteDeFrais(): HasOne

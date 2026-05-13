@@ -78,7 +78,7 @@
             </thead>
             <tbody>
                 @forelse ($tiersList as $tiers)
-                    <tr>
+                    <tr style="cursor:pointer" data-tiers-href="{{ route('tiers.show', $tiers->id) }}" onclick="if (!event.target.closest('button,a,input,select,textarea')) { window.location = this.dataset.tiersHref; }">
                         <td class="fw-semibold">
                             <span style="font-size:.65rem;">{{ $tiers->type === 'entreprise' ? '🏢' : '👤' }}</span>
                             {{ $tiers->displayName() }}
@@ -108,6 +108,7 @@
                             @endif
                         </td>
                         <td class="text-end">
+                            <x-tiers-row-trigger :tiersId="$tiers->id" class="me-1" />
                             <a href="{{ route('tiers.transactions', $tiers->id) }}"
                                class="btn btn-sm btn-outline-secondary me-1"
                                title="Transactions">

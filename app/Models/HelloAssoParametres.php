@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\HelloAssoEnvironnement;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class HelloAssoParametres extends Model
 {
+    use HasFactory;
+
     protected $table = 'helloasso_parametres';
 
     protected $hidden = [
@@ -28,8 +31,6 @@ final class HelloAssoParametres extends Model
         'compte_helloasso_id',
         'compte_versement_id',
         'sous_categorie_don_id',
-        'sous_categorie_cotisation_id',
-        'sous_categorie_inscription_id',
     ];
 
     protected function casts(): array
@@ -42,8 +43,6 @@ final class HelloAssoParametres extends Model
             'compte_helloasso_id' => 'integer',
             'compte_versement_id' => 'integer',
             'sous_categorie_don_id' => 'integer',
-            'sous_categorie_cotisation_id' => 'integer',
-            'sous_categorie_inscription_id' => 'integer',
         ];
     }
 

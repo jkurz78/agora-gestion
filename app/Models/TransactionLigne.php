@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 final class TransactionLigne extends Model
@@ -27,6 +28,8 @@ final class TransactionLigne extends Model
         'notes',
         'piece_jointe_path',
         'helloasso_item_id',
+        'helloasso_option_id',
+        'helloasso_tier_id',
     ];
 
     protected function casts(): array
@@ -38,6 +41,8 @@ final class TransactionLigne extends Model
             'operation_id' => 'integer',
             'seance' => 'integer',
             'helloasso_item_id' => 'integer',
+            'helloasso_option_id' => 'integer',
+            'helloasso_tier_id' => 'integer',
         ];
     }
 
@@ -59,5 +64,10 @@ final class TransactionLigne extends Model
     public function affectations(): HasMany
     {
         return $this->hasMany(TransactionLigneAffectation::class);
+    }
+
+    public function recuFiscalActif(): HasOne
+    {
+        return $this->hasOne(RecuFiscalEmis::class, 'transaction_ligne_id')->whereNull('annule_at');
     }
 }

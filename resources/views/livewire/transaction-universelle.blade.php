@@ -527,6 +527,7 @@
                                 {{ $tx->tiers }}
                                 @if($tx->tiers_id)
                                     <x-tiers-info-icon :tiersId="$tx->tiers_id" />
+                                    <x-tiers-row-trigger :tiersId="$tx->tiers_id" />
                                 @endif
                             @else
                                 <span class="text-muted">—</span>

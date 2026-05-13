@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,9 +26,11 @@ afterEach(function () {
 it('has sync config columns on helloasso_parametres', function () {
     expect(Schema::hasColumn('helloasso_parametres', 'compte_helloasso_id'))->toBeTrue();
     expect(Schema::hasColumn('helloasso_parametres', 'compte_versement_id'))->toBeTrue();
+    // sous_categorie_don_id réintroduit en Lot A (fallback Donation hors form Donation)
     expect(Schema::hasColumn('helloasso_parametres', 'sous_categorie_don_id'))->toBeTrue();
-    expect(Schema::hasColumn('helloasso_parametres', 'sous_categorie_cotisation_id'))->toBeTrue();
-    expect(Schema::hasColumn('helloasso_parametres', 'sous_categorie_inscription_id'))->toBeTrue();
+    // Colonnes sous_categorie_cotisation_id / inscription_id restent supprimées (portées par helloasso_form_mappings)
+    expect(Schema::hasColumn('helloasso_parametres', 'sous_categorie_cotisation_id'))->toBeFalse();
+    expect(Schema::hasColumn('helloasso_parametres', 'sous_categorie_inscription_id'))->toBeFalse();
 });
 
 it('has helloasso_form_mappings table', function () {
@@ -41,7 +42,6 @@ it('has helloasso_form_mappings table', function () {
 
 it('can save sync config on helloasso_parametres', function () {
     $compte = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
-    $scDon = SousCategorie::factory()->create(['nom' => 'Don']);
 
     $p = HelloAssoParametres::create([
         'association_id' => $this->association->id,
@@ -50,9 +50,8 @@ it('can save sync config on helloasso_parametres', function () {
         'organisation_slug' => 'test',
         'environnement' => 'sandbox',
         'compte_helloasso_id' => $compte->id,
-        'sous_categorie_don_id' => $scDon->id,
     ]);
 
     expect($p->compte_helloasso_id)->toBe($compte->id);
-    expect($p->sous_categorie_don_id)->toBe($scDon->id);
+    // Sous-catégories portées par helloasso_form_mappings depuis slice 3d
 });

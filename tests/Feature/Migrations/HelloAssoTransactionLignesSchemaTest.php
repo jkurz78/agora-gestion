@@ -9,7 +9,6 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
 use App\Tenant\TenantContext;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 
@@ -87,7 +86,9 @@ it('can store helloasso_item_id on a transaction ligne', function () {
     expect($ligne->helloasso_item_id)->toBe(123456789);
 });
 
-it('helloasso_item_id is unique and rejects duplicates', function () {
+it('helloasso_item_id allows multiple rows for same item (options split — B1)', function () {
+    // Depuis B1, la contrainte unique est composite (item_id, option_id) —
+    // deux lignes avec le même item_id mais des option_id différents sont licites.
     $user = User::factory()->create();
     $compte = CompteBancaire::factory()->create();
     $sousCat = SousCategorie::factory()->create();
@@ -95,25 +96,31 @@ it('helloasso_item_id is unique and rejects duplicates', function () {
     $transaction = Transaction::create([
         'type' => 'recette',
         'date' => '2026-01-15',
-        'libelle' => 'Test HA',
+        'libelle' => 'Test HA split',
         'montant_total' => 100.00,
         'mode_paiement' => 'cb',
-        'reference' => 'TEST-UNIQUE',
+        'reference' => 'TEST-SPLIT',
         'compte_id' => $compte->id,
         'saisi_par' => $user->id,
     ]);
 
+    // Ligne parent (option_id = null)
     TransactionLigne::create([
         'transaction_id' => $transaction->id,
         'sous_categorie_id' => $sousCat->id,
-        'montant' => 50.00,
+        'montant' => 0.00,
         'helloasso_item_id' => 999888777,
+        'helloasso_option_id' => null,
     ]);
 
+    // Ligne option
     TransactionLigne::create([
         'transaction_id' => $transaction->id,
         'sous_categorie_id' => $sousCat->id,
-        'montant' => 50.00,
+        'montant' => 100.00,
         'helloasso_item_id' => 999888777,
+        'helloasso_option_id' => 11111,
     ]);
-})->throws(QueryException::class);
+
+    expect(TransactionLigne::where('helloasso_item_id', 999888777)->count())->toBe(2);
+});

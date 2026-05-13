@@ -59,6 +59,29 @@ final class HelloAssoApiClient
     }
 
     /**
+     * Fetch the detail of a single form, including its tiers.
+     *
+     * @return array<string, mixed>
+     */
+    public function fetchFormDetail(string $formType, string $formSlug): array
+    {
+        $this->authenticate();
+
+        // L'endpoint /public est accessible avec ou sans token et retourne les infos
+        // publiques du form (validityType, startDate, endDate, tiers avec id/label/price/
+        // isEligibleTaxReceipt). L'endpoint sans /public peut renvoyer 403 selon les
+        // scopes du token OAuth — /public est donc plus robuste pour ce cas d'usage.
+        $response = Http::withToken($this->accessToken)
+            ->get("{$this->baseUrl}/v5/organizations/{$this->organisationSlug}/forms/{$formType}/{$formSlug}/public");
+
+        if ($response->failed()) {
+            throw new RuntimeException("Échec récupération formulaire {$formType}/{$formSlug} : {$response->status()}");
+        }
+
+        return $response->json();
+    }
+
+    /**
      * Fetch all payments for a date range.
      *
      * The /payments endpoint returns idCashOut, cashOutDate, cashOutState

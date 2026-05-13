@@ -54,33 +54,20 @@
                 </div>
             </div>
 
-            {{-- Mapping sous-catégories --}}
-            <h6 class="mt-3">Sous-catégories par défaut</h6>
+            {{-- Fallback Don additionnel --}}
+            <h6 class="mt-4">Sous-catégorie de fallback</h6>
+            <p class="text-muted small mb-2">
+                Utilisée pour les <strong>dons additionnels</strong> (montant libre ajouté au paiement
+                d'une cotisation). Pas nécessaire si tes adhérents ne peuvent pas ajouter de don sur tes
+                formulaires HelloAsso.
+            </p>
             <div class="row g-3 mb-3">
-                <div class="col-md-4">
-                    <label class="form-label small">Dons (Donation)</label>
+                <div class="col-md-6">
+                    <label class="form-label small">Don additionnel (Donation libre)</label>
                     <select wire:model="sousCategorieDonId" class="form-select form-select-sm">
-                        <option value="">— Sélectionner —</option>
+                        <option value="">— Aucun —</option>
                         @foreach($sousCategoriesDon as $sc)
-                            <option value="{{ $sc->id }}">{{ $sc->nom }} ({{ $sc->code_cerfa }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label small">Cotisations (Membership)</label>
-                    <select wire:model="sousCategorieCotisationId" class="form-select form-select-sm">
-                        <option value="">— Sélectionner —</option>
-                        @foreach($sousCategoriesCotisation as $sc)
-                            <option value="{{ $sc->id }}">{{ $sc->nom }} ({{ $sc->code_cerfa }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label small">Inscriptions (Registration)</label>
-                    <select wire:model="sousCategorieInscriptionId" class="form-select form-select-sm">
-                        <option value="">— Sélectionner —</option>
-                        @foreach($sousCategoriesInscription as $sc)
-                            <option value="{{ $sc->id }}">{{ $sc->nom }} ({{ $sc->code_cerfa }})</option>
+                            <option value="{{ $sc->id }}">{{ $sc->nom }}@if($sc->code_cerfa) ({{ $sc->code_cerfa }})@endif</option>
                         @endforeach
                     </select>
                 </div>

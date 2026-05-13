@@ -8,6 +8,7 @@ use App\Console\Commands\VersionStampCommand;
 use App\Enums\RoleAssociation;
 use App\Enums\StatutFactureDeposee;
 use App\Enums\StatutNoteDeFrais;
+use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\AssociationUser;
 use App\Models\Extourne;
@@ -19,6 +20,9 @@ use App\Models\RecuFiscalEmis;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Observers\AdhesionObserver;
+use App\Observers\AdhesionRecuFiscalObserver;
+use App\Observers\AdhesionTransactionLigneObserver;
 use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
 use App\Observers\TransactionLigneRecuFiscalObserver;
@@ -29,6 +33,7 @@ use App\Policies\ExtournePolicy;
 use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
 use App\Policies\RecuFiscalPolicy;
+use App\Services\Adhesion\SousCategorieFormuleResolver;
 use App\Services\NoteDeFrais\LigneTypes\LigneTypeRegistry;
 use App\Tenant\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -44,6 +49,7 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(LigneTypeRegistry::class);
+        $this->app->singleton(SousCategorieFormuleResolver::class);
     }
 
     public function boot(): void
@@ -57,7 +63,10 @@ final class AppServiceProvider extends ServiceProvider
         Association::observe(ImmutableSlugObserver::class);
         Transaction::observe(TransactionObserver::class);
         Transaction::observe(TransactionRecuFiscalObserver::class);
+        Transaction::observe(AdhesionObserver::class);
         TransactionLigne::observe(TransactionLigneRecuFiscalObserver::class);
+        TransactionLigne::observe(AdhesionTransactionLigneObserver::class);
+        Adhesion::observe(AdhesionRecuFiscalObserver::class);
         User::observe(UserRoleObserver::class);
 
         // Rate limiter pour l'API newsletter publique : 5 requêtes / IP / heure.

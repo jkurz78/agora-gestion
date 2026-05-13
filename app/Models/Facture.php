@@ -9,12 +9,15 @@ use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 final class Facture extends TenantModel
 {
+    use HasFactory;
+
     protected $fillable = [
         'association_id', 'numero', 'date', 'statut', 'tiers_id', 'compte_bancaire_id',
         'conditions_reglement', 'mentions_legales', 'montant_total',

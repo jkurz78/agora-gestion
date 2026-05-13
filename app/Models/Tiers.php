@@ -203,6 +203,11 @@ final class Tiers extends TenantModel implements AuthenticatableContract
         return $this->hasMany(Transaction::class);
     }
 
+    public function adhesions(): HasMany
+    {
+        return $this->hasMany(Adhesion::class);
+    }
+
     public function participants(): HasMany
     {
         return $this->hasMany(Participant::class);

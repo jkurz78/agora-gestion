@@ -6,10 +6,12 @@ namespace App\Models;
 
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Traits\TenantStorage;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class DocumentPrevisionnel extends TenantModel
 {
+    use HasFactory;
     use TenantStorage;
 
     protected $table = 'documents_previsionnels';

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\Association;
 use App\Models\CompteBancaire;
 use App\Models\HelloAssoParametres;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\User;
@@ -25,7 +24,6 @@ beforeEach(function () {
 
     $this->compteHA = CompteBancaire::factory()->create(['nom' => 'HelloAsso']);
     $this->compteCourant = CompteBancaire::factory()->create(['nom' => 'Compte courant']);
-    $this->scDon = SousCategorie::factory()->pourDons()->create(['nom' => 'Don']);
 
     $this->parametres = HelloAssoParametres::create([
         'association_id' => $this->association->id,
@@ -35,7 +33,6 @@ beforeEach(function () {
         'environnement' => 'sandbox',
         'compte_helloasso_id' => $this->compteHA->id,
         'compte_versement_id' => $this->compteCourant->id,
-        'sous_categorie_don_id' => $this->scDon->id,
     ]);
 
     $this->tiers = Tiers::factory()->avecHelloasso()->create([

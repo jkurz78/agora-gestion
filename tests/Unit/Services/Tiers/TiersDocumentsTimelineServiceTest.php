@@ -1,0 +1,300 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\StatutPresence;
+use App\Enums\TypeDocumentPrevisionnel;
+use App\Enums\TypeTransaction;
+use App\Models\Adhesion;
+use App\Models\Association;
+use App\Models\DocumentPrevisionnel;
+use App\Models\Facture;
+use App\Models\FacturePartenaireDeposee;
+use App\Models\Participant;
+use App\Models\ParticipantDocument;
+use App\Models\Presence;
+use App\Models\RecuFiscalEmis;
+use App\Models\Seance;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Services\Tiers\TiersDocumentsTimelineService;
+use App\Tenant\TenantContext;
+
+beforeEach(function (): void {
+    $this->association = Association::factory()->create();
+    TenantContext::boot($this->association);
+    $this->service = app(TiersDocumentsTimelineService::class);
+});
+
+it('liste un reçu fiscal don (pas d\'adhésion liée)', function (): void {
+    $tiers = Tiers::factory()->create();
+    $tx = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Recette->value]);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => null,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->recusFiscaux)->toHaveCount(1)
+        ->and($result->recusFiscaux[0]->type)->toBe('don');
+});
+
+it('détecte un reçu fiscal de type cotisation via adhésion liée', function (): void {
+    $tiers = Tiers::factory()->create();
+    $tx = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Recette->value]);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id]);
+    Adhesion::factory()->create(['tiers_id' => $tiers->id, 'transaction_id' => $tx->id]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => null,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->recusFiscaux)->toHaveCount(1)
+        ->and($result->recusFiscaux[0]->type)->toBe('cotisation');
+});
+
+it('exclut les reçus fiscaux annulés', function (): void {
+    $tiers = Tiers::factory()->create();
+    $tx = Transaction::factory()->create(['tiers_id' => $tiers->id]);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => now(),
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->recusFiscaux)->toHaveCount(0);
+});
+
+it('liste les factures émises tous statuts', function (): void {
+    $tiers = Tiers::factory()->create();
+    Facture::factory()->create(['tiers_id' => $tiers->id, 'statut' => 'brouillon']);
+    Facture::factory()->create(['tiers_id' => $tiers->id, 'statut' => 'validee']);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->facturesEmises)->toHaveCount(2);
+});
+
+it('liste les factures partenaires déposées', function (): void {
+    $tiers = Tiers::factory()->create();
+    FacturePartenaireDeposee::factory()->create(['tiers_id' => $tiers->id]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->facturesDeposees)->toHaveCount(1);
+});
+
+it('liste les justificatifs des participants du tiers', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    ParticipantDocument::factory()->create([
+        'participant_id' => $participant->id,
+        'label' => 'Attestation médicale',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->justificatifsParticipants)->toHaveCount(1)
+        ->and($result->justificatifsParticipants[0]->label)->toBe('Attestation médicale')
+        ->and($result->justificatifsParticipants[0]->participantId)->toBe($participant->id);
+});
+
+it('exclut les justificatifs des participants d\'autres tiers', function (): void {
+    $tiers = Tiers::factory()->create();
+    $autre = Tiers::factory()->create();
+    $autreParticipant = Participant::factory()->create(['tiers_id' => $autre->id]);
+    ParticipantDocument::factory()->create(['participant_id' => $autreParticipant->id]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->justificatifsParticipants)->toHaveCount(0);
+});
+
+it('liste les pièces jointes au niveau transaction', function (): void {
+    $tiers = Tiers::factory()->create();
+    Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'piece_jointe_path' => 'tx/1/scan.pdf',
+        'libelle' => 'Facture EDF',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->piecesJointes)->toHaveCount(1)
+        ->and($result->piecesJointes[0]->niveau)->toBe('transaction')
+        ->and($result->piecesJointes[0]->ligneId)->toBeNull()
+        ->and($result->piecesJointes[0]->libelle)->toBe('Facture EDF');
+});
+
+it('liste les pièces jointes au niveau ligne', function (): void {
+    $tiers = Tiers::factory()->create();
+    $tx = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'piece_jointe_path' => null,
+        'libelle' => 'Note de frais Q1',
+    ]);
+    $ligne = TransactionLigne::factory()->create([
+        'transaction_id' => $tx->id,
+        'piece_jointe_path' => 'ndf/1/ticket.pdf',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->piecesJointes)->toHaveCount(1)
+        ->and($result->piecesJointes[0]->niveau)->toBe('ligne')
+        ->and($result->piecesJointes[0]->ligneId)->toBe((int) $ligne->id);
+});
+
+it('isole les documents par tenant (asso B ne voit pas les docs de asso A)', function (): void {
+    $tiersA = Tiers::factory()->create();
+    Facture::factory()->create(['tiers_id' => $tiersA->id]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiersA->id,
+        'annule_at' => null,
+    ]);
+
+    // Bascule sur une autre association
+    $assoB = Association::factory()->create();
+    TenantContext::boot($assoB);
+    $tiersB = Tiers::factory()->create();
+
+    $result = $this->service->forTiers($tiersB);
+
+    expect($result->totalGlobal)->toBe(0);
+
+    // Re-test : même service appelé sur tiersA depuis le tenant B → doit aussi retourner 0
+    // car TenantModel scope global filtre sur association_id
+    $resultCross = $this->service->forTiers($tiersA);
+    expect($resultCross->totalGlobal)->toBe(0);
+});
+
+it('countTotal somme les 5 sources', function (): void {
+    $tiers = Tiers::factory()->create();
+    // 1 PJ niveau transaction (la ligne ci-dessous n'en a pas → ne double pas le compte)
+    $tx = Transaction::factory()->create(['tiers_id' => $tiers->id, 'piece_jointe_path' => 'a.pdf']);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id, 'piece_jointe_path' => null]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => null,
+    ]);
+    Facture::factory()->create(['tiers_id' => $tiers->id]);
+    FacturePartenaireDeposee::factory()->create(['tiers_id' => $tiers->id]);
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    ParticipantDocument::factory()->create(['participant_id' => $participant->id]);
+
+    expect($this->service->countTotal($tiers))->toBe(5);
+});
+
+it('liste les documents prévisionnels (devis + pro forma) du tiers via ses participants', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    DocumentPrevisionnel::factory()->create([
+        'participant_id' => $participant->id,
+        'operation_id' => $participant->operation_id,
+        'type' => TypeDocumentPrevisionnel::Devis,
+        'numero' => 'D-2025-0001',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->documentsPrevisionnels)->toHaveCount(1)
+        ->and($result->documentsPrevisionnels[0]->numero)->toBe('D-2025-0001')
+        ->and($result->documentsPrevisionnels[0]->type)->toBe(TypeDocumentPrevisionnel::Devis);
+});
+
+it('exclut les documents prévisionnels des participants d\'autres tiers', function (): void {
+    $tiers = Tiers::factory()->create();
+    $autre = Tiers::factory()->create();
+    $autreParticipant = Participant::factory()->create(['tiers_id' => $autre->id]);
+    DocumentPrevisionnel::factory()->create([
+        'participant_id' => $autreParticipant->id,
+        'operation_id' => $autreParticipant->operation_id,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->documentsPrevisionnels)->toHaveCount(0);
+});
+
+it('liste une attestation par couple (participant, opération) avec au moins une présence', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    $seance = Seance::factory()->create(['operation_id' => $participant->operation_id]);
+    Presence::factory()->create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'statut' => StatutPresence::Present->value,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->attestationsPresence)->toHaveCount(1)
+        ->and($result->attestationsPresence[0]->participantId)->toBe((int) $participant->id)
+        ->and($result->attestationsPresence[0]->operationId)->toBe((int) $participant->operation_id)
+        ->and($result->attestationsPresence[0]->nbPresences)->toBe(1);
+});
+
+it('exclut les participants sans aucune présence statut Present', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    $seance = Seance::factory()->create(['operation_id' => $participant->operation_id]);
+    Presence::factory()->create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'statut' => StatutPresence::Excuse->value,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->attestationsPresence)->toHaveCount(0);
+});
+
+it('inclut une opération archivée avec badge', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    $seance = Seance::factory()->create(['operation_id' => $participant->operation_id]);
+    Presence::factory()->create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'statut' => StatutPresence::Present->value,
+    ]);
+    $participant->operation->delete();
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->attestationsPresence)->toHaveCount(1)
+        ->and($result->attestationsPresence[0]->operationArchivee)->toBeTrue();
+});
+
+it('countTotal somme les 6 sources (avec documents prévisionnels)', function (): void {
+    $tiers = Tiers::factory()->create();
+    // 1 PJ niveau transaction
+    $tx = Transaction::factory()->create(['tiers_id' => $tiers->id, 'piece_jointe_path' => 'a.pdf']);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id, 'piece_jointe_path' => null]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => null,
+    ]);
+    Facture::factory()->create(['tiers_id' => $tiers->id]);
+    FacturePartenaireDeposee::factory()->create(['tiers_id' => $tiers->id]);
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    ParticipantDocument::factory()->create(['participant_id' => $participant->id]);
+    DocumentPrevisionnel::factory()->create([
+        'participant_id' => $participant->id,
+        'operation_id' => $participant->operation_id,
+    ]);
+
+    expect($this->service->countTotal($tiers))->toBe(6);
+});

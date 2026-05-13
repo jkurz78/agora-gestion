@@ -83,7 +83,7 @@ it('la page /tiers/{id}/transactions rend TransactionUniverselle avec tiersId', 
 });
 
 it('la page /dons rend TransactionUniverselle avec sousCategorieFilter pour_dons', function () {
-    $this->get('/tiers/dons')
+    $this->get('/comptabilite/dons')
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 
@@ -92,7 +92,7 @@ it('la page /dons rend TransactionUniverselle avec sousCategorieFilter pour_dons
 });
 
 it('la page /cotisations rend TransactionUniverselle avec sousCategorieFilter pour_cotisations', function () {
-    $this->get('/tiers/cotisations')
+    $this->get('/comptabilite/cotisations')
         ->assertStatus(200)
         ->assertSeeLivewire(TransactionUniverselle::class);
 

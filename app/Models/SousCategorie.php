@@ -59,4 +59,14 @@ final class SousCategorie extends TenantModel
     {
         return $query->whereHas('usages', fn (Builder $q) => $q->where('usage', $usage->value));
     }
+
+    public function formulesAdhesion(): HasMany
+    {
+        return $this->hasMany(FormuleAdhesion::class, 'sous_categorie_id');
+    }
+
+    public function formuleAdhesionActive(): ?FormuleAdhesion
+    {
+        return $this->formulesAdhesion()->where('actif', true)->first();
+    }
 }

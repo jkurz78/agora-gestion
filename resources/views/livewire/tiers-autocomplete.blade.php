@@ -92,7 +92,8 @@
 
     {{-- Activate existing tiers modal --}}
     @if($showActivateModal && $existingTiers)
-        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background:rgba(0,0,0,.4);z-index:2000" wire:click.self="$set('showActivateModal', false)">
+        {{-- z-index 2200 : TiersAutocomplete peut être imbriqué dans NouvelleAdhesionModal (2055), tiers-quick-view (2060), etc. Aligné avec TiersForm. --}}
+        <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background:rgba(0,0,0,.4);z-index:2200" wire:click.self="$set('showActivateModal', false)">
             <div class="bg-white rounded p-4" style="width:420px;max-width:95vw">
                 <h6 class="fw-bold mb-3" style="color:#722281">Tiers existant</h6>
 

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\DroitImage;
 use App\Traits\TenantStorage;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 
 final class Participant extends TenantModel
 {
+    use HasFactory;
     use TenantStorage;
 
     protected $fillable = [

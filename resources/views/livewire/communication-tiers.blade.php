@@ -184,7 +184,7 @@
                                 $canSelect = $hasEmail && ! $optout;
                                 $rowClass  = $optout ? 'text-muted' : '';
                             @endphp
-                            <tr class="{{ $rowClass }}">
+                            <tr class="{{ $rowClass }}" style="cursor:pointer" data-tiers-href="{{ route('tiers.show', $tiers->id) }}" onclick="if (!event.target.closest('button,a,input,select,textarea')) { window.location = this.dataset.tiersHref; }">
                                 <td>
                                     @if ($canSelect)
                                         <input type="checkbox" class="form-check-input"
@@ -233,6 +233,7 @@
                                     @endif
                                 </td>
                                 <td class="text-end">
+                                    <x-tiers-row-trigger :tiersId="$tiers->id" class="me-1" />
                                     <a href="{{ route('tiers.transactions', $tiers->id) }}"
                                        class="btn btn-sm btn-outline-secondary"
                                        title="Voir les transactions">

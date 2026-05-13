@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\UsageComptable;
 use App\Exceptions\RecuFiscalException;
+use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\RecuFiscalEmis;
 use App\Models\SousCategorie;
@@ -34,6 +35,12 @@ final class RecuFiscalService
 
         if (! $ligne->sousCategorie) {
             throw RecuFiscalException::sansSousCategorie();
+        }
+
+        // Garde montant > 0 : un don ou une cotisation à 0€ (palier HelloAsso "offert"
+        // par exemple) ne peut pas donner droit à un reçu fiscal — pas de versement.
+        if ((float) $ligne->montant <= 0) {
+            throw RecuFiscalException::montantNul();
         }
 
         $transaction = $ligne->transaction;
@@ -81,8 +88,9 @@ final class RecuFiscalService
             $formeDon = $this->determinerFormeDon($sousCat);
             $modeVersement = $ligne->transaction->mode_paiement?->value ?? 'autre';
             $numero = $this->allouerNumero($anneeCivile);
+            $objet = $this->determinerObjetRecu($sousCat);
 
-            $pdfBinaire = $this->genererPdfBinaire($asso, $tiers, $ligne, $numero, $articleCgi, $formeDon, $modeVersement);
+            $pdfBinaire = $this->genererPdfBinaire($asso, $tiers, $ligne, $numero, $articleCgi, $formeDon, $modeVersement, $objet);
             $relativePath = "recus_fiscaux/{$anneeCivile}/{$numero}.pdf";
             $fullPath = "associations/{$asso->id}/{$relativePath}";
             Storage::disk('local')->put($fullPath, $pdfBinaire);
@@ -106,6 +114,26 @@ final class RecuFiscalService
                 'emitted_by_user_id' => $user?->id,
             ]);
         });
+    }
+
+    public function obtenirOuGenererPourAdhesion(Adhesion $adhesion, ?User $user = null): RecuFiscalEmis
+    {
+        $this->validerEligibiliteAdhesion($adhesion);
+        $ligne = $this->resoudreLigneCotisation($adhesion);
+
+        return $this->obtenirOuGenerer($ligne, $user);
+    }
+
+    public function validerEligibiliteAdhesion(Adhesion $adhesion): void
+    {
+        if ($adhesion->transaction_id === null) {
+            throw RecuFiscalException::adhesionGratuite();
+        }
+        if (! $adhesion->deductible_fiscal) {
+            throw RecuFiscalException::adhesionNonDeductible();
+        }
+        $ligne = $this->resoudreLigneCotisation($adhesion);
+        $this->validerEligibilite($ligne);
     }
 
     public function annuler(RecuFiscalEmis $recu, string $motif, ?User $user = null): void
@@ -149,6 +177,35 @@ final class RecuFiscalService
         ]);
     }
 
+    private function resoudreLigneCotisation(Adhesion $adhesion): TransactionLigne
+    {
+        if ($adhesion->transaction_id === null) {
+            throw RecuFiscalException::adhesionGratuite();
+        }
+        // Exclure les lignes options HelloAsso (B1) — on cherche la ligne parent
+        $lignes = $adhesion->transaction->lignes()->whereNull('helloasso_option_id')->get();
+
+        if ($adhesion->formuleAdhesion?->est_helloasso) {
+            $ligne = $lignes->firstWhere('helloasso_tier_id', $adhesion->formuleAdhesion->helloasso_tier_id);
+            if ($ligne !== null) {
+                return $ligne;
+            }
+        }
+
+        if ($lignes->count() === 1) {
+            return $lignes->first();
+        }
+
+        if ($adhesion->formuleAdhesion !== null) {
+            $ligne = $lignes->firstWhere('sous_categorie_id', $adhesion->formuleAdhesion->sous_categorie_id);
+            if ($ligne !== null) {
+                return $ligne;
+            }
+        }
+
+        throw new RecuFiscalException("Impossible d'identifier la ligne cotisation de l'adhésion #{$adhesion->id}.");
+    }
+
     private function allouerNumero(int $annee): string
     {
         return DB::transaction(function () use ($annee) {
@@ -183,6 +240,11 @@ final class RecuFiscalService
             : 'numeraire';
     }
 
+    private function determinerObjetRecu(SousCategorie $sc): string
+    {
+        return $sc->hasUsage(UsageComptable::Cotisation) ? 'cotisation' : 'don';
+    }
+
     private function genererPdfBinaire(
         Association $asso,
         Tiers $donateur,
@@ -191,6 +253,7 @@ final class RecuFiscalService
         string $articleCgi,
         string $formeDon,
         string $modeVersement,
+        string $objet = 'don',
     ): string {
         $montantFloat = (float) $ligne->montant;
         $montantFormate = number_format($montantFloat, 2, ',', ' ').' €';
@@ -209,19 +272,22 @@ final class RecuFiscalService
         };
 
         $estMecenatEntreprise = $articleCgi === 'art_238_bis' && $donateur->type === 'entreprise';
+        $estCotisation = $objet === 'cotisation';
 
-        $titreDocument = $estMecenatEntreprise
-            ? "Reçu au titre du mécénat d'entreprise"
-            : "Reçu au titre des dons à certains organismes d'intérêt général";
+        $titreDocument = match (true) {
+            $estCotisation => "Reçu au titre d'une cotisation à un organisme d'intérêt général",
+            $estMecenatEntreprise => "Reçu au titre du mécénat d'entreprise",
+            default => "Reçu au titre des dons à certains organismes d'intérêt général",
+        };
 
         $contexteSpecifique = $estMecenatEntreprise
             ? "Versement effectué dans le cadre du mécénat d'entreprise prévu à l'article 238 bis du CGI."
             : null;
 
-        $formeLibelle = match ($formeDon) {
-            'numeraire' => 'Don manuel en numéraire',
-            'abandon_revenus' => "Le donateur renonce expressément au remboursement des frais engagés dans le cadre de son activité bénévole et entend en faire don à l'association.",
-            default => $formeDon,
+        $formeLibelle = match (true) {
+            $estCotisation => 'Cotisation versée par le membre',
+            $formeDon === 'abandon_revenus' => "Le donateur renonce expressément au remboursement des frais engagés dans le cadre de son activité bénévole et entend en faire don à l'association.",
+            default => 'Don manuel en numéraire',
         };
 
         $modeLibelle = match ($modeVersement) {
@@ -293,6 +359,7 @@ final class RecuFiscalService
             'appLogoBase64' => $appLogoBase64,
             'footerLogoBase64' => null,
             'footerLogoMime' => null,
+            'objet' => $objet,
         ])->setPaper('a4', 'portrait');
 
         return $pdf->output();

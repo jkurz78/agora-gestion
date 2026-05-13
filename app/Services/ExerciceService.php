@@ -203,6 +203,26 @@ final class ExerciceService
     }
 
     /**
+     * Same as availableYears() but excludes years for which the Exercice
+     * is closed in the database. Useful for forms that must not allow
+     * write operations on a closed exercise (cohérence comptable).
+     *
+     * @return list<int>
+     */
+    public function openYears(): array
+    {
+        $years = $this->availableYears();
+        $closedYears = Exercice::query()
+            ->whereIn('annee', $years)
+            ->where('statut', StatutExercice::Cloture->value)
+            ->pluck('annee')
+            ->map(fn ($a) => (int) $a)
+            ->all();
+
+        return array_values(array_diff($years, $closedYears));
+    }
+
+    /**
      * Switch the displayed exercice in session.
      */
     public function changerExerciceAffiche(Exercice $exercice): void
