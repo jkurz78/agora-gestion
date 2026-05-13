@@ -1,6 +1,7 @@
 @php
     $fields = [
         'type' => 'Type',
+        'civilite' => 'Civilité',
         'nom' => 'Nom',
         'prenom' => 'Prénom',
         'entreprise' => 'Entreprise',
@@ -116,6 +117,13 @@
                                                     class="form-select form-select-sm border-0 bg-transparent shadow-none">
                                                 <option value="particulier">Particulier</option>
                                                 <option value="entreprise">Entreprise</option>
+                                            </select>
+                                        @elseif($key === 'civilite')
+                                            <select wire:model.live="resultData.{{ $key }}"
+                                                    class="form-select form-select-sm border-0 bg-transparent shadow-none">
+                                                <option value="">—</option>
+                                                <option value="M.">M.</option>
+                                                <option value="Mme">Mme</option>
                                             </select>
                                         @else
                                             <input type="text"
