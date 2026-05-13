@@ -84,18 +84,19 @@ it('displays animateur from existing depense transaction', function () {
 
 it('opens create modal with pre-filled tiers and seance', function () {
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
-        ->call('openCreateModal', $this->tiers->id, 2)
+        ->call('openCreateModal', $this->tiers->id, $this->sousCategorie->id, 2)
         ->assertSet('showModal', true)
         ->assertSet('isEditing', false)
         ->assertSet('modalTiersId', $this->tiers->id)
         ->assertSet('modalTiersLabel', $this->tiers->displayName())
         ->assertSet('modalLignes.0.seance', 2)
+        ->assertSet('modalLignes.0.sous_categorie_id', $this->sousCategorie->id)
         ->assertSet('modalLignes.0.operation_id', $this->operation->id);
 });
 
 it('creates a depense transaction from modal', function () {
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
-        ->call('openCreateModal', $this->tiers->id, 1)
+        ->call('openCreateModal', $this->tiers->id, $this->sousCategorie->id, 1)
         ->set('modalDate', now()->format('Y-m-d'))
         ->set('modalReference', 'FAC-2026-001')
         ->set('modalLignes.0.sous_categorie_id', $this->sousCategorie->id)
@@ -123,7 +124,7 @@ it('creates a depense transaction from modal', function () {
 
 it('validates required fields on save', function () {
     Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
-        ->call('openCreateModal', $this->tiers->id, null)
+        ->call('openCreateModal', $this->tiers->id, $this->sousCategorie->id, null)
         ->set('modalDate', '')
         ->set('modalReference', '')
         ->set('modalLignes.0.sous_categorie_id', null)
@@ -166,7 +167,7 @@ it('opens edit modal with existing transaction data', function () {
 
 it('adds and removes modal lines', function () {
     $component = Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
-        ->call('openCreateModal', $this->tiers->id, 1);
+        ->call('openCreateModal', $this->tiers->id, $this->sousCategorie->id, 1);
 
     // Starts with 1 line
     expect($component->get('modalLignes'))->toHaveCount(1);
