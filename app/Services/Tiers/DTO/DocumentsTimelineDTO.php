@@ -19,6 +19,8 @@ final readonly class DocumentsTimelineDTO
         public array $piecesJointes,
         /** @var DocumentPrevisionnelLigneDTO[] */
         public array $documentsPrevisionnels,
+        /** @var AttestationPresenceLigneDTO[] */
+        public array $attestationsPresence,
         public int $totalGlobal,
     ) {}
 }
