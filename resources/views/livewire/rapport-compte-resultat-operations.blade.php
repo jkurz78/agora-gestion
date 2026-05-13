@@ -256,6 +256,21 @@
 
             $chargesDisplay  = $previsionnel ? $mergeForDisplay($charges, $previsionsCharges)   : $charges;
             $produitsDisplay = $previsionnel ? $mergeForDisplay($produits, $previsionsProduits) : $produits;
+
+            // Triplet formaté pour le mode parSeances=OFF + previsionnel=ON
+            // (utilisé pour rendre 3 <td> distincts au lieu d'une cellule empilée)
+            $formatTriad = function (float $realise, float $prevu, bool $isDepenses = false): array {
+                $ecart = $realise - $prevu;
+                $isPositive = $isDepenses ? ($ecart < 0) : ($ecart > 0);
+                $ecartColor = abs($ecart) < 0.01 ? '#6c757d' : ($isPositive ? '#2E7D32' : '#B5453A');
+                $signe = $ecart > 0 ? '+' : '';
+                return [
+                    'prevu' => number_format($prevu, 2, ',', ' '),
+                    'realise' => number_format($realise, 2, ',', ' '),
+                    'ecart' => $signe . number_format($ecart, 2, ',', ' '),
+                    'ecartColor' => $ecartColor,
+                ];
+            };
         @endphp
 
         @foreach ([
@@ -282,12 +297,18 @@
                             <tr style="background:#3d5473;color:#fff;">
                                 <td style="width:20px;"></td>
                                 <td></td>
-                                <td class="text-end" style="width:130px;font-size:12px;opacity:.85;">Montant</td>
+                                @if ($previsionnel)
+                                    <td class="text-end" style="width:110px;font-size:12px;opacity:.85;padding:4px 8px;">Prévu</td>
+                                    <td class="text-end" style="width:110px;font-size:12px;opacity:.85;padding:4px 8px;">Réalisé</td>
+                                    <td class="text-end" style="width:110px;font-size:12px;opacity:.85;padding:4px 8px;">Écart</td>
+                                @else
+                                    <td class="text-end" style="width:130px;font-size:12px;opacity:.85;">Montant</td>
+                                @endif
                             </tr>
                         @endif
                         {{-- Titre section --}}
                         <tr style="background:#3d5473;color:#fff;font-weight:700;font-size:14px;">
-                            <td colspan="{{ $parSeances ? count($seances) + 3 : 3 }}" style="padding:4px 12px 10px;">
+                            <td colspan="{{ $parSeances ? count($seances) + 3 : ($previsionnel ? 5 : 3) }}" style="padding:4px 12px 10px;">
                                 {{ $section['label'] }}
                             </td>
                         </tr>
@@ -347,13 +368,10 @@
                                         @endif
                                     @else
                                         @if ($previsionnel)
-                                            <td class="text-end" style="padding:7px 12px;">
-                                                {!! $renderCellule(
-                                                    (float) ($cat['montant'] ?? 0),
-                                                    (float) ($sectionIdx['cat'][$cat['categorie_id']] ?? 0),
-                                                    $section['label'] === 'DÉPENSES'
-                                                ) !!}
-                                            </td>
+                                            @php $tri = $formatTriad((float) ($cat['montant'] ?? 0), (float) ($sectionIdx['cat'][$cat['categorie_id']] ?? 0), $section['label'] === 'DÉPENSES'); @endphp
+                                            <td class="text-end" style="padding:7px 12px;color:#6c757d;">{{ $tri['prevu'] }} &euro;</td>
+                                            <td class="text-end fw-bold" style="padding:7px 12px;">{{ $tri['realise'] }} &euro;</td>
+                                            <td class="text-end" style="padding:7px 12px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
                                         @else
                                             <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($cat['montant'], 2, ',', ' ') }} &euro;</td>
                                         @endif
@@ -398,13 +416,10 @@
                                             @endif
                                         @else
                                             @if ($previsionnel)
-                                                <td class="text-end" style="padding:5px 12px;color:#444;">
-                                                    {!! $renderCellule(
-                                                        (float) ($sc['montant'] ?? 0),
-                                                        (float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0),
-                                                        $section['label'] === 'DÉPENSES'
-                                                    ) !!}
-                                                </td>
+                                                @php $tri = $formatTriad((float) ($sc['montant'] ?? 0), (float) ($sectionIdx['sc'][$sc['sous_categorie_id']] ?? 0), $section['label'] === 'DÉPENSES'); @endphp
+                                                <td class="text-end" style="padding:5px 12px;color:#6c757d;">{{ $tri['prevu'] }} &euro;</td>
+                                                <td class="text-end fw-bold" style="padding:5px 12px;color:#444;">{{ $tri['realise'] }} &euro;</td>
+                                                <td class="text-end" style="padding:5px 12px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
                                             @else
                                                 <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['montant'], 2, ',', ' ') }} &euro;</td>
                                             @endif
@@ -467,13 +482,10 @@
                                                     @endif
                                                 @else
                                                     @if ($previsionnel)
-                                                        <td class="text-end" style="padding:4px 12px;font-size:12px;">
-                                                            {!! $renderCellule(
-                                                                (float) ($t['montant'] ?? 0),
-                                                                (float) ($sectionIdx['tiers'][$sc['sous_categorie_id']][$t['tiers_id']] ?? 0),
-                                                                $section['label'] === 'DÉPENSES'
-                                                            ) !!}
-                                                        </td>
+                                                        @php $tri = $formatTriad((float) ($t['montant'] ?? 0), (float) ($sectionIdx['tiers'][$sc['sous_categorie_id']][$t['tiers_id']] ?? 0), $section['label'] === 'DÉPENSES'); @endphp
+                                                        <td class="text-end" style="padding:4px 12px;color:#6c757d;font-size:12px;">{{ $tri['prevu'] }} &euro;</td>
+                                                        <td class="text-end" style="padding:4px 12px;color:#666;font-size:12px;font-weight:600;">{{ $tri['realise'] }} &euro;</td>
+                                                        <td class="text-end" style="padding:4px 12px;color:{{ $tri['ecartColor'] }};font-size:12px;">{{ $tri['ecart'] }} &euro;</td>
                                                     @else
                                                         <td class="text-end" style="padding:4px 12px;color:#666;font-size:12px;">{{ number_format($t['montant'], 2, ',', ' ') }} &euro;</td>
                                                     @endif
@@ -538,13 +550,10 @@
                                 @endif
                             @else
                                 @if ($previsionnel)
-                                    <td class="text-end" style="padding:9px 12px;">
-                                        {!! $renderCellule(
-                                            (float) $section['totalMontant'],
-                                            $totalPrevuSection,
-                                            $section['label'] === 'DÉPENSES'
-                                        ) !!}
-                                    </td>
+                                    @php $tri = $formatTriad((float) $section['totalMontant'], (float) $totalPrevuSection, $section['label'] === 'DÉPENSES'); @endphp
+                                    <td class="text-end" style="padding:9px 12px;opacity:.85;">{{ $tri['prevu'] }} &euro;</td>
+                                    <td class="text-end" style="padding:9px 12px;">{{ $tri['realise'] }} &euro;</td>
+                                    <td class="text-end" style="padding:9px 12px;color:{{ $tri['ecartColor'] }};">{{ $tri['ecart'] }} &euro;</td>
                                 @else
                                     <td class="text-end" style="padding:9px 12px;">{{ number_format($section['totalMontant'], 2, ',', ' ') }} &euro;</td>
                                 @endif
