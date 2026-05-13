@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Livewire\Tiers\Onglets\Documents;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\DocumentPrevisionnel;
 use App\Models\Facture;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\Participant;
@@ -57,6 +58,7 @@ it('masque la section Factures émises si aucune facture', function (): void {
     Livewire::test(Documents::class, ['tiers' => $tiers])
         ->assertSee('Reçus fiscaux émis')
         ->assertDontSee('Factures émises')
+        ->assertDontSee('Devis et Pro forma')
         ->assertDontSee('Factures partenaires déposées')
         ->assertDontSee('Justificatifs participants')
         ->assertDontSee('Pièces jointes comptables');
@@ -85,6 +87,54 @@ it('affiche les 5 sections quand toutes ont du contenu', function (): void {
     Livewire::test(Documents::class, ['tiers' => $tiers])
         ->assertSee('Reçus fiscaux émis')
         ->assertSee('Factures émises')
+        ->assertSee('Factures partenaires déposées')
+        ->assertSee('Justificatifs participants')
+        ->assertSee('Pièces jointes comptables');
+});
+
+// ── Slice 8 post-recette : section Devis et Pro forma ────────────────────────
+
+it('affiche la section Devis et Pro forma quand le tiers en a', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    DocumentPrevisionnel::factory()->create([
+        'participant_id' => $participant->id,
+        'operation_id' => $participant->operation_id,
+        'type' => 'devis',
+        'numero' => 'D-2025-9999',
+    ]);
+
+    Livewire::test(Documents::class, ['tiers' => $tiers])
+        ->assertSee('Devis et Pro forma')
+        ->assertSee('D-2025-9999');
+});
+
+it('affiche les 6 sections quand toutes ont du contenu (avec devis/pro forma)', function (): void {
+    $tiers = Tiers::factory()->create();
+    $tx = Transaction::factory()->create([
+        'tiers_id' => $tiers->id,
+        'piece_jointe_path' => 'a.pdf',
+        'libelle' => 'Test',
+    ]);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => null,
+    ]);
+    Facture::factory()->create(['tiers_id' => $tiers->id]);
+    FacturePartenaireDeposee::factory()->create(['tiers_id' => $tiers->id]);
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    ParticipantDocument::factory()->create(['participant_id' => $participant->id]);
+    DocumentPrevisionnel::factory()->create([
+        'participant_id' => $participant->id,
+        'operation_id' => $participant->operation_id,
+    ]);
+
+    Livewire::test(Documents::class, ['tiers' => $tiers])
+        ->assertSee('Reçus fiscaux émis')
+        ->assertSee('Factures émises')
+        ->assertSee('Devis et Pro forma')
         ->assertSee('Factures partenaires déposées')
         ->assertSee('Justificatifs participants')
         ->assertSee('Pièces jointes comptables');
@@ -157,6 +207,7 @@ it('rend la vue vide quand le tiers n\'a aucun document', function (): void {
     Livewire::test(Documents::class, ['tiers' => $tiers])
         ->assertDontSee('Reçus fiscaux émis')
         ->assertDontSee('Factures émises')
+        ->assertDontSee('Devis et Pro forma')
         ->assertDontSee('Factures partenaires déposées')
         ->assertDontSee('Justificatifs participants')
         ->assertDontSee('Pièces jointes comptables');

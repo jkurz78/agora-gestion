@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\TypeDocumentPrevisionnel;
 use App\Enums\TypeTransaction;
 use App\Models\Adhesion;
 use App\Models\Association;
+use App\Models\DocumentPrevisionnel;
 use App\Models\Facture;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\Participant;
@@ -189,4 +191,57 @@ it('countTotal somme les 5 sources', function (): void {
     ParticipantDocument::factory()->create(['participant_id' => $participant->id]);
 
     expect($this->service->countTotal($tiers))->toBe(5);
+});
+
+it('liste les documents prévisionnels (devis + pro forma) du tiers via ses participants', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    DocumentPrevisionnel::factory()->create([
+        'participant_id' => $participant->id,
+        'operation_id' => $participant->operation_id,
+        'type' => TypeDocumentPrevisionnel::Devis,
+        'numero' => 'D-2025-0001',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->documentsPrevisionnels)->toHaveCount(1)
+        ->and($result->documentsPrevisionnels[0]->numero)->toBe('D-2025-0001')
+        ->and($result->documentsPrevisionnels[0]->type)->toBe(TypeDocumentPrevisionnel::Devis);
+});
+
+it('exclut les documents prévisionnels des participants d\'autres tiers', function (): void {
+    $tiers = Tiers::factory()->create();
+    $autre = Tiers::factory()->create();
+    $autreParticipant = Participant::factory()->create(['tiers_id' => $autre->id]);
+    DocumentPrevisionnel::factory()->create([
+        'participant_id' => $autreParticipant->id,
+        'operation_id' => $autreParticipant->operation_id,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->documentsPrevisionnels)->toHaveCount(0);
+});
+
+it('countTotal somme les 6 sources (avec documents prévisionnels)', function (): void {
+    $tiers = Tiers::factory()->create();
+    // 1 PJ niveau transaction
+    $tx = Transaction::factory()->create(['tiers_id' => $tiers->id, 'piece_jointe_path' => 'a.pdf']);
+    $ligne = TransactionLigne::factory()->create(['transaction_id' => $tx->id, 'piece_jointe_path' => null]);
+    RecuFiscalEmis::factory()->create([
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'annule_at' => null,
+    ]);
+    Facture::factory()->create(['tiers_id' => $tiers->id]);
+    FacturePartenaireDeposee::factory()->create(['tiers_id' => $tiers->id]);
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    ParticipantDocument::factory()->create(['participant_id' => $participant->id]);
+    DocumentPrevisionnel::factory()->create([
+        'participant_id' => $participant->id,
+        'operation_id' => $participant->operation_id,
+    ]);
+
+    expect($this->service->countTotal($tiers))->toBe(6);
 });
