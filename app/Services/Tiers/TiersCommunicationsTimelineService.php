@@ -36,10 +36,11 @@ final class TiersCommunicationsTimelineService
                 fn (Builder $q) => $q->where('categorie', $filtreCategorie),
             )
             ->with([
-                'participant:id,nom,prenom',
+                'participant:id,tiers_id',
+                'participant.tiers:id,nom,prenom',
                 'operation:id,nom',
-                'campagne:id,nom',
-                'envoyePar:id,name',
+                'campagne:id,objet',
+                'envoyePar:id,nom',
                 'opens',
             ])
             ->orderByDesc('created_at')

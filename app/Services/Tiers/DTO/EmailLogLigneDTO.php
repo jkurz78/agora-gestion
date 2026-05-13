@@ -45,8 +45,8 @@ final readonly class EmailLogLigneDTO
         $attachmentNom = $aPj ? basename((string) $log->attachment_path) : null;
 
         $participantNom = null;
-        if ($log->participant) {
-            $participantNom = trim(((string) $log->participant->prenom).' '.((string) $log->participant->nom));
+        if ($log->participant?->tiers) {
+            $participantNom = trim(((string) $log->participant->tiers->prenom).' '.((string) $log->participant->tiers->nom));
         }
 
         return new self(
@@ -65,8 +65,8 @@ final readonly class EmailLogLigneDTO
             participantNom: $participantNom,
             operationId: $log->operation_id !== null ? (int) $log->operation_id : null,
             operationNom: $log->operation?->nom,
-            campagneNom: $log->campagne?->nom,
-            envoyeParNom: $log->envoyePar?->name,
+            campagneNom: $log->campagne?->objet,
+            envoyeParNom: $log->envoyePar?->nom,
         );
     }
 }
