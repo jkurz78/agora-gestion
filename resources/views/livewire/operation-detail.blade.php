@@ -103,27 +103,41 @@
     </div>
 
     <div class="card mt-3">
-        <div class="card-header">
-            <h6 class="mb-0">Bilan financier</h6>
-        </div>
+        <div class="card-header"><h6 class="mb-0">Bilan financier</h6></div>
         <div class="card-body">
             <table class="table table-sm mb-0">
+                <thead>
+                    <tr style="background:#3d5473;color:#fff">
+                        <th></th>
+                        <th class="text-end">Planifié</th>
+                        <th class="text-end">Réalisé</th>
+                        <th class="text-end">Écart</th>
+                    </tr>
+                </thead>
                 <tbody>
                     <tr>
                         <td>Total dépenses</td>
+                        <td class="text-end">{{ number_format($totalDepensesPrev, 2, ',', ' ') }} &euro;</td>
                         <td class="text-end text-danger fw-bold">{{ number_format($totalDepenses, 2, ',', ' ') }} &euro;</td>
+                        <td class="text-end {{ $ecartDepenses > 0 ? 'text-danger' : 'text-success' }}">{{ ($ecartDepenses > 0 ? '+' : '') . number_format($ecartDepenses, 2, ',', ' ') }} &euro;</td>
                     </tr>
                     <tr>
                         <td>Total recettes</td>
+                        <td class="text-end">{{ number_format($totalRecettesPrev, 2, ',', ' ') }} &euro;</td>
                         <td class="text-end text-success fw-bold">{{ number_format($totalRecettes, 2, ',', ' ') }} &euro;</td>
+                        <td class="text-end {{ $ecartRecettes < 0 ? 'text-danger' : 'text-success' }}">{{ ($ecartRecettes >= 0 ? '+' : '') . number_format($ecartRecettes, 2, ',', ' ') }} &euro;</td>
                     </tr>
                     <tr>
                         <td>Total dons</td>
+                        <td class="text-end text-muted">—</td>
                         <td class="text-end text-success fw-bold">{{ number_format($totalDons, 2, ',', ' ') }} &euro;</td>
+                        <td class="text-end text-muted">—</td>
                     </tr>
                     <tr class="table-active">
                         <td class="fw-bold">Solde</td>
+                        <td class="text-end fw-bold">{{ number_format($soldePrev, 2, ',', ' ') }} &euro;</td>
                         <td class="text-end fw-bold {{ $solde >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format($solde, 2, ',', ' ') }} &euro;</td>
+                        <td class="text-end fw-bold {{ $ecartSolde >= 0 ? 'text-success' : 'text-danger' }}">{{ ($ecartSolde >= 0 ? '+' : '') . number_format($ecartSolde, 2, ',', ' ') }} &euro;</td>
                     </tr>
                 </tbody>
             </table>

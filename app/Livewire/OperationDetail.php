@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\UsageComptable;
+use App\Models\EncadrementPrevision;
 use App\Models\Operation;
+use App\Models\Reglement;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -43,6 +45,18 @@ final class OperationDetail extends Component
             ->sum('montant');
         $solde = ($totalRecettes + $totalDons) - $totalDepenses;
 
+        $totalDepensesPrev = (float) EncadrementPrevision::where('operation_id', $operation->id)
+            ->sum('montant_prevu');
+
+        $totalRecettesPrev = (float) Reglement::query()
+            ->whereIn('participant_id', $operation->participants()->pluck('id'))
+            ->sum('montant_prevu');
+
+        $soldePrev = $totalRecettesPrev - $totalDepensesPrev;
+        $ecartDepenses = $totalDepenses - $totalDepensesPrev;
+        $ecartRecettes = $totalRecettes - $totalRecettesPrev;
+        $ecartSolde = $solde - $soldePrev;
+
         $participantsCount = $operation->participants()->count();
         $seancesCount = $operation->seances()->count();
 
@@ -67,6 +81,12 @@ final class OperationDetail extends Component
             'totalRecettes' => $totalRecettes,
             'totalDons' => $totalDons,
             'solde' => $solde,
+            'totalDepensesPrev' => $totalDepensesPrev,
+            'totalRecettesPrev' => $totalRecettesPrev,
+            'soldePrev' => $soldePrev,
+            'ecartDepenses' => $ecartDepenses,
+            'ecartRecettes' => $ecartRecettes,
+            'ecartSolde' => $ecartSolde,
             'participantsCount' => $participantsCount,
             'operationMeta' => $operationMeta,
         ]);
