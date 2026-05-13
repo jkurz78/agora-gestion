@@ -150,6 +150,66 @@ it('expose les réalisés hors-séance via orphanRealiseHorsSeance', function ()
         ->and($data['animateurs'][$this->tiers->id]['totalRealise'])->toBe(60.0);
 });
 
+it('calcule grandRealise depuis séances + orphelins', function (): void {
+    // Réalisé attribué à la séance 1
+    $tx1 = Transaction::factory()->create([
+        'type' => TypeTransaction::Depense,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compte->id,
+        'date' => now(),
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $tx1->id,
+        'sous_categorie_id' => $this->sc1->id,
+        'operation_id' => $this->operation->id,
+        'seance' => 1,
+        'montant' => 80,
+    ]);
+
+    // Réalisé orphelin (sans séance)
+    $tx2 = Transaction::factory()->create([
+        'type' => TypeTransaction::Depense,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compte->id,
+        'date' => now(),
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $tx2->id,
+        'sous_categorie_id' => $this->sc1->id,
+        'operation_id' => $this->operation->id,
+        'seance' => null,
+        'montant' => 30,
+    ]);
+
+    $data = app(EncadrementMatrixBuilder::class)->build($this->operation);
+
+    expect($data['grandRealise'])->toBe(110.0)
+        ->and($data['seanceRealiseTotaux'][$this->seance1->id])->toBe(80.0)
+        ->and($data['orphanRealiseHorsSeance'][$this->tiers->id])->toBe(30.0);
+});
+
+it('route les realises avec numero seance obsolète vers orphanRealiseHorsSeance', function (): void {
+    $tx = Transaction::factory()->create([
+        'type' => TypeTransaction::Depense,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compte->id,
+        'date' => now(),
+    ]);
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'sous_categorie_id' => $this->sc1->id,
+        'operation_id' => $this->operation->id,
+        'seance' => 99, // numero qui n'existe pas
+        'montant' => 42,
+    ]);
+
+    $data = app(EncadrementMatrixBuilder::class)->build($this->operation);
+
+    expect($data['orphanRealiseHorsSeance'][$this->tiers->id] ?? 0)->toBe(42.0)
+        ->and($data['animateurs'][$this->tiers->id]['totalRealise'])->toBe(42.0)
+        ->and($data['seanceRealiseTotaux'])->toBeEmpty();
+});
+
 it('ignore les prévisions d\'une autre association (fail-closed)', function (): void {
     $autre = Association::factory()->create();
     TenantContext::boot($autre);

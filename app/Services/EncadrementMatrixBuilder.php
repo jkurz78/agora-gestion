@@ -8,6 +8,7 @@ use App\Enums\TypeTransaction;
 use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TransactionLigne;
 use Illuminate\Database\Eloquent\Collection;
@@ -105,6 +106,11 @@ final class EncadrementMatrixBuilder
 
             $sId = (int) ($seanceIdByNumero->get($seanceNumero) ?? 0);
             if ($sId === 0) {
+                // Stale séance number (séance supprimée) : on route vers orphan plutôt
+                // que de perdre le montant silencieusement.
+                $orphanRealiseHorsSeance[$tId] = ($orphanRealiseHorsSeance[$tId] ?? 0.0) + $montant;
+                $animateurs[$tId]['totalRealise'] += $montant;
+
                 continue;
             }
 
@@ -158,7 +164,7 @@ final class EncadrementMatrixBuilder
     /**
      * @param  array<int, array<string, mixed>>  $animateurs
      */
-    private function ensureSousCategorie(array &$animateurs, int $tiersId, mixed $sousCategorie): void
+    private function ensureSousCategorie(array &$animateurs, int $tiersId, ?SousCategorie $sousCategorie): void
     {
         if ($sousCategorie === null) {
             return;
