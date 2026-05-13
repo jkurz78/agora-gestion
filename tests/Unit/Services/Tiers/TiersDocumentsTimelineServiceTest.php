@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\StatutPresence;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Enums\TypeTransaction;
 use App\Models\Adhesion;
@@ -11,7 +12,9 @@ use App\Models\Facture;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\Participant;
 use App\Models\ParticipantDocument;
+use App\Models\Presence;
 use App\Models\RecuFiscalEmis;
+use App\Models\Seance;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -222,6 +225,56 @@ it('exclut les documents prévisionnels des participants d\'autres tiers', funct
     $result = $this->service->forTiers($tiers);
 
     expect($result->documentsPrevisionnels)->toHaveCount(0);
+});
+
+it('liste une attestation par couple (participant, opération) avec au moins une présence', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    $seance = Seance::factory()->create(['operation_id' => $participant->operation_id]);
+    Presence::factory()->create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'statut' => StatutPresence::Present->value,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->attestationsPresence)->toHaveCount(1)
+        ->and($result->attestationsPresence[0]->participantId)->toBe((int) $participant->id)
+        ->and($result->attestationsPresence[0]->operationId)->toBe((int) $participant->operation_id)
+        ->and($result->attestationsPresence[0]->nbPresences)->toBe(1);
+});
+
+it('exclut les participants sans aucune présence statut Present', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    $seance = Seance::factory()->create(['operation_id' => $participant->operation_id]);
+    Presence::factory()->create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'statut' => StatutPresence::Excuse->value,
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->attestationsPresence)->toHaveCount(0);
+});
+
+it('inclut une opération archivée avec badge', function (): void {
+    $tiers = Tiers::factory()->create();
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    $seance = Seance::factory()->create(['operation_id' => $participant->operation_id]);
+    Presence::factory()->create([
+        'participant_id' => $participant->id,
+        'seance_id' => $seance->id,
+        'statut' => StatutPresence::Present->value,
+    ]);
+    $participant->operation->delete();
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->attestationsPresence)->toHaveCount(1)
+        ->and($result->attestationsPresence[0]->operationArchivee)->toBeTrue();
 });
 
 it('countTotal somme les 6 sources (avec documents prévisionnels)', function (): void {

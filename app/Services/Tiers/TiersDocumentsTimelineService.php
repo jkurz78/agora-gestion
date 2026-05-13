@@ -300,7 +300,7 @@ final class TiersDocumentsTimelineService
                 nbPresences: $presencesPresent->count(),
                 nbSeancesTotal: $participant->operation->seances->count(),
                 dateDernierePresence: $dateDerniere,
-                downloadUrl: route('participants.attestation-recap-pdf', [
+                downloadUrl: route('operations.participants.attestation-recap-pdf', [
                     'operation' => $participant->operation->id,
                     'participant' => $participant->id,
                 ]),
