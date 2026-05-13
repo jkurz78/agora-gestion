@@ -7,6 +7,10 @@
         @include('livewire.tiers.onglets.partials.documents-factures-emises', ['lignes' => $timeline->facturesEmises])
     @endif
 
+    @if(! empty($timeline->documentsPrevisionnels))
+        @include('livewire.tiers.onglets.partials.documents-previsionnels', ['lignes' => $timeline->documentsPrevisionnels])
+    @endif
+
     @if(! empty($timeline->facturesDeposees))
         @include('livewire.tiers.onglets.partials.documents-factures-deposees', ['lignes' => $timeline->facturesDeposees])
     @endif
