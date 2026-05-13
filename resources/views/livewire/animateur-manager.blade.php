@@ -74,15 +74,17 @@
                             <td rowspan="2" style="position:sticky;left:0;z-index:1;background:#fff;padding:2px 8px 2px 20px;font-size:11px;color:#6c757d;white-space:nowrap;vertical-align:middle">
                                 <div class="d-flex align-items-center justify-content-between">
                                     <span>{{ $sc['scName'] }}</span>
-                                    @if($this->canEdit && ! $sc['hasRealise'])
+                                    @if($this->canEdit)
                                         <div class="d-flex gap-1">
                                             <button class="btn btn-sm p-0" style="color:#0d6efd;font-size:10px;border:1px solid #0d6efd;border-radius:3px;padding:0 3px !important;line-height:1.3"
                                                     wire:click="recopierLigne({{ $tiersId }}, {{ $scId }})"
                                                     title="Recopier la 1re séance sur toute la ligne">→</button>
-                                            <button class="btn btn-sm p-0" style="color:#b00;font-size:11px;line-height:1;border:none;background:none"
-                                                    wire:click="supprimerLigne({{ $tiersId }}, {{ $scId }})"
-                                                    wire:confirm="Supprimer cette ligne ?"
-                                                    title="Supprimer la ligne">✕</button>
+                                            @if(! $sc['hasRealise'])
+                                                <button class="btn btn-sm p-0" style="color:#b00;font-size:11px;line-height:1;border:none;background:none"
+                                                        wire:click="supprimerLigne({{ $tiersId }}, {{ $scId }})"
+                                                        wire:confirm="Supprimer cette ligne ?"
+                                                        title="Supprimer la ligne">✕</button>
+                                            @endif
                                         </div>
                                     @endif
                                 </div>
