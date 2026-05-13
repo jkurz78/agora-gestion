@@ -22,4 +22,8 @@
     @if(! empty($timeline->piecesJointes))
         @include('livewire.tiers.onglets.partials.documents-pieces-jointes', ['lignes' => $timeline->piecesJointes])
     @endif
+
+    @if(! empty($timeline->attestationsPresence))
+        @include('livewire.tiers.onglets.partials.documents-attestations-presence', ['lignes' => $timeline->attestationsPresence])
+    @endif
 </div>
