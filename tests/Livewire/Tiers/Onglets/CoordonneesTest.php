@@ -38,3 +38,26 @@ it('affiche un badge optout si le tiers est désinscrit', function (): void {
     Livewire::test(Coordonnees::class, ['tiers' => $tiers])
         ->assertSee('Désinscrit');
 });
+
+it('affiche la civilité quand elle est renseignée', function (): void {
+    $tiers = Tiers::factory()->create([
+        'civilite' => 'Mme',
+        'nom' => 'Kurz',
+        'prenom' => 'Anne',
+    ]);
+
+    Livewire::test(Coordonnees::class, ['tiers' => $tiers])
+        ->assertSee('Civilité')
+        ->assertSee('Madame');
+});
+
+it('n\'affiche pas la ligne Civilité quand elle est null', function (): void {
+    $tiers = Tiers::factory()->create([
+        'civilite' => null,
+        'nom' => 'Sans',
+        'prenom' => 'Civil',
+    ]);
+
+    Livewire::test(Coordonnees::class, ['tiers' => $tiers])
+        ->assertDontSee('Civilité');
+});

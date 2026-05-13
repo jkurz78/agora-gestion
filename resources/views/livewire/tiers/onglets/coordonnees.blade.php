@@ -5,6 +5,10 @@
             <div class="card-header py-2 small fw-semibold">Identité</div>
             <div class="card-body">
                 <dl class="row mb-0 small">
+                    @if($tiers->civilite)
+                        <dt class="col-sm-4 text-muted">Civilité</dt>
+                        <dd class="col-sm-8 mb-2">{{ $tiers->civilite_label }}</dd>
+                    @endif
                     <dt class="col-sm-4 text-muted">Nom</dt>
                     <dd class="col-sm-8 mb-2 fw-semibold">{{ strtoupper($tiers->nom ?? '—') }}</dd>
                     @if($tiers->prenom)
