@@ -1,8 +1,4 @@
 <x-tiers.section-card titre="Attestations de présence" :compteur="count($lignes)" id="documents-attestations-presence">
-    <div class="alert alert-info small py-2 mb-2 d-flex align-items-center gap-2">
-        <i class="bi bi-stars"></i>
-        <span>Documents régénérés à la demande à partir des présences enregistrées.</span>
-    </div>
     <div class="table-responsive">
         <table class="table table-sm table-hover align-middle">
             <thead class="table-dark" style="--bs-table-bg:#3d5473;--bs-table-border-color:#4d6880">

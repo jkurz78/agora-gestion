@@ -157,7 +157,7 @@ it('affiche la section Attestations de présence quand le tiers a des présences
 
     Livewire::test(Documents::class, ['tiers' => $tiers])
         ->assertSee('Attestations de présence')
-        ->assertSee('Documents régénérés à la demande');
+        ->assertSee($participant->operation->nom);
 });
 
 // ── Task 7.3.5 : badge type don/cotisation ───────────────────────────────────
