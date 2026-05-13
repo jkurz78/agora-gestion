@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Tiers;
 
 use App\Models\Adhesion;
+use App\Models\DocumentPrevisionnel;
 use App\Models\Facture;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\ParticipantDocument;
@@ -13,6 +14,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Tiers\DTO\DocumentParticipantLigneDTO;
+use App\Services\Tiers\DTO\DocumentPrevisionnelLigneDTO;
 use App\Services\Tiers\DTO\DocumentsTimelineDTO;
 use App\Services\Tiers\DTO\FactureDeposeeLigneDTO;
 use App\Services\Tiers\DTO\FactureEmiseLigneDTO;
@@ -29,6 +31,7 @@ final class TiersDocumentsTimelineService
         $facturesDeposees = $this->facturesDeposees($tiers);
         $justificatifs = $this->justificatifsParticipants($tiers);
         $piecesJointes = $this->piecesJointes($tiers);
+        $documentsPrevisionnels = $this->documentsPrevisionnels($tiers);
 
         return new DocumentsTimelineDTO(
             recusFiscaux: $recus,
@@ -36,8 +39,9 @@ final class TiersDocumentsTimelineService
             facturesDeposees: $facturesDeposees,
             justificatifsParticipants: $justificatifs,
             piecesJointes: $piecesJointes,
+            documentsPrevisionnels: $documentsPrevisionnels,
             totalGlobal: count($recus) + count($facturesEmises) + count($facturesDeposees)
-                + count($justificatifs) + count($piecesJointes),
+                + count($justificatifs) + count($piecesJointes) + count($documentsPrevisionnels),
         );
     }
 
@@ -48,8 +52,9 @@ final class TiersDocumentsTimelineService
         $c = FacturePartenaireDeposee::where('tiers_id', $tiers->id)->count();
         $d = ParticipantDocument::whereIn('participant_id', $tiers->participants()->select('id'))->count();
         $e = $this->countPiecesJointes($tiers);
+        $f = DocumentPrevisionnel::whereIn('participant_id', $tiers->participants()->select('id'))->count();
 
-        return $a + $b + $c + $d + $e;
+        return $a + $b + $c + $d + $e + $f;
     }
 
     /** @return RecuFiscalLigneDTO[] */
@@ -197,6 +202,42 @@ final class TiersDocumentsTimelineService
         return $lignesDtos->concat($txDtos)
             ->sortByDesc(fn (PieceJointeLigneDTO $p) => $p->dateTransaction->timestamp)
             ->values()
+            ->all();
+    }
+
+    /** @return DocumentPrevisionnelLigneDTO[] */
+    private function documentsPrevisionnels(Tiers $tiers): array
+    {
+        return DocumentPrevisionnel::query()
+            ->whereIn('participant_id', $tiers->participants()->select('id'))
+            ->with([
+                'participant:id,tiers_id',
+                'participant.tiers:id,nom,prenom',
+                'operation:id,nom',
+            ])
+            ->orderByDesc('date')
+            ->orderByDesc('version')
+            ->get()
+            ->map(function (DocumentPrevisionnel $d): DocumentPrevisionnelLigneDTO {
+                $tiersRelation = $d->participant?->tiers;
+                $participantNom = $tiersRelation
+                    ? trim((string) ($tiersRelation->prenom ?? '').' '.($tiersRelation->nom ?? ''))
+                    : '?';
+
+                return new DocumentPrevisionnelLigneDTO(
+                    id: (int) $d->id,
+                    numero: (string) $d->numero,
+                    type: $d->type,
+                    version: (int) $d->version,
+                    date: Carbon::parse($d->date),
+                    montantTotal: (float) $d->montant_total,
+                    operationId: (int) $d->operation_id,
+                    operationNom: (string) ($d->operation->nom ?? ''),
+                    participantId: (int) $d->participant_id,
+                    participantNom: $participantNom,
+                    downloadUrl: route('operations.documents-previsionnels.pdf', ['document' => $d->id]),
+                );
+            })
             ->all();
     }
 
