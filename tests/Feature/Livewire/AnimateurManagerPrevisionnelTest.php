@@ -148,3 +148,13 @@ it('supprime un encadrant sans réalisé (cascade prévisions)', function (): vo
 
     expect(EncadrementPrevision::count())->toBe(0);
 });
+
+it('refuse de créer une prévision sur une séance d\'une autre opération', function (): void {
+    $autreOp = Operation::factory()->create();
+    $seanceAutre = Seance::create(['operation_id' => $autreOp->id, 'numero' => 1, 'date' => now()]);
+
+    Livewire::test(AnimateurManager::class, ['operation' => $this->operation])
+        ->call('updateMontantPrevu', $this->tiers->id, $this->sc1->id, $seanceAutre->id, '50');
+
+    expect(EncadrementPrevision::where('seance_id', $seanceAutre->id)->count())->toBe(0);
+});

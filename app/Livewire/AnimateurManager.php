@@ -106,22 +106,11 @@ final class AnimateurManager extends Component
     {
         $this->guardCanEdit();
 
-        $premiereSeance = Seance::where('operation_id', $this->operation->id)->orderBy('numero')->first();
-        if ($premiereSeance === null) {
+        if (! $this->upsertPrevisionPremierSeance($tiersId, $sousCategorieId)) {
             $this->addError('ajouterEncadrant', "Aucune séance définie sur l'opération.");
 
             return;
         }
-
-        EncadrementPrevision::updateOrCreate(
-            [
-                'operation_id' => $this->operation->id,
-                'tiers_id' => $tiersId,
-                'sous_categorie_id' => $sousCategorieId,
-                'seance_id' => $premiereSeance->id,
-            ],
-            ['montant_prevu' => 0]
-        );
 
         $this->newTiersIdEnCours = null;
         $this->newTiersId = null;
@@ -147,20 +136,11 @@ final class AnimateurManager extends Component
     {
         $this->guardCanEdit();
 
-        $premiereSeance = Seance::where('operation_id', $this->operation->id)->orderBy('numero')->first();
-        if ($premiereSeance === null) {
+        if (! $this->upsertPrevisionPremierSeance($tiersId, $sousCategorieId)) {
+            $this->addError('ajouterLigne', "Aucune séance définie sur l'opération.");
+
             return;
         }
-
-        EncadrementPrevision::updateOrCreate(
-            [
-                'operation_id' => $this->operation->id,
-                'tiers_id' => $tiersId,
-                'sous_categorie_id' => $sousCategorieId,
-                'seance_id' => $premiereSeance->id,
-            ],
-            ['montant_prevu' => 0]
-        );
 
         $this->fermerAjoutLigne();
     }
@@ -168,6 +148,10 @@ final class AnimateurManager extends Component
     public function updateMontantPrevu(int $tiersId, int $sousCategorieId, int $seanceId, string $montant): void
     {
         $this->guardCanEdit();
+
+        if (! Seance::where('id', $seanceId)->where('operation_id', $this->operation->id)->exists()) {
+            return;
+        }
 
         $parsed = (float) str_replace(',', '.', $montant);
 
@@ -266,6 +250,26 @@ final class AnimateurManager extends Component
         EncadrementPrevision::where('operation_id', $this->operation->id)
             ->where('tiers_id', $tiersId)
             ->delete();
+    }
+
+    private function upsertPrevisionPremierSeance(int $tiersId, int $sousCategorieId): bool
+    {
+        $premiereSeance = Seance::where('operation_id', $this->operation->id)->orderBy('numero')->first();
+        if ($premiereSeance === null) {
+            return false;
+        }
+
+        EncadrementPrevision::updateOrCreate(
+            [
+                'operation_id' => $this->operation->id,
+                'tiers_id' => $tiersId,
+                'sous_categorie_id' => $sousCategorieId,
+                'seance_id' => $premiereSeance->id,
+            ],
+            ['montant_prevu' => 0]
+        );
+
+        return true;
     }
 
     private function guardCanEdit(): void
