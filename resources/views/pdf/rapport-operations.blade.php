@@ -25,7 +25,7 @@
             $idx = [];
             foreach ($hierarchy as $cat) {
                 foreach ($cat['sous_categories'] as $sc) {
-                    $scId = (int) $sc['id'];
+                    $scId = (int) $sc['sous_categorie_id'];
                     $idx[$scId] = [
                         'montant' => (float) ($sc['montant'] ?? $sc['total'] ?? 0),
                         'seances' => $sc['seances'] ?? [],

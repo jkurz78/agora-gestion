@@ -1042,7 +1042,7 @@ final class CompteResultatBuilder
 
             if (! isset($tree[$catId])) {
                 $tree[$catId] = [
-                    'id' => $catId,
+                    'categorie_id' => $catId,
                     'label' => $row->categorie_nom,
                     'sous_categories' => [],
                     'seances' => [],
@@ -1052,7 +1052,7 @@ final class CompteResultatBuilder
             }
             if (! isset($tree[$catId]['sous_categories'][$scId])) {
                 $tree[$catId]['sous_categories'][$scId] = [
-                    'id' => $scId,
+                    'sous_categorie_id' => $scId,
                     'label' => $row->sous_categorie_nom,
                     'seances' => [],
                     'total' => 0.0,
