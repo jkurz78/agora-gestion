@@ -106,6 +106,10 @@
                     <input type="checkbox" wire:model.live="parTiers" class="form-check-input" id="toggleTiers">
                     <label class="form-check-label small" for="toggleTiers">Tiers en lignes</label>
                 </div>
+                <div class="form-check form-switch mb-0">
+                    <input type="checkbox" wire:model.live="previsionnel" class="form-check-input" id="togglePrevisionnel">
+                    <label class="form-check-label small" for="togglePrevisionnel">Montants pr&eacute;visionnels</label>
+                </div>
                 {{-- Export dropdown --}}
                 @if (! empty($selectedOperationIds))
                 <div class="ms-auto">

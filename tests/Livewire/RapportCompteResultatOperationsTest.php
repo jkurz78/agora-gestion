@@ -57,16 +57,16 @@ it('affiche les données filtrées par opération', function () {
 
 it('supporte parSeances via query string', function () {
     Livewire::test(RapportCompteResultatOperations::class)
-        ->assertSet('parSeances', false)
-        ->set('parSeances', true)
-        ->assertSet('parSeances', true);
+        ->assertSet('parSeances', true)
+        ->set('parSeances', false)
+        ->assertSet('parSeances', false);
 });
 
 it('supporte parTiers via query string', function () {
     Livewire::test(RapportCompteResultatOperations::class)
-        ->assertSet('parTiers', false)
-        ->set('parTiers', true)
-        ->assertSet('parTiers', true);
+        ->assertSet('parTiers', true)
+        ->set('parTiers', false)
+        ->assertSet('parTiers', false);
 });
 
 it('passe les données tiers quand parTiers est actif', function () {
