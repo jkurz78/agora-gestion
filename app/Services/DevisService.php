@@ -834,7 +834,16 @@ final class DevisService
 
         $pdfPath = $this->genererPdf($devis);
 
-        $mailable = new DevisManuelMail($devis, $sujet, $corps, $pdfPath);
+        $mailable = new DevisManuelMail(
+            devis: $devis,
+            sujet: $sujet,
+            corps: $corps,
+            pdfPath: $pdfPath,
+            civilite: $devis->tiers?->civilite?->value,
+            politesse: $devis->tiers?->politesse,
+            prenom: $devis->tiers?->prenom,
+            nom: $devis->tiers?->nom,
+        );
 
         Mail::to($email)->send($mailable);
 

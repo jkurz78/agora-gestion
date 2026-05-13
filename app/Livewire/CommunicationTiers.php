@@ -395,6 +395,8 @@ final class CommunicationTiers extends Component
             corps: $this->corps,
             trackingToken: $trackingToken,
             attachmentPaths: [],
+            civilite: $tiers->civilite?->value,
+            politesse: $tiers->politesse,
         );
 
         try {
@@ -490,6 +492,8 @@ final class CommunicationTiers extends Component
                     corps: $this->corps,
                     trackingToken: $trackingToken,
                     attachmentPaths: $permanentPaths,
+                    civilite: $tiers->civilite?->value,
+                    politesse: $tiers->politesse,
                 );
 
                 Mail::mailer()

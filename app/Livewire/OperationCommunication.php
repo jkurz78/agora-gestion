@@ -660,6 +660,8 @@ final class OperationCommunication extends Component
             typeOperationId: $operation->typeOperation?->id,
             trackingToken: $trackingToken,
             seances: $seances,
+            civilite: $tiers->civilite?->value,
+            politesse: $tiers->politesse,
         );
     }
 

@@ -6,6 +6,8 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
+use App\Mail\Concerns\HasPolitesseVariables;
+use App\Support\TemplateSubstitution;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -13,6 +15,8 @@ use Illuminate\Mail\Mailables\Envelope;
 
 final class DocumentMail extends Mailable
 {
+    use HasPolitesseVariables;
+
     public readonly string $corpsHtml;
 
     public function __construct(
@@ -29,14 +33,15 @@ final class DocumentMail extends Mailable
         public readonly string $pdfContent,
         public readonly string $pdfFilename,
         public readonly ?int $typeOperationId = null,
+        public readonly ?string $civilite = null,
+        public readonly ?string $politesse = null,
     ) {
         $corps = $this->customCorps
             ?? '<p>Bonjour {prenom},</p><p>Veuillez trouver ci-joint {type_document_article} n° {numero_document}.</p>';
         $allVars = $this->variables() + EmailLogo::variables($this->typeOperationId);
-        $corps = str_replace(
-            array_keys($allVars),
-            array_values($allVars),
-            strip_tags($corps, EmailLogo::ALLOWED_TAGS)
+        $corps = TemplateSubstitution::apply(
+            strip_tags($corps, EmailLogo::ALLOWED_TAGS),
+            $allVars
         );
         $this->corpsHtml = ArticleFr::contracter($corps);
     }
@@ -44,11 +49,7 @@ final class DocumentMail extends Mailable
     public function envelope(): Envelope
     {
         $objet = $this->customObjet ?? '{type_document_uc} n° {numero_document}';
-        $subject = str_replace(
-            array_keys($this->variables()),
-            array_values($this->variables()),
-            $objet
-        );
+        $subject = TemplateSubstitution::apply($objet, $this->variables());
 
         return new Envelope(subject: ArticleFr::contracter($subject));
     }
@@ -89,6 +90,11 @@ final class DocumentMail extends Mailable
             '{numero_document}' => $this->numeroDocument,
             '{date_document}' => $this->dateDocument,
             '{montant_total}' => $this->montantTotal,
-        ];
+        ] + $this->politesseVariables(
+            $this->civilite,
+            $this->politesse,
+            $this->prenomDestinataire,
+            $this->nomDestinataire,
+        );
     }
 }

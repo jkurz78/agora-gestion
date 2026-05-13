@@ -204,6 +204,8 @@ final class AttestationModal extends Component
                     libelleArticle: $typeOp->libelle_article,
                     blocSeances: $this->buildBlocSeances('seance', $seance),
                     typeOperationId: $typeOp?->id,
+                    civilite: $participant->tiers->civilite?->value,
+                    politesse: $participant->tiers->politesse,
                 );
 
                 Mail::mailer()
@@ -296,6 +298,8 @@ final class AttestationModal extends Component
                 libelleArticle: $typeOp->libelle_article ?? null,
                 blocSeances: $this->buildBlocSeances('recap', null, $this->seancesPresent, $this->totalSeances),
                 typeOperationId: $typeOp?->id,
+                civilite: $participant->tiers->civilite?->value,
+                politesse: $participant->tiers->politesse,
             );
 
             Mail::mailer()
