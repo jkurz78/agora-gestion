@@ -12,6 +12,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
+use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
@@ -88,4 +89,39 @@ it('affiche les 3 lignes Prévu/Réalisé/Écart quand toggle previsionnel ON', 
         ->set('selectedOperationIds', [$op->id])
         ->set('previsionnel', true)
         ->assertSee('300,00'); // prévu visible quelque part dans le rendu
+});
+
+it('exporte le PDF rapport opérations avec previsionnel via prev=1', function (): void {
+    $op = Operation::factory()->create();
+    $exercice = app(ExerciceService::class)->current();
+
+    $response = $this->get(route('rapports.export', [
+        'rapport' => 'operations',
+        'format' => 'pdf',
+        'exercice' => $exercice,
+        'ops' => [$op->id],
+        'seances' => '1',
+        'tiers' => '1',
+        'prev' => '1',
+    ]));
+
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf');
+});
+
+it('exporte le Excel rapport opérations avec previsionnel via prev=1', function (): void {
+    $op = Operation::factory()->create();
+    $exercice = app(ExerciceService::class)->current();
+
+    $response = $this->get(route('rapports.export', [
+        'rapport' => 'operations',
+        'format' => 'xlsx',
+        'exercice' => $exercice,
+        'ops' => [$op->id],
+        'seances' => '1',
+        'tiers' => '1',
+        'prev' => '1',
+    ]));
+
+    $response->assertOk();
 });

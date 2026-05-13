@@ -6,6 +6,7 @@
 
 @section('content')
     @php
+        $previsionnel = $previsionnel ?? false;
         $nSeances = $parSeances ? count($seances) : 0;
         // Taille adaptative selon le nombre de colonnes
         if ($nSeances > 10) {
@@ -18,10 +19,43 @@
         $fmt = fn(float $v): string => number_format($v, 2, ',', ' ') . ' €';
         $colCount = $parSeances ? count($seances) + 3 : 3;
         if ($parTiers) $colCount++;
+
+        // Build flat previsions lookup: sc_id => { montant, seances: {num => float} }
+        $buildPrevIdx = function (array $hierarchy): array {
+            $idx = [];
+            foreach ($hierarchy as $cat) {
+                foreach ($cat['sous_categories'] as $sc) {
+                    $scId = (int) $sc['id'];
+                    $idx[$scId] = [
+                        'montant' => (float) ($sc['montant'] ?? $sc['total'] ?? 0),
+                        'seances' => $sc['seances'] ?? [],
+                    ];
+                }
+            }
+            return $idx;
+        };
+
+        $prevChargesIdx  = $previsionnel ? $buildPrevIdx($previsionsCharges  ?? []) : [];
+        $prevProduitsIdx = $previsionnel ? $buildPrevIdx($previsionsProduits ?? []) : [];
+
+        // Renders a stacked Prévu/Réalisé/Écart cell for DOMPDF
+        $renderCellPrev = function (float $realise, float $prevu): string {
+            $r = number_format($realise, 2, ',', ' ');
+            $p = number_format($prevu,   2, ',', ' ');
+            $ecart = $realise - $prevu;
+            $couleur = abs($ecart) < 0.01 ? '#6c757d' : ($ecart >= 0 ? '#2E7D32' : '#B5453A');
+            $signe = $ecart > 0 ? '+' : '';
+            $e = $signe . number_format($ecart, 2, ',', ' ');
+            return '<div style="line-height:1.3;font-size:9px">'
+                . '<div style="color:#6c757d;font-size:8px">' . $p . '</div>'
+                . '<div style="font-weight:600">' . $r . '</div>'
+                . '<div style="color:' . $couleur . ';font-size:8px">' . $e . '</div>'
+                . '</div>';
+        };
     @endphp
 
-    @foreach ([['data' => $charges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges],
-               ['data' => $produits, 'label' => 'RECETTES', 'totalMontant' => $totalProduits]] as $section)
+    @foreach ([['data' => $charges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges, 'prevIdx' => $prevChargesIdx],
+               ['data' => $produits, 'label' => 'RECETTES', 'totalMontant' => $totalProduits, 'prevIdx' => $prevProduitsIdx]] as $section)
     <table class="data-table" style="margin-bottom:14px;font-size:{{ $fontSize }};">
         <tbody>
             {{-- Column header --}}
@@ -61,17 +95,45 @@
                     </tr>
 
                     @foreach ($scVisibles as $sc)
+                        @php
+                            $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                            $prevSc = $section['prevIdx'][$scId] ?? ['montant' => 0.0, 'seances' => []];
+                        @endphp
                         {{-- Sub-category row --}}
                         <tr class="cr-sub">
                             <td style="width:16px;"></td>
                             <td>{{ $sc['label'] }}</td>
                             @if ($parSeances)
                                 @foreach ($seances as $s)
-                                    <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">{{ ($sc['seances'][$s] ?? 0) > 0 ? $fmt($sc['seances'][$s]) : '—' }}</td>
+                                    @php
+                                        $scReal = (float) ($sc['seances'][$s] ?? 0);
+                                        $scPrev = (float) ($prevSc['seances'][$s] ?? 0);
+                                    @endphp
+                                    <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">
+                                        @if ($previsionnel)
+                                            {!! $renderCellPrev($scReal, $scPrev) !!}
+                                        @else
+                                            {{ $scReal > 0 ? $fmt($scReal) : '—' }}
+                                        @endif
+                                    </td>
                                 @endforeach
-                                <td class="text-right fw-bold" style="padding:{{ $pad }};white-space:nowrap;">{{ $fmt($sc['total']) }}</td>
+                                @php $scTotalReal = (float) ($sc['total'] ?? 0); @endphp
+                                <td class="text-right fw-bold" style="padding:{{ $pad }};white-space:nowrap;">
+                                    @if ($previsionnel)
+                                        {!! $renderCellPrev($scTotalReal, (float) $prevSc['montant']) !!}
+                                    @else
+                                        {{ $fmt($scTotalReal) }}
+                                    @endif
+                                </td>
                             @else
-                                <td class="text-right">{{ $fmt($sc['montant']) }}</td>
+                                @php $scMontant = (float) ($sc['montant'] ?? 0); @endphp
+                                <td class="text-right">
+                                    @if ($previsionnel)
+                                        {!! $renderCellPrev($scMontant, (float) $prevSc['montant']) !!}
+                                    @else
+                                        {{ $fmt($scMontant) }}
+                                    @endif
+                                </td>
                             @endif
                         </tr>
 
