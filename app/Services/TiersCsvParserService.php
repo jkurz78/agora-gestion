@@ -13,6 +13,7 @@ final class TiersCsvParserService
     public const EXPECTED_HEADERS = [
         'nom',
         'prenom',
+        'civilite',
         'entreprise',
         'email',
         'telephone',
@@ -119,6 +120,9 @@ final class TiersCsvParserService
                     $row[$key] = trim($value);
                 }
             }
+
+            // Normalize civilite to canonical enum value or null
+            $row['civilite'] = $this->normaliserCivilite($row['civilite'] ?? null);
 
             // Duplicate detection: same identity = same name + same email (or both emails empty)
             // Two rows with same nom+prenom but different emails are legitimate homonymes
@@ -238,7 +242,7 @@ final class TiersCsvParserService
         $columnMap = [];
 
         foreach ($row as $position => $header) {
-            $normalized = Str::lower(trim((string) $header));
+            $normalized = Str::lower(Str::ascii(trim((string) $header)));
             if (in_array($normalized, self::EXPECTED_HEADERS, true)) {
                 $columnMap[$position] = $normalized;
             }
@@ -269,6 +273,25 @@ final class TiersCsvParserService
         }
 
         return $row;
+    }
+
+    /**
+     * Normalise a raw civilité string to a canonical enum value ('M.' or 'Mme'), or null.
+     * Accepts: M., M, Monsieur, Mme, Madame (case-insensitive, accent-stripped).
+     */
+    private function normaliserCivilite(?string $raw): ?string
+    {
+        if ($raw === null || trim($raw) === '') {
+            return null;
+        }
+
+        $key = Str::lower(Str::ascii(trim($raw)));
+
+        return match ($key) {
+            'm.', 'm', 'monsieur' => 'M.',
+            'mme', 'madame' => 'Mme',
+            default => null,
+        };
     }
 
     /**

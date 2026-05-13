@@ -127,6 +127,7 @@ final class TiersCsvImportService
             'type' => $row['type'],
             'nom' => $row['nom'] ?? null,
             'prenom' => $row['prenom'] ?? null,
+            'civilite' => $row['civilite'] ?? null,
             'entreprise' => $row['entreprise'] ?? null,
             'email' => $row['email'] ?? null,
             'telephone' => $row['telephone'] ?? null,
@@ -143,7 +144,7 @@ final class TiersCsvImportService
     {
         $data = [];
 
-        foreach (['nom', 'prenom', 'entreprise', 'email', 'telephone', 'adresse_ligne1', 'code_postal', 'ville', 'pays'] as $field) {
+        foreach (['nom', 'prenom', 'civilite', 'entreprise', 'email', 'telephone', 'adresse_ligne1', 'code_postal', 'ville', 'pays'] as $field) {
             $rowValue = $row[$field] ?? null;
             // Read raw attribute to bypass the uppercase accessor on nom
             $tiersValue = $tiers->getRawOriginal($field);

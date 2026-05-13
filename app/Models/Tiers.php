@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Civilite;
 use App\Enums\Newsletter\SubscriptionRequestStatus;
 use App\Models\Newsletter\SubscriptionRequest;
 use Illuminate\Auth\Authenticatable;
@@ -22,6 +23,7 @@ final class Tiers extends TenantModel implements AuthenticatableContract
         'type',
         'nom',
         'prenom',
+        'civilite',
         'entreprise',
         'email',
         'telephone',
@@ -44,6 +46,7 @@ final class Tiers extends TenantModel implements AuthenticatableContract
             'pour_recettes' => 'boolean',
             'est_helloasso' => 'boolean',
             'email_optout' => 'boolean',
+            'civilite' => Civilite::class,
         ];
     }
 
@@ -236,5 +239,31 @@ final class Tiers extends TenantModel implements AuthenticatableContract
                 ->whereColumn('newsletter_subscription_requests.tiers_id', 'tiers.id')
                 ->where('newsletter_subscription_requests.status', SubscriptionRequestStatus::Confirmed->value);
         });
+    }
+
+    public function getCiviliteLabelAttribute(): string
+    {
+        return $this->civilite?->label() ?? '';
+    }
+
+    public function getSalutationAttribute(): string
+    {
+        return match ($this->civilite) {
+            Civilite::M => 'Monsieur',
+            Civilite::Mme => 'Madame',
+            null => 'Madame, Monsieur',
+        };
+    }
+
+    public function getAdressePolieAttribute(): string
+    {
+        if ($this->type === 'entreprise') {
+            return (string) ($this->entreprise ?? $this->nom);
+        }
+        if ($this->civilite !== null) {
+            return trim($this->civilite->label().' '.$this->nom);
+        }
+
+        return trim(((string) $this->prenom).' '.((string) $this->nom));
     }
 }

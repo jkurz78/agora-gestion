@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Enums\CategorieEmail;
 use App\Models\Association;
+use App\Models\CampagneEmail;
 use App\Models\EmailLog;
 use App\Models\EmailOpen;
 use App\Models\Participant;
 use App\Models\Tiers;
+use App\Models\User;
 use App\Services\Tiers\DTO\CommunicationsTimelineDTO;
 use App\Services\Tiers\DTO\EmailLogLigneDTO;
 use App\Services\Tiers\TiersCommunicationsTimelineService;
@@ -240,9 +242,9 @@ it('isole les emails par tenant (asso B ne voit pas les emails de asso A)', func
 
 it('charge envoyePar, campagne et participant sans planter sur des colonnes inexistantes', function (): void {
     $tiers = Tiers::factory()->create(['nom' => 'Kurz', 'prenom' => 'Anne']);
-    $user = \App\Models\User::factory()->create(['nom' => 'Admin']);
+    $user = User::factory()->create(['nom' => 'Admin']);
     $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
-    $campagne = \App\Models\CampagneEmail::create([
+    $campagne = CampagneEmail::create([
         'operation_id' => $participant->operation_id,
         'objet' => 'Newsletter mai',
         'corps' => '<p>hello</p>',
