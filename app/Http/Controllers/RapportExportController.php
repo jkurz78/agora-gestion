@@ -368,7 +368,9 @@ final class RapportExportController extends Controller
                             } else {
                                 $values[] = (float) ($t['montant'] ?? 0);
                             }
-                            // Previsionnel: tiers rows get no individual prev (sc-level only)
+                            // Previsionnel: les tiers individuels ne sont pas restitués ici par choix de design ;
+                            // la granularité affichée s'arrête à la sous-catégorie. Les prévisions par tiers
+                            // existent en DB (encadrement_previsions.tiers_id) mais sont agrégées au niveau sc.
                             if ($previsionnel) {
                                 $values[] = '';
                                 $values[] = '';

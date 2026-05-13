@@ -171,6 +171,12 @@
                         }
                     }
                 }
+                $totalPrevuSection = 0.0;
+                if ($previsionnel) {
+                    foreach ($section['prevIdx'] as $entry) {
+                        $totalPrevuSection += $entry['montant'] ?? 0.0;
+                    }
+                }
             @endphp
             <tr class="cr-total">
                 <td colspan="2">TOTAL {{ $section['label'] }}</td>
@@ -178,9 +184,21 @@
                     @foreach ($seances as $s)
                         <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">{{ $fmt($totalSectionSeances[$s]) }}</td>
                     @endforeach
-                    <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">{{ $fmt($section['totalMontant']) }}</td>
+                    <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">
+                        @if ($previsionnel)
+                            {!! $renderCellPrev($section['totalMontant'], $totalPrevuSection) !!}
+                        @else
+                            {{ $fmt($section['totalMontant']) }}
+                        @endif
+                    </td>
                 @else
-                    <td class="text-right">{{ $fmt($section['totalMontant']) }}</td>
+                    <td class="text-right">
+                        @if ($previsionnel)
+                            {!! $renderCellPrev($section['totalMontant'], $totalPrevuSection) !!}
+                        @else
+                            {{ $fmt($section['totalMontant']) }}
+                        @endif
+                    </td>
                 @endif
             </tr>
         </tbody>
