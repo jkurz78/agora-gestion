@@ -5,23 +5,29 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\DTOs\InvoiceOcrResult;
+use App\Enums\Espace;
 use App\Enums\ModePaiement;
+use App\Enums\RoleAssociation;
 use App\Enums\TypeTransaction;
 use App\Exceptions\OcrAnalysisException;
 use App\Exceptions\OcrNotConfiguredException;
+use App\Livewire\Concerns\MontantValidation;
 use App\Models\CompteBancaire;
+use App\Models\EncadrementPrevision;
 use App\Models\Operation;
 use App\Models\Seance;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\EncadrementMatrixBuilder;
 use App\Services\ExerciceService;
 use App\Services\InvoiceOcrService;
 use App\Services\TransactionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -36,8 +42,9 @@ final class AnimateurManager extends Component
     // --- Tiers autocomplete for adding new animateur ---
     public ?int $newTiersId = null;
 
-    /** @var array<int> Tiers IDs ajoutés manuellement (pas encore de transaction) */
-    public array $addedTiersIds = [];
+    public ?int $newTiersIdEnCours = null; // tiers sélectionné mais sous-cat pas encore choisie
+
+    public ?int $addingScForTiersId = null; // pour ajout de ligne sous-cat sur encadrant existant
 
     // --- Modal state ---
     public bool $showModal = false;
@@ -91,13 +98,211 @@ final class AnimateurManager extends Component
     #[On('tiers-selected')]
     public function onTiersSelected(int $id): void
     {
-        if (! in_array($id, $this->addedTiersIds, true)) {
-            $this->addedTiersIds[] = $id;
-        }
+        $this->newTiersIdEnCours = $id;
         $this->newTiersId = null;
     }
 
-    public function openCreateModal(int $tiersId, ?int $seanceNum): void
+    public function ajouterEncadrantAvecSousCategorie(int $tiersId, int $sousCategorieId): void
+    {
+        $this->guardCanEdit();
+
+        if (! $this->upsertPrevisionPremierSeance($tiersId, $sousCategorieId)) {
+            $this->addError('ajouterEncadrant', "Aucune séance définie sur l'opération.");
+
+            return;
+        }
+
+        $this->newTiersIdEnCours = null;
+        $this->newTiersId = null;
+    }
+
+    public function annulerAjoutEncadrant(): void
+    {
+        $this->newTiersIdEnCours = null;
+        $this->newTiersId = null;
+    }
+
+    public function ouvrirAjoutLigne(int $tiersId): void
+    {
+        $this->addingScForTiersId = $tiersId;
+    }
+
+    public function fermerAjoutLigne(): void
+    {
+        $this->addingScForTiersId = null;
+    }
+
+    public function ajouterLigneSousCategorie(int $tiersId, int $sousCategorieId): void
+    {
+        $this->guardCanEdit();
+
+        if (! $this->upsertPrevisionPremierSeance($tiersId, $sousCategorieId)) {
+            $this->addError('ajouterLigne', "Aucune séance définie sur l'opération.");
+
+            return;
+        }
+
+        $this->fermerAjoutLigne();
+    }
+
+    public function updateMontantPrevu(int $tiersId, int $sousCategorieId, int $seanceId, string $montant): void
+    {
+        $this->guardCanEdit();
+
+        if (! Seance::where('id', $seanceId)->where('operation_id', $this->operation->id)->exists()) {
+            return;
+        }
+
+        $parsed = (float) str_replace(',', '.', $montant);
+
+        $validator = Validator::make(
+            ['montant' => $parsed],
+            ['montant' => ['required', 'numeric', MontantValidation::RULE]],
+            MontantValidation::messages(['montant'])
+        );
+        if ($validator->fails()) {
+            $this->addError('updateMontantPrevu', $validator->errors()->first('montant'));
+
+            return;
+        }
+
+        EncadrementPrevision::updateOrCreate(
+            [
+                'operation_id' => $this->operation->id,
+                'tiers_id' => $tiersId,
+                'sous_categorie_id' => $sousCategorieId,
+                'seance_id' => $seanceId,
+            ],
+            ['montant_prevu' => $parsed]
+        );
+    }
+
+    public function recopierLigne(int $tiersId, int $sousCategorieId): void
+    {
+        $this->guardCanEdit();
+
+        $seances = Seance::where('operation_id', $this->operation->id)->orderBy('numero')->get();
+        if ($seances->count() < 2) {
+            return;
+        }
+
+        $premiere = $seances->first();
+        $source = EncadrementPrevision::where('operation_id', $this->operation->id)
+            ->where('tiers_id', $tiersId)
+            ->where('sous_categorie_id', $sousCategorieId)
+            ->where('seance_id', $premiere->id)
+            ->first();
+
+        if ($source === null) {
+            return;
+        }
+
+        foreach ($seances->skip(1) as $seance) {
+            EncadrementPrevision::updateOrCreate(
+                [
+                    'operation_id' => $this->operation->id,
+                    'tiers_id' => $tiersId,
+                    'sous_categorie_id' => $sousCategorieId,
+                    'seance_id' => $seance->id,
+                ],
+                ['montant_prevu' => $source->montant_prevu]
+            );
+        }
+    }
+
+    public function supprimerLigne(int $tiersId, int $sousCategorieId): void
+    {
+        $this->guardCanEdit();
+
+        $realiseCount = TransactionLigne::query()
+            ->whereHas('transaction', fn ($q) => $q->where('type', TypeTransaction::Depense)->where('tiers_id', $tiersId))
+            ->where('operation_id', $this->operation->id)
+            ->where('sous_categorie_id', $sousCategorieId)
+            ->count();
+
+        if ($realiseCount > 0) {
+            $this->addError('supprimerLigne', 'Impossible de supprimer : des transactions réalisées existent.');
+
+            return;
+        }
+
+        EncadrementPrevision::where('operation_id', $this->operation->id)
+            ->where('tiers_id', $tiersId)
+            ->where('sous_categorie_id', $sousCategorieId)
+            ->delete();
+    }
+
+    public function supprimerEncadrant(int $tiersId): void
+    {
+        $this->guardCanEdit();
+
+        $realiseCount = TransactionLigne::query()
+            ->whereHas('transaction', fn ($q) => $q->where('type', TypeTransaction::Depense)->where('tiers_id', $tiersId))
+            ->where('operation_id', $this->operation->id)
+            ->count();
+
+        if ($realiseCount > 0) {
+            $this->addError('supprimerEncadrant', 'Impossible de supprimer : des transactions réalisées existent pour cet encadrant.');
+
+            return;
+        }
+
+        EncadrementPrevision::where('operation_id', $this->operation->id)
+            ->where('tiers_id', $tiersId)
+            ->delete();
+    }
+
+    private function upsertPrevisionPremierSeance(int $tiersId, int $sousCategorieId): bool
+    {
+        $premiereSeance = Seance::where('operation_id', $this->operation->id)->orderBy('numero')->first();
+        if ($premiereSeance === null) {
+            return false;
+        }
+
+        EncadrementPrevision::updateOrCreate(
+            [
+                'operation_id' => $this->operation->id,
+                'tiers_id' => $tiersId,
+                'sous_categorie_id' => $sousCategorieId,
+                'seance_id' => $premiereSeance->id,
+            ],
+            ['montant_prevu' => 0]
+        );
+
+        return true;
+    }
+
+    private function guardCanEdit(): void
+    {
+        $role = auth()->user()?->currentRole();
+        $hasWrite = RoleAssociation::tryFrom($role ?? '')?->canWrite(Espace::Gestion) ?? false;
+
+        if (! $hasWrite) {
+            abort(403);
+        }
+    }
+
+    public function getCanEditProperty(): bool
+    {
+        $role = auth()->user()?->currentRole();
+
+        return RoleAssociation::tryFrom($role ?? '')?->canWrite(Espace::Gestion) ?? false;
+    }
+
+    /**
+     * @return array<int, array{id: int, nom: string}>
+     */
+    public function getSousCategoriesDepenseProperty(): array
+    {
+        return SousCategorie::query()
+            ->whereHas('categorie', fn ($q) => $q->where('type', 'depense'))
+            ->orderBy('nom')
+            ->get(['id', 'nom'])
+            ->map(fn ($sc) => ['id' => (int) $sc->id, 'nom' => $sc->nom])
+            ->toArray();
+    }
+
+    public function openCreateModal(int $tiersId, int $sousCategorieId, ?int $seanceNum): void
     {
         $tiers = Tiers::find($tiersId);
         if ($tiers === null) {
@@ -122,7 +327,7 @@ final class AnimateurManager extends Component
 
         $this->modalLignes = [
             [
-                'sous_categorie_id' => null,
+                'sous_categorie_id' => $sousCategorieId,
                 'operation_id' => $this->operation->id,
                 'seance' => $seanceNum,
                 'montant' => '',
@@ -468,12 +673,10 @@ final class AnimateurManager extends Component
             ->orderBy('numero')
             ->get();
 
-        $matrixData = $this->buildMatrixData($seances);
+        $matrixData = app(EncadrementMatrixBuilder::class)->build($this->operation);
 
         $comptes = $this->showModal
-            ? CompteBancaire::saisieManuelle()
-                ->orderBy('nom')
-                ->get(['id', 'nom'])
+            ? CompteBancaire::saisieManuelle()->orderBy('nom')->get(['id', 'nom'])
             : collect();
 
         return view('livewire.animateur-manager', [
@@ -481,6 +684,7 @@ final class AnimateurManager extends Component
             'matrixData' => $matrixData,
             'comptes' => $comptes,
             'modesPaiement' => ModePaiement::cases(),
+            'sousCategoriesDepense' => $this->sousCategoriesDepense,
         ]);
     }
 
@@ -541,7 +745,7 @@ final class AnimateurManager extends Component
         return $date;
     }
 
-    private function buildLigneNotes(array $ligne, \Illuminate\Support\Collection $operations, \Illuminate\Support\Collection $sousCategories): string
+    private function buildLigneNotes(array $ligne, Collection $operations, Collection $sousCategories): string
     {
         $parts = [];
 
@@ -570,123 +774,5 @@ final class AnimateurManager extends Component
         }
 
         return implode(' — ', $parts);
-    }
-
-    /**
-     * Build the matrix data structure for the animateurs view.
-     *
-     * @return array{animateurs: array, seanceTotals: array<string, float>, grandTotal: float}
-     */
-    private function buildMatrixData(Collection $seances): array
-    {
-        // Fetch all depense transaction lines for this operation
-        $lignes = TransactionLigne::query()
-            ->whereHas('transaction', fn ($q) => $q->where('type', TypeTransaction::Depense))
-            ->where('operation_id', $this->operation->id)
-            ->with(['transaction.tiers', 'sousCategorie'])
-            ->get();
-
-        $animateurs = [];
-        $seanceTotals = [];
-        $grandTotal = 0.0;
-
-        foreach ($lignes as $ligne) {
-            $transaction = $ligne->transaction;
-            if ($transaction === null || $transaction->tiers === null) {
-                continue;
-            }
-
-            $tiersId = $transaction->tiers_id;
-            $tiersName = $transaction->tiers->displayName();
-            $seanceNum = $ligne->seance;
-            $seanceKey = $seanceNum !== null ? (string) $seanceNum : 'null';
-            $scId = $ligne->sous_categorie_id;
-            $scName = $ligne->sousCategorie?->nom ?? 'Sans catégorie';
-            $montant = (float) $ligne->montant;
-
-            // Initialize animateur entry
-            if (! isset($animateurs[$tiersId])) {
-                $animateurs[$tiersId] = [
-                    'tiersId' => $tiersId,
-                    'tiersName' => $tiersName,
-                    'sousCategories' => [],
-                    'seanceTotals' => [],
-                    'total' => 0.0,
-                ];
-            }
-
-            // Initialize sous-catégorie entry
-            if (! isset($animateurs[$tiersId]['sousCategories'][$scId])) {
-                $animateurs[$tiersId]['sousCategories'][$scId] = [
-                    'scId' => $scId,
-                    'scName' => $scName,
-                    'seanceAmounts' => [],
-                    'total' => 0.0,
-                ];
-            }
-
-            // Accumulate amount
-            $scData = &$animateurs[$tiersId]['sousCategories'][$scId];
-            if (! isset($scData['seanceAmounts'][$seanceKey])) {
-                $scData['seanceAmounts'][$seanceKey] = [
-                    'montant' => 0.0,
-                    'transactionIds' => [],
-                    'numeroPieces' => [],
-                ];
-            }
-            $scData['seanceAmounts'][$seanceKey]['montant'] += $montant;
-            if (! in_array($transaction->id, $scData['seanceAmounts'][$seanceKey]['transactionIds'], true)) {
-                $scData['seanceAmounts'][$seanceKey]['transactionIds'][] = $transaction->id;
-                if ($transaction->numero_piece) {
-                    $scData['seanceAmounts'][$seanceKey]['numeroPieces'][] = $transaction->numero_piece;
-                }
-            }
-            $scData['total'] += $montant;
-
-            // Animateur seance totals
-            if (! isset($animateurs[$tiersId]['seanceTotals'][$seanceKey])) {
-                $animateurs[$tiersId]['seanceTotals'][$seanceKey] = 0.0;
-            }
-            $animateurs[$tiersId]['seanceTotals'][$seanceKey] += $montant;
-            $animateurs[$tiersId]['total'] += $montant;
-
-            // Global seance totals
-            if (! isset($seanceTotals[$seanceKey])) {
-                $seanceTotals[$seanceKey] = 0.0;
-            }
-            $seanceTotals[$seanceKey] += $montant;
-            $grandTotal += $montant;
-        }
-
-        // Merge manually added tiers (no transactions yet)
-        foreach ($this->addedTiersIds as $addedId) {
-            if (! isset($animateurs[$addedId])) {
-                $tiers = Tiers::find($addedId);
-                if ($tiers !== null) {
-                    $animateurs[$addedId] = [
-                        'tiersId' => $addedId,
-                        'tiersName' => $tiers->displayName(),
-                        'sousCategories' => [],
-                        'seanceTotals' => [],
-                        'total' => 0.0,
-                    ];
-                }
-            }
-        }
-
-        // Remove from addedTiersIds those that now have transactions
-        $this->addedTiersIds = array_values(array_filter(
-            $this->addedTiersIds,
-            fn (int $id): bool => ! isset($animateurs[$id]) || $animateurs[$id]['total'] === 0.0
-        ));
-
-        // Sort animateurs by name
-        uasort($animateurs, fn (array $a, array $b): int => strcasecmp($a['tiersName'], $b['tiersName']));
-
-        return [
-            'animateurs' => $animateurs,
-            'seanceTotals' => $seanceTotals,
-            'grandTotal' => $grandTotal,
-        ];
     }
 }

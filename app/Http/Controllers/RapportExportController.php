@@ -295,8 +295,9 @@ final class RapportExportController extends Controller
         $operationIds = array_map('intval', (array) $request->query('ops', []));
         $parSeances = $request->boolean('seances');
         $parTiers = $request->boolean('tiers');
+        $previsionnel = $request->boolean('prev');
 
-        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers);
+        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel);
 
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
@@ -304,6 +305,26 @@ final class RapportExportController extends Controller
 
         $seances = $data['seances'] ?? [];
         $row = 1;
+
+        // Build flat previsions lookup: sc_id => { montant, seances: {num => float} }
+        // Only populated when $previsionnel is true.
+        $buildPrevIdx = function (array $hierarchy): array {
+            $idx = [];
+            foreach ($hierarchy as $cat) {
+                foreach ($cat['sous_categories'] as $sc) {
+                    $scId = (int) $sc['id'];
+                    $idx[$scId] = [
+                        'montant' => (float) ($sc['montant'] ?? $sc['total'] ?? 0),
+                        'seances' => $sc['seances'] ?? [],
+                    ];
+                }
+            }
+
+            return $idx;
+        };
+
+        $prevChargesIdx = $previsionnel ? $buildPrevIdx($data['previsions_charges'] ?? []) : [];
+        $prevProduitsIdx = $previsionnel ? $buildPrevIdx($data['previsions_produits'] ?? []) : [];
 
         // Header row
         if ($parSeances) {
@@ -322,13 +343,20 @@ final class RapportExportController extends Controller
             }
             $headers[] = 'Montant';
         }
+        if ($previsionnel) {
+            $headers[] = 'Prévu';
+            $headers[] = 'Écart';
+        }
         $sheet->fromArray([$headers], null, 'A'.$row);
         $sheet->getStyle('A1:'.chr(64 + count($headers)).'1')->getFont()->setBold(true);
         $row++;
 
-        foreach ([['Charge', $data['charges']], ['Produit', $data['produits']]] as [$type, $sections]) {
+        foreach ([['Charge', $data['charges'], $prevChargesIdx], ['Produit', $data['produits'], $prevProduitsIdx]] as [$type, $sections, $prevIdx]) {
             foreach ($sections as $cat) {
                 foreach ($cat['sous_categories'] as $sc) {
+                    $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                    $prevSc = $prevIdx[$scId] ?? ['montant' => 0.0, 'seances' => []];
+
                     if ($parTiers && ! empty($sc['tiers'])) {
                         foreach ($sc['tiers'] as $t) {
                             $values = [$type, $cat['label'], $sc['label'], $t['label']];
@@ -339,6 +367,13 @@ final class RapportExportController extends Controller
                                 $values[] = (float) ($t['total'] ?? 0);
                             } else {
                                 $values[] = (float) ($t['montant'] ?? 0);
+                            }
+                            // Previsionnel: les tiers individuels ne sont pas restitués ici par choix de design ;
+                            // la granularité affichée s'arrête à la sous-catégorie. Les prévisions par tiers
+                            // existent en DB (encadrement_previsions.tiers_id) mais sont agrégées au niveau sc.
+                            if ($previsionnel) {
+                                $values[] = '';
+                                $values[] = '';
                             }
                             $sheet->fromArray([$values], null, 'A'.$row);
                             $row++;
@@ -353,9 +388,16 @@ final class RapportExportController extends Controller
                         foreach ($seances as $s) {
                             $values[] = (float) ($sc['seances'][$s] ?? 0);
                         }
-                        $values[] = (float) ($sc['total'] ?? 0);
+                        $realise = (float) ($sc['total'] ?? 0);
+                        $values[] = $realise;
                     } else {
-                        $values[] = (float) ($sc['montant'] ?? 0);
+                        $realise = (float) ($sc['montant'] ?? 0);
+                        $values[] = $realise;
+                    }
+                    if ($previsionnel) {
+                        $prevu = (float) $prevSc['montant'];
+                        $values[] = $prevu;
+                        $values[] = $realise - $prevu;
                     }
                     $sheet->fromArray([$values], null, 'A'.$row);
                     if ($parTiers) {
@@ -372,9 +414,21 @@ final class RapportExportController extends Controller
                     foreach ($seances as $s) {
                         $values[] = (float) ($cat['seances'][$s] ?? 0);
                     }
-                    $values[] = (float) ($cat['total'] ?? 0);
+                    $catRealise = (float) ($cat['total'] ?? 0);
+                    $values[] = $catRealise;
                 } else {
-                    $values[] = (float) ($cat['montant'] ?? 0);
+                    $catRealise = (float) ($cat['montant'] ?? 0);
+                    $values[] = $catRealise;
+                }
+                if ($previsionnel) {
+                    // Compute cat prevu by summing sc previsions for sous_categories of this cat
+                    $catPrevu = 0.0;
+                    foreach ($cat['sous_categories'] as $sc) {
+                        $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
+                        $catPrevu += (float) ($prevIdx[$scId]['montant'] ?? 0);
+                    }
+                    $values[] = $catPrevu;
+                    $values[] = $catRealise - $catPrevu;
                 }
                 $sheet->fromArray([$values], null, 'A'.$row);
                 $sheet->getStyle('A'.$row.':'.chr(64 + count($headers)).$row)->getFont()->setBold(true);
@@ -602,8 +656,9 @@ final class RapportExportController extends Controller
         $operationIds = array_map('intval', (array) $request->query('ops', []));
         $parSeances = $request->boolean('seances');
         $parTiers = $request->boolean('tiers');
+        $previsionnel = $request->boolean('prev');
 
-        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers);
+        $data = $rapportService->compteDeResultatOperations($exercice, $operationIds, $parSeances, $parTiers, $previsionnel);
         $seances = $data['seances'] ?? [];
 
         $totalCharges = $parSeances
@@ -616,9 +671,12 @@ final class RapportExportController extends Controller
         return [
             'charges' => $data['charges'],
             'produits' => $data['produits'],
+            'previsionsCharges' => $data['previsions_charges'] ?? [],
+            'previsionsProduits' => $data['previsions_produits'] ?? [],
             'seances' => $seances,
             'parSeances' => $parSeances,
             'parTiers' => $parTiers,
+            'previsionnel' => $previsionnel,
             'totalCharges' => $totalCharges,
             'totalProduits' => $totalProduits,
             'resultatNet' => $totalProduits - $totalCharges,

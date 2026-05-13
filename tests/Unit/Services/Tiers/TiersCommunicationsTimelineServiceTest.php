@@ -237,3 +237,36 @@ it('isole les emails par tenant (asso B ne voit pas les emails de asso A)', func
     $resultCross = $this->service->forTiers($tiersA);
     expect($resultCross->total)->toBe(0);
 });
+
+it('charge envoyePar, campagne et participant sans planter sur des colonnes inexistantes', function (): void {
+    $tiers = Tiers::factory()->create(['nom' => 'Kurz', 'prenom' => 'Anne']);
+    $user = \App\Models\User::factory()->create(['nom' => 'Admin']);
+    $participant = Participant::factory()->create(['tiers_id' => $tiers->id]);
+    $campagne = \App\Models\CampagneEmail::create([
+        'operation_id' => $participant->operation_id,
+        'objet' => 'Newsletter mai',
+        'corps' => '<p>hello</p>',
+        'nb_destinataires' => 1,
+        'nb_erreurs' => 0,
+        'envoye_par' => $user->id,
+    ]);
+
+    EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => $participant->id,
+        'campagne_id' => $campagne->id,
+        'envoye_par' => $user->id,
+        'objet' => 'Email test',
+    ]);
+
+    $result = $this->service->forTiers($tiers);
+
+    expect($result->total)->toBe(1);
+
+    /** @var EmailLogLigneDTO $ligne */
+    $ligne = $result->emails->getCollection()->first();
+    expect($ligne)->toBeInstanceOf(EmailLogLigneDTO::class)
+        ->and($ligne->envoyeParNom)->toBe('Admin')
+        ->and($ligne->campagneNom)->toBe('Newsletter mai')
+        ->and($ligne->participantNom)->toBe('Anne KURZ');
+});

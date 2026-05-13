@@ -17,10 +17,13 @@ final class RapportCompteResultatOperations extends Component
     public array $selectedOperationIds = [];
 
     #[Url(as: 'seances')]
-    public bool $parSeances = false;
+    public bool $parSeances = true;
 
     #[Url(as: 'tiers')]
-    public bool $parTiers = false;
+    public bool $parTiers = true;
+
+    #[Url(as: 'prev')]
+    public bool $previsionnel = false;
 
     public function exportUrl(string $format): string
     {
@@ -33,6 +36,7 @@ final class RapportCompteResultatOperations extends Component
             'ops' => $this->selectedOperationIds,
             'seances' => $this->parSeances ? '1' : '0',
             'tiers' => $this->parTiers ? '1' : '0',
+            'prev' => $this->previsionnel ? '1' : '0',
         ]);
     }
 
@@ -44,6 +48,8 @@ final class RapportCompteResultatOperations extends Component
 
         $charges = [];
         $produits = [];
+        $previsionsCharges = [];
+        $previsionsProduits = [];
         $seances = [];
         $totalCharges = 0.0;
         $totalProduits = 0.0;
@@ -55,10 +61,13 @@ final class RapportCompteResultatOperations extends Component
                 $this->selectedOperationIds,
                 $this->parSeances,
                 $this->parTiers,
+                $this->previsionnel,
             );
             $charges = $data['charges'];
             $produits = $data['produits'];
             $seances = $data['seances'] ?? [];
+            $previsionsCharges = $data['previsions_charges'] ?? [];
+            $previsionsProduits = $data['previsions_produits'] ?? [];
             $totalCharges = $this->parSeances
                 ? collect($charges)->sum('total')
                 : collect($charges)->sum('montant');
@@ -71,6 +80,8 @@ final class RapportCompteResultatOperations extends Component
             'operationTree' => $operationTree,
             'charges' => $charges,
             'produits' => $produits,
+            'previsionsCharges' => $previsionsCharges,
+            'previsionsProduits' => $previsionsProduits,
             'seances' => $seances,
             'totalCharges' => $totalCharges,
             'totalProduits' => $totalProduits,
