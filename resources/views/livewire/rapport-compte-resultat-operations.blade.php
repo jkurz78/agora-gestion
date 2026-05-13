@@ -132,6 +132,65 @@
     @if (! $hasSelection)
         <p class="text-muted text-center py-4">S&eacute;lectionnez au moins une op&eacute;ration pour afficher le rapport.</p>
     @else
+        @php
+            // ---------------------------------------------------------------
+            // Helpers prévisionnel
+            // ---------------------------------------------------------------
+
+            // Indexe une hiérarchie de prévisions en sous-dictionnaires plats
+            $indexPrevisions = function (array $hierarchy): array {
+                $idx = [
+                    'cat'         => [],  // cat_id => montant
+                    'cat_seance'  => [],  // cat_id => [seance => montant]
+                    'sc'          => [],  // sc_id  => montant
+                    'sc_seance'   => [],  // sc_id  => [seance => montant]
+                    'tiers'       => [],  // sc_id  => [tiers_id => montant]
+                    'tiers_seance'=> [],  // sc_id  => [tiers_id => [seance => montant]]
+                ];
+                foreach ($hierarchy as $cat) {
+                    $cId = $cat['id'];
+                    $idx['cat'][$cId] = (float) ($cat['montant'] ?? $cat['total'] ?? 0);
+                    foreach (($cat['seances'] ?? []) as $s => $m) {
+                        $idx['cat_seance'][$cId][$s] = (float) $m;
+                    }
+                    foreach ($cat['sous_categories'] as $sc) {
+                        $scId = $sc['id'];
+                        $idx['sc'][$scId] = (float) ($sc['montant'] ?? $sc['total'] ?? 0);
+                        foreach (($sc['seances'] ?? []) as $s => $m) {
+                            $idx['sc_seance'][$scId][$s] = (float) $m;
+                        }
+                        foreach (($sc['tiers'] ?? []) as $t) {
+                            $tId = $t['tiers_id'];
+                            $idx['tiers'][$scId][$tId] = (float) ($t['montant'] ?? $t['total'] ?? 0);
+                            foreach (($t['seances'] ?? []) as $s => $m) {
+                                $idx['tiers_seance'][$scId][$tId][$s] = (float) $m;
+                            }
+                        }
+                    }
+                }
+                return $idx;
+            };
+
+            $idxPrevCharges  = $indexPrevisions($previsionsCharges);
+            $idxPrevProduits = $indexPrevisions($previsionsProduits);
+
+            // Rend une cellule "stack" Prévu / Réalisé / Écart
+            $renderCellule = function (float $realise, float $prevu): string {
+                $r = number_format($realise, 2, ',', ' ');
+                $p = number_format($prevu,   2, ',', ' ');
+                $ecart = $realise - $prevu;
+                $couleurEcart = abs($ecart) < 0.01 ? '#6c757d' : ($ecart >= 0 ? '#2E7D32' : '#B5453A');
+                $signe = $ecart > 0 ? '+' : '';
+                $e = $signe . number_format($ecart, 2, ',', ' ');
+
+                return '<div style="line-height:1.2;font-size:11px">'
+                    . '<div style="color:#6c757d">' . $p . '</div>'
+                    . '<div style="font-weight:600">' . $r . '</div>'
+                    . '<div style="color:' . $couleurEcart . ';font-size:10px">' . $e . '</div>'
+                    . '</div>';
+            };
+        @endphp
+
         @foreach ([
             ['data' => $charges, 'label' => 'DÉPENSES', 'totalMontant' => $totalCharges],
             ['data' => $produits, 'label' => 'RECETTES', 'totalMontant' => $totalProduits],
@@ -166,6 +225,10 @@
                             </td>
                         </tr>
 
+                        @php
+                            $sectionIdx = $section['label'] === 'DÉPENSES' ? $idxPrevCharges : $idxPrevProduits;
+                        @endphp
+
                         @foreach ($section['data'] as $cat)
                             @php
                                 $scVisibles = collect($cat['sous_categories'])->filter(fn($sc) =>
@@ -179,17 +242,44 @@
                                     <td style="font-weight:600;color:#1e3a5f;padding:7px 12px;">{{ $cat['label'] }}</td>
                                     @if ($parSeances)
                                         @foreach ($seances as $s)
-                                            <td class="text-end fw-bold" style="padding:7px 8px;">
-                                                @if (($cat['seances'][$s] ?? 0) > 0)
-                                                    {{ number_format($cat['seances'][$s], 2, ',', ' ') }} &euro;
-                                                @else
-                                                    &mdash;
-                                                @endif
-                                            </td>
+                                            @if ($previsionnel)
+                                                <td class="text-end" style="padding:7px 8px;">
+                                                    {!! $renderCellule(
+                                                        (float) ($cat['seances'][$s] ?? 0),
+                                                        (float) ($sectionIdx['cat_seance'][$cat['id']][$s] ?? 0)
+                                                    ) !!}
+                                                </td>
+                                            @else
+                                                <td class="text-end fw-bold" style="padding:7px 8px;">
+                                                    @if (($cat['seances'][$s] ?? 0) > 0)
+                                                        {{ number_format($cat['seances'][$s], 2, ',', ' ') }} &euro;
+                                                    @else
+                                                        &mdash;
+                                                    @endif
+                                                </td>
+                                            @endif
                                         @endforeach
-                                        <td class="text-end fw-bold" style="padding:7px 8px;">{{ number_format($cat['total'], 2, ',', ' ') }} &euro;</td>
+                                        @if ($previsionnel)
+                                            <td class="text-end" style="padding:7px 8px;">
+                                                {!! $renderCellule(
+                                                    (float) ($cat['total'] ?? 0),
+                                                    (float) ($sectionIdx['cat'][$cat['id']] ?? 0)
+                                                ) !!}
+                                            </td>
+                                        @else
+                                            <td class="text-end fw-bold" style="padding:7px 8px;">{{ number_format($cat['total'], 2, ',', ' ') }} &euro;</td>
+                                        @endif
                                     @else
-                                        <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($cat['montant'], 2, ',', ' ') }} &euro;</td>
+                                        @if ($previsionnel)
+                                            <td class="text-end" style="padding:7px 12px;">
+                                                {!! $renderCellule(
+                                                    (float) ($cat['montant'] ?? 0),
+                                                    (float) ($sectionIdx['cat'][$cat['id']] ?? 0)
+                                                ) !!}
+                                            </td>
+                                        @else
+                                            <td class="text-end fw-bold" style="padding:7px 12px;">{{ number_format($cat['montant'], 2, ',', ' ') }} &euro;</td>
+                                        @endif
                                     @endif
                                 </tr>
 
@@ -200,17 +290,44 @@
                                         <td style="padding:5px 12px 5px 32px;color:#444;">{{ $sc['label'] }}</td>
                                         @if ($parSeances)
                                             @foreach ($seances as $s)
-                                                <td class="text-end" style="padding:5px 8px;color:#444;">
-                                                    @if (($sc['seances'][$s] ?? 0) > 0)
-                                                        {{ number_format($sc['seances'][$s], 2, ',', ' ') }} &euro;
-                                                    @else
-                                                        &mdash;
-                                                    @endif
-                                                </td>
+                                                @if ($previsionnel)
+                                                    <td class="text-end" style="padding:5px 8px;color:#444;">
+                                                        {!! $renderCellule(
+                                                            (float) ($sc['seances'][$s] ?? 0),
+                                                            (float) ($sectionIdx['sc_seance'][$sc['id']][$s] ?? 0)
+                                                        ) !!}
+                                                    </td>
+                                                @else
+                                                    <td class="text-end" style="padding:5px 8px;color:#444;">
+                                                        @if (($sc['seances'][$s] ?? 0) > 0)
+                                                            {{ number_format($sc['seances'][$s], 2, ',', ' ') }} &euro;
+                                                        @else
+                                                            &mdash;
+                                                        @endif
+                                                    </td>
+                                                @endif
                                             @endforeach
-                                            <td class="text-end fw-bold" style="padding:5px 8px;">{{ number_format($sc['total'], 2, ',', ' ') }} &euro;</td>
+                                            @if ($previsionnel)
+                                                <td class="text-end" style="padding:5px 8px;">
+                                                    {!! $renderCellule(
+                                                        (float) ($sc['total'] ?? 0),
+                                                        (float) ($sectionIdx['sc'][$sc['id']] ?? 0)
+                                                    ) !!}
+                                                </td>
+                                            @else
+                                                <td class="text-end fw-bold" style="padding:5px 8px;">{{ number_format($sc['total'], 2, ',', ' ') }} &euro;</td>
+                                            @endif
                                         @else
-                                            <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['montant'], 2, ',', ' ') }} &euro;</td>
+                                            @if ($previsionnel)
+                                                <td class="text-end" style="padding:5px 12px;color:#444;">
+                                                    {!! $renderCellule(
+                                                        (float) ($sc['montant'] ?? 0),
+                                                        (float) ($sectionIdx['sc'][$sc['id']] ?? 0)
+                                                    ) !!}
+                                                </td>
+                                            @else
+                                                <td class="text-end" style="padding:5px 12px;color:#444;">{{ number_format($sc['montant'], 2, ',', ' ') }} &euro;</td>
+                                            @endif
                                         @endif
                                     </tr>
 
@@ -234,17 +351,44 @@
                                                 </td>
                                                 @if ($parSeances)
                                                     @foreach ($seances as $s)
-                                                        <td class="text-end" style="padding:4px 8px;color:#888;font-size:12px;">
-                                                            @if (($t['seances'][$s] ?? 0) > 0)
-                                                                {{ number_format($t['seances'][$s], 2, ',', ' ') }} &euro;
-                                                            @else
-                                                                &mdash;
-                                                            @endif
-                                                        </td>
+                                                        @if ($previsionnel)
+                                                            <td class="text-end" style="padding:4px 8px;font-size:12px;">
+                                                                {!! $renderCellule(
+                                                                    (float) ($t['seances'][$s] ?? 0),
+                                                                    (float) ($sectionIdx['tiers_seance'][$sc['id']][$t['tiers_id']][$s] ?? 0)
+                                                                ) !!}
+                                                            </td>
+                                                        @else
+                                                            <td class="text-end" style="padding:4px 8px;color:#888;font-size:12px;">
+                                                                @if (($t['seances'][$s] ?? 0) > 0)
+                                                                    {{ number_format($t['seances'][$s], 2, ',', ' ') }} &euro;
+                                                                @else
+                                                                    &mdash;
+                                                                @endif
+                                                            </td>
+                                                        @endif
                                                     @endforeach
-                                                    <td class="text-end" style="padding:4px 8px;color:#666;font-size:12px;">{{ number_format($t['total'], 2, ',', ' ') }} &euro;</td>
+                                                    @if ($previsionnel)
+                                                        <td class="text-end" style="padding:4px 8px;font-size:12px;">
+                                                            {!! $renderCellule(
+                                                                (float) ($t['total'] ?? 0),
+                                                                (float) ($sectionIdx['tiers'][$sc['id']][$t['tiers_id']] ?? 0)
+                                                            ) !!}
+                                                        </td>
+                                                    @else
+                                                        <td class="text-end" style="padding:4px 8px;color:#666;font-size:12px;">{{ number_format($t['total'], 2, ',', ' ') }} &euro;</td>
+                                                    @endif
                                                 @else
-                                                    <td class="text-end" style="padding:4px 12px;color:#666;font-size:12px;">{{ number_format($t['montant'], 2, ',', ' ') }} &euro;</td>
+                                                    @if ($previsionnel)
+                                                        <td class="text-end" style="padding:4px 12px;font-size:12px;">
+                                                            {!! $renderCellule(
+                                                                (float) ($t['montant'] ?? 0),
+                                                                (float) ($sectionIdx['tiers'][$sc['id']][$t['tiers_id']] ?? 0)
+                                                            ) !!}
+                                                        </td>
+                                                    @else
+                                                        <td class="text-end" style="padding:4px 12px;color:#666;font-size:12px;">{{ number_format($t['montant'], 2, ',', ' ') }} &euro;</td>
+                                                    @endif
                                                 @endif
                                             </tr>
                                             @endif
@@ -265,16 +409,54 @@
                                     }
                                 }
                             }
+                            // Sommes prévues par séance pour le total section
+                            $totalPrevuSeances = [];
+                            if ($previsionnel && $parSeances) {
+                                $totalPrevuSeances = array_fill_keys($seances, 0.0);
+                                foreach ($sectionIdx['cat_seance'] as $catSeances) {
+                                    foreach ($seances as $s) {
+                                        $totalPrevuSeances[$s] += $catSeances[$s] ?? 0.0;
+                                    }
+                                }
+                            }
+                            $totalPrevuSection = $previsionnel ? array_sum($sectionIdx['cat']) : 0.0;
                         @endphp
                         <tr style="background:#5a7fa8;color:#fff;font-weight:700;font-size:14px;">
                             <td colspan="2" style="padding:9px 12px;">TOTAL {{ $section['label'] }}</td>
                             @if ($parSeances)
                                 @foreach ($seances as $s)
-                                    <td class="text-end" style="padding:9px 8px;">{{ number_format($totalSectionSeances[$s], 2, ',', ' ') }} &euro;</td>
+                                    @if ($previsionnel)
+                                        <td class="text-end" style="padding:9px 8px;">
+                                            {!! $renderCellule(
+                                                (float) ($totalSectionSeances[$s] ?? 0),
+                                                (float) ($totalPrevuSeances[$s] ?? 0)
+                                            ) !!}
+                                        </td>
+                                    @else
+                                        <td class="text-end" style="padding:9px 8px;">{{ number_format($totalSectionSeances[$s], 2, ',', ' ') }} &euro;</td>
+                                    @endif
                                 @endforeach
-                                <td class="text-end" style="padding:9px 8px;">{{ number_format($section['totalMontant'], 2, ',', ' ') }} &euro;</td>
+                                @if ($previsionnel)
+                                    <td class="text-end" style="padding:9px 8px;">
+                                        {!! $renderCellule(
+                                            (float) $section['totalMontant'],
+                                            $totalPrevuSection
+                                        ) !!}
+                                    </td>
+                                @else
+                                    <td class="text-end" style="padding:9px 8px;">{{ number_format($section['totalMontant'], 2, ',', ' ') }} &euro;</td>
+                                @endif
                             @else
-                                <td class="text-end" style="padding:9px 12px;">{{ number_format($section['totalMontant'], 2, ',', ' ') }} &euro;</td>
+                                @if ($previsionnel)
+                                    <td class="text-end" style="padding:9px 12px;">
+                                        {!! $renderCellule(
+                                            (float) $section['totalMontant'],
+                                            $totalPrevuSection
+                                        ) !!}
+                                    </td>
+                                @else
+                                    <td class="text-end" style="padding:9px 12px;">{{ number_format($section['totalMontant'], 2, ',', ' ') }} &euro;</td>
+                                @endif
                             @endif
                         </tr>
                     </tbody>
