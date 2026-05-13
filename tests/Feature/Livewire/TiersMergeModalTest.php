@@ -402,3 +402,34 @@ it('cancelMerge still works correctly after adding createNewTiers', function () 
         ->assertDispatched('tiers-merge-cancelled')
         ->assertSet('showModal', false);
 });
+
+it('expose civilite dans MERGE_FIELDS et permet l\'arbitrage', function () {
+    $tiers = Tiers::factory()->create([
+        'association_id' => $this->association->id,
+        'type' => 'particulier',
+        'nom' => 'Kurz',
+        'prenom' => 'Anne',
+        'civilite' => null,
+    ]);
+
+    $sourceData = [
+        'nom' => 'Kurz',
+        'prenom' => 'Anne',
+        'civilite' => 'Mme',
+    ];
+
+    Livewire::test(TiersMergeModal::class)
+        ->dispatch('open-tiers-merge',
+            sourceData: $sourceData,
+            tiersId: $tiers->id,
+            sourceLabel: 'Source',
+            targetLabel: 'Cible',
+            confirmLabel: 'Valider',
+            context: 'test',
+        )
+        ->assertSet('resultData.civilite', 'Mme') // target was null, took source
+        ->set('resultData.civilite', 'M.')
+        ->call('confirmMerge');
+
+    expect($tiers->fresh()->civilite)->toBe(\App\Enums\Civilite::M);
+});

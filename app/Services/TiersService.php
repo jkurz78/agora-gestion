@@ -22,7 +22,7 @@ final class TiersService
 {
     /** Mergeable scalar fields exposed by the arbitrage UI. */
     public const MERGE_FIELDS = [
-        'type', 'nom', 'prenom', 'entreprise', 'email',
+        'type', 'civilite', 'nom', 'prenom', 'entreprise', 'email',
         'telephone', 'adresse_ligne1', 'code_postal', 'ville', 'pays',
     ];
 
