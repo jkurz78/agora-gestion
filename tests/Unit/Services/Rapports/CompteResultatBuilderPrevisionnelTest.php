@@ -150,3 +150,49 @@ it("filtre fail-closed les prévisions d'autres associations", function (): void
     $total = collect($data['previsions_charges'])->sum(fn ($cat) => collect($cat['sous_categories'])->sum('montant'));
     expect($total)->toBe(50.0);
 });
+
+it("filtre fail-closed les previsions produits d'autres associations", function (): void {
+    // Réglement valide dans notre asso
+    Reglement::create([
+        'participant_id' => $this->participant->id,
+        'seance_id' => $this->seance->id,
+        'montant_prevu' => 60,
+    ]);
+
+    // Réglement dans une autre asso (ne devrait jamais remonter)
+    $autre = Association::factory()->create();
+    TenantContext::boot($autre);
+    $typeOpAutre = TypeOperation::factory()->create([
+        'sous_categorie_id' => SousCategorie::factory()->create([
+            'categorie_id' => Categorie::factory()->recette()->create()->id,
+        ])->id,
+    ]);
+    $opAutre = Operation::factory()->create([
+        'type_operation_id' => $typeOpAutre->id,
+        'date_debut' => Carbon::create(2026, 9, 5),
+    ]);
+    $sAutre = Seance::create(['operation_id' => $opAutre->id, 'numero' => 1, 'date' => now()]);
+    $tAutre = Tiers::factory()->create();
+    $partAutre = Participant::factory()->create([
+        'operation_id' => $opAutre->id,
+        'tiers_id' => $tAutre->id,
+    ]);
+    Reglement::create([
+        'participant_id' => $partAutre->id,
+        'seance_id' => $sAutre->id,
+        'montant_prevu' => 9999,
+    ]);
+
+    TenantContext::boot($this->association);
+
+    $data = app(CompteResultatBuilder::class)->compteDeResultatOperations(
+        exercice: 2026,
+        operationIds: [$this->operation->id],
+        parSeances: false,
+        parTiers: false,
+        previsionnel: true,
+    );
+
+    $total = collect($data['previsions_produits'])->sum(fn ($cat) => collect($cat['sous_categories'])->sum('montant'));
+    expect($total)->toBe(60.0); // pas 9999 + 60
+});
