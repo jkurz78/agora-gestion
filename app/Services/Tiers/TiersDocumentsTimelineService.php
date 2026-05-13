@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Services\Tiers;
 
+use App\Enums\StatutPresence;
 use App\Models\Adhesion;
 use App\Models\DocumentPrevisionnel;
 use App\Models\Facture;
 use App\Models\FacturePartenaireDeposee;
+use App\Models\Participant;
 use App\Models\ParticipantDocument;
+use App\Models\Presence;
 use App\Models\RecuFiscalEmis;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Tiers\DTO\AttestationPresenceLigneDTO;
 use App\Services\Tiers\DTO\DocumentParticipantLigneDTO;
 use App\Services\Tiers\DTO\DocumentPrevisionnelLigneDTO;
 use App\Services\Tiers\DTO\DocumentsTimelineDTO;
@@ -32,6 +36,7 @@ final class TiersDocumentsTimelineService
         $justificatifs = $this->justificatifsParticipants($tiers);
         $piecesJointes = $this->piecesJointes($tiers);
         $documentsPrevisionnels = $this->documentsPrevisionnels($tiers);
+        $attestations = $this->attestationsPresence($tiers);
 
         return new DocumentsTimelineDTO(
             recusFiscaux: $recus,
@@ -40,8 +45,10 @@ final class TiersDocumentsTimelineService
             justificatifsParticipants: $justificatifs,
             piecesJointes: $piecesJointes,
             documentsPrevisionnels: $documentsPrevisionnels,
+            attestationsPresence: $attestations,
             totalGlobal: count($recus) + count($facturesEmises) + count($facturesDeposees)
-                + count($justificatifs) + count($piecesJointes) + count($documentsPrevisionnels),
+                + count($justificatifs) + count($piecesJointes) + count($documentsPrevisionnels)
+                + count($attestations),
         );
     }
 
@@ -53,8 +60,9 @@ final class TiersDocumentsTimelineService
         $d = ParticipantDocument::whereIn('participant_id', $tiers->participants()->select('id'))->count();
         $e = $this->countPiecesJointes($tiers);
         $f = DocumentPrevisionnel::whereIn('participant_id', $tiers->participants()->select('id'))->count();
+        $g = $this->countAttestationsPresence($tiers);
 
-        return $a + $b + $c + $d + $e + $f;
+        return $a + $b + $c + $d + $e + $f + $g;
     }
 
     /** @return RecuFiscalLigneDTO[] */
@@ -239,6 +247,102 @@ final class TiersDocumentsTimelineService
                 );
             })
             ->all();
+    }
+
+    /** @return AttestationPresenceLigneDTO[] */
+    private function attestationsPresence(Tiers $tiers): array
+    {
+        $participants = Participant::query()
+            ->where('tiers_id', $tiers->id)
+            ->with([
+                'tiers:id,nom,prenom',
+                'operation' => fn ($q) => $q->withTrashed()->select('id', 'nom', 'deleted_at'),
+                'operation.seances:id,operation_id,date,numero',
+                'presences:id,participant_id,seance_id,statut',
+            ])
+            ->get();
+
+        $lignes = [];
+
+        foreach ($participants as $participant) {
+            if ($participant->operation === null) {
+                continue;
+            }
+
+            // Filtrer en PHP : statut encrypté — impossible de filtrer en SQL
+            $presencesPresent = $participant->presences->filter(
+                fn (Presence $p) => $p->statut === StatutPresence::Present->value
+            );
+
+            if ($presencesPresent->isEmpty()) {
+                continue;
+            }
+
+            // Date de la dernière séance où le participant était présent
+            $seancesById = $participant->operation->seances->keyBy('id');
+            $datesPresence = $presencesPresent
+                ->map(fn (Presence $p) => $seancesById->get($p->seance_id)?->date)
+                ->filter()
+                ->map(fn ($d) => $d instanceof Carbon ? $d : Carbon::parse($d));
+            $dateDerniere = $datesPresence->isNotEmpty() ? $datesPresence->max() : null;
+
+            $tiersRel = $participant->tiers;
+            $participantNom = $tiersRel
+                ? trim((string) ($tiersRel->prenom ?? '').' '.($tiersRel->nom ?? ''))
+                : '?';
+
+            $lignes[] = new AttestationPresenceLigneDTO(
+                participantId: (int) $participant->id,
+                participantNom: $participantNom,
+                operationId: (int) $participant->operation->id,
+                operationNom: (string) $participant->operation->nom,
+                operationArchivee: $participant->operation->trashed(),
+                nbPresences: $presencesPresent->count(),
+                nbSeancesTotal: $participant->operation->seances->count(),
+                dateDernierePresence: $dateDerniere,
+                downloadUrl: route('participants.attestation-recap-pdf', [
+                    'operation' => $participant->operation->id,
+                    'participant' => $participant->id,
+                ]),
+            );
+        }
+
+        // Tri DESC par dateDernierePresence (nulls en queue)
+        usort($lignes, function (AttestationPresenceLigneDTO $a, AttestationPresenceLigneDTO $b): int {
+            if ($a->dateDernierePresence === null && $b->dateDernierePresence === null) {
+                return 0;
+            }
+            if ($a->dateDernierePresence === null) {
+                return 1;
+            }
+            if ($b->dateDernierePresence === null) {
+                return -1;
+            }
+
+            return $b->dateDernierePresence->timestamp <=> $a->dateDernierePresence->timestamp;
+        });
+
+        return $lignes;
+    }
+
+    private function countAttestationsPresence(Tiers $tiers): int
+    {
+        $participants = Participant::query()
+            ->where('tiers_id', $tiers->id)
+            ->with('presences:id,participant_id,statut')
+            ->get();
+
+        $count = 0;
+        foreach ($participants as $participant) {
+            $hasPresence = $participant->presences->contains(
+                fn (Presence $p) => $p->statut === StatutPresence::Present->value
+            );
+            if ($hasPresence) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 
     private function countPiecesJointes(Tiers $tiers): int
