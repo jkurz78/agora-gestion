@@ -24,6 +24,8 @@ final class TiersForm extends Component
 
     public ?string $entreprise = null;
 
+    public ?string $civilite = null;
+
     public ?string $email = null;
 
     public ?string $telephone = null;
@@ -62,7 +64,7 @@ final class TiersForm extends Component
     public function showNewForm(): void
     {
         $this->reset([
-            'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
+            'tiersId', 'type', 'nom', 'prenom', 'civilite', 'entreprise', 'email', 'telephone',
             'adresse_ligne1', 'code_postal', 'ville', 'pays',
             'pour_depenses', 'pour_recettes', 'est_helloasso', 'showDetails',
         ]);
@@ -90,6 +92,7 @@ final class TiersForm extends Component
         $this->type = $tiers->type;
         $this->nom = $tiers->nom;
         $this->prenom = $tiers->prenom;
+        $this->civilite = $tiers->civilite?->value;
         $this->entreprise = $tiers->entreprise;
         $this->email = $tiers->email;
         $this->telephone = $tiers->telephone;
@@ -115,7 +118,7 @@ final class TiersForm extends Component
     public function openWithPrefill(array $prefill): void
     {
         $this->reset([
-            'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
+            'tiersId', 'type', 'nom', 'prenom', 'civilite', 'entreprise', 'email', 'telephone',
             'adresse_ligne1', 'code_postal', 'ville', 'pays',
             'pour_depenses', 'pour_recettes', 'est_helloasso', 'showDetails', 'context',
         ]);
@@ -139,7 +142,7 @@ final class TiersForm extends Component
     public function resetForm(): void
     {
         $this->reset([
-            'tiersId', 'type', 'nom', 'prenom', 'entreprise', 'email', 'telephone',
+            'tiersId', 'type', 'nom', 'prenom', 'civilite', 'entreprise', 'email', 'telephone',
             'adresse_ligne1', 'code_postal', 'ville', 'pays',
             'pour_depenses', 'pour_recettes', 'est_helloasso', 'showForm', 'showDetails',
             'sourceId',
@@ -156,6 +159,7 @@ final class TiersForm extends Component
                 ? ['required', 'string', 'max:150']
                 : ['nullable', 'string', 'max:150'],
             'prenom' => ['nullable', 'string', 'max:100'],
+            'civilite' => ['nullable', 'in:M.,Mme'],
             'entreprise' => $this->type === 'entreprise'
                 ? ['required', 'string', 'max:255']
                 : ['nullable', 'string', 'max:255'],
@@ -237,6 +241,7 @@ final class TiersForm extends Component
                 ? ['required', 'string', 'max:150']
                 : ['nullable', 'string', 'max:150'],
             'prenom' => ['nullable', 'string', 'max:100'],
+            'civilite' => ['nullable', 'in:M.,Mme'],
             'entreprise' => $this->type === 'entreprise'
                 ? ['required', 'string', 'max:255']
                 : ['nullable', 'string', 'max:255'],
@@ -275,6 +280,11 @@ final class TiersForm extends Component
 
     private function persist(array $validated): void
     {
+        // Normalize empty string to null for nullable enum field
+        if (($validated['civilite'] ?? null) === '') {
+            $validated['civilite'] = null;
+        }
+
         $service = app(TiersService::class);
 
         if ($this->tiersId) {

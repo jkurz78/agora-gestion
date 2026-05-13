@@ -66,6 +66,15 @@
                             <label class="form-label">Prénom</label>
                             <input type="text" wire:model="prenom" class="form-control" placeholder="Prénom">
                         </div>
+                        <div class="col-md-4" wire:key="field-part-civilite">
+                            <label class="form-label" for="civilite">Civilité</label>
+                            <select wire:model="civilite" id="civilite" class="form-select @error('civilite') is-invalid @enderror">
+                                <option value="">— Non précisé —</option>
+                                <option value="M.">Monsieur</option>
+                                <option value="Mme">Madame</option>
+                            </select>
+                            @error('civilite') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                        </div>
                     @endif
 
                     {{-- Usage (hidden in participant context) --}}
