@@ -11,6 +11,7 @@ use App\Mail\MessageLibreMail;
 use App\Models\CampagneEmail;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
+use App\Models\EncadrementPrevision;
 use App\Models\MessageTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
@@ -191,23 +192,32 @@ final class OperationCommunication extends Component
     }
 
     /**
-     * Return tiers acting as encadrants on this operation: any Tiers with at
-     * least one Depense transaction whose lines reference this operation.
+     * Return tiers acting as encadrants on this operation: union of
+     * — any Tiers with at least one Depense transaction whose lines reference this operation (réalisés)
+     * — any Tiers referenced by an EncadrementPrevision on this operation (prévisionnels)
      */
     public function getEncadrantsTiers(): Collection
     {
-        $tiersIds = Transaction::query()
+        $tiersIdsReal = Transaction::query()
             ->where('type', TypeTransaction::Depense)
             ->whereHas('lignes', fn ($q) => $q->where('operation_id', $this->operation->id))
             ->pluck('tiers_id')
             ->filter()
             ->unique();
 
-        if ($tiersIds->isEmpty()) {
+        $tiersIdsPrev = EncadrementPrevision::query()
+            ->where('operation_id', $this->operation->id)
+            ->pluck('tiers_id')
+            ->filter()
+            ->unique();
+
+        $allIds = $tiersIdsReal->merge($tiersIdsPrev)->unique();
+
+        if ($allIds->isEmpty()) {
             return collect();
         }
 
-        return Tiers::whereIn('id', $tiersIds)
+        return Tiers::whereIn('id', $allIds)
             ->orderBy('nom')
             ->orderBy('prenom')
             ->get();
