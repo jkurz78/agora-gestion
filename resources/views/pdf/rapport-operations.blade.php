@@ -39,11 +39,15 @@
         $prevProduitsIdx = $previsionnel ? $buildPrevIdx($previsionsProduits ?? []) : [];
 
         // Renders a stacked Prévu/Réalisé/Écart cell for DOMPDF
-        $renderCellPrev = function (float $realise, float $prevu): string {
+        $renderCellPrev = function (float $realise, float $prevu, bool $isDepenses = false): string {
             $r = number_format($realise, 2, ',', ' ');
             $p = number_format($prevu,   2, ',', ' ');
             $ecart = $realise - $prevu;
-            $couleur = abs($ecart) < 0.01 ? '#6c757d' : ($ecart >= 0 ? '#2E7D32' : '#B5453A');
+
+            // Côté dépenses : écart positif = dépassement = rouge. Côté recettes : écart positif = bonne nouvelle = vert.
+            $isPositive = $isDepenses ? ($ecart < 0) : ($ecart > 0);
+            $couleur = abs($ecart) < 0.01 ? '#6c757d' : ($isPositive ? '#2E7D32' : '#B5453A');
+
             $signe = $ecart > 0 ? '+' : '';
             $e = $signe . number_format($ecart, 2, ',', ' ');
             return '<div style="line-height:1.3;font-size:9px">'
@@ -111,7 +115,7 @@
                                     @endphp
                                     <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">
                                         @if ($previsionnel)
-                                            {!! $renderCellPrev($scReal, $scPrev) !!}
+                                            {!! $renderCellPrev($scReal, $scPrev, $section['label'] === 'DÉPENSES') !!}
                                         @else
                                             {{ $scReal > 0 ? $fmt($scReal) : '—' }}
                                         @endif
@@ -120,7 +124,7 @@
                                 @php $scTotalReal = (float) ($sc['total'] ?? 0); @endphp
                                 <td class="text-right fw-bold" style="padding:{{ $pad }};white-space:nowrap;">
                                     @if ($previsionnel)
-                                        {!! $renderCellPrev($scTotalReal, (float) $prevSc['montant']) !!}
+                                        {!! $renderCellPrev($scTotalReal, (float) $prevSc['montant'], $section['label'] === 'DÉPENSES') !!}
                                     @else
                                         {{ $fmt($scTotalReal) }}
                                     @endif
@@ -129,7 +133,7 @@
                                 @php $scMontant = (float) ($sc['montant'] ?? 0); @endphp
                                 <td class="text-right">
                                     @if ($previsionnel)
-                                        {!! $renderCellPrev($scMontant, (float) $prevSc['montant']) !!}
+                                        {!! $renderCellPrev($scMontant, (float) $prevSc['montant'], $section['label'] === 'DÉPENSES') !!}
                                     @else
                                         {{ $fmt($scMontant) }}
                                     @endif
@@ -186,7 +190,7 @@
                     @endforeach
                     <td class="text-right" style="padding:{{ $pad }};white-space:nowrap;">
                         @if ($previsionnel)
-                            {!! $renderCellPrev($section['totalMontant'], $totalPrevuSection) !!}
+                            {!! $renderCellPrev($section['totalMontant'], $totalPrevuSection, $section['label'] === 'DÉPENSES') !!}
                         @else
                             {{ $fmt($section['totalMontant']) }}
                         @endif
@@ -194,7 +198,7 @@
                 @else
                     <td class="text-right">
                         @if ($previsionnel)
-                            {!! $renderCellPrev($section['totalMontant'], $totalPrevuSection) !!}
+                            {!! $renderCellPrev($section['totalMontant'], $totalPrevuSection, $section['label'] === 'DÉPENSES') !!}
                         @else
                             {{ $fmt($section['totalMontant']) }}
                         @endif

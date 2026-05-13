@@ -175,11 +175,15 @@
             $idxPrevProduits = $indexPrevisions($previsionsProduits);
 
             // Rend une cellule "stack" Prévu / Réalisé / Écart
-            $renderCellule = function (float $realise, float $prevu): string {
+            $renderCellule = function (float $realise, float $prevu, bool $isDepenses = false): string {
                 $r = number_format($realise, 2, ',', ' ');
                 $p = number_format($prevu,   2, ',', ' ');
                 $ecart = $realise - $prevu;
-                $couleurEcart = abs($ecart) < 0.01 ? '#6c757d' : ($ecart >= 0 ? '#2E7D32' : '#B5453A');
+
+                // Côté dépenses : écart positif = dépassement = rouge. Côté recettes : écart positif = bonne nouvelle = vert.
+                $isPositive = $isDepenses ? ($ecart < 0) : ($ecart > 0);
+                $couleurEcart = abs($ecart) < 0.01 ? '#6c757d' : ($isPositive ? '#2E7D32' : '#B5453A');
+
                 $signe = $ecart > 0 ? '+' : '';
                 $e = $signe . number_format($ecart, 2, ',', ' ');
 
@@ -246,7 +250,8 @@
                                                 <td class="text-end" style="padding:7px 8px;">
                                                     {!! $renderCellule(
                                                         (float) ($cat['seances'][$s] ?? 0),
-                                                        (float) ($sectionIdx['cat_seance'][$cat['id']][$s] ?? 0)
+                                                        (float) ($sectionIdx['cat_seance'][$cat['id']][$s] ?? 0),
+                                                        $section['label'] === 'DÉPENSES'
                                                     ) !!}
                                                 </td>
                                             @else
@@ -263,7 +268,8 @@
                                             <td class="text-end" style="padding:7px 8px;">
                                                 {!! $renderCellule(
                                                     (float) ($cat['total'] ?? 0),
-                                                    (float) ($sectionIdx['cat'][$cat['id']] ?? 0)
+                                                    (float) ($sectionIdx['cat'][$cat['id']] ?? 0),
+                                                    $section['label'] === 'DÉPENSES'
                                                 ) !!}
                                             </td>
                                         @else
@@ -274,7 +280,8 @@
                                             <td class="text-end" style="padding:7px 12px;">
                                                 {!! $renderCellule(
                                                     (float) ($cat['montant'] ?? 0),
-                                                    (float) ($sectionIdx['cat'][$cat['id']] ?? 0)
+                                                    (float) ($sectionIdx['cat'][$cat['id']] ?? 0),
+                                                    $section['label'] === 'DÉPENSES'
                                                 ) !!}
                                             </td>
                                         @else
@@ -294,7 +301,8 @@
                                                     <td class="text-end" style="padding:5px 8px;color:#444;">
                                                         {!! $renderCellule(
                                                             (float) ($sc['seances'][$s] ?? 0),
-                                                            (float) ($sectionIdx['sc_seance'][$sc['id']][$s] ?? 0)
+                                                            (float) ($sectionIdx['sc_seance'][$sc['id']][$s] ?? 0),
+                                                            $section['label'] === 'DÉPENSES'
                                                         ) !!}
                                                     </td>
                                                 @else
@@ -311,7 +319,8 @@
                                                 <td class="text-end" style="padding:5px 8px;">
                                                     {!! $renderCellule(
                                                         (float) ($sc['total'] ?? 0),
-                                                        (float) ($sectionIdx['sc'][$sc['id']] ?? 0)
+                                                        (float) ($sectionIdx['sc'][$sc['id']] ?? 0),
+                                                        $section['label'] === 'DÉPENSES'
                                                     ) !!}
                                                 </td>
                                             @else
@@ -322,7 +331,8 @@
                                                 <td class="text-end" style="padding:5px 12px;color:#444;">
                                                     {!! $renderCellule(
                                                         (float) ($sc['montant'] ?? 0),
-                                                        (float) ($sectionIdx['sc'][$sc['id']] ?? 0)
+                                                        (float) ($sectionIdx['sc'][$sc['id']] ?? 0),
+                                                        $section['label'] === 'DÉPENSES'
                                                     ) !!}
                                                 </td>
                                             @else
@@ -355,7 +365,8 @@
                                                             <td class="text-end" style="padding:4px 8px;font-size:12px;">
                                                                 {!! $renderCellule(
                                                                     (float) ($t['seances'][$s] ?? 0),
-                                                                    (float) ($sectionIdx['tiers_seance'][$sc['id']][$t['tiers_id']][$s] ?? 0)
+                                                                    (float) ($sectionIdx['tiers_seance'][$sc['id']][$t['tiers_id']][$s] ?? 0),
+                                                                    $section['label'] === 'DÉPENSES'
                                                                 ) !!}
                                                             </td>
                                                         @else
@@ -372,7 +383,8 @@
                                                         <td class="text-end" style="padding:4px 8px;font-size:12px;">
                                                             {!! $renderCellule(
                                                                 (float) ($t['total'] ?? 0),
-                                                                (float) ($sectionIdx['tiers'][$sc['id']][$t['tiers_id']] ?? 0)
+                                                                (float) ($sectionIdx['tiers'][$sc['id']][$t['tiers_id']] ?? 0),
+                                                                $section['label'] === 'DÉPENSES'
                                                             ) !!}
                                                         </td>
                                                     @else
@@ -383,7 +395,8 @@
                                                         <td class="text-end" style="padding:4px 12px;font-size:12px;">
                                                             {!! $renderCellule(
                                                                 (float) ($t['montant'] ?? 0),
-                                                                (float) ($sectionIdx['tiers'][$sc['id']][$t['tiers_id']] ?? 0)
+                                                                (float) ($sectionIdx['tiers'][$sc['id']][$t['tiers_id']] ?? 0),
+                                                                $section['label'] === 'DÉPENSES'
                                                             ) !!}
                                                         </td>
                                                     @else
@@ -429,7 +442,8 @@
                                         <td class="text-end" style="padding:9px 8px;">
                                             {!! $renderCellule(
                                                 (float) ($totalSectionSeances[$s] ?? 0),
-                                                (float) ($totalPrevuSeances[$s] ?? 0)
+                                                (float) ($totalPrevuSeances[$s] ?? 0),
+                                                $section['label'] === 'DÉPENSES'
                                             ) !!}
                                         </td>
                                     @else
@@ -440,7 +454,8 @@
                                     <td class="text-end" style="padding:9px 8px;">
                                         {!! $renderCellule(
                                             (float) $section['totalMontant'],
-                                            $totalPrevuSection
+                                            $totalPrevuSection,
+                                            $section['label'] === 'DÉPENSES'
                                         ) !!}
                                     </td>
                                 @else
@@ -451,7 +466,8 @@
                                     <td class="text-end" style="padding:9px 12px;">
                                         {!! $renderCellule(
                                             (float) $section['totalMontant'],
-                                            $totalPrevuSection
+                                            $totalPrevuSection,
+                                            $section['label'] === 'DÉPENSES'
                                         ) !!}
                                     </td>
                                 @else
