@@ -421,16 +421,8 @@ final class RapportExportController extends Controller
                     $values[] = $catRealise;
                 }
                 if ($previsionnel) {
-                    // Category-level prevision = sum of sc previsions in this category
-                    $catId = (int) ($cat['categorie_id'] ?? 0);
-                    $catPrevu = 0.0;
-                    foreach ($prevIdx as $scId => $prev) {
-                        // Re-sum by checking which sc belong to this cat is complex without mapping.
-                        // Use a simpler approach: iterate previsions hierarchy to find cat total.
-                        // For now, sum sc-level previsions for matching sc_ids within this cat's sous_categories.
-                        $catPrevu = 0.0; // reset; will compute below
-                    }
                     // Compute cat prevu by summing sc previsions for sous_categories of this cat
+                    $catPrevu = 0.0;
                     foreach ($cat['sous_categories'] as $sc) {
                         $scId = (int) ($sc['sous_categorie_id'] ?? $sc['id'] ?? 0);
                         $catPrevu += (float) ($prevIdx[$scId]['montant'] ?? 0);
