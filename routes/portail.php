@@ -17,6 +17,7 @@ use App\Livewire\Portail\ChooseTiers;
 use App\Livewire\Portail\FacturePartenaire\AtraiterIndex;
 use App\Livewire\Portail\FacturePartenaire\Depot;
 use App\Livewire\Portail\HistoriqueDepenses\Index as HistoriqueDepensesIndex;
+use App\Livewire\Portail\MonProfil;
 use App\Livewire\Portail\TableauDeBord;
 use App\Livewire\Portail\Login;
 use App\Livewire\Portail\NoteDeFrais\Form;
@@ -38,6 +39,7 @@ Route::prefix('{association:slug}/portail')
         Route::get('/demo/login-as/{tierId}', DemoLoginAsTierController::class)->name('demo.login-as');
         Route::middleware([EnsureTiersChosen::class, EnforceSessionLifetime::class, Authenticate::class])->group(function () {
             Route::get('/', TableauDeBord::class)->name('home');
+            Route::get('/mon-profil', MonProfil::class)->name('mon-profil');
             Route::post('/logout', LogoutController::class)->name('logout');
 
             Route::prefix('notes-de-frais')->middleware(EnsurePeutVoirNotesDeFrais::class)->name('ndf.')->group(function () {
