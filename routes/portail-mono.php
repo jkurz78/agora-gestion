@@ -20,6 +20,7 @@ use App\Http\Controllers\Portail\TransactionPdfController;
 use App\Http\Middleware\MonoAssociationResolver;
 use App\Http\Middleware\Portail\Authenticate;
 use App\Http\Middleware\Portail\EnforceSessionLifetime;
+use App\Http\Middleware\Portail\EnsurePeutVoirNotesDeFrais;
 use App\Http\Middleware\Portail\EnsurePourDepenses;
 use App\Http\Middleware\Portail\EnsureTiersChosen;
 use App\Http\Middleware\RequireMono;
@@ -49,7 +50,7 @@ Route::prefix('portail')
             Route::get('/', Home::class)->name('home');
             Route::post('/logout', LogoutController::class)->name('logout');
 
-            Route::prefix('notes-de-frais')->middleware(EnsurePourDepenses::class)->name('ndf.')->group(function (): void {
+            Route::prefix('notes-de-frais')->middleware(EnsurePeutVoirNotesDeFrais::class)->name('ndf.')->group(function (): void {
                 Route::get('/', Index::class)->name('index');
                 Route::get('/nouvelle', Form::class)->name('create');
                 Route::get('/{noteDeFrais}/edit', Form::class)->name('edit');
