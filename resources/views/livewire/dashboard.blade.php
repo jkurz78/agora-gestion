@@ -314,6 +314,16 @@
                     <h6 class="mb-0"><a href="{{ route('comptabilite.budget') }}" class="text-decoration-none text-dark">Résumé budget</a></h6>
                 </div>
                 <div class="card-body py-2">
+                    @if(empty($budgetParCategorie))
+                        <div class="text-center text-muted small py-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Aucun budget défini pour cet exercice.
+                            <a href="{{ route('comptabilite.budget') }}" class="ms-2">Configurer le budget →</a>
+                            <div class="mt-1" style="font-size:.75rem;color:#999">
+                                Le réalisé global de l'exercice est visible dans le bandeau « Solde général » en haut.
+                            </div>
+                        </div>
+                    @else
                     <div class="row text-center mb-2">
                         <div class="col-md-4">
                             <div class="small text-muted">Prévu</div>
@@ -367,6 +377,7 @@
                             </tbody>
                         </table>
                     @endif
+                    @endif {{-- /budgetParCategorie empty --}}
                 </div>
             </div>
         </div>
