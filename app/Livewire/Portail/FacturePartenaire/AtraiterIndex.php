@@ -61,6 +61,6 @@ final class AtraiterIndex extends Component
 
         return view('livewire.portail.facture-partenaire.atraiter-index', [
             'depots' => $depots,
-        ])->layout('portail.layouts.app');
+        ])->layout('portail.layouts.authenticated');
     }
 }
