@@ -621,19 +621,25 @@
 
     {{-- ── Preview modal ── --}}
     @if($showPreview)
+        @php $preview = $this->getPreviewData(); @endphp
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2100"
              wire:click.self="$set('showPreview', false)">
             <div class="bg-white rounded-3 shadow" style="max-width:700px;width:95%;max-height:80vh;display:flex;flex-direction:column">
                 <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0"><i class="bi bi-eye me-1"></i> Aperçu du message</h6>
+                    <h6 class="mb-0">
+                        <i class="bi bi-eye me-1"></i> Aperçu du message
+                        @if(!empty($preview['destinataire']))
+                            <span class="text-muted small ms-2">— rendu pour {{ $preview['destinataire'] }}</span>
+                        @endif
+                    </h6>
                     <button type="button" class="btn-close" wire:click="$set('showPreview', false)"></button>
                 </div>
                 <div class="p-3 border-bottom bg-light">
-                    <strong class="small">Objet :</strong> {{ $objet }}
+                    <strong class="small">Objet :</strong> {{ $preview['objet'] }}
                 </div>
                 <div class="p-3" style="overflow-y:auto;flex:1">
-                    {!! $corps !!}
+                    {!! $preview['corps'] !!}
                 </div>
             </div>
         </div>
