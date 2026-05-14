@@ -236,7 +236,7 @@
                                 <tr>
                                     <th>Date</th>
                                     <th>Donateur</th>
-                                    <th>Sous-catégorie</th>
+                                    <th>Nature</th>
                                     <th class="text-end">Montant</th>
                                 </tr>
                             </thead>
