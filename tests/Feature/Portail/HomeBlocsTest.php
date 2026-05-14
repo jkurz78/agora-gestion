@@ -28,61 +28,46 @@ function loginTiers(array $flags): Tiers
     return $tiers;
 }
 
-it('affiche le bloc Membre placeholder et cache Partenaire si pour_recettes only', function () {
-    loginTiers(['pour_depenses' => false, 'pour_recettes' => true]);
-
-    $this->get('/portail/')
-        ->assertStatus(200)
-        ->assertSeeText('Espace membre')
-        ->assertDontSee('Vos notes de frais');
-});
-
-it('affiche le bloc Partenaire avec NDF et cache Membre si pour_depenses only', function () {
-    loginTiers(['pour_depenses' => true, 'pour_recettes' => false]);
-
-    $this->get('/portail/')
-        ->assertStatus(200)
-        ->assertSeeText('Vos notes de frais')
-        ->assertDontSeeText('Espace membre');
-});
-
-it('affiche les deux blocs dans l\'ordre Membre puis Partenaire si les deux flags', function () {
-    loginTiers(['pour_depenses' => true, 'pour_recettes' => true]);
-
-    $response = $this->get('/portail/');
-    $response->assertStatus(200)->assertSeeText('Espace membre')->assertSeeText('Vos notes de frais');
-
-    $html = $response->getContent();
-    $posMembre = strpos($html, 'Espace membre');
-    $posNdf = strpos($html, 'Vos notes de frais');
-
-    expect($posMembre)->toBeLessThan($posNdf);
-});
-
-it('affiche le message neutre si aucun flag', function () {
+it('tiers membre seul (pour_depenses=false) ne voit pas les raccourcis frais', function () {
     loginTiers(['pour_depenses' => false, 'pour_recettes' => false]);
 
     $this->get('/portail/')
         ->assertStatus(200)
-        ->assertSeeText('Aucun espace activé');
+        ->assertSeeText('Mon profil')
+        ->assertDontSeeText('Notes de frais')
+        ->assertDontSeeText('Factures partenaires')
+        ->assertDontSeeText('Historique dépenses');
 });
 
-it('tiers pour_depenses voit les sections Notes de frais et Vos factures', function () {
+it('tiers pour_depenses voit les raccourcis Notes de frais, Factures partenaires, Historique dépenses', function () {
     loginTiers(['pour_depenses' => true, 'pour_recettes' => false]);
 
     $this->get('/portail/')
         ->assertStatus(200)
-        ->assertSeeText('Vos notes de frais')
-        ->assertSeeText('Boîte de dépôt')
-        ->assertSeeText('Historique et règlement');
+        ->assertSeeText('Mon profil')
+        ->assertSeeText('Notes de frais')
+        ->assertSeeText('Factures partenaires')
+        ->assertSeeText('Historique dépenses');
 });
 
-it('tiers pour_recettes seul (sans pour_depenses) ne voit aucune carte facture/NDF', function () {
+it('tiers pour_recettes seul (sans pour_depenses) ne voit pas les raccourcis frais', function () {
     loginTiers(['pour_depenses' => false, 'pour_recettes' => true]);
 
     $this->get('/portail/')
         ->assertStatus(200)
-        ->assertDontSeeText('Vos notes de frais')
-        ->assertDontSeeText('Boîte de dépôt')
-        ->assertDontSeeText('Historique et règlement');
+        ->assertSeeText('Mon profil')
+        ->assertDontSeeText('Notes de frais')
+        ->assertDontSeeText('Factures partenaires')
+        ->assertDontSeeText('Historique dépenses');
+});
+
+it('tableau de bord affiche les descriptions des raccourcis', function () {
+    loginTiers(['pour_depenses' => true, 'pour_recettes' => false]);
+
+    $this->get('/portail/')
+        ->assertStatus(200)
+        ->assertSeeText('Coordonnées et préférences')
+        ->assertSeeText('Saisir et suivre vos remboursements')
+        ->assertSeeText('Déposer vos factures fournisseurs')
+        ->assertSeeText('Vos remboursements passés');
 });
