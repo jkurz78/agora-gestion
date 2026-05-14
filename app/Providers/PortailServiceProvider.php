@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Services\Portail\PortailSectionsResolver;
 use App\Services\Portail\Providers\FacturesPartenairesProvider;
 use App\Services\Portail\Providers\HistoriqueDepensesProvider;
+use App\Services\Portail\Providers\MesAdhesionsProvider;
 use App\Services\Portail\Providers\MonProfilProvider;
 use App\Services\Portail\Providers\NotesDeFraisProvider;
 use App\Services\Portail\Providers\TableauDeBordProvider;
@@ -28,5 +29,6 @@ final class PortailServiceProvider extends ServiceProvider
         $resolver->register(new NotesDeFraisProvider);
         $resolver->register(new FacturesPartenairesProvider);
         $resolver->register(new HistoriqueDepensesProvider);
+        $resolver->register(new MesAdhesionsProvider);
     }
 }
