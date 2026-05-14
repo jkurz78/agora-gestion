@@ -414,6 +414,8 @@ final class ParticipantTable extends Component
                 customCorps: $template?->corps,
                 libelleArticle: $typeOp->libelle_article,
                 typeOperationId: $typeOp->id,
+                civilite: $participant->tiers->civilite?->value,
+                politesse: $participant->tiers->politesse,
             );
 
             Mail::mailer()

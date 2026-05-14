@@ -6,6 +6,8 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
+use App\Mail\Concerns\HasPolitesseVariables;
+use App\Support\TemplateSubstitution;
 use App\Support\TenantUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Attachment;
@@ -16,6 +18,7 @@ use Illuminate\Queue\SerializesModels;
 
 final class FormulaireInvitation extends Mailable
 {
+    use HasPolitesseVariables;
     use Queueable;
     use SerializesModels;
 
@@ -38,8 +41,10 @@ final class FormulaireInvitation extends Mailable
         public readonly ?string $customCorps = null,
         public readonly ?string $libelleArticle = null,
         public readonly ?int $typeOperationId = null,
+        public readonly ?string $civilite = null,
+        public readonly ?string $politesse = null,
     ) {
-        $vars = $this->variables() + EmailLogo::variables($this->typeOperationId);
+        $vars = $this->allVariables();
 
         $corps = $this->customCorps
             ?? '<p>Bonjour <strong>{prenom}</strong>,</p><p>Nous vous invitons à compléter votre formulaire pour <strong>{operation}</strong>.</p>';
@@ -47,7 +52,7 @@ final class FormulaireInvitation extends Mailable
         // If template uses {bloc_liens} or {url}, don't show the auto block
         $this->showAutoBlock = ! str_contains($corps, '{bloc_liens}') && ! str_contains($corps, '{url}');
 
-        $corps = str_replace(array_keys($vars), array_values($vars), $corps);
+        $corps = TemplateSubstitution::apply($corps, $vars);
         $corps = ArticleFr::contracter($corps);
 
         $this->corpsHtml = strip_tags($corps, EmailLogo::ALLOWED_TAGS);
@@ -55,15 +60,30 @@ final class FormulaireInvitation extends Mailable
 
     public function envelope(): Envelope
     {
-        $vars = $this->variables();
+        $vars = $this->allVariables();
 
         $objet = $this->customObjet
             ?? 'Formulaire à compléter — {operation}';
 
-        $objet = str_replace(array_keys($vars), array_values($vars), $objet);
+        $objet = TemplateSubstitution::apply($objet, $vars);
         $objet = ArticleFr::contracter($objet);
 
         return new Envelope(subject: $objet);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function allVariables(): array
+    {
+        return $this->variables()
+            + $this->politesseVariables(
+                $this->civilite,
+                $this->politesse,
+                $this->prenomParticipant,
+                $this->nomParticipant,
+            )
+            + EmailLogo::variables($this->typeOperationId);
     }
 
     /**

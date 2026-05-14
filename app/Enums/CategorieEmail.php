@@ -46,6 +46,13 @@ enum CategorieEmail: string
 
         return match ($this) {
             self::Formulaire => $common + [
+                '{civilite}' => 'Civilité courte (M. / Mme / vide)',
+                '{politesse}' => 'Civilité longue (Monsieur / Madame / vide)',
+                '{civilite_nom}' => 'M. Kurz (recommandé)',
+                '{politesse_nom}' => 'Monsieur Kurz (recommandé)',
+                '{civilite_prenom_nom}' => 'M. Jürgen Kurz',
+                '{politesse_prenom_nom}' => 'Monsieur Jürgen Kurz',
+                '{salutation}' => 'Madame / Monsieur / Madame, Monsieur',
                 '{bloc_liens}' => 'Bloc complet (bouton + code + expiration)',
                 '{url}' => 'URL du formulaire',
                 '{code}' => 'Code du formulaire',

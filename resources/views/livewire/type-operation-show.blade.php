@@ -402,6 +402,15 @@ x-on:click.window="
                                     $objtVarGroups = match($emailSubTab) {
                                         'formulaire' => [
                                             'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom'],
+                                            'Politesse' => [
+                                                '{politesse_nom}' => 'Monsieur Kurz (recommandé)',
+                                                '{civilite_nom}' => 'M. Kurz (recommandé)',
+                                                '{politesse_prenom_nom}' => 'Monsieur Jürgen Kurz',
+                                                '{civilite_prenom_nom}' => 'M. Jürgen Kurz',
+                                                '{politesse}' => 'Monsieur / Madame seul',
+                                                '{civilite}' => 'M. / Mme seul',
+                                                '{salutation}' => 'Salutation (« Madame, Monsieur » si pas de civilité)',
+                                            ],
                                             'Opération' => ['{operation}' => 'Opération', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
                                             'Formulaire' => ['{url}' => 'URL', '{code}' => 'Code', '{date_expiration}' => 'Date expiration'],
                                             'Association' => ['{association}' => 'Nom'],
@@ -658,6 +667,15 @@ x-on:click.window="
                     const varGroups = {
                         'formulaire': {
                             'Participant': {'{prenom}': 'Prénom', '{nom}': 'Nom'},
+                            'Politesse': {
+                                '{politesse_nom}': 'Monsieur Kurz (recommandé)',
+                                '{civilite_nom}': 'M. Kurz (recommandé)',
+                                '{politesse_prenom_nom}': 'Monsieur Jürgen Kurz',
+                                '{civilite_prenom_nom}': 'M. Jürgen Kurz',
+                                '{politesse}': 'Monsieur / Madame seul',
+                                '{civilite}': 'M. / Mme seul',
+                                '{salutation}': 'Salutation (« Madame, Monsieur » si pas de civilité)',
+                            },
                             'Opération': {'{operation}': 'Opération', '{type_operation}': 'Type', '{logo_operation}': 'Logo opération', '{date_debut}': 'Date début', '{date_fin}': 'Date fin', '{nb_seances}': 'Nb séances'},
                             'Formulaire': {'{url}': 'URL', '{code}': 'Code', '{date_expiration}': 'Date expiration'},
                             'Association': {'{association}': 'Nom', '{logo}': 'Logo'},
