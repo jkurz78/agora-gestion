@@ -393,7 +393,7 @@ final class CommunicationTiers extends Component
 
         return [
             'objet' => $mail->envelope()->subject,
-            'corps' => $mail->corpsHtml,
+            'corps' => \App\Helpers\EmailLogo::previewSwap($mail->corpsHtml),
             'destinataire' => $tiers->displayName(),
         ];
     }

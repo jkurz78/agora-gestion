@@ -96,6 +96,50 @@ final class EmailLogo
     }
 
     /**
+     * Pour l'aperçu navigateur uniquement : remplace les références cid:logo-asso
+     * et cid:logo-op par des data URLs base64, afin que les <img> s'affichent
+     * dans un contexte HTML hors email (modale Aperçu, vue TinyMCE…).
+     *
+     * À ne PAS utiliser dans le corps réellement envoyé : le CID est plus
+     * efficace (attachement inline unique) et standard pour les mails.
+     */
+    public static function previewSwap(string $html, ?int $typeOperationId = null): string
+    {
+        $asso = self::resolve();
+        if ($asso !== null) {
+            $dataUrl = self::toDataUrl($asso);
+            if ($dataUrl !== null) {
+                $html = str_replace('cid:'.self::CID_ASSO, $dataUrl, $html);
+            }
+        }
+
+        if ($typeOperationId !== null) {
+            $op = self::resolveForTypeOperation($typeOperationId);
+            if ($op !== null) {
+                $dataUrl = self::toDataUrl($op);
+                if ($dataUrl !== null) {
+                    $html = str_replace('cid:'.self::CID_OP, $dataUrl, $html);
+                }
+            }
+        }
+
+        return $html;
+    }
+
+    /**
+     * @param  array{path: string, mime: string}  $resolved
+     */
+    private static function toDataUrl(array $resolved): ?string
+    {
+        $bytes = @file_get_contents($resolved['path']);
+        if ($bytes === false) {
+            return null;
+        }
+
+        return 'data:'.$resolved['mime'].';base64,'.base64_encode($bytes);
+    }
+
+    /**
      * Builds a CID <img> tag if the logo resolves, empty string otherwise.
      *
      * @param  array{path: string, mime: string}|null  $resolved
