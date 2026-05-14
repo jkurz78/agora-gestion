@@ -741,7 +741,7 @@ final class OperationCommunication extends Component
 
         return [
             'objet' => $mail->envelope()->subject,
-            'corps' => \App\Helpers\EmailLogo::previewSwap($mail->corpsHtml, $operation->type_operation_id),
+            'corps' => EmailLogo::previewSwap($mail->corpsHtml, $operation->type_operation_id),
             'participant' => $tiers->displayName(),
         ];
     }
