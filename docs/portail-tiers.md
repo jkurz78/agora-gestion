@@ -1,6 +1,6 @@
 # Portail Tiers et Membres
 
-Statut : v0 Slice 1 (Auth OTP) livré 2026-04-19. v1 Slice 1 (F+A — Fondation portail + Mon profil) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`.
+Statut : v0 Slice 1 (Auth OTP) livré 2026-04-19. v1 Slice 1 (F+A — Fondation portail + Mon profil) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`. v2 Slice 2 (Mes adhésions + Mes dons) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice2-adhesions-dons.md`.
 
 ## Objectif
 
@@ -638,3 +638,98 @@ Le libellé affiché est "Don par abandon de créance".
 | Portail Form (propriété + checkbox) | `app/Livewire/Portail/NoteDeFrais/Form.php` + `resources/views/livewire/portail/note-de-frais/form.blade.php` |
 | Portail Show (bandeau statut) | `resources/views/livewire/portail/note-de-frais/show.blade.php` |
 | Back-office Show (encart + modale + action) | `app/Livewire/BackOffice/NoteDeFrais/Show.php` + `resources/views/livewire/back-office/note-de-frais/show.blade.php` |
+
+---
+
+## Slice 2 (B) — Mes adhésions + Mes dons (2026-05-14)
+
+Statut : livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`.
+
+Spec complète : [`docs/specs/2026-05-14-portail-membres-slice2-adhesions-dons.md`](specs/2026-05-14-portail-membres-slice2-adhesions-dons.md).
+Plan : [`plans/portail-membres-slice2-adhesions-dons.md`](../plans/portail-membres-slice2-adhesions-dons.md).
+
+Ce slice ajoute deux sections métier dans le portail : **Mes adhésions** et **Mes dons**. Il introduit le groupe sidebar « Ma vie de membre », le pattern de téléchargement de reçu à la demande, et trois colonnes d'URLs paramétrables sur le modèle `Association`.
+
+### Sidebar — nouveau groupe « Ma vie de membre »
+
+Deux providers sont enregistrés dans `PortailServiceProvider::boot()`, entre le groupe « Espace personnel » (ordres 10–20) et le groupe « Mes frais & factures » (ordres 30–50) :
+
+| Provider | Classe | id | Route | Ordre | Visible si |
+|---|---|---|---|---|---|
+| Mes adhésions | `App\Services\Portail\Providers\MesAdhesionsProvider` | `mes-adhesions` | `portail.mes-adhesions` | 60 | `≥ 1 adhésion` liée au Tiers |
+| Mes dons | `App\Services\Portail\Providers\MesDonsProvider` | `mes-dons` | `portail.mes-dons` | 70 | `≥ 1 don` visible selon le critère de `TiersDonsTimelineService` (recette + sous-cat usage Don) |
+
+La visibilité est évaluée par `resolve(Tiers): ?PortailSectionDTO` — retourner `null` exclut la section de la sidebar pour ce Tiers.
+
+### Téléchargement reçu à la demande
+
+Pattern commun aux deux composants : ownership check → service → `streamPdf`.
+
+#### Reçu cotisation (adhésion)
+
+Action Livewire : `App\Livewire\Portail\MesAdhesions::telechargerRecuCotisation(int $adhesionId)`
+
+```
+Ownership check  :  (int) $adhesion->tiers_id === (int) $tiers->id  → 403 sinon
+Service          :  RecuFiscalService::obtenirOuGenererPourAdhesion(Adhesion)
+Réponse          :  streamPdf(RecuFiscalEmis)
+Log              :  portail.recu.cotisation.telecharge
+```
+
+#### Reçu fiscal don
+
+Action Livewire : `App\Livewire\Portail\MesDons::telechargerRecuFiscal(int $ligneId)`
+
+```
+Ownership check  :  la ligne demandée doit apparaître dans
+                    TiersDonsTimelineService::forTiers($tiers)  → 403 sinon
+Service          :  RecuFiscalService::obtenirOuGenerer(TransactionLigne)
+Réponse          :  streamPdf(RecuFiscalEmis)
+Log              :  portail.recu.fiscal.telecharge
+```
+
+`LogContext` propage `association_id` automatiquement sur les deux événements.
+
+**Tests d'intrusion** : intra-asso 403 (Tiers B tente de télécharger le reçu de Tiers A), cross-tenant 403 (TenantScope filtre à la source).
+
+### URLs paramétrables au niveau Association
+
+Trois colonnes nullable ajoutées sur la table `association` (migration `2026_05_14_*_add_url_fields_to_associations.php`) :
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `url_site_web` | `string nullable` | Site web global de l'asso (réutilisable ailleurs) |
+| `url_renouvellement_adhesion` | `string nullable` | URL externe (typiquement HelloAsso) pour renouveler une adhésion |
+| `url_nouveau_don` | `string nullable` | URL externe pour faire un nouveau don |
+
+Deux helpers sur `App\Models\Association` avec fallback Elvis sur `url_site_web` (traite aussi la chaîne vide) :
+
+```php
+public function urlRenouvellementAdhesion(): ?string
+{
+    return $this->url_renouvellement_adhesion ?: ($this->url_site_web ?: null);
+}
+
+public function urlNouveauDon(): ?string
+{
+    return $this->url_nouveau_don ?: ($this->url_site_web ?: null);
+}
+```
+
+Les CTA « Renouveler mon adhésion » et « Faire un nouveau don » sont **cachés** dans les vues si la valeur (ou son fallback) est `null`.
+
+### Procédures admin
+
+#### Configurer les URLs externes
+
+Les trois champs `url_*` sur la table `association` ne sont pas encore exposés dans l'IHM back-office Paramètres asso. Ils doivent être saisis via tinker. Dette à reprendre dans un slice ultérieur ou en tâche standalone.
+
+Exemple tinker :
+
+```php
+Association::where('slug', 'mon-association')->update([
+    'url_site_web'                 => 'https://www.mon-association.fr',
+    'url_renouvellement_adhesion'  => 'https://www.helloasso.com/associations/mon-association/adhesions/',
+    'url_nouveau_don'              => 'https://www.helloasso.com/associations/mon-association/formulaires/1',
+]);
+```
