@@ -18,6 +18,15 @@ use Illuminate\Support\Collection;
 
 final class TiersDonsTimelineService
 {
+    public function tiersAUnDon(Tiers $tiers): bool
+    {
+        return TransactionLigne::query()
+            ->whereHas('transaction', fn ($q) => $q->where('tiers_id', (int) $tiers->id)
+                ->where('type', TypeTransaction::Recette->value))
+            ->whereHas('sousCategorie.usages', fn ($q) => $q->where('usage', UsageComptable::Don->value))
+            ->exists();
+    }
+
     public function forTiers(Tiers $tiers, ?int $anneeCivile = null): DonsTimelineDTO
     {
         $query = TransactionLigne::query()
