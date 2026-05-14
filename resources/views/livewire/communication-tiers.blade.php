@@ -289,6 +289,15 @@
                                     @php
                                         $varGroups = [
                                             'Tiers' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email}' => 'Email'],
+                                            'Politesse' => [
+                                                '{politesse_nom}' => 'Monsieur Kurz (recommandé)',
+                                                '{civilite_nom}' => 'M. Kurz (recommandé)',
+                                                '{politesse_prenom_nom}' => 'Monsieur Jürgen Kurz',
+                                                '{civilite_prenom_nom}' => 'M. Jürgen Kurz',
+                                                '{politesse}' => 'Monsieur / Madame seul',
+                                                '{civilite}' => 'M. / Mme seul',
+                                                '{salutation}' => 'Salutation (« Madame, Monsieur » si pas de civilité)',
+                                            ],
                                             'Association' => ['{association}' => "Nom de l'association", '{lien_desinscription}' => 'Lien de désinscription'],
                                         ];
                                     @endphp
