@@ -671,7 +671,7 @@
                     <strong class="small">Objet :</strong> {{ $previewLog->objet_rendu ?? $previewLog->objet }}
                 </div>
                 <div class="p-3" style="overflow-y:auto;flex:1">
-                    {!! $previewLog->corps_html !!}
+                    {!! \App\Helpers\EmailLogo::previewSwap($previewLog->corps_html ?? '') !!}
                 </div>
             </div>
         </div>
