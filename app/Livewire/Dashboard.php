@@ -12,6 +12,7 @@ use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
 use App\Services\SoldeService;
@@ -82,23 +83,31 @@ final class Dashboard extends Component
             ->take(5)
             ->get();
 
-        // Derniers dons — transactions ayant au moins une ligne avec sous-cat pour_dons
+        // Derniers dons — lignes de transaction avec sous-cat usage Don
+        // (et non transactions entières : une même transaction peut contenir
+        // une adhésion ET un don, il faut isoler chaque ligne par montant).
         $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
-        $derniersDons = Transaction::where('type', 'recette')
-            ->forExercice($exercice)
-            ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $donSousCategorieIds))
-            ->with(['tiers', 'lignes' => fn ($q) => $q->whereIn('sous_categorie_id', $donSousCategorieIds), 'lignes.sousCategorie'])
-            ->latest('date')->latest('id')
+        $derniersDons = TransactionLigne::query()
+            ->whereIn('transaction_lignes.sous_categorie_id', $donSousCategorieIds)
+            ->whereHas('transaction', fn ($q) => $q->where('type', 'recette')->forExercice($exercice))
+            ->with(['transaction.tiers', 'sousCategorie'])
+            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->orderByDesc('transactions.date')
+            ->orderByDesc('transaction_lignes.id')
+            ->select('transaction_lignes.*')
             ->take(5)
             ->get();
 
-        // Dernières adhésions (cotisations) — avec adhésions et formule pour afficher label + dates
+        // Dernières adhésions — lignes de cotisation, avec adhésion (formule + dates)
         $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
-        $dernieresAdhesions = Transaction::where('type', 'recette')
-            ->forExercice($exercice)
-            ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $cotSousCategorieIds))
-            ->with(['tiers', 'adhesions.formuleAdhesion'])
-            ->latest('date')->latest('id')
+        $dernieresAdhesions = TransactionLigne::query()
+            ->whereIn('transaction_lignes.sous_categorie_id', $cotSousCategorieIds)
+            ->whereHas('transaction', fn ($q) => $q->where('type', 'recette')->forExercice($exercice))
+            ->with(['transaction.tiers', 'transaction.adhesions.formuleAdhesion', 'sousCategorie'])
+            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->orderByDesc('transactions.date')
+            ->orderByDesc('transaction_lignes.id')
+            ->select('transaction_lignes.*')
             ->take(5)
             ->get();
 

@@ -241,13 +241,12 @@
                                 </tr>
                             </thead>
                             <tbody style="color:#555">
-                                @forelse ($derniersDons as $don)
-                                    @php $scNom = $don->lignes->first()?->sousCategorie?->nom ?? '—'; @endphp
+                                @forelse ($derniersDons as $ligne)
                                     <tr>
-                                        <td class="small text-nowrap">{{ $don->date->format('d/m/Y') }}</td>
-                                        <td class="small">{{ $don->tiers ? $don->tiers->displayName() : 'Anonyme' }}</td>
-                                        <td class="small text-muted">{{ $scNom }}</td>
-                                        <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $don->montant_total, 2, ',', ' ') }} &euro;</td>
+                                        <td class="small text-nowrap">{{ $ligne->transaction->date->format('d/m/Y') }}</td>
+                                        <td class="small">{{ $ligne->transaction->tiers ? $ligne->transaction->tiers->displayName() : 'Anonyme' }}</td>
+                                        <td class="small text-muted">{{ $ligne->sousCategorie?->nom ?? '—' }}</td>
+                                        <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $ligne->montant, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -278,20 +277,20 @@
                                 </tr>
                             </thead>
                             <tbody style="color:#555">
-                                @forelse ($dernieresAdhesions as $tx)
+                                @forelse ($dernieresAdhesions as $ligne)
                                     @php
-                                        $adh = $tx->adhesions->first();
+                                        $adh = $ligne->transaction->adhesions->first();
                                         $formule = $adh?->label_formule ?? $adh?->formuleAdhesion?->nom ?? '—';
                                         $debut = $adh?->date_debut?->format('d/m/Y');
                                         $fin = $adh?->date_fin?->format('d/m/Y');
                                         $periode = ($debut && $fin) ? "{$debut} → {$fin}" : ($debut ?: '—');
                                     @endphp
                                     <tr>
-                                        <td class="small text-nowrap">{{ $tx->date->format('d/m/Y') }}</td>
-                                        <td class="small">{{ $tx->tiers?->displayName() ?? '—' }}</td>
+                                        <td class="small text-nowrap">{{ $ligne->transaction->date->format('d/m/Y') }}</td>
+                                        <td class="small">{{ $ligne->transaction->tiers?->displayName() ?? '—' }}</td>
                                         <td class="small text-muted">{{ $formule }}</td>
                                         <td class="small text-nowrap text-muted">{{ $periode }}</td>
-                                        <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $tx->montant_total, 2, ',', ' ') }} &euro;</td>
+                                        <td class="text-end small fw-semibold text-nowrap">{{ number_format((float) $ligne->montant, 2, ',', ' ') }} &euro;</td>
                                     </tr>
                                 @empty
                                     <tr>
