@@ -2,7 +2,7 @@
 
 **Created**: 2026-05-14
 **Branch**: `feat/portail-membres-slice1-fondation-profil` (à créer depuis `main`)
-**Status**: approved (2026-05-14, mode subagent-driven, Sonnet en exécuteurs)
+**Status**: implemented (2026-05-14, 14 commits, 513 tests Portail / 0 failure, security PASS, spec compliance 12/12 PASS)
 **Spec**: [docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md](../docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md)
 
 ## Goal
