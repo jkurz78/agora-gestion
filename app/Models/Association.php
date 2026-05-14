@@ -64,6 +64,9 @@ final class Association extends Model
         'rescrit_fiscal_date',
         'signataire_nom',
         'signataire_qualite',
+        'url_site_web',
+        'url_renouvellement_adhesion',
+        'url_nouveau_don',
     ];
 
     protected function casts(): array
@@ -154,6 +157,16 @@ final class Association extends Model
         $mime = Storage::disk('local')->mimeType($path) ?: 'image/png';
 
         return 'data:'.$mime.';base64,'.base64_encode((string) $contents);
+    }
+
+    public function urlRenouvellementAdhesion(): ?string
+    {
+        return $this->url_renouvellement_adhesion ?: ($this->url_site_web ?: null);
+    }
+
+    public function urlNouveauDon(): ?string
+    {
+        return $this->url_nouveau_don ?: ($this->url_site_web ?: null);
     }
 
     public function sousCategoriesFor(UsageComptable $usage): Collection
