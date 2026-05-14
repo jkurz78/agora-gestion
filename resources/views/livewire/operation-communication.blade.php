@@ -33,6 +33,15 @@
                             @php
                                 $varGroups = [
                                     'Participant' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email_participant}' => 'Email'],
+                                    'Politesse' => [
+                                        '{politesse_nom}' => 'Monsieur Kurz (recommandé)',
+                                        '{civilite_nom}' => 'M. Kurz (recommandé)',
+                                        '{politesse_prenom_nom}' => 'Monsieur Jürgen Kurz',
+                                        '{civilite_prenom_nom}' => 'M. Jürgen Kurz',
+                                        '{politesse}' => 'Monsieur / Madame seul',
+                                        '{civilite}' => 'M. / Mme seul',
+                                        '{salutation}' => 'Salutation (« Madame, Monsieur » si pas de civilité)',
+                                    ],
                                     'Opération' => ['{operation}' => 'Nom', '{type_operation}' => 'Type', '{date_debut}' => 'Date début', '{date_fin}' => 'Date fin', '{nb_seances}' => 'Nb séances'],
                                     'Association' => ['{association}' => 'Nom'],
                                     'Séances' => ['{date_prochaine_seance}' => 'Date prochaine', '{numero_prochaine_seance}' => 'N° prochaine', '{titre_prochaine_seance}' => 'Titre prochaine', '{jours_avant_prochaine_seance}' => 'Jours avant prochaine', '{date_precedente_seance}' => 'Date précédente', '{numero_precedente_seance}' => 'N° précédente', '{titre_precedente_seance}' => 'Titre précédente', '{nb_seances_effectuees}' => 'Nb effectuées', '{nb_seances_restantes}' => 'Nb restantes'],
@@ -559,6 +568,15 @@
             '{prenom}': 'Prénom',
             '{nom}': 'Nom',
             '{email_participant}': 'Email',
+        },
+        'Politesse': {
+            '{politesse_nom}': 'Monsieur Kurz (recommandé)',
+            '{civilite_nom}': 'M. Kurz (recommandé)',
+            '{politesse_prenom_nom}': 'Monsieur Jürgen Kurz',
+            '{civilite_prenom_nom}': 'M. Jürgen Kurz',
+            '{politesse}': 'Monsieur / Madame seul',
+            '{civilite}': 'M. / Mme seul',
+            '{salutation}': 'Salutation (« Madame, Monsieur » si pas de civilité)',
         },
         'Opération': {
             '{operation}': 'Nom',

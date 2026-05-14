@@ -660,6 +660,8 @@ final class OperationCommunication extends Component
             typeOperationId: $operation->typeOperation?->id,
             trackingToken: $trackingToken,
             seances: $seances,
+            civilite: $tiers->civilite?->value,
+            politesse: $tiers->politesse,
         );
     }
 
@@ -739,7 +741,7 @@ final class OperationCommunication extends Component
 
         return [
             'objet' => $mail->envelope()->subject,
-            'corps' => $mail->corpsHtml,
+            'corps' => EmailLogo::previewSwap($mail->corpsHtml, $operation->type_operation_id),
             'participant' => $tiers->displayName(),
         ];
     }

@@ -358,6 +358,46 @@ final class CommunicationTiers extends Component
         $this->emailAttachments = array_values($this->emailAttachments);
     }
 
+    /**
+     * Préparer l'aperçu en substituant les variables sur le 1er tiers
+     * sélectionné. Retourne ['objet' => string, 'corps' => string, 'destinataire' => ?string].
+     *
+     * @return array{objet: string, corps: string, destinataire: ?string}
+     */
+    public function getPreviewData(): array
+    {
+        if (empty($this->selectedTiersIds) || $this->corps === '') {
+            return [
+                'objet' => $this->objet,
+                'corps' => '<p class="text-muted"><em>Sélectionnez au moins un tiers et saisissez un corps pour voir l\'aperçu.</em></p>',
+                'destinataire' => null,
+            ];
+        }
+
+        $tiers = Tiers::find($this->selectedTiersIds[0]);
+        if (! $tiers) {
+            return ['objet' => $this->objet, 'corps' => $this->corps, 'destinataire' => null];
+        }
+
+        $mail = new CommunicationTiersMail(
+            prenom: $tiers->prenom ?? '',
+            nom: $tiers->nom ?? '',
+            email: $tiers->email ?? '',
+            objet: $this->objet,
+            corps: $this->corps,
+            trackingToken: null,
+            attachmentPaths: [],
+            civilite: $tiers->civilite?->value,
+            politesse: $tiers->politesse,
+        );
+
+        return [
+            'objet' => $mail->envelope()->subject,
+            'corps' => EmailLogo::previewSwap($mail->corpsHtml),
+            'destinataire' => $tiers->displayName(),
+        ];
+    }
+
     // ── Test email ───────────────────────────────────────────────────────────
 
     public function envoyerTest(): void
@@ -395,6 +435,8 @@ final class CommunicationTiers extends Component
             corps: $this->corps,
             trackingToken: $trackingToken,
             attachmentPaths: [],
+            civilite: $tiers->civilite?->value,
+            politesse: $tiers->politesse,
         );
 
         try {
@@ -490,6 +532,8 @@ final class CommunicationTiers extends Component
                     corps: $this->corps,
                     trackingToken: $trackingToken,
                     attachmentPaths: $permanentPaths,
+                    civilite: $tiers->civilite?->value,
+                    politesse: $tiers->politesse,
                 );
 
                 Mail::mailer()

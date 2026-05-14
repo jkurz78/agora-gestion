@@ -6,8 +6,10 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
+use App\Mail\Concerns\HasPolitesseVariables;
 use App\Models\Seance;
 use App\Support\CurrentAssociation;
+use App\Support\TemplateSubstitution;
 use App\Support\TenantUrl;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
@@ -17,6 +19,8 @@ use Illuminate\Support\Collection;
 
 final class MessageLibreMail extends Mailable
 {
+    use HasPolitesseVariables;
+
     public readonly string $corpsHtml;
 
     /** @param array<int, array{path: string, nom: string}|string> $attachmentPaths */
@@ -46,12 +50,13 @@ final class MessageLibreMail extends Mailable
         public readonly ?string $trackingToken = null,
         /** @var Collection<int, Seance> */
         public readonly ?Collection $seances = null,
+        public readonly ?string $civilite = null,
+        public readonly ?string $politesse = null,
     ) {
         $allVars = $this->variables() + EmailLogo::variables($this->typeOperationId);
-        $corps = str_replace(
-            array_keys($allVars),
-            array_values($allVars),
-            strip_tags($this->corps, EmailLogo::ALLOWED_TAGS)
+        $corps = TemplateSubstitution::apply(
+            strip_tags($this->corps, EmailLogo::ALLOWED_TAGS),
+            $allVars
         );
         $html = ArticleFr::contracter($corps);
 
@@ -66,11 +71,7 @@ final class MessageLibreMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $subject = str_replace(
-            array_keys($this->variables()),
-            array_values($this->variables()),
-            $this->objet
-        );
+        $subject = TemplateSubstitution::apply($this->objet, $this->variables());
 
         return new Envelope(subject: ArticleFr::contracter($subject));
     }
@@ -146,7 +147,12 @@ final class MessageLibreMail extends Mailable
             '{association}' => CurrentAssociation::tryGet()?->nom ?? '',
             '{table_seances}' => $this->buildTableSeances(false),
             '{table_seances_a_venir}' => $this->buildTableSeances(true),
-        ];
+        ] + $this->politesseVariables(
+            $this->civilite,
+            $this->politesse,
+            $this->prenomParticipant,
+            $this->nomParticipant,
+        );
     }
 
     private function buildTableSeances(bool $aVenirOnly): string

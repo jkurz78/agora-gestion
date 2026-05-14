@@ -6,7 +6,9 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
+use App\Mail\Concerns\HasPolitesseVariables;
 use App\Support\CurrentAssociation;
+use App\Support\TemplateSubstitution;
 use App\Support\TenantUrl;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
@@ -15,6 +17,8 @@ use Illuminate\Mail\Mailables\Envelope;
 
 final class CommunicationTiersMail extends Mailable
 {
+    use HasPolitesseVariables;
+
     public readonly string $corpsHtml;
 
     /** @param array<int, array{path: string, nom: string}|string> $attachmentPaths */
@@ -26,12 +30,13 @@ final class CommunicationTiersMail extends Mailable
         public readonly string $corps,
         public readonly ?string $trackingToken = null,
         public readonly array $attachmentPaths = [],
+        public readonly ?string $civilite = null,
+        public readonly ?string $politesse = null,
     ) {
         $allVars = $this->variables() + EmailLogo::variables();
-        $corps = str_replace(
-            array_keys($allVars),
-            array_values($allVars),
-            strip_tags($this->corps, EmailLogo::ALLOWED_TAGS)
+        $corps = TemplateSubstitution::apply(
+            strip_tags($this->corps, EmailLogo::ALLOWED_TAGS),
+            $allVars
         );
         $html = ArticleFr::contracter($corps);
 
@@ -57,11 +62,7 @@ final class CommunicationTiersMail extends Mailable
 
     public function envelope(): Envelope
     {
-        $subject = str_replace(
-            array_keys($this->variables()),
-            array_values($this->variables()),
-            $this->objet
-        );
+        $subject = TemplateSubstitution::apply($this->objet, $this->variables());
 
         return new Envelope(subject: ArticleFr::contracter($subject));
     }
@@ -119,6 +120,11 @@ final class CommunicationTiersMail extends Mailable
             '{association}' => CurrentAssociation::tryGet()?->nom ?? '',
             '{lien_optout}' => $optoutUrl,
             '{lien_desinscription}' => '<a href="'.htmlspecialchars($optoutUrl).'" style="color:#999">Se désinscrire</a>',
-        ];
+        ] + $this->politesseVariables(
+            $this->civilite,
+            $this->politesse,
+            $this->prenom,
+            $this->nom,
+        );
     }
 }

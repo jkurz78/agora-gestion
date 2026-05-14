@@ -792,6 +792,8 @@ final class ParticipantShow extends Component
                 pdfContent: $pdfContent,
                 pdfFilename: $pdfFilename,
                 typeOperationId: $doc->operation->type_operation_id,
+                civilite: $tiers->civilite?->value,
+                politesse: $tiers->politesse,
             );
 
             Mail::mailer()

@@ -12,6 +12,7 @@ use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\SousCategorie;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Services\BudgetService;
 use App\Services\ExerciceService;
 use App\Services\SoldeService;
@@ -37,46 +38,76 @@ final class Dashboard extends Component
         $totalDepenses = (float) Transaction::where('type', 'depense')->forExercice($exercice)->sum('montant_total');
         $soldeGeneral = $totalRecettes - $totalDepenses;
 
-        // Budget résumé
+        // Budget résumé — agrégation par catégorie pour sous-totaux
         $budgetLines = BudgetLine::forExercice($exercice)
             ->with('sousCategorie.categorie')
             ->get();
 
         $totalPrevu = (float) $budgetLines->sum('montant_prevu');
         $totalRealise = 0.0;
+        $budgetParCategorie = []; // ['categorieNom' => ['type' => 'depense|recette', 'prevu' => float, 'realise' => float]]
         foreach ($budgetLines as $line) {
-            $totalRealise += $budgetService->realise($line->sous_categorie_id, $exercice);
+            $r = (float) $budgetService->realise($line->sous_categorie_id, $exercice);
+            $totalRealise += $r;
+            $cat = $line->sousCategorie?->categorie;
+            $catKey = $cat?->nom ?? '—';
+            if (! isset($budgetParCategorie[$catKey])) {
+                $budgetParCategorie[$catKey] = [
+                    'type' => $cat?->type ?? 'depense',
+                    'prevu' => 0.0,
+                    'realise' => 0.0,
+                ];
+            }
+            $budgetParCategorie[$catKey]['prevu'] += (float) $line->montant_prevu;
+            $budgetParCategorie[$catKey]['realise'] += $r;
         }
+        // Tri : recettes en premier, puis dépenses, alpha dans chaque groupe
+        uksort($budgetParCategorie, function ($a, $b) use ($budgetParCategorie): int {
+            $ta = $budgetParCategorie[$a]['type'] === 'recette' ? 0 : 1;
+            $tb = $budgetParCategorie[$b]['type'] === 'recette' ? 0 : 1;
 
-        // Dernières dépenses
+            return $ta <=> $tb ?: strcasecmp($a, $b);
+        });
+
+        // Dernières dépenses (avec tiers)
         $dernieresDepenses = Transaction::where('type', 'depense')->forExercice($exercice)
+            ->with('tiers')
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
-        // Dernières recettes
+        // Dernières recettes (avec tiers)
         $dernieresRecettes = Transaction::where('type', 'recette')->forExercice($exercice)
+            ->with('tiers')
             ->latest('date')->latest('id')
             ->take(5)
             ->get();
 
-        // Derniers dons — transactions ayant au moins une ligne avec sous-cat pour_dons
+        // Derniers dons — lignes de transaction avec sous-cat usage Don
+        // (et non transactions entières : une même transaction peut contenir
+        // une adhésion ET un don, il faut isoler chaque ligne par montant).
         $donSousCategorieIds = SousCategorie::forUsage(UsageComptable::Don)->pluck('id');
-        $derniersDons = Transaction::where('type', 'recette')
-            ->forExercice($exercice)
-            ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $donSousCategorieIds))
-            ->with('tiers')
-            ->latest('date')->latest('id')
+        $derniersDons = TransactionLigne::query()
+            ->whereIn('transaction_lignes.sous_categorie_id', $donSousCategorieIds)
+            ->whereHas('transaction', fn ($q) => $q->where('type', 'recette')->forExercice($exercice))
+            ->with(['transaction.tiers', 'sousCategorie'])
+            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->orderByDesc('transactions.date')
+            ->orderByDesc('transaction_lignes.id')
+            ->select('transaction_lignes.*')
             ->take(5)
             ->get();
 
-        // Dernières adhésions (cotisations)
+        // Dernières adhésions — lignes de cotisation, avec adhésion (formule + dates)
         $cotSousCategorieIds = SousCategorie::forUsage(UsageComptable::Cotisation)->pluck('id');
-        $dernieresAdhesions = Transaction::where('type', 'recette')
-            ->forExercice($exercice)
-            ->whereHas('lignes', fn ($q) => $q->whereIn('sous_categorie_id', $cotSousCategorieIds))
-            ->with('tiers')
-            ->latest('date')->latest('id')
+        $dernieresAdhesions = TransactionLigne::query()
+            ->whereIn('transaction_lignes.sous_categorie_id', $cotSousCategorieIds)
+            ->whereHas('transaction', fn ($q) => $q->where('type', 'recette')->forExercice($exercice))
+            ->with(['transaction.tiers', 'transaction.adhesions.formuleAdhesion', 'sousCategorie'])
+            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->orderByDesc('transactions.date')
+            ->orderByDesc('transaction_lignes.id')
+            ->select('transaction_lignes.*')
             ->take(5)
             ->get();
 
@@ -120,6 +151,7 @@ final class Dashboard extends Component
             'totalDepenses' => $totalDepenses,
             'totalPrevu' => $totalPrevu,
             'totalRealise' => $totalRealise,
+            'budgetParCategorie' => $budgetParCategorie,
             'dernieresDepenses' => $dernieresDepenses,
             'dernieresRecettes' => $dernieresRecettes,
             'derniersDons' => $derniersDons,

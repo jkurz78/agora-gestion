@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Civilite;
 use App\Enums\Espace;
 use App\Livewire\Banques\HelloassoSyncWizard;
 use App\Livewire\ParticipantShow;
@@ -431,5 +432,5 @@ it('expose civilite dans MERGE_FIELDS et permet l\'arbitrage', function () {
         ->set('resultData.civilite', 'M.')
         ->call('confirmMerge');
 
-    expect($tiers->fresh()->civilite)->toBe(\App\Enums\Civilite::M);
+    expect($tiers->fresh()->civilite)->toBe(Civilite::M);
 });

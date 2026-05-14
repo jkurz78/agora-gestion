@@ -6,7 +6,9 @@ namespace App\Mail;
 
 use App\Helpers\ArticleFr;
 use App\Helpers\EmailLogo;
+use App\Mail\Concerns\HasPolitesseVariables;
 use App\Support\CurrentAssociation;
+use App\Support\TemplateSubstitution;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
@@ -16,6 +18,7 @@ use Illuminate\Queue\SerializesModels;
 
 final class AttestationPresenceMail extends Mailable
 {
+    use HasPolitesseVariables;
     use Queueable;
     use SerializesModels;
 
@@ -38,13 +41,14 @@ final class AttestationPresenceMail extends Mailable
         public readonly ?string $libelleArticle = null,
         public readonly ?string $blocSeances = null,
         public readonly ?int $typeOperationId = null,
+        public readonly ?string $civilite = null,
+        public readonly ?string $politesse = null,
     ) {
         $corps = $this->customCorps ?? '<p>Bonjour {prenom}, veuillez trouver ci-joint votre attestation de présence.</p>';
         $allVars = $this->variables() + EmailLogo::variables($this->typeOperationId);
-        $corps = str_replace(
-            array_keys($allVars),
-            array_values($allVars),
-            strip_tags($corps, EmailLogo::ALLOWED_TAGS)
+        $corps = TemplateSubstitution::apply(
+            strip_tags($corps, EmailLogo::ALLOWED_TAGS),
+            $allVars
         );
         $this->corpsHtml = ArticleFr::contracter($corps);
     }
@@ -52,11 +56,7 @@ final class AttestationPresenceMail extends Mailable
     public function envelope(): Envelope
     {
         $objet = $this->customObjet ?? 'Attestation de présence — {operation}';
-        $subject = str_replace(
-            array_keys($this->variables()),
-            array_values($this->variables()),
-            $objet
-        );
+        $subject = TemplateSubstitution::apply($objet, $this->variables());
 
         return new Envelope(subject: ArticleFr::contracter($subject));
     }
@@ -105,6 +105,11 @@ final class AttestationPresenceMail extends Mailable
             '{date_seance}' => $this->dateSeance ?? '',
             '{bloc_seances}' => $this->blocSeances ?? '',
             '{association}' => CurrentAssociation::tryGet()?->nom ?? '',
-        ];
+        ] + $this->politesseVariables(
+            $this->civilite,
+            $this->politesse,
+            $this->prenomParticipant,
+            $this->nomParticipant,
+        );
     }
 }

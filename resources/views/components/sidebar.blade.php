@@ -31,6 +31,11 @@
     background: transparent;
     color: #333;
     box-shadow: none;
+    text-decoration: none; /* nécessaire quand l'élément est un <a> (5 espaces auto-nav) */
+}
+.sidebar a.accordion-button:hover {
+    color: #722281;
+    text-decoration: none;
 }
 .sidebar .accordion-button:not(.collapsed) {
     color: #722281;
@@ -153,14 +158,10 @@ $activeGroup = match(true) {
             {{-- ─── COMPTABILITÉ ─── --}}
             <div class="accordion-item border-0">
                 <h2 class="accordion-header">
-                    <button class="accordion-button {{ $activeGroup === 'comptabilite' ? '' : 'collapsed' }}"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#grpComptabilite"
-                            aria-expanded="{{ $activeGroup === 'comptabilite' ? 'true' : 'false' }}"
-                            aria-controls="grpComptabilite">
+                    <a href="{{ route('comptabilite.transactions') }}"
+                       class="accordion-button {{ $activeGroup === 'comptabilite' ? '' : 'collapsed' }}">
                         <i class="bi bi-calculator me-2"></i> Comptabilité
-                    </button>
+                    </a>
                 </h2>
                 <div id="grpComptabilite"
                      class="accordion-collapse collapse {{ $activeGroup === 'comptabilite' ? 'show' : '' }}"
@@ -263,14 +264,10 @@ $activeGroup = match(true) {
             {{-- ─── BANQUES ─── --}}
             <div class="accordion-item border-0">
                 <h2 class="accordion-header">
-                    <button class="accordion-button {{ $activeGroup === 'banques' ? '' : 'collapsed' }}"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#grpBanques"
-                            aria-expanded="{{ $activeGroup === 'banques' ? 'true' : 'false' }}"
-                            aria-controls="grpBanques">
+                    <a href="{{ route('banques.comptes.index') }}"
+                       class="accordion-button {{ $activeGroup === 'banques' ? '' : 'collapsed' }}">
                         <i class="bi bi-bank2 me-2"></i> Banques
-                    </button>
+                    </a>
                 </h2>
                 <div id="grpBanques"
                      class="accordion-collapse collapse {{ $activeGroup === 'banques' ? 'show' : '' }}"
@@ -331,14 +328,10 @@ $activeGroup = match(true) {
             {{-- ─── TIERS ─── --}}
             <div class="accordion-item border-0">
                 <h2 class="accordion-header">
-                    <button class="accordion-button {{ $activeGroup === 'tiers' ? '' : 'collapsed' }}"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#grpTiers"
-                            aria-expanded="{{ $activeGroup === 'tiers' ? 'true' : 'false' }}"
-                            aria-controls="grpTiers">
+                    <a href="{{ route('tiers.index') }}"
+                       class="accordion-button {{ $activeGroup === 'tiers' ? '' : 'collapsed' }}">
                         <i class="bi bi-people me-2"></i> Tiers
-                    </button>
+                    </a>
                 </h2>
                 <div id="grpTiers"
                      class="accordion-collapse collapse {{ $activeGroup === 'tiers' ? 'show' : '' }}"
@@ -377,14 +370,10 @@ $activeGroup = match(true) {
             {{-- ─── OPÉRATIONS ─── --}}
             <div class="accordion-item border-0">
                 <h2 class="accordion-header">
-                    <button class="accordion-button {{ $activeGroup === 'operations' ? '' : 'collapsed' }}"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#grpOperations"
-                            aria-expanded="{{ $activeGroup === 'operations' ? 'true' : 'false' }}"
-                            aria-controls="grpOperations">
+                    <a href="{{ route('operations.index') }}"
+                       class="accordion-button {{ $activeGroup === 'operations' ? '' : 'collapsed' }}">
                         <i class="bi bi-calendar-event me-2"></i> Opérations
-                    </button>
+                    </a>
                 </h2>
                 <div id="grpOperations"
                      class="accordion-collapse collapse {{ $activeGroup === 'operations' ? 'show' : '' }}"
@@ -421,14 +410,10 @@ $activeGroup = match(true) {
             {{-- ─── FACTURATION ─── --}}
             <div class="accordion-item border-0">
                 <h2 class="accordion-header">
-                    <button class="accordion-button {{ $activeGroup === 'facturation' ? '' : 'collapsed' }}"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#grpFacturation"
-                            aria-expanded="{{ $activeGroup === 'facturation' ? 'true' : 'false' }}"
-                            aria-controls="grpFacturation">
+                    <a href="{{ route('facturation.factures') }}"
+                       class="accordion-button {{ $activeGroup === 'facturation' ? '' : 'collapsed' }}">
                         <i class="bi bi-receipt me-2"></i> Facturation
-                    </button>
+                    </a>
                 </h2>
                 <div id="grpFacturation"
                      class="accordion-collapse collapse {{ $activeGroup === 'facturation' ? 'show' : '' }}"

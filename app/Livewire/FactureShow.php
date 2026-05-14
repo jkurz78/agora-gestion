@@ -247,6 +247,8 @@ final class FactureShow extends Component
                 pdfContent: $pdfContent,
                 pdfFilename: $pdfFilename,
                 typeOperationId: $this->resolveFirstTypeOperationId(),
+                civilite: $tiers->civilite?->value,
+                politesse: $tiers->politesse,
             );
 
             Mail::mailer()

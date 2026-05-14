@@ -289,6 +289,15 @@
                                     @php
                                         $varGroups = [
                                             'Tiers' => ['{prenom}' => 'Prénom', '{nom}' => 'Nom', '{email}' => 'Email'],
+                                            'Politesse' => [
+                                                '{politesse_nom}' => 'Monsieur Kurz (recommandé)',
+                                                '{civilite_nom}' => 'M. Kurz (recommandé)',
+                                                '{politesse_prenom_nom}' => 'Monsieur Jürgen Kurz',
+                                                '{civilite_prenom_nom}' => 'M. Jürgen Kurz',
+                                                '{politesse}' => 'Monsieur / Madame seul',
+                                                '{civilite}' => 'M. / Mme seul',
+                                                '{salutation}' => 'Salutation (« Madame, Monsieur » si pas de civilité)',
+                                            ],
                                             'Association' => ['{association}' => "Nom de l'association", '{lien_desinscription}' => 'Lien de désinscription'],
                                         ];
                                     @endphp
@@ -612,19 +621,25 @@
 
     {{-- ── Preview modal ── --}}
     @if($showPreview)
+        @php $preview = $this->getPreviewData(); @endphp
         <div class="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
              style="background:rgba(0,0,0,.4);z-index:2100"
              wire:click.self="$set('showPreview', false)">
             <div class="bg-white rounded-3 shadow" style="max-width:700px;width:95%;max-height:80vh;display:flex;flex-direction:column">
                 <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0"><i class="bi bi-eye me-1"></i> Aperçu du message</h6>
+                    <h6 class="mb-0">
+                        <i class="bi bi-eye me-1"></i> Aperçu du message
+                        @if(!empty($preview['destinataire']))
+                            <span class="text-muted small ms-2">— rendu pour {{ $preview['destinataire'] }}</span>
+                        @endif
+                    </h6>
                     <button type="button" class="btn-close" wire:click="$set('showPreview', false)"></button>
                 </div>
                 <div class="p-3 border-bottom bg-light">
-                    <strong class="small">Objet :</strong> {{ $objet }}
+                    <strong class="small">Objet :</strong> {{ $preview['objet'] }}
                 </div>
                 <div class="p-3" style="overflow-y:auto;flex:1">
-                    {!! $corps !!}
+                    {!! $preview['corps'] !!}
                 </div>
             </div>
         </div>
@@ -654,6 +669,18 @@
                 { token: '{prenom}', label: 'Prénom' },
                 { token: '{nom}', label: 'Nom' },
                 { token: '{email}', label: 'Email' },
+            ]
+        },
+        {
+            title: 'Politesse',
+            items: [
+                { token: '{politesse_nom}', label: 'Monsieur Kurz (recommandé)' },
+                { token: '{civilite_nom}', label: 'M. Kurz (recommandé)' },
+                { token: '{politesse_prenom_nom}', label: 'Monsieur Jürgen Kurz' },
+                { token: '{civilite_prenom_nom}', label: 'M. Jürgen Kurz' },
+                { token: '{politesse}', label: 'Monsieur / Madame seul' },
+                { token: '{civilite}', label: 'M. / Mme seul' },
+                { token: '{salutation}', label: 'Salutation (« Madame, Monsieur » si pas de civilité)' },
             ]
         },
         {

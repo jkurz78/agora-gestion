@@ -266,4 +266,49 @@ final class Tiers extends TenantModel implements AuthenticatableContract
 
         return trim(((string) $this->prenom).' '.((string) $this->nom));
     }
+
+    public function getPolitesseAttribute(): string
+    {
+        return $this->civilite?->label() ?? '';
+    }
+
+    public function getCiviliteNomAttribute(): string
+    {
+        if ($this->type === 'entreprise') {
+            return (string) ($this->entreprise ?? $this->nom);
+        }
+        $civ = $this->civilite?->value ?? '';
+
+        return trim($civ.' '.$this->nom);
+    }
+
+    public function getPolitesseNomAttribute(): string
+    {
+        if ($this->type === 'entreprise') {
+            return (string) ($this->entreprise ?? $this->nom);
+        }
+        $pol = $this->civilite?->label() ?? '';
+
+        return trim($pol.' '.$this->nom);
+    }
+
+    public function getCivilitePrenomNomAttribute(): string
+    {
+        if ($this->type === 'entreprise') {
+            return (string) ($this->entreprise ?? $this->nom);
+        }
+        $civ = $this->civilite?->value ?? '';
+
+        return trim($civ.' '.((string) $this->prenom).' '.$this->nom);
+    }
+
+    public function getPolitessePrenomNomAttribute(): string
+    {
+        if ($this->type === 'entreprise') {
+            return (string) ($this->entreprise ?? $this->nom);
+        }
+        $pol = $this->civilite?->label() ?? '';
+
+        return trim($pol.' '.((string) $this->prenom).' '.$this->nom);
+    }
 }
