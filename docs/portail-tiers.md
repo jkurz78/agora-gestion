@@ -1,6 +1,6 @@
-# Portail Tiers — v1 (Slice 1 : Auth OTP)
+# Portail Tiers et Membres
 
-Statut : livré 2026-04-19, branche feat/portail-tiers-slice1-auth-otp
+Statut : v0 Slice 1 (Auth OTP) livré 2026-04-19. v1 Slice 1 (F+A — Fondation portail + Mon profil) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`.
 
 ## Objectif
 
