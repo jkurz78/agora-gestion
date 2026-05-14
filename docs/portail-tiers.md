@@ -473,6 +473,81 @@ section "Vision back-office".
 - Cleanup OTP expirés : lazy-delete au `verify`, pas de job dédié — à prévoir si la table grossit.
 - Sous-domaines par asso (v3.1) : préparé via le préfixe `/portail/{slug}`.
 
+---
+
+## Slice 1 (F+A) — Fondation portail + Mon profil (2026-05-14)
+
+Statut : livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`.
+
+Spec complète : [`docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`](specs/2026-05-14-portail-membres-slice1-fondation-profil.md).
+Plan : [`plans/portail-membres-slice1-fondation-profil.md`](../plans/portail-membres-slice1-fondation-profil.md).
+
+Ce slice ne livre aucune section métier nouvelle. Il pose la **fondation de navigation** (sidebar pilotée par un résolveur extensible, nouveau layout post-auth) et un premier écran applicatif (**Mon profil**), pour que tout Tiers — adhérent, donateur, participant, bénévole — ait une raison de se connecter dès la v0. Les slices 2 à 4 branchez leurs sections sur ce résolveur sans rework.
+
+### Sidebar adaptative
+
+La sidebar est pilotée par `App\Services\Portail\PortailSectionsResolver`, un singleton enregistré dans `App\Providers\PortailServiceProvider`. Le résolveur suit un **pattern registry** : chaque section est déclarée par une classe `PortailSectionProvider` (interface à une méthode `resolve(Tiers): ?PortailSectionDTO`). Retourner `null` exclut la section de la sidebar pour ce Tiers.
+
+Au boot, `PortailServiceProvider` enregistre les **5 providers fondation** dans l'ordre d'affichage :
+
+| Provider | Classe | Visible si |
+|---|---|---|
+| Tableau de bord | `App\Services\Portail\Providers\TableauDeBordProvider` | Toujours |
+| Mon profil | `App\Services\Portail\Providers\MonProfilProvider` | Toujours |
+| Notes de frais | `App\Services\Portail\Providers\NotesDeFraisProvider` | `Tiers::pour_depenses === true` **OU** `NoteDeFrais` liée à ce Tiers existe (`≥ 1 NDF`) |
+| Factures partenaires | `App\Services\Portail\Providers\FacturesPartenairesProvider` | `Tiers::pour_depenses === true` (strict) |
+| Historique dépenses | `App\Services\Portail\Providers\HistoriqueDepensesProvider` | `Tiers::pour_depenses === true` (strict) |
+
+La règle NDF ("**`pour_depenses=true` OU ≥1 NDF**") est appliquée de manière identique dans le provider sidebar et dans le middleware de route `App\Http\Middleware\Portail\EnsurePeutVoirNotesDeFrais` (voir code source pour l'implémentation exacte).
+
+Pour enregistrer une section dans un slice ultérieur, créer une classe implémentant `PortailSectionProvider`, l'instancier et l'appeler via `$resolver->register(...)` dans le `boot()` du service provider concerné.
+
+### Layouts
+
+Le portail utilise deux layouts distincts selon le contexte d'authentification :
+
+| Layout | Fichier | Utilisé par |
+|---|---|---|
+| Anonyme (auth) | `portail.layouts.app` | `Login`, `OtpVerify`, `ChooseTiers` |
+| Post-authentification | `portail.layouts.authenticated` | `TableauDeBord`, `MonProfil`, NDF (Index/Form/Show), FacturePartenaire (AtraiterIndex/Depot), HistoriqueDepenses/Index |
+
+`portail.layouts.app` est un layout centré-card sans sidebar, adapté aux écrans de connexion.
+`portail.layouts.authenticated` intègre la sidebar pilotée par `PortailSectionsResolver`, un en-tête avec le logo de l'association et un pied de page AgoraGestion.
+
+### Mon profil — défense en profondeur
+
+Le composant `App\Livewire\Portail\MonProfil` expose des propriétés publiques Livewire **uniquement** pour les champs éditables : `adresse_ligne1`, `adresse_ligne2`, `code_postal`, `ville`, `pays`, `telephone`, `email_optout`.
+
+Les champs verrouillés (`civilite`, `nom`, `prenom`, `email`, `date_naissance`) ne sont **jamais** des propriétés publiques Livewire. Ils sont lus directement depuis le modèle `Tiers` au rendu et affichés en HTML `disabled`. Cette approche bloque toute tentative d'injection via `wire:model` ou `wire:set` côté client : même si un utilisateur manipule le DOM pour soumettre une valeur sur un champ verrouillé, le composant ne possède pas la propriété correspondante et ne l'écrira jamais en base.
+
+### Procédures admin
+
+#### Comment un participant fait sa première NDF
+
+Par défaut, sans `pour_depenses=true`, le menu "Notes de frais" n'apparaît pas dans la sidebar d'un participant (la règle `≥ 1 NDF` ne peut pas être satisfaite sans dépôt préalable).
+
+Procédure pour débloquer un participant qui signale un frais pour la première fois :
+
+1. Ouvrir la fiche Tiers du participant dans le back-office.
+2. Passer le flag **"Peut déposer des frais"** (`pour_depenses`) à `true`.
+3. Enregistrer.
+
+Dès ce moment, le menu "Notes de frais" apparaît dans la sidebar du participant lors de sa prochaine connexion. Une fois la première NDF déposée, le menu restera visible même si le flag est repassé à `false` (règle `≥ 1 NDF` satisfaite).
+
+Pas de bouton "Demander un remboursement" côté portail v0 — la procédure reste manuelle côté admin.
+
+#### Comment permettre à un parent de voir son enfant
+
+Il n'existe pas de modèle `representant_legal` dans l'application. La solution repose sur le sélecteur OTP multi-Tiers livré en Slice 1 Auth (v4.x) :
+
+1. Ouvrir la fiche Tiers de **l'enfant** dans le back-office.
+2. Saisir l'**email du parent** dans le champ email de la fiche Tiers de l'enfant.
+3. Enregistrer.
+
+Lors de la connexion, le parent saisit son email. L'OTP est envoyé à cet email. Après validation, le sélecteur de Tiers affiche à la fois la fiche du parent et celle de l'enfant (tous les Tiers ayant cet email dans l'association). Le parent peut choisir "Enfant Martin" et accéder au portail en tant qu'enfant.
+
+Note : cette approche repose sur la garantie multi-tenant (`TenantScope` fail-closed) — seuls les Tiers de l'association courante sont listés dans le sélecteur.
+
 ## Abandon de créance
 
 Statut : livré 2026-04-21, branche feat/portail-tiers-slice1-auth-otp.
