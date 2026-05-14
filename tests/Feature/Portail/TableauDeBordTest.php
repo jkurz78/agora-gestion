@@ -20,8 +20,8 @@ it('tableau de bord membre seul affiche Bonjour prenom et 1 raccourci Mon profil
 
     $tiers = Tiers::factory()->create([
         'association_id' => $asso->id,
-        'prenom'         => 'Sophie',
-        'pour_depenses'  => false,
+        'prenom' => 'Sophie',
+        'pour_depenses' => false,
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);
@@ -44,8 +44,8 @@ it('tableau de bord bénévole pour_depenses=true affiche 4 raccourcis', functio
 
     $tiers = Tiers::factory()->create([
         'association_id' => $asso->id,
-        'prenom'         => 'Lucie',
-        'pour_depenses'  => true,
+        'prenom' => 'Lucie',
+        'pour_depenses' => true,
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);

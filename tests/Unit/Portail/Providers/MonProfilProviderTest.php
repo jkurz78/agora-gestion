@@ -6,8 +6,8 @@ use App\Models\Tiers;
 use App\Services\Portail\Providers\MonProfilProvider;
 
 it('returns the mon-profil DTO for any Tiers', function (): void {
-    $tiers = new Tiers();
-    $provider = new MonProfilProvider();
+    $tiers = new Tiers;
+    $provider = new MonProfilProvider;
 
     $dto = $provider->resolve($tiers);
 

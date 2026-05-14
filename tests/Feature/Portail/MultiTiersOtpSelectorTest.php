@@ -10,7 +10,6 @@ use App\Models\Tiers;
 use App\Services\Portail\AuthSessionService;
 use App\Services\Portail\OtpService;
 use App\Tenant\TenantContext;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 

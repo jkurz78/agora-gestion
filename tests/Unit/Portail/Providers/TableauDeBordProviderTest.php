@@ -6,8 +6,8 @@ use App\Models\Tiers;
 use App\Services\Portail\Providers\TableauDeBordProvider;
 
 it('returns the tableau-de-bord DTO for any Tiers', function (): void {
-    $tiers = new Tiers();
-    $provider = new TableauDeBordProvider();
+    $tiers = new Tiers;
+    $provider = new TableauDeBordProvider;
 
     $dto = $provider->resolve($tiers);
 

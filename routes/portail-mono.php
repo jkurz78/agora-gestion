@@ -28,13 +28,13 @@ use App\Livewire\Portail\ChooseTiers;
 use App\Livewire\Portail\FacturePartenaire\AtraiterIndex;
 use App\Livewire\Portail\FacturePartenaire\Depot;
 use App\Livewire\Portail\HistoriqueDepenses\Index as HistoriqueDepensesIndex;
-use App\Livewire\Portail\MonProfil;
-use App\Livewire\Portail\TableauDeBord;
 use App\Livewire\Portail\Login;
+use App\Livewire\Portail\MonProfil;
 use App\Livewire\Portail\NoteDeFrais\Form;
 use App\Livewire\Portail\NoteDeFrais\Index;
 use App\Livewire\Portail\NoteDeFrais\Show;
 use App\Livewire\Portail\OtpVerify;
+use App\Livewire\Portail\TableauDeBord;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('portail')

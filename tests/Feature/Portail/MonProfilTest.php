@@ -24,15 +24,15 @@ it('affiche la page Mon profil avec les champs attendus', function () {
 
     $tiers = Tiers::factory()->create([
         'association_id' => $asso->id,
-        'prenom'         => 'Alice',
-        'nom'            => 'Martin',
-        'email'          => 'alice@example.com',
-        'telephone'      => '0600000000',
+        'prenom' => 'Alice',
+        'nom' => 'Martin',
+        'email' => 'alice@example.com',
+        'telephone' => '0600000000',
         'adresse_ligne1' => '10 rue de la Paix',
-        'code_postal'    => '75001',
-        'ville'          => 'Paris',
-        'pays'           => 'France',
-        'email_optout'   => false,
+        'code_postal' => '75001',
+        'ville' => 'Paris',
+        'pays' => 'France',
+        'email_optout' => false,
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);
@@ -65,7 +65,7 @@ it('édition des 6 champs autorisés persiste en base', function () {
 
     $tiers = Tiers::factory()->create([
         'association_id' => $asso->id,
-        'email'          => 'alice@example.com',
+        'email' => 'alice@example.com',
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);
@@ -98,7 +98,7 @@ it('wire:set email est bloqué ou sans effet en base', function () {
 
     $tiers = Tiers::factory()->create([
         'association_id' => $asso->id,
-        'email'          => 'alice@example.com',
+        'email' => 'alice@example.com',
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);
@@ -110,7 +110,7 @@ it('wire:set email est bloqué ou sans effet en base', function () {
         Livewire::test(MonProfil::class, ['association' => $asso])
             ->set('email', 'pirate@evil.com')
             ->call('save');
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // Livewire threw — intrusion blocked at the component level.
     }
 
@@ -126,7 +126,7 @@ it('wire:set nom est bloqué ou sans effet en base', function () {
 
     $tiers = Tiers::factory()->create([
         'association_id' => $asso->id,
-        'nom'            => 'Martin',
+        'nom' => 'Martin',
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);
@@ -137,7 +137,7 @@ it('wire:set nom est bloqué ou sans effet en base', function () {
         Livewire::test(MonProfil::class, ['association' => $asso])
             ->set('nom', 'HACKER')
             ->call('save');
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // Livewire threw — intrusion blocked.
     }
 
@@ -153,7 +153,7 @@ it('validation téléphone trop long génère une erreur et ne modifie pas la ba
 
     $tiers = Tiers::factory()->create([
         'association_id' => $asso->id,
-        'telephone'      => '0600000000',
+        'telephone' => '0600000000',
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);
@@ -175,8 +175,8 @@ it('lien mailto contactez-nous contient l\'email de l\'association', function ()
 
     $tiers = Tiers::factory()->create([
         'association_id' => $asso->id,
-        'prenom'         => 'Bob',
-        'nom'            => 'Dupont',
+        'prenom' => 'Bob',
+        'nom' => 'Dupont',
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);
@@ -198,8 +198,8 @@ it('lien mailto suppression compte contient subject et nom encodés', function (
 
     $tiers = Tiers::factory()->create([
         'association_id' => $asso->id,
-        'prenom'         => 'Clara',
-        'nom'            => 'Lebrun',
+        'prenom' => 'Clara',
+        'nom' => 'Lebrun',
     ]);
 
     Auth::guard('tiers-portail')->login($tiers);
