@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Services\Portail\PortailSectionsResolver;
+use App\Services\Portail\Providers\FacturesPartenairesProvider;
+use App\Services\Portail\Providers\HistoriqueDepensesProvider;
 use App\Services\Portail\Providers\MonProfilProvider;
+use App\Services\Portail\Providers\NotesDeFraisProvider;
 use App\Services\Portail\Providers\TableauDeBordProvider;
 use Illuminate\Support\ServiceProvider;
 
@@ -22,5 +25,8 @@ final class PortailServiceProvider extends ServiceProvider
 
         $resolver->register(new TableauDeBordProvider);
         $resolver->register(new MonProfilProvider);
+        $resolver->register(new NotesDeFraisProvider);
+        $resolver->register(new FacturesPartenairesProvider);
+        $resolver->register(new HistoriqueDepensesProvider);
     }
 }
