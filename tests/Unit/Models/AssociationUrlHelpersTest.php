@@ -10,6 +10,11 @@ dataset('urlRenouvellementCases', [
     'specific empty falls back to site' => ['', 'https://asso.fr', 'https://asso.fr'],
     'both null → null' => [null, null, null],
     'both empty → null' => ['', '', null],
+    'http scheme accepted' => ['http://asso.fr/renouveler', 'https://asso.fr', 'http://asso.fr/renouveler'],
+    'javascript scheme blocked' => ['javascript:alert(1)', null, null],
+    'data scheme blocked' => ['data:text/html,<script>alert(1)</script>', null, null],
+    'relative URL blocked' => ['/foo', null, null],
+    'fallback javascript scheme blocked' => [null, 'javascript:fetch(document.cookie)', null],
 ]);
 
 dataset('urlNouveauDonCases', [
@@ -18,6 +23,11 @@ dataset('urlNouveauDonCases', [
     'specific empty falls back to site' => ['', 'https://asso.fr', 'https://asso.fr'],
     'both null → null' => [null, null, null],
     'both empty → null' => ['', '', null],
+    'http scheme accepted' => ['http://asso.fr/don', 'https://asso.fr', 'http://asso.fr/don'],
+    'javascript scheme blocked' => ['javascript:alert(1)', null, null],
+    'data scheme blocked' => ['data:text/html,<script>alert(1)</script>', null, null],
+    'relative URL blocked' => ['/foo', null, null],
+    'fallback javascript scheme blocked' => [null, 'javascript:fetch(document.cookie)', null],
 ]);
 
 it('urlRenouvellementAdhesion retourne la bonne URL', function (

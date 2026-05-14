@@ -161,12 +161,21 @@ final class Association extends Model
 
     public function urlRenouvellementAdhesion(): ?string
     {
-        return $this->url_renouvellement_adhesion ?: ($this->url_site_web ?: null);
+        return $this->urlExterneSafe($this->url_renouvellement_adhesion ?: $this->url_site_web);
     }
 
     public function urlNouveauDon(): ?string
     {
-        return $this->url_nouveau_don ?: ($this->url_site_web ?: null);
+        return $this->urlExterneSafe($this->url_nouveau_don ?: $this->url_site_web);
+    }
+
+    private function urlExterneSafe(?string $url): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        return preg_match('#^https?://#i', $url) === 1 ? $url : null;
     }
 
     public function sousCategoriesFor(UsageComptable $usage): Collection
