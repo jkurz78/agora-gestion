@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Services\Portail\PortailSectionsResolver;
+use App\Services\Portail\Providers\MonProfilProvider;
+use App\Services\Portail\Providers\TableauDeBordProvider;
 use Illuminate\Support\ServiceProvider;
 
 final class PortailServiceProvider extends ServiceProvider
@@ -12,5 +14,13 @@ final class PortailServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(PortailSectionsResolver::class);
+    }
+
+    public function boot(): void
+    {
+        $resolver = $this->app->make(PortailSectionsResolver::class);
+
+        $resolver->register(new TableauDeBordProvider);
+        $resolver->register(new MonProfilProvider);
     }
 }
