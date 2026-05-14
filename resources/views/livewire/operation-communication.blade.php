@@ -560,6 +560,15 @@
             '{nom}': 'Nom',
             '{email_participant}': 'Email',
         },
+        'Politesse': {
+            '{politesse_nom}': 'Monsieur Kurz (recommandé)',
+            '{civilite_nom}': 'M. Kurz (recommandé)',
+            '{politesse_prenom_nom}': 'Monsieur Jürgen Kurz',
+            '{civilite_prenom_nom}': 'M. Jürgen Kurz',
+            '{politesse}': 'Monsieur / Madame seul',
+            '{civilite}': 'M. / Mme seul',
+            '{salutation}': 'Salutation (« Madame, Monsieur » si pas de civilité)',
+        },
         'Opération': {
             '{operation}': 'Nom',
             '{type_operation}': 'Type',

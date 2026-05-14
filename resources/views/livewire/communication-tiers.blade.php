@@ -657,6 +657,18 @@
             ]
         },
         {
+            title: 'Politesse',
+            items: [
+                { token: '{politesse_nom}', label: 'Monsieur Kurz (recommandé)' },
+                { token: '{civilite_nom}', label: 'M. Kurz (recommandé)' },
+                { token: '{politesse_prenom_nom}', label: 'Monsieur Jürgen Kurz' },
+                { token: '{civilite_prenom_nom}', label: 'M. Jürgen Kurz' },
+                { token: '{politesse}', label: 'Monsieur / Madame seul' },
+                { token: '{civilite}', label: 'M. / Mme seul' },
+                { token: '{salutation}', label: 'Salutation (« Madame, Monsieur » si pas de civilité)' },
+            ]
+        },
+        {
             title: 'Association',
             items: [
                 { token: '{association}', label: "Nom de l'association" },
