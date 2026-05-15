@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Association;
+use App\Models\EmailLog;
 use App\Models\NoteDeFrais;
 use App\Models\Participant;
 use App\Models\Tiers;
@@ -162,6 +163,48 @@ it('tiers sans participation n\'affiche pas Mes activités dans la sidebar', fun
     ])->render();
 
     expect($html)->not->toContain('Mes activités');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scénario 8 : Tiers avec ≥ 1 EmailLog → sidebar contient "Mes messages"
+// ─────────────────────────────────────────────────────────────────────────────
+it('tiers avec au moins un EmailLog affiche Mes messages dans la sidebar', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $tiers = Tiers::factory()->create([
+        'association_id' => $asso->id,
+        'pour_depenses' => false,
+    ]);
+
+    EmailLog::factory()->create(['tiers_id' => $tiers->id]);
+
+    $html = view('portail.layouts.partials.sidebar', [
+        'tiers' => $tiers,
+        'portailAssociation' => $asso,
+    ])->render();
+
+    expect($html)->toContain('Mes messages');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scénario 9 : Tiers sans EmailLog → sidebar NE contient PAS "Mes messages"
+// ─────────────────────────────────────────────────────────────────────────────
+it('tiers sans EmailLog n\'affiche pas Mes messages dans la sidebar', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $tiers = Tiers::factory()->create([
+        'association_id' => $asso->id,
+        'pour_depenses' => false,
+    ]);
+
+    $html = view('portail.layouts.partials.sidebar', [
+        'tiers' => $tiers,
+        'portailAssociation' => $asso,
+    ])->render();
+
+    expect($html)->not->toContain('Mes messages');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

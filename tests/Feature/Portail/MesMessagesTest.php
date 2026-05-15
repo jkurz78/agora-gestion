@@ -178,6 +178,102 @@ it('ne révèle pas les métadonnées internes (envoye_par, statut, tracking_tok
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Test 6b : Métadonnées masquées — statut + erreur_message
+// ─────────────────────────────────────────────────────────────────────────────
+it('ne révèle pas statut ni erreur_message dans le rendu portail', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    $log = EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'objet' => 'Email avec erreur',
+        'statut' => 'envoye',
+        'erreur_message' => 'SMTP timeout connexion refusée',
+    ]);
+
+    $html = Livewire::test(MesMessages::class, ['association' => $asso])
+        ->call('toggleMessage', (int) $log->id)
+        ->html();
+
+    expect($html)
+        ->not->toContain('envoye')
+        ->not->toContain('SMTP timeout connexion refusée');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 8 : PJ bouton présent (positif)
+// ─────────────────────────────────────────────────────────────────────────────
+it('affiche le bouton Télécharger la pièce jointe avec target="_blank" quand attachment_path est non null', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    $log = EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'objet' => 'Email avec pièce jointe',
+        'attachment_path' => 'associations/1/emails/doc.pdf',
+    ]);
+
+    $html = Livewire::test(MesMessages::class, ['association' => $asso])
+        ->call('toggleMessage', (int) $log->id)
+        ->html();
+
+    expect($html)
+        ->toContain('Télécharger la pièce jointe')
+        ->toContain('target="_blank"');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 9 : PJ bouton absent (négatif)
+// ─────────────────────────────────────────────────────────────────────────────
+it('n\'affiche pas le bouton Télécharger la pièce jointe quand attachment_path est null', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    $log = EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'objet' => 'Email sans pièce jointe',
+        'attachment_path' => null,
+    ]);
+
+    $html = Livewire::test(MesMessages::class, ['association' => $asso])
+        ->call('toggleMessage', (int) $log->id)
+        ->html();
+
+    expect($html)->not->toContain('Télécharger la pièce jointe');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 10 : Vocabulaire — pas de jargon technique
+// ─────────────────────────────────────────────────────────────────────────────
+it('ne contient pas le terme EmailLog dans le rendu HTML portail', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'objet' => 'Message ordinaire',
+    ]);
+
+    $html = Livewire::test(MesMessages::class, ['association' => $asso])
+        ->assertStatus(200)
+        ->html();
+
+    expect(strtolower($html))->not->toContain('emaillog');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Test 7 : Empty state
 // ─────────────────────────────────────────────────────────────────────────────
 it('affiche le message vide si aucun email reçu', function () {
