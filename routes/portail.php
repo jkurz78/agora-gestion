@@ -9,6 +9,7 @@ use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
 use App\Http\Controllers\Portail\MesActivitesRedirectController;
+use App\Http\Controllers\Portail\MessageAttachmentController;
 use App\Http\Controllers\Portail\RecuPortailController;
 use App\Http\Controllers\Portail\TransactionPdfController;
 use App\Http\Middleware\Portail\Authenticate;
@@ -51,6 +52,7 @@ Route::prefix('{association:slug}/portail')
             Route::get('/mes-adhesions', MesAdhesions::class)->name('mes-adhesions');
             Route::get('/mes-dons', MesDons::class)->name('mes-dons');
             Route::get('/mes-messages', MesMessages::class)->name('mes-messages');
+            Route::get('/messages/attachment/{emailLog}', MessageAttachmentController::class)->name('messages.attachment');
             Route::get('/mes-activites', MesActivitesRedirectController::class)->name('mes-activites.index');
             Route::get('/mes-activites/{typeOperation}', MesActivites::class)->name('mes-activites.show');
             Route::get('/recus/cotisation/{adhesion}', [RecuPortailController::class, 'cotisation'])->name('recus.cotisation');
