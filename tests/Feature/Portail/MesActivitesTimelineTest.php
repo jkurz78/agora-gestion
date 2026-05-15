@@ -73,9 +73,9 @@ it('affiche la timeline des séances pour les cartes En cours', function () {
         ->assertStatus(200)
         ->html();
 
-    expect($html)->toContain('seance-timeline');
-    // 2 séances = 2 <li> items
-    expect(substr_count($html, '<li class="d-flex align-items-center'))->toBe(2);
+    expect($html)->toContain('<ul class="seance-timeline');
+    // 2 séances = 2 <li> items (horizontal layout: flex-column align-items-center)
+    expect(substr_count($html, '<li class="d-flex flex-column align-items-center'))->toBe(2);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ it('mappe les 4 statuts de présence aux bonnes classes CSS dans la timeline', f
         ->assertStatus(200)
         ->html();
 
-    expect($html)->toContain('seance-timeline');
+    expect($html)->toContain('<ul class="seance-timeline');
     expect($html)->toContain('bg-success');
     expect($html)->toContain('bg-warning');
     expect($html)->toContain('bg-danger');
@@ -213,7 +213,7 @@ it('n\'affiche pas de timeline pour les cartes À venir', function () {
         ->assertStatus(200)
         ->html();
 
-    expect($html)->not->toContain('seance-timeline');
+    expect($html)->not->toContain('<ul class="seance-timeline');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -257,7 +257,7 @@ it('n\'affiche pas de timeline pour les cartes Terminées', function () {
         ->assertStatus(200)
         ->html();
 
-    expect($html)->not->toContain('seance-timeline');
+    expect($html)->not->toContain('<ul class="seance-timeline');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -290,7 +290,7 @@ it('n\'affiche pas de timeline pour une opération En cours sans séances', func
         ->assertStatus(200)
         ->html();
 
-    expect($html)->not->toContain('seance-timeline');
+    expect($html)->not->toContain('<ul class="seance-timeline');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -333,8 +333,8 @@ it('affiche la timeline sans erreur quand certaines séances n\'ont pas de date'
         ->html();
 
     // Timeline présente avec seulement les 2 séances datées
-    expect($html)->toContain('seance-timeline');
-    expect(substr_count($html, '<li class="d-flex align-items-center'))->toBe(2);
+    expect($html)->toContain('<ul class="seance-timeline');
+    expect(substr_count($html, '<li class="d-flex flex-column align-items-center'))->toBe(2);
     // Le compteur total (4 séances) est affiché
     expect($html)->toContain('4 séance(s)');
 });

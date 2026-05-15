@@ -1,15 +1,7 @@
-<style>
-    .pastille-future {
-        background: #fff;
-        border: 2px solid #3d5473;
-    }
-</style>
-
 <div class="card mb-2 shadow-sm">
     <div class="card-body py-3">
         <div class="d-flex justify-content-between align-items-start">
             <div>
-                <span class="text-muted small">{{ $participation->operation->typeOperation->nom }}</span>
                 <div class="fw-semibold">{{ $participation->operation->nom }}</div>
                 @php
                     $seancesAvecDate = $participation->operation->seances->filter(fn($s) => $s->date !== null);
@@ -35,7 +27,7 @@
                     @php
                         $presencesParSeance = $participation->presences->keyBy('seance_id');
                     @endphp
-                    <ul class="seance-timeline list-unstyled mt-3 mb-0">
+                    <ul class="seance-timeline list-unstyled mt-3 mb-0 d-flex flex-md-row flex-column gap-2 gap-md-3 align-items-md-start">
                         @foreach($seancesAvecDate->sortBy('date') as $seance)
                             @php
                                 $presence = $presencesParSeance->get($seance->id);
@@ -49,22 +41,46 @@
                                     default => ['bg-light border', 'Non renseigné'],
                                 };
                             @endphp
-                            <li class="d-flex align-items-center gap-2 mb-2">
+                            <li class="d-flex flex-column align-items-center text-center" style="min-width:50px;">
                                 <span class="pastille rounded-circle {{ $pastilleClass }}"
-                                      style="width:14px;height:14px;display:inline-block;"
+                                      style="width:18px;height:18px;display:inline-block;"
                                       title="{{ $tooltipText }}"></span>
-                                <span class="small">{{ $seance->date->format('d/m/Y') }}</span>
+                                <small class="mt-1">{{ $seance->date->format('d/m') }}</small>
                                 @if($statut === \App\Enums\StatutPresence::Present->value)
                                     <a href="{{ \App\Support\PortailRoute::to('attestations.seance', $portailAssociation ?? null, ['operation' => $participation->operation_id, 'seance' => $seance->id]) }}"
                                        target="_blank" rel="noopener"
-                                       class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1"
-                                       title="Voir l'attestation de cette séance">
+                                       class="btn btn-sm btn-link p-0 mt-1"
+                                       title="Voir l'attestation">
                                         <i class="bi bi-file-earmark-pdf"></i>
                                     </a>
                                 @endif
                             </li>
                         @endforeach
                     </ul>
+                @endif
+
+                {{-- Bloc financier --}}
+                @php
+                    $totalPrevu = $participation->totalPrevu();
+                    $totalRegle = $participation->totalRegle();
+                    $resteARegler = $participation->resteARegler();
+                @endphp
+
+                @if ($totalPrevu > 0)
+                    <div class="mt-3 p-2 bg-light rounded small d-flex flex-wrap align-items-center gap-3">
+                        <span><strong>Total :</strong> {{ number_format($totalPrevu, 2, ',', ' ') }} €</span>
+                        <span class="text-muted">·</span>
+                        <span><strong>Réglé :</strong> {{ number_format($totalRegle, 2, ',', ' ') }} €</span>
+                        @if ($totalRegle === 0.0)
+                            <span class="badge bg-secondary ms-auto">En attente de règlement</span>
+                        @elseif ($resteARegler > 0)
+                            <span class="text-muted">·</span>
+                            <span><strong>Reste :</strong> {{ number_format($resteARegler, 2, ',', ' ') }} €</span>
+                            <span class="badge bg-warning text-dark ms-auto">À régler</span>
+                        @else
+                            <span class="badge bg-success ms-auto">À jour</span>
+                        @endif
+                    </div>
                 @endif
             </div>
         </div>

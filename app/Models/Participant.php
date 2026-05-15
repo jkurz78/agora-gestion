@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\DroitImage;
+use App\Enums\StatutReglement;
 use App\Enums\TypeDocumentPrevisionnel;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -132,6 +133,27 @@ final class Participant extends TenantModel
             ->whereIn('type', [TypeDocumentPrevisionnel::Devis->value, TypeDocumentPrevisionnel::Proforma->value])
             ->latest('id')
             ->first();
+    }
+
+    public function totalPrevu(): float
+    {
+        return (float) $this->reglements()->sum('montant_prevu');
+    }
+
+    public function totalRegle(): float
+    {
+        return (float) Transaction::query()
+            ->whereIn('reglement_id', $this->reglements()->pluck('id'))
+            ->whereIn('statut_reglement', [
+                StatutReglement::Recu->value,
+                StatutReglement::Pointe->value,
+            ])
+            ->sum('montant_total');
+    }
+
+    public function resteARegler(): float
+    {
+        return max(0.0, $this->totalPrevu() - $this->totalRegle());
     }
 
     public function factureRattachee(): ?Facture
