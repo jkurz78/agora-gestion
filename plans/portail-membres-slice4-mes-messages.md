@@ -2,7 +2,7 @@
 
 **Created**: 2026-05-15
 **Branch**: `feat/portail-membres-slice1-fondation-profil` (option B git, dernier slice)
-**Status**: approved (2026-05-15, mode subagent-driven, Sonnet en exécuteurs)
+**Status**: implemented (2026-05-15, ~10 commits, 660 tests Portail / 0 failure, security PASS, spec compliance PASS après gaps comblés)
 **Spec**: [docs/specs/2026-05-15-portail-membres-slice4-mes-messages.md](../docs/specs/2026-05-15-portail-membres-slice4-mes-messages.md)
 **Slices 1+2+3 statut** : implementés et validés en local.
 
