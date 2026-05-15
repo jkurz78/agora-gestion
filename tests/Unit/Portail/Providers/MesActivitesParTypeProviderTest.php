@@ -112,7 +112,7 @@ it('produit des DTOs avec id, routeName, routeParams et ordre corrects', functio
     expect($sections)->toHaveCount(1);
 
     $dto = $sections->first();
-    expect($dto->id)->toBe('mes-activites-' . (int) $typeOp->id);
+    expect($dto->id)->toBe('mes-activites-'.(int) $typeOp->id);
     expect($dto->routeName)->toBe('portail.mes-activites.show');
     expect($dto->routeParams)->toBe(['typeOperation' => (int) $typeOp->id]);
     expect($dto->ordre)->toBeGreaterThanOrEqual(80);

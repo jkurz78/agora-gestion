@@ -61,7 +61,7 @@ it('redirige vers le type unique quand le tiers a 1 type d\'activité', function
     $response = $this->get("/{$asso->slug}/portail/mes-activites");
     $response->assertRedirect();
     $location = $response->headers->get('Location');
-    expect($location)->toContain('/mes-activites/' . (int) $typeOp->id);
+    expect($location)->toContain('/mes-activites/'.(int) $typeOp->id);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,5 +93,5 @@ it('redirige vers le premier type alphabétique quand le tiers a 2 types', funct
     $response->assertRedirect();
     $location = $response->headers->get('Location');
     // "Ateliers" vient avant "Zumba" alphabétiquement
-    expect($location)->toContain('/mes-activites/' . (int) $typeA->id);
+    expect($location)->toContain('/mes-activites/'.(int) $typeA->id);
 });
