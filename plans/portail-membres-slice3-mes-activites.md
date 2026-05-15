@@ -2,7 +2,7 @@
 
 **Created**: 2026-05-15
 **Branch**: `feat/portail-membres-slice1-fondation-profil` (option B git — toutes les slices sur une seule branche, MEP groupée)
-**Status**: approved (2026-05-15, mode subagent-driven, Sonnet en exécuteurs)
+**Status**: implemented (2026-05-15, 13 commits, 619 tests Portail / 0 failure, security PASS, spec compliance 22/22 PASS après gaps comblés)
 **Spec**: [docs/specs/2026-05-15-portail-membres-slice3-mes-activites.md](../docs/specs/2026-05-15-portail-membres-slice3-mes-activites.md)
 **Slices 1+2 statut** : implemented, validés en local. 24 commits sur la branche.
 
