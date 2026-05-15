@@ -1,6 +1,6 @@
 # Portail Tiers et Membres
 
-Statut : v0 Slice 1 (Auth OTP) livré 2026-04-19. v1 Slice 1 (F+A — Fondation portail + Mon profil) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`. v2 Slice 2 (Mes adhésions + Mes dons) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice2-adhesions-dons.md`.
+Statut : v0 Slice 1 (Auth OTP) livré 2026-04-19. v1 Slice 1 (F+A — Fondation portail + Mon profil) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`. v2 Slice 2 (Mes adhésions + Mes dons) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice2-adhesions-dons.md`. v3 Slice 3 (D — Mes activités) livré 2026-05-15, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-15-portail-membres-slice3-mes-activites.md`.
 
 ## Objectif
 
@@ -733,3 +733,179 @@ Association::where('slug', 'mon-association')->update([
     'url_nouveau_don'              => 'https://www.helloasso.com/associations/mon-association/formulaires/1',
 ]);
 ```
+
+---
+
+## Slice 3 (D) — Mes activités (2026-05-15)
+
+Statut : livré 2026-05-15, branche `feat/portail-membres-slice1-fondation-profil`.
+
+Spec complète : [`docs/specs/2026-05-15-portail-membres-slice3-mes-activites.md`](specs/2026-05-15-portail-membres-slice3-mes-activites.md).
+Plan : [`plans/portail-membres-slice3-mes-activites.md`](../plans/portail-membres-slice3-mes-activites.md).
+
+Ce slice ajoute un écran **Mes activités** dans le portail. Un Tiers ayant participé à au moins une opération (Séances d'une formation, parcours de soins, etc.) y voit ses participations classées en trois sections temporelles : **À venir**, **En cours**, **Terminées**. L'écran propose le téléchargement des attestations de présence, des devis et des factures rattachés à chaque participation. Le tableau de bord affiche une alerte « Action requise » pour les questionnaires pré-activité non remplis.
+
+Points structurants :
+- **1 entrée sidebar unique** (groupe « Mes activités », ordre 80), quelle que soit la diversité des types d'opération.
+- **3 sections temporelles** dans l'écran, calculées via le helper `ClassificationTemporelle`.
+- **Vocabulaire portail** : le mot « opération » ne doit jamais apparaître dans le rendu HTML public — toujours « activité », « questionnaire » ou le nom du TypeOperation.
+
+### Sidebar — nouveau groupe « Mes activités »
+
+Un seul provider est enregistré dans `PortailServiceProvider::boot()`, après les groupes existants :
+
+| Provider | Classe | id | Route | Ordre | Icon | Groupe | Visible si |
+|---|---|---|---|---|---|---|---|
+| Mes activités | `App\Services\Portail\Providers\MesActivitesProvider` | `mes-activites` | `portail.mes-activites` | 80 | `bi-calendar-event` | Mes activités | `≥ 1 Participation` liée au Tiers connecté |
+
+**Décision de conception — 1 entrée unique (Option B retenue) :** l'équipe a évalué deux approches :
+- Option A : 1 entrée sidebar par `TypeOperation` distinct ayant des participations → sidebar instable si l'asso rebaptise ses types, et largeur imprévisible.
+- Option B : 1 entrée unique « Mes activités » → sidebar stable, scalable, libellés indépendants des renommages asso.
+
+Option B retenue. Si un Tiers a des participations dans plusieurs types d'opération, les sous-tabs par type sont présentés **dans l'écran** (pas dans la sidebar).
+
+### Classification temporelle
+
+Pattern partagé par `MesActivites::render()` et `TableauDeBord::render()` (alerte magic-link).
+
+#### Helper
+
+`App\Services\Portail\ClassificationTemporelle` — classe finale à méthode statique :
+
+```php
+ClassificationTemporelle::pour(Operation $operation): HorizonTemporel
+```
+
+#### Enum `HorizonTemporel`
+
+| Case | Signification |
+|---|---|
+| `AVenir` | L'opération n'a pas encore commencé |
+| `EnCours` | L'opération est en cours |
+| `Terminee` | L'opération est terminée |
+
+#### Logique de calcul
+
+1. Si l'opération possède **au moins une Séance** : utiliser `min(date des séances)` comme début et `max(date des séances)` comme fin.
+2. Sinon, si `Operation.date_debut` et `Operation.date_fin` sont renseignées : les utiliser directement.
+3. Sinon : retourner `EnCours` (défaut conservatif — ne pas masquer des participations dont les dates sont inconnues).
+
+Les comparaisons utilisent `Carbon::today()` sans heure, sans timezone applicatif.
+
+### Téléchargement attestations à la demande
+
+Pattern : ownership check → service partagé → PDF inline.
+
+#### Routes portail
+
+```
+GET /portail/{slug}/attestations/seance/{seanceId}
+    └─ portail.attestations.seance  →  AttestationPortailController::seance()
+
+GET /portail/{slug}/attestations/participant/{participantId}/recap
+    └─ portail.attestations.recap   →  AttestationPortailController::recap()
+```
+
+#### Service partagé
+
+`App\Services\AttestationPresencePdfService` — extrait du contrôleur back-office existant et utilisé par les deux points d'entrée (back-office et portail). Aucune duplication de logique PDF.
+
+#### Règles d'ownership
+
+| Attestation | Condition de validation |
+|---|---|
+| Par séance | Le Tiers connecté doit avoir un `Participant` avec une `Presence` de statut `Present` sur la séance demandée |
+| Récapitulatif | Le `Participant` demandé doit appartenir au Tiers connecté (`participant.tiers_id === tiers.id`) |
+
+Violation → 403.
+
+#### Réponse HTTP
+
+PDF servi avec `Content-Disposition: inline` (ouverture en nouvel onglet).
+
+Noms de fichier :
+- Séance : `{slug-asso}-attestation-seance-{seance_id}.pdf`
+- Récap : `{slug-asso}-attestation-recap-{participant_id}.pdf`
+
+#### Logs structurés
+
+| Clé | Déclencheur |
+|---|---|
+| `portail.attestation.seance.telecharge` | `AttestationPortailController::seance()` |
+| `portail.attestation.recap.telecharge` | `AttestationPortailController::recap()` |
+
+### Téléchargement devis et factures à la demande
+
+Pattern : ownership check → helper modèle → PDF inline.
+
+#### Contrôleur
+
+`App\Http\Controllers\Portail\DocumentPortailController` expose deux méthodes :
+
+```php
+public function devis(Request $request): Response      // portail.documents.devis
+public function facture(Request $request): Response    // portail.documents.facture
+```
+
+#### Helpers modèle
+
+Deux helpers sur `App\Models\Participant` :
+
+```php
+public function devisProformaLePlusRecent(): ?DocumentPrevisionnel
+public function factureRattachee(): ?Facture
+```
+
+Le lien indirect pour `factureRattachee()` suit la chaîne :
+`Facture → FactureLigne → TransactionLigne → Transaction → Reglement → Participant`.
+
+#### Règles d'ownership
+
+- Devis : le `DocumentPrevisionnel` doit être lié à un `Participant` appartenant au Tiers connecté.
+- Facture : la `Facture` doit être liée (via la chaîne ci-dessus) à un `Participant` appartenant au Tiers connecté.
+
+Violation → 403.
+
+#### Réponse HTTP
+
+PDF servi avec `Content-Disposition: inline` (ouverture en nouvel onglet).
+
+#### Logs structurés
+
+| Clé | Déclencheur |
+|---|---|
+| `portail.devis.telecharge` | `DocumentPortailController::devis()` |
+| `portail.facture.telecharge` | `DocumentPortailController::facture()` |
+
+### Alerte dashboard « Action requise »
+
+Calculée dans `TableauDeBord::render()` à partir des `FormulaireToken` actifs liés au Tiers connecté.
+
+#### Critères d'affichage
+
+Un `FormulaireToken` génère une alerte si **toutes** les conditions suivantes sont réunies :
+- `expire_at >= today` (non expiré)
+- `rempli_at IS NULL` (non rempli)
+- L'opération liée est classée `AVenir` ou `EnCours` par `ClassificationTemporelle` (les questionnaires d'opérations terminées sont silencieux)
+
+#### Affichage
+
+- Max 3 alertes affichées dans la vue.
+- Si le nombre total dépasse 3 : mention « + X autres ».
+- Bouton « Ouvrir le questionnaire » → `route('formulaire.index', ['token' => $token->token])` en `target="_blank"`.
+
+### Vocabulaire portail (rappel)
+
+Le mot **« opération »** (insensible à la casse) ne doit **jamais** apparaître dans le rendu HTML public du portail.
+
+Termes autorisés côté UI :
+
+| Concept technique | Terme portail |
+|---|---|
+| `Operation` | « activité » |
+| `FormulaireToken` | « questionnaire » |
+| `TypeOperation.libelle` | nom métier de l'asso (« Parcours de soins », « Formation », etc.) |
+
+Le code interne conserve les noms de modèles `Operation` / `Participation` / `TypeOperation` — aucun renommage de modèle.
+
+**Test de non-régression** : `assertDontSee('opération', false)` dans `MesActivitesTest` (insensible à la casse, couvre aussi « Opération »).
