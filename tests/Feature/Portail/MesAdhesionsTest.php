@@ -9,7 +9,6 @@ use App\Models\Association;
 use App\Models\RecuFiscalEmis;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Support\PortailRoute;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;

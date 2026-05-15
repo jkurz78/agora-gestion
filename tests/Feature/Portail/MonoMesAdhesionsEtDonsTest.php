@@ -12,6 +12,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\RecuFiscalService;
 use App\Support\MonoAssociation;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
@@ -154,7 +155,7 @@ it('mode mono: GET /portail/recus/cotisation/{id} sert le PDF inline', function 
         'pdf_hash' => hash('sha256', $fakePdf),
     ]);
 
-    app()->bind(\App\Services\RecuFiscalService::class, fn () => new class($recu)
+    app()->bind(RecuFiscalService::class, fn () => new class($recu)
     {
         public function __construct(private readonly RecuFiscalEmis $existant) {}
 
@@ -222,7 +223,7 @@ it('mode mono: GET /portail/recus/fiscal/{id} sert le PDF inline', function () {
         'pdf_hash' => hash('sha256', $fakePdf),
     ]);
 
-    app()->bind(\App\Services\RecuFiscalService::class, fn () => new class($recu)
+    app()->bind(RecuFiscalService::class, fn () => new class($recu)
     {
         public function __construct(private readonly RecuFiscalEmis $existant) {}
 

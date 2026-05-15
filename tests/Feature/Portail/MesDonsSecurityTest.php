@@ -11,6 +11,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -161,7 +162,7 @@ it('[log] GET recus.fiscal éligible émet Log::info avec ligne_id et tiers_id',
         'pdf_hash' => hash('sha256', $fakePdf),
     ]);
 
-    app()->bind(\App\Services\RecuFiscalService::class, fn () => new class($recu)
+    app()->bind(RecuFiscalService::class, fn () => new class($recu)
     {
         public function __construct(private readonly RecuFiscalEmis $existant) {}
 

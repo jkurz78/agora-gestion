@@ -7,6 +7,7 @@ use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\RecuFiscalEmis;
 use App\Models\Tiers;
+use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -117,7 +118,7 @@ it('[log] GET recus.cotisation éligible émet Log::info avec adhesion_id et tie
     ]);
 
     // Stub du service pour éviter la vraie génération PDF
-    app()->bind(\App\Services\RecuFiscalService::class, fn () => new class($recu)
+    app()->bind(RecuFiscalService::class, fn () => new class($recu)
     {
         public function __construct(private readonly RecuFiscalEmis $existant) {}
 

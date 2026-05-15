@@ -26,19 +26,19 @@ afterEach(function () {
 function tdb_currentOp(Association $asso, TypeOperation $typeOp, string $nom = 'Stage photo'): Operation
 {
     $op = Operation::factory()->create([
-        'association_id'    => $asso->id,
+        'association_id' => $asso->id,
         'type_operation_id' => $typeOp->id,
-        'nom'               => $nom,
+        'nom' => $nom,
     ]);
     Seance::factory()->create([
         'association_id' => $asso->id,
-        'operation_id'   => $op->id,
-        'date'           => today()->subMonth(),
+        'operation_id' => $op->id,
+        'date' => today()->subMonth(),
     ]);
     Seance::factory()->create([
         'association_id' => $asso->id,
-        'operation_id'   => $op->id,
-        'date'           => today()->addMonth(),
+        'operation_id' => $op->id,
+        'date' => today()->addMonth(),
     ]);
 
     return $op;
@@ -47,14 +47,14 @@ function tdb_currentOp(Association $asso, TypeOperation $typeOp, string $nom = '
 function tdb_pastOp(Association $asso, TypeOperation $typeOp): Operation
 {
     $op = Operation::factory()->create([
-        'association_id'    => $asso->id,
+        'association_id' => $asso->id,
         'type_operation_id' => $typeOp->id,
-        'nom'               => 'Activité passée',
+        'nom' => 'Activité passée',
     ]);
     Seance::factory()->create([
         'association_id' => $asso->id,
-        'operation_id'   => $op->id,
-        'date'           => today()->subMonths(2),
+        'operation_id' => $op->id,
+        'date' => today()->subMonths(2),
     ]);
 
     return $op;
@@ -65,9 +65,9 @@ function tdb_makeToken(Association $asso, Participant $participant, string $toke
     return FormulaireToken::create([
         'association_id' => $asso->id,
         'participant_id' => $participant->id,
-        'token'          => $token,
-        'expire_at'      => today()->addDays(10),
-        'rempli_at'      => null,
+        'token' => $token,
+        'expire_at' => today()->addDays(10),
+        'rempli_at' => null,
     ]);
 }
 
@@ -75,12 +75,12 @@ function tdb_makeToken(Association $asso, Participant $participant, string $toke
 // Cas 1 : 1 token actif sur participation En cours → alerte visible
 // ─────────────────────────────────────────────────────────────────────────────
 it('affiche une alerte Action requise pour un token actif sur opération en cours', function () {
-    $asso  = Association::factory()->create();
+    $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
     $typeOp = TypeOperation::factory()->create([
         'association_id' => $asso->id,
-        'nom'            => 'Formation',
+        'nom' => 'Formation',
     ]);
     $op = tdb_currentOp($asso, $typeOp, 'Stage photo');
 
@@ -89,8 +89,8 @@ it('affiche une alerte Action requise pour un token actif sur opération en cour
 
     $participant = Participant::factory()->create([
         'association_id' => $asso->id,
-        'tiers_id'       => $tiers->id,
-        'operation_id'   => $op->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $op->id,
     ]);
     tdb_makeToken($asso, $participant, 'TDB1-AAAA');
 
@@ -107,19 +107,19 @@ it('affiche une alerte Action requise pour un token actif sur opération en cour
 // Cas 2 : Token sur opération Terminée → AUCUNE alerte
 // ─────────────────────────────────────────────────────────────────────────────
 it('ne montre pas d\'alerte pour un token sur opération terminée', function () {
-    $asso  = Association::factory()->create();
+    $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
     $typeOp = TypeOperation::factory()->create(['association_id' => $asso->id]);
-    $op     = tdb_pastOp($asso, $typeOp);
+    $op = tdb_pastOp($asso, $typeOp);
 
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
     $participant = Participant::factory()->create([
         'association_id' => $asso->id,
-        'tiers_id'       => $tiers->id,
-        'operation_id'   => $op->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $op->id,
     ]);
     tdb_makeToken($asso, $participant, 'TDB2-PAST');
 
@@ -132,19 +132,19 @@ it('ne montre pas d\'alerte pour un token sur opération terminée', function ()
 // Cas 3 : 5 tokens actifs → 3 alertes + mention "+ 2 autre(s)"
 // ─────────────────────────────────────────────────────────────────────────────
 it('limite les alertes à 3 et affiche le compteur du surplus', function () {
-    $asso  = Association::factory()->create();
+    $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
     $typeOp = TypeOperation::factory()->create(['association_id' => $asso->id, 'nom' => 'Atelier']);
-    $tiers  = Tiers::factory()->create(['association_id' => $asso->id]);
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
     for ($i = 1; $i <= 5; $i++) {
         $op = tdb_currentOp($asso, $typeOp, "Activité {$i}");
-        $p  = Participant::factory()->create([
+        $p = Participant::factory()->create([
             'association_id' => $asso->id,
-            'tiers_id'       => $tiers->id,
-            'operation_id'   => $op->id,
+            'tiers_id' => $tiers->id,
+            'operation_id' => $op->id,
         ]);
         tdb_makeToken($asso, $p, "TDB3-{$i}000");
     }
@@ -159,7 +159,7 @@ it('limite les alertes à 3 et affiche le compteur du surplus', function () {
 // Cas 4 : Aucun token actif → pas d'alerte
 // ─────────────────────────────────────────────────────────────────────────────
 it('n\'affiche pas d\'alerte quand il n\'y a aucun token actif', function () {
-    $asso  = Association::factory()->create();
+    $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
