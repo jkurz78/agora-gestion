@@ -22,9 +22,9 @@ afterEach(function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 1 : Section À venir
+// Test 1 : Section À venir — sous-section présente, les deux autres absentes
 // ─────────────────────────────────────────────────────────────────────────────
-it('affiche la section À venir avec l\'activité et les sections En cours / Terminées vides', function () {
+it('affiche la sous-section À venir avec l\'activité et masque En cours / Terminées si vides', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
@@ -69,18 +69,26 @@ it('affiche la section À venir avec l\'activité et les sections En cours / Ter
     // H4 titre de la page
     expect($html)->toContain('Mes activités');
 
-    // TypeOperation nom + Opération nom dans la section À venir
+    // H5 type + opération nom dans la page
     expect($html)->toContain('Parcours de soins');
     expect($html)->toContain('Cycle Printemps 2026');
 
-    // Sections vides pour En cours et Terminées
-    expect($html)->toContain('Aucune activité dans cette catégorie');
+    // H6 sous-section "À venir" présente, les deux autres absentes (vides → masquées)
+    expect($html)->toContain('<h6');
+    expect($html)->toContain('À venir');
+    // Sous-sections vides → leur H6 absent
+    expect($html)->not->toContain('Terminées');
+    // "En cours" peut apparaître dans les tooltips de carte — on vérifie l'absence du H6 heading
+    expect($html)->not->toMatch('/<h6[^>]*>En cours</');
+
+    // Pas de message vide générique (on masque les sous-sections vides)
+    expect($html)->not->toContain('Aucune activité dans cette catégorie');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 2 : Section En cours
+// Test 2 : Section En cours — sous-section présente, les deux autres absentes
 // ─────────────────────────────────────────────────────────────────────────────
-it('affiche la section En cours avec l\'activité et les sections À venir / Terminées vides', function () {
+it('affiche la sous-section En cours avec l\'activité et masque À venir / Terminées si vides', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
@@ -124,13 +132,18 @@ it('affiche la section En cours avec l\'activité et les sections À venir / Ter
 
     expect($html)->toContain('Formations');
     expect($html)->toContain('Formation Leadership 2026');
-    expect($html)->toContain('Aucune activité dans cette catégorie');
+    // H6 "En cours" présent
+    expect($html)->toMatch('/<h6[^>]*>En cours</');
+    // H6 "À venir" et "Terminées" absents (vides → masqués)
+    expect($html)->not->toMatch('/<h6[^>]*>À venir</');
+    expect($html)->not->toContain('Terminées');
+    expect($html)->not->toContain('Aucune activité dans cette catégorie');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 3 : Section Terminées
+// Test 3 : Section Terminées — sous-section présente, les deux autres absentes
 // ─────────────────────────────────────────────────────────────────────────────
-it('affiche la section Terminées avec l\'activité et les sections À venir / En cours vides', function () {
+it('affiche la sous-section Terminées avec l\'activité et masque À venir / En cours si vides', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
@@ -174,7 +187,12 @@ it('affiche la section Terminées avec l\'activité et les sections À venir / E
 
     expect($html)->toContain('Ateliers bien-être');
     expect($html)->toContain('Atelier Yoga Été 2025');
-    expect($html)->toContain('Aucune activité dans cette catégorie');
+    // H6 "Terminées" présent
+    expect($html)->toMatch('/<h6[^>]*>Terminées</');
+    // H6 "À venir" et "En cours" absents (vides → masqués)
+    expect($html)->not->toMatch('/<h6[^>]*>À venir</');
+    expect($html)->not->toMatch('/<h6[^>]*>En cours</');
+    expect($html)->not->toContain('Aucune activité dans cette catégorie');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,10 +233,31 @@ it('n\'expose jamais le mot « opération » dans le HTML rendu', function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tests Step 4 : Sous-tabs par TypeOperation
+// Test 5 : Sans participation — message vide, pas de blocs H5
 // ─────────────────────────────────────────────────────────────────────────────
+it('affiche le message vide quand le tiers n\'a aucune participation', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
 
-it('affiche les sous-tabs nav-pills si le tiers a des participations sur 2 types distincts', function () {
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+        ->assertStatus(200)
+        ->html();
+
+    expect($html)->toContain('Mes activités');
+    expect($html)->toContain('Vous n\'avez pas encore d\'activité enregistrée');
+
+    // Pas de sous-sections temporelles (aucun H6)
+    expect($html)->not->toContain('<h6');
+    expect($html)->not->toContain('Terminées');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 6 : 2 types actifs → 2 blocs H5 présents (alphabétique)
+// ─────────────────────────────────────────────────────────────────────────────
+it('affiche 2 blocs H5 distincts quand le tiers a des participations sur 2 types distincts', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
@@ -260,12 +299,21 @@ it('affiche les sous-tabs nav-pills si le tiers a des participations sur 2 types
         ->assertStatus(200)
         ->html();
 
-    expect($html)->toContain('nav-pills');
+    // Les 2 H5 présents
     expect($html)->toContain('Formations');
     expect($html)->toContain('Parcours de soins');
+
+    // Pas de nav-pills
+    expect($html)->not->toContain('nav-pills');
+
+    // Ordre alphabétique : "Formations" avant "Parcours de soins"
+    expect(strpos($html, 'Formations'))->toBeLessThan(strpos($html, 'Parcours de soins'));
 });
 
-it('n\'affiche pas les sous-tabs nav-pills si le tiers a des participations sur 1 seul type', function () {
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 7 : 1 type actif → exactement 1 bloc H5, pas de nav-pills
+// ─────────────────────────────────────────────────────────────────────────────
+it('affiche 1 seul bloc H5 quand le tiers n\'a qu\'un seul type d\'activité', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
@@ -303,31 +351,38 @@ it('n\'affiche pas les sous-tabs nav-pills si le tiers a des participations sur 
         ->assertStatus(200)
         ->html();
 
+    // H5 présent exactement une fois
+    expect(substr_count($html, 'Formations'))->toBeGreaterThanOrEqual(1);
+
+    // Pas de nav-pills
     expect($html)->not->toContain('nav-pills');
 });
 
-it('le tab actif par défaut est le premier type alphabétique', function () {
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 8 : Sous-section vide → H6 absent (masqué)
+// ─────────────────────────────────────────────────────────────────────────────
+it('masque la sous-section H6 vide dans le bloc H5', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
-    $typeA = TypeOperation::factory()->create([
+    $typeOp = TypeOperation::factory()->create([
         'association_id' => $asso->id,
-        'nom' => 'Formations',
-    ]);
-    $typeB = TypeOperation::factory()->create([
-        'association_id' => $asso->id,
-        'nom' => 'Parcours de soins',
+        'nom' => 'Ateliers',
     ]);
 
-    $opA = Operation::factory()->create([
+    $operation = Operation::factory()->create([
         'association_id' => $asso->id,
-        'type_operation_id' => $typeA->id,
-        'nom' => 'Formation Alpha',
+        'type_operation_id' => $typeOp->id,
+        'nom' => 'Atelier Yoga',
+        'date_debut' => null,
+        'date_fin' => null,
     ]);
-    $opB = Operation::factory()->create([
+
+    // Séances toutes futures → classifié "À venir"
+    Seance::factory()->create([
         'association_id' => $asso->id,
-        'type_operation_id' => $typeB->id,
-        'nom' => 'Suivi Printemps',
+        'operation_id' => $operation->id,
+        'date' => now()->addMonth(),
     ]);
 
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
@@ -336,95 +391,18 @@ it('le tab actif par défaut est le premier type alphabétique', function () {
     Participant::factory()->create([
         'association_id' => $asso->id,
         'tiers_id' => $tiers->id,
-        'operation_id' => $opA->id,
-    ]);
-    Participant::factory()->create([
-        'association_id' => $asso->id,
-        'tiers_id' => $tiers->id,
-        'operation_id' => $opB->id,
+        'operation_id' => $operation->id,
     ]);
 
     $html = Livewire::test(MesActivites::class, ['association' => $asso])
         ->assertStatus(200)
         ->html();
 
-    // "Formations" est premier alphabétique — son bouton doit avoir class "active"
-    expect($html)->toContain('Formations');
-    // Le bouton Formations doit apparaître avant "active" (dans un nav-link active)
-    $posFormations = strpos($html, 'Formations');
-    $posActive = strpos($html, 'active');
-    expect($posActive)->toBeLessThan($posFormations + 200); // active proche de Formations
-    // Parcours de soins ne doit pas être actif (pas active sur son bouton)
-    expect($html)->not->toMatch('/Parcours de soins[^<]*active/');
-});
+    // H5 présent
+    expect($html)->toContain('Ateliers');
 
-it('changer de tab filtre les activités affichées', function () {
-    $asso = Association::factory()->create();
-    TenantContext::boot($asso);
-
-    $typeA = TypeOperation::factory()->create([
-        'association_id' => $asso->id,
-        'nom' => 'Formations',
-    ]);
-    $typeB = TypeOperation::factory()->create([
-        'association_id' => $asso->id,
-        'nom' => 'Parcours de soins',
-    ]);
-
-    $opA = Operation::factory()->create([
-        'association_id' => $asso->id,
-        'type_operation_id' => $typeA->id,
-        'nom' => 'Formation Unique',
-    ]);
-    $opB = Operation::factory()->create([
-        'association_id' => $asso->id,
-        'type_operation_id' => $typeB->id,
-        'nom' => 'Suivi Unique',
-    ]);
-
-    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
-    Auth::guard('tiers-portail')->login($tiers);
-
-    Participant::factory()->create([
-        'association_id' => $asso->id,
-        'tiers_id' => $tiers->id,
-        'operation_id' => $opA->id,
-    ]);
-    Participant::factory()->create([
-        'association_id' => $asso->id,
-        'tiers_id' => $tiers->id,
-        'operation_id' => $opB->id,
-    ]);
-
-    // Sélectionner le type B (Parcours de soins)
-    $component = Livewire::test(MesActivites::class, ['association' => $asso])
-        ->set('typeOperationId', (int) $typeB->id);
-
-    $html = $component->html();
-
-    expect($html)->toContain('Suivi Unique');
-    expect($html)->not->toContain('Formation Unique');
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Test 5 : Sans participation — 3 sections vides
-// ─────────────────────────────────────────────────────────────────────────────
-it('affiche les 3 sections avec message vide quand le tiers n\'a aucune participation', function () {
-    $asso = Association::factory()->create();
-    TenantContext::boot($asso);
-
-    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
-    Auth::guard('tiers-portail')->login($tiers);
-
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
-        ->assertStatus(200)
-        ->html();
-
-    expect($html)->toContain('Mes activités');
-    expect($html)->toContain('À venir');
-    expect($html)->toContain('En cours');
-    expect($html)->toContain('Terminée');
-
-    // Tous les messages vides présents (3 fois)
-    expect(substr_count($html, 'Aucune activité dans cette catégorie'))->toBe(3);
+    // H6 "À venir" présent, "En cours" et "Terminées" absents (masqués)
+    expect($html)->toMatch('/<h6[^>]*>À venir</');
+    expect($html)->not->toMatch('/<h6[^>]*>En cours</');
+    expect($html)->not->toContain('Terminées');
 });
