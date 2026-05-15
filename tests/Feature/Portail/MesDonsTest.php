@@ -12,13 +12,10 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 beforeEach(function () {
     TenantContext::clear();
@@ -168,9 +165,9 @@ it('cache le CTA Nouveau don si url_nouveau_don et url_site_web sont null', func
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 5 : Bouton reçu — déjà émis (stream PDF, pas de nouveau reçu créé)
+// Test 5 : Bouton reçu — déjà émis (href vers route, pas wire:click)
 // ─────────────────────────────────────────────────────────────────────────────
-it('bouton reçu visible si reçu déjà émis et clic stream le PDF sans créer un nouveau reçu', function () {
+it('bouton reçu visible si reçu déjà émis — href vers recus.fiscal sans wire:click', function () {
     $asso = Association::factory()->create([
         'eligible_recu_fiscal' => true,
         'signataire_nom' => 'Jean Test',
@@ -194,7 +191,7 @@ it('bouton reçu visible si reçu déjà émis et clic stream le PDF sans créer
     $pdfPath = "recus_fiscaux/2025/test-{$ligne->id}.pdf";
     Storage::disk('local')->put("associations/{$asso->id}/{$pdfPath}", $fakePdfContent);
 
-    $recu = RecuFiscalEmis::factory()->create([
+    RecuFiscalEmis::factory()->create([
         'association_id' => $asso->id,
         'tiers_id' => $tiers->id,
         'transaction_ligne_id' => $ligne->id,
@@ -202,44 +199,20 @@ it('bouton reçu visible si reçu déjà émis et clic stream le PDF sans créer
         'pdf_hash' => hash('sha256', $fakePdfContent),
     ]);
 
-    // Le bouton doit être visible
     $html = Livewire::test(MesDons::class, ['association' => $asso])->html();
-    expect($html)->toContain('Télécharger le reçu');
 
-    $countBefore = RecuFiscalEmis::count();
-
-    $capturedRecu = $recu;
-    app()->bind(RecuFiscalService::class, fn () => new class($capturedRecu)
-    {
-        public function __construct(private readonly RecuFiscalEmis $existant) {}
-
-        public function obtenirOuGenerer(TransactionLigne $ligne, mixed $user = null): RecuFiscalEmis
-        {
-            return $this->existant;
-        }
-
-        public function streamPdf(RecuFiscalEmis $recu): Response
-        {
-            return response('%PDF-1.4 fake', 200, ['Content-Type' => 'application/pdf']);
-        }
-
-        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
-        {
-            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
-        }
-    });
-
-    Livewire::test(MesDons::class, ['association' => $asso])
-        ->call('telechargerRecuFiscal', $ligne->id);
-
-    // Pas de nouveau reçu créé
-    expect(RecuFiscalEmis::count())->toBe($countBefore);
+    // Le bouton est désormais un lien <a> vers la route HTTP
+    expect($html)->toContain('Voir le reçu');
+    expect($html)->toContain('recus/fiscal/'.$ligne->id);
+    expect($html)->toContain('target="_blank"');
+    // Pas de wire:click résiduel
+    expect($html)->not->toContain('wire:click="telechargerRecuFiscal');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 6 : Bouton reçu — génération à la demande
+// Test 6 : Bouton reçu — éligible sans reçu existant — href présent
 // ─────────────────────────────────────────────────────────────────────────────
-it('éligible sans reçu existant — clic génère via le service', function () {
+it('éligible sans reçu existant — href vers route recus.fiscal présent', function () {
     $asso = Association::factory()->create([
         'eligible_recu_fiscal' => true,
         'signataire_nom' => 'Jean Test',
@@ -258,35 +231,10 @@ it('éligible sans reçu existant — clic génère via le service', function ()
     $sousCat = makeSousCatDon($asso);
     $ligne = makeDonLigne($asso, $tiers, $sousCat, '2025-04-01', 75.0);
 
-    $fakeRecu = RecuFiscalEmis::factory()->make(['id' => 999, 'association_id' => $asso->id]);
-    $countBefore = RecuFiscalEmis::count();
+    $html = Livewire::test(MesDons::class, ['association' => $asso])->html();
 
-    app()->bind(RecuFiscalService::class, fn () => new class($fakeRecu)
-    {
-        public function __construct(private readonly RecuFiscalEmis $fakeRecu) {}
-
-        public function obtenirOuGenerer(TransactionLigne $ligne, mixed $user = null): RecuFiscalEmis
-        {
-            return $this->fakeRecu;
-        }
-
-        public function streamPdf(RecuFiscalEmis $recu): Response
-        {
-            return response('%PDF-fake', 200, ['Content-Type' => 'application/pdf']);
-        }
-
-        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
-        {
-            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
-        }
-    });
-
-    Livewire::test(MesDons::class, ['association' => $asso])
-        ->call('telechargerRecuFiscal', $ligne->id)
-        ->assertOk();
-
-    // Le stub ne crée pas de RecuFiscalEmis en base — on vérifie stabilité
-    expect(RecuFiscalEmis::count())->toBe($countBefore);
+    expect($html)->toContain('Voir le reçu');
+    expect($html)->toContain('recus/fiscal/'.$ligne->id);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -311,5 +259,6 @@ it('cache tous les boutons reçu si eligible_recu_fiscal est false', function ()
 
     $html = Livewire::test(MesDons::class, ['association' => $asso])->html();
 
-    expect($html)->not->toContain('Télécharger le reçu');
+    expect($html)->not->toContain('Voir le reçu');
+    expect($html)->not->toContain('recus/fiscal');
 });

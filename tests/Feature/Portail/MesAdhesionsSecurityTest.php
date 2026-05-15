@@ -2,28 +2,25 @@
 
 declare(strict_types=1);
 
-use App\Livewire\Portail\MesAdhesions;
+use App\Http\Controllers\Portail\RecuPortailController;
 use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\RecuFiscalEmis;
 use App\Models\Tiers;
-use App\Models\User;
-use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Livewire\Livewire;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Dossier d'intrusion — Portail Tiers Slice 2 (Mes adhésions).
  *
- * Trois scénarios critiques :
- *   10. Intrusion intra-asso : Alice ne peut pas télécharger le reçu de Bob (403).
- *   11. Intrusion cross-tenant : TenantScope bloque find() → null → 404.
- *   12. Logger : téléchargement éligible émet Log::info avec adhesion_id + tiers_id.
+ * Les tests d'intrusion passent désormais par les routes HTTP
+ * (RecuPortailController) au lieu des actions Livewire supprimées.
+ *
+ *   10. Intrusion intra-asso : Alice ne peut pas voir le reçu de Bob (403).
+ *   11. Intrusion cross-tenant : TenantScope bloque le binding → 404.
+ *   12. Logger : GET éligible émet Log::info avec adhesion_id + tiers_id.
  */
 beforeEach(function () {
     TenantContext::clear();
@@ -35,9 +32,9 @@ afterEach(function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 10 : Intrusion intra-asso — Alice ne peut pas télécharger le reçu de Bob
+// Test 10 : Intrusion intra-asso — Alice ne peut pas voir le reçu de Bob
 // ─────────────────────────────────────────────────────────────────────────────
-it('[intrusion] Alice 403 quand elle appelle telechargerRecuCotisation avec l\'adhesion de Bob', function () {
+it('[intrusion] Alice 403 sur GET recus.cotisation avec l\'adhésion de Bob', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
@@ -50,18 +47,16 @@ it('[intrusion] Alice 403 quand elle appelle telechargerRecuCotisation avec l\'a
     ]);
 
     Auth::guard('tiers-portail')->login($alice);
+    session(['portail.last_activity_at' => now()->timestamp]);
 
-    $result = Livewire::test(MesAdhesions::class, ['association' => $asso])
-        ->call('telechargerRecuCotisation', $bobAdhesion->id);
-
-    // Livewire traduit abort(403) en une erreur 403 sur le composant
-    $result->assertForbidden();
+    $url = route('portail.recus.cotisation', ['association' => $asso->slug, 'adhesion' => $bobAdhesion->id]);
+    $this->get($url)->assertForbidden();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 11 : Intrusion cross-tenant — adhesion asso B invisible depuis asso A
 // ─────────────────────────────────────────────────────────────────────────────
-it('[intrusion] find() retourne null pour une adhesion d\'un autre tenant → 404', function () {
+it('[intrusion] find() retourne 404 pour une adhesion d\'un autre tenant via route binding', function () {
     $assoA = Association::factory()->create();
     $assoB = Association::factory()->create();
 
@@ -76,55 +71,66 @@ it('[intrusion] find() retourne null pour une adhesion d\'un autre tenant → 40
     TenantContext::boot($assoA);
     $alice = Tiers::factory()->create(['association_id' => $assoA->id]);
     Auth::guard('tiers-portail')->login($alice);
+    session(['portail.last_activity_at' => now()->timestamp]);
 
-    $result = Livewire::test(MesAdhesions::class, ['association' => $assoA])
-        ->call('telechargerRecuCotisation', $adhesionB->id);
-
-    // TenantScope fail-closed : Adhesion::find() retourne null → abort(404)
-    $result->assertNotFound();
+    // TenantScope fail-closed : binding Adhesion filtre cross-tenant → 404
+    $url = route('portail.recus.cotisation', ['association' => $assoA->slug, 'adhesion' => $adhesionB->id]);
+    $this->get($url)->assertNotFound();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 12 : Logger — appel éligible émet l'event de log attendu
+// Test 12 : Logger — GET éligible émet l'event de log attendu
 // ─────────────────────────────────────────────────────────────────────────────
-it('[log] telechargerRecuCotisation émet Log::info avec adhesion_id et tiers_id', function () {
-    $asso = Association::factory()->create(['eligible_recu_fiscal' => true]);
+it('[log] GET recus.cotisation éligible émet Log::info avec adhesion_id et tiers_id', function () {
+    $asso = Association::factory()->create([
+        'eligible_recu_fiscal' => true,
+        'signataire_nom' => 'Jean Test',
+        'signataire_qualite' => 'Président',
+    ]);
     TenantContext::boot($asso);
 
-    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    $tiers = Tiers::factory()->create([
+        'association_id' => $asso->id,
+        'adresse_ligne1' => '1 rue test',
+        'code_postal' => '75001',
+        'ville' => 'Paris',
+    ]);
     Auth::guard('tiers-portail')->login($tiers);
+    session(['portail.last_activity_at' => now()->timestamp]);
 
     $adhesion = Adhesion::factory()->create([
         'association_id' => $asso->id,
         'tiers_id' => $tiers->id,
     ]);
 
-    // Stub du service (final class → liaison container remplacée)
-    $fakeRecu = new RecuFiscalEmis(['id' => 1]);
-    app()->bind(RecuFiscalService::class, fn () => new class($fakeRecu)
+    // Créer un faux PDF dans le storage pour que le controller puisse le lire
+    $fakePdf = '%PDF-1.4 fake log test';
+    $pdfPath = "recus_fiscaux/2025/test-{$adhesion->id}.pdf";
+    Storage::disk('local')->put("associations/{$asso->id}/{$pdfPath}", $fakePdf);
+
+    $recu = RecuFiscalEmis::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => null,
+        'pdf_path' => $pdfPath,
+        'pdf_hash' => hash('sha256', $fakePdf),
+    ]);
+
+    // Stub du service pour éviter la vraie génération PDF
+    app()->bind(\App\Services\RecuFiscalService::class, fn () => new class($recu)
     {
-        public function __construct(private readonly RecuFiscalEmis $fakeRecu) {}
+        public function __construct(private readonly RecuFiscalEmis $existant) {}
 
-        public function obtenirOuGenererPourAdhesion(Adhesion $adhesion, ?User $user = null): RecuFiscalEmis
+        public function obtenirOuGenererPourAdhesion(Adhesion $adhesion, mixed $user = null): RecuFiscalEmis
         {
-            return $this->fakeRecu;
-        }
-
-        public function streamPdf(RecuFiscalEmis $recu): Response
-        {
-            return response('%PDF-fake', 200, ['Content-Type' => 'application/pdf']);
-        }
-
-        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
-        {
-            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
+            return $this->existant;
         }
     });
 
     Log::spy();
 
-    Livewire::test(MesAdhesions::class, ['association' => $asso])
-        ->call('telechargerRecuCotisation', $adhesion->id);
+    $url = route('portail.recus.cotisation', ['association' => $asso->slug, 'adhesion' => $adhesion->id]);
+    $this->get($url)->assertStatus(200);
 
     Log::shouldHaveReceived('info')
         ->once()

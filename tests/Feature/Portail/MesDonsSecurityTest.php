@@ -5,29 +5,26 @@ declare(strict_types=1);
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
-use App\Livewire\Portail\MesDons;
 use App\Models\Association;
 use App\Models\RecuFiscalEmis;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
-use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Livewire\Livewire;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Dossier d'intrusion — Portail Tiers Slice 2 (Mes dons).
  *
- * Trois scénarios critiques :
- *   8. Intrusion intra-asso : Alice ne peut pas télécharger le reçu de Bob (403).
- *   9. Intrusion cross-tenant : TenantScope filtre la ligne de l'asso B → 403.
- *  10. Logger : téléchargement éligible émet Log::info avec ligne_id + tiers_id.
+ * Les tests d'intrusion passent désormais par les routes HTTP
+ * (RecuPortailController) au lieu des actions Livewire supprimées.
+ *
+ *   8. Intrusion intra-asso : Alice ne peut pas voir le reçu de Bob (403).
+ *   9. Intrusion cross-tenant : TiensDonsTimelineService filtre → 403.
+ *  10. Logger : GET éligible émet Log::info avec ligne_id + tiers_id.
  */
 beforeEach(function () {
     TenantContext::clear();
@@ -38,7 +35,7 @@ afterEach(function () {
     TenantContext::clear();
 });
 
-function makeEligibleDonLigne(Association $asso, Tiers $tiers, string $date = '2025-06-01'): TransactionLigne
+function makeEligibleDonLigneHttp(Association $asso, Tiers $tiers, string $date = '2025-06-01'): TransactionLigne
 {
     $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
     $sousCat->usages()->create(['usage' => UsageComptable::Don->value]);
@@ -59,9 +56,9 @@ function makeEligibleDonLigne(Association $asso, Tiers $tiers, string $date = '2
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 8 : Intrusion intra-asso — Alice ne peut pas télécharger le reçu de Bob
+// Test 8 : Intrusion intra-asso — Alice ne peut pas voir le reçu de Bob
 // ─────────────────────────────────────────────────────────────────────────────
-it('[intrusion] Alice 403 quand elle appelle telechargerRecuFiscal avec la ligne de Bob', function () {
+it('[intrusion] Alice 403 GET recus.fiscal avec la ligne de Bob', function () {
     $asso = Association::factory()->create([
         'eligible_recu_fiscal' => true,
         'signataire_nom' => 'Jean Test',
@@ -78,15 +75,14 @@ it('[intrusion] Alice 403 quand elle appelle telechargerRecuFiscal avec la ligne
         'ville' => 'Paris',
     ]);
 
-    $bobLigne = makeEligibleDonLigne($asso, $bob);
+    $bobLigne = makeEligibleDonLigneHttp($asso, $bob);
 
     Auth::guard('tiers-portail')->login($alice);
-
-    $result = Livewire::test(MesDons::class, ['association' => $asso])
-        ->call('telechargerRecuFiscal', $bobLigne->id);
+    session(['portail.last_activity_at' => now()->timestamp]);
 
     // forTiers($alice) ne retournera pas la ligne de Bob → abort_unless → 403
-    $result->assertForbidden();
+    $url = route('portail.recus.fiscal', ['association' => $asso->slug, 'ligne' => $bobLigne->id]);
+    $this->get($url)->assertForbidden();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,7 +108,7 @@ it('[intrusion] cross-tenant 403 — TenantScope filtre la ligne d\'un autre ten
         'code_postal' => '69001',
         'ville' => 'Lyon',
     ]);
-    $ligneB = makeEligibleDonLigne($assoB, $tiersB);
+    $ligneB = makeEligibleDonLigneHttp($assoB, $tiersB);
 
     // Alice se connecte sur portail asso A
     TenantContext::boot($assoA);
@@ -123,18 +119,17 @@ it('[intrusion] cross-tenant 403 — TenantScope filtre la ligne d\'un autre ten
         'ville' => 'Paris',
     ]);
     Auth::guard('tiers-portail')->login($alice);
+    session(['portail.last_activity_at' => now()->timestamp]);
 
-    $result = Livewire::test(MesDons::class, ['association' => $assoA])
-        ->call('telechargerRecuFiscal', $ligneB->id);
-
-    // TenantScope fail-closed : forTiers($alice, assoA) ne retourne pas ligneB → 403
-    $result->assertForbidden();
+    // Garde cross-tenant dans controller (association_id check) + forTiers filtre → 403
+    $url = route('portail.recus.fiscal', ['association' => $assoA->slug, 'ligne' => $ligneB->id]);
+    $this->get($url)->assertForbidden();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 10 : Logger — appel éligible émet l'event de log attendu
+// Test 10 : Logger — GET éligible émet l'event de log attendu
 // ─────────────────────────────────────────────────────────────────────────────
-it('[log] telechargerRecuFiscal émet Log::info avec ligne_id et tiers_id', function () {
+it('[log] GET recus.fiscal éligible émet Log::info avec ligne_id et tiers_id', function () {
     $asso = Association::factory()->create([
         'eligible_recu_fiscal' => true,
         'signataire_nom' => 'Jean Test',
@@ -149,34 +144,37 @@ it('[log] telechargerRecuFiscal émet Log::info avec ligne_id et tiers_id', func
         'ville' => 'Paris',
     ]);
     Auth::guard('tiers-portail')->login($tiers);
+    session(['portail.last_activity_at' => now()->timestamp]);
 
-    $ligne = makeEligibleDonLigne($asso, $tiers);
+    $ligne = makeEligibleDonLigneHttp($asso, $tiers);
 
-    $fakeRecu = new RecuFiscalEmis(['id' => 1]);
-    app()->bind(RecuFiscalService::class, fn () => new class($fakeRecu)
+    // Créer un faux PDF dans le storage
+    $fakePdf = '%PDF-1.4 fake log test';
+    $pdfPath = "recus_fiscaux/2025/test-{$ligne->id}.pdf";
+    Storage::disk('local')->put("associations/{$asso->id}/{$pdfPath}", $fakePdf);
+
+    $recu = RecuFiscalEmis::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'transaction_ligne_id' => $ligne->id,
+        'pdf_path' => $pdfPath,
+        'pdf_hash' => hash('sha256', $fakePdf),
+    ]);
+
+    app()->bind(\App\Services\RecuFiscalService::class, fn () => new class($recu)
     {
-        public function __construct(private readonly RecuFiscalEmis $fakeRecu) {}
+        public function __construct(private readonly RecuFiscalEmis $existant) {}
 
         public function obtenirOuGenerer(TransactionLigne $l, mixed $user = null): RecuFiscalEmis
         {
-            return $this->fakeRecu;
-        }
-
-        public function streamPdf(RecuFiscalEmis $recu): Response
-        {
-            return response('%PDF-fake', 200, ['Content-Type' => 'application/pdf']);
-        }
-
-        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
-        {
-            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
+            return $this->existant;
         }
     });
 
     Log::spy();
 
-    Livewire::test(MesDons::class, ['association' => $asso])
-        ->call('telechargerRecuFiscal', $ligne->id);
+    $url = route('portail.recus.fiscal', ['association' => $asso->slug, 'ligne' => $ligne->id]);
+    $this->get($url)->assertStatus(200);
 
     Log::shouldHaveReceived('info')
         ->once()

@@ -16,6 +16,7 @@ use App\Http\Controllers\Portail\DemoLoginAsTierController;
 use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
+use App\Http\Controllers\Portail\RecuPortailController;
 use App\Http\Controllers\Portail\TransactionPdfController;
 use App\Http\Middleware\MonoAssociationResolver;
 use App\Http\Middleware\Portail\Authenticate;
@@ -54,6 +55,8 @@ Route::prefix('portail')
             Route::get('/mon-profil', MonProfil::class)->name('mon-profil');
             Route::get('/mes-adhesions', MesAdhesions::class)->name('mes-adhesions');
             Route::get('/mes-dons', MesDons::class)->name('mes-dons');
+            Route::get('/recus/cotisation/{adhesion}', [RecuPortailController::class, 'cotisation'])->name('recus.cotisation');
+            Route::get('/recus/fiscal/{ligne}', [RecuPortailController::class, 'fiscalDon'])->name('recus.fiscal');
             Route::post('/logout', LogoutController::class)->name('logout');
 
             Route::prefix('notes-de-frais')->middleware(EnsurePeutVoirNotesDeFrais::class)->name('ndf.')->group(function (): void {

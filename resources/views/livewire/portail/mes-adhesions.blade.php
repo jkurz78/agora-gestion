@@ -55,13 +55,11 @@
                             <td>{{ $dto->libelleType() }}</td>
                             <td>
                                 @if ($dto->peutEmettreRecu($portailAssociation) || $dto->recuFiscalActif() !== null)
-                                    <button
-                                        wire:click="telechargerRecuCotisation({{ $dto->adhesion->id }})"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        wire:loading.attr="disabled"
-                                    >
-                                        <i class="bi bi-download"></i> Télécharger le reçu
-                                    </button>
+                                    <a href="{{ \App\Support\PortailRoute::to('recus.cotisation', $portailAssociation, ['adhesion' => $dto->adhesion->id]) }}"
+                                       target="_blank" rel="noopener"
+                                       class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-file-earmark-pdf"></i> Voir le reçu
+                                    </a>
                                 @endif
                             </td>
                         </tr>

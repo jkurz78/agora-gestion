@@ -9,14 +9,11 @@ use App\Models\Association;
 use App\Models\RecuFiscalEmis;
 use App\Models\Tiers;
 use App\Models\Transaction;
-use App\Models\User;
-use App\Services\RecuFiscalService;
+use App\Support\PortailRoute;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 beforeEach(function () {
     TenantContext::clear();
@@ -138,9 +135,9 @@ it('cache le CTA Renouveler si url_renouvellement_adhesion et url_site_web sont 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 5 : Bouton reçu — déjà émis (stream PDF, pas de nouveau reçu créé)
+// Test 5 : Bouton reçu — déjà émis (href vers route, pas wire:click)
 // ─────────────────────────────────────────────────────────────────────────────
-it('bouton reçu visible si reçu déjà émis et clic stream le PDF sans créer un nouveau reçu', function () {
+it('bouton reçu visible si reçu déjà émis — href vers recus.cotisation sans wire:click', function () {
     $asso = Association::factory()->create(['eligible_recu_fiscal' => true]);
     TenantContext::boot($asso);
 
@@ -152,18 +149,19 @@ it('bouton reçu visible si reçu déjà émis et clic stream le PDF sans créer
     ]);
     Auth::guard('tiers-portail')->login($tiers);
 
-    $transaction = Transaction::factory()->create(['statut_reglement' => StatutReglement::Recu,
+    $transaction = Transaction::factory()->create([
+        'statut_reglement' => StatutReglement::Recu,
         'association_id' => $asso->id,
         'tiers_id' => $tiers->id,
     ]);
     $ligne = $transaction->lignes()->first();
 
-    // Créer un reçu pré-existant avec un vrai fichier dans Storage::fake
+    // Créer un reçu pré-existant
     $fakePdfContent = '%PDF-1.4 fake';
     $pdfPath = "recus_fiscaux/2025/test-{$ligne->id}.pdf";
     Storage::disk('local')->put("associations/{$asso->id}/{$pdfPath}", $fakePdfContent);
 
-    $recu = RecuFiscalEmis::factory()->create([
+    RecuFiscalEmis::factory()->create([
         'association_id' => $asso->id,
         'tiers_id' => $tiers->id,
         'transaction_ligne_id' => $ligne->id,
@@ -179,46 +177,20 @@ it('bouton reçu visible si reçu déjà émis et clic stream le PDF sans créer
         'montant_facial' => 50.00,
     ]);
 
-    // Le bouton doit être visible
     $html = Livewire::test(MesAdhesions::class, ['association' => $asso])->html();
-    expect($html)->toContain('Télécharger le reçu');
 
-    $countBefore = RecuFiscalEmis::count();
-    $recuCapture = null;
-
-    // Substitut du service (final class → on remplace la liaison container)
-    $capturedRecu = $recu;
-    app()->bind(RecuFiscalService::class, fn () => new class($capturedRecu)
-    {
-        public function __construct(private readonly RecuFiscalEmis $existant) {}
-
-        public function obtenirOuGenererPourAdhesion(Adhesion $adhesion, ?User $user = null): RecuFiscalEmis
-        {
-            return $this->existant;
-        }
-
-        public function streamPdf(RecuFiscalEmis $recu): Response
-        {
-            return response('%PDF-1.4 fake', 200, ['Content-Type' => 'application/pdf']);
-        }
-
-        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
-        {
-            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
-        }
-    });
-
-    Livewire::test(MesAdhesions::class, ['association' => $asso])
-        ->call('telechargerRecuCotisation', $adhesion->id);
-
-    // Pas de nouveau reçu créé (le stub retourne l'existant)
-    expect(RecuFiscalEmis::count())->toBe($countBefore);
+    // Le bouton est désormais un lien <a> vers la route HTTP
+    expect($html)->toContain('Voir le reçu');
+    expect($html)->toContain('recus/cotisation/'.$adhesion->id);
+    expect($html)->toContain('target="_blank"');
+    // Pas de wire:click résiduel
+    expect($html)->not->toContain('wire:click="telechargerRecuCotisation');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 6 : Bouton reçu — génération à la demande
+// Test 6 : Bouton reçu — éligible sans reçu existant — href présent
 // ─────────────────────────────────────────────────────────────────────────────
-it('bouton reçu éligible sans reçu existant — clic crée via le service', function () {
+it('adhésion éligible sans reçu existant — href vers route recus.cotisation présent', function () {
     $asso = Association::factory()->create(['eligible_recu_fiscal' => true]);
     TenantContext::boot($asso);
 
@@ -230,7 +202,8 @@ it('bouton reçu éligible sans reçu existant — clic crée via le service', f
     ]);
     Auth::guard('tiers-portail')->login($tiers);
 
-    $transaction = Transaction::factory()->create(['statut_reglement' => StatutReglement::Recu,
+    $transaction = Transaction::factory()->create([
+        'statut_reglement' => StatutReglement::Recu,
         'association_id' => $asso->id,
         'tiers_id' => $tiers->id,
     ]);
@@ -243,39 +216,10 @@ it('bouton reçu éligible sans reçu existant — clic crée via le service', f
         'montant_facial' => 50.00,
     ]);
 
-    $fakeRecu = RecuFiscalEmis::factory()->make(['id' => 999, 'association_id' => $asso->id]);
+    $html = Livewire::test(MesAdhesions::class, ['association' => $asso])->html();
 
-    // Stub du service — on vérifie qu'il est bien appelé en comptant les RecuFiscalEmis avant/après
-    // (le stub ne crée pas de reçu réel — le test vérifie que la mécanique s'enclenche)
-    $countBefore = RecuFiscalEmis::count();
-
-    app()->bind(RecuFiscalService::class, fn () => new class($fakeRecu)
-    {
-        public function __construct(private readonly RecuFiscalEmis $fakeRecu) {}
-
-        public function obtenirOuGenererPourAdhesion(Adhesion $adhesion, ?User $user = null): RecuFiscalEmis
-        {
-            return $this->fakeRecu;
-        }
-
-        public function streamPdf(RecuFiscalEmis $recu): Response
-        {
-            return response('%PDF-fake', 200, ['Content-Type' => 'application/pdf']);
-        }
-
-        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
-        {
-            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
-        }
-    });
-
-    // Appel : le stub est résolu et retourne le fakeRecu — aucune exception = succès
-    Livewire::test(MesAdhesions::class, ['association' => $asso])
-        ->call('telechargerRecuCotisation', $adhesion->id)
-        ->assertOk();
-
-    // Le stub ne crée pas de nouveau RecuFiscalEmis en base
-    expect(RecuFiscalEmis::count())->toBe($countBefore);
+    expect($html)->toContain('Voir le reçu');
+    expect($html)->toContain('recus/cotisation/'.$adhesion->id);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,7 +232,8 @@ it('cache tous les boutons reçu si eligible_recu_fiscal est false', function ()
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
-    $transaction = Transaction::factory()->create(['statut_reglement' => StatutReglement::Recu,
+    $transaction = Transaction::factory()->create([
+        'statut_reglement' => StatutReglement::Recu,
         'association_id' => $asso->id,
         'tiers_id' => $tiers->id,
     ]);
@@ -303,7 +248,8 @@ it('cache tous les boutons reçu si eligible_recu_fiscal est false', function ()
 
     $html = Livewire::test(MesAdhesions::class, ['association' => $asso])->html();
 
-    expect($html)->not->toContain('Télécharger le reçu');
+    expect($html)->not->toContain('Voir le reçu');
+    expect($html)->not->toContain('recus/cotisation');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -332,7 +278,8 @@ it('cache le bouton reçu sur adhésion gratuite mais le montre sur les éligibl
     ]);
 
     // Adhésion éligible
-    $transaction = Transaction::factory()->create(['statut_reglement' => StatutReglement::Recu,
+    $transaction = Transaction::factory()->create([
+        'statut_reglement' => StatutReglement::Recu,
         'association_id' => $asso->id,
         'tiers_id' => $tiers->id,
     ]);
@@ -347,7 +294,8 @@ it('cache le bouton reçu sur adhésion gratuite mais le montre sur les éligibl
 
     $html = Livewire::test(MesAdhesions::class, ['association' => $asso])->html();
 
-    expect($html)->toContain('Télécharger le reçu');
+    expect($html)->toContain('Voir le reçu');
+    expect($html)->toContain('recus/cotisation');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

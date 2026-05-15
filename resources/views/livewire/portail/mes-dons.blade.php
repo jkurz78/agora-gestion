@@ -55,13 +55,11 @@
                                 </td>
                                 <td>
                                     @if ($donDto->peutTelecharger || $donDto->recu !== null)
-                                        <button
-                                            wire:click="telechargerRecuFiscal({{ $donDto->ligne->id }})"
-                                            class="btn btn-sm btn-outline-secondary"
-                                            wire:loading.attr="disabled"
-                                        >
-                                            <i class="bi bi-download"></i> Télécharger le reçu
-                                        </button>
+                                        <a href="{{ \App\Support\PortailRoute::to('recus.fiscal', $portailAssociation, ['ligne' => $donDto->ligne->id]) }}"
+                                           target="_blank" rel="noopener"
+                                           class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-file-earmark-pdf"></i> Voir le reçu
+                                        </a>
                                     @elseif ($donDto->raisonBlocage)
                                         <span class="text-muted small">{{ $donDto->raisonBlocage }}</span>
                                     @endif

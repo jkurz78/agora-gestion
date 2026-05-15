@@ -5,8 +5,6 @@ declare(strict_types=1);
 use App\Enums\StatutReglement;
 use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
-use App\Livewire\Portail\MesAdhesions;
-use App\Livewire\Portail\MesDons;
 use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\SousCategorie;
@@ -16,21 +14,16 @@ use App\Models\TransactionLigne;
 use App\Services\RecuFiscalService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Auth;
-use Livewire\Livewire;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Test d'intégration — vérifie que le téléchargement de reçu via Livewire
- * retourne un StreamedResponse (et non un Response standard que Livewire
- * tenterait de JSON-encoder, provoquant "Malformed UTF-8 characters").
+ * Tests d'intégration réels (vraie génération PDF) pour les routes HTTP
+ * RecuPortailController — vérifient les headers et la signature %PDF-.
  *
- * RED : échoue parce que streamDownloadResponse() n'existe pas encore.
- * GREEN : passe après l'ajout de la méthode et la mise à jour des composants.
+ * Ces tests n'utilisent pas Storage::fake — ils laissent le service écrire
+ * le PDF sur le disk local (storage_path/framework/testing).
  */
 beforeEach(function () {
     TenantContext::clear();
-    // Pas de Storage::fake — on laisse le service écrire sur le disque local réel
-    // via une configuration test (storage_path/framework/testing).
 });
 
 afterEach(function () {
@@ -41,9 +34,6 @@ afterEach(function () {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Prépare une association pleinement éligible aux reçus fiscaux.
- */
 function makeAssoEligible(): Association
 {
     return Association::factory()->create([
@@ -53,9 +43,6 @@ function makeAssoEligible(): Association
     ]);
 }
 
-/**
- * Prépare un Tiers avec adresse complète (requis par validerEligibilite).
- */
 function makeTiersAvecAdresse(Association $asso): Tiers
 {
     return Tiers::factory()->create([
@@ -66,9 +53,6 @@ function makeTiersAvecAdresse(Association $asso): Tiers
     ]);
 }
 
-/**
- * Crée une transaction Recette encaissée + une ligne avec usage Don.
- */
 function makeDonLigneReelle(Association $asso, Tiers $tiers, float $montant = 50.0): TransactionLigne
 {
     $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
@@ -91,47 +75,47 @@ function makeDonLigneReelle(Association $asso, Tiers $tiers, float $montant = 50
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 1 : MesDons — streamDownloadResponse retourne un StreamedResponse
+// Test 1 : Route recus.fiscal — PDF réel, inline, bytes %PDF-
 // ─────────────────────────────────────────────────────────────────────────────
-it('telechargerRecuFiscal retourne un StreamedResponse (pas un Response standard)', function () {
+it('GET recus.fiscal génère un vrai PDF : Content-Type, inline, bytes commencent par %PDF-', function () {
     $asso = makeAssoEligible();
     TenantContext::boot($asso);
 
     $tiers = makeTiersAvecAdresse($asso);
     Auth::guard('tiers-portail')->login($tiers);
+    session(['portail.last_activity_at' => now()->timestamp]);
 
     $ligne = makeDonLigneReelle($asso, $tiers, 75.0);
 
     // Génère le reçu via le vrai service (crée le PDF sur le disk local)
     $recu = app(RecuFiscalService::class)->obtenirOuGenerer($ligne);
-
-    // Vérifier que l'intégrité est OK après génération
     expect($recu->verifierIntegrite())->toBeTrue();
 
-    // Appeler l'action Livewire et capturer la réponse
-    $component = Livewire::test(MesDons::class, ['association' => $asso])
-        ->call('telechargerRecuFiscal', $ligne->id);
+    $url = route('portail.recus.fiscal', ['association' => $asso->slug, 'ligne' => $ligne->id]);
+    $response = $this->get($url);
 
-    // La réponse doit être un StreamedResponse — pas un JsonResponse ni un Response standard.
-    // Livewire place la réponse dans la propriété effects['redirect'] ou la retourne directement.
-    // Le signal fiable : assertOk() passe et le Content-Type n'est PAS application/json.
-    $component->assertOk();
+    $response->assertStatus(200);
+    $response->assertHeader('Content-Type', 'application/pdf');
 
-    // Vérification directe via le service : streamDownloadResponse doit exister et retourner StreamedResponse
-    $response = app(RecuFiscalService::class)->streamDownloadResponse($recu);
-    expect($response)->toBeInstanceOf(StreamedResponse::class);
-    expect($response->headers->get('Content-Type'))->toContain('application/pdf');
+    $disposition = $response->headers->get('Content-Disposition');
+    expect($disposition)->toContain('inline');
+    expect($disposition)->not->toContain('attachment');
+
+    // Anti-régression Acrobat : les bytes doivent commencer par %PDF-
+    $body = $response->getContent();
+    expect(substr((string) $body, 0, 5))->toBe('%PDF-');
 })->skip(fn () => ! class_exists(RecuFiscalService::class), 'Service introuvable');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 2 : MesAdhesions — streamDownloadResponse retourne un StreamedResponse
+// Test 2 : Route recus.cotisation — PDF réel, inline, bytes %PDF-
 // ─────────────────────────────────────────────────────────────────────────────
-it('telechargerRecuCotisation retourne un StreamedResponse (pas un Response standard)', function () {
+it('GET recus.cotisation génère un vrai PDF : Content-Type, inline, bytes commencent par %PDF-', function () {
     $asso = makeAssoEligible();
     TenantContext::boot($asso);
 
     $tiers = makeTiersAvecAdresse($asso);
     Auth::guard('tiers-portail')->login($tiers);
+    session(['portail.last_activity_at' => now()->timestamp]);
 
     $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
     $sousCat->usages()->create(['usage' => UsageComptable::Cotisation->value]);
@@ -145,9 +129,6 @@ it('telechargerRecuCotisation retourne un StreamedResponse (pas un Response stan
         'mode_paiement' => 'cheque',
     ]);
 
-    // Le factory afterCreating crée 1-3 lignes aléatoires sans sous_categorie cotisation.
-    // resoudreLigneCotisation() ne peut résoudre que s'il y a exactement 1 ligne (sans formule).
-    // On supprime les lignes auto-créées et on en pose une seule avec la bonne sous-catégorie.
     $tx->lignes()->delete();
     $ligneCotisation = TransactionLigne::factory()->create([
         'transaction_id' => $tx->id,
@@ -167,14 +148,17 @@ it('telechargerRecuCotisation retourne un StreamedResponse (pas un Response stan
     $recu = app(RecuFiscalService::class)->obtenirOuGenererPourAdhesion($adhesion);
     expect($recu->verifierIntegrite())->toBeTrue();
 
-    // Appeler l'action Livewire
-    $component = Livewire::test(MesAdhesions::class, ['association' => $asso])
-        ->call('telechargerRecuCotisation', $adhesion->id);
+    $url = route('portail.recus.cotisation', ['association' => $asso->slug, 'adhesion' => $adhesion->id]);
+    $response = $this->get($url);
 
-    $component->assertOk();
+    $response->assertStatus(200);
+    $response->assertHeader('Content-Type', 'application/pdf');
 
-    // Vérification directe : streamDownloadResponse doit exister et retourner StreamedResponse
-    $response = app(RecuFiscalService::class)->streamDownloadResponse($recu);
-    expect($response)->toBeInstanceOf(StreamedResponse::class);
-    expect($response->headers->get('Content-Type'))->toContain('application/pdf');
+    $disposition = $response->headers->get('Content-Disposition');
+    expect($disposition)->toContain('inline');
+    expect($disposition)->not->toContain('attachment');
+
+    // Anti-régression Acrobat : les bytes doivent commencer par %PDF-
+    $body = $response->getContent();
+    expect(substr((string) $body, 0, 5))->toBe('%PDF-');
 })->skip(fn () => ! class_exists(RecuFiscalService::class), 'Service introuvable');
