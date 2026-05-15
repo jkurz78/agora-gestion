@@ -215,6 +215,198 @@ it('n\'expose jamais le mot « opération » dans le HTML rendu', function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Tests Step 4 : Sous-tabs par TypeOperation
+// ─────────────────────────────────────────────────────────────────────────────
+
+it('affiche les sous-tabs nav-pills si le tiers a des participations sur 2 types distincts', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $typeA = TypeOperation::factory()->create([
+        'association_id' => $asso->id,
+        'nom' => 'Formations',
+    ]);
+    $typeB = TypeOperation::factory()->create([
+        'association_id' => $asso->id,
+        'nom' => 'Parcours de soins',
+    ]);
+
+    $opA = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeA->id,
+        'nom' => 'Formation Leadership',
+    ]);
+    $opB = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeB->id,
+        'nom' => 'Suivi Printemps',
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $opA->id,
+    ]);
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $opB->id,
+    ]);
+
+    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+        ->assertStatus(200)
+        ->html();
+
+    expect($html)->toContain('nav-pills');
+    expect($html)->toContain('Formations');
+    expect($html)->toContain('Parcours de soins');
+});
+
+it('n\'affiche pas les sous-tabs nav-pills si le tiers a des participations sur 1 seul type', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $typeA = TypeOperation::factory()->create([
+        'association_id' => $asso->id,
+        'nom' => 'Formations',
+    ]);
+
+    $opA = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeA->id,
+        'nom' => 'Formation Alpha',
+    ]);
+    $opB = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeA->id,
+        'nom' => 'Formation Beta',
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $opA->id,
+    ]);
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $opB->id,
+    ]);
+
+    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+        ->assertStatus(200)
+        ->html();
+
+    expect($html)->not->toContain('nav-pills');
+});
+
+it('le tab actif par défaut est le premier type alphabétique', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $typeA = TypeOperation::factory()->create([
+        'association_id' => $asso->id,
+        'nom' => 'Formations',
+    ]);
+    $typeB = TypeOperation::factory()->create([
+        'association_id' => $asso->id,
+        'nom' => 'Parcours de soins',
+    ]);
+
+    $opA = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeA->id,
+        'nom' => 'Formation Alpha',
+    ]);
+    $opB = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeB->id,
+        'nom' => 'Suivi Printemps',
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $opA->id,
+    ]);
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $opB->id,
+    ]);
+
+    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+        ->assertStatus(200)
+        ->html();
+
+    // "Formations" est premier alphabétique — son bouton doit avoir class "active"
+    expect($html)->toContain('Formations');
+    // Le bouton Formations doit apparaître avant "active" (dans un nav-link active)
+    $posFormations = strpos($html, 'Formations');
+    $posActive = strpos($html, 'active');
+    expect($posActive)->toBeLessThan($posFormations + 200); // active proche de Formations
+    // Parcours de soins ne doit pas être actif (pas active sur son bouton)
+    expect($html)->not->toMatch('/Parcours de soins[^<]*active/');
+});
+
+it('changer de tab filtre les activités affichées', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $typeA = TypeOperation::factory()->create([
+        'association_id' => $asso->id,
+        'nom' => 'Formations',
+    ]);
+    $typeB = TypeOperation::factory()->create([
+        'association_id' => $asso->id,
+        'nom' => 'Parcours de soins',
+    ]);
+
+    $opA = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeA->id,
+        'nom' => 'Formation Unique',
+    ]);
+    $opB = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeB->id,
+        'nom' => 'Suivi Unique',
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $opA->id,
+    ]);
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $opB->id,
+    ]);
+
+    // Sélectionner le type B (Parcours de soins)
+    $component = Livewire::test(MesActivites::class, ['association' => $asso])
+        ->set('typeOperationId', (int) $typeB->id);
+
+    $html = $component->html();
+
+    expect($html)->toContain('Suivi Unique');
+    expect($html)->not->toContain('Formation Unique');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Test 5 : Sans participation — 3 sections vides
 // ─────────────────────────────────────────────────────────────────────────────
 it('affiche les 3 sections avec message vide quand le tiers n\'a aucune participation', function () {
