@@ -76,6 +76,7 @@ final class MesActivites extends Component
             'aVenir' => $byHorizon->get(HorizonTemporel::AVenir->name, collect()),
             'enCours' => $byHorizon->get(HorizonTemporel::EnCours->name, collect()),
             'terminees' => $byHorizon->get(HorizonTemporel::Terminee->name, collect()),
+            'portailAssociation' => $this->association,
         ])->layout('portail.layouts.authenticated');
     }
 }

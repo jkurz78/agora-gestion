@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\DroitImage;
+use App\Enums\TypeDocumentPrevisionnel;
 use App\Traits\TenantStorage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -123,6 +124,23 @@ final class Participant extends TenantModel
     public function documents(): HasMany
     {
         return $this->hasMany(ParticipantDocument::class);
+    }
+
+    public function devisProformaLePlusRecent(): ?DocumentPrevisionnel
+    {
+        return $this->documentsPrevisionnels()
+            ->whereIn('type', [TypeDocumentPrevisionnel::Devis->value, TypeDocumentPrevisionnel::Proforma->value])
+            ->latest('id')
+            ->first();
+    }
+
+    public function factureRattachee(): ?Facture
+    {
+        // Chaîne : Participant → Reglement → Transaction → TransactionLigne → FactureLigne → Facture
+        return Facture::query()
+            ->whereHas('lignes.transactionLigne.transaction.reglement', fn ($q) => $q->where('participant_id', (int) $this->id))
+            ->latest('id')
+            ->first();
     }
 
     protected static function booted(): void

@@ -77,5 +77,41 @@
                 </a>
             </div>
         @endif
+
+        {{-- Boutons documents selon horizon --}}
+        @php
+            $devis = in_array(($horizon ?? ''), ['avenir', 'encours'])
+                ? $participation->devisProformaLePlusRecent()
+                : null;
+            $facture = in_array(($horizon ?? ''), ['encours', 'terminee'])
+                ? $participation->factureRattachee()
+                : null;
+        @endphp
+
+        @if ($devis !== null || $facture !== null)
+            <div class="mt-3 d-flex flex-wrap gap-2">
+                @if ($devis !== null)
+                    <a href="{{ \App\Support\PortailRoute::to('documents.devis', $portailAssociation ?? null, ['document' => $devis->id]) }}"
+                       target="_blank" rel="noopener"
+                       class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-file-earmark-text"></i>
+                        Voir le {{ $devis->type === \App\Enums\TypeDocumentPrevisionnel::Devis ? 'devis' : 'pro forma' }}
+                    </a>
+                @endif
+
+                @if ($facture !== null)
+                    <a href="{{ \App\Support\PortailRoute::to('documents.facture', $portailAssociation ?? null, ['facture' => $facture->id]) }}"
+                       target="_blank" rel="noopener"
+                       class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-receipt"></i>
+                        @if (($horizon ?? '') === 'encours')
+                            Voir la facture en cours
+                        @else
+                            Voir la facture finale
+                        @endif
+                    </a>
+                @endif
+            </div>
+        @endif
     </div>
 </div>

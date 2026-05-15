@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Portail\DemoLoginAsTierController;
+use App\Http\Controllers\Portail\DocumentPortailController;
 use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
@@ -49,6 +50,8 @@ Route::prefix('{association:slug}/portail')
             Route::get('/mes-activites', MesActivites::class)->name('mes-activites');
             Route::get('/recus/cotisation/{adhesion}', [RecuPortailController::class, 'cotisation'])->name('recus.cotisation');
             Route::get('/recus/fiscal/{ligne}', [RecuPortailController::class, 'fiscalDon'])->name('recus.fiscal');
+            Route::get('/documents/devis/{document}', [DocumentPortailController::class, 'devis'])->name('documents.devis');
+            Route::get('/documents/facture/{facture}', [DocumentPortailController::class, 'facture'])->name('documents.facture');
             Route::post('/logout', LogoutController::class)->name('logout');
 
             Route::prefix('notes-de-frais')->middleware(EnsurePeutVoirNotesDeFrais::class)->name('ndf.')->group(function () {

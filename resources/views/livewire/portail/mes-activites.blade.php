@@ -17,7 +17,7 @@
     {{-- Section : À venir --}}
     <h5 class="mb-3">À venir</h5>
     @forelse ($aVenir as $participation)
-        @include('livewire.portail.mes-activites._carte', ['participation' => $participation, 'horizon' => 'avenir'])
+        @include('livewire.portail.mes-activites._carte', ['participation' => $participation, 'horizon' => 'avenir', 'portailAssociation' => $portailAssociation ?? null])
     @empty
         <p class="text-muted">Aucune activité dans cette catégorie.</p>
     @endforelse
@@ -25,7 +25,7 @@
     {{-- Section : En cours --}}
     <h5 class="mt-4 mb-3">En cours</h5>
     @forelse ($enCours as $participation)
-        @include('livewire.portail.mes-activites._carte', ['participation' => $participation, 'horizon' => 'encours'])
+        @include('livewire.portail.mes-activites._carte', ['participation' => $participation, 'horizon' => 'encours', 'portailAssociation' => $portailAssociation ?? null])
     @empty
         <p class="text-muted">Aucune activité dans cette catégorie.</p>
     @endforelse
@@ -33,7 +33,7 @@
     {{-- Section : Terminées --}}
     <h5 class="mt-4 mb-3">Terminée</h5>
     @forelse ($terminees as $participation)
-        @include('livewire.portail.mes-activites._carte', ['participation' => $participation, 'horizon' => 'terminee'])
+        @include('livewire.portail.mes-activites._carte', ['participation' => $participation, 'horizon' => 'terminee', 'portailAssociation' => $portailAssociation ?? null])
     @empty
         <p class="text-muted">Aucune activité dans cette catégorie.</p>
     @endforelse
