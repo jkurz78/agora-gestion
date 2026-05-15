@@ -1,4 +1,11 @@
 <div>
+    @if($alertes->isNotEmpty())
+        @include('livewire.portail._alertes-magic-link', [
+            'alertes'       => $alertes,
+            'alertesAutres' => $alertesAutres,
+        ])
+    @endif
+
     @php
         $descriptions = [
             'mon-profil'           => 'Coordonnées et préférences',
