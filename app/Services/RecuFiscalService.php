@@ -179,7 +179,7 @@ final class RecuFiscalService
             throw new \RuntimeException("Intégrité du PDF reçu n°{$recu->numero} compromise — hash incorrect");
         }
 
-        $filename = "recu-fiscal-{$recu->numero}.pdf";
+        $filename = $recu->pdfFilename();
         $path = $recu->pdfFullPath();
 
         return response()->streamDownload(
@@ -197,7 +197,7 @@ final class RecuFiscalService
             throw new \RuntimeException("Intégrité du PDF reçu n°{$recu->numero} compromise — hash incorrect");
         }
 
-        $filename = "recu-fiscal-{$recu->numero}.pdf";
+        $filename = $recu->pdfFilename();
         $contents = Storage::disk('local')->get($recu->pdfFullPath());
 
         return response($contents, 200, [

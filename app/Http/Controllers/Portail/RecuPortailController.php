@@ -49,7 +49,7 @@ final class RecuPortailController extends Controller
         ]);
 
         $contents = Storage::disk('local')->get($recu->pdfFullPath());
-        $filename = "recu-cotisation-{$recu->numero}.pdf";
+        $filename = $recu->pdfFilename();
 
         return response($contents, 200, [
             'Content-Type' => 'application/pdf',
@@ -107,7 +107,7 @@ final class RecuPortailController extends Controller
         ]);
 
         $contents = Storage::disk('local')->get($recu->pdfFullPath());
-        $filename = "recu-fiscal-{$recu->numero}.pdf";
+        $filename = $recu->pdfFilename();
 
         return response($contents, 200, [
             'Content-Type' => 'application/pdf',
