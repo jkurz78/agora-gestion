@@ -83,25 +83,32 @@ function monoActivitesSetup(): array
         'statut' => StatutPresence::Present->value,
     ]);
 
-    return [$asso, $tiers, $operation, $seance, $participant];
+    return [$asso, $tiers, $typeOp, $operation, $seance, $participant];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 1 : Mes activités accessible en mode mono
 // ─────────────────────────────────────────────────────────────────────────────
-it('mode mono: GET /portail/mes-activites retourne 200 avec Mes activités', function () {
-    monoActivitesSetup();
+it('mode mono: GET /portail/mes-activites redirige vers le 1er type alphabétique', function () {
+    [$asso, $tiers, $typeOp] = monoActivitesSetup();
 
     $this->get('/portail/mes-activites')
+        ->assertRedirect();
+});
+
+it('mode mono: GET /portail/mes-activites/{typeOperation} retourne 200 avec titre Mes ...', function () {
+    [$asso, $tiers, $typeOp] = monoActivitesSetup();
+
+    $this->get("/portail/mes-activites/{$typeOp->id}")
         ->assertStatus(200)
-        ->assertSeeText('Mes activités');
+        ->assertSeeText('Mes ');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 2 : Téléchargement devis depuis mode mono
 // ─────────────────────────────────────────────────────────────────────────────
 it('mode mono: GET /portail/documents/devis/{id} sert le PDF inline', function () {
-    [$asso, $tiers, $operation, $seance, $participant] = monoActivitesSetup();
+    [$asso, $tiers, $typeOp, $operation, $seance, $participant] = monoActivitesSetup();
 
     $devis = DocumentPrevisionnel::factory()->devis()->create([
         'association_id' => $asso->id,
@@ -122,7 +129,7 @@ it('mode mono: GET /portail/documents/devis/{id} sert le PDF inline', function (
 // Test 3 : Téléchargement facture depuis mode mono
 // ─────────────────────────────────────────────────────────────────────────────
 it('mode mono: GET /portail/documents/facture/{id} sert le PDF inline', function () {
-    [$asso, $tiers, $operation, $seance, $participant] = monoActivitesSetup();
+    [$asso, $tiers, $typeOp, $operation, $seance, $participant] = monoActivitesSetup();
 
     $sousCat = SousCategorie::factory()->create(['association_id' => $asso->id]);
 
@@ -171,7 +178,7 @@ it('mode mono: GET /portail/documents/facture/{id} sert le PDF inline', function
 // Test 4 : Téléchargement attestation séance depuis mode mono
 // ─────────────────────────────────────────────────────────────────────────────
 it('mode mono: GET /portail/attestations/seance/{operation}/{seance} sert le PDF', function () {
-    [$asso, $tiers, $operation, $seance, $participant] = monoActivitesSetup();
+    [$asso, $tiers, $typeOp, $operation, $seance, $participant] = monoActivitesSetup();
 
     $response = $this->get("/portail/attestations/seance/{$operation->id}/{$seance->id}");
 
@@ -184,7 +191,7 @@ it('mode mono: GET /portail/attestations/seance/{operation}/{seance} sert le PDF
 // Test 5 : Téléchargement attestation recap depuis mode mono
 // ─────────────────────────────────────────────────────────────────────────────
 it('mode mono: GET /portail/attestations/recap/{operation}/{participant} sert le PDF', function () {
-    [$asso, $tiers, $operation, $seance, $participant] = monoActivitesSetup();
+    [$asso, $tiers, $typeOp, $operation, $seance, $participant] = monoActivitesSetup();
 
     $response = $this->get("/portail/attestations/recap/{$operation->id}/{$participant->id}");
 

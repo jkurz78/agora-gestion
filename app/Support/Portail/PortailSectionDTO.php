@@ -15,5 +15,6 @@ final readonly class PortailSectionDTO
         public ?string $groupe,
         public bool $visible,
         public ?int $badge,
+        public ?array $routeParams = null,
     ) {}
 }

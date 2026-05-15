@@ -20,9 +20,22 @@ final class MesActivites extends Component
 
     public Association $association;
 
-    public function mount(Association $association): void
+    public TypeOperation $typeOperation;
+
+    public function mount(Association $association, TypeOperation $typeOperation): void
     {
         $this->association = $association;
+        $this->typeOperation = $typeOperation;
+
+        $tiers = Auth::guard('tiers-portail')->user();
+        abort_unless($tiers !== null, 403);
+
+        $hasParticipation = Participant::query()
+            ->where('tiers_id', (int) $tiers->id)
+            ->whereHas('operation', fn ($q) => $q->where('type_operation_id', (int) $this->typeOperation->id))
+            ->exists();
+
+        abort_unless($hasParticipation, 403);
     }
 
     public function render(): View
@@ -31,37 +44,20 @@ final class MesActivites extends Component
 
         $participations = Participant::query()
             ->where('tiers_id', (int) $tiers->id)
+            ->whereHas('operation', fn ($q) => $q->where('type_operation_id', (int) $this->typeOperation->id))
             ->with(['operation.typeOperation', 'operation.seances', 'presences', 'formulaireToken'])
             ->orderByDesc('date_inscription')
             ->get();
 
-        // Distinct TypeOperation instances having ≥ 1 participation, sorted alphabetically
-        $typesActifs = $participations
-            ->map(fn (Participant $p): ?TypeOperation => $p->operation?->typeOperation)
-            ->filter()
-            ->unique('id')
-            ->sortBy('nom')
-            ->values();
-
-        // For each type, group participations by temporal horizon
-        $blocs = $typesActifs->map(function (TypeOperation $type) use ($participations): array {
-            $partsType = $participations->filter(
-                fn (Participant $p): bool => (int) ($p->operation?->type_operation_id) === (int) $type->id
-            );
-            $byHorizon = $partsType->groupBy(
-                fn (Participant $p): string => ClassificationTemporelle::pour($p->operation)->name
-            );
-
-            return [
-                'type' => $type,
-                'aVenir' => $byHorizon->get(HorizonTemporel::AVenir->name, collect()),
-                'enCours' => $byHorizon->get(HorizonTemporel::EnCours->name, collect()),
-                'terminees' => $byHorizon->get(HorizonTemporel::Terminee->name, collect()),
-            ];
-        });
+        $byHorizon = $participations->groupBy(
+            fn (Participant $p): string => ClassificationTemporelle::pour($p->operation)->name
+        );
 
         return view('livewire.portail.mes-activites', [
-            'blocs' => $blocs,
+            'titre' => 'Mes '.mb_strtolower($this->typeOperation->nom),
+            'aVenir' => $byHorizon->get(HorizonTemporel::AVenir->name, collect()),
+            'enCours' => $byHorizon->get(HorizonTemporel::EnCours->name, collect()),
+            'terminees' => $byHorizon->get(HorizonTemporel::Terminee->name, collect()),
             'portailAssociation' => $this->association,
         ])->layout('portail.layouts.authenticated');
     }

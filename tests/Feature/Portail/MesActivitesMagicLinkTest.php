@@ -105,7 +105,7 @@ it('affiche le bloc magic-link sur une carte À venir avec token actif', functio
         'rempli_at' => null,
     ]);
 
-    Livewire::test(MesActivites::class, ['association' => $asso])
+    Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertSee('1234-5678')
         ->assertSeeHtml('target="_blank"')
         ->assertSeeHtml('Ouvrir le questionnaire');
@@ -138,7 +138,7 @@ it('affiche le bloc magic-link sur une carte En cours avec token actif', functio
         'rempli_at' => null,
     ]);
 
-    Livewire::test(MesActivites::class, ['association' => $asso])
+    Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertSee('ABCD-EFGH')
         ->assertSeeHtml('target="_blank"')
         ->assertSeeHtml('Ouvrir le questionnaire');
@@ -171,7 +171,7 @@ it('n\'affiche pas le bloc magic-link sur une carte Terminée même avec token a
         'rempli_at' => null,
     ]);
 
-    Livewire::test(MesActivites::class, ['association' => $asso])
+    Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertDontSee('TERM-1234');
 });
 
@@ -202,7 +202,7 @@ it('n\'affiche pas le bloc magic-link si le token est expiré', function () {
         'rempli_at' => null,
     ]);
 
-    Livewire::test(MesActivites::class, ['association' => $asso])
+    Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertDontSee('EXPI-0000');
 });
 
@@ -233,6 +233,6 @@ it('n\'affiche pas le bloc magic-link si le token est déjà rempli', function (
         'rempli_at' => now(),
     ]);
 
-    Livewire::test(MesActivites::class, ['association' => $asso])
+    Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertDontSee('REMS-9999');
 });

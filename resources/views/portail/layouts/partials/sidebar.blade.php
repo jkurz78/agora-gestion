@@ -15,10 +15,14 @@
             @foreach ($items as $section)
                 @php
                     $routeShortName = preg_replace('/^portail\./', '', $section->routeName);
+                    $extraParams = $section->routeParams ?? [];
                     $url = \Illuminate\Support\Facades\Route::has($section->routeName)
-                        ? \App\Support\PortailRoute::to($routeShortName, $portailAssociation)
+                        ? \App\Support\PortailRoute::to($routeShortName, $portailAssociation, $extraParams)
                         : '#';
-                    $isActive = request()->routeIs($section->routeName);
+                    $isActive = request()->routeIs($section->routeName)
+                        && collect($extraParams)->every(
+                            fn ($v, $k) => (string) request()->route($k) === (string) $v
+                        );
                 @endphp
                 <a href="{{ $url }}"
                    class="nav-link{{ $isActive ? ' active' : '' }}"

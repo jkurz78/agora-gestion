@@ -8,6 +8,7 @@ use App\Http\Controllers\Portail\DocumentPortailController;
 use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
+use App\Http\Controllers\Portail\MesActivitesRedirectController;
 use App\Http\Controllers\Portail\RecuPortailController;
 use App\Http\Controllers\Portail\TransactionPdfController;
 use App\Http\Middleware\Portail\Authenticate;
@@ -48,7 +49,8 @@ Route::prefix('{association:slug}/portail')
             Route::get('/mon-profil', MonProfil::class)->name('mon-profil');
             Route::get('/mes-adhesions', MesAdhesions::class)->name('mes-adhesions');
             Route::get('/mes-dons', MesDons::class)->name('mes-dons');
-            Route::get('/mes-activites', MesActivites::class)->name('mes-activites');
+            Route::get('/mes-activites', MesActivitesRedirectController::class)->name('mes-activites.index');
+            Route::get('/mes-activites/{typeOperation}', MesActivites::class)->name('mes-activites.show');
             Route::get('/recus/cotisation/{adhesion}', [RecuPortailController::class, 'cotisation'])->name('recus.cotisation');
             Route::get('/recus/fiscal/{ligne}', [RecuPortailController::class, 'fiscalDon'])->name('recus.fiscal');
             Route::get('/documents/devis/{document}', [DocumentPortailController::class, 'devis'])->name('documents.devis');

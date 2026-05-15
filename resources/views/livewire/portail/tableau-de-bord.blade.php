@@ -31,8 +31,9 @@
                 @foreach ($sectionsDuGroupe as $section)
                     @php
                         $routeShortName = preg_replace('/^portail\./', '', $section->routeName);
+                        $extraParams = $section->routeParams ?? [];
                         $url = \Illuminate\Support\Facades\Route::has($section->routeName)
-                            ? \App\Support\PortailRoute::to($routeShortName, $association)
+                            ? \App\Support\PortailRoute::to($routeShortName, $association, $extraParams)
                             : '#';
                         $desc = $descriptions[$section->id] ?? $section->label;
                     @endphp

@@ -69,7 +69,7 @@ it('affiche la timeline des séances pour les cartes En cours', function () {
         'operation_id' => $operation->id,
     ]);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -159,7 +159,7 @@ it('mappe les 4 statuts de présence aux bonnes classes CSS dans la timeline', f
         'statut' => StatutPresence::Arret->value,
     ]);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -209,7 +209,7 @@ it('n\'affiche pas de timeline pour les cartes À venir', function () {
         'operation_id' => $operation->id,
     ]);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -253,7 +253,7 @@ it('n\'affiche pas de timeline pour les cartes Terminées', function () {
         'operation_id' => $operation->id,
     ]);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -286,7 +286,7 @@ it('n\'affiche pas de timeline pour une opération En cours sans séances', func
         'operation_id' => $operation->id,
     ]);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -328,7 +328,7 @@ it('affiche la timeline sans erreur quand certaines séances n\'ont pas de date'
         'operation_id' => $operation->id,
     ]);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -365,7 +365,7 @@ it('affiche "Inscrit le X" pour opération sans séance ni dates', function () {
         'date_inscription' => '2026-01-15',
     ]);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 

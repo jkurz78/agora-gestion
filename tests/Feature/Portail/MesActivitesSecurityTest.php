@@ -21,7 +21,7 @@ afterEach(function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 6 : Pas de fuite intra-asso — Alice ne voit que ses activités
+// Test 1 : Alice ne voit pas les activités de Bob dans la même asso
 // ─────────────────────────────────────────────────────────────────────────────
 it('[intrusion] Alice ne voit pas les activités de Bob dans la même asso', function () {
     $asso = Association::factory()->create();
@@ -66,7 +66,7 @@ it('[intrusion] Alice ne voit pas les activités de Bob dans la même asso', fun
 
     Auth::guard('tiers-portail')->login($alice);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -81,9 +81,39 @@ it('[intrusion] Alice ne voit pas les activités de Bob dans la même asso', fun
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 7 : Pas de fuite cross-tenant — TenantScope filtre les Participant
+// Test 2 : Tiers ne peut pas accéder à un type pour lequel il n'est pas inscrit
 // ─────────────────────────────────────────────────────────────────────────────
-it('[intrusion] Alice asso A ne voit pas les activités de l\'asso B', function () {
+it('[intrusion] Tiers reçoit 403 pour un TypeOperation sans participation', function () {
+    $assoA = Association::factory()->create();
+    TenantContext::boot($assoA);
+
+    $typeOpA = TypeOperation::factory()->create(['association_id' => $assoA->id, 'nom' => 'Type A']);
+    $typeOpB = TypeOperation::factory()->create(['association_id' => $assoA->id, 'nom' => 'Type B']);
+
+    $opA = Operation::factory()->create([
+        'association_id' => $assoA->id,
+        'type_operation_id' => $typeOpA->id,
+    ]);
+
+    $alice = Tiers::factory()->create(['association_id' => $assoA->id]);
+    Auth::guard('tiers-portail')->login($alice);
+
+    // Alice a des participations sur type A mais pas sur type B
+    Participant::factory()->create([
+        'association_id' => $assoA->id,
+        'tiers_id' => $alice->id,
+        'operation_id' => $opA->id,
+    ]);
+
+    // Tente d'accéder au type B → 403
+    Livewire::test(MesActivites::class, ['association' => $assoA, 'typeOperation' => $typeOpB])
+        ->assertStatus(403);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 3 : Pas de fuite cross-tenant — TenantScope filtre les Participant
+// ─────────────────────────────────────────────────────────────────────────────
+it('[intrusion] Alice asso A reçoit 403 en tentant d\'accéder à un TypeOperation de l\'asso B', function () {
     $assoA = Association::factory()->create();
     $assoB = Association::factory()->create();
 
@@ -102,15 +132,13 @@ it('[intrusion] Alice asso A ne voit pas les activités de l\'asso B', function 
         'operation_id' => $opSecretB->id,
     ]);
 
-    // Alice se connecte sur asso A
+    // Alice se connecte sur asso A et tente d'accéder au typeOpB de assoB
     TenantContext::boot($assoA);
     $alice = Tiers::factory()->create(['association_id' => $assoA->id]);
     Auth::guard('tiers-portail')->login($alice);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $assoA])
-        ->assertStatus(200)
-        ->html();
-
-    // TenantScope sur Participant empêche la fuite cross-tenant
-    expect($html)->not->toContain('Op SecretAssoB');
+    // TenantScope sur TypeOperation empêche de trouver typeOpB (assoB) depuis assoA
+    // → abort_unless($hasParticipation, 403) est déclenché
+    Livewire::test(MesActivites::class, ['association' => $assoA, 'typeOperation' => $typeOpB])
+        ->assertStatus(403);
 });

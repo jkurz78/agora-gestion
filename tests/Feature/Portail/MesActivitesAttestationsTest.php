@@ -58,7 +58,7 @@ function makeEnCoursOpAtt(Association $asso): array
         'numero' => 2,
     ]);
 
-    return [$operation, $seance];
+    return [$typeOp, $operation, $seance];
 }
 
 function makeTermineeOpAtt(Association $asso): array
@@ -78,7 +78,7 @@ function makeTermineeOpAtt(Association $asso): array
         'numero' => 1,
     ]);
 
-    return [$operation, $seance];
+    return [$typeOp, $operation, $seance];
 }
 
 function makeParticipantAtt(Association $asso, Operation $operation, Tiers $tiers): Participant
@@ -106,14 +106,14 @@ it('Section En cours : bouton attestation séance affiché pour séance avec sta
     $asso = makeAssoAtt2();
     TenantContext::boot($asso);
 
-    [$operation, $seancePas] = makeEnCoursOpAtt($asso);
+    [$typeOp, $operation, $seancePas] = makeEnCoursOpAtt($asso);
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
     $participant = makeParticipantAtt($asso, $operation, $tiers);
     addPresence($seancePas, $participant, StatutPresence::Present->value);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -133,14 +133,14 @@ it('Section Terminée : bouton attestation globale affiché', function () {
     $asso = makeAssoAtt2();
     TenantContext::boot($asso);
 
-    [$operation, $seance] = makeTermineeOpAtt($asso);
+    [$typeOp, $operation, $seance] = makeTermineeOpAtt($asso);
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
     $participant = makeParticipantAtt($asso, $operation, $tiers);
     addPresence($seance, $participant, StatutPresence::Present->value);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -160,14 +160,14 @@ it('Section En cours : pas de bouton attestation si statut != Present (Excuse)',
     $asso = makeAssoAtt2();
     TenantContext::boot($asso);
 
-    [$operation, $seancePas] = makeEnCoursOpAtt($asso);
+    [$typeOp, $operation, $seancePas] = makeEnCoursOpAtt($asso);
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
     $participant = makeParticipantAtt($asso, $operation, $tiers);
     addPresence($seancePas, $participant, StatutPresence::Excuse->value);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 

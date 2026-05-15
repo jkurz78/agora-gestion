@@ -18,6 +18,7 @@ use App\Http\Controllers\Portail\DocumentPortailController;
 use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
+use App\Http\Controllers\Portail\MesActivitesRedirectController;
 use App\Http\Controllers\Portail\RecuPortailController;
 use App\Http\Controllers\Portail\TransactionPdfController;
 use App\Http\Middleware\MonoAssociationResolver;
@@ -58,7 +59,8 @@ Route::prefix('portail')
             Route::get('/mon-profil', MonProfil::class)->name('mon-profil');
             Route::get('/mes-adhesions', MesAdhesions::class)->name('mes-adhesions');
             Route::get('/mes-dons', MesDons::class)->name('mes-dons');
-            Route::get('/mes-activites', MesActivites::class)->name('mes-activites');
+            Route::get('/mes-activites', MesActivitesRedirectController::class)->name('mes-activites.index');
+            Route::get('/mes-activites/{typeOperation}', MesActivites::class)->name('mes-activites.show');
             Route::get('/documents/devis/{document}', [DocumentPortailController::class, 'devis'])->name('documents.devis');
             Route::get('/documents/facture/{facture}', [DocumentPortailController::class, 'facture'])->name('documents.facture');
             Route::get('/attestations/seance/{operation}/{seance}', [AttestationPortailController::class, 'seance'])->name('attestations.seance');

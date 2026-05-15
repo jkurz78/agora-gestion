@@ -155,14 +155,14 @@ it('affiche le bouton Voir le devis sur la carte À venir quand un devis est rat
     $asso = makeAssoDocTest();
     TenantContext::boot($asso);
 
-    [, $operation] = makeOperationDocTest($asso, 'all');
+    [$typeOp, $operation] = makeOperationDocTest($asso, 'all');
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
     $participant = makeParticipantDocTest($asso, $operation, $tiers);
     $devis = attachDevisToParticipant($asso, $participant);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -177,14 +177,14 @@ it('affiche le bouton Voir la facture en cours sur la carte En cours quand une f
     $asso = makeAssoDocTest();
     TenantContext::boot($asso);
 
-    [, $operation] = makeOperationDocTest($asso, 'mixed');
+    [$typeOp, $operation] = makeOperationDocTest($asso, 'mixed');
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
     $participant = makeParticipantDocTest($asso, $operation, $tiers);
     $facture = attachFactureToParticipant($asso, $participant);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -199,14 +199,14 @@ it('affiche le bouton Voir la facture finale sur la carte Terminée quand une fa
     $asso = makeAssoDocTest();
     TenantContext::boot($asso);
 
-    [, $operation] = makeOperationDocTest($asso, 'none');
+    [$typeOp, $operation] = makeOperationDocTest($asso, 'none');
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
     $participant = makeParticipantDocTest($asso, $operation, $tiers);
     $facture = attachFactureToParticipant($asso, $participant);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
@@ -221,19 +221,15 @@ it('n\'affiche pas les boutons devis/facture quand aucun document n\'est rattach
     $asso = makeAssoDocTest();
     TenantContext::boot($asso);
 
-    // Crée 3 participants dans les 3 sections sans docs
-    [, $opAvenir] = makeOperationDocTest($asso, 'all');
-    [, $opEncours] = makeOperationDocTest($asso, 'mixed');
-    [, $opTerminee] = makeOperationDocTest($asso, 'none');
+    // Crée 1 participant dans la section À venir sans docs
+    [$typeOp, $opAvenir] = makeOperationDocTest($asso, 'all');
 
     $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
     Auth::guard('tiers-portail')->login($tiers);
 
     makeParticipantDocTest($asso, $opAvenir, $tiers);
-    makeParticipantDocTest($asso, $opEncours, $tiers);
-    makeParticipantDocTest($asso, $opTerminee, $tiers);
 
-    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+    $html = Livewire::test(MesActivites::class, ['association' => $asso, 'typeOperation' => $typeOp])
         ->assertStatus(200)
         ->html();
 
