@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 beforeEach(function () {
     MonoAssociation::flush();
@@ -144,6 +145,11 @@ it('mode mono: telechargerRecuCotisation depuis MesAdhesions appelle le service 
         {
             return response('%PDF-fake', 200, ['Content-Type' => 'application/pdf']);
         }
+
+        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
+        {
+            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
+        }
     });
 
     Livewire::test(MesAdhesions::class, ['association' => $asso])
@@ -204,6 +210,11 @@ it('mode mono: telechargerRecuFiscal depuis MesDons appelle le service sans erre
         public function streamPdf(RecuFiscalEmis $recu): Response
         {
             return response('%PDF-fake', 200, ['Content-Type' => 'application/pdf']);
+        }
+
+        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
+        {
+            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
         }
     });
 

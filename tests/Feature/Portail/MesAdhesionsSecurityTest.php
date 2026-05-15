@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Dossier d'intrusion — Portail Tiers Slice 2 (Mes adhésions).
@@ -112,6 +113,11 @@ it('[log] telechargerRecuCotisation émet Log::info avec adhesion_id et tiers_id
         public function streamPdf(RecuFiscalEmis $recu): Response
         {
             return response('%PDF-fake', 200, ['Content-Type' => 'application/pdf']);
+        }
+
+        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
+        {
+            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
         }
     });
 

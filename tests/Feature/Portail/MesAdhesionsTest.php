@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 beforeEach(function () {
     TenantContext::clear();
@@ -200,6 +201,11 @@ it('bouton reçu visible si reçu déjà émis et clic stream le PDF sans créer
         {
             return response('%PDF-1.4 fake', 200, ['Content-Type' => 'application/pdf']);
         }
+
+        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
+        {
+            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
+        }
     });
 
     Livewire::test(MesAdhesions::class, ['association' => $asso])
@@ -255,6 +261,11 @@ it('bouton reçu éligible sans reçu existant — clic crée via le service', f
         public function streamPdf(RecuFiscalEmis $recu): Response
         {
             return response('%PDF-fake', 200, ['Content-Type' => 'application/pdf']);
+        }
+
+        public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
+        {
+            return response()->streamDownload(fn () => print '%PDF-fake', 'recu.pdf', ['Content-Type' => 'application/pdf']);
         }
     });
 

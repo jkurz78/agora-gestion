@@ -68,6 +68,6 @@ final class MesDons extends Component
             'tiers_id' => $tiers->id,
         ]);
 
-        return app(RecuFiscalService::class)->streamPdf($recu);
+        return app(RecuFiscalService::class)->streamDownloadResponse($recu);
     }
 }
