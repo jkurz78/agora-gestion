@@ -11,9 +11,12 @@
             <div>
                 <span class="text-muted small">{{ $participation->operation->typeOperation->nom }}</span>
                 <div class="fw-semibold">{{ $participation->operation->nom }}</div>
-                @if ($participation->operation->seances->isNotEmpty())
+                @php
+                    $seancesAvecDate = $participation->operation->seances->filter(fn($s) => $s->date !== null);
+                @endphp
+                @if ($seancesAvecDate->isNotEmpty())
                     <div class="small text-muted">
-                        {{ $participation->operation->seances->min('date')->format('d/m/Y') }}
+                        {{ $seancesAvecDate->min('date')->format('d/m/Y') }}
                         — {{ $participation->operation->seances->count() }} séance(s)
                     </div>
                 @elseif ($participation->operation->date_debut)
@@ -28,12 +31,12 @@
                 @endif
 
                 {{-- Timeline séances : section En cours uniquement --}}
-                @if (($horizon ?? '') === 'encours' && $participation->operation->seances->isNotEmpty())
+                @if (($horizon ?? '') === 'encours' && $seancesAvecDate->isNotEmpty())
                     @php
                         $presencesParSeance = $participation->presences->keyBy('seance_id');
                     @endphp
                     <ul class="seance-timeline list-unstyled mt-3 mb-0">
-                        @foreach($participation->operation->seances->sortBy('date') as $seance)
+                        @foreach($seancesAvecDate->sortBy('date') as $seance)
                             @php
                                 $presence = $presencesParSeance->get($seance->id);
                                 $statut = $presence?->statut ?? null;

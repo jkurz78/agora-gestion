@@ -72,3 +72,26 @@ it('classe EnCours par défaut une opération sans séance ni dates', function (
 
     expect(ClassificationTemporelle::pour($op))->toBe(HorizonTemporel::EnCours);
 });
+
+it('classe AVenir en ignorant les séances sans date et en utilisant la séance datée future', function (): void {
+    $op = Operation::factory()->create(['date_debut' => null, 'date_fin' => null]);
+    // 2 séances sans date
+    Seance::factory()->create(['operation_id' => $op->id, 'date' => null]);
+    Seance::factory()->create(['operation_id' => $op->id, 'date' => null]);
+    // 1 séance avec date future
+    Seance::factory()->create(['operation_id' => $op->id, 'date' => '2026-06-15']);
+
+    expect(ClassificationTemporelle::pour($op))->toBe(HorizonTemporel::AVenir);
+});
+
+it('classe via fallback Operation quand toutes les séances sont sans date', function (): void {
+    $op = Operation::factory()->create([
+        'date_debut' => '2026-05-01',
+        'date_fin' => '2026-05-31',
+    ]);
+    // Séances sans date — doivent être ignorées
+    Seance::factory()->create(['operation_id' => $op->id, 'date' => null]);
+    Seance::factory()->create(['operation_id' => $op->id, 'date' => null]);
+
+    expect(ClassificationTemporelle::pour($op))->toBe(HorizonTemporel::EnCours);
+});

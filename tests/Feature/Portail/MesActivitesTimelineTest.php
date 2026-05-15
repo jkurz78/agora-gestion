@@ -296,6 +296,52 @@ it('n\'affiche pas de timeline pour une opération En cours sans séances', func
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 6 : Opération sans séance ni date_debut/date_fin → label "Inscrit le X"
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 7 : Opération En cours avec 4 séances dont 2 sans date → pas de 500
+// ─────────────────────────────────────────────────────────────────────────────
+it('affiche la timeline sans erreur quand certaines séances n\'ont pas de date', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $typeOp = TypeOperation::factory()->create(['association_id' => $asso->id, 'nom' => 'Atelier']);
+    $operation = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeOp->id,
+        'nom' => 'Atelier mixte',
+        'date_debut' => null,
+        'date_fin' => null,
+    ]);
+
+    // 2 séances datées (passée + future → En cours)
+    Seance::factory()->create(['association_id' => $asso->id, 'operation_id' => $operation->id, 'date' => now()->subWeek()]);
+    Seance::factory()->create(['association_id' => $asso->id, 'operation_id' => $operation->id, 'date' => now()->addWeek()]);
+    // 2 séances sans date
+    Seance::factory()->create(['association_id' => $asso->id, 'operation_id' => $operation->id, 'date' => null]);
+    Seance::factory()->create(['association_id' => $asso->id, 'operation_id' => $operation->id, 'date' => null]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $operation->id,
+    ]);
+
+    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+        ->assertStatus(200)
+        ->html();
+
+    // Timeline présente avec seulement les 2 séances datées
+    expect($html)->toContain('seance-timeline');
+    expect(substr_count($html, '<li class="d-flex align-items-center'))->toBe(2);
+    // Le compteur total (4 séances) est affiché
+    expect($html)->toContain('4 séance(s)');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 8 : "Inscrit le X" pour opération sans séance ni dates
+// ─────────────────────────────────────────────────────────────────────────────
 it('affiche "Inscrit le X" pour opération sans séance ni dates', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);

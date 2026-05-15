@@ -14,7 +14,7 @@ final class ClassificationTemporelle
     {
         $today = Carbon::today();
 
-        $seances = $op->seances()->orderBy('date')->get();
+        $seances = $op->seances()->whereNotNull('date')->orderBy('date')->get();
 
         if ($seances->isNotEmpty()) {
             /** @var Carbon $min */
