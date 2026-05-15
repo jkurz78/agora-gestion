@@ -1,6 +1,6 @@
 # Portail Tiers et Membres
 
-Statut : v0 Slice 1 (Auth OTP) livré 2026-04-19. v1 Slice 1 (F+A — Fondation portail + Mon profil) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`. v2 Slice 2 (Mes adhésions + Mes dons) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice2-adhesions-dons.md`. v3 Slice 3 (D — Mes activités) livré 2026-05-15, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-15-portail-membres-slice3-mes-activites.md`.
+Statut : v0 Slice 1 (Auth OTP) livré 2026-04-19. v1 Slice 1 (F+A — Fondation portail + Mon profil) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`. v2 Slice 2 (Mes adhésions + Mes dons) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice2-adhesions-dons.md`. v3 Slice 3 (D — Mes activités) livré 2026-05-15, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-15-portail-membres-slice3-mes-activites.md`. **v4 Slice 4 (E — Mes messages) livré 2026-05-15 — programme portail v0 COMPLET.** Voir aussi `docs/specs/2026-05-15-portail-membres-slice4-mes-messages.md`.
 
 ## Objectif
 
@@ -909,3 +909,90 @@ Termes autorisés côté UI :
 Le code interne conserve les noms de modèles `Operation` / `Participation` / `TypeOperation` — aucun renommage de modèle.
 
 **Test de non-régression** : `assertDontSee('opération', false)` dans `MesActivitesTest` (insensible à la casse, couvre aussi « Opération »).
+
+---
+
+## Slice 4 (E) — Mes messages (2026-05-15)
+
+Statut : livré 2026-05-15, branche `feat/portail-membres-slice1-fondation-profil`.
+Dernier slice du programme portail v0.
+
+Spec complète : [`docs/specs/2026-05-15-portail-membres-slice4-mes-messages.md`](specs/2026-05-15-portail-membres-slice4-mes-messages.md).
+Plan : [`plans/portail-membres-slice4-mes-messages.md`](../plans/portail-membres-slice4-mes-messages.md).
+
+Ce slice expose à chaque Tiers les emails que l'association lui a envoyés. Le vocabulaire UI est **« Mes messages »** ; les identifiants internes restent `EmailLog` et `Communications` (aucun renommage de modèle).
+
+### Sidebar — nouveau groupe « Mes messages »
+
+Un provider est enregistré dans `PortailServiceProvider::boot()` après le groupe « Mes activités » (ordre 80) :
+
+| Provider | Classe | id | Route | Ordre | Icon | Groupe | Visible si |
+|---|---|---|---|---|---|---|---|
+| Mes messages | `App\Services\Portail\Providers\MesMessagesProvider` | `mes-messages` | `portail.mes-messages` | 90 | `bi-envelope` | Mes messages | `≥ 1 EmailLog` destiné au Tiers (via `tiers_id` direct ou `participant.tiers_id`) |
+
+### Affichage liste + expand inline
+
+#### Composant
+
+`App\Livewire\Portail\MesMessages` — utilise le trait `WithPagination`.
+
+La liste est paginée à **25 messages par page**. `TiersCommunicationsTimelineService` expose une constante `PAGE_SIZE = 50` ; le composant passe un paramètre `pageSize` pour overrider à 25 en contexte portail.
+
+#### Pattern expand inline
+
+- Click sur une ligne → Bootstrap collapse affichant le corps HTML du message dans `<div class="portail-email-body">`.
+- CSS scopé sur `.portail-email-body` : `max-width` sur les images et les tableaux pour éviter les débordements.
+- Un seul message peut être ouvert à la fois : propriété `$messageOuvertId`.
+- Méthode `toggleMessage(int $id)` : si `$id === $this->messageOuvertId`, referme. Sinon ouvre. Les IDs hors page courante sont **ignorés silencieusement** (défense contre l'injection via `wire:set`).
+
+### Téléchargement PJ via route portail
+
+#### Route
+
+```
+GET /portail/{slug}/messages/{emailLog}/piece-jointe
+    └─ portail.messages.attachment  →  App\Http\Controllers\Portail\MessageAttachmentController::__invoke
+```
+
+#### Contrôleur
+
+- **Ownership cross-tenant** : `Tiers::find($emailLog->tiers_id)` passe sous TenantScope — retourne `null` si l'`EmailLog` appartient à une autre association → 404.
+- **Ownership intra-asso** : `(int) $tiers->id === (int) auth('tiers-portail')->id()` → 403 sinon.
+- **Réponse** : `Content-Disposition: inline`, `target="_blank"` côté vue. MIME détecté via `Storage::disk('local')->mimeType($path)` avec fallback `application/octet-stream`.
+- **Nom de fichier** : `basename($attachment_path)` (nom stocké tel quel).
+- **Log** : clé `portail.message.attachment.telecharge` avec `email_log_id` + `tiers_id`.
+
+### Sécurité multi-tenant — point de vigilance EmailLog
+
+`EmailLog` n'étend pas `TenantModel` et ne possède donc pas de TenantScope global.
+
+Protection v0 : **indirecte via `Tiers`**. La query de base du composant utilise `whereIn('tiers_id', Tiers::select('id'))` ; cette sous-requête passe par le TenantScope de `TenantModel` sur `Tiers` et filtre automatiquement les EmailLog de l'association courante.
+
+Dans le contrôleur PJ : `Tiers::find($emailLog->tiers_id)` retourne `null` si l'EmailLog appartient à une association différente (TenantScope sur Tiers) → 404 cross-tenant.
+
+Dette à évaluer : faire étendre `TenantModel` à `EmailLog` directement pour une défense en profondeur (protection directe, indépendante de la query liste).
+
+### Hors scope v0 (parqué)
+
+- Filtrage par catégorie
+- Badge catégorie sur chaque ligne
+- Recherche full-text
+- Action « marquer lu / non lu »
+- Action « renvoyer »
+- Sanitize HTMLPurifier (admin trusté en v0)
+- PJ multiples (la table `email_logs` ne possède qu'un champ `attachment_path` unique)
+
+---
+
+## Programme portail v0 — résumé final
+
+Le programme portail v0 est **complet**. Les quatre slices ont été développés sur une branche unique `feat/portail-membres-slice1-fondation-profil` (~80 commits).
+
+| Slice | Code | Livré | Contenu |
+|---|---|---|---|
+| Slice 1 | F+A | 2026-05-14 | Fondation portail (sidebar adaptative, layouts, résolveur) + Mon profil |
+| Slice 2 | B/C | 2026-05-14 | Mes adhésions + Mes dons (reçus à la demande, URLs paramétrables) |
+| Slice 3 | D | 2026-05-15 | Mes activités (classification temporelle, attestations, devis, factures) |
+| Slice 4 | E | 2026-05-15 | Mes messages (expand inline, téléchargement PJ, ownership strict) |
+
+Prochaine étape : test manuel localhost + PR vers main.
