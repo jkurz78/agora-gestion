@@ -25,6 +25,7 @@ use App\Livewire\Portail\Login;
 use App\Livewire\Portail\MesActivites;
 use App\Livewire\Portail\MesAdhesions;
 use App\Livewire\Portail\MesDons;
+use App\Livewire\Portail\MesMessages;
 use App\Livewire\Portail\MonProfil;
 use App\Livewire\Portail\NoteDeFrais\Form;
 use App\Livewire\Portail\NoteDeFrais\Index;
@@ -49,6 +50,7 @@ Route::prefix('{association:slug}/portail')
             Route::get('/mon-profil', MonProfil::class)->name('mon-profil');
             Route::get('/mes-adhesions', MesAdhesions::class)->name('mes-adhesions');
             Route::get('/mes-dons', MesDons::class)->name('mes-dons');
+            Route::get('/mes-messages', MesMessages::class)->name('mes-messages');
             Route::get('/mes-activites', MesActivitesRedirectController::class)->name('mes-activites.index');
             Route::get('/mes-activites/{typeOperation}', MesActivites::class)->name('mes-activites.show');
             Route::get('/recus/cotisation/{adhesion}', [RecuPortailController::class, 'cotisation'])->name('recus.cotisation');
