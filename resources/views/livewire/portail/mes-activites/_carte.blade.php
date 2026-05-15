@@ -57,5 +57,25 @@
                 @endif
             </div>
         </div>
+
+        {{-- Bloc questionnaire : À venir + En cours uniquement, token actif --}}
+        @if (in_array(($horizon ?? ''), ['avenir', 'encours'])
+             && $participation->formulaireToken !== null
+             && $participation->formulaireToken->expire_at->gte(today())
+             && $participation->formulaireToken->rempli_at === null)
+            @php $token = $participation->formulaireToken; @endphp
+            <div class="alert alert-info mt-3 mb-0 small d-flex align-items-center justify-content-between gap-2">
+                <div>
+                    <i class="bi bi-info-circle me-1"></i>
+                    <strong>Questionnaire à remplir.</strong>
+                    Code : <code>{{ $token->token }}</code>
+                </div>
+                <a href="{{ route('formulaire.index', ['token' => $token->token]) }}"
+                   target="_blank" rel="noopener"
+                   class="btn btn-sm btn-primary">
+                    Ouvrir le questionnaire
+                </a>
+            </div>
+        @endif
     </div>
 </div>

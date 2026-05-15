@@ -34,7 +34,7 @@ final class MesActivites extends Component
 
         $participations = Participant::query()
             ->where('tiers_id', (int) $tiers->id)
-            ->with(['operation.typeOperation', 'operation.seances', 'presences'])
+            ->with(['operation.typeOperation', 'operation.seances', 'presences', 'formulaireToken'])
             ->orderByDesc('date_inscription')
             ->get();
 
