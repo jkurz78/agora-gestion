@@ -19,6 +19,7 @@ use App\Livewire\Portail\FacturePartenaire\AtraiterIndex;
 use App\Livewire\Portail\FacturePartenaire\Depot;
 use App\Livewire\Portail\HistoriqueDepenses\Index as HistoriqueDepensesIndex;
 use App\Livewire\Portail\Login;
+use App\Livewire\Portail\MesActivites;
 use App\Livewire\Portail\MesAdhesions;
 use App\Livewire\Portail\MesDons;
 use App\Livewire\Portail\MonProfil;
@@ -45,6 +46,7 @@ Route::prefix('{association:slug}/portail')
             Route::get('/mon-profil', MonProfil::class)->name('mon-profil');
             Route::get('/mes-adhesions', MesAdhesions::class)->name('mes-adhesions');
             Route::get('/mes-dons', MesDons::class)->name('mes-dons');
+            Route::get('/mes-activites', MesActivites::class)->name('mes-activites');
             Route::get('/recus/cotisation/{adhesion}', [RecuPortailController::class, 'cotisation'])->name('recus.cotisation');
             Route::get('/recus/fiscal/{ligne}', [RecuPortailController::class, 'fiscalDon'])->name('recus.fiscal');
             Route::post('/logout', LogoutController::class)->name('logout');
