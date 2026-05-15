@@ -9,7 +9,7 @@
                 @if ($seancesAvecDate->isNotEmpty())
                     <div class="small text-muted">
                         {{ $seancesAvecDate->min('date')->format('d/m/Y') }}
-                        — {{ $participation->operation->seances->count() }} séance(s)
+                        — {{ $participation->operation->nombre_seances ?? $participation->operation->seances->count() }} séance(s)
                     </div>
                 @elseif ($participation->operation->date_debut)
                     <div class="small text-muted">
@@ -68,7 +68,7 @@
 
                 @if ($totalPrevu > 0)
                     <div class="mt-3 p-2 bg-light rounded small d-flex flex-wrap align-items-center gap-3">
-                        <span><strong>Total :</strong> {{ number_format($totalPrevu, 2, ',', ' ') }} €</span>
+                        <span><strong>Total dû :</strong> {{ number_format($totalPrevu, 2, ',', ' ') }} €</span>
                         <span class="text-muted">·</span>
                         <span><strong>Réglé :</strong> {{ number_format($totalRegle, 2, ',', ' ') }} €</span>
                         @if ($totalRegle === 0.0)
@@ -91,15 +91,15 @@
              && $participation->formulaireToken->expire_at->gte(today())
              && $participation->formulaireToken->rempli_at === null)
             @php $token = $participation->formulaireToken; @endphp
-            <div class="alert alert-info mt-3 mb-0 small d-flex align-items-center justify-content-between gap-2">
+            <div class="alert alert-info mt-3 mb-0 small d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
                 <div>
                     <i class="bi bi-info-circle me-1"></i>
-                    <strong>Questionnaire à remplir.</strong>
-                    Code : <code>{{ $token->token }}</code>
+                    Pour finaliser votre inscription à <strong>{{ $participation->operation->typeOperation->nom }}</strong> · <strong>{{ $participation->operation->nom }}</strong>, vous avez un questionnaire à remplir.
+                    Le code pour signer votre réponse au questionnaire est : <code>{{ $token->token }}</code>
                 </div>
                 <a href="{{ route('formulaire.index', ['token' => $token->token]) }}"
                    target="_blank" rel="noopener"
-                   class="btn btn-sm btn-primary">
+                   class="btn btn-sm btn-primary text-nowrap">
                     Ouvrir le questionnaire
                 </a>
             </div>

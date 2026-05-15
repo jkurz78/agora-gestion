@@ -5,7 +5,7 @@
             $op            = $participation->operation;
             $typeNom       = $op->typeOperation->nom;
         @endphp
-        <div class="alert alert-warning d-flex align-items-center justify-content-between gap-3">
+        <div class="alert alert-info d-flex align-items-center justify-content-between gap-3">
             <div class="flex-grow-1">
                 <i class="bi bi-exclamation-triangle me-2"></i>
                 <strong>Action requise</strong> — Vous avez été invité à répondre au questionnaire pour
@@ -13,7 +13,7 @@
             </div>
             <a href="{{ route('formulaire.index', ['token' => $token->token]) }}"
                target="_blank" rel="noopener"
-               class="btn btn-sm btn-warning text-nowrap">
+               class="btn btn-sm btn-primary text-nowrap">
                 Ouvrir le questionnaire
             </a>
         </div>

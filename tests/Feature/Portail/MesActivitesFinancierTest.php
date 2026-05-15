@@ -162,7 +162,7 @@ it('n\'affiche pas le bloc financier quand aucun règlement programmé', functio
         ->assertStatus(200)
         ->html();
 
-    expect($html)->not->toContain('Total :');
+    expect($html)->not->toContain('Total dû :');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
