@@ -51,6 +51,14 @@
                                       style="width:14px;height:14px;display:inline-block;"
                                       title="{{ $tooltipText }}"></span>
                                 <span class="small">{{ $seance->date->format('d/m/Y') }}</span>
+                                @if($statut === \App\Enums\StatutPresence::Present->value)
+                                    <a href="{{ \App\Support\PortailRoute::to('attestations.seance', $portailAssociation ?? null, ['operation' => $participation->operation_id, 'seance' => $seance->id]) }}"
+                                       target="_blank" rel="noopener"
+                                       class="btn btn-sm btn-outline-secondary ms-2 py-0 px-1"
+                                       title="Voir l'attestation de cette séance">
+                                        <i class="bi bi-file-earmark-pdf"></i>
+                                    </a>
+                                @endif
                             </li>
                         @endforeach
                     </ul>
@@ -88,7 +96,7 @@
                 : null;
         @endphp
 
-        @if ($devis !== null || $facture !== null)
+        @if ($devis !== null || $facture !== null || ($horizon ?? '') === 'terminee')
             <div class="mt-3 d-flex flex-wrap gap-2">
                 @if ($devis !== null)
                     <a href="{{ \App\Support\PortailRoute::to('documents.devis', $portailAssociation ?? null, ['document' => $devis->id]) }}"
@@ -109,6 +117,14 @@
                         @else
                             Voir la facture finale
                         @endif
+                    </a>
+                @endif
+
+                @if (($horizon ?? '') === 'terminee')
+                    <a href="{{ \App\Support\PortailRoute::to('attestations.recap', $portailAssociation ?? null, ['operation' => $participation->operation_id, 'participant' => $participation->id]) }}"
+                       target="_blank" rel="noopener"
+                       class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-file-earmark-pdf"></i> Voir l'attestation globale
                     </a>
                 @endif
             </div>
