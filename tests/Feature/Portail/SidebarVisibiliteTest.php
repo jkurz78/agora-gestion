@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Association;
 use App\Models\NoteDeFrais;
+use App\Models\Participant;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 
@@ -119,7 +120,52 @@ it('cumul pour_depenses=true avec NDF affiche toutes les 5 sections', function (
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Scénario 5 : Anonyme (tiers=null) → collection vide, aucune section visible
+// Scénario 5 : Tiers avec ≥ 1 Participation → sidebar contient "Mes activités"
+// ─────────────────────────────────────────────────────────────────────────────
+it('tiers avec participation affiche Mes activités dans la sidebar', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $tiers = Tiers::factory()->create([
+        'association_id' => $asso->id,
+        'pour_depenses' => false,
+    ]);
+
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+    ]);
+
+    $html = view('portail.layouts.partials.sidebar', [
+        'tiers' => $tiers,
+        'portailAssociation' => $asso,
+    ])->render();
+
+    expect($html)->toContain('Mes activités');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scénario 6 : Tiers sans Participation → sidebar NE contient PAS "Mes activités"
+// ─────────────────────────────────────────────────────────────────────────────
+it('tiers sans participation n\'affiche pas Mes activités dans la sidebar', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $tiers = Tiers::factory()->create([
+        'association_id' => $asso->id,
+        'pour_depenses' => false,
+    ]);
+
+    $html = view('portail.layouts.partials.sidebar', [
+        'tiers' => $tiers,
+        'portailAssociation' => $asso,
+    ])->render();
+
+    expect($html)->not->toContain('Mes activités');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scénario 7 : Anonyme (tiers=null) → collection vide, aucune section visible
 // ─────────────────────────────────────────────────────────────────────────────
 it('tiers null produit une sidebar sans entrées de navigation', function () {
     $asso = Association::factory()->create();

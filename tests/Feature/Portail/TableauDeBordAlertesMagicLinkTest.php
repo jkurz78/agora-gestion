@@ -169,3 +169,31 @@ it('n\'affiche pas d\'alerte quand il n\'y a aucun token actif', function () {
         ->assertStatus(200)
         ->assertDontSeeText('Action requise');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cas 5 : Vocabulaire — le mot "opération" ne doit pas fuiter sur le dashboard
+// ─────────────────────────────────────────────────────────────────────────────
+it('n\'expose pas le mot opération sur le dashboard même avec un token actif sur participation en cours', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $typeOp = TypeOperation::factory()->create([
+        'association_id' => $asso->id,
+        'nom' => 'Stage',
+    ]);
+    $op = tdb_currentOp($asso, $typeOp, 'Stage intensif');
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    $participant = Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $op->id,
+    ]);
+    tdb_makeToken($asso, $participant, 'TDB5-VOCAB');
+
+    $this->get("/{$asso->slug}/portail/")
+        ->assertStatus(200)
+        ->assertDontSee('opération', false);
+});

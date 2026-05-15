@@ -292,3 +292,36 @@ it('n\'affiche pas de timeline pour une opération En cours sans séances', func
 
     expect($html)->not->toContain('seance-timeline');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 6 : Opération sans séance ni date_debut/date_fin → label "Inscrit le X"
+// ─────────────────────────────────────────────────────────────────────────────
+it('affiche "Inscrit le X" pour opération sans séance ni dates', function () {
+    $asso = Association::factory()->create();
+    TenantContext::boot($asso);
+
+    $typeOp = TypeOperation::factory()->create(['association_id' => $asso->id, 'nom' => 'Projet']);
+    $operation = Operation::factory()->create([
+        'association_id' => $asso->id,
+        'type_operation_id' => $typeOp->id,
+        'nom' => 'Projet sans séances ni dates',
+        'date_debut' => null,
+        'date_fin' => null,
+    ]);
+
+    $tiers = Tiers::factory()->create(['association_id' => $asso->id]);
+    Auth::guard('tiers-portail')->login($tiers);
+
+    Participant::factory()->create([
+        'association_id' => $asso->id,
+        'tiers_id' => $tiers->id,
+        'operation_id' => $operation->id,
+        'date_inscription' => '2026-01-15',
+    ]);
+
+    $html = Livewire::test(MesActivites::class, ['association' => $asso])
+        ->assertStatus(200)
+        ->html();
+
+    expect($html)->toContain('Inscrit le 15/01/2026');
+});
