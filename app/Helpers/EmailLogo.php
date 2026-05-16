@@ -96,12 +96,16 @@ final class EmailLogo
     }
 
     /**
-     * Pour l'aperçu navigateur uniquement : remplace les références cid:logo-asso
-     * et cid:logo-op par des data URLs base64, afin que les <img> s'affichent
-     * dans un contexte HTML hors email (modale Aperçu, vue TinyMCE…).
+     * Pour l'aperçu navigateur uniquement : prépare le HTML d'un email pour un
+     * affichage en aperçu back-office (modale Aperçu, modale détail Communications,
+     * vue TinyMCE…). Effectue :
+     *  - swap des références cid:logo-asso / cid:logo-op par des data URLs base64
+     *  - strip du pixel de tracking (<img src=".../t/{token}.gif">) — sinon le
+     *    simple affichage interne au back-office déclencherait un EmailOpen.
      *
      * À ne PAS utiliser dans le corps réellement envoyé : le CID est plus
-     * efficace (attachement inline unique) et standard pour les mails.
+     * efficace (attachement inline unique) et standard pour les mails, et le
+     * pixel doit y rester pour comptabiliser les vraies ouvertures destinataire.
      */
     public static function previewSwap(string $html, ?int $typeOperationId = null): string
     {
@@ -123,7 +127,22 @@ final class EmailLogo
             }
         }
 
-        return $html;
+        return self::stripTrackingPixel($html);
+    }
+
+    /**
+     * Retire le pixel de tracking (<img src=".../t/{token}.gif" ...>) du HTML.
+     *
+     * Matche tout <img> dont le src pointe vers la route `email.tracking`
+     * (`/t/{token}.gif`), indépendamment de l'ordre des attributs.
+     */
+    public static function stripTrackingPixel(string $html): string
+    {
+        return (string) preg_replace(
+            '#<img\b[^>]*\bsrc="[^"]*/t/[^"/]+\.gif"[^>]*/?>#i',
+            '',
+            $html
+        );
     }
 
     /**

@@ -148,6 +148,26 @@ it('rend le corps_html sans double-échappement dans le srcdoc de l\'iframe', fu
     expect($html)->not->toContain('&amp;lt;p&amp;gt;');
 });
 
+it('strip le pixel de tracking de l\'aperçu (afficher dans le back-office ne doit pas compter comme ouverture)', function (): void {
+    // Bug 2026-05-16 : l'iframe back-office chargeait le pixel embarqué dans
+    // corps_html → EmailTrackingController enregistrait un EmailOpen alors que
+    // c'était juste un admin qui consultait. Le pixel doit être strippé en aperçu.
+    $tiers = Tiers::factory()->create();
+    $log = EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+        'objet' => 'Sujet',
+        'corps_html' => '<p>Bonjour</p><img src="https://app.test/t/sometoken.gif" width="1" height="1" alt="" style="display:none">',
+    ]);
+
+    $html = Livewire::test(Communications::class, ['tiers' => $tiers])
+        ->call('openDetail', $log->id)
+        ->html();
+
+    expect($html)->toContain('&lt;p&gt;Bonjour')
+        ->and($html)->not->toContain('/t/sometoken.gif');
+});
+
 it("refuse d'ouvrir un email qui n'appartient pas au tiers", function (): void {
     $tiers = Tiers::factory()->create();
     $autre = Tiers::factory()->create();
