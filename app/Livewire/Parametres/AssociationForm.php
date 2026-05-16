@@ -50,6 +50,12 @@ final class AssociationForm extends Component
 
     public ?int $facture_compte_bancaire_id = null;
 
+    public ?string $url_site_web = null;
+
+    public ?string $url_renouvellement_adhesion = null;
+
+    public ?string $url_nouveau_don = null;
+
     public ?string $anthropic_api_key = null;
 
     public ?string $email_from = null;
@@ -82,6 +88,9 @@ final class AssociationForm extends Component
             $this->facture_mentions_legales = $association->facture_mentions_legales;
             $this->facture_mentions_penalites = $association->facture_mentions_penalites;
             $this->facture_compte_bancaire_id = $association->facture_compte_bancaire_id;
+            $this->url_site_web = $association->url_site_web;
+            $this->url_renouvellement_adhesion = $association->url_renouvellement_adhesion;
+            $this->url_nouveau_don = $association->url_nouveau_don;
             $this->anthropic_api_key = $association->anthropic_api_key;
             $this->email_from = $association->email_from;
             $this->email_from_name = $association->email_from_name;
@@ -105,6 +114,9 @@ final class AssociationForm extends Component
             'facture_mentions_legales' => ['nullable', 'string', 'max:2000'],
             'facture_mentions_penalites' => ['nullable', 'string', 'max:2000'],
             'facture_compte_bancaire_id' => ['nullable', 'integer', 'exists:comptes_bancaires,id'],
+            'url_site_web' => ['nullable', 'string', 'url', 'max:255'],
+            'url_renouvellement_adhesion' => ['nullable', 'string', 'url', 'max:255'],
+            'url_nouveau_don' => ['nullable', 'string', 'url', 'max:255'],
             'anthropic_api_key' => ['nullable', 'string', 'max:255'],
             'email_from' => ['nullable', 'email', 'max:255'],
             'email_from_name' => ['nullable', 'string', 'max:255'],
@@ -123,6 +135,9 @@ final class AssociationForm extends Component
             'facture_mentions_legales' => $this->facture_mentions_legales,
             'facture_mentions_penalites' => $this->facture_mentions_penalites,
             'facture_compte_bancaire_id' => $this->facture_compte_bancaire_id,
+            'url_site_web' => $this->url_site_web ?: null,
+            'url_renouvellement_adhesion' => $this->url_renouvellement_adhesion ?: null,
+            'url_nouveau_don' => $this->url_nouveau_don ?: null,
             'anthropic_api_key' => $this->anthropic_api_key ?: null,
             'email_from' => $this->email_from ?: null,
             'email_from_name' => $this->email_from_name ?: null,
