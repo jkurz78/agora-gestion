@@ -299,7 +299,7 @@ final class OperationCommunication extends Component
         ]);
 
         MessageTemplate::create([
-            'categorie' => 'operation',
+            'categorie' => CategorieEmail::Message->value,
             'nom' => $this->templateNom,
             'objet' => $this->objet,
             'corps' => EmailTemplate::sanitizeCorps($this->corps),
@@ -343,7 +343,7 @@ final class OperationCommunication extends Component
     public function getAvailableTemplates(): Collection
     {
         return MessageTemplate::with('typeOperation')
-            ->where('categorie', 'operation')
+            ->where('categorie', CategorieEmail::Message->value)
             ->orderBy('nom')
             ->get()
             ->groupBy(fn (MessageTemplate $t) => $t->typeOperation?->nom ?? 'Modèles généraux');

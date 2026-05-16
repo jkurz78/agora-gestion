@@ -211,6 +211,7 @@ it('groups templates by type operation', function () {
 
     MessageTemplate::create([
         'association_id' => $this->association->id,
+        'categorie' => 'message',
         'nom' => 'Gabarit global',
         'objet' => 'Sujet global',
         'corps' => 'Corps global',
@@ -218,6 +219,7 @@ it('groups templates by type operation', function () {
     ]);
     MessageTemplate::create([
         'association_id' => $this->association->id,
+        'categorie' => 'message',
         'nom' => 'Gabarit sophrologie',
         'objet' => 'Sujet sophrologie',
         'corps' => 'Corps sophrologie',
