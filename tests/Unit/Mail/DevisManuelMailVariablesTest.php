@@ -55,4 +55,4 @@ it('DevisManuelMail substitue toutes les variables politesse dans le corps', fun
     );
 
     assertNoUnsubstitutedEmailVariables($mail);
-})->todo('Bug dans DevisManuelMail : la vue utilise $corps (brut) au lieu de $corpsHtml (substitué) — les variables politesse ne sont jamais remplacées dans le rendu final');
+});
