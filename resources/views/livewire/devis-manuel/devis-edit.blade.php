@@ -319,7 +319,7 @@
                 <div class="card mb-4 border-success">
                     <div class="card-body text-success small">
                         <i class="bi bi-check-circle-fill me-1"></i>
-                        Accepté par <strong>{{ $devis->accepteParUser->name }}</strong>
+                        Accepté par <strong>{{ $devis->accepteParUser->nom }}</strong>
                         le {{ $devis->accepte_le?->format('d/m/Y à H:i') }}
                     </div>
                 </div>
@@ -329,7 +329,7 @@
                 <div class="card mb-4 border-danger">
                     <div class="card-body text-danger small">
                         <i class="bi bi-x-circle-fill me-1"></i>
-                        Refusé par <strong>{{ $devis->refuseParUser->name }}</strong>
+                        Refusé par <strong>{{ $devis->refuseParUser->nom }}</strong>
                         le {{ $devis->refuse_le?->format('d/m/Y à H:i') }}
                     </div>
                 </div>
@@ -339,7 +339,7 @@
                 <div class="card mb-4 border-dark">
                     <div class="card-body text-secondary small">
                         <i class="bi bi-slash-circle-fill me-1"></i>
-                        Annulé par <strong>{{ $devis->annuleParUser->name }}</strong>
+                        Annulé par <strong>{{ $devis->annuleParUser->nom }}</strong>
                         le {{ $devis->annule_le?->format('d/m/Y à H:i') }}
                     </div>
                 </div>

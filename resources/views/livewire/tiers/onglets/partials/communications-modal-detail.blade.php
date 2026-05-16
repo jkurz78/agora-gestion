@@ -33,7 +33,7 @@
 
                     @if($email->envoyePar)
                         <dt class="col-sm-3">Envoyé par</dt>
-                        <dd class="col-sm-9">{{ $email->envoyePar->name }}</dd>
+                        <dd class="col-sm-9">{{ $email->envoyePar->nom }}</dd>
                     @endif
 
                     @if($email->emailTemplate)

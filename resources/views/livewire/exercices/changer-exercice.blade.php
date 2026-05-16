@@ -41,7 +41,7 @@
                             {{ $ex->date_cloture ? $ex->date_cloture->format('d/m/Y') : '—' }}
                         </td>
                         <td>
-                            {{ $ex->cloturePar ? $ex->cloturePar->name : '—' }}
+                            {{ $ex->cloturePar ? $ex->cloturePar->nom : '—' }}
                         </td>
                         <td>
                             @if ($ex->helloasso_url)

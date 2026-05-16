@@ -359,7 +359,7 @@
                                     <span class="text-muted small ms-2">
                                         {{ $campagne->created_at->format('d/m/Y H:i') }}
                                         @if($campagne->envoyePar)
-                                            — {{ $campagne->envoyePar->name }}
+                                            — {{ $campagne->envoyePar->nom }}
                                         @endif
                                     </span>
                                 </div>

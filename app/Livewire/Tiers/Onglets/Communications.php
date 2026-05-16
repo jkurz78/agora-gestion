@@ -59,7 +59,7 @@ final class Communications extends Component
                     'participant.tiers:id,nom,prenom',
                     'operation:id,nom',
                     'campagne:id,nom',
-                    'envoyePar:id,name',
+                    'envoyePar:id,nom',
                     'opens',
                     'emailTemplate:id,nom',
                 ])

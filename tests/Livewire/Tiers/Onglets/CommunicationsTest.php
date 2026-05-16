@@ -75,19 +75,22 @@ it('ouvre et ferme la modale de détail', function (): void {
 });
 
 it('ouvre la modale de détail pour un email lié à un participant et affiche son nom (regression bug 2026-05-16)', function (): void {
-    // Bug remonté 2026-05-16 en prod (MySQL) :
+    // Bugs remontés 2026-05-16 en prod (MySQL) :
     //   SQLSTATE[42S22]: Column not found: 1054 Unknown column 'nom' in 'field list'
-    // L'eager-load `participant:id,nom,prenom` était erroné — les colonnes nom/prenom
-    // vivent sur Tiers (Participant n'a que tiers_id). SQLite est tolérant et ne
-    // déclenchait pas le bug en test ; on assert donc directement le rendu du nom
-    // pour qu'il vienne forcément du tiers du participant.
+    //   (eager-load `participant:id,nom,prenom` — Participant n'a pas ces colonnes)
+    //   SQLSTATE[42S22]: Column not found: 1054 Unknown column 'name' in 'field list'
+    //   (eager-load `envoyePar:id,name` — users a `nom`, pas `name`)
+    // SQLite est tolérant aux colonnes inexistantes, on assert donc directement le
+    // rendu des deux noms pour forcer les bons accès relationnels.
     $tiersAdherent = Tiers::factory()->create(['prenom' => 'Bob', 'nom' => 'PARENT']);
     $tiersEnfant = Tiers::factory()->create(['prenom' => 'Alice', 'nom' => 'ENFANT']);
     $participant = Participant::factory()->create(['tiers_id' => $tiersEnfant->id]);
+    $envoyeur = User::factory()->create(['nom' => 'AdminUser']);
 
     $log = EmailLog::factory()->create([
         'tiers_id' => $tiersAdherent->id, // email envoyé au parent
         'participant_id' => $participant->id, // pour le compte de l'enfant
+        'envoye_par' => $envoyeur->id,
         'objet' => 'Attestation Alice',
         'corps_html' => '<p>Hello</p>',
     ]);
@@ -96,8 +99,9 @@ it('ouvre la modale de détail pour un email lié à un participant et affiche s
         ->call('openDetail', $log->id)
         ->assertSet('selectedEmailId', $log->id)
         ->assertSee('Attestation Alice')
-        ->assertSee('Alice')    // prénom de l'enfant (via participant.tiers)
-        ->assertSee('ENFANT');  // nom de l'enfant
+        ->assertSee('Alice')      // prénom de l'enfant (via participant.tiers)
+        ->assertSee('ENFANT')     // nom de l'enfant
+        ->assertSee('AdminUser'); // nom de l'utilisateur ayant envoyé (envoyePar.nom)
 });
 
 it("refuse d'ouvrir un email qui n'appartient pas au tiers", function (): void {
