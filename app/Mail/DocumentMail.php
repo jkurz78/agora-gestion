@@ -35,6 +35,8 @@ final class DocumentMail extends Mailable
         public readonly ?int $typeOperationId = null,
         public readonly ?string $civilite = null,
         public readonly ?string $politesse = null,
+        public readonly ?string $operationLabel = null,
+        public readonly ?string $typeOperationLabel = null,
     ) {
         $corps = $this->customCorps
             ?? '<p>Bonjour {prenom},</p><p>Veuillez trouver ci-joint {type_document_article} n° {numero_document}.</p>';
@@ -90,6 +92,8 @@ final class DocumentMail extends Mailable
             '{numero_document}' => $this->numeroDocument,
             '{date_document}' => $this->dateDocument,
             '{montant_total}' => $this->montantTotal,
+            '{operation}' => $this->operationLabel ?? '',
+            '{type_operation}' => $this->typeOperationLabel ?? '',
         ] + $this->politesseVariables(
             $this->civilite,
             $this->politesse,

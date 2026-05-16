@@ -79,4 +79,4 @@ it('DocumentMail substitue {operation} et {type_operation} dans le sujet', funct
 
     // We verify the rendered subject no longer contains raw placeholders.
     assertNoUnsubstitutedEmailVariables($mail);
-})->todo('Bug 1 — Step 2 must wire {operation} + {type_operation} in DocumentMail::variables()');
+});

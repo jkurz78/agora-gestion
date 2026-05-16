@@ -232,6 +232,10 @@ final class FactureShow extends Component
                 ->value('id')
             : null;
 
+        // Charger l'opération liée pour {operation} / {type_operation} dans le gabarit.
+        // Null pour les factures libres (sans opération associée).
+        $operationLiee = $operationId ? Operation::with('typeOperation')->find($operationId) : null;
+
         try {
             $mail = new DocumentMail(
                 prenomDestinataire: $tiers->prenom ?? '',
@@ -249,6 +253,8 @@ final class FactureShow extends Component
                 typeOperationId: $this->resolveFirstTypeOperationId(),
                 civilite: $tiers->civilite?->value,
                 politesse: $tiers->politesse,
+                operationLabel: $operationLiee?->nom,
+                typeOperationLabel: $operationLiee?->typeOperation?->nom,
             );
 
             Mail::mailer()

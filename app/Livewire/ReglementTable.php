@@ -560,6 +560,8 @@ final class ReglementTable extends Component
                 typeOperationId: $this->operation->type_operation_id,
                 civilite: $tiers->civilite?->value,
                 politesse: $tiers->politesse,
+                operationLabel: $this->operation->nom,
+                typeOperationLabel: $this->operation->typeOperation?->nom,
             );
 
             Mail::mailer()

@@ -794,6 +794,8 @@ final class ParticipantShow extends Component
                 typeOperationId: $doc->operation->type_operation_id,
                 civilite: $tiers->civilite?->value,
                 politesse: $tiers->politesse,
+                operationLabel: $doc->operation->nom,
+                typeOperationLabel: $doc->operation->typeOperation?->nom,
             );
 
             Mail::mailer()
