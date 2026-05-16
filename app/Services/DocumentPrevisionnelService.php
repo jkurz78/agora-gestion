@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\TypeDocumentPrevisionnel;
-use App\Models\Association;
 use App\Models\DocumentPrevisionnel;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\Tiers;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
-use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -200,81 +197,19 @@ final class DocumentPrevisionnelService
 
         PdfFooterRenderer::render($pdf, PdfFooterRenderer::generatedByText());
 
+        // Pro forma / devis prévisionnel = PDF standard (pas un document fiscal).
+        // Le wrap Factur-X / PDF/A-3 a été retiré 2026-05-16 : ces documents ne
+        // sont pas des factures (TypeCode 380), donc rien à embarquer en XML
+        // structuré, et le combo footer logos (SVG opacity:0.6) + PDF/A-3 strict
+        // faisait refuser le fichier par Acrobat. Les vraies factures sont
+        // toujours Factur-X via FactureService::genererPdf.
         $pdfContent = $pdf->output();
-
-        // Convert to PDF/A-3 with metadata XML
-        $xml = $this->genererMetadataXml($document, $association, $tiers);
-        $writer = new FacturXWriter;
-        $pdfA3Content = $writer->generate($pdfContent, $xml, 'minimum', false);
 
         // Store on disk — nom court uniquement, chemin tenant-scoped via pdfFullPath()
         $shortName = "{$document->id}.pdf";
-        Storage::disk('local')->put($document->storagePath("documents-previsionnels/{$shortName}"), $pdfA3Content);
+        Storage::disk('local')->put($document->storagePath("documents-previsionnels/{$shortName}"), $pdfContent);
         $document->update(['pdf_path' => $shortName]);
 
-        return $pdfA3Content;
-    }
-
-    private function genererMetadataXml(
-        DocumentPrevisionnel $document,
-        ?Association $association,
-        Tiers $tiers,
-    ): string {
-        $numero = htmlspecialchars($document->numero, ENT_XML1, 'UTF-8');
-        $date = $document->date->format('Ymd');
-        $montant = number_format((float) $document->montant_total, 2, '.', '');
-        $sellerName = htmlspecialchars($association?->nom ?? '', ENT_XML1, 'UTF-8');
-        $siret = htmlspecialchars($association?->siret ?? '', ENT_XML1, 'UTF-8');
-        $buyerName = htmlspecialchars($tiers->displayName(), ENT_XML1, 'UTF-8');
-
-        $siretBlock = '';
-        if ($siret !== '') {
-            $siretBlock = <<<XML
-                <ram:SpecifiedLegalOrganization>
-                    <ram:ID schemeID="0002">{$siret}</ram:ID>
-                </ram:SpecifiedLegalOrganization>
-XML;
-        }
-
-        // TypeCode 325 = Pro forma, not 380 (Invoice)
-        return <<<XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
-    xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
-    xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
-    <rsm:ExchangedDocumentContext>
-        <ram:GuidelineSpecifiedDocumentContextParameter>
-            <ram:ID>urn:factur-x.eu:1p0:minimum</ram:ID>
-        </ram:GuidelineSpecifiedDocumentContextParameter>
-    </rsm:ExchangedDocumentContext>
-    <rsm:ExchangedDocument>
-        <ram:ID>{$numero}</ram:ID>
-        <ram:TypeCode>325</ram:TypeCode>
-        <ram:IssueDateTime>
-            <udt:DateTimeString format="102">{$date}</udt:DateTimeString>
-        </ram:IssueDateTime>
-    </rsm:ExchangedDocument>
-    <rsm:SupplyChainTradeTransaction>
-        <ram:ApplicableHeaderTradeAgreement>
-            <ram:SellerTradeParty>
-                <ram:Name>{$sellerName}</ram:Name>
-                {$siretBlock}
-            </ram:SellerTradeParty>
-            <ram:BuyerTradeParty>
-                <ram:Name>{$buyerName}</ram:Name>
-            </ram:BuyerTradeParty>
-        </ram:ApplicableHeaderTradeAgreement>
-        <ram:ApplicableHeaderTradeDelivery/>
-        <ram:ApplicableHeaderTradeSettlement>
-            <ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
-            <ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-                <ram:TaxBasisTotalAmount>{$montant}</ram:TaxBasisTotalAmount>
-                <ram:GrandTotalAmount>{$montant}</ram:GrandTotalAmount>
-                <ram:DuePayableAmount>{$montant}</ram:DuePayableAmount>
-            </ram:SpecifiedTradeSettlementHeaderMonetarySummation>
-        </ram:ApplicableHeaderTradeSettlement>
-    </rsm:SupplyChainTradeTransaction>
-</rsm:CrossIndustryInvoice>
-XML;
+        return $pdfContent;
     }
 }
