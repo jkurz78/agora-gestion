@@ -55,10 +55,10 @@
                         </dd>
                     @endif
 
-                    @if($email->participant)
+                    @if($email->participant?->tiers)
                         <dt class="col-sm-3">Participant</dt>
                         <dd class="col-sm-9">
-                            {{ $email->participant->prenom }} {{ $email->participant->nom }}
+                            {{ $email->participant->tiers->prenom }} {{ $email->participant->tiers->nom }}
                         </dd>
                     @endif
                 </dl>
@@ -82,9 +82,12 @@
                 @if($email->attachment_path)
                     <h6 class="mt-3">Pièce jointe</h6>
                     <p class="mb-0">
-                        <i class="bi bi-paperclip"></i>
-                        {{ basename($email->attachment_path) }}
-                        {{-- Lien de téléchargement à brancher selon la route storage --}}
+                        <a href="{{ route('tiers.email-logs.attachment', ['emailLog' => $email->id]) }}"
+                           target="_blank"
+                           rel="noopener">
+                            <i class="bi bi-paperclip"></i>
+                            {{ basename($email->attachment_path) }}
+                        </a>
                     </p>
                 @endif
 

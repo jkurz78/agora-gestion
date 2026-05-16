@@ -55,7 +55,8 @@ final class Communications extends Component
         if ($this->selectedEmailId !== null) {
             $selected = EmailLog::query()
                 ->with([
-                    'participant:id,nom,prenom',
+                    'participant:id,tiers_id',
+                    'participant.tiers:id,nom,prenom',
                     'operation:id,nom',
                     'campagne:id,nom',
                     'envoyePar:id,name',
