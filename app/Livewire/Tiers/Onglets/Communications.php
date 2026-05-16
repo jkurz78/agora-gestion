@@ -58,10 +58,11 @@ final class Communications extends Component
                     'participant:id,tiers_id',
                     'participant.tiers:id,nom,prenom',
                     'operation:id,nom',
-                    'campagne:id,nom',
+                    'campagne:id,objet',
                     'envoyePar:id,nom',
                     'opens',
-                    'emailTemplate:id,nom',
+                    'emailTemplate:id,categorie,type_operation_id',
+                    'emailTemplate.typeOperation:id,nom',
                 ])
                 ->find($this->selectedEmailId);
 

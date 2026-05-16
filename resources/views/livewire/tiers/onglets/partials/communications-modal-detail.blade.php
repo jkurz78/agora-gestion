@@ -38,12 +38,17 @@
 
                     @if($email->emailTemplate)
                         <dt class="col-sm-3">Modèle</dt>
-                        <dd class="col-sm-9">{{ $email->emailTemplate->nom }}</dd>
+                        <dd class="col-sm-9">
+                            {{ $email->emailTemplate->categorie->label() }}
+                            @if($email->emailTemplate->typeOperation)
+                                — {{ $email->emailTemplate->typeOperation->nom }}
+                            @endif
+                        </dd>
                     @endif
 
                     @if($email->campagne)
                         <dt class="col-sm-3">Campagne</dt>
-                        <dd class="col-sm-9">{{ $email->campagne->nom }}</dd>
+                        <dd class="col-sm-9">{{ $email->campagne->objet }}</dd>
                     @endif
 
                     @if($email->operation)

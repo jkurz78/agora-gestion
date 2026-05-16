@@ -5,10 +5,13 @@ declare(strict_types=1);
 use App\Enums\CategorieEmail;
 use App\Livewire\Tiers\Onglets\Communications;
 use App\Models\Association;
+use App\Models\CampagneEmail;
 use App\Models\EmailLog;
 use App\Models\EmailOpen;
+use App\Models\EmailTemplate;
 use App\Models\Participant;
 use App\Models\Tiers;
+use App\Models\TypeOperation;
 use App\Models\User;
 use App\Tenant\TenantContext;
 use Livewire\Livewire;
@@ -74,23 +77,38 @@ it('ouvre et ferme la modale de détail', function (): void {
         ->assertSet('selectedEmailId', null);
 });
 
-it('ouvre la modale de détail pour un email lié à un participant et affiche son nom (regression bug 2026-05-16)', function (): void {
-    // Bugs remontés 2026-05-16 en prod (MySQL) :
-    //   SQLSTATE[42S22]: Column not found: 1054 Unknown column 'nom' in 'field list'
-    //   (eager-load `participant:id,nom,prenom` — Participant n'a pas ces colonnes)
-    //   SQLSTATE[42S22]: Column not found: 1054 Unknown column 'name' in 'field list'
-    //   (eager-load `envoyePar:id,name` — users a `nom`, pas `name`)
-    // SQLite est tolérant aux colonnes inexistantes, on assert donc directement le
-    // rendu des deux noms pour forcer les bons accès relationnels.
+it('ouvre la modale de détail et affiche participant, envoyé par et modèle (regression bugs 2026-05-16)', function (): void {
+    // Bugs remontés 2026-05-16 en prod (MySQL) — SQLite tolère les colonnes
+    // inexistantes, donc on assert directement le rendu pour forcer les bons accès :
+    //   - `participant:id,nom,prenom` → Participant n'a ni nom ni prenom (sur tiers)
+    //   - `envoyePar:id,name` → users a `nom`, pas `name`
+    //   - `emailTemplate:id,nom` → email_templates n'a ni nom ni name
+    //   - `campagne:id,nom` → campagnes_email a `objet`, pas `nom`
     $tiersAdherent = Tiers::factory()->create(['prenom' => 'Bob', 'nom' => 'PARENT']);
     $tiersEnfant = Tiers::factory()->create(['prenom' => 'Alice', 'nom' => 'ENFANT']);
     $participant = Participant::factory()->create(['tiers_id' => $tiersEnfant->id]);
     $envoyeur = User::factory()->create(['nom' => 'AdminUser']);
+    $typeOp = TypeOperation::factory()->create(['nom' => 'PSA Yoga']);
+    $template = EmailTemplate::create([
+        'association_id' => $tiersAdherent->association_id,
+        'categorie' => CategorieEmail::Attestation->value,
+        'type_operation_id' => $typeOp->id,
+        'objet' => 'Attestation',
+        'corps' => '<p>Corps</p>',
+    ]);
+    $campagne = CampagneEmail::create([
+        'association_id' => $tiersAdherent->association_id,
+        'objet' => 'Newsletter Mai',
+        'corps' => '<p>Newsletter</p>',
+        'envoye_par' => $envoyeur->id,
+    ]);
 
     $log = EmailLog::factory()->create([
         'tiers_id' => $tiersAdherent->id, // email envoyé au parent
         'participant_id' => $participant->id, // pour le compte de l'enfant
         'envoye_par' => $envoyeur->id,
+        'email_template_id' => $template->id,
+        'campagne_id' => $campagne->id,
         'objet' => 'Attestation Alice',
         'corps_html' => '<p>Hello</p>',
     ]);
@@ -99,9 +117,11 @@ it('ouvre la modale de détail pour un email lié à un participant et affiche s
         ->call('openDetail', $log->id)
         ->assertSet('selectedEmailId', $log->id)
         ->assertSee('Attestation Alice')
-        ->assertSee('Alice')      // prénom de l'enfant (via participant.tiers)
-        ->assertSee('ENFANT')     // nom de l'enfant
-        ->assertSee('AdminUser'); // nom de l'utilisateur ayant envoyé (envoyePar.nom)
+        ->assertSee('Alice')         // prénom de l'enfant (via participant.tiers)
+        ->assertSee('ENFANT')        // nom de l'enfant
+        ->assertSee('AdminUser')     // nom utilisateur ayant envoyé (envoyePar.nom)
+        ->assertSee('PSA Yoga')      // type_operation du template (emailTemplate.typeOperation.nom)
+        ->assertSee('Newsletter Mai'); // objet de la campagne (campagne.objet)
 });
 
 it("refuse d'ouvrir un email qui n'appartient pas au tiers", function (): void {
