@@ -43,6 +43,7 @@ final class FormulaireInvitation extends Mailable
         public readonly ?int $typeOperationId = null,
         public readonly ?string $civilite = null,
         public readonly ?string $politesse = null,
+        public readonly ?string $trackingToken = null,
     ) {
         $vars = $this->allVariables();
 
@@ -54,8 +55,15 @@ final class FormulaireInvitation extends Mailable
 
         $corps = TemplateSubstitution::apply($corps, $vars);
         $corps = ArticleFr::contracter($corps);
+        $html = strip_tags($corps, EmailLogo::ALLOWED_TAGS);
 
-        $this->corpsHtml = strip_tags($corps, EmailLogo::ALLOWED_TAGS);
+        // Append tracking pixel if token provided
+        if ($this->trackingToken) {
+            $pixelUrl = TenantUrl::route('email.tracking', ['token' => $this->trackingToken]);
+            $html .= '<img src="'.htmlspecialchars($pixelUrl).'" width="1" height="1" alt="" style="display:none">';
+        }
+
+        $this->corpsHtml = $html;
     }
 
     public function envelope(): Envelope

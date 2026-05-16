@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 final class DevisService
@@ -833,6 +834,7 @@ final class DevisService
         }
 
         $pdfPath = $this->genererPdf($devis);
+        $trackingToken = Str::random(32);
 
         $mailable = new DevisManuelMail(
             devis: $devis,
@@ -843,6 +845,7 @@ final class DevisService
             politesse: $devis->tiers?->politesse,
             prenom: $devis->tiers?->prenom,
             nom: $devis->tiers?->nom,
+            trackingToken: $trackingToken,
         );
 
         Mail::to($email)->send($mailable);
@@ -853,10 +856,11 @@ final class DevisService
             'destinataire_email' => $email,
             'destinataire_nom' => $devis->tiers?->displayName(),
             'objet' => $sujet,
-            'corps_html' => $corps,
+            'corps_html' => $mailable->corpsHtml,
             'attachment_path' => $pdfPath,
             'statut' => 'envoye',
             'envoye_par' => Auth::id(),
+            'tracking_token' => $trackingToken,
         ]);
     }
 

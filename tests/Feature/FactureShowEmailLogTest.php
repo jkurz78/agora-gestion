@@ -7,6 +7,7 @@ use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
 use App\Livewire\FactureShow;
 use App\Models\Association;
+use App\Models\CompteBancaire;
 use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Facture;
@@ -51,7 +52,7 @@ beforeEach(function (): void {
         'ville' => 'Paris',
     ]);
 
-    $compte = \App\Models\CompteBancaire::factory()->create([
+    $compte = CompteBancaire::factory()->create([
         'association_id' => $this->association->id,
     ]);
 
@@ -121,6 +122,10 @@ it('enregistre un EmailLog avec corps_html et attachment_path après envoi de fa
     expect($log->categorie)->toBe(CategorieEmail::Document->value);
     expect($log->statut)->toBe('envoye');
 
+    // tracking_token persisté + pixel embarqué dans corps_html (ouvertures activées)
+    expect($log->tracking_token)->not->toBeNull()->toHaveLength(32);
+    expect($log->corps_html)->toContain('/t/'.$log->tracking_token.'.gif');
+
     // envoye_par pointe vers l'utilisateur authentifié
     expect((int) $log->envoye_par)->toBe((int) $this->user->id);
 });
@@ -157,7 +162,7 @@ it('n\'enregistre pas d\'EmailLog quand le tiers n\'a pas d\'email dans FactureS
     ]);
 
     $exercice = app(ExerciceService::class)->current();
-    $compte = \App\Models\CompteBancaire::factory()->create(['association_id' => $this->association->id]);
+    $compte = CompteBancaire::factory()->create(['association_id' => $this->association->id]);
 
     $factureNoEmail = Facture::create([
         'association_id' => $this->association->id,

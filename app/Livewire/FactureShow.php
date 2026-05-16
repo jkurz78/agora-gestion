@@ -24,6 +24,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 final class FactureShow extends Component
@@ -237,6 +238,7 @@ final class FactureShow extends Component
         $operationLiee = $operationId ? Operation::with('typeOperation')->find($operationId) : null;
 
         try {
+            $trackingToken = Str::random(32);
             $mail = new DocumentMail(
                 prenomDestinataire: $tiers->prenom ?? '',
                 nomDestinataire: $tiers->nom,
@@ -255,6 +257,7 @@ final class FactureShow extends Component
                 politesse: $tiers->politesse,
                 operationLabel: $operationLiee?->nom,
                 typeOperationLabel: $operationLiee?->typeOperation?->nom,
+                trackingToken: $trackingToken,
             );
 
             Mail::mailer()
@@ -272,6 +275,7 @@ final class FactureShow extends Component
                 emailTemplateId: $template?->id !== null ? (int) $template->id : null,
                 pdfContent: $pdfContent,
                 pdfFilename: $pdfFilename,
+                extra: ['tracking_token' => $trackingToken],
             );
 
             $this->emailMessage = "Facture envoyée à {$tiers->email}.";

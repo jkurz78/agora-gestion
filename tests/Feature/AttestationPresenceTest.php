@@ -201,7 +201,10 @@ it('sends attestation emails and logs them', function () {
 
     $log = EmailLog::where('participant_id', $participant->id)->where('categorie', 'attestation')->first();
     expect($log)->not->toBeNull()
-        ->and($log->statut)->toBe('envoye');
+        ->and($log->statut)->toBe('envoye')
+        ->and($log->tracking_token)->not->toBeNull()
+        ->and(strlen((string) $log->tracking_token))->toBe(32)
+        ->and($log->corps_html)->toContain('/t/'.$log->tracking_token.'.gif');
 });
 
 it('opens recap modal with seances list', function () {

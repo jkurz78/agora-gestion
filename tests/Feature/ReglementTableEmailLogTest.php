@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\CategorieEmail;
-use App\Enums\TypeDocumentPrevisionnel;
 use App\Livewire\ReglementTable;
 use App\Models\Association;
 use App\Models\DocumentPrevisionnel;
@@ -103,6 +102,10 @@ it('enregistre un EmailLog avec corps_html et attachment_path après envoi de de
     // catégorie
     expect($log->categorie)->toBe(CategorieEmail::Document->value);
 
+    // tracking_token persisté + pixel embarqué dans corps_html (ouvertures activées)
+    expect($log->tracking_token)->not->toBeNull()->toHaveLength(32);
+    expect($log->corps_html)->toContain('/t/'.$log->tracking_token.'.gif');
+
     // Le fichier doit exister sur le disque local fake
     Storage::disk('local')->assertExists($log->attachment_path);
 
@@ -146,7 +149,7 @@ it('enregistre un EmailLog statut erreur quand Mail::send lève une exception', 
     // Override Mail facade to throw on `to()`
     Mail::shouldReceive('mailer')->andReturnSelf();
     Mail::shouldReceive('to')->andReturnSelf();
-    Mail::shouldReceive('send')->andThrow(new \RuntimeException('SMTP connection refused'));
+    Mail::shouldReceive('send')->andThrow(new RuntimeException('SMTP connection refused'));
 
     Livewire::test(ReglementTable::class, ['operation' => $this->operation])
         ->call('envoyerDocumentEmail', $this->participant->id, 'devis');

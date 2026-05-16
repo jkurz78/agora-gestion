@@ -16,13 +16,13 @@ use App\Mail\DocumentMail;
 use App\Models\CompteBancaire;
 use App\Models\DocumentPrevisionnel;
 use App\Models\EmailTemplate;
-use App\Services\Email\EmailLogStorageService;
 use App\Models\Operation;
 use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\DocumentPrevisionnelService;
+use App\Services\Email\EmailLogStorageService;
 use App\Services\NumeroPieceService;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 final class ReglementTable extends Component
@@ -544,6 +545,7 @@ final class ReglementTable extends Component
             ->first();
 
         try {
+            $trackingToken = Str::random(32);
             $mail = new DocumentMail(
                 prenomDestinataire: $tiers->prenom ?? '',
                 nomDestinataire: $tiers->nom,
@@ -562,6 +564,7 @@ final class ReglementTable extends Component
                 politesse: $tiers->politesse,
                 operationLabel: $this->operation->nom,
                 typeOperationLabel: $this->operation->typeOperation?->nom,
+                trackingToken: $trackingToken,
             );
 
             Mail::mailer()
@@ -579,6 +582,7 @@ final class ReglementTable extends Component
                 emailTemplateId: $template?->id !== null ? (int) $template->id : null,
                 pdfContent: $pdfContent,
                 pdfFilename: $pdfFilename,
+                extra: ['tracking_token' => $trackingToken],
             );
 
             $this->docModalMessage = ucfirst($typeLabel)." envoyé à {$tiers->email}.";

@@ -20,6 +20,7 @@ use App\Services\FormulaireTokenService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -400,6 +401,7 @@ final class ParticipantTable extends Component
 
         try {
             $op = $participant->operation;
+            $trackingToken = Str::random(32);
             $mail = new FormulaireInvitation(
                 prenomParticipant: $participant->tiers->prenom ?? 'Participant',
                 nomParticipant: $participant->tiers->nom ?? '',
@@ -417,6 +419,7 @@ final class ParticipantTable extends Component
                 typeOperationId: $typeOp->id,
                 civilite: $participant->tiers->civilite?->value,
                 politesse: $participant->tiers->politesse,
+                trackingToken: $trackingToken,
             );
 
             Mail::mailer()
@@ -432,6 +435,7 @@ final class ParticipantTable extends Component
                 participantId: (int) $participant->id,
                 operationId: (int) $participant->operation_id,
                 emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+                extra: ['tracking_token' => $trackingToken],
             );
 
             $this->tokenEmailMessage = "Email envoyé à {$email}.";

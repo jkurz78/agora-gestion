@@ -17,6 +17,7 @@ use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -187,6 +188,7 @@ final class AttestationModal extends Component
                 // Generate individual PDF in memory
                 $pdfData = $this->generateSeancePdfData($participant, $seance);
 
+                $trackingToken = Str::random(32);
                 $mail = new AttestationPresenceMail(
                     prenomParticipant: $participant->tiers->prenom ?? '',
                     nomParticipant: $participant->tiers->nom ?? '',
@@ -206,6 +208,7 @@ final class AttestationModal extends Component
                     typeOperationId: $typeOp?->id,
                     civilite: $participant->tiers->civilite?->value,
                     politesse: $participant->tiers->politesse,
+                    trackingToken: $trackingToken,
                 );
 
                 Mail::mailer()
@@ -223,6 +226,7 @@ final class AttestationModal extends Component
                     emailTemplateId: $template?->id !== null ? (int) $template->id : null,
                     pdfContent: $pdfData,
                     pdfFilename: "Attestation présence - S{$seance->numero}.pdf",
+                    extra: ['tracking_token' => $trackingToken],
                 );
 
                 $sent++;
@@ -278,6 +282,7 @@ final class AttestationModal extends Component
             $pdfData = $this->generateRecapPdfData($participant);
             $prenom = $participant->tiers->prenom ?? '';
             $nom = $participant->tiers->nom ?? '';
+            $trackingToken = Str::random(32);
 
             $mail = new AttestationPresenceMail(
                 prenomParticipant: $prenom,
@@ -298,6 +303,7 @@ final class AttestationModal extends Component
                 typeOperationId: $typeOp?->id,
                 civilite: $participant->tiers->civilite?->value,
                 politesse: $participant->tiers->politesse,
+                trackingToken: $trackingToken,
             );
 
             Mail::mailer()
@@ -315,6 +321,7 @@ final class AttestationModal extends Component
                 emailTemplateId: $template?->id !== null ? (int) $template->id : null,
                 pdfContent: $pdfData,
                 pdfFilename: "Attestation présence - {$prenom} {$nom}.pdf",
+                extra: ['tracking_token' => $trackingToken],
             );
 
             $this->resultMessage = "Email envoyé à {$this->participantEmail}.";

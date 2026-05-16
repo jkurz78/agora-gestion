@@ -7,6 +7,7 @@ namespace App\Mail;
 use App\Mail\Concerns\HasPolitesseVariables;
 use App\Models\Devis;
 use App\Support\TemplateSubstitution;
+use App\Support\TenantUrl;
 use Illuminate\Mail\Attachment;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -27,11 +28,20 @@ final class DevisManuelMail extends Mailable
         public readonly ?string $politesse = null,
         public readonly ?string $prenom = null,
         public readonly ?string $nom = null,
+        public readonly ?string $trackingToken = null,
     ) {
-        $this->corpsHtml = TemplateSubstitution::apply(
+        $html = TemplateSubstitution::apply(
             $this->corps,
             $this->variables()
         );
+
+        // Append tracking pixel if token provided
+        if ($this->trackingToken) {
+            $pixelUrl = TenantUrl::route('email.tracking', ['token' => $this->trackingToken]);
+            $html .= '<img src="'.htmlspecialchars($pixelUrl).'" width="1" height="1" alt="" style="display:none">';
+        }
+
+        $this->corpsHtml = $html;
     }
 
     public function envelope(): Envelope

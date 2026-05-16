@@ -92,6 +92,10 @@ it('enregistre un EmailLog avec corps_html après envoi formulaire invitation', 
     expect($log->statut)->toBe('envoye');
     expect((int) $log->participant_id)->toBe((int) $this->participant->id);
     expect((int) $log->operation_id)->toBe((int) $this->operation->id);
+
+    // tracking_token persisté + pixel embarqué dans corps_html (ouvertures activées)
+    expect($log->tracking_token)->not->toBeNull()->toHaveLength(32);
+    expect($log->corps_html)->toContain('/t/'.$log->tracking_token.'.gif');
 });
 
 it('enregistre un EmailLog erreur pour formulaire avec corps_html null', function (): void {

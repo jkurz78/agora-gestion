@@ -118,6 +118,10 @@ it('enregistre un EmailLog avec corps_html et attachment_path après envoi de de
 
     // participant_id correct
     expect((int) $log->participant_id)->toBe((int) $this->participant->id);
+
+    // tracking_token persisté + pixel embarqué dans corps_html (ouvertures activées)
+    expect($log->tracking_token)->not->toBeNull()->toHaveLength(32);
+    expect($log->corps_html)->toContain('/t/'.$log->tracking_token.'.gif');
 });
 
 it('enregistre un EmailLog statut erreur quand Mail::send lève une exception depuis ParticipantShow', function (): void {

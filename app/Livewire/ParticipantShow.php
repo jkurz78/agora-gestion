@@ -23,6 +23,7 @@ use App\Support\FlashMessages;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -779,6 +780,7 @@ final class ParticipantShow extends Component
             ->first();
 
         try {
+            $trackingToken = Str::random(32);
             $mail = new DocumentMail(
                 prenomDestinataire: $tiers->prenom ?? '',
                 nomDestinataire: $tiers->nom,
@@ -797,6 +799,7 @@ final class ParticipantShow extends Component
                 politesse: $tiers->politesse,
                 operationLabel: $doc->operation->nom,
                 typeOperationLabel: $doc->operation->typeOperation?->nom,
+                trackingToken: $trackingToken,
             );
 
             Mail::mailer()
@@ -814,6 +817,7 @@ final class ParticipantShow extends Component
                 emailTemplateId: $template?->id !== null ? (int) $template->id : null,
                 pdfContent: $pdfContent,
                 pdfFilename: $pdfFilename,
+                extra: ['tracking_token' => $trackingToken],
             );
 
             session()->flash('success', FlashMessages::documentSentTo($typeLabel, $tiers->email));

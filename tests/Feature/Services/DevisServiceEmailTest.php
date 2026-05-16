@@ -175,4 +175,8 @@ it('envoyerEmail crée une entrée email_logs avec tiers_id, sujet et attachment
     expect($log->objet)->toBe($sujet);
     expect($log->attachment_path)->not->toBeNull()->toBeString()->not->toBeEmpty();
     expect($log->statut)->toBe('envoye');
+
+    // tracking_token persisté + pixel embarqué dans corps_html (ouvertures activées)
+    expect($log->tracking_token)->not->toBeNull()->toHaveLength(32);
+    expect($log->corps_html)->toContain('/t/'.$log->tracking_token.'.gif');
 });
