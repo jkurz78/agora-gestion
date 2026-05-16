@@ -57,6 +57,6 @@ final class Index extends Component
 
         return view('livewire.portail.note-de-frais.index', [
             'notes' => $notes,
-        ])->layout('portail.layouts.app');
+        ])->layout('portail.layouts.authenticated');
     }
 }

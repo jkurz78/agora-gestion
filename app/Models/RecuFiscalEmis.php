@@ -42,6 +42,18 @@ final class RecuFiscalEmis extends TenantModel
         'annule_at' => 'datetime',
     ];
 
+    public function association(): BelongsTo
+    {
+        return $this->belongsTo(Association::class);
+    }
+
+    public function pdfFilename(): string
+    {
+        $slug = $this->association?->slug ?? 'asso';
+
+        return "{$slug}-recu-fiscal-{$this->numero}.pdf";
+    }
+
     public function tiers(): BelongsTo
     {
         return $this->belongsTo(Tiers::class);

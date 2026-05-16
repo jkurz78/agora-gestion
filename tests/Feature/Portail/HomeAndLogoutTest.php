@@ -41,10 +41,9 @@ it('GET /{slug}/portail/ authentifié affiche nom asso, bienvenue et placeholder
     $this->get("/{$asso->slug}/portail/")
         ->assertStatus(200)
         ->assertSeeText('Les Amis du Quartier')
-        ->assertSeeText('Marie')
-        ->assertSeeText('DUPONT')
-        ->assertSeeText('Déconnexion')
-        ->assertSee('notes de frais');
+        ->assertSeeText('Bonjour Marie')
+        ->assertSeeText('Se déconnecter')
+        ->assertSeeText('Notes de frais');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -27,6 +27,8 @@ final readonly class EmailLogLigneDTO
         public ?string $operationNom,
         public ?string $campagneNom,
         public ?string $envoyeParNom,
+        public string $corpsHtml = '',
+        public ?string $attachmentPath = null,
     ) {}
 
     public static function fromEmailLog(EmailLog $log): self
@@ -67,6 +69,8 @@ final readonly class EmailLogLigneDTO
             operationNom: $log->operation?->nom,
             campagneNom: $log->campagne?->objet,
             envoyeParNom: $log->envoyePar?->nom,
+            corpsHtml: (string) $log->corps_html,
+            attachmentPath: $log->attachment_path !== null ? (string) $log->attachment_path : null,
         );
     }
 }

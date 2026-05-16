@@ -2,26 +2,37 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Portail\AttestationPortailController;
 use App\Http\Controllers\Portail\DemoLoginAsTierController;
+use App\Http\Controllers\Portail\DocumentPortailController;
 use App\Http\Controllers\Portail\FacturePartenaireDeposeePdfController;
 use App\Http\Controllers\Portail\LogoController;
 use App\Http\Controllers\Portail\LogoutController;
+use App\Http\Controllers\Portail\MesActivitesRedirectController;
+use App\Http\Controllers\Portail\MessageAttachmentController;
+use App\Http\Controllers\Portail\RecuPortailController;
 use App\Http\Controllers\Portail\TransactionPdfController;
 use App\Http\Middleware\Portail\Authenticate;
 use App\Http\Middleware\Portail\BootTenantFromSlug;
 use App\Http\Middleware\Portail\EnforceSessionLifetime;
+use App\Http\Middleware\Portail\EnsurePeutVoirNotesDeFrais;
 use App\Http\Middleware\Portail\EnsurePourDepenses;
 use App\Http\Middleware\Portail\EnsureTiersChosen;
 use App\Livewire\Portail\ChooseTiers;
 use App\Livewire\Portail\FacturePartenaire\AtraiterIndex;
 use App\Livewire\Portail\FacturePartenaire\Depot;
 use App\Livewire\Portail\HistoriqueDepenses\Index as HistoriqueDepensesIndex;
-use App\Livewire\Portail\Home;
 use App\Livewire\Portail\Login;
+use App\Livewire\Portail\MesActivites;
+use App\Livewire\Portail\MesAdhesions;
+use App\Livewire\Portail\MesDons;
+use App\Livewire\Portail\MesMessages;
+use App\Livewire\Portail\MonProfil;
 use App\Livewire\Portail\NoteDeFrais\Form;
 use App\Livewire\Portail\NoteDeFrais\Index;
 use App\Livewire\Portail\NoteDeFrais\Show;
 use App\Livewire\Portail\OtpVerify;
+use App\Livewire\Portail\TableauDeBord;
 use Illuminate\Support\Facades\Route;
 
 // Slug-first (toujours valide, noms portail.*)
@@ -36,10 +47,23 @@ Route::prefix('{association:slug}/portail')
         Route::get('/choisir', ChooseTiers::class)->name('choisir');
         Route::get('/demo/login-as/{tierId}', DemoLoginAsTierController::class)->name('demo.login-as');
         Route::middleware([EnsureTiersChosen::class, EnforceSessionLifetime::class, Authenticate::class])->group(function () {
-            Route::get('/', Home::class)->name('home');
+            Route::get('/', TableauDeBord::class)->name('home');
+            Route::get('/mon-profil', MonProfil::class)->name('mon-profil');
+            Route::get('/mes-adhesions', MesAdhesions::class)->name('mes-adhesions');
+            Route::get('/mes-dons', MesDons::class)->name('mes-dons');
+            Route::get('/mes-messages', MesMessages::class)->name('mes-messages');
+            Route::get('/messages/attachment/{emailLog}', MessageAttachmentController::class)->name('messages.attachment');
+            Route::get('/mes-activites', MesActivitesRedirectController::class)->name('mes-activites.index');
+            Route::get('/mes-activites/{typeOperation}', MesActivites::class)->name('mes-activites.show');
+            Route::get('/recus/cotisation/{adhesion}', [RecuPortailController::class, 'cotisation'])->name('recus.cotisation');
+            Route::get('/recus/fiscal/{ligne}', [RecuPortailController::class, 'fiscalDon'])->name('recus.fiscal');
+            Route::get('/documents/devis/{document}', [DocumentPortailController::class, 'devis'])->name('documents.devis');
+            Route::get('/documents/facture/{facture}', [DocumentPortailController::class, 'facture'])->name('documents.facture');
+            Route::get('/attestations/seance/{operation}/{seance}', [AttestationPortailController::class, 'seance'])->name('attestations.seance');
+            Route::get('/attestations/recap/{operation}/{participant}', [AttestationPortailController::class, 'recap'])->name('attestations.recap');
             Route::post('/logout', LogoutController::class)->name('logout');
 
-            Route::prefix('notes-de-frais')->middleware(EnsurePourDepenses::class)->name('ndf.')->group(function () {
+            Route::prefix('notes-de-frais')->middleware(EnsurePeutVoirNotesDeFrais::class)->name('ndf.')->group(function () {
                 Route::get('/', Index::class)->name('index');
                 Route::get('/nouvelle', Form::class)->name('create');
                 Route::get('/{noteDeFrais}/edit', Form::class)->name('edit');

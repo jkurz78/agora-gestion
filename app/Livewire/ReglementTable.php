@@ -15,8 +15,8 @@ use App\Livewire\Concerns\MontantValidation;
 use App\Mail\DocumentMail;
 use App\Models\CompteBancaire;
 use App\Models\DocumentPrevisionnel;
-use App\Models\EmailLog;
 use App\Models\EmailTemplate;
+use App\Services\Email\EmailLogStorageService;
 use App\Models\Operation;
 use App\Models\Reglement;
 use App\Models\Seance;
@@ -560,41 +560,41 @@ final class ReglementTable extends Component
                 typeOperationId: $this->operation->type_operation_id,
                 civilite: $tiers->civilite?->value,
                 politesse: $tiers->politesse,
+                operationLabel: $this->operation->nom,
+                typeOperationLabel: $this->operation->typeOperation?->nom,
             );
 
             Mail::mailer()
                 ->to($tiers->email)
                 ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
-            EmailLog::create([
-                'tiers_id' => $tiers->id,
-                'participant_id' => $doc->participant_id,
-                'operation_id' => $doc->operation_id,
-                'categorie' => CategorieEmail::Document->value,
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $tiers->email,
-                'destinataire_nom' => $tiers->displayName(),
-                'objet' => $mail->envelope()->subject,
-                'statut' => 'envoye',
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logSent(
+                mail: $mail,
+                tiers: $tiers,
+                categorie: CategorieEmail::Document,
+                destinataireEmail: $tiers->email,
+                destinataireNom: $tiers->displayName(),
+                participantId: $doc->participant_id !== null ? (int) $doc->participant_id : null,
+                operationId: $doc->operation_id !== null ? (int) $doc->operation_id : null,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+                pdfContent: $pdfContent,
+                pdfFilename: $pdfFilename,
+            );
 
             $this->docModalMessage = ucfirst($typeLabel)." envoyé à {$tiers->email}.";
             $this->docModalMessageType = 'success';
         } catch (\Throwable $e) {
-            EmailLog::create([
-                'tiers_id' => $tiers->id,
-                'participant_id' => $doc->participant_id,
-                'operation_id' => $doc->operation_id,
-                'categorie' => CategorieEmail::Document->value,
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $tiers->email,
-                'destinataire_nom' => $tiers->displayName(),
-                'objet' => ucfirst($typeLabel).' '.$doc->numero,
-                'statut' => 'erreur',
-                'erreur_message' => $e->getMessage(),
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logError(
+                tiers: $tiers,
+                categorie: CategorieEmail::Document,
+                destinataireEmail: $tiers->email,
+                objetFallback: ucfirst($typeLabel).' '.$doc->numero,
+                erreurMessage: $e->getMessage(),
+                destinataireNom: $tiers->displayName(),
+                participantId: $doc->participant_id !== null ? (int) $doc->participant_id : null,
+                operationId: $doc->operation_id !== null ? (int) $doc->operation_id : null,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+            );
 
             $this->docModalMessage = "Erreur lors de l'envoi : ".$e->getMessage();
             $this->docModalMessageType = 'danger';

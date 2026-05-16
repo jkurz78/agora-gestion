@@ -57,6 +57,6 @@ final class Show extends Component
 
         return view('livewire.portail.note-de-frais.show', [
             'ndf' => $ndf,
-        ])->layout('portail.layouts.app');
+        ])->layout('portail.layouts.authenticated');
     }
 }

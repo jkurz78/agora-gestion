@@ -126,6 +126,14 @@ final class FormulaireInvitation extends Mailable
     /** @return array<int, Attachment> */
     public function attachments(): array
     {
+        // Only attach the association logo if the body actually references it.
+        // Without this guard, clients (Gmail, Apple Mail) display unreferenced
+        // inline attachments at the bottom of the message at native size
+        // — producing the "giant logo" footer regression.
+        if (! str_contains($this->corpsHtml, 'cid:'.EmailLogo::CID_ASSO)) {
+            return [];
+        }
+
         $logo = EmailLogo::resolve();
         if (! $logo) {
             return [];

@@ -18,6 +18,7 @@ final class TiersCommunicationsTimelineService
         Tiers $tiers,
         ?string $filtreCategorie = null,
         int $page = 1,
+        int $pageSize = self::PAGE_SIZE,
     ): CommunicationsTimelineDTO {
         $base = $this->baseQuery($tiers);
 
@@ -44,7 +45,7 @@ final class TiersCommunicationsTimelineService
                 'opens',
             ])
             ->orderByDesc('created_at')
-            ->paginate(self::PAGE_SIZE, ['*'], 'page', $page);
+            ->paginate($pageSize, ['*'], 'page', $page);
 
         $paginator->setCollection(
             $paginator->getCollection()->map(fn (EmailLog $log) => EmailLogLigneDTO::fromEmailLog($log))
@@ -60,6 +61,11 @@ final class TiersCommunicationsTimelineService
     public function countTotal(Tiers $tiers): int
     {
         return $this->baseQuery($tiers)->count();
+    }
+
+    public function tiersAUnMessage(Tiers $tiers): bool
+    {
+        return $this->baseQuery($tiers)->exists();
     }
 
     private function baseQuery(Tiers $tiers): Builder

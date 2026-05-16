@@ -408,7 +408,7 @@ final class Form extends Component
             'sousCategories' => $sousCategories,
             'operations' => $operations,
             'selectedOperation' => $selectedOperation,
-        ])->layout('portail.layouts.app');
+        ])->layout('portail.layouts.authenticated');
     }
 
     /**

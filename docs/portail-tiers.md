@@ -1,6 +1,6 @@
-# Portail Tiers — v1 (Slice 1 : Auth OTP)
+# Portail Tiers et Membres
 
-Statut : livré 2026-04-19, branche feat/portail-tiers-slice1-auth-otp
+Statut : v0 Slice 1 (Auth OTP) livré 2026-04-19. v1 Slice 1 (F+A — Fondation portail + Mon profil) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`. v2 Slice 2 (Mes adhésions + Mes dons) livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-14-portail-membres-slice2-adhesions-dons.md`. v3 Slice 3 (D — Mes activités) livré 2026-05-15, branche `feat/portail-membres-slice1-fondation-profil`. Voir aussi `docs/specs/2026-05-15-portail-membres-slice3-mes-activites.md`. **v4 Slice 4 (E — Mes messages) livré 2026-05-15 — programme portail v0 COMPLET.** Voir aussi `docs/specs/2026-05-15-portail-membres-slice4-mes-messages.md`.
 
 ## Objectif
 
@@ -473,6 +473,81 @@ section "Vision back-office".
 - Cleanup OTP expirés : lazy-delete au `verify`, pas de job dédié — à prévoir si la table grossit.
 - Sous-domaines par asso (v3.1) : préparé via le préfixe `/portail/{slug}`.
 
+---
+
+## Slice 1 (F+A) — Fondation portail + Mon profil (2026-05-14)
+
+Statut : livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`.
+
+Spec complète : [`docs/specs/2026-05-14-portail-membres-slice1-fondation-profil.md`](specs/2026-05-14-portail-membres-slice1-fondation-profil.md).
+Plan : [`plans/portail-membres-slice1-fondation-profil.md`](../plans/portail-membres-slice1-fondation-profil.md).
+
+Ce slice ne livre aucune section métier nouvelle. Il pose la **fondation de navigation** (sidebar pilotée par un résolveur extensible, nouveau layout post-auth) et un premier écran applicatif (**Mon profil**), pour que tout Tiers — adhérent, donateur, participant, bénévole — ait une raison de se connecter dès la v0. Les slices 2 à 4 branchez leurs sections sur ce résolveur sans rework.
+
+### Sidebar adaptative
+
+La sidebar est pilotée par `App\Services\Portail\PortailSectionsResolver`, un singleton enregistré dans `App\Providers\PortailServiceProvider`. Le résolveur suit un **pattern registry** : chaque section est déclarée par une classe `PortailSectionProvider` (interface à une méthode `resolve(Tiers): ?PortailSectionDTO`). Retourner `null` exclut la section de la sidebar pour ce Tiers.
+
+Au boot, `PortailServiceProvider` enregistre les **5 providers fondation** dans l'ordre d'affichage :
+
+| Provider | Classe | Visible si |
+|---|---|---|
+| Tableau de bord | `App\Services\Portail\Providers\TableauDeBordProvider` | Toujours |
+| Mon profil | `App\Services\Portail\Providers\MonProfilProvider` | Toujours |
+| Notes de frais | `App\Services\Portail\Providers\NotesDeFraisProvider` | `Tiers::pour_depenses === true` **OU** `NoteDeFrais` liée à ce Tiers existe (`≥ 1 NDF`) |
+| Factures partenaires | `App\Services\Portail\Providers\FacturesPartenairesProvider` | `Tiers::pour_depenses === true` (strict) |
+| Historique dépenses | `App\Services\Portail\Providers\HistoriqueDepensesProvider` | `Tiers::pour_depenses === true` (strict) |
+
+La règle NDF ("**`pour_depenses=true` OU ≥1 NDF**") est appliquée de manière identique dans le provider sidebar et dans le middleware de route `App\Http\Middleware\Portail\EnsurePeutVoirNotesDeFrais` (voir code source pour l'implémentation exacte).
+
+Pour enregistrer une section dans un slice ultérieur, créer une classe implémentant `PortailSectionProvider`, l'instancier et l'appeler via `$resolver->register(...)` dans le `boot()` du service provider concerné.
+
+### Layouts
+
+Le portail utilise deux layouts distincts selon le contexte d'authentification :
+
+| Layout | Fichier | Utilisé par |
+|---|---|---|
+| Anonyme (auth) | `portail.layouts.app` | `Login`, `OtpVerify`, `ChooseTiers` |
+| Post-authentification | `portail.layouts.authenticated` | `TableauDeBord`, `MonProfil`, NDF (Index/Form/Show), FacturePartenaire (AtraiterIndex/Depot), HistoriqueDepenses/Index |
+
+`portail.layouts.app` est un layout centré-card sans sidebar, adapté aux écrans de connexion.
+`portail.layouts.authenticated` intègre la sidebar pilotée par `PortailSectionsResolver`, un en-tête avec le logo de l'association et un pied de page AgoraGestion.
+
+### Mon profil — défense en profondeur
+
+Le composant `App\Livewire\Portail\MonProfil` expose des propriétés publiques Livewire **uniquement** pour les champs éditables : `adresse_ligne1`, `adresse_ligne2`, `code_postal`, `ville`, `pays`, `telephone`, `email_optout`.
+
+Les champs verrouillés (`civilite`, `nom`, `prenom`, `email`, `date_naissance`) ne sont **jamais** des propriétés publiques Livewire. Ils sont lus directement depuis le modèle `Tiers` au rendu et affichés en HTML `disabled`. Cette approche bloque toute tentative d'injection via `wire:model` ou `wire:set` côté client : même si un utilisateur manipule le DOM pour soumettre une valeur sur un champ verrouillé, le composant ne possède pas la propriété correspondante et ne l'écrira jamais en base.
+
+### Procédures admin
+
+#### Comment un participant fait sa première NDF
+
+Par défaut, sans `pour_depenses=true`, le menu "Notes de frais" n'apparaît pas dans la sidebar d'un participant (la règle `≥ 1 NDF` ne peut pas être satisfaite sans dépôt préalable).
+
+Procédure pour débloquer un participant qui signale un frais pour la première fois :
+
+1. Ouvrir la fiche Tiers du participant dans le back-office.
+2. Passer le flag **"Peut déposer des frais"** (`pour_depenses`) à `true`.
+3. Enregistrer.
+
+Dès ce moment, le menu "Notes de frais" apparaît dans la sidebar du participant lors de sa prochaine connexion. Une fois la première NDF déposée, le menu restera visible même si le flag est repassé à `false` (règle `≥ 1 NDF` satisfaite).
+
+Pas de bouton "Demander un remboursement" côté portail v0 — la procédure reste manuelle côté admin.
+
+#### Comment permettre à un parent de voir son enfant
+
+Il n'existe pas de modèle `representant_legal` dans l'application. La solution repose sur le sélecteur OTP multi-Tiers livré en Slice 1 Auth (v4.x) :
+
+1. Ouvrir la fiche Tiers de **l'enfant** dans le back-office.
+2. Saisir l'**email du parent** dans le champ email de la fiche Tiers de l'enfant.
+3. Enregistrer.
+
+Lors de la connexion, le parent saisit son email. L'OTP est envoyé à cet email. Après validation, le sélecteur de Tiers affiche à la fois la fiche du parent et celle de l'enfant (tous les Tiers ayant cet email dans l'association). Le parent peut choisir "Enfant Martin" et accéder au portail en tant qu'enfant.
+
+Note : cette approche repose sur la garantie multi-tenant (`TenantScope` fail-closed) — seuls les Tiers de l'association courante sont listés dans le sélecteur.
+
 ## Abandon de créance
 
 Statut : livré 2026-04-21, branche feat/portail-tiers-slice1-auth-otp.
@@ -563,3 +638,361 @@ Le libellé affiché est "Don par abandon de créance".
 | Portail Form (propriété + checkbox) | `app/Livewire/Portail/NoteDeFrais/Form.php` + `resources/views/livewire/portail/note-de-frais/form.blade.php` |
 | Portail Show (bandeau statut) | `resources/views/livewire/portail/note-de-frais/show.blade.php` |
 | Back-office Show (encart + modale + action) | `app/Livewire/BackOffice/NoteDeFrais/Show.php` + `resources/views/livewire/back-office/note-de-frais/show.blade.php` |
+
+---
+
+## Slice 2 (B) — Mes adhésions + Mes dons (2026-05-14)
+
+Statut : livré 2026-05-14, branche `feat/portail-membres-slice1-fondation-profil`.
+
+Spec complète : [`docs/specs/2026-05-14-portail-membres-slice2-adhesions-dons.md`](specs/2026-05-14-portail-membres-slice2-adhesions-dons.md).
+Plan : [`plans/portail-membres-slice2-adhesions-dons.md`](../plans/portail-membres-slice2-adhesions-dons.md).
+
+Ce slice ajoute deux sections métier dans le portail : **Mes adhésions** et **Mes dons**. Il introduit le groupe sidebar « Ma vie de membre », le pattern de téléchargement de reçu à la demande, et trois colonnes d'URLs paramétrables sur le modèle `Association`.
+
+### Sidebar — nouveau groupe « Ma vie de membre »
+
+Deux providers sont enregistrés dans `PortailServiceProvider::boot()`, entre le groupe « Espace personnel » (ordres 10–20) et le groupe « Mes frais & factures » (ordres 30–50) :
+
+| Provider | Classe | id | Route | Ordre | Visible si |
+|---|---|---|---|---|---|
+| Mes adhésions | `App\Services\Portail\Providers\MesAdhesionsProvider` | `mes-adhesions` | `portail.mes-adhesions` | 60 | `≥ 1 adhésion` liée au Tiers |
+| Mes dons | `App\Services\Portail\Providers\MesDonsProvider` | `mes-dons` | `portail.mes-dons` | 70 | `≥ 1 don` visible selon le critère de `TiersDonsTimelineService` (recette + sous-cat usage Don) |
+
+La visibilité est évaluée par `resolve(Tiers): ?PortailSectionDTO` — retourner `null` exclut la section de la sidebar pour ce Tiers.
+
+### Téléchargement reçu à la demande
+
+Pattern commun aux deux composants : ownership check → service → `streamPdf`.
+
+#### Reçu cotisation (adhésion)
+
+Action Livewire : `App\Livewire\Portail\MesAdhesions::telechargerRecuCotisation(int $adhesionId)`
+
+```
+Ownership check  :  (int) $adhesion->tiers_id === (int) $tiers->id  → 403 sinon
+Service          :  RecuFiscalService::obtenirOuGenererPourAdhesion(Adhesion)
+Réponse          :  streamPdf(RecuFiscalEmis)
+Log              :  portail.recu.cotisation.telecharge
+```
+
+#### Reçu fiscal don
+
+Action Livewire : `App\Livewire\Portail\MesDons::telechargerRecuFiscal(int $ligneId)`
+
+```
+Ownership check  :  la ligne demandée doit apparaître dans
+                    TiersDonsTimelineService::forTiers($tiers)  → 403 sinon
+Service          :  RecuFiscalService::obtenirOuGenerer(TransactionLigne)
+Réponse          :  streamPdf(RecuFiscalEmis)
+Log              :  portail.recu.fiscal.telecharge
+```
+
+`LogContext` propage `association_id` automatiquement sur les deux événements.
+
+**Tests d'intrusion** : intra-asso 403 (Tiers B tente de télécharger le reçu de Tiers A), cross-tenant 403 (TenantScope filtre à la source).
+
+### URLs paramétrables au niveau Association
+
+Trois colonnes nullable ajoutées sur la table `association` (migration `2026_05_14_*_add_url_fields_to_associations.php`) :
+
+| Colonne | Type | Rôle |
+|---|---|---|
+| `url_site_web` | `string nullable` | Site web global de l'asso (réutilisable ailleurs) |
+| `url_renouvellement_adhesion` | `string nullable` | URL externe (typiquement HelloAsso) pour renouveler une adhésion |
+| `url_nouveau_don` | `string nullable` | URL externe pour faire un nouveau don |
+
+Deux helpers sur `App\Models\Association` avec fallback Elvis sur `url_site_web` (traite aussi la chaîne vide) :
+
+```php
+public function urlRenouvellementAdhesion(): ?string
+{
+    return $this->url_renouvellement_adhesion ?: ($this->url_site_web ?: null);
+}
+
+public function urlNouveauDon(): ?string
+{
+    return $this->url_nouveau_don ?: ($this->url_site_web ?: null);
+}
+```
+
+Les CTA « Renouveler mon adhésion » et « Faire un nouveau don » sont **cachés** dans les vues si la valeur (ou son fallback) est `null`.
+
+### Procédures admin
+
+#### Configurer les URLs externes
+
+Les trois champs `url_*` sur la table `association` ne sont pas encore exposés dans l'IHM back-office Paramètres asso. Ils doivent être saisis via tinker. Dette à reprendre dans un slice ultérieur ou en tâche standalone.
+
+Exemple tinker :
+
+```php
+Association::where('slug', 'mon-association')->update([
+    'url_site_web'                 => 'https://www.mon-association.fr',
+    'url_renouvellement_adhesion'  => 'https://www.helloasso.com/associations/mon-association/adhesions/',
+    'url_nouveau_don'              => 'https://www.helloasso.com/associations/mon-association/formulaires/1',
+]);
+```
+
+---
+
+## Slice 3 (D) — Mes activités (2026-05-15)
+
+Statut : livré 2026-05-15, branche `feat/portail-membres-slice1-fondation-profil`.
+
+Spec complète : [`docs/specs/2026-05-15-portail-membres-slice3-mes-activites.md`](specs/2026-05-15-portail-membres-slice3-mes-activites.md).
+Plan : [`plans/portail-membres-slice3-mes-activites.md`](../plans/portail-membres-slice3-mes-activites.md).
+
+Ce slice ajoute un écran **Mes activités** dans le portail. Un Tiers ayant participé à au moins une opération (Séances d'une formation, parcours de soins, etc.) y voit ses participations classées en trois sections temporelles : **À venir**, **En cours**, **Terminées**. L'écran propose le téléchargement des attestations de présence, des devis et des factures rattachés à chaque participation. Le tableau de bord affiche une alerte « Action requise » pour les questionnaires pré-activité non remplis.
+
+Points structurants :
+- **1 entrée sidebar unique** (groupe « Mes activités », ordre 80), quelle que soit la diversité des types d'opération.
+- **3 sections temporelles** dans l'écran, calculées via le helper `ClassificationTemporelle`.
+- **Vocabulaire portail** : le mot « opération » ne doit jamais apparaître dans le rendu HTML public — toujours « activité », « questionnaire » ou le nom du TypeOperation.
+
+### Sidebar — nouveau groupe « Mes activités »
+
+Un seul provider est enregistré dans `PortailServiceProvider::boot()`, après les groupes existants :
+
+| Provider | Classe | id | Route | Ordre | Icon | Groupe | Visible si |
+|---|---|---|---|---|---|---|---|
+| Mes activités | `App\Services\Portail\Providers\MesActivitesProvider` | `mes-activites` | `portail.mes-activites` | 80 | `bi-calendar-event` | Mes activités | `≥ 1 Participation` liée au Tiers connecté |
+
+**Décision de conception — 1 entrée unique (Option B retenue) :** l'équipe a évalué deux approches :
+- Option A : 1 entrée sidebar par `TypeOperation` distinct ayant des participations → sidebar instable si l'asso rebaptise ses types, et largeur imprévisible.
+- Option B : 1 entrée unique « Mes activités » → sidebar stable, scalable, libellés indépendants des renommages asso.
+
+Option B retenue. Si un Tiers a des participations dans plusieurs types d'opération, les sous-tabs par type sont présentés **dans l'écran** (pas dans la sidebar).
+
+### Classification temporelle
+
+Pattern partagé par `MesActivites::render()` et `TableauDeBord::render()` (alerte magic-link).
+
+#### Helper
+
+`App\Services\Portail\ClassificationTemporelle` — classe finale à méthode statique :
+
+```php
+ClassificationTemporelle::pour(Operation $operation): HorizonTemporel
+```
+
+#### Enum `HorizonTemporel`
+
+| Case | Signification |
+|---|---|
+| `AVenir` | L'opération n'a pas encore commencé |
+| `EnCours` | L'opération est en cours |
+| `Terminee` | L'opération est terminée |
+
+#### Logique de calcul
+
+1. Si l'opération possède **au moins une Séance** : utiliser `min(date des séances)` comme début et `max(date des séances)` comme fin.
+2. Sinon, si `Operation.date_debut` et `Operation.date_fin` sont renseignées : les utiliser directement.
+3. Sinon : retourner `EnCours` (défaut conservatif — ne pas masquer des participations dont les dates sont inconnues).
+
+Les comparaisons utilisent `Carbon::today()` sans heure, sans timezone applicatif.
+
+### Téléchargement attestations à la demande
+
+Pattern : ownership check → service partagé → PDF inline.
+
+#### Routes portail
+
+```
+GET /portail/{slug}/attestations/seance/{seanceId}
+    └─ portail.attestations.seance  →  AttestationPortailController::seance()
+
+GET /portail/{slug}/attestations/participant/{participantId}/recap
+    └─ portail.attestations.recap   →  AttestationPortailController::recap()
+```
+
+#### Service partagé
+
+`App\Services\AttestationPresencePdfService` — extrait du contrôleur back-office existant et utilisé par les deux points d'entrée (back-office et portail). Aucune duplication de logique PDF.
+
+#### Règles d'ownership
+
+| Attestation | Condition de validation |
+|---|---|
+| Par séance | Le Tiers connecté doit avoir un `Participant` avec une `Presence` de statut `Present` sur la séance demandée |
+| Récapitulatif | Le `Participant` demandé doit appartenir au Tiers connecté (`participant.tiers_id === tiers.id`) |
+
+Violation → 403.
+
+#### Réponse HTTP
+
+PDF servi avec `Content-Disposition: inline` (ouverture en nouvel onglet).
+
+Noms de fichier :
+- Séance : `{slug-asso}-attestation-seance-{seance_id}.pdf`
+- Récap : `{slug-asso}-attestation-recap-{participant_id}.pdf`
+
+#### Logs structurés
+
+| Clé | Déclencheur |
+|---|---|
+| `portail.attestation.seance.telecharge` | `AttestationPortailController::seance()` |
+| `portail.attestation.recap.telecharge` | `AttestationPortailController::recap()` |
+
+### Téléchargement devis et factures à la demande
+
+Pattern : ownership check → helper modèle → PDF inline.
+
+#### Contrôleur
+
+`App\Http\Controllers\Portail\DocumentPortailController` expose deux méthodes :
+
+```php
+public function devis(Request $request): Response      // portail.documents.devis
+public function facture(Request $request): Response    // portail.documents.facture
+```
+
+#### Helpers modèle
+
+Deux helpers sur `App\Models\Participant` :
+
+```php
+public function devisProformaLePlusRecent(): ?DocumentPrevisionnel
+public function factureRattachee(): ?Facture
+```
+
+Le lien indirect pour `factureRattachee()` suit la chaîne :
+`Facture → FactureLigne → TransactionLigne → Transaction → Reglement → Participant`.
+
+#### Règles d'ownership
+
+- Devis : le `DocumentPrevisionnel` doit être lié à un `Participant` appartenant au Tiers connecté.
+- Facture : la `Facture` doit être liée (via la chaîne ci-dessus) à un `Participant` appartenant au Tiers connecté.
+
+Violation → 403.
+
+#### Réponse HTTP
+
+PDF servi avec `Content-Disposition: inline` (ouverture en nouvel onglet).
+
+#### Logs structurés
+
+| Clé | Déclencheur |
+|---|---|
+| `portail.devis.telecharge` | `DocumentPortailController::devis()` |
+| `portail.facture.telecharge` | `DocumentPortailController::facture()` |
+
+### Alerte dashboard « Action requise »
+
+Calculée dans `TableauDeBord::render()` à partir des `FormulaireToken` actifs liés au Tiers connecté.
+
+#### Critères d'affichage
+
+Un `FormulaireToken` génère une alerte si **toutes** les conditions suivantes sont réunies :
+- `expire_at >= today` (non expiré)
+- `rempli_at IS NULL` (non rempli)
+- L'opération liée est classée `AVenir` ou `EnCours` par `ClassificationTemporelle` (les questionnaires d'opérations terminées sont silencieux)
+
+#### Affichage
+
+- Max 3 alertes affichées dans la vue.
+- Si le nombre total dépasse 3 : mention « + X autres ».
+- Bouton « Ouvrir le questionnaire » → `route('formulaire.index', ['token' => $token->token])` en `target="_blank"`.
+
+### Vocabulaire portail (rappel)
+
+Le mot **« opération »** (insensible à la casse) ne doit **jamais** apparaître dans le rendu HTML public du portail.
+
+Termes autorisés côté UI :
+
+| Concept technique | Terme portail |
+|---|---|
+| `Operation` | « activité » |
+| `FormulaireToken` | « questionnaire » |
+| `TypeOperation.libelle` | nom métier de l'asso (« Parcours de soins », « Formation », etc.) |
+
+Le code interne conserve les noms de modèles `Operation` / `Participation` / `TypeOperation` — aucun renommage de modèle.
+
+**Test de non-régression** : `assertDontSee('opération', false)` dans `MesActivitesTest` (insensible à la casse, couvre aussi « Opération »).
+
+---
+
+## Slice 4 (E) — Mes messages (2026-05-15)
+
+Statut : livré 2026-05-15, branche `feat/portail-membres-slice1-fondation-profil`.
+Dernier slice du programme portail v0.
+
+Spec complète : [`docs/specs/2026-05-15-portail-membres-slice4-mes-messages.md`](specs/2026-05-15-portail-membres-slice4-mes-messages.md).
+Plan : [`plans/portail-membres-slice4-mes-messages.md`](../plans/portail-membres-slice4-mes-messages.md).
+
+Ce slice expose à chaque Tiers les emails que l'association lui a envoyés. Le vocabulaire UI est **« Mes messages »** ; les identifiants internes restent `EmailLog` et `Communications` (aucun renommage de modèle).
+
+### Sidebar — nouveau groupe « Mes messages »
+
+Un provider est enregistré dans `PortailServiceProvider::boot()` après le groupe « Mes activités » (ordre 80) :
+
+| Provider | Classe | id | Route | Ordre | Icon | Groupe | Visible si |
+|---|---|---|---|---|---|---|---|
+| Mes messages | `App\Services\Portail\Providers\MesMessagesProvider` | `mes-messages` | `portail.mes-messages` | 90 | `bi-envelope` | Mes messages | `≥ 1 EmailLog` destiné au Tiers (via `tiers_id` direct ou `participant.tiers_id`) |
+
+### Affichage liste + expand inline
+
+#### Composant
+
+`App\Livewire\Portail\MesMessages` — utilise le trait `WithPagination`.
+
+La liste est paginée à **25 messages par page**. `TiersCommunicationsTimelineService` expose une constante `PAGE_SIZE = 50` ; le composant passe un paramètre `pageSize` pour overrider à 25 en contexte portail.
+
+#### Pattern expand inline
+
+- Click sur une ligne → Bootstrap collapse affichant le corps HTML du message dans `<div class="portail-email-body">`.
+- CSS scopé sur `.portail-email-body` : `max-width` sur les images et les tableaux pour éviter les débordements.
+- Un seul message peut être ouvert à la fois : propriété `$messageOuvertId`.
+- Méthode `toggleMessage(int $id)` : si `$id === $this->messageOuvertId`, referme. Sinon ouvre. Les IDs hors page courante sont **ignorés silencieusement** (défense contre l'injection via `wire:set`).
+
+### Téléchargement PJ via route portail
+
+#### Route
+
+```
+GET /portail/{slug}/messages/{emailLog}/piece-jointe
+    └─ portail.messages.attachment  →  App\Http\Controllers\Portail\MessageAttachmentController::__invoke
+```
+
+#### Contrôleur
+
+- **Ownership cross-tenant** : `Tiers::find($emailLog->tiers_id)` passe sous TenantScope — retourne `null` si l'`EmailLog` appartient à une autre association → 404.
+- **Ownership intra-asso** : `(int) $tiers->id === (int) auth('tiers-portail')->id()` → 403 sinon.
+- **Réponse** : `Content-Disposition: inline`, `target="_blank"` côté vue. MIME détecté via `Storage::disk('local')->mimeType($path)` avec fallback `application/octet-stream`.
+- **Nom de fichier** : `basename($attachment_path)` (nom stocké tel quel).
+- **Log** : clé `portail.message.attachment.telecharge` avec `email_log_id` + `tiers_id`.
+
+### Sécurité multi-tenant — point de vigilance EmailLog
+
+`EmailLog` n'étend pas `TenantModel` et ne possède donc pas de TenantScope global.
+
+Protection v0 : **indirecte via `Tiers`**. La query de base du composant utilise `whereIn('tiers_id', Tiers::select('id'))` ; cette sous-requête passe par le TenantScope de `TenantModel` sur `Tiers` et filtre automatiquement les EmailLog de l'association courante.
+
+Dans le contrôleur PJ : `Tiers::find($emailLog->tiers_id)` retourne `null` si l'EmailLog appartient à une association différente (TenantScope sur Tiers) → 404 cross-tenant.
+
+Dette à évaluer : faire étendre `TenantModel` à `EmailLog` directement pour une défense en profondeur (protection directe, indépendante de la query liste).
+
+### Hors scope v0 (parqué)
+
+- Filtrage par catégorie
+- Badge catégorie sur chaque ligne
+- Recherche full-text
+- Action « marquer lu / non lu »
+- Action « renvoyer »
+- Sanitize HTMLPurifier (admin trusté en v0)
+- PJ multiples (la table `email_logs` ne possède qu'un champ `attachment_path` unique)
+
+---
+
+## Programme portail v0 — résumé final
+
+Le programme portail v0 est **complet**. Les quatre slices ont été développés sur une branche unique `feat/portail-membres-slice1-fondation-profil` (~80 commits).
+
+| Slice | Code | Livré | Contenu |
+|---|---|---|---|
+| Slice 1 | F+A | 2026-05-14 | Fondation portail (sidebar adaptative, layouts, résolveur) + Mon profil |
+| Slice 2 | B/C | 2026-05-14 | Mes adhésions + Mes dons (reçus à la demande, URLs paramétrables) |
+| Slice 3 | D | 2026-05-15 | Mes activités (classification temporelle, attestations, devis, factures) |
+| Slice 4 | E | 2026-05-15 | Mes messages (expand inline, téléchargement PJ, ownership strict) |
+
+Prochaine étape : test manuel localhost + PR vers main.

@@ -18,6 +18,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class RecuFiscalService
 {
@@ -162,13 +163,41 @@ final class RecuFiscalService
         });
     }
 
+    /**
+     * Retourne un StreamedResponse pour le téléchargement depuis un composant Livewire.
+     *
+     * Livewire 3 détecte les StreamedResponse comme des downloads et les pipe
+     * directement au navigateur, sans tenter de les JSON-encoder (ce qui
+     * échouerait sur les bytes binaires PDF avec "Malformed UTF-8 characters").
+     *
+     * Conserver streamPdf() pour la route HTTP back-office (RecuFiscalController)
+     * qui attend un Response inline (Content-Disposition: inline).
+     */
+    public function streamDownloadResponse(RecuFiscalEmis $recu): StreamedResponse
+    {
+        if (! $recu->verifierIntegrite()) {
+            throw new \RuntimeException("Intégrité du PDF reçu n°{$recu->numero} compromise — hash incorrect");
+        }
+
+        $filename = $recu->pdfFilename();
+        $path = $recu->pdfFullPath();
+
+        return response()->streamDownload(
+            function () use ($path): void {
+                echo Storage::disk('local')->get($path);
+            },
+            $filename,
+            ['Content-Type' => 'application/pdf']
+        );
+    }
+
     public function streamPdf(RecuFiscalEmis $recu): Response
     {
         if (! $recu->verifierIntegrite()) {
             throw new \RuntimeException("Intégrité du PDF reçu n°{$recu->numero} compromise — hash incorrect");
         }
 
-        $filename = "recu-fiscal-{$recu->numero}.pdf";
+        $filename = $recu->pdfFilename();
         $contents = Storage::disk('local')->get($recu->pdfFullPath());
 
         return response($contents, 200, [

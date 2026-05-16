@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Support\CurrentAssociation;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,11 +29,12 @@ final class LayoutAssociationComposerProvider extends ServiceProvider
         // MonoAssociationResolver (mono). Resolving here via View Composer is more
         // robust than view()->share() in middleware, which can be lost across
         // Livewire 4 render cycles.
-        View::composer('portail.layouts.app', function ($view): void {
+        View::composer(['portail.layouts.app', 'portail.layouts.authenticated'], function ($view): void {
             $association = CurrentAssociation::tryGet();
 
             if ($association !== null) {
                 $view->with('portailAssociation', $association);
+                $view->with('tiers', Auth::guard('tiers-portail')->user());
             }
         });
     }

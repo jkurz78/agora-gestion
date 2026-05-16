@@ -10,13 +10,13 @@ use App\Enums\RoleAssociation;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Mail\DocumentMail;
-use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Facture;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\TransactionLigne;
 use App\Models\TypeOperation;
+use App\Services\Email\EmailLogStorageService;
 use App\Services\FactureService;
 use App\Support\CurrentAssociation;
 use Illuminate\Contracts\View\View;
@@ -232,6 +232,10 @@ final class FactureShow extends Component
                 ->value('id')
             : null;
 
+        // Charger l'opération liée pour {operation} / {type_operation} dans le gabarit.
+        // Null pour les factures libres (sans opération associée).
+        $operationLiee = $operationId ? Operation::with('typeOperation')->find($operationId) : null;
+
         try {
             $mail = new DocumentMail(
                 prenomDestinataire: $tiers->prenom ?? '',
@@ -249,41 +253,41 @@ final class FactureShow extends Component
                 typeOperationId: $this->resolveFirstTypeOperationId(),
                 civilite: $tiers->civilite?->value,
                 politesse: $tiers->politesse,
+                operationLabel: $operationLiee?->nom,
+                typeOperationLabel: $operationLiee?->typeOperation?->nom,
             );
 
             Mail::mailer()
                 ->to($tiers->email)
                 ->send($mail->from($fromEmail, $fromName));
 
-            EmailLog::create([
-                'tiers_id' => $tiers->id,
-                'participant_id' => $participantId,
-                'operation_id' => $operationId,
-                'categorie' => CategorieEmail::Document->value,
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $tiers->email,
-                'destinataire_nom' => $tiers->displayName(),
-                'objet' => $mail->envelope()->subject,
-                'statut' => 'envoye',
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logSent(
+                mail: $mail,
+                tiers: $tiers,
+                categorie: CategorieEmail::Document,
+                destinataireEmail: $tiers->email,
+                destinataireNom: $tiers->displayName(),
+                participantId: $participantId !== null ? (int) $participantId : null,
+                operationId: $operationId !== null ? (int) $operationId : null,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+                pdfContent: $pdfContent,
+                pdfFilename: $pdfFilename,
+            );
 
             $this->emailMessage = "Facture envoyée à {$tiers->email}.";
             $this->emailMessageType = 'success';
         } catch (\Throwable $e) {
-            EmailLog::create([
-                'tiers_id' => $tiers->id,
-                'participant_id' => $participantId,
-                'operation_id' => $operationId,
-                'categorie' => CategorieEmail::Document->value,
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $tiers->email,
-                'destinataire_nom' => $tiers->displayName(),
-                'objet' => 'Facture '.$label,
-                'statut' => 'erreur',
-                'erreur_message' => $e->getMessage(),
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logError(
+                tiers: $tiers,
+                categorie: CategorieEmail::Document,
+                destinataireEmail: $tiers->email,
+                objetFallback: 'Facture '.$label,
+                erreurMessage: $e->getMessage(),
+                destinataireNom: $tiers->displayName(),
+                participantId: $participantId !== null ? (int) $participantId : null,
+                operationId: $operationId !== null ? (int) $operationId : null,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+            );
 
             $this->emailMessage = 'Erreur lors de l\'envoi : '.$e->getMessage();
             $this->emailMessageType = 'danger';

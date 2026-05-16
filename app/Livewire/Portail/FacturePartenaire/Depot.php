@@ -66,6 +66,6 @@ final class Depot extends Component
     public function render(): View
     {
         return view('livewire.portail.facture-partenaire.depot')
-            ->layout('portail.layouts.app');
+            ->layout('portail.layouts.authenticated');
     }
 }

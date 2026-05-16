@@ -82,3 +82,22 @@ function something()
 {
     // ..
 }
+
+/**
+ * Asserts that a rendered Mailable contains no unsubstituted {xxx} placeholders
+ * in either its subject or its HTML body.
+ *
+ * This is the canonical "leak test" for all Mailables in AgoraGestion.
+ * Any {xxx} surviving after TemplateSubstitution::apply() is a bug visible to users.
+ */
+function assertNoUnsubstitutedEmailVariables(\Illuminate\Mail\Mailable $mail): void
+{
+    $subject = $mail->envelope()->subject;
+    $html = $mail->render();
+    $combined = $subject."\n".$html;
+    preg_match_all('/\{[a-z_]+\}/', $combined, $matches);
+    expect($matches[0])->toBe(
+        [],
+        'Variables non substituées détectées dans l\'email : '.implode(', ', array_unique($matches[0]))
+    );
+}

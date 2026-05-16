@@ -150,6 +150,6 @@ final class EmailLogo
             return '';
         }
 
-        return '<img src="cid:'.htmlspecialchars($cid).'" alt="'.htmlspecialchars($alt).'" style="height:80px;width:auto;">';
+        return '<img src="cid:'.htmlspecialchars($cid).'" alt="'.htmlspecialchars($alt).'" height="40" style="max-height:40px;height:auto;width:auto;">';
     }
 }

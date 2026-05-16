@@ -35,6 +35,8 @@ final class DocumentMail extends Mailable
         public readonly ?int $typeOperationId = null,
         public readonly ?string $civilite = null,
         public readonly ?string $politesse = null,
+        public readonly ?string $operationLabel = null,
+        public readonly ?string $typeOperationLabel = null,
     ) {
         $corps = $this->customCorps
             ?? '<p>Bonjour {prenom},</p><p>Veuillez trouver ci-joint {type_document_article} n° {numero_document}.</p>';
@@ -67,11 +69,17 @@ final class DocumentMail extends Mailable
                 ->withMime('application/pdf'),
         ];
 
-        $logo = EmailLogo::resolve();
-        if ($logo) {
-            $attachments[] = Attachment::fromPath($logo['path'])
-                ->as(EmailLogo::CID_ASSO)
-                ->withMime($logo['mime']);
+        // Only attach the association logo if the body actually references it.
+        // Without this guard, the logo is attached to every mail, and clients
+        // (Gmail, Apple Mail) display unreferenced inline attachments at the bottom
+        // of the message — producing an unwanted "giant logo" footer.
+        if (str_contains($this->corpsHtml, 'cid:'.EmailLogo::CID_ASSO)) {
+            $logo = EmailLogo::resolve();
+            if ($logo) {
+                $attachments[] = Attachment::fromPath($logo['path'])
+                    ->as(EmailLogo::CID_ASSO)
+                    ->withMime($logo['mime']);
+            }
         }
 
         return $attachments;
@@ -90,6 +98,8 @@ final class DocumentMail extends Mailable
             '{numero_document}' => $this->numeroDocument,
             '{date_document}' => $this->dateDocument,
             '{montant_total}' => $this->montantTotal,
+            '{operation}' => $this->operationLabel ?? '',
+            '{type_operation}' => $this->typeOperationLabel ?? '',
         ] + $this->politesseVariables(
             $this->civilite,
             $this->politesse,

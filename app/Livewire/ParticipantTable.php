@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\CategorieEmail;
 use App\Enums\Espace;
 use App\Enums\RoleAssociation;
 use App\Enums\UsageComptable;
 use App\Mail\FormulaireInvitation;
-use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\TransactionLigne;
+use App\Services\Email\EmailLogStorageService;
 use App\Services\ExerciceService;
 use App\Services\FormulaireTokenService;
 use Carbon\Carbon;
@@ -422,35 +423,31 @@ final class ParticipantTable extends Component
                 ->to($email)
                 ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
-            EmailLog::create([
-                'tiers_id' => $participant->tiers_id,
-                'participant_id' => $participant->id,
-                'operation_id' => $participant->operation_id,
-                'categorie' => 'formulaire',
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $email,
-                'destinataire_nom' => $destinataireNom,
-                'objet' => $template?->objet ?? 'Formulaire à compléter — '.$op->nom,
-                'statut' => 'envoye',
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logSent(
+                mail: $mail,
+                tiers: $participant->tiers,
+                categorie: CategorieEmail::Formulaire,
+                destinataireEmail: $email,
+                destinataireNom: $destinataireNom,
+                participantId: (int) $participant->id,
+                operationId: (int) $participant->operation_id,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+            );
 
             $this->tokenEmailMessage = "Email envoyé à {$email}.";
             $this->tokenEmailType = 'success';
         } catch (\Throwable $e) {
-            EmailLog::create([
-                'tiers_id' => $participant->tiers_id,
-                'participant_id' => $participant->id,
-                'operation_id' => $participant->operation_id,
-                'categorie' => 'formulaire',
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $email,
-                'destinataire_nom' => $destinataireNom,
-                'objet' => $template?->objet ?? 'Formulaire à compléter — '.($participant->operation?->nom ?? ''),
-                'statut' => 'erreur',
-                'erreur_message' => $e->getMessage(),
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logError(
+                tiers: $participant->tiers,
+                categorie: CategorieEmail::Formulaire,
+                destinataireEmail: $email,
+                objetFallback: $template?->objet ?? 'Formulaire à compléter — '.($participant->operation?->nom ?? ''),
+                erreurMessage: $e->getMessage(),
+                destinataireNom: $destinataireNom,
+                participantId: (int) $participant->id,
+                operationId: (int) $participant->operation_id,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+            );
 
             $this->tokenEmailMessage = 'Erreur lors de l\'envoi : '.$e->getMessage();
             $this->tokenEmailType = 'danger';

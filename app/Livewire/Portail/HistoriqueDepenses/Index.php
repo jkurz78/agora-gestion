@@ -47,6 +47,6 @@ final class Index extends Component
         return view('livewire.portail.historique-depenses.index', [
             'transactions' => $transactions,
             'resources' => $resources,
-        ])->layout('portail.layouts.app');
+        ])->layout('portail.layouts.authenticated');
     }
 }
