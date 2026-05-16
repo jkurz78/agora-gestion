@@ -18,6 +18,7 @@ use App\Models\ParticipantDocument;
 use App\Models\ParticipantDonneesMedicales;
 use App\Models\Tiers;
 use App\Services\DocumentPrevisionnelService;
+use App\Services\Email\EmailLogStorageService;
 use App\Support\FlashMessages;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -802,34 +803,32 @@ final class ParticipantShow extends Component
                 ->to($tiers->email)
                 ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
-            EmailLog::create([
-                'tiers_id' => $tiers->id,
-                'participant_id' => $doc->participant_id,
-                'operation_id' => $doc->operation_id,
-                'categorie' => CategorieEmail::Document->value,
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $tiers->email,
-                'destinataire_nom' => $tiers->displayName(),
-                'objet' => $mail->envelope()->subject,
-                'statut' => 'envoye',
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logSent(
+                mail: $mail,
+                tiers: $tiers,
+                categorie: CategorieEmail::Document,
+                destinataireEmail: $tiers->email,
+                destinataireNom: $tiers->displayName(),
+                participantId: $doc->participant_id !== null ? (int) $doc->participant_id : null,
+                operationId: $doc->operation_id !== null ? (int) $doc->operation_id : null,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+                pdfContent: $pdfContent,
+                pdfFilename: $pdfFilename,
+            );
 
             session()->flash('success', FlashMessages::documentSentTo($typeLabel, $tiers->email));
         } catch (\Throwable $e) {
-            EmailLog::create([
-                'tiers_id' => $tiers->id,
-                'participant_id' => $doc->participant_id,
-                'operation_id' => $doc->operation_id,
-                'categorie' => CategorieEmail::Document->value,
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $tiers->email,
-                'destinataire_nom' => $tiers->displayName(),
-                'objet' => ucfirst($typeLabel).' '.$doc->numero,
-                'statut' => 'erreur',
-                'erreur_message' => $e->getMessage(),
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logError(
+                tiers: $tiers,
+                categorie: CategorieEmail::Document,
+                destinataireEmail: $tiers->email,
+                objetFallback: ucfirst($typeLabel).' '.$doc->numero,
+                erreurMessage: $e->getMessage(),
+                destinataireNom: $tiers->displayName(),
+                participantId: $doc->participant_id !== null ? (int) $doc->participant_id : null,
+                operationId: $doc->operation_id !== null ? (int) $doc->operation_id : null,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+            );
 
             session()->flash('error', "Erreur lors de l'envoi : ".$e->getMessage());
         }
