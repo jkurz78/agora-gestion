@@ -7,6 +7,7 @@ use App\Models\Association;
 use App\Models\EmailLog;
 use App\Models\Tiers;
 use App\Services\Email\EmailLogStorageService;
+use App\Models\User;
 use App\Tenant\TenantContext;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -179,6 +180,62 @@ it('logError crée un EmailLog erreur sans écrire sur le disque', function (): 
 
 // ---------------------------------------------------------------------------
 // f) extra fields are merged into EmailLog
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// g) envoye_par auto-rempli depuis Auth::id() (succès ET erreur)
+// ---------------------------------------------------------------------------
+
+it('logSent auto-remplit envoye_par avec Auth::id() quand authentifié', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create();
+    $mail = new FakeMailable();
+
+    $emailLog = $this->service->logSent(
+        mail: $mail,
+        tiers: $tiers,
+        categorie: CategorieEmail::Document,
+        destinataireEmail: 'g@h.com',
+    );
+
+    expect((int) $emailLog->envoye_par)->toBe((int) $user->id);
+});
+
+it('logError auto-remplit envoye_par avec Auth::id() quand authentifié', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $tiers = Tiers::factory()->create();
+
+    $emailLog = $this->service->logError(
+        tiers: $tiers,
+        categorie: CategorieEmail::Document,
+        destinataireEmail: 'h@i.com',
+        objetFallback: 'Sujet',
+        erreurMessage: 'Boom',
+    );
+
+    expect((int) $emailLog->envoye_par)->toBe((int) $user->id);
+});
+
+it('logSent laisse envoye_par null quand aucun utilisateur authentifié', function (): void {
+    $tiers = Tiers::factory()->create();
+    $mail = new FakeMailable();
+
+    $emailLog = $this->service->logSent(
+        mail: $mail,
+        tiers: $tiers,
+        categorie: CategorieEmail::Document,
+        destinataireEmail: 'i@j.com',
+    );
+
+    expect($emailLog->envoye_par)->toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// h) extra fields are merged into EmailLog
 // ---------------------------------------------------------------------------
 
 it('les champs extra sont persistés dans l\'EmailLog', function (): void {

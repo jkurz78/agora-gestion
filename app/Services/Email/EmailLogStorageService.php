@@ -10,6 +10,7 @@ use App\Models\EmailTemplate;
 use App\Models\Tiers;
 use App\Tenant\TenantContext;
 use Illuminate\Mail\Mailable;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -71,6 +72,7 @@ final class EmailLogStorageService
             'corps_html' => $corpsHtml,
             'statut' => 'envoye',
             'attachment_path' => $attachmentPath,
+            'envoye_par' => Auth::id(),
         ], $extra);
 
         return EmailLog::create($data);
@@ -109,6 +111,7 @@ final class EmailLogStorageService
             'statut' => 'erreur',
             'erreur_message' => $erreurMessage,
             'attachment_path' => null,
+            'envoye_par' => Auth::id(),
         ], $extra);
 
         return EmailLog::create($data);
