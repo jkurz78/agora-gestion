@@ -13,6 +13,7 @@ use App\Models\Reglement;
 use App\Models\Seance;
 use App\Models\Tiers;
 use App\Support\CurrentAssociation;
+use App\Support\PdfFooterRenderer;
 use Atgp\FacturX\Writer as FacturXWriter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
@@ -183,13 +184,21 @@ final class DocumentPrevisionnelService
             }
         }
 
+        $appLogoPath = public_path('images/agora-gestion.svg');
+        $appLogoBase64 = file_exists($appLogoPath) ? base64_encode(file_get_contents($appLogoPath)) : null;
+
         $pdf = Pdf::loadView('pdf.document-previsionnel', [
             'document' => $document,
             'association' => $association,
             'tiers' => $tiers,
             'headerLogoBase64' => $headerLogoBase64,
             'headerLogoMime' => $headerLogoMime,
+            'appLogoBase64' => $appLogoBase64,
+            'footerLogoBase64' => null,
+            'footerLogoMime' => null,
         ])->setPaper('a4', 'portrait');
+
+        PdfFooterRenderer::render($pdf, PdfFooterRenderer::generatedByText());
 
         $pdfContent = $pdf->output();
 

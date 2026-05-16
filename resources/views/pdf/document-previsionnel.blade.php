@@ -10,7 +10,7 @@
             font-size: 11px;
             color: #212529;
             line-height: 1.4;
-            margin: 15mm;
+            margin: 15mm 15mm 25mm 15mm; /* bottom élargi pour réserver la zone du footer-logos partial */
         }
         table { width: 100%; border-collapse: collapse; }
         table.layout td { vertical-align: top; padding: 0; }

@@ -13,6 +13,7 @@ use App\Models\Tiers;
 use App\Models\TypeOperation;
 use App\Models\User;
 use App\Services\DocumentPrevisionnelService;
+use App\Support\CurrentAssociation;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -95,6 +96,33 @@ it('generates a PDF for a proforma', function () {
 
     expect($pdfContent)->toBeString()
         ->and(str_starts_with($pdfContent, '%PDF'))->toBeTrue();
+});
+
+it('le rendu HTML d\'une proforma include le footer-logos avec appLogoBase64', function () {
+    // Régression bug 2026-05-16 : DocumentPrevisionnelService ne passait ni
+    // appLogoBase64 ni n'appelait PdfFooterRenderer::render() — résultat : PDF
+    // proforma/devis prévisionnel sans pied de page. Le test sur le binaire PDF
+    // est trop brittle (streams Flate-compressés), on assert sur la vue.
+    [$operation, $participant] = createDocPrevSetup();
+
+    $doc = $this->service->emettre($operation, $participant, TypeDocumentPrevisionnel::Proforma);
+    $doc->load('participant.tiers', 'operation');
+
+    $appLogoBase64 = base64_encode(file_get_contents(public_path('images/agora-gestion.svg')));
+
+    $html = view('pdf.document-previsionnel', [
+        'document' => $doc,
+        'association' => CurrentAssociation::get(),
+        'tiers' => $doc->participant->tiers,
+        'headerLogoBase64' => null,
+        'headerLogoMime' => null,
+        'appLogoBase64' => $appLogoBase64,
+        'footerLogoBase64' => null,
+        'footerLogoMime' => null,
+    ])->render();
+
+    // Le footer-logos est inclus → image avec le base64 du logo AgoraGestion
+    expect($html)->toContain('data:image/svg+xml;base64,'.$appLogoBase64);
 });
 
 it('stores the PDF on disk and updates pdf_path', function () {
