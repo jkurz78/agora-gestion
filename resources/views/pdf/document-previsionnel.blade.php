@@ -179,5 +179,8 @@
         <p>Ce document n'est pas une facture.</p>
     </div>
 
+    {{-- FOOTER LOGOS --}}
+    @include('pdf.partials.footer-logos')
+
 </body>
 </html>
