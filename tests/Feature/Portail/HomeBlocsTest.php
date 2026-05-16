@@ -35,18 +35,18 @@ it('tiers membre seul (pour_depenses=false) ne voit pas les raccourcis frais', f
         ->assertStatus(200)
         ->assertSeeText('Mon profil')
         ->assertDontSeeText('Notes de frais')
-        ->assertDontSeeText('Factures partenaires')
+        ->assertDontSeeText('Factures')
         ->assertDontSeeText('Historique dépenses');
 });
 
-it('tiers pour_depenses voit les raccourcis Notes de frais, Factures partenaires, Historique dépenses', function () {
+it('tiers pour_depenses voit les raccourcis Notes de frais, Factures, Historique dépenses', function () {
     loginTiers(['pour_depenses' => true, 'pour_recettes' => false]);
 
     $this->get('/portail/')
         ->assertStatus(200)
         ->assertSeeText('Mon profil')
         ->assertSeeText('Notes de frais')
-        ->assertSeeText('Factures partenaires')
+        ->assertSeeText('Factures')
         ->assertSeeText('Historique dépenses');
 });
 
@@ -57,7 +57,7 @@ it('tiers pour_recettes seul (sans pour_depenses) ne voit pas les raccourcis fra
         ->assertStatus(200)
         ->assertSeeText('Mon profil')
         ->assertDontSeeText('Notes de frais')
-        ->assertDontSeeText('Factures partenaires')
+        ->assertDontSeeText('Factures')
         ->assertDontSeeText('Historique dépenses');
 });
 

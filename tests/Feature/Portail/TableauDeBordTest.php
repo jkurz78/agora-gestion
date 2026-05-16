@@ -32,7 +32,7 @@ it('tableau de bord membre seul affiche Bonjour prenom et 1 raccourci Mon profil
         ->assertSeeText('Mon profil')
         ->assertSee("/{$asso->slug}/portail/mon-profil")
         ->assertDontSeeText('Notes de frais')
-        ->assertDontSeeText('Factures partenaires')
+        ->assertDontSeeText('Factures')
         ->assertDontSeeText('Historique dépenses');
 });
 
@@ -58,7 +58,7 @@ it('tableau de bord bénévole pour_depenses=true affiche 4 raccourcis', functio
         ->assertSee("/{$asso->slug}/portail/mon-profil")
         ->assertSeeText('Notes de frais')
         ->assertSee("/{$asso->slug}/portail/notes-de-frais")
-        ->assertSeeText('Factures partenaires')
+        ->assertSeeText('Factures')
         ->assertSeeText('Historique dépenses');
 });
 

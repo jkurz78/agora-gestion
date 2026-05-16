@@ -7,12 +7,20 @@
 
     <div class="list-group">
         @foreach ($timeline->emails as $email)
+            @php
+                $categorie = \App\Enums\CategorieEmail::tryFrom((string) $email->categorie);
+                $badgeLabel = $categorie ? $categorie->labelPortail() : 'Autre';
+                $badgeCss   = $categorie ? $categorie->cssBadgePortail() : 'bg-secondary';
+            @endphp
             <div class="list-group-item">
                 <button type="button"
                         wire:click="toggleMessage({{ $email->id }})"
-                        class="btn btn-link text-decoration-none text-start p-0 d-flex justify-content-between align-items-center w-100">
-                    <span><strong>{{ $email->objet }}</strong></span>
-                    <span class="text-muted small">{{ $email->dateEnvoi->format('d/m/Y') }}</span>
+                        class="btn btn-link text-decoration-none text-start p-0 d-flex align-items-center gap-3 w-100">
+                    <span class="text-muted small text-nowrap" style="min-width:140px;">
+                        {{ $email->dateEnvoi->format('d/m/Y H:i') }}
+                    </span>
+                    <span class="badge {{ $badgeCss }}">{{ $badgeLabel }}</span>
+                    <strong>{{ $email->objet }}</strong>
                 </button>
 
                 @if ($messageOuvertId === (int) $email->id)

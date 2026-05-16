@@ -22,8 +22,8 @@ final class MesMessagesProvider implements PortailSectionProvider
             label: 'Mes messages',
             routeName: 'portail.mes-messages',
             icon: 'bi-envelope',
-            ordre: 90,
-            groupe: 'Mes messages',
+            ordre: 25,
+            groupe: 'Espace personnel',
             visible: true,
             badge: null,
         );

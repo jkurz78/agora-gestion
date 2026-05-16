@@ -21,7 +21,7 @@ final class HistoriqueDepensesProvider implements PortailSectionProvider
             label: 'Historique dépenses',
             routeName: 'portail.historique.index',
             icon: 'bi-clock-history',
-            ordre: 50,
+            ordre: 99,
             groupe: 'Mes frais & factures',
             visible: true,
             badge: null,

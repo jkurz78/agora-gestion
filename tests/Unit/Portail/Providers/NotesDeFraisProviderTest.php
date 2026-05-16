@@ -45,7 +45,7 @@ it('returns correct DTO values', function (): void {
         ->and($dto->label)->toBe('Notes de frais')
         ->and($dto->routeName)->toBe('portail.ndf.index')
         ->and($dto->icon)->toBe('bi-receipt')
-        ->and($dto->ordre)->toBe(30)
+        ->and($dto->ordre)->toBe(90)
         ->and($dto->groupe)->toBe('Mes frais & factures')
         ->and($dto->visible)->toBeTrue()
         ->and($dto->badge)->toBeNull();

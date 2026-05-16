@@ -18,10 +18,10 @@ final class FacturesPartenairesProvider implements PortailSectionProvider
 
         return new PortailSectionDTO(
             id: 'factures-partenaires',
-            label: 'Factures partenaires',
+            label: 'Factures',
             routeName: 'portail.factures.index',
             icon: 'bi-file-earmark-text',
-            ordre: 40,
+            ordre: 95,
             groupe: 'Mes frais & factures',
             visible: true,
             badge: null,

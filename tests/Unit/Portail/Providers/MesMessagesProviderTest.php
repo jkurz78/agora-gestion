@@ -18,8 +18,8 @@ it('returns DTO when tiers has at least 1 EmailLog', function (): void {
         ->and($dto->label)->toBe('Mes messages')
         ->and($dto->routeName)->toBe('portail.mes-messages')
         ->and($dto->icon)->toBe('bi-envelope')
-        ->and($dto->ordre)->toBe(90)
-        ->and($dto->groupe)->toBe('Mes messages')
+        ->and($dto->ordre)->toBe(25)
+        ->and($dto->groupe)->toBe('Espace personnel')
         ->and($dto->visible)->toBeTrue()
         ->and($dto->badge)->toBeNull();
 });

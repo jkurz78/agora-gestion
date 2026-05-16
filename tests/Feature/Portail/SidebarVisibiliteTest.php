@@ -35,7 +35,7 @@ it('membre seul affiche Tableau de bord et Mon profil, pas les sections frais', 
         ->toContain('Tableau de bord')
         ->toContain('Mon profil')
         ->not->toContain('Notes de frais')
-        ->not->toContain('Factures partenaires')
+        ->not->toContain('Factures')
         ->not->toContain('Historique dépenses');
 });
 
@@ -43,7 +43,7 @@ it('membre seul affiche Tableau de bord et Mon profil, pas les sections frais', 
 // Scénario 2 : Participant-NDF — pour_depenses=false mais ≥1 NDF existante
 // Doit afficher "Tableau de bord", "Mon profil" et "Notes de frais".
 // ─────────────────────────────────────────────────────────────────────────────
-it('participant NDF affiche Notes de frais mais pas Factures partenaires ni Historique', function () {
+it('participant NDF affiche Notes de frais mais pas Factures ni Historique', function () {
     $asso = Association::factory()->create();
     TenantContext::boot($asso);
 
@@ -63,7 +63,7 @@ it('participant NDF affiche Notes de frais mais pas Factures partenaires ni Hist
         ->toContain('Tableau de bord')
         ->toContain('Mon profil')
         ->toContain('Notes de frais')
-        ->not->toContain('Factures partenaires')
+        ->not->toContain('Factures')
         ->not->toContain('Historique dépenses');
 });
 
@@ -89,7 +89,7 @@ it('bénévole pour_depenses=true affiche toutes les 5 sections', function () {
         ->toContain('Tableau de bord')
         ->toContain('Mon profil')
         ->toContain('Notes de frais')
-        ->toContain('Factures partenaires')
+        ->toContain('Factures')
         ->toContain('Historique dépenses');
 });
 
@@ -116,7 +116,7 @@ it('cumul pour_depenses=true avec NDF affiche toutes les 5 sections', function (
         ->toContain('Tableau de bord')
         ->toContain('Mon profil')
         ->toContain('Notes de frais')
-        ->toContain('Factures partenaires')
+        ->toContain('Factures')
         ->toContain('Historique dépenses');
 });
 
@@ -223,6 +223,6 @@ it('tiers null produit une sidebar sans entrées de navigation', function () {
         ->not->toContain('Tableau de bord')
         ->not->toContain('Mon profil')
         ->not->toContain('Notes de frais')
-        ->not->toContain('Factures partenaires')
+        ->not->toContain('Factures')
         ->not->toContain('Historique dépenses');
 });

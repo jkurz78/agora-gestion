@@ -13,10 +13,10 @@ it('returns DTO when pour_depenses=true', function (): void {
 
     expect($dto)->not->toBeNull()
         ->and($dto->id)->toBe('factures-partenaires')
-        ->and($dto->label)->toBe('Factures partenaires')
+        ->and($dto->label)->toBe('Factures')
         ->and($dto->routeName)->toBe('portail.factures.index')
         ->and($dto->icon)->toBe('bi-file-earmark-text')
-        ->and($dto->ordre)->toBe(40)
+        ->and($dto->ordre)->toBe(95)
         ->and($dto->groupe)->toBe('Mes frais & factures')
         ->and($dto->visible)->toBeTrue()
         ->and($dto->badge)->toBeNull();

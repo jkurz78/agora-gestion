@@ -16,7 +16,7 @@ it('returns DTO when pour_depenses=true', function (): void {
         ->and($dto->label)->toBe('Historique dépenses')
         ->and($dto->routeName)->toBe('portail.historique.index')
         ->and($dto->icon)->toBe('bi-clock-history')
-        ->and($dto->ordre)->toBe(50)
+        ->and($dto->ordre)->toBe(99)
         ->and($dto->groupe)->toBe('Mes frais & factures')
         ->and($dto->visible)->toBeTrue()
         ->and($dto->badge)->toBeNull();

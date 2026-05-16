@@ -23,6 +23,28 @@ enum CategorieEmail: string
         };
     }
 
+    public function labelPortail(): string
+    {
+        return match ($this) {
+            self::Formulaire => 'Questionnaire',
+            self::Attestation => 'Attestation',
+            self::Document => 'Document',
+            self::Message => 'Message',
+            self::Communication => 'Actualités',
+        };
+    }
+
+    public function cssBadgePortail(): string
+    {
+        return match ($this) {
+            self::Formulaire => 'bg-warning text-dark',
+            self::Attestation => 'bg-success',
+            self::Document => 'bg-info text-dark',
+            self::Message => 'bg-secondary',
+            self::Communication => 'bg-primary',
+        };
+    }
+
     /**
      * @return array<string, string>
      */

@@ -22,7 +22,7 @@ final class NotesDeFraisProvider implements PortailSectionProvider
             label: 'Notes de frais',
             routeName: 'portail.ndf.index',
             icon: 'bi-receipt',
-            ordre: 30,
+            ordre: 90,
             groupe: 'Mes frais & factures',
             visible: true,
             badge: null,
