@@ -78,7 +78,7 @@
                 <h6>Contenu</h6>
                 @if($email->corps_html)
                     <iframe sandbox=""
-                            srcdoc="{{ e(\App\Helpers\EmailLogo::previewSwap($email->corps_html)) }}"
+                            srcdoc="{{ \App\Helpers\EmailLogo::previewSwap($email->corps_html) }}"
                             style="width: 100%; height: 50vh; border: 1px solid var(--bs-border-color); border-radius: 4px;"></iframe>
                 @else
                     <p class="text-muted">Pas de corps HTML enregistré.</p>

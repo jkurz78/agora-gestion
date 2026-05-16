@@ -124,6 +124,30 @@ it('ouvre la modale de détail et affiche participant, envoyé par et modèle (r
         ->assertSee('Newsletter Mai'); // objet de la campagne (campagne.objet)
 });
 
+it('rend le corps_html sans double-échappement dans le srcdoc de l\'iframe', function (): void {
+    // Bug 2026-05-16 : `srcdoc="{{ e(...) }}"` faisait un double-escape (le `{{ }}`
+    // Blade escape déjà). Résultat : l'iframe affichait les tags comme du texte
+    // au lieu de rendre le HTML. Le srcdoc doit contenir `&lt;p&gt;` (single-escape)
+    // pas `&amp;lt;p&amp;gt;` (double-escape).
+    $tiers = Tiers::factory()->create();
+    $log = EmailLog::factory()->create([
+        'tiers_id' => $tiers->id,
+        'participant_id' => null,
+        'objet' => 'Sujet',
+        'corps_html' => '<p>Bonjour <strong>Jean</strong></p>',
+    ]);
+
+    $component = Livewire::test(Communications::class, ['tiers' => $tiers])
+        ->call('openDetail', $log->id);
+
+    $html = $component->html();
+
+    // Single-escape attendu dans le srcdoc
+    expect($html)->toContain('&lt;p&gt;Bonjour');
+    // Le double-escape (bug) inclurait `&amp;lt;`
+    expect($html)->not->toContain('&amp;lt;p&amp;gt;');
+});
+
 it("refuse d'ouvrir un email qui n'appartient pas au tiers", function (): void {
     $tiers = Tiers::factory()->create();
     $autre = Tiers::factory()->create();
