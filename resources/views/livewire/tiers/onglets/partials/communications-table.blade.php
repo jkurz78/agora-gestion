@@ -50,7 +50,12 @@
                     </td>
                     <td class="text-center">
                         @if($email->aPieceJointe)
-                            <i class="bi bi-paperclip" title="{{ $email->attachmentNom }}"></i>
+                            <a href="{{ route('tiers.email-logs.attachment', ['emailLog' => $email->id]) }}"
+                               target="_blank"
+                               rel="noopener"
+                               title="Télécharger {{ $email->attachmentNom }}">
+                                <i class="bi bi-paperclip"></i>
+                            </a>
                         @else
                             <span class="text-muted">—</span>
                         @endif

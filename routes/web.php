@@ -12,6 +12,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DevisManuelPdfController;
 use App\Http\Controllers\DocumentPrevisionnelPdfController;
 use App\Http\Controllers\DroitImagePdfController;
+use App\Http\Controllers\EmailLogAttachmentController;
 use App\Http\Controllers\EmailOptoutController;
 use App\Http\Controllers\EmailTrackingController;
 use App\Http\Controllers\FacturePdfController;
@@ -272,6 +273,8 @@ Route::middleware(['auth', 'verified', EnsureTwoFactor::class])
             ->name('dons.recu-fiscal');
         Route::get('/recus-fiscaux/{recu}/download', [RecuFiscalController::class, 'downloadByRecu'])
             ->name('recu-fiscal.download');
+        Route::get('/email-logs/{emailLog}/attachment', EmailLogAttachmentController::class)
+            ->name('email-logs.attachment');
     });
 
 // ── Devis libres ──
