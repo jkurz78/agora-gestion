@@ -29,8 +29,9 @@ final class MessageAttachmentController
         $emailTiers = Tiers::find($emailLog->tiers_id);
         abort_unless($emailTiers !== null, 404);
 
-        // Ownership : le Tiers connecté doit être le destinataire
-        abort_unless((int) $emailTiers->id === (int) $tiers->id, 403);
+        // Ownership : le Tiers connecté doit être le destinataire.
+        // 404 et non 403 pour bloquer l'oracle d'énumération cross-Tiers.
+        abort_unless((int) $emailTiers->id === (int) $tiers->id, 404);
 
         // PJ doit exister
         abort_unless($emailLog->attachment_path !== null, 404);
@@ -44,7 +45,12 @@ final class MessageAttachmentController
 
         // MIME detection
         $mime = $disk->mimeType($emailLog->attachment_path) ?: 'application/octet-stream';
+
+        // RFC 5987 Content-Disposition avec fallback ASCII pour vieux clients
         $filename = basename($emailLog->attachment_path);
+        $asciiFilename = preg_replace('/[^\x20-\x7E]/', '_', $filename) ?: 'piece-jointe';
+        $encodedFilename = rawurlencode($filename);
+        $contentDisposition = "inline; filename=\"{$asciiFilename}\"; filename*=UTF-8''{$encodedFilename}";
 
         Log::info('portail.message.attachment.telecharge', [
             'email_log_id' => $emailLog->id,
@@ -53,9 +59,10 @@ final class MessageAttachmentController
 
         return response($contents, 200, [
             'Content-Type' => $mime,
-            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+            'Content-Disposition' => $contentDisposition,
             'Content-Length' => (string) strlen($contents),
             'Cache-Control' => 'private, no-cache, no-store, must-revalidate',
+            'Content-Security-Policy' => 'sandbox',
         ]);
     }
 }

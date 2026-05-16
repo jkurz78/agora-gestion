@@ -98,7 +98,7 @@ it('retourne 404 quand le fichier est absent du disque', function () {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Test 4 : Intrusion intra-asso — 403
+// Test 4 : Intrusion intra-asso — 404 (oracle d'énumération bloqué)
 // ─────────────────────────────────────────────────────────────────────────────
 it('[sécurité] Alice ne peut pas télécharger la PJ de Bob dans la même asso', function () {
     [$asso, $alice] = makeAssoAndAlice();
@@ -110,7 +110,7 @@ it('[sécurité] Alice ne peut pas télécharger la PJ de Bob dans la même asso
 
     $url = PortailRoute::to('messages.attachment', $asso, ['emailLog' => $emailLog->id]);
 
-    $this->get($url)->assertStatus(403);
+    $this->get($url)->assertNotFound();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -158,6 +158,38 @@ it('émet un log portail.message.attachment.telecharge sur succès', function ()
             'tiers_id' => $alice->id,
         ])
         ->once();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 7a : Content-Disposition RFC 5987
+// ─────────────────────────────────────────────────────────────────────────────
+it('inclut filename*=UTF-8\'\' dans Content-Disposition', function () {
+    [$asso, $alice] = makeAssoAndAlice();
+    Auth::guard('tiers-portail')->login($alice);
+
+    $emailLog = makeEmailLogWithAttachment((int) $alice->id, 'recu-fiscal-été.pdf', '%PDF-1.4 accents');
+
+    $url = PortailRoute::to('messages.attachment', $asso, ['emailLog' => $emailLog->id]);
+
+    $response = $this->get($url);
+    $response->assertStatus(200);
+    expect($response->headers->get('Content-Disposition'))->toContain("filename*=UTF-8''");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Test 7b : Content-Security-Policy sandbox
+// ─────────────────────────────────────────────────────────────────────────────
+it('inclut Content-Security-Policy: sandbox sur la réponse', function () {
+    [$asso, $alice] = makeAssoAndAlice();
+    Auth::guard('tiers-portail')->login($alice);
+
+    $emailLog = makeEmailLogWithAttachment((int) $alice->id, 'doc.pdf', '%PDF-1.4 csp test');
+
+    $url = PortailRoute::to('messages.attachment', $asso, ['emailLog' => $emailLog->id]);
+
+    $response = $this->get($url);
+    $response->assertStatus(200);
+    expect($response->headers->get('Content-Security-Policy'))->toBe('sandbox');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
