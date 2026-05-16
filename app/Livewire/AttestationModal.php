@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\CategorieEmail;
 use App\Enums\StatutPresence;
 use App\Mail\AttestationPresenceMail;
-use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use App\Models\Operation;
 use App\Models\Participant;
 use App\Models\Seance;
+use App\Services\Email\EmailLogStorageService;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
@@ -212,34 +212,32 @@ final class AttestationModal extends Component
                     ->to($pData['email'])
                     ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
-                EmailLog::create([
-                    'tiers_id' => $participant->tiers_id,
-                    'participant_id' => $participant->id,
-                    'operation_id' => $this->operation->id,
-                    'categorie' => 'attestation',
-                    'email_template_id' => $template?->id,
-                    'destinataire_email' => $pData['email'],
-                    'destinataire_nom' => trim($pData['nom'].' '.$pData['prenom']),
-                    'objet' => $mail->envelope()->subject,
-                    'statut' => 'envoye',
-                    'envoye_par' => Auth::id(),
-                ]);
+                app(EmailLogStorageService::class)->logSent(
+                    mail: $mail,
+                    tiers: $participant->tiers,
+                    categorie: CategorieEmail::Attestation,
+                    destinataireEmail: $pData['email'],
+                    destinataireNom: trim($pData['nom'].' '.$pData['prenom']),
+                    participantId: (int) $participant->id,
+                    operationId: (int) $this->operation->id,
+                    emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+                    pdfContent: $pdfData,
+                    pdfFilename: "Attestation présence - S{$seance->numero}.pdf",
+                );
 
                 $sent++;
             } catch (\Throwable $e) {
-                EmailLog::create([
-                    'tiers_id' => $participant->tiers_id,
-                    'participant_id' => $participant->id,
-                    'operation_id' => $this->operation->id,
-                    'categorie' => 'attestation',
-                    'email_template_id' => $template?->id,
-                    'destinataire_email' => $pData['email'],
-                    'destinataire_nom' => trim($pData['nom'].' '.$pData['prenom']),
-                    'objet' => $template?->objet ?? 'Attestation',
-                    'statut' => 'erreur',
-                    'erreur_message' => $e->getMessage(),
-                    'envoye_par' => Auth::id(),
-                ]);
+                app(EmailLogStorageService::class)->logError(
+                    tiers: $participant->tiers,
+                    categorie: CategorieEmail::Attestation,
+                    destinataireEmail: $pData['email'],
+                    objetFallback: $template?->objet ?? 'Attestation',
+                    erreurMessage: $e->getMessage(),
+                    destinataireNom: trim($pData['nom'].' '.$pData['prenom']),
+                    participantId: (int) $participant->id,
+                    operationId: (int) $this->operation->id,
+                    emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+                );
                 $errors++;
             }
         }
@@ -306,35 +304,33 @@ final class AttestationModal extends Component
                 ->to($this->participantEmail)
                 ->send($mail->from($typeOp->effectiveEmailFrom(), $typeOp->effectiveEmailFromName()));
 
-            EmailLog::create([
-                'tiers_id' => $participant->tiers_id,
-                'participant_id' => $participant->id,
-                'operation_id' => $this->operation->id,
-                'categorie' => 'attestation',
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $this->participantEmail,
-                'destinataire_nom' => trim("{$nom} {$prenom}"),
-                'objet' => $mail->envelope()->subject,
-                'statut' => 'envoye',
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logSent(
+                mail: $mail,
+                tiers: $participant->tiers,
+                categorie: CategorieEmail::Attestation,
+                destinataireEmail: $this->participantEmail,
+                destinataireNom: trim("{$nom} {$prenom}"),
+                participantId: (int) $participant->id,
+                operationId: (int) $this->operation->id,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+                pdfContent: $pdfData,
+                pdfFilename: "Attestation présence - {$prenom} {$nom}.pdf",
+            );
 
             $this->resultMessage = "Email envoyé à {$this->participantEmail}.";
             $this->resultType = 'success';
         } catch (\Throwable $e) {
-            EmailLog::create([
-                'tiers_id' => $participant->tiers_id,
-                'participant_id' => $participant->id,
-                'operation_id' => $this->operation->id,
-                'categorie' => 'attestation',
-                'email_template_id' => $template?->id,
-                'destinataire_email' => $this->participantEmail,
-                'destinataire_nom' => trim(($participant->tiers->nom ?? '').' '.($participant->tiers->prenom ?? '')),
-                'objet' => $template?->objet ?? 'Attestation',
-                'statut' => 'erreur',
-                'erreur_message' => $e->getMessage(),
-                'envoye_par' => Auth::id(),
-            ]);
+            app(EmailLogStorageService::class)->logError(
+                tiers: $participant->tiers,
+                categorie: CategorieEmail::Attestation,
+                destinataireEmail: $this->participantEmail,
+                objetFallback: $template?->objet ?? 'Attestation',
+                erreurMessage: $e->getMessage(),
+                destinataireNom: trim(($participant->tiers->nom ?? '').' '.($participant->tiers->prenom ?? '')),
+                participantId: (int) $participant->id,
+                operationId: (int) $this->operation->id,
+                emailTemplateId: $template?->id !== null ? (int) $template->id : null,
+            );
 
             $this->resultMessage = "Erreur : {$e->getMessage()}";
             $this->resultType = 'danger';
