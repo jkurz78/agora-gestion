@@ -39,3 +39,13 @@ it('lets normal URLs through when a super-admin exists', function () {
     // /login devrait s'afficher normalement
     $this->get('/login')->assertOk();
 });
+
+it('bypasses the install gate in demo environment even without a super-admin', function () {
+    // Pas de super-admin en base — en prod ça redirigerait vers /setup.
+    // En env=demo, le snapshot est réimporté en boucle et peut légitimement
+    // ne pas contenir de super-admin ; on ne doit pas bloquer le site.
+    app()->detectEnvironment(fn (): string => 'demo');
+    Cache::forget('app.installed');
+
+    $this->get('/login')->assertOk();
+});

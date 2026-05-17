@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\Demo;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -38,6 +39,12 @@ final class RedirectIfNotInstalled
 
     public function handle(Request $request, Closure $next): Response
     {
+        // Env démo : le snapshot est rejoué en boucle et peut légitimement
+        // ne pas contenir de super-admin. Ne pas bloquer le site sur /setup.
+        if (Demo::isActive()) {
+            return $next($request);
+        }
+
         $installed = User::superAdminExists();
 
         if (! $installed) {
