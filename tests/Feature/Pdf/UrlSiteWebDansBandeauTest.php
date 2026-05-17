@@ -42,6 +42,17 @@ it('PDF tiers affiche url_site_web dans le bandeau coordonnées', function (stri
     expect($content)->toContain($expectedAccessor);
 })->with('templates_tiers_avec_url');
 
+it('PDF tiers affiche email et telephone dans le bandeau coordonnées', function (string $relativePath, string $expectedAccessor) {
+    // L'accesseur de base ($association ou $asso) est dérivé de celui de url_site_web.
+    $base = str_replace('url_site_web', '', $expectedAccessor); // ex: '$association->'
+    $absolute = base_path($relativePath);
+    $content = file_get_contents($absolute);
+
+    expect($content)
+        ->toContain($base.'email')
+        ->and($content)->toContain($base.'telephone');
+})->with('templates_tiers_avec_url');
+
 dataset('templates_internes_sans_url', [
     'rapprochement' => 'resources/views/pdf/rapprochement.blade.php',
     'remise-bancaire' => 'resources/views/pdf/remise-bancaire.blade.php',

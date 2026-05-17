@@ -96,6 +96,12 @@
                         @if($association->code_postal || $association->ville)
                             — {{ $association->code_postal }} {{ $association->ville }}
                         @endif
+                        @if($association->email || $association->telephone)
+                            <br>
+                            @if($association->email){{ $association->email }}@endif
+                            @if($association->email && $association->telephone) &mdash; @endif
+                            @if($association->telephone){{ $association->telephone }}@endif
+                        @endif
                         @if($association->url_site_web)
                             <br>{{ $association->url_site_web }}
                         @endif
