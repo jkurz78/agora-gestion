@@ -150,7 +150,7 @@ it('Section Terminée : bouton attestation globale affiché', function () {
     ]);
 
     expect($html)->toContain($expectedUrl);
-    expect($html)->toContain('attestation globale');
+    expect($html)->toContain('Attestation globale');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

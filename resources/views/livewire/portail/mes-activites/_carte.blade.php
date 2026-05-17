@@ -26,6 +26,9 @@
                 @if (($horizon ?? '') === 'encours' && $seancesAvecDate->isNotEmpty())
                     @php
                         $presencesParSeance = $participation->presences->keyBy('seance_id');
+                        $aDesAttestations = $seancesAvecDate->contains(
+                            fn($s) => $presencesParSeance->get($s->id)?->statut === \App\Enums\StatutPresence::Present->value
+                        );
                     @endphp
                     <ul class="seance-timeline list-unstyled mt-3 mb-0 d-flex flex-md-row flex-column gap-2 gap-md-3 align-items-md-start">
                         @foreach($seancesAvecDate->sortBy('date') as $seance)
@@ -49,14 +52,40 @@
                                 @if($statut === \App\Enums\StatutPresence::Present->value)
                                     <a href="{{ \App\Support\PortailRoute::to('attestations.seance', $portailAssociation ?? null, ['operation' => $participation->operation_id, 'seance' => $seance->id]) }}"
                                        target="_blank" rel="noopener"
-                                       class="btn btn-sm btn-link p-0 mt-1"
-                                       title="Voir l'attestation">
-                                        <i class="bi bi-file-earmark-pdf"></i>
+                                       class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center justify-content-center p-1 mt-1"
+                                       style="line-height:1;"
+                                       title="Voir l'attestation de présence">
+                                        <i class="bi bi-file-earmark-pdf fs-5"></i>
                                     </a>
                                 @endif
                             </li>
                         @endforeach
+
+                        {{-- Desktop : étiquette alignée verticalement avec les boutons PDF
+                             via deux placeholders invisibles (pastille + date) qui réservent l'espace --}}
+                        @if ($aDesAttestations)
+                            <li class="d-none d-md-flex flex-column align-items-start ms-md-2">
+                                <span style="width:18px;height:18px;display:inline-block;visibility:hidden;"></span>
+                                <small class="mt-1" style="visibility:hidden;">--/--</small>
+                                <span class="small text-muted text-nowrap mt-1 d-inline-flex align-items-center"
+                                      style="min-height:calc(1.25rem + 0.5rem + 2px);">
+                                    <i class="bi bi-file-earmark-pdf me-1"></i>Attestations de présence
+                                </span>
+                            </li>
+                        @endif
                     </ul>
+                @endif
+
+                {{-- Attestation globale : activité terminée --}}
+                @if (($horizon ?? '') === 'terminee')
+                    <div class="mt-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <a href="{{ \App\Support\PortailRoute::to('attestations.recap', $portailAssociation ?? null, ['operation' => $participation->operation_id, 'participant' => $participation->id]) }}"
+                           target="_blank" rel="noopener"
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-file-earmark-pdf"></i> Attestation globale
+                        </a>
+                        <span class="small text-muted text-nowrap"><i class="bi bi-file-earmark-pdf me-1"></i>Attestation de présence</span>
+                    </div>
                 @endif
 
                 {{-- Bloc financier --}}
@@ -115,7 +144,7 @@
                 : null;
         @endphp
 
-        @if ($devis !== null || $facture !== null || ($horizon ?? '') === 'terminee')
+        @if ($devis !== null || $facture !== null)
             <div class="mt-3 d-flex flex-wrap gap-2">
                 @if ($devis !== null)
                     <a href="{{ \App\Support\PortailRoute::to('documents.devis', $portailAssociation ?? null, ['document' => $devis->id]) }}"
@@ -136,14 +165,6 @@
                         @else
                             Voir la facture finale
                         @endif
-                    </a>
-                @endif
-
-                @if (($horizon ?? '') === 'terminee')
-                    <a href="{{ \App\Support\PortailRoute::to('attestations.recap', $portailAssociation ?? null, ['operation' => $participation->operation_id, 'participant' => $participation->id]) }}"
-                       target="_blank" rel="noopener"
-                       class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-file-earmark-pdf"></i> Voir l'attestation globale
                     </a>
                 @endif
             </div>
