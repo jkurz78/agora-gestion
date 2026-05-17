@@ -102,6 +102,9 @@
                                 @if($association->code_postal || $association->ville)
                                     — {{ $association->code_postal }} {{ $association->ville }}
                                 @endif
+                                @if($association->url_site_web)
+                                    <br>{{ $association->url_site_web }}
+                                @endif
                             </div>
                         @endif
                     </td>

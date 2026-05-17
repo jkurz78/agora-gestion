@@ -126,6 +126,10 @@
                             @if($association->email){{ $association->email }}@endif
                             @if($association->email && $association->telephone) &mdash; @endif
                             @if($association->telephone){{ $association->telephone }}@endif
+                            @if ($association->url_site_web)
+                                @if ($association->email || $association->telephone)<br>@endif
+                                {{ $association->url_site_web }}
+                            @endif
                         </div>
                         @if($association->siret)
                             <div class="association-address" style="margin-top: 2px;">SIRET&nbsp;: {{ $association->siret }}</div>
