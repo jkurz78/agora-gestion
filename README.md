@@ -151,24 +151,26 @@ L'import des demandes confirmées vers la table `tiers` (déduplication, fusion)
 
 ```
 app/
-├── Enums/           # TypeCategorie, ModePaiement, StatutMembre, StatutOperation
+├── Enums/           # Valeurs typées PHP 8.2 (TypeTransaction, ModePaiement, StatutReglement, UsageComptable…)
 ├── Http/
-│   ├── Controllers/ # CRUD simples (Membre, Operation, Parametres)
+│   ├── Controllers/ # PDFs, exports, auth, portail, pièces jointes
 │   └── Requests/    # Validation des formulaires
-├── Livewire/        # 12 composants reactifs (formulaires + listes)
-├── Models/          # 14 modeles Eloquent
-├── Services/        # Logique metier (8 services)
-└── View/Components/ # Composants Blade reutilisables
+├── Livewire/        # Composants réactifs (formulaires + listes + onglets)
+├── Models/          # Modèles Eloquent (TenantModel pour les modèles multi-tenant)
+├── Services/        # Logique métier (DB::transaction)
+├── Support/         # Helpers (TenantUrl, LogContext, PdfFooterRenderer…)
+├── Tenant/          # TenantContext + TenantScope fail-closed
+└── View/Components/ # Composants Blade réutilisables
 
 database/
-├── migrations/      # 13 migrations domaine + 3 Laravel
-├── seeders/         # Donnees de dev realistes
-└── factories/       # 14 factories pour les tests
+├── migrations/      # Migrations Laravel + domaine (~100 fichiers)
+├── seeders/         # Données de dev réalistes
+└── factories/       # Factories pour les tests
 
 resources/views/
 ├── layouts/         # app.blade.php (navbar Bootstrap)
 ├── livewire/        # Vues des composants Livewire
-└── [modules]/       # Vues par module (membres, operations, parametres...)
+└── [modules]/       # Vues par module (tiers, transactions, dons, cotisations, budget…)
 ```
 
 ### Patterns principaux
@@ -188,32 +190,46 @@ Route::view('/depenses', 'depenses.index')  →  <livewire:depense-list />
 
 **Events Livewire** : les composants communiquent par evenements (`depense-saved`, `edit-depense`).
 
-### Modeles & Relations
+### Modèles & Relations
+
+Le modèle comptable a été unifié en v2.x autour de `Transaction` / `TransactionLigne` (plus de `Depense`/`Recette`/`Don`/`Cotisation` distincts).
 
 ```
-User ──hasMany──→ Depense, Recette, Don (via saisi_par)
+Association (tenant) ──hasMany──→ Tiers, Transaction, NoteDeFrais, Operation, …
 
-CompteBancaire ──hasMany──→ Depense, Recette, Cotisation, Don
+Tiers ──hasMany──→ Transaction, Adhesion, Participant, EmailLog, NoteDeFrais
 
-Categorie ──hasMany──→ SousCategorie ──hasMany──→ DepenseLigne, RecetteLigne, BudgetLine
+Transaction (TypeTransaction: Depense|Recette) ──hasMany──→ TransactionLigne
+TransactionLigne ──belongsTo──→ SousCategorie, Operation, Seance (optionnel)
+                ──hasOne ──→ RecuFiscalEmis (pour les dons)
 
-Operation ──hasMany──→ DepenseLigne, RecetteLigne, Don
+Categorie ──hasMany──→ SousCategorie
+SousCategorie ──belongsToMany──→ UsageComptable (table pivot usages_sous_categories)
 
-Depense ──hasMany──→ DepenseLigne (montant reparti par sous-categorie/operation/seance)
-Recette ──hasMany──→ RecetteLigne
+Operation ──hasMany──→ Seance, Participant
+Participant ──hasMany──→ Reglement, Presence
+Participant ──belongsTo──→ Tiers, Operation, refereParTiers, medecinTiers, therapeuteTiers
 
-Membre ──hasMany──→ Cotisation
-Donateur ──hasMany──→ Don
+NoteDeFrais ──hasMany──→ NoteDeFraisLigne (avec strategy pattern par type)
+Adhesion ──belongsTo──→ FormuleAdhesion, Tiers, Transaction (lien règlement)
+Facture / Devis / RemiseBancaire / Extourne / Provision : modèles dédiés
 ```
 
 ### Enums
 
-| Enum | Valeurs |
-|------|---------|
-| `TypeCategorie` | `Depense`, `Recette` |
-| `ModePaiement` | `Virement`, `Cheque`, `Especes`, `Cb`, `Prelevement` |
-| `StatutMembre` | `Actif`, `Inactif` |
-| `StatutOperation` | `EnCours`, `Cloturee` |
+PHP 8.2 enums dans `app/Enums/`. Principaux :
+
+| Enum | Rôle |
+|------|------|
+| `TypeTransaction` | `Depense`, `Recette` |
+| `ModePaiement` | `Virement`, `Cheque`, `Especes`, `Cb`, `Prelevement`, `Helloasso` |
+| `StatutReglement` | `Pointe`, `Recu`, `EnAttente`, `Rejete` |
+| `UsageComptable` | `Don`, `Cotisation`, `Adhesion`, `AbandonCreance`, … |
+| `CategorieEmail` | `Attestation`, `Recu`, `Message`, `Newsletter`, … |
+| `RoleSysteme` | `SuperAdmin`, `Utilisateur` |
+| `StatutNoteDeFrais` | `Brouillon`, `Soumise`, `Validee`, `Payee`, `Rejetee` |
+
+Voir le dossier complet pour les autres enums (statuts facture, devis, présence, type opération…).
 
 ---
 
@@ -248,7 +264,7 @@ Ce projet est concu pour etre developpe avec un assistant IA (Claude Code). Voic
 | Pas de logique metier dans les controllers | Les controllers valident et delegent, c'est tout |
 | Pas de requetes SQL brutes | Utiliser Eloquent + scopes. N+1 = eager loading avec `::with()` |
 | Transactions pour les ecritures multi-tables | `DB::transaction()` dans les services |
-| SoftDeletes sur les modeles financiers | Depense, Recette, Don — ne jamais supprimer definitivement |
+| SoftDeletes sur les modèles financiers | `Transaction`, `TransactionLigne`, `NoteDeFrais`, `Adhesion`, `Devis`, `Facture`, `Operation`… — ne jamais supprimer définitivement |
 | Scope `forExercice(int)` | Toute requete liee a une periode doit filtrer par exercice (sept-aout) |
 | Validation dans FormRequest | Pas de validation inline dans les controllers |
 | Enums PHP pour les types fixes | `ModePaiement`, `TypeCategorie`, etc. — pas de strings magiques |

@@ -2,7 +2,7 @@
 
 ## Principe
 
-- Une instance héberge N associations. SVS est le tenant #1.
+- Une instance héberge N associations. Le tenant #1 est la première association créée lors du setup initial.
 - Pas de flag `APP_MULTI_TENANT` — le mode multi-tenant est toujours actif.
 - Résolution du tenant par session (`current_association_id`), pas par sous-domaine (prévu en v3.1+).
 - Toute donnée métier porte une colonne `association_id` — jamais de données partagées entre tenants via Eloquent.
