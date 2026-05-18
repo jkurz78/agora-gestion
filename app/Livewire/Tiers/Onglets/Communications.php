@@ -7,6 +7,7 @@ namespace App\Livewire\Tiers\Onglets;
 use App\Models\EmailLog;
 use App\Models\Tiers;
 use App\Services\Tiers\TiersCommunicationsTimelineService;
+use App\Tenant\TenantContext;
 use Illuminate\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -66,11 +67,20 @@ final class Communications extends Component
                 ])
                 ->find($this->selectedEmailId);
 
-            // Garde-fou tenant : l'email doit appartenir au tiers (via tiers_id direct ou participant)
             if ($selected !== null) {
-                $appartient = (int) $selected->tiers_id === (int) $this->tiers->id
+                // Garde tenant explicite : EmailLog n'extends pas TenantModel.
+                // Tiers::find applique le TenantScope fail-closed → null si cross-tenant.
+                $emailLogTiers = $selected->tiers_id !== null
+                    ? Tiers::find($selected->tiers_id)
+                    : null;
+                $tenantOk = $emailLogTiers !== null
+                    && (int) $emailLogTiers->association_id === (int) TenantContext::currentId();
+
+                $appartient = $tenantOk && (
+                    (int) $selected->tiers_id === (int) $this->tiers->id
                     || ($selected->participant_id !== null
-                        && $this->tiers->participants()->whereKey($selected->participant_id)->exists());
+                        && $this->tiers->participants()->whereKey($selected->participant_id)->exists())
+                );
                 if (! $appartient) {
                     $selected = null;
                     $this->selectedEmailId = null;

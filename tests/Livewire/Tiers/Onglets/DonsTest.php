@@ -95,3 +95,49 @@ it('affiche un encart de blocage global si signataire absent', function (): void
     Livewire::test(Dons::class, ['tiers' => $tiers])
         ->assertSee('signataire');
 });
+
+// ── Sécurité : gardes tenant + tiers ─────────────────────────────────────────
+
+it("refuse d'afficher les avertissements d'un don d'un autre tenant", function (): void {
+    $tiersA = Tiers::factory()->create();
+
+    $assoB = Association::factory()->create();
+    TenantContext::boot($assoB);
+    $sousCatB = SousCategorie::factory()->create(['nom' => 'Don B', 'association_id' => $assoB->id]);
+    $sousCatB->usages()->create(['usage' => UsageComptable::Don->value]);
+    $tiersB = Tiers::factory()->create(['association_id' => $assoB->id]);
+    $donB = makeDonForDonsTest($tiersB, $sousCatB, '2025-04-01', 80);
+
+    TenantContext::boot(Association::find($tiersA->association_id));
+
+    Livewire::test(Dons::class, ['tiers' => $tiersA])
+        ->call('afficherAvertissements', $donB->id)
+        ->assertStatus(403);
+});
+
+it("refuse d'afficher les avertissements d'un don d'un autre tiers (même tenant)", function (): void {
+    $tiers = Tiers::factory()->create();
+    $autreTiers = Tiers::factory()->create();
+    $donAutreTiers = makeDonForDonsTest($autreTiers, $this->sousCat, '2025-04-01', 80);
+
+    Livewire::test(Dons::class, ['tiers' => $tiers])
+        ->call('afficherAvertissements', $donAutreTiers->id)
+        ->assertStatus(403);
+});
+
+it("refuse de re-émettre un reçu d'un autre tiers (même tenant)", function (): void {
+    $tiers = Tiers::factory()->create();
+    $autreTiers = Tiers::factory()->create();
+    $donAutreTiers = makeDonForDonsTest($autreTiers, $this->sousCat, '2025-04-01', 80);
+    $recuAutreTiers = RecuFiscalEmis::factory()->create([
+        'transaction_ligne_id' => $donAutreTiers->id,
+        'tiers_id' => $autreTiers->id,
+        'annule_at' => null,
+    ]);
+
+    Livewire::test(Dons::class, ['tiers' => $tiers])
+        ->set('recuAAnnuler', $recuAutreTiers->id)
+        ->set('motifAnnulation', 'tentative cross-tiers')
+        ->call('confirmerReEmission')
+        ->assertStatus(403);
+});

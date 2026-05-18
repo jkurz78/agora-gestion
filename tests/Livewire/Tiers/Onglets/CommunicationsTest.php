@@ -181,6 +181,29 @@ it("refuse d'ouvrir un email qui n'appartient pas au tiers", function (): void {
         ->assertSet('selectedEmailId', null);
 });
 
+it("refuse d'ouvrir un email d'un autre tenant (cross-tenant EmailLog)", function (): void {
+    // Tenant A — admin connecté
+    $tiersA = Tiers::factory()->create(['association_id' => $this->association->id]);
+
+    // Tenant B — créer EmailLog rattaché à un tiers B
+    $assoB = Association::factory()->create();
+    TenantContext::boot($assoB);
+    $tiersB = Tiers::factory()->create(['association_id' => $assoB->id]);
+    $logB = EmailLog::factory()->create([
+        'tiers_id' => $tiersB->id,
+        'participant_id' => null,
+        'objet' => 'Cross-tenant secret',
+    ]);
+
+    // Rebascule sur tenant A
+    TenantContext::boot($this->association);
+
+    Livewire::test(Communications::class, ['tiers' => $tiersA])
+        ->call('openDetail', $logB->id)
+        ->assertSet('selectedEmailId', null)
+        ->assertDontSee('Cross-tenant secret');
+});
+
 // ── Task 4.6 : badges PJ + erreur + ouvertures ───────────────────────────────
 
 it("affiche l'icône pièce jointe quand attachment_path est rempli", function (): void {

@@ -56,14 +56,19 @@ final class Dons extends Component
             return;
         }
         $recu = RecuFiscalEmis::findOrFail($this->recuAAnnuler);
+        abort_unless((int) $recu->tiers_id === (int) $this->tiers->id, 403);
         $service->reemettre($recu, $this->motifAnnulation, auth()->user());
         $this->fermerModaleAnnulation();
     }
 
     public function afficherAvertissements(int $ligneId): void
     {
-        $this->ligneAvecAvertissement = $ligneId;
         $don = TransactionLigne::with('transaction')->findOrFail($ligneId);
+        abort_unless(
+            $don->transaction !== null && (int) $don->transaction->tiers_id === (int) $this->tiers->id,
+            403
+        );
+        $this->ligneAvecAvertissement = $ligneId;
         $asso = Association::findOrFail(TenantContext::currentId());
 
         $alertes = [];

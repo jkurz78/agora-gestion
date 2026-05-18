@@ -26,10 +26,24 @@ final class NoteDeFraisPieceJointeController extends Controller
             abort(404);
         }
 
-        if (! Storage::disk('local')->exists($ligne->piece_jointe_path)) {
+        $disk = Storage::disk('local');
+        if (! $disk->exists($ligne->piece_jointe_path)) {
             abort(404);
         }
 
-        return Storage::disk('local')->response($ligne->piece_jointe_path);
+        $filename = basename($ligne->piece_jointe_path);
+        $asciiFilename = preg_replace('/[^\x20-\x7E]/', '_', $filename) ?: 'piece-jointe';
+        $encodedFilename = rawurlencode($filename);
+
+        return $disk->response(
+            $ligne->piece_jointe_path,
+            $filename,
+            [
+                'Content-Disposition' => "attachment; filename=\"{$asciiFilename}\"; filename*=UTF-8''{$encodedFilename}",
+                'Content-Security-Policy' => 'sandbox',
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'private, no-cache, no-store, must-revalidate',
+            ]
+        );
     }
 }

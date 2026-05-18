@@ -50,6 +50,22 @@ it('controller retourne la PJ de la ligne avec statut 200', function () {
     $response->assertHeader('Content-Type'); // header présent
 });
 
+it('controller sert la PJ ligne avec CSP sandbox, no-sniff et Content-Disposition attachment', function () {
+    $path = "associations/{$this->association->id}/transactions/{$this->tx->id}/ligne-csp.pdf";
+    Storage::disk('local')->put($path, '%PDF-1.4 csp test');
+    $this->ligne->update(['piece_jointe_path' => $path]);
+
+    $response = $this->get(route('comptabilite.transactions.piece-jointe-ligne', [
+        'transaction' => $this->tx->id,
+        'ligne' => $this->ligne->id,
+    ]));
+
+    $response->assertStatus(200);
+    expect($response->headers->get('Content-Security-Policy'))->toContain('sandbox');
+    expect($response->headers->get('X-Content-Type-Options'))->toBe('nosniff');
+    expect($response->headers->get('Content-Disposition'))->toContain('attachment');
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 2. Controller : PJ manquante sur disque → 404
 // ─────────────────────────────────────────────────────────────────────────────
