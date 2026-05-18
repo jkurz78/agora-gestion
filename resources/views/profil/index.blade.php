@@ -3,7 +3,7 @@
     view()->share('espace', $espace);
     view()->share('espaceColor', $espace->color());
     view()->share('espaceLabel', $espace->label());
-    $retourRoute = route($espace->value . '.dashboard');
+    $retourRoute = route('dashboard');
 @endphp
 
 <x-app-layout>

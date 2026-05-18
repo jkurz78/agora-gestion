@@ -146,11 +146,11 @@
     <nav class="navbar navbar-expand-lg navbar-app mb-4">
         <div class="container-fluid">
             <div class="navbar-brand d-flex align-items-center gap-2 mb-0">
-                <a href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.dashboard') }}">
+                <a href="{{ route('dashboard') }}">
                     <img src="{{ $logoAsset }}" alt="{{ $nomAsso }}" height="45">
                 </a>
                 <span class="d-inline-block lh-sm">
-                    <a class="d-block text-decoration-none" href="{{ route(($espace ?? \App\Enums\Espace::Compta)->value . '.dashboard') }}"
+                    <a class="d-block text-decoration-none" href="{{ route('dashboard') }}"
                        style="color: rgba(255,255,255,0.9);">{{ $nomAsso }}</a>
                     <x-espace-switcher />
                 </span>
