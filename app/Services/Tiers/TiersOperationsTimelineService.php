@@ -22,6 +22,29 @@ use Illuminate\Support\Facades\DB;
 
 final class TiersOperationsTimelineService
 {
+    public function countTotal(Tiers $tiers): int
+    {
+        $nbParticipations = $tiers->participants()->count();
+
+        $nbReferre = Participant::where('refere_par_id', $tiers->id)
+            ->distinct()->count('tiers_id');
+
+        $nbSuit = Participant::where(fn ($q) => $q
+            ->where('medecin_tiers_id', $tiers->id)
+            ->orWhere('therapeute_tiers_id', $tiers->id)
+        )->distinct()->count('tiers_id');
+
+        $nbEnc = TransactionLigne::query()
+            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+            ->where('transactions.tiers_id', $tiers->id)
+            ->where('transactions.type', TypeTransaction::Depense->value)
+            ->whereNotNull('transaction_lignes.operation_id')
+            ->distinct()
+            ->count('transaction_lignes.operation_id');
+
+        return $nbParticipations + $nbReferre + $nbSuit + $nbEnc;
+    }
+
     public function forTiers(Tiers $tiers): ParticipationsTimelineDTO
     {
         $participants = Participant::query()

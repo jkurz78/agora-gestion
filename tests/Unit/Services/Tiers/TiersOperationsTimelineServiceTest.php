@@ -969,3 +969,63 @@ it('encadrementForTiers isole multi-tenant', function (): void {
     expect($dto->totalCount)->toBe(1)
         ->and($dto->lignes[0]->montantTotal())->toBe(100.00);
 });
+
+// ── countTotal() : badge onglet "Opérations" ─────────────────────────────────
+
+it('countTotal retourne 0 si le tiers n\'a ni participation, ni référement, ni suivi, ni encadrement', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    expect(app(TiersOperationsTimelineService::class)->countTotal($tiers))->toBe(0);
+});
+
+it('countTotal somme les 4 sous-compteurs (participations + réferre + suit + encadrement)', function (): void {
+    $tiers = Tiers::factory()->create();
+
+    // 2 participations distinctes (2 opérations)
+    $op1 = Operation::factory()->create();
+    $op2 = Operation::factory()->create();
+    Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op1->id]);
+    Participant::factory()->create(['tiers_id' => $tiers->id, 'operation_id' => $op2->id]);
+
+    // 1 tiers référé (refere_par_id = $tiers)
+    $refere = Tiers::factory()->create();
+    Participant::factory()->create([
+        'tiers_id' => $refere->id,
+        'refere_par_id' => $tiers->id,
+        'operation_id' => $op1->id,
+    ]);
+
+    // 1 tiers suivi en tant que médecin
+    $suivi = Tiers::factory()->create();
+    Participant::factory()->create([
+        'tiers_id' => $suivi->id,
+        'medecin_tiers_id' => $tiers->id,
+        'operation_id' => $op1->id,
+    ]);
+
+    // 1 opération encadrée (dépense rattachée au tiers)
+    $opEnc = Operation::factory()->create();
+    $trEnc = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $trEnc->id, 'operation_id' => $opEnc->id, 'montant' => 100.00]);
+
+    // 2 participations + 1 referre + 1 suit + 1 encadrement = 5
+    expect(app(TiersOperationsTimelineService::class)->countTotal($tiers))->toBe(5);
+});
+
+it('countTotal isole multi-tenant (TenantScope sur Transaction)', function (): void {
+    $assoB = Association::factory()->create();
+
+    TenantContext::boot($assoB);
+    $tiersIntrus = Tiers::factory()->create();
+    $opB = Operation::factory()->create();
+    $trB = Transaction::factory()->create(['tiers_id' => $tiersIntrus->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $trB->id, 'operation_id' => $opB->id, 'montant' => 50.00]);
+
+    TenantContext::boot(Association::first()->fresh());
+    $tiers = Tiers::factory()->create();
+    $opA = Operation::factory()->create();
+    $trA = Transaction::factory()->create(['tiers_id' => $tiers->id, 'type' => TypeTransaction::Depense]);
+    TransactionLigne::factory()->create(['transaction_id' => $trA->id, 'operation_id' => $opA->id, 'montant' => 10.00]);
+
+    expect(app(TiersOperationsTimelineService::class)->countTotal($tiers))->toBe(1);
+});

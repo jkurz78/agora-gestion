@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Tiers;
 
-use App\Enums\TypeTransaction;
-use App\Models\Participant;
 use App\Models\Tiers;
-use App\Models\TransactionLigne;
 use App\Services\Tiers\TiersAdhesionTimelineService;
 use App\Services\Tiers\TiersCommunicationsTimelineService;
 use App\Services\Tiers\TiersDocumentsTimelineService;
 use App\Services\Tiers\TiersDonsTimelineService;
+use App\Services\Tiers\TiersOperationsTimelineService;
 use Illuminate\View\View;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -50,21 +48,7 @@ final class FicheTiers extends Component
             $onglets[] = ['key' => 'adhesion', 'label' => 'Adhésion', 'count' => $adhesionsCount];
         }
 
-        $nbParticipations = $this->tiers->participants()->count();
-        $nbReferre = Participant::where('refere_par_id', $this->tiers->id)
-            ->distinct()->count('tiers_id');
-        $nbSuit = Participant::where(fn ($q) => $q
-            ->where('medecin_tiers_id', $this->tiers->id)
-            ->orWhere('therapeute_tiers_id', $this->tiers->id)
-        )->distinct()->count('tiers_id');
-        $nbEnc = TransactionLigne::query()
-            ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
-            ->where('transactions.tiers_id', $this->tiers->id)
-            ->where('transactions.type', TypeTransaction::Depense->value)
-            ->whereNotNull('transaction_lignes.operation_id')
-            ->distinct()
-            ->count('transaction_lignes.operation_id');
-        $totalOperations = $nbParticipations + $nbReferre + $nbSuit + $nbEnc;
+        $totalOperations = app(TiersOperationsTimelineService::class)->countTotal($this->tiers);
         if ($totalOperations > 0) {
             $onglets[] = ['key' => 'operations', 'label' => 'Opérations', 'count' => $totalOperations];
         }
