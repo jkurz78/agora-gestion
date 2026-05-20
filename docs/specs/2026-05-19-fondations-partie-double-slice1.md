@@ -111,9 +111,11 @@ CREATE TABLE comptes (
 **Décisions** :
 - `numero_pcg` unique par tenant. Sert de clé naturelle (« le 706 de cette asso »).
 - `classe` dérivée du 1er chiffre du `numero_pcg`, dénormalisée pour perf.
+- `categorie_id` est un **regroupement métier libre** (« comment l'asso veut voir son CR »), **pas une hiérarchie PCG**. Les catégories actuelles ne sont pas mappables sur les 2 premiers chiffres PCG (ex : « Charges d'exploitation » regroupe 606, 611, 622, 626 → racines 60, 61, 62, 62 distinctes). La hiérarchie PCG est implicite dans `numero_pcg` ; `categorie_id` sert un besoin orthogonal. Nullable.
 - `lettrable` flag explicite : TRUE pour les comptes de portage (411, 401, 5112, 530), FALSE pour 512 (rapprochement bancaire à la place) et tous les comptes de gestion (6, 7).
 - Attributs bancaires en colonnes nullables sur `comptes` plutôt que table satellite — densité faible (1 asso a 1-5 comptes bancaires), pas la peine d'externaliser.
 - `est_systeme` empêche la suppression et l'édition des comptes générés par seed (411, 401, 5112, 530).
+- **Pas de colonne `tiers_id` sur `comptes`**. Les comptes 411 et 401 sont **uniques** par tenant. La dimension tiers est portée exclusivement par `transaction_lignes.tiers_id` (voir §2.2 et §3.6). Justification : avec l'axe analytique `tiers_id` sur la ligne, un sous-compte par tiers serait une seconde source de vérité redondante. Le « grand livre tiers » et le solde par tiers se calculent par `WHERE compte_id = 411 AND tiers_id = X`, le FEC se génère via les colonnes auxiliaires `CompAuxNum` / `CompAuxLib`.
 
 ### 2.2. Modification de `transaction_lignes`
 
@@ -217,7 +219,7 @@ Le slice 1 introduit (ou conserve) les comptes suivants. Le mapping `sous_catego
 
 ### 3.3. Comptes système nouveaux
 
-Seedés par migration, `est_systeme = TRUE`, ne peuvent être ni supprimés ni édités :
+Seedés par migration, `est_systeme = TRUE`, **uniques par tenant**, `categorie_id = NULL` (regroupement métier non applicable à ces comptes systèmes), ne peuvent être ni supprimés ni édités :
 
 | Numéro PCG | Intitulé | Classe | Lettrable |
 |---|---|---|---|
@@ -226,6 +228,8 @@ Seedés par migration, `est_systeme = TRUE`, ne peuvent être ni supprimés ni �
 | `5112` | Chèques à encaisser | 5 | TRUE |
 | `530` | Caisse (espèces) | 5 | TRUE — créé seulement si l'asso utilise les espèces (voir 3.4) |
 
+**Note importante** : `411` et `401` restent uniques (pas de sous-compte par tiers en base). La dimension tiers est portée par `transaction_lignes.tiers_id` (voir §3.6 pour la convention d'affichage).
+
 ### 3.4. Caisse espèces — création conditionnelle
 
 Slice 1 vérifie si des transactions historiques de l'exercice courant ont `mode_paiement = 'espèces'`. Si oui → compte 530 créé. Sinon → pas créé (l'asso ne manipule pas d'espèces, le compte serait du bruit).
@@ -233,6 +237,25 @@ Slice 1 vérifie si des transactions historiques de l'exercice courant ont `mode
 ### 3.5. Plan de comptes anticipé pour slice 2+ (NON seedé slice 1)
 
 Pour mémoire, slice 2+ introduira : 102 Fonds associatifs, 119 Report à nouveau, 120 Résultat de l'exercice, 44566 TVA déductible, 44571 TVA collectée, 2x Immobilisations, 28x Amortissements, etc.
+
+Slice 2 (bilan) tranchera également si on **étend la table `categories`** avec des entrées système pour structurer la présentation du bilan (Actif Immobilisé, Actif Circulant, Passif Permanent…) ou si la structure du bilan est codée en dur dans `BilanBuilder`. Slice 1 laisse `categorie_id = NULL` sur tous les comptes de classe 1-5.
+
+### 3.6. Convention d'affichage des comptes 411 et 401
+
+**Règle d'or** : l'utilisateur ne tape jamais le numéro de compte 411 ou 401, et ne le voit pas par défaut.
+
+| Contexte | Représentation utilisateur (slice 1) | Représentation interne |
+|---|---|---|
+| Saisie d'une recette / dépense / facture | Autocomplete sur **le tiers** (« Jean DUPOND ») | `EcritureGenerator` résout en interne vers `compte = 411` ou `401` et écrit `tiers_id` sur la ligne |
+| Affichage d'une ligne 411 ou 401 dans la liste des transactions, fiche tiers, journal | Nom du tiers (`Jean DUPOND`) | `compte_id = 411` + `tiers_id = 42` + jointure pour l'intitulé |
+| Affichage d'une ligne sur compte non-tiers (706, 5112, 512BNP) | Intitulé du compte (`Cotisations`, `Banque BNP`) | `compte_id` + jointure pour intitulé |
+| Mode « afficher les numéros » (toggle slice 2+) | `411 Jean DUPOND`, `706 Cotisations`, `5121 Banque BNP` | Idem |
+
+Slice 1 affiche uniquement le mode utilisateur (sans numéros). Le toggle mode comptable est slice 2+.
+
+**Recherche d'un compte (pour OD libres slice 2+)** : un service `RechercheCompteService::pourSaisie(string $query)` proposera des résultats unifiés (compte de gestion + tiers + comptes de portage). Pas implémenté slice 1.
+
+**Conséquence pour la fiche tiers 360 existante (v4.3.1)** : `TiersOperationsTimelineService` continue d'agréger via `transaction_lignes.tiers_id`. Cohérent : l'axe tiers reste l'axe analytique cross-comptes (le tiers Pierre apparaît sur ses lignes 411 ET sur ses lignes 5112 ET sur ses lignes 512BNP). Le grand livre 411 spécifique au tiers reste obtenu par filtre composé `compte = 411 AND tiers_id = X`.
 
 ---
 
@@ -258,7 +281,7 @@ final class EcritureGenerator
     ): Transaction;
 
     public function pourRecetteACredit(
-        Tiers $tiers,
+        Tiers $tiers,                       // résolu en interne vers compte 411 + ligne.tiers_id
         Compte $compteProduit,
         float $montant,
         \DateTimeInterface $dateConstatation,
@@ -291,6 +314,8 @@ final class EcritureGenerator
 2. **Cohérence comptes/classe** : produit sur classe 7, charge sur classe 6, trésorerie sur classe 5, tiers sur classe 4. Throw `CompteIncorrectException` sinon.
 3. **Tenant** : tous les comptes/tiers passés en argument appartiennent au tenant courant. Throw `TenantBoundaryException` sinon.
 4. **Lettrage** : si l'opération produit un appariement (encaissement créance, remise), un `lettrage_code` est généré (UUID-short 20 chars) et appliqué aux lignes appariées via `LettrageService::lettrer()`.
+5. **Tiers obligatoire sur 411 et 401** : toute ligne générée sur le compte 411 ou 401 porte `transaction_lignes.tiers_id NOT NULL`. Throw `TiersRequisException` sinon. Inversement, les lignes sur comptes de gestion (6, 7) peuvent porter un tiers ou non (cas dons anonymes, ajustements). Les lignes sur comptes de trésorerie principale (512X) ne portent jamais de tiers.
+6. **Résolution interne des comptes système** : `EcritureGenerator` résout lui-même les comptes 411, 401, 5112, 530 via `Compte::ofNumeroSysteme('411')`. Les callers passent uniquement le `Tiers` et le compte de gestion concerné. Aucun caller ne manipule directement la référence aux comptes système.
 
 ### 4.3. Matrice de génération (référence)
 
@@ -511,6 +536,8 @@ Les colonnes droppées en fin de slice 1 (`sous_categorie_id`, `montant`, `type`
 
 La table `categories` (catégorie comptable de regroupement, ex: « Recettes courantes », « Charges de fonctionnement ») est **conservée telle quelle**. `comptes.categorie_id` y pointe pour le regroupement UI dans les écrans Paramètres et le compte de résultat.
 
+**Justification du couplage** : les catégories d'AgoraGestion sont un regroupement métier libre, choisi par l'asso pour structurer sa lecture du CR. Elles ne correspondent **pas** à une hiérarchie PCG dérivable (ex : « Charges d'exploitation » regroupe 606, 611, 622, 626 → racines PCG distinctes 60/61/62). Conserver `categorie_id` préserve cette souplesse de présentation. Slice 2 décidera si on l'étend aux comptes de bilan ou si on garde la présentation du bilan codée en dur.
+
 ---
 
 ## 10. Acceptance Criteria
@@ -541,6 +568,8 @@ La table `categories` (catégorie comptable de regroupement, ex: « Recettes cou
 - [ ] **Invariant équilibre** : aucune transaction n'a `∑ debit ≠ ∑ credit`. Test global Pest qui scanne toutes les transactions de l'exercice après backfill.
 - [ ] **Invariant lettrage** : pour chaque `lettrage_code` distinct, ∑ (debit - credit) = 0. Test global.
 - [ ] **Invariant tenant** : aucune `transaction_ligne.compte_id` ne pointe vers un compte d'un autre tenant. Test cross-check `comptes.association_id = transactions.association_id`.
+- [ ] **Invariant tiers obligatoire 411/401** : toute ligne sur le compte 411 ou 401 porte un `tiers_id NOT NULL`. Test global Pest scanne toutes les lignes de l'exercice. Aucune fuite après backfill.
+- [ ] **Invariant pas de tiers sur 512** : aucune ligne sur un compte de classe 5 préfixé `512` ne porte de `tiers_id`. Le tiers est sur les lignes 5112/530/411/401, jamais sur 512. Test global.
 
 ### Audit
 
