@@ -36,6 +36,7 @@
 12. **Remise bancaire = transaction multi-lignes splittée par tiers** (Variante 2a). La table `remises_bancaires` survit comme groupement logique avec lien vers la transaction de dépôt et les écritures sources.
 13. **Backfill** : exercice courant uniquement (un seul tenant, premier exercice → 1A = 1C). Pas de pivot date, pas de support legacy en lecture.
 14. **Hors slice 1 (slices ultérieurs)** : bilan, TVA, immobilisations, à-nouveau formel à la clôture, OD libres, UI manuelle de lettrage/délettrage, chèque impayé (flow dédié).
+15. **Gouvernance** : branche longue durée `feat/compta-v5`, `main` reste propre et livrable en hotfix pendant toute la durée. Sync `main → feat/compta-v5` régulier après chaque hotfix prod. Recette en préprod NAS sur clone prod non-anonymisé (compta + tiers réels, données médicales illisibles par construction — clé chiffrement préprod différente). Backfill **idempotent** avec option `--force` (préprod uniquement). Détails procéduraux : §16 Gouvernance.
 
 ## Hypothèses techniques verrouillées
 
@@ -508,6 +509,30 @@ Le backfill s'exécute dans une `DB::transaction()`. Si le test post-validation 
 
 Les colonnes droppées en fin de slice 1 (`sous_categorie_id`, `montant`, `type`) ne sont droppées **qu'après** une période de stabilité (1 semaine en prod minimum), via une migration séparée dans une PR ultérieure. Slice 1 livre le code qui ne les utilise plus, mais la suppression physique est différée pour rollback de sécurité.
 
+### 8.6. Idempotence (recette préprod itérative)
+
+Le backfill est **idempotent par défaut** pour supporter les itérations RC en préprod sans re-cloner la prod à chaque fois.
+
+**Stratégie « Smart »** :
+- À chaque transaction examinée, vérifier `transactions.equilibree`. Si `TRUE` → transaction déjà convertie, **skip**.
+- Si `FALSE` → conversion appliquée.
+- Logs : la commande affiche le décompte « X transactions converties, Y déjà à jour, Z skipped sans tiers / sans code_cerfa ».
+
+**Option `--force`** : ignore le flag `equilibree`, re-convertit toutes les transactions de l'exercice. Avant re-conversion : reset des colonnes `debit`, `credit`, `compte_id`, `tiers_id` (sur les lignes), `lettrage_code`, suppression des transactions T4 de remise qui auraient été créées lors d'un backfill précédent. Suppression aussi des entrées `lettrage_audit` du backfill (filtrées par `motif = 'backfill'`). Utile en préprod pour repartir d'un état propre sans re-cloner.
+
+```bash
+# Usage normal (idempotent)
+php artisan compta:backfill-partie-double --exercice=current
+
+# Reset complet (préprod uniquement, JAMAIS en prod)
+php artisan compta:backfill-partie-double --exercice=current --force
+
+# Audit préalable
+php artisan compta:backfill-partie-double --exercice=current --dry-run
+```
+
+`--force` est **refusé en production** (guard sur `app()->environment()`). Préprod et local uniquement.
+
 ---
 
 ## 9. Renommage `sous_categorie` → `compte`
@@ -783,9 +808,158 @@ Estimation grossière : ~3-4 semaines de travail subagent-driven. Step 13 (backf
 
 ---
 
-## 16. Référence
+## 16. Gouvernance et stratégie de déploiement
+
+### 16.1. Branche longue durée
+
+- **Branche** : `feat/compta-v5` créée depuis `main` au démarrage du slice.
+- **Convention commits sur la branche** : préfixe `feat(v5):` pour distinguer dans l'historique.
+- **`main` reste propre** : hotfixes prod possibles et encouragés pendant toute la durée du slice. Tags `v4.x.y` continuent à sortir normalement.
+- **Pas de PR vers main avant validation complète** : la branche v5 vit en autonomie en préprod, mergée vers main uniquement en cutover final.
+
+### 16.2. Sync main → v5
+
+Après tout hotfix mergé sur `main` :
+1. `git checkout feat/compta-v5`
+2. `git merge main` (ou `git rebase main` selon préférence — recommandation : **merge** pour conserver l'historique tag/release)
+3. Résoudre conflits éventuels (probables sur `transactions`, `transaction_lignes`, `sous_categories` si touchés)
+4. **Test critique** : `php artisan compta:backfill-partie-double --exercice=current --dry-run` doit rester vert. Si rouge → le hotfix prod a introduit un cas non couvert par le backfill, à traiter avant de pousser le sync.
+5. `php artisan test` complet doit rester vert
+6. `git push origin feat/compta-v5`
+
+**Cadence** : sync immédiat après chaque hotfix touchant les tables compta. Sync hebdomadaire minimum sinon, pour limiter l'accumulation de divergences.
+
+### 16.3. Workflow hotfix prod pendant slice v5
+
+| Étape | Action |
+|---|---|
+| Bug remonté en prod | Création branche `fix/...` depuis `main` |
+| Fix + tests | Subagent-driven habituel |
+| PR `fix/...` → `main` | Review + merge |
+| Tag + release | `v4.x.y` + GitHub release |
+| Deploy prod | `deploy.sh` |
+| **Sync `main → feat/compta-v5`** | Immédiat après merge sur main |
+| Push v5 | `git push origin feat/compta-v5` |
+
+### 16.4. Procédure clone prod → préprod
+
+L'infra `clone-prod-to-preprod.sh` (à factoriser à partir des scripts d'ops existants gitignored — voir mémoire `project_refresh_preprod.md`) :
+
+```bash
+# Sur le NAS staging
+./clone-prod-to-preprod.sh
+```
+
+Le script :
+1. **Dump prod** : `mysqldump` SVS DB → fichier temporaire SCP transféré vers NAS
+2. **Restore préprod** : `mysql --force` import dans la DB préprod existante (drop + create + import)
+3. **Copie storage** : `rsync -av storage/app/associations/ prod:NAS_storage/`
+4. **Convention clé chiffrement** : **NE PAS** copier `APP_KEY` de prod → préprod garde sa clé locale. Conséquence : les colonnes `participant_donnees_medicales`, `presences.commentaire_medical_chiffre` deviennent illisibles côté préprod (DecryptException catchée et remplacée par placeholder "(données médicales — chiffrement préprod différent)"). Conforme à la contrainte « médicales peuvent rester illisibles ».
+5. **Anonymisation** : **aucune**. Compta et tiers gardent leurs vrais noms / vrais emails pour reconnaître les cas réels en test.
+6. **Bridage préprod** via `.env.preprod` :
+   - `APP_ENV=preprod`
+   - `MAIL_MAILER=log`
+   - `HELLOASSO_WEBHOOK_DISABLED=true`
+   - `INCOMING_MAIL_DISABLED=true`
+   - SMTP test pour ne jamais envoyer de vrai email
+7. **Logs** : timestamp dans `storage/logs/clone-prod-YYYY-MM-DD.log`
+
+**Sécurité** : ce script n'est jamais déclenché depuis prod. C'est un pull du NAS vers lui-même via SCP/rsync.
+
+### 16.5. Déploiement v5 sur préprod (à chaque RC)
+
+`deploy-preprod-v5.sh` (variant de `deploy.sh` orienté préprod, gitignored) :
+
+```bash
+./deploy-preprod-v5.sh [--reset]
+```
+
+Sans `--reset` (cas normal, itération RC) :
+1. `php artisan down --message="Recette v5 en cours"`
+2. `git fetch origin && git checkout feat/compta-v5 && git pull`
+3. `composer install --no-dev`
+4. `php artisan migrate --force` (pose colonnes / tables nouvelles ; idempotent grâce aux migrations Laravel)
+5. `php artisan compta:backfill-partie-double --exercice=current --dry-run` (validation préalable, stop si rouge)
+6. `php artisan compta:backfill-partie-double --exercice=current` (backfill idempotent — skip les transactions déjà à jour)
+7. `php artisan optimize:clear`
+8. `php artisan up`
+9. Smoke automatisé : `php artisan compta:smoke-test-v5` (commande dédiée — CR + rappro + assertion équilibre)
+
+Avec `--reset` (repartir d'un état propre sans re-cloner) :
+- Étape supplémentaire entre 4 et 5 : `php artisan compta:backfill-partie-double --exercice=current --force` (reset complet, re-conversion totale)
+
+### 16.6. Check-list manuelle de recette préprod
+
+À jouer par le PO sur chaque RC majeur (au moins RC1 et version « release candidate stable ») :
+
+- [ ] Lecture CR exercice courant → totaux identiques à ceux affichés en prod
+- [ ] Saisie nouvelle recette chèque → transaction T1 visible, CR à jour, solde tiers à jour
+- [ ] Saisie nouvelle dépense espèces → transaction visible, CR à jour
+- [ ] Émission facture Factur-X → ligne 411 créée, créance ouverte visible sur fiche tiers
+- [ ] Encaissement de la facture → auto-lettrage 411, solde ouvert = 0
+- [ ] Comptabilisation règlements (onglet règlements d'opération) → transactions générées correctement
+- [ ] Remise bancaire (sélection N chèques + création) → T4 splittée par tiers, lettrage auto, ligne unique au rappro
+- [ ] Rappro bancaire mensuel → cocher la remise, pointer, vérifier état
+- [ ] Extourne d'une transaction lettrée → auto-délettrage, solde tiers remonté
+- [ ] Fiche tiers 360 → toutes lignes apparaissent, soldes ouverts cohérents
+- [ ] Exports PDF + Excel du CR → identiques à prod
+- [ ] Tests intrusions multi-tenant (12 tests S6) → toujours verts post-backfill
+
+### 16.7. Cutover prod (validation finale → merge main)
+
+Quand toutes les recettes RC sont vertes et que le PO valide :
+
+```bash
+# 1. Backup prod (ceinture-bretelles)
+ssh prod 'mysqldump --single-transaction svs_prod | gzip > backup-pre-v5-$(date +%Y%m%d).sql.gz'
+
+# 2. Merge final (no-ff pour conserver l'historique de branche)
+git checkout main
+git pull
+git merge --no-ff feat/compta-v5 -m "feat(v5): fondations partie double — slice 1"
+git push origin main
+
+# 3. Tag + release GitHub
+git tag v5.0.0
+git push origin v5.0.0
+gh release create v5.0.0 --title "v5.0.0 — Fondations partie double" --notes-file CHANGELOG-v5.md
+
+# 4. Deploy prod (workflow GitHub Actions habituel sur tag v*)
+# 5. Smoke test prod automatique + manuel (mêmes checks que §16.6)
+
+# 6. Si tout OK
+git branch -d feat/compta-v5
+git push origin --delete feat/compta-v5
+```
+
+### 16.8. Rollback prod (en cas d'échec post-cutover)
+
+Si problème détecté après deploy v5.0.0 :
+
+1. `ssh prod 'cd /path/to/app && git checkout v4.x.y'` (dernier tag stable v4)
+2. `gunzip < backup-pre-v5-YYYYMMDD.sql.gz | mysql svs_prod` (restore DB pré-v5)
+3. `composer install --no-dev` (recharge deps v4)
+4. `php artisan optimize:clear`
+5. `php artisan up`
+6. Communication utilisateur
+7. Post-mortem + correctif sur `feat/compta-v5` réouverte → nouvelle RC → nouvelle recette → re-cutover
+
+**Le rollback ne fait pas appel à une migration `down()`** : on restore le dump, c'est plus sûr que de jouer les rollbacks de migrations sur des données. Pour cette raison, **le dump pré-cutover est obligatoire**.
+
+### 16.9. Durée prévisible et gestion des conflits
+
+- Estimation : **4 à 6 semaines** entre création branche et merge main, dont ~3-4 semaines de build subagent-driven (§15) + ~1-2 semaines de recette préprod itérative.
+- Hotfixes prod attendus pendant la durée : 2 à 5 selon le rythme habituel.
+- Risque principal : **divergence galopante** si les syncs main → v5 sont espacés. Mitigation : automatiser le sync via un hook ou une commande artisan dédiée (`php artisan v5:sync-from-main`) qui fetch + merge + run dry-run + report. À envisager au step 1 du plan.
+
+---
+
+## 17. Référence
 
 - Mémoire d'origine : `project_compta_partie_double.md` — cadrage initial cash basis enrichie, **révisé par cette spec**
 - Mémoire connexe : `project_adr_remise_bancaire.md` — ADR-001 sur la remise. **Le nouveau modèle absorbe l'ADR-001** : la remise devient une écriture comptable splittée par tiers, le `statut_reglement` (recu/depose/pointe) disparaît au profit du lettrage.
 - Mémoire connexe : `project_provisions.md` — provisions livrées v2.10.0, conservées telles quelles.
 - Mémoire connexe : `project_extourne_annulation_facture_programme.md` — extournes livrées v4.2.2, enrichies d'auto-délettrage en step 12.
+- Mémoire connexe : `project_refresh_preprod.md` — refresh préprod, contexte du clone prod → préprod factorisé en §16.4.
+- Mémoire connexe : `project_multi_tenancy_recette_preprod.md` — référence sur le workflow de recette sur le NAS staging.
+- Mémoire connexe : `project_infra_deploy.md` — scripts d'ops gitignored (`deploy.sh`, `clone-prod.sh`), CI/CD GitHub Actions sur tags `v*`.
