@@ -30,7 +30,7 @@ use Illuminate\Support\Facades\DB;
  * System accounts (411/401/5112) are only seeded by SystemeSeeder::seed()
  * for associations that exist AT migration time. The factory association
  * created per-test is newer, so it has no system accounts by default.
- * Tests that need system accounts call replaySystemeSeed() explicitly.
+ * Tests that need system accounts call SystemeSeeder::seed() directly.
  */
 
 // ---------------------------------------------------------------------------
@@ -158,14 +158,26 @@ it('ofNumeroSysteme throws ModelNotFoundException for an unknown numero', functi
 // 5. ofNumeroSysteme does not match non-system rows
 // ---------------------------------------------------------------------------
 
-it('ofNumeroSysteme returns the system row for 411 (est_systeme = true)', function () {
-    // Seed system accounts for the current tenant.
-    SystemeSeeder::seed();
+it('ofNumeroSysteme does not return a non-system row for 411', function () {
+    $association = TenantContext::current();
 
-    $compte = Compte::ofNumeroSysteme('411');
+    // Insert a non-system 411 without seeding the system row.
+    DB::table('comptes')->insert([
+        'association_id' => $association->id,
+        'numero_pcg' => '411',
+        'intitule' => 'Clients (non-système)',
+        'classe' => 4,
+        'actif' => true,
+        'est_systeme' => false,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 
-    expect($compte->est_systeme)->toBeTrue();
-});
+    // No est_systeme=true row exists → must throw.
+    Compte::ofNumeroSysteme('411');
+})->throws(ModelNotFoundException::class);
 
 // ---------------------------------------------------------------------------
 // 6. Scope lettrables
@@ -194,7 +206,7 @@ it('lettrables() scope returns only lettrable comptes', function () {
     $lettrables = Compte::lettrables()->get();
 
     // 411, 401, 5112 are lettrable; the 706 we inserted is not.
-    expect($lettrables->count())->toBeGreaterThanOrEqual(3);
+    expect($lettrables->count())->toBe(3);
     expect($lettrables->every(fn (Compte $c) => $c->lettrable === true))->toBeTrue();
 
     // The non-lettrable 706 must not appear.
@@ -358,7 +370,7 @@ it('lignes() returns TransactionLignes belonging to the compte', function () {
 
     expect($compte)->not->toBeNull();
     expect($compte->lignes)->toHaveCount(1);
-    expect($compte->lignes->first()->compte_id)->toBe($compteId);
+    expect((int) $compte->lignes->first()->compte_id)->toBe($compteId);
 });
 
 // ---------------------------------------------------------------------------
