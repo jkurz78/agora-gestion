@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: approved (2026-05-20)
+**Status**: in-progress (sous-slice 1a, 3/11 steps done — 2026-05-20)
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -92,9 +92,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ### Phase A — Préparation (steps 1-2) — Sous-slice 1a
 
-#### Step 1 : Création de la branche `feat/compta-v5` et scripts ops squelette
+#### Step 1 : Création de la branche `feat/compta-v5` et scripts ops squelette ✅
 
 **Complexity**: trivial
+**Status**: ✅ done — commit `037bc22f` (2026-05-20)
 **RED**: N/A — pas de test pour la création de branche
 **GREEN**:
 - `git checkout main && git pull && git checkout -b feat/compta-v5`
@@ -105,9 +106,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `scripts/*.sh`, `.env.preprod.example`
 **Commit**: `chore(v5): bootstrap feat/compta-v5 branch + ops scripts skeleton`
 
-#### Step 2 : Audit pré-backfill — commande artisan `audit:compta-v5-preparation`
+#### Step 2 : Audit pré-backfill — commande artisan `audit:compta-v5-preparation` ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `3281d432` (2026-05-20). 6 tests Pest verts (33 assertions), Pint vert. 5 sections d'audit, JSON output dans `storage/audits/`.
 **RED**: Tests Pest :
 - Sous-catégorie sans `code_cerfa` → apparaît dans le rapport
 - Sous-catégorie avec `code_cerfa` valide → ne pose pas problème
@@ -126,9 +128,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ### Phase B — Schéma (steps 3-8) — Sous-slice 1a
 
-#### Step 3 : Migration `comptes` — création table + seed depuis `sous_categories`
+#### Step 3 : Migration `comptes` — création table + seed depuis `sous_categories` ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `b9c1d28b` (2026-05-20). 8 tests Pest verts (42 assertions), Pint vert, suite complète 3453 tests verts. Décision notable : garde-fou extrait en service `App\Services\Compta\Migrations\AuditGuard` (testable hors cycle migrate). `pour_inscriptions` dérivé du pivot `usages_sous_categories` (colonne booléenne droppée v4.1.2).
 **RED**: Tests Pest migration :
 - Table `comptes` existe avec toutes les colonnes attendues
 - Chaque `sous_categorie` existante a un `compte` correspondant avec `numero_pcg = code_cerfa`, `intitule = nom`, `classe` dérivée, `categorie_id` copié
