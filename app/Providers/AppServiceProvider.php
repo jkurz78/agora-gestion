@@ -11,6 +11,7 @@ use App\Enums\StatutNoteDeFrais;
 use App\Models\Adhesion;
 use App\Models\Association;
 use App\Models\AssociationUser;
+use App\Models\Compte;
 use App\Models\Extourne;
 use App\Models\FacturePartenaireDeposee;
 use App\Models\IncomingDocument;
@@ -29,6 +30,7 @@ use App\Observers\TransactionLigneRecuFiscalObserver;
 use App\Observers\TransactionObserver;
 use App\Observers\TransactionRecuFiscalObserver;
 use App\Observers\UserRoleObserver;
+use App\Policies\ComptePolicy;
 use App\Policies\ExtournePolicy;
 use App\Policies\FacturePartenaireDeposeePolicy;
 use App\Policies\NoteDeFraisPolicy;
@@ -54,6 +56,7 @@ final class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Gate::policy(Compte::class, ComptePolicy::class);
         Gate::policy(FacturePartenaireDeposee::class, FacturePartenaireDeposeePolicy::class);
         Gate::policy(NoteDeFrais::class, NoteDeFraisPolicy::class);
         Gate::policy(Extourne::class, ExtournePolicy::class);
