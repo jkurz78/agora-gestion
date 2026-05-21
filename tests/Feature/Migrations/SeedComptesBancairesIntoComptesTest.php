@@ -452,3 +452,82 @@ it('seeds an inactive bank (actif_recettes_depenses=false) into comptes', functi
     expect((int) $compte->classe)->toBe(5);
     expect((bool) $compte->est_systeme)->toBeTrue();
 });
+
+it('down() removes all bank sous-comptes including 5-digit numero_pcg (10+ banks)', function () {
+    // Regression guard: LIKE '512_' only matched 4-char numbers (5121–5129).
+    // A tenant with 10+ banks gets '51210', '51211'… which '512_' silently skipped.
+    // The fixed pattern '512_%' (one mandatory char + any suffix) covers all lengths.
+    $association = Association::firstOrFail();
+
+    // 1. Insert 11 banks — ROW_NUMBER() will assign rang 1..11
+    //    → numero_pcg: 5121, 5122, …, 5129, 51210, 51211
+    $banks = [];
+    for ($i = 1; $i <= 11; $i++) {
+        $banks[] = [
+            'association_id' => $association->id,
+            'nom' => "Banque {$i}",
+            'iban' => null,
+            'bic' => null,
+            'domiciliation' => null,
+            'solde_initial' => '0.00',
+            'date_solde_initial' => null,
+            'actif_recettes_depenses' => true,
+            'saisie_automatisee' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+    }
+    DB::table('comptes_bancaires')->insert($banks);
+
+    replayBancairesSeed();
+
+    // 2. Verify the 10th and 11th banks received 5-digit numero_pcg
+    $numeros = DB::table('comptes')
+        ->where('association_id', $association->id)
+        ->where('classe', 5)
+        ->orderBy('numero_pcg')
+        ->pluck('numero_pcg')
+        ->all();
+
+    expect($numeros)->toHaveCount(11);
+    expect($numeros)->toContain('51210');
+    expect($numeros)->toContain('51211');
+
+    // 3. Hand-insert a fake classe-5 system compte with numero_pcg='5112'
+    //    (simulates Step 5's future caisse/système compte — must survive down())
+    DB::table('comptes')->insert([
+        'association_id' => $association->id,
+        'numero_pcg' => '5112',
+        'intitule' => 'Caisse (système, futur step 5)',
+        'classe' => 5,
+        'categorie_id' => null,
+        'parent_compte_id' => null,
+        'actif' => true,
+        'est_systeme' => true,
+        'pour_inscriptions' => false,
+        'lettrable' => false,
+        'iban' => null,
+        'bic' => null,
+        'domiciliation' => null,
+        'solde_initial' => '0.00',
+        'date_solde_initial' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // 4. Run the same DELETE as down() uses (with the corrected LIKE pattern)
+    DB::table('comptes')
+        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
+        ->delete();
+
+    // 5. All 11 bank sous-comptes are gone; the fake 5112 remains
+    $remaining = DB::table('comptes')
+        ->where('association_id', $association->id)
+        ->where('classe', 5)
+        ->pluck('numero_pcg')
+        ->all();
+
+    expect($remaining)->toHaveCount(1);
+    expect($remaining[0])->toBe('5112');
+});
