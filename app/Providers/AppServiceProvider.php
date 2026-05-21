@@ -26,6 +26,7 @@ use App\Observers\AdhesionRecuFiscalObserver;
 use App\Observers\AdhesionTransactionLigneObserver;
 use App\Observers\AssociationObserver;
 use App\Observers\ImmutableSlugObserver;
+use App\Observers\TransactionLigneObserver;
 use App\Observers\TransactionLigneRecuFiscalObserver;
 use App\Observers\TransactionObserver;
 use App\Observers\TransactionRecuFiscalObserver;
@@ -67,6 +68,7 @@ final class AppServiceProvider extends ServiceProvider
         Transaction::observe(TransactionObserver::class);
         Transaction::observe(TransactionRecuFiscalObserver::class);
         Transaction::observe(AdhesionObserver::class);
+        TransactionLigne::observe(TransactionLigneObserver::class);
         TransactionLigne::observe(TransactionLigneRecuFiscalObserver::class);
         TransactionLigne::observe(AdhesionTransactionLigneObserver::class);
         Adhesion::observe(AdhesionRecuFiscalObserver::class);
