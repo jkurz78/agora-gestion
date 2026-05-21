@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: in-progress (sous-slice 1a, 7/11 steps done — 2026-05-21)
+**Status**: in-progress (sous-slice 1a, 8/11 steps done — 2026-05-21)
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -210,9 +210,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: Migration + tests
 **Commit**: `feat(v5): add equilibree flag + type_ecriture enum to transactions`
 
-#### Step 8 : Migration `lettrage_audit`
+#### Step 8 : Migration `lettrage_audit` ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `ece08013` (2026-05-21). 14 tests Pest verts (24 assertions), Pint vert, suite complète **10 925 assertions / 0 failed**. Table append-only conforme spec §2.5 : 9 colonnes + 2 indexes composites, pas d'`updated_at` ni `deleted_at`, `action` ENUM('lettre','delettre'), `transaction_ligne_ids` JSON, FK cascade asso + compte, FK nullOnDelete user (RGPD-ready), tenant scope vérifié au SQL.
 **RED**: Tests Pest :
 - Table existe avec colonnes attendues
 - Indexes posés
