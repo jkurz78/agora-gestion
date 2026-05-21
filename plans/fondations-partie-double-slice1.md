@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: in-progress (sous-slice 1a, 10/11 steps done — 2026-05-21)
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) — prête pour validation PO + `/clear` avant sous-slice 1b
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -270,9 +270,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Models/TransactionLigne.php`, `app/Observers/TransactionLigneObserver.php`, tests
 **Commit**: `feat(v5): TransactionLigne enrichi (debit/credit + observer XOR + isLettree)`
 
-#### Step 11 : Cohabitation `SousCategorie` ↔ `Compte` (pas d'alias en 1a, déféré 1d)
+#### Step 11 : Cohabitation `SousCategorie` ↔ `Compte` (pas d'alias en 1a, déféré 1d) ✅
 
 **Complexity**: trivial
+**Status**: ✅ done — commit `315658d9` (2026-05-21). 4 tests Pest verts (15 assertions), Pint vert, suite complète **10 995 assertions / 0 failed**. Aucune modif code prod — uniquement le test file `tests/Feature/Models/SousCategorieCompteCohabitationTest.php`. Verifie : tables distinctes (`comptes` vs `sous_categories`), coexistence Eloquent sans collision, `FormuleAdhesion::sousCategorie` retourne toujours `SousCategorie` (smoke test régression).
 **Décision révisée post-AC review** : transformer `SousCategorie` en alias deprecated dans 1a casserait silencieusement les ~10 relations existantes (`Adhesion::sousCategorie`, `FormuleAdhesion::sousCategorie`, `BudgetLine::sousCategorie`, `UsageSousCategorie::sousCategorie`, etc.). On garde `SousCategorie` **inchangé** en 1a (pointe toujours sur `sous_categories`). Le renommage transverse `SousCategorie → Compte` est fait en bloc en 1d (Steps 36-39) avec une migration de relations propre.
 
 **RED**: Tests Pest :
