@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: in-progress (sous-slice 1a, 3/11 steps done — 2026-05-20)
+**Status**: in-progress (sous-slice 1a, 4/11 steps done — 2026-05-21)
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -148,9 +148,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `database/migrations/2026_05_20_000001_create_comptes_table.php`, `tests/Feature/Migrations/CreateComptesTableTest.php`
 **Commit**: `feat(v5): create comptes table + seed depuis sous_categories`
 
-#### Step 4 : Seed `comptes` depuis `comptes_bancaires` (sous-comptes 5121, 5122…)
+#### Step 4 : Seed `comptes` depuis `comptes_bancaires` (sous-comptes 5121, 5122…) ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commits `a3627a3a` + `eb581e1a` + `3352c710` (2026-05-21). 11 tests Pest verts (38 assertions), Pint vert, suite complète 10746 assertions / 0 failed. Décisions notables : seed extrait en service `App\Services\Compta\Migrations\BancairesSeeder` (mirror du pattern `AuditGuard`), numérotation par `ROW_NUMBER() OVER (PARTITION BY association_id ORDER BY id)` avec branching MySQL/SQLite (`CONCAT` vs `||`), `down()` filtre `LIKE '512_%'` (un char min après 512) pour exclure le futur 5112 système et supporter les assos avec 10+ banques (`51210`+), idempotence via `INSERT IGNORE` / `INSERT OR IGNORE` sur l'unique `(association_id, numero_pcg)`. `comptes_bancaires` n'a pas de `deleted_at` (model sans SoftDeletes) — comportement documenté inline.
 **RED**: Tests Pest :
 - Chaque `compte_bancaire` actif crée un compte `5121`, `5122`… par incrément
 - Attributs bancaires copiés (IBAN, BIC, domiciliation, solde_initial, date_solde_initial)
