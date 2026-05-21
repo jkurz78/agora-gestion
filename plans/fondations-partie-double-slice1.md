@@ -38,11 +38,11 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ### Sémantique partie double
 
-- [ ] **Invariant équilibre** : `∑ debit = ∑ credit` sur toutes les transactions de l'exercice
-- [ ] **Invariant lettrage** : `∑ (debit - credit) = 0` pour chaque `lettrage_code`
-- [ ] **Invariant tenant** : aucune ligne ne pointe vers un compte d'un autre tenant
-- [ ] **Invariant tiers obligatoire 411/401** : toute ligne sur 411 ou 401 porte un `tiers_id`
-- [ ] **Invariant pas de tiers sur 512X** : aucune ligne 512 ne porte de tiers
+- [ ] **Invariant équilibre** : `∑ debit = ∑ credit` sur toutes les transactions de l'exercice — *vérifiable à partir de fin sous-slice 1b (EcritureGenerator), validé définitivement en sous-slice 1d (post-backfill).*
+- [ ] **Invariant lettrage** : `∑ (debit - credit) = 0` pour chaque `lettrage_code` — *idem, vérifiable dès 1b.*
+- [ ] **Invariant tenant** : aucune ligne ne pointe vers un compte d'un autre tenant — *posé structurellement en 1a, exerçable dès 1b.*
+- [ ] **Invariant tiers obligatoire 411/401** : toute ligne sur 411 ou 401 porte un `tiers_id` — *exerçable dès Step 14 (EcritureGenerator invariants).*
+- [ ] **Invariant pas de tiers sur 512X** : aucune ligne 512 ne porte de tiers — *idem.*
 
 ### Audit
 
@@ -50,9 +50,9 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ### Gouvernance
 
-- [ ] **Branche `feat/compta-v5`** vit en parallèle de `main`, mergée uniquement au cutover final
-- [ ] **Scripts ops** : `clone-prod-to-preprod.sh`, `deploy-preprod-v5.sh`, `v5:sync-from-main` opérationnels
-- [ ] **Recette préprod manuelle** : 12 vérifications PO §16.6 passées vertes
+- [ ] **Branche `feat/compta-v5`** vit en parallèle de `main`, mergée uniquement au cutover final — *vérifié manuellement par le développeur avant chaque push, pas par CI.*
+- [ ] **Scripts ops** : squelettes posés en Step 1 (sous-slice 1a), scripts fonctionnels testables en dry-run en Step 43 (sous-slice 1d).
+- [ ] **Recette préprod manuelle** : 12 vérifications PO §16.6 passées vertes — *déféré sous-slice 1d uniquement.*
 
 ---
 
@@ -135,10 +135,12 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 - `pour_inscriptions` flag conservé
 - Unicité `(association_id, numero_pcg)` respectée
 - Tenant scope : aucun compte ne fuit entre asso
+- **Garde-fou** : si une sous-catégorie sans `code_cerfa` existe au moment de la migration → throw `RuntimeException` explicite (« Run `php artisan audit:compta-v5-preparation` first and fix sous-catégories without code_cerfa before migrating »)
+- Test Pest dédié : seed une sous-catégorie sans code_cerfa, attend `RuntimeException` au `migrate`
 **GREEN**:
 - Migration `2026_05_20_000001_create_comptes_table.php` (schéma spec §2.1)
+- Pré-check dans `up()` : `if (SousCategorie::whereNull('code_cerfa')->exists()) throw ...`
 - Backfill SQL inline : `INSERT INTO comptes SELECT FROM sous_categories` pour chaque tenant
-- Garde-fou : refuse migration si sous-catégorie sans `code_cerfa` (forcer audit Step 2 préalable)
 **REFACTOR**: None needed
 **Files**: `database/migrations/2026_05_20_000001_create_comptes_table.php`, `tests/Feature/Migrations/CreateComptesTableTest.php`
 **Commit**: `feat(v5): create comptes table + seed depuis sous_categories`
@@ -162,13 +164,13 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 **Complexity**: standard
 **RED**: Tests Pest :
-- Compte 411, 401, 5112 créés pour chaque tenant
-- Compte 530 créé **uniquement** si l'asso a des transactions `mode_paiement = 'espèces'`
-- `est_systeme = TRUE`, `lettrable = TRUE`, `categorie_id = NULL`
-- Tentative de delete/edit refusée
+- Compte 411, 401, 5112 créés pour chaque tenant (toujours)
+- **Critère 530 — décision actée** : `EXISTS (SELECT 1 FROM transactions WHERE association_id = :id AND mode_paiement = 'especes' AND deleted_at IS NULL)`. Tenant avec transactions espèces non-supprimées → compte 530 créé. Tenant sans → compte 530 absent. Tenant avec uniquement des transactions espèces soft-deleted → compte 530 absent.
+- `est_systeme = TRUE`, `lettrable = TRUE`, `categorie_id = NULL` pour tous les comptes système
+- Tentative de delete/edit refusée par policy
 **GREEN**:
 - Migration `2026_05_20_000003_seed_comptes_systeme.php`
-- Détection conditionnelle 530
+- Détection conditionnelle 530 avec SQL exact ci-dessus
 - Policy `ComptePolicy::update / delete` refuse `est_systeme = TRUE`
 **REFACTOR**: None needed
 **Files**: Migration + `app/Policies/ComptePolicy.php` + tests
@@ -226,16 +228,17 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 - `Compte::ofNumeroSysteme('411')` retourne le 411 système
 - Scope `lettrables()` filtre `lettrable = TRUE`
 - Scope `classe(int $classe)` filtre par classe
-- Scope `bancaires()` filtre `classe = 5 AND numero_pcg LIKE '512%'`
+- **Scope `bancaires()`** : retourne les comptes 5121, 5122… (banques physiques uniquement). Assertions positives ET négatives : 5121 inclus, **5112 et 530 EXCLUS**. Filtre exact : `classe = 5 AND numero_pcg LIKE '512_'` (regex underscore = un seul caractère après 512, donc 5121-5129 mais pas 5112).
 - Relation `Compte::lignes()` retourne les `TransactionLigne` du compte
 - Étend `TenantModel`, scope global respecté
 **GREEN**:
 - `App\Models\Compte` extends `TenantModel`
 - Méthodes statiques + scopes + relation
+- Scope `bancaires()` utilise `LIKE '512_'` (underscore SQL = exactement un caractère)
 - Casts (`classe`, `actif`, `est_systeme`, `lettrable`)
 **REFACTOR**: None needed
 **Files**: `app/Models/Compte.php`, `tests/Feature/Models/CompteTest.php`
-**Commit**: `feat(v5): App\Models\Compte avec scopes ofNumero / lettrables / classe`
+**Commit**: `feat(v5): App\Models\Compte avec scopes ofNumero / lettrables / classe / bancaires`
 
 #### Step 10 : Modèle `TransactionLigne` enrichi (debit, credit, lettrage)
 
@@ -243,30 +246,36 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **RED**: Tests Pest :
 - `TransactionLigne::isLettree()` retourne true ssi `lettrage_code IS NOT NULL`
 - Accesseur `montantSigne` retourne `debit - credit`
-- Validation mutator : impossible d'avoir `debit > 0 AND credit > 0` simultanément
+- **Validation via `saving` observer** : refuse à la sauvegarde si `debit > 0 AND credit > 0` (XOR violation) → throw `InvalidArgumentException`
+- **Cas (debit=0, credit=0)** : également refusé à `saving` (ligne vide non-significative). Toute ligne persistée doit avoir soit `debit > 0` soit `credit > 0`, jamais les deux ni aucun
 - Relation `compte()` retourne le Compte
 - Relation `transaction()` inchangée
+- **Exception** : pendant la migration Step 6 et avant le backfill, les lignes héritées ont `debit = 0` ET `credit = 0`. L'observer ne se déclenche **que sur `creating` et `updating` explicites**, pas sur les writes batch SQL des migrations. Documenté dans l'observer.
 **GREEN**:
 - Enrichir le modèle existant
-- Mutator validation débit XOR crédit
+- Observer `TransactionLigneObserver::saving` avec validation XOR + ni-ni
 - Accesseur `montantSigne`
+- Observer enregistré dans `AppServiceProvider`
 **REFACTOR**: None needed
-**Files**: `app/Models/TransactionLigne.php`, tests
-**Commit**: `feat(v5): TransactionLigne enrichi (debit/credit + isLettree + montantSigne)`
+**Files**: `app/Models/TransactionLigne.php`, `app/Observers/TransactionLigneObserver.php`, tests
+**Commit**: `feat(v5): TransactionLigne enrichi (debit/credit + observer XOR + isLettree)`
 
-#### Step 11 : Alias deprecated `SousCategorie` étend `Compte`
+#### Step 11 : Cohabitation `SousCategorie` ↔ `Compte` (pas d'alias en 1a, déféré 1d)
 
 **Complexity**: trivial
+**Décision révisée post-AC review** : transformer `SousCategorie` en alias deprecated dans 1a casserait silencieusement les ~10 relations existantes (`Adhesion::sousCategorie`, `FormuleAdhesion::sousCategorie`, `BudgetLine::sousCategorie`, `UsageSousCategorie::sousCategorie`, etc.). On garde `SousCategorie` **inchangé** en 1a (pointe toujours sur `sous_categories`). Le renommage transverse `SousCategorie → Compte` est fait en bloc en 1d (Steps 36-39) avec une migration de relations propre.
+
 **RED**: Tests Pest :
-- `SousCategorie::find(X)` retourne le Compte correspondant
-- Trigger d'un warning log « SousCategorie deprecated, use Compte » à l'instanciation
-- Tests existants utilisant SousCategorie continuent de fonctionner
+- `Compte::find(X)` et `SousCategorie::find(X)` retournent des objets **distincts** (deux tables, deux IDs potentiellement différents même si valeurs identiques)
+- Les deux modèles cohabitent sans collision Eloquent
+- Aucun test existant ne casse à cause du nouveau modèle `Compte` ajouté
 **GREEN**:
-- `App\Models\SousCategorie` extends `Compte` + log deprecated dans constructor
-- Conservation `$table = 'sous_categories'` interdite — pointe vers `comptes`
-**REFACTOR**: None needed (deprecated, supprimé Step 39)
-**Files**: `app/Models/SousCategorie.php` (modifié), tests
-**Commit**: `chore(v5): SousCategorie devient alias deprecated de Compte`
+- Aucune modification de `App\Models\SousCategorie` en 1a
+- `App\Models\Compte` (créé Step 9) coexiste sur la table `comptes`
+- Pas d'alias, pas de log deprecated
+**REFACTOR**: None needed
+**Files**: aucun nouveau fichier (juste un test de cohabitation)
+**Commit**: `test(v5): valider la cohabitation Compte / SousCategorie en 1a`
 
 ---
 
