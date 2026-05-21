@@ -421,3 +421,34 @@ it('is idempotent — re-running the seed is a no-op', function () {
 
     expect($count)->toBe(1);
 });
+
+it('seeds an inactive bank (actif_recettes_depenses=false) into comptes', function () {
+    // Inactive banks are included: actif_recettes_depenses gates manual-entry UI,
+    // not ledger existence. The seeder must not filter on this flag.
+    $association = Association::firstOrFail();
+
+    DB::table('comptes_bancaires')->insert([
+        'association_id' => $association->id,
+        'nom' => 'Banque Inactive',
+        'iban' => null,
+        'bic' => null,
+        'domiciliation' => null,
+        'solde_initial' => '0.00',
+        'date_solde_initial' => null,
+        'actif_recettes_depenses' => false,
+        'saisie_automatisee' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    replayBancairesSeed();
+
+    $compte = DB::table('comptes')
+        ->where('association_id', $association->id)
+        ->where('numero_pcg', '5121')
+        ->first();
+
+    expect($compte)->not->toBeNull();
+    expect((int) $compte->classe)->toBe(5);
+    expect((bool) $compte->est_systeme)->toBeTrue();
+});

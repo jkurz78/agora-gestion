@@ -44,7 +44,7 @@ return new class extends Migration
     {
         DB::table('comptes')
             ->where('classe', 5)
-            ->where('numero_pcg', 'LIKE', '512%')
+            ->where('numero_pcg', 'LIKE', '512_')
             ->delete();
     }
 };
