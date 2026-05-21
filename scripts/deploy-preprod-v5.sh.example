@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+#
+# deploy-preprod-v5.sh — Deploy feat/compta-v5 branch to preprod (NAS)
+#
+# Reference: docs/specs/2026-05-19-fondations-partie-double-slice1.md §16.5
+#
+# Pulls the latest feat/compta-v5, runs migrations, runs the backfill
+# (idempotent by default; --reset re-converts from scratch). Smoke-tests
+# at the end.
+#
+# This is an EXAMPLE template. Copy to deploy-preprod-v5.sh, fill in
+# the path, and never commit the result.
+#
+# Usage:
+#   ./deploy-preprod-v5.sh           # idempotent iteration
+#   ./deploy-preprod-v5.sh --reset   # wipe v5 conversion and re-apply
+
+set -euo pipefail
+
+APP_PATH="/path/to/preprod/agora-gestion"
+BRANCH="feat/compta-v5"
+
+RESET=0
+if [[ "${1:-}" == "--reset" ]]; then
+  RESET=1
+fi
+
+cd "${APP_PATH}"
+
+echo "[$(date)] Step 1: Maintenance mode"
+php artisan down --message="Recette v5 en cours, retour dans quelques instants" || true
+
+echo "[$(date)] Step 2: git fetch + checkout ${BRANCH}"
+git fetch origin
+git checkout "${BRANCH}"
+git pull --ff-only origin "${BRANCH}"
+
+echo "[$(date)] Step 3: composer install"
+composer install --no-dev --optimize-autoloader
+
+echo "[$(date)] Step 4: artisan migrate"
+php artisan migrate --force
+
+echo "[$(date)] Step 5: backfill dry-run (sanity)"
+php artisan compta:backfill-partie-double --exercice=current --dry-run
+
+if [[ "${RESET}" == "1" ]]; then
+  echo "[$(date)] Step 6 (--reset): full re-conversion"
+  php artisan compta:backfill-partie-double --exercice=current --force
+else
+  echo "[$(date)] Step 6: idempotent conversion (skip already-converted)"
+  php artisan compta:backfill-partie-double --exercice=current
+fi
+
+echo "[$(date)] Step 7: optimize:clear + up"
+php artisan optimize:clear
+php artisan up
+
+echo "[$(date)] Step 8: smoke test"
+php artisan compta:smoke-test-v5
+
+echo "[$(date)] Done. Preprod ${BRANCH} is live."
