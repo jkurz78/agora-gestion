@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: in-progress (sous-slice 1a, 8/11 steps done — 2026-05-21)
+**Status**: in-progress (sous-slice 1a, 9/11 steps done — 2026-05-21)
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -228,21 +228,22 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ### Phase C — Modèle Eloquent (steps 9-11) — Sous-slice 1a *(fin → `/clear`)*
 
-#### Step 9 : Modèle `App\Models\Compte` + relations + scopes
+#### Step 9 : Modèle `App\Models\Compte` + relations + scopes ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commits `ee77bd1c` + `7b3dd671` (2026-05-21). 15 tests Pest verts (32 assertions), Pint vert, suite complète **10 959 assertions / 0 failed**. Modèle Step 5 enrichi : 2 statics (`ofNumero` retourne `?self`, `ofNumeroSysteme` throws `ModelNotFoundException`), 3 scopes (`lettrables`, `classe(int)`, `bancaires`), 1 relation `lignes(): HasMany`. **Décision actée** : `bancaires()` utilise `LIKE '512_%'` (harmonisé avec Step 4 `down()`) — supporte 10+ banques, exclut toujours 5112 et 530. 4 fixes post-review : commentaire helper, test négatif `ofNumeroSysteme`, `count == 3` exact, cast `(int)` FK.
 **RED**: Tests Pest :
 - `Compte::ofNumero('706')` retourne le compte 706 du tenant courant
 - `Compte::ofNumeroSysteme('411')` retourne le 411 système
 - Scope `lettrables()` filtre `lettrable = TRUE`
 - Scope `classe(int $classe)` filtre par classe
-- **Scope `bancaires()`** : retourne les comptes 5121, 5122… (banques physiques uniquement). Assertions positives ET négatives : 5121 inclus, **5112 et 530 EXCLUS**. Filtre exact : `classe = 5 AND numero_pcg LIKE '512_'` (regex underscore = un seul caractère après 512, donc 5121-5129 mais pas 5112).
+- **Scope `bancaires()`** : retourne les comptes 5121, 5122… (banques physiques uniquement). Assertions positives ET négatives : 5121 inclus, **5112 et 530 EXCLUS**. Filtre exact : `classe = 5 AND numero_pcg LIKE '512_%'` (un char + reste optionnel après 512, supporte 10+ banques tout en excluant 5112).
 - Relation `Compte::lignes()` retourne les `TransactionLigne` du compte
 - Étend `TenantModel`, scope global respecté
 **GREEN**:
 - `App\Models\Compte` extends `TenantModel`
 - Méthodes statiques + scopes + relation
-- Scope `bancaires()` utilise `LIKE '512_'` (underscore SQL = exactement un caractère)
+- Scope `bancaires()` utilise `LIKE '512_%'` (consistant avec Step 4 down() + 10+ banques)
 - Casts (`classe`, `actif`, `est_systeme`, `lettrable`)
 **REFACTOR**: None needed
 **Files**: `app/Models/Compte.php`, `tests/Feature/Models/CompteTest.php`
