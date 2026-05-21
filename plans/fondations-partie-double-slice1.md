@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: in-progress (sous-slice 1a, 4/11 steps done — 2026-05-21)
+**Status**: in-progress (sous-slice 1a, 5/11 steps done — 2026-05-21)
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -164,9 +164,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `database/migrations/2026_05_20_000002_seed_comptes_bancaires_into_comptes.php`, tests Feature dédiés
 **Commit**: `feat(v5): seed comptes bancaires comme sous-comptes 5121, 5122…`
 
-#### Step 5 : Seed comptes système (411, 401, 5112, 530 conditionnel)
+#### Step 5 : Seed comptes système (411, 401, 5112, 530 conditionnel) ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commits `409c61f4` + `2f0e177c` (2026-05-21). 19 tests Pest verts (82 assertions ; 8 migration + 11 policy), Pint vert, suite complète **10 829 assertions / 0 failed**. Décisions notables : seed extrait en service `App\Services\Compta\Migrations\SystemeSeeder` (mirror du pattern `AuditGuard` / `BancairesSeeder`), split `unconditionalSql()` (411/401/5112) + `conditionalCaisseSql()` (530) avec SQL EXISTS verbatim plan. Modèle minimal `App\Models\Compte` (TenantModel + SoftDeletes + fillable + casts, enrichi en Step 9 — `// TODO step 9` marker). `ComptePolicy` (update + delete refusent `est_systeme=true`, sinon délègue à `RoleAssociation::canWrite(Espace::Compta)`), enregistrée dans `AppServiceProvider`. **Bug pré-existant Step 3 surfacé et corrigé** : FK `comptes.association_id` sans cascade (default RESTRICT) cassait 141 tests dès que chaque association recevait un seed système — fix `->cascadeOnDelete()` aligné sur la convention projet (10+ tables tenant-scopées). Tests Step 4 refinés (`classe = 5` → `numero_pcg LIKE '512_%'`) pour ne pas compter le nouveau 5112 système.
 **RED**: Tests Pest :
 - Compte 411, 401, 5112 créés pour chaque tenant (toujours)
 - **Critère 530 — décision actée** : `EXISTS (SELECT 1 FROM transactions WHERE association_id = :id AND mode_paiement = 'especes' AND deleted_at IS NULL)`. Tenant avec transactions espèces non-supprimées → compte 530 créé. Tenant sans → compte 530 absent. Tenant avec uniquement des transactions espèces soft-deleted → compte 530 absent.
