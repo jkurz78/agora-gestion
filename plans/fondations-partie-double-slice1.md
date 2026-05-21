@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: in-progress (sous-slice 1a, 9/11 steps done — 2026-05-21)
+**Status**: in-progress (sous-slice 1a, 10/11 steps done — 2026-05-21)
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -249,9 +249,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Models/Compte.php`, `tests/Feature/Models/CompteTest.php`
 **Commit**: `feat(v5): App\Models\Compte avec scopes ofNumero / lettrables / classe / bancaires`
 
-#### Step 10 : Modèle `TransactionLigne` enrichi (debit, credit, lettrage)
+#### Step 10 : Modèle `TransactionLigne` enrichi (debit, credit, lettrage) ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `cca10ca6` (2026-05-21). 14 tests Pest verts (22 assertions), Pint vert, suite complète **10 980 assertions / 0 failed** (vérifiée directement par l'orchestrateur). Modèle enrichi : 6 fillable + 4 casts (compte_id/tiers_id int, debit/credit decimal:2), `isLettree()`, accessor `montantSigne` (Attribute style), relations `compte()` + `tiers()` BelongsTo. Observer `TransactionLigneObserver::saving` avec **discriminator `compte_id === null` skip** (clé du design — laisse passer les lignes legacy slice-0 inchangées pendant que Steps 21-26 rebranchent les services). Cas couverts : XOR violation (deux > 0), ni-ni (deux = 0), legacy row (compte_id null) succès, raw `DB::table` bypass de l'observer. Spec compliance et code quality APPROVED 0 issues.
 **RED**: Tests Pest :
 - `TransactionLigne::isLettree()` retourne true ssi `lettrage_code IS NOT NULL`
 - Accesseur `montantSigne` retourne `debit - credit`
