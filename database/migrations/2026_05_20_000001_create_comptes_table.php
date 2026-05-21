@@ -39,7 +39,7 @@ return new class extends Migration
 
         Schema::create('comptes', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('association_id')->constrained('association');
+            $table->foreignId('association_id')->constrained('association')->cascadeOnDelete();
             $table->string('numero_pcg', 10);
             $table->string('intitule', 255);
             $table->unsignedTinyInteger('classe');

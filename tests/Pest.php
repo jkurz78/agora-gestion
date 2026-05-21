@@ -3,6 +3,7 @@
 use App\Models\Association;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Cache;
 use Tests\Support\LigneDonHelper;
 use Tests\TestCase;
@@ -90,7 +91,7 @@ function something()
  * This is the canonical "leak test" for all Mailables in AgoraGestion.
  * Any {xxx} surviving after TemplateSubstitution::apply() is a bug visible to users.
  */
-function assertNoUnsubstitutedEmailVariables(\Illuminate\Mail\Mailable $mail): void
+function assertNoUnsubstitutedEmailVariables(Mailable $mail): void
 {
     $subject = $mail->envelope()->subject;
     $html = $mail->render();

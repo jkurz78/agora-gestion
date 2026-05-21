@@ -102,7 +102,7 @@ it('increments numero_pcg per tenant (3 banks → 5121, 5122, 5123)', function (
 
     $numeros = DB::table('comptes')
         ->where('association_id', $association->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->orderBy('numero_pcg')
         ->pluck('numero_pcg')
         ->all();
@@ -163,14 +163,14 @@ it('restarts numbering at 5121 for each tenant', function () {
 
     $numerosA = DB::table('comptes')
         ->where('association_id', $assoA->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->orderBy('numero_pcg')
         ->pluck('numero_pcg')
         ->all();
 
     $numerosB = DB::table('comptes')
         ->where('association_id', $assoB->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->orderBy('numero_pcg')
         ->pluck('numero_pcg')
         ->all();
@@ -324,7 +324,7 @@ it('does not seed soft-deleted comptes_bancaires rows', function () {
 
     $count = DB::table('comptes')
         ->where('association_id', $association->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->count();
 
     expect($count)->toBe(1);
@@ -367,12 +367,12 @@ it('does not leak tenant A comptes into tenant B scope', function () {
 
     $countA = DB::table('comptes')
         ->where('association_id', $assoA->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->count();
 
     $countB = DB::table('comptes')
         ->where('association_id', $assoB->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->count();
 
     // Each tenant has exactly 1 bank compte; no cross-tenant spill
@@ -381,12 +381,12 @@ it('does not leak tenant A comptes into tenant B scope', function () {
 
     $compteA = DB::table('comptes')
         ->where('association_id', $assoA->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->first();
 
     $compteB = DB::table('comptes')
         ->where('association_id', $assoB->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->first();
 
     expect($compteA->intitule)->toBe('Banque Tenant A');
@@ -416,7 +416,7 @@ it('is idempotent — re-running the seed is a no-op', function () {
 
     $count = DB::table('comptes')
         ->where('association_id', $association->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->count();
 
     expect($count)->toBe(1);
@@ -457,6 +457,10 @@ it('down() removes all bank sous-comptes including 5-digit numero_pcg (10+ banks
     // Regression guard: LIKE '512_' only matched 4-char numbers (5121–5129).
     // A tenant with 10+ banks gets '51210', '51211'… which '512_' silently skipped.
     // The fixed pattern '512_%' (one mandatory char + any suffix) covers all lengths.
+    //
+    // Note: Step 5 (SystemeSeeder) already seeds 5112 for every tenant via
+    // RefreshDatabase. The hand-insert that was here before Step 5 landed is
+    // replaced by asserting on the real Step 5 row — the invariant is identical.
     $association = Association::firstOrFail();
 
     // 1. Insert 11 banks — ROW_NUMBER() will assign rang 1..11
@@ -481,10 +485,11 @@ it('down() removes all bank sous-comptes including 5-digit numero_pcg (10+ banks
 
     replayBancairesSeed();
 
-    // 2. Verify the 10th and 11th banks received 5-digit numero_pcg
+    // 2. Verify the 10th and 11th banks received 5-digit numero_pcg.
+    //    Filter to 512_% only (excludes the 5112 system compte from Step 5).
     $numeros = DB::table('comptes')
         ->where('association_id', $association->id)
-        ->where('classe', 5)
+        ->where('numero_pcg', 'LIKE', '512_%')
         ->orderBy('numero_pcg')
         ->pluck('numero_pcg')
         ->all();
@@ -493,27 +498,12 @@ it('down() removes all bank sous-comptes including 5-digit numero_pcg (10+ banks
     expect($numeros)->toContain('51210');
     expect($numeros)->toContain('51211');
 
-    // 3. Hand-insert a fake classe-5 system compte with numero_pcg='5112'
-    //    (simulates Step 5's future caisse/système compte — must survive down())
-    DB::table('comptes')->insert([
-        'association_id' => $association->id,
-        'numero_pcg' => '5112',
-        'intitule' => 'Caisse (système, futur step 5)',
-        'classe' => 5,
-        'categorie_id' => null,
-        'parent_compte_id' => null,
-        'actif' => true,
-        'est_systeme' => true,
-        'pour_inscriptions' => false,
-        'lettrable' => false,
-        'iban' => null,
-        'bic' => null,
-        'domiciliation' => null,
-        'solde_initial' => '0.00',
-        'date_solde_initial' => null,
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
+    // 3. The 5112 system compte is already present (seeded by Step 5 via RefreshDatabase).
+    $has5112 = DB::table('comptes')
+        ->where('association_id', $association->id)
+        ->where('numero_pcg', '5112')
+        ->exists();
+    expect($has5112)->toBeTrue();
 
     // 4. Run the same DELETE as down() uses (with the corrected LIKE pattern)
     DB::table('comptes')
@@ -521,7 +511,7 @@ it('down() removes all bank sous-comptes including 5-digit numero_pcg (10+ banks
         ->where('numero_pcg', 'LIKE', '512_%')
         ->delete();
 
-    // 5. All 11 bank sous-comptes are gone; the fake 5112 remains
+    // 5. All 11 bank sous-comptes are gone; the 5112 system compte remains
     $remaining = DB::table('comptes')
         ->where('association_id', $association->id)
         ->where('classe', 5)
