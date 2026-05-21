@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: in-progress (sous-slice 1a, 6/11 steps done — 2026-05-21)
+**Status**: in-progress (sous-slice 1a, 7/11 steps done — 2026-05-21)
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -197,9 +197,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: Migration + tests Feature
 **Commit**: `feat(v5): add debit/credit/tiers_id/lettrage_code columns to transaction_lignes`
 
-#### Step 7 : Migration `transactions` — flags `equilibree` + `type_ecriture`
+#### Step 7 : Migration `transactions` — flags `equilibree` + `type_ecriture` ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `36f3a10f` (2026-05-21). 13 tests Pest verts (25 assertions), Pint vert, suite complète **10 900 assertions / 0 failed**. `equilibree` BOOLEAN default FALSE + `type_ecriture` ENUM('normale','an','od','extourne') default 'normale' ajoutés en `AFTER montant_total` / `AFTER equilibree`. Legacy `type`, `compte_id`, `tiers_id`, `remise_id` conservés intacts. `down()` testé.
 **RED**: Tests Pest :
 - Colonnes `equilibree` (default FALSE) + `type_ecriture` (enum) existent
 - Anciennes colonnes `type`, `compte_id` conservées
