@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: in-progress (sous-slice 1a, 5/11 steps done — 2026-05-21)
+**Status**: in-progress (sous-slice 1a, 6/11 steps done — 2026-05-21)
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -181,12 +181,13 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: Migration + `app/Policies/ComptePolicy.php` + tests
 **Commit**: `feat(v5): seed comptes système 411/401/5112 + 530 conditionnel + policy garde-fou`
 
-#### Step 6 : Migration `transaction_lignes` — colonnes débit/crédit + lettrage + tiers
+#### Step 6 : Migration `transaction_lignes` — colonnes débit/crédit + lettrage + tiers ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `789241bf` (2026-05-21). 12 tests Pest verts (49 assertions), Pint vert, suite complète **10 876 assertions / 0 failed**. 6 colonnes ajoutées avec types/defaults exact spec §2.2 (`compte_id` / `tiers_id` BIGINT nullable FK `nullOnDelete()`, `debit` / `credit` DECIMAL(12,2) DEFAULT 0, `lettrage_code` VARCHAR(20), `libelle` VARCHAR(255)), **3 indexes** posés `(compte_id, tiers_id, lettrage_code)` + `(lettrage_code)` + `(compte_id, tiers_id)`, `sous_categorie_id` et `montant` conservés intacts, `down()` testé (drop indexes → FKs → columns).
 **RED**: Tests Pest :
 - Colonnes `compte_id`, `debit`, `credit`, `tiers_id`, `lettrage_code`, `libelle` existent avec types attendus
-- Index `(compte_id, tiers_id, lettrage_code)` et `(lettrage_code)` posés
+- Index `(compte_id, tiers_id, lettrage_code)`, `(lettrage_code)` et `(compte_id, tiers_id)` posés (3 indexes per spec §2.2)
 - `sous_categorie_id` et `montant` conservés (nullables)
 - Aucune ligne existante n'est cassée par la migration
 **GREEN**:
