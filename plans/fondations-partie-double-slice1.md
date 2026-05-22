@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) — prête pour validation PO + `/clear` avant sous-slice 1b
+**Status**: sous-slices 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE (9/9 — 2026-05-22) — prête pour validation PO console (tinker) + `/clear` avant sous-slice 1c (branchements UI)
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -62,8 +62,8 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 | Sous-slice | Steps | Phases | Critère de complétude | Durée estimée |
 |---|---|---|---|---|
-| **1a — Data layer** | 1-11 | A + B + C | Toutes migrations passées, modèles `Compte` / `TransactionLigne` enrichi en place, suite Pest verte | ~3-4 jours |
-| **1b — Services partie double** | 12-20 | D | `LettrageService` + `EcritureGenerator` complets, matrice École C testée unitairement, suite Pest verte | ~5-7 jours |
+| **1a — Data layer** ✅ | 1-11 | A + B + C | Toutes migrations passées, modèles `Compte` / `TransactionLigne` enrichi en place, suite Pest verte | ~3-4 jours |
+| **1b — Services partie double** ✅ | 12-20 | D | `LettrageService` + `EcritureGenerator` complets, matrice École C testée unitairement, suite Pest verte | ~5-7 jours |
 | **1c — Branchements + rapports** | 21-31 | E + F + G | Tous écrans de saisie + rapports rebranchés sur le nouveau moteur, tests non-régression CR + rappro verts, suite Pest verte | ~5-7 jours |
 | **1d — Backfill + renommage + ops** | 32-44 | H + I + (J) + K | Backfill idempotent fonctionnel, codebase renommé, scripts ops finalisés, recette préprod jouée — **prêt cutover prod** | ~5-7 jours |
 
@@ -290,11 +290,15 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 
 ---
 
-### Phase D — Services (steps 12-20) — Sous-slice 1b *(fin → `/clear`)*
+### Phase D — Services (steps 12-20) — Sous-slice 1b ✅ TERMINÉE 2026-05-22 *(fin → `/clear`)*
 
-#### Step 12 : `LettrageService::lettrer` — invariants + audit
+Sous-slice 1b livrée sur `feat/compta-v5` — 9 commits (Steps 12-20), 76 nouveaux tests Pest unit, +374 assertions. Suite globale 11 371 assertions / 0 failed. `LettrageService` et `EcritureGenerator` complets, matrice École C entièrement testée unitairement. **Pas encore branché sur l'UI** (c'est 1c).
+
+
+#### Step 12 : `LettrageService::lettrer` — invariants + audit ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `70b46ae8` (2026-05-22). 9/9 tests, 29 assertions. Décision : tenant-check exécuté en premier (security-first vs ordre plan), bcmath pour comparaison équilibre (évite drift float), `Illuminate\Support\Collection` en signature (supertype).
 **RED**: Tests Pest exhaustifs sur invariants :
 - Lettrage de 2 lignes équilibrées sur compte lettrable → OK + lettrage_code généré + audit créé
 - Compte non lettrable → throw `CompteNonLettrableException`
@@ -313,9 +317,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/LettrageService.php`, `app/Exceptions/Compta/*.php`, tests
 **Commit**: `feat(v5): LettrageService::lettrer + 5 invariants + audit`
 
-#### Step 13 : `LettrageService::delettrer` + `delettrerParLigne`
+#### Step 13 : `LettrageService::delettrer` + `delettrerParLigne` ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `87bd2786` (2026-05-22). 7/7 tests, 32 assertions. Refactor `writeAudit()` mutualisé entre lettrer/delettrer. Filtrage tenant via `whereHas('compte')` (TenantScope global s'applique automatiquement).
 **RED**: Tests Pest :
 - `delettrer($code)` passe `lettrage_code = NULL` sur toutes les lignes du code
 - Audit ligne action='delettre' créée
@@ -329,9 +334,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/LettrageService.php` (étendu), tests
 **Commit**: `feat(v5): LettrageService::delettrer + delettrerParLigne + audit`
 
-#### Step 14 : `EcritureGenerator` squelette + invariants
+#### Step 14 : `EcritureGenerator` squelette + invariants ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `f5ef4452` (2026-05-22). 14/14 tests, 18 assertions. Invariants exposés en **public** pour testabilité directe (visibilité à réévaluer après Step 20 — peut être réduit à private si les `pour*` les exercent déjà). 4 nouvelles exceptions (EcritureNonEquilibree, CompteIncorrect, TiersRequis, TiersInterdit) + enrichissement `TenantBoundaryException::crossTenantTiers`.
 **RED**: Tests Pest sur le squelette :
 - `EcritureGenerator` est résoluble via container
 - Méthode `assertEquilibre` valide une collection de lignes
@@ -347,9 +353,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/EcritureGenerator.php`, exceptions, tests
 **Commit**: `feat(v5): EcritureGenerator skeleton + invariants partagés`
 
-#### Step 15 : `EcritureGenerator::pourRecetteComptant` (tous modes)
+#### Step 15 : `EcritureGenerator::pourRecetteComptant` (tous modes) ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `27613be5` (2026-05-22). 13/13 tests, 49 assertions. Refactor : helper privé `resoudreComptePortage(ModePaiement, ?Compte): Compte`. Décisions actées : Prelevement = Virement (portage 512X) ; `assertPasDeTiersSur512` NON appelé sur T1 directes (contradiction §4.2 vs §4.3 matrice — la matrice gagne, tiers sur 512 pour identifier l'émetteur) ; legacy `montant=0`, `sous_categorie_id=null` (observer XOR skip via discriminator `compte_id !== null`) ; `Transaction.fillable` enrichi avec `equilibree` + `type_ecriture` (manquaient en 1a).
 **RED**: Tests Pest matrice §4.3 lignes 1-4 :
 - Recette comptant chèque → T1 `5112 D X (tiers) / 706 C X`
 - Recette comptant espèces → T1 `530 D X (tiers) / 706 C X`
@@ -366,9 +373,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/EcritureGenerator.php` (étendu), tests
 **Commit**: `feat(v5): EcritureGenerator::pourRecetteComptant (chèque/espèces/virement/CB)`
 
-#### Step 16 : `EcritureGenerator::pourRecetteACredit`
+#### Step 16 : `EcritureGenerator::pourRecetteACredit` ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `4da5e084` (2026-05-22). 9/9 tests, 27 assertions. Refactor : helper privé `createTransactionHeader(...)` extrait (mutualisé Steps 15-19). `mode_paiement = null` pour créance constatée (colonne nullable depuis migration 2026-04-05).
 **RED**: Tests Pest :
 - Recette à crédit → T1 `411 D X (tiers) / 706 C X`
 - Pas de portage (pas de transaction T2 ici)
@@ -380,9 +388,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/EcritureGenerator.php`, tests
 **Commit**: `feat(v5): EcritureGenerator::pourRecetteACredit (411/706)`
 
-#### Step 17 : `EcritureGenerator::pourEncaissementCreance` + auto-lettrage 411
+#### Step 17 : `EcritureGenerator::pourEncaissementCreance` + auto-lettrage 411 ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `a1f35238` (2026-05-22). 10/10 tests, 47 assertions. Décisions : `LettrageDejaPresentException` réutilisée pour ligne 411 source déjà lettrée (sémantiquement équivalent) ; `LigneDejaLettreeException` créée mais non utilisée (réserve message métier futur — à nettoyer en revue 1b) ; résolution ligne 411 source via query DB fraîche (collection `lignes` en mémoire stale après UPDATE externe).
 **RED**: Tests Pest :
 - Encaissement d'une créance 411 existante → T2 `5112 ou 530 ou 512 D X (tiers) / 411 C X (tiers)`
 - Auto-lettrage : la ligne 411 de T1 et de T2 partagent un nouveau `lettrage_code`
@@ -398,9 +407,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: `app/Services/Compta/EcritureGenerator.php`, tests
 **Commit**: `feat(v5): EcritureGenerator::pourEncaissementCreance + auto-lettrage 411`
 
-#### Step 18 : `EcritureGenerator::pourDepense*` (3 cas)
+#### Step 18 : `EcritureGenerator::pourDepense*` (3 cas) ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `9116b731` (2026-05-22). 11/11 tests, 44 assertions. Refactor : helper privé `resoudreComptePortageDepense(ModePaiement, Compte): Compte` séparé de `resoudreComptePortage` recette (Cheque → 5112 en recette / 512 en dépense — asymétrie spec §4.3). `createTransactionHeader` enrichi pour accepter `TypeTransaction` en argument (compat-non-breaking sur Steps 15-17).
 **RED**: Tests Pest matrice §4.3 :
 - Dépense comptant chèque émis → `607 D X / 512 C X (tiers)` (pas de 5112 miroir, décision actée)
 - Dépense comptant CB → `607 D X / 512 C X (tiers)`
@@ -412,9 +422,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: tests
 **Commit**: `feat(v5): EcritureGenerator::pourDepenseComptant (3 modes)`
 
-#### Step 19 : `EcritureGenerator::pourDepenseACredit` + `pourReglementFournisseur` + auto-lettrage 401
+#### Step 19 : `EcritureGenerator::pourDepenseACredit` + `pourReglementFournisseur` + auto-lettrage 401 ✅
 
 **Complexity**: standard
+**Status**: ✅ done — commit `1604623b` (2026-05-22). 14/14 tests (6 dépense crédit + 8 règlement), 64 assertions. Décision REFACTOR : pas de factorisation S17/S19 — 5 axes diffèrent (compte tiers, sens inversé, helper portage, TypeTransaction, libellé) ; un sens inversé paramétré nuirait à la lisibilité métier.
 **RED**: Tests Pest :
 - Dépense à crédit → `607 D X / 401 C X (tiers)`
 - Règlement fournisseur → `401 D X (tiers) / 512 C X` + auto-lettrage paire 401
@@ -425,9 +436,10 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 **Files**: tests
 **Commit**: `feat(v5): EcritureGenerator::pourDepenseACredit + pourReglementFournisseur + auto-lettrage 401`
 
-#### Step 20 : `EcritureGenerator::pourRemiseBancaire` (Variante 2a splittée par tiers)
+#### Step 20 : `EcritureGenerator::pourRemiseBancaire` (Variante 2a splittée par tiers) ✅
 
 **Complexity**: complex
+**Status**: ✅ done — commit `9359a5c5` (2026-05-22). 13/13 tests, 67 assertions. Refactor : helper privé `regrouperParTiers(Collection): Collection`. Résolution `CompteBancaire → Compte 512X` par **IBAN** (le BancairesSeeder copie verbatim `iban` ; pas de FK dédiée — à statuer en 1c/1d si besoin). `assertPasDeTiersSur512` enfin exercé (ligne 512 D totale sans tiers, lignes 5112 crédit AVEC tiers). Note : lignes en mémoire `TransactionLigne` stale après UPDATE SQL de `lettrer()` — rechargements DB explicites avant/après.
 **RED**: Tests Pest cas remise §11 scénario 2 :
 - Remise de 3 chèques (Pierre 50, Paul 30, Jeanne 20) sur 512BNP
 - Transaction T4 créée avec **4 lignes** :
