@@ -21,9 +21,6 @@ use Illuminate\Support\Facades\DB;
 // Helpers locaux
 // ---------------------------------------------------------------------------
 
-/**
- * Récupère le compte système par numero_pcg pour le tenant courant.
- */
 function compteSystemeEnc(string $numeroPcg): Compte
 {
     return Compte::where('numero_pcg', $numeroPcg)
@@ -32,54 +29,45 @@ function compteSystemeEnc(string $numeroPcg): Compte
         ->firstOrFail();
 }
 
-/**
- * Crée un compte produit classe 7 pour le tenant courant (unique par suffix).
- */
 function compte706Enc(string $suffix = ''): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => '706enc'.$suffix,
-        'intitule' => 'Cotisations encaissement '.$suffix,
-        'classe' => 7,
-        'lettrable' => false,
-        'actif' => true,
-        'est_systeme' => false,
+        'numero_pcg'     => '706enc'.$suffix,
+        'intitule'       => 'Cotisations encaissement '.$suffix,
+        'classe'         => 7,
+        'lettrable'      => false,
+        'actif'          => true,
+        'est_systeme'    => false,
         'pour_inscriptions' => false,
     ]);
 }
 
-/**
- * Crée un compte bancaire 512X pour le tenant courant.
- */
 function compte512Enc(string $suffix = 'BNP'): Compte
 {
     return Compte::firstOrCreate(
         [
             'association_id' => TenantContext::currentId(),
-            'numero_pcg' => '512'.$suffix,
+            'numero_pcg'     => '512'.$suffix,
         ],
         [
-            'intitule' => 'Compte bancaire '.$suffix,
-            'classe' => 5,
-            'lettrable' => false,
-            'actif' => true,
-            'est_systeme' => false,
+            'intitule'          => 'Compte bancaire '.$suffix,
+            'classe'            => 5,
+            'lettrable'         => false,
+            'actif'             => true,
+            'est_systeme'       => false,
             'pour_inscriptions' => false,
         ]
     );
 }
 
-/**
- * Crée un tiers pour le tenant courant.
- */
 function tiersCourantEnc(): Tiers
 {
     return Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
 }
 
 /**
- * Crée une créance T1 (411 D / 706 C) via pourRecetteACredit.
+ * Crée une créance T1 via pourRecetteACredit (nouvelle signature multi-ventilation).
  */
 function creerCreance(float $montant = 150.00, ?string $suffix = null): Transaction
 {
@@ -89,8 +77,7 @@ function creerCreance(float $montant = 150.00, ?string $suffix = null): Transact
 
     return $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: $montant,
+        ventilations: [['compte' => $compteProduit, 'montant' => $montant]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
         libelle: 'Facture test '.($suffix ?? uniqid()),
     );
@@ -103,8 +90,6 @@ function creerCreance(float $montant = 150.00, ?string $suffix = null): Transact
 beforeEach(function () {
     SystemeSeeder::seed();
 
-    // 530 (Caisse) est conditionnel dans SystemeSeeder : il nécessite une transaction
-    // espèces existante. On l'insère directement pour les tests encaissement espèces.
     $tenantId = (int) TenantContext::currentId();
     $isSqlite = DB::getDriverName() === 'sqlite';
     $insertClause = $isSqlite ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
@@ -118,16 +103,16 @@ beforeEach(function () {
 });
 
 // ---------------------------------------------------------------------------
-// Cas 1 : Encaissement chèque → T2 : 5112 D (tiers) / 411 C (tiers)
+// Cas 1 : Encaissement chèque → T2 : 5112 D (sans tiers) / 411 C (avec tiers) + auto-lettrage
+// École 411 systématique : la ligne 5xx ne porte PLUS de tiers
 // ---------------------------------------------------------------------------
-test('pourEncaissementCreance chèque crée T2 5112 D (tiers) / 411 C (tiers) + auto-lettrage', function () {
+test('pourEncaissementCreance chèque crée T2 5112 D (sans tiers) / 411 C (avec tiers) + auto-lettrage', function () {
     $transactionCreance = creerCreance(150.00, 'CA');
 
     $compte411 = compteSystemeEnc('411');
     $compte5112 = compteSystemeEnc('5112');
     $compteTresorerie = compte512Enc('BNP');
 
-    // Récupérer le tiers de la créance depuis la ligne 411
     $ligne411T1 = $transactionCreance->lignes->firstWhere('compte_id', $compte411->id);
     $tiers = Tiers::find($ligne411T1->tiers_id);
 
@@ -144,12 +129,12 @@ test('pourEncaissementCreance chèque crée T2 5112 D (tiers) / 411 C (tiers) + 
     expect($t2)->toBeInstanceOf(Transaction::class);
     expect($t2->lignes)->toHaveCount(2);
 
-    // T2 : ligne 5112 D (portage chèque) avec tiers
+    // T2 : ligne 5112 D (portage chèque) SANS tiers (FEC-conformité)
     $ligne5112T2 = $t2->lignes->firstWhere('compte_id', $compte5112->id);
     expect($ligne5112T2)->not->toBeNull('La ligne 5112 doit exister dans T2');
     expect((float) $ligne5112T2->debit)->toBe(150.00);
     expect((float) $ligne5112T2->credit)->toBe(0.00);
-    expect((int) $ligne5112T2->tiers_id)->toBe((int) $tiers->id);
+    expect($ligne5112T2->tiers_id)->toBeNull('Ligne 5112 D ne porte pas de tiers — FEC-conformité');
 
     // T2 : ligne 411 C avec tiers
     $ligne411T2 = $t2->lignes->firstWhere('compte_id', $compte411->id);
@@ -168,9 +153,9 @@ test('pourEncaissementCreance chèque crée T2 5112 D (tiers) / 411 C (tiers) + 
 });
 
 // ---------------------------------------------------------------------------
-// Cas 2 : Encaissement espèces → T2 : 530 D (tiers) / 411 C (tiers) + auto-lettrage
+// Cas 2 : Encaissement espèces → T2 : 530 D (sans tiers) / 411 C (avec tiers) + auto-lettrage
 // ---------------------------------------------------------------------------
-test('pourEncaissementCreance espèces crée T2 530 D (tiers) / 411 C (tiers) + auto-lettrage', function () {
+test('pourEncaissementCreance espèces crée T2 530 D (sans tiers) / 411 C (avec tiers) + auto-lettrage', function () {
     $transactionCreance = creerCreance(80.00, 'CB');
 
     $compte411 = compteSystemeEnc('411');
@@ -192,7 +177,7 @@ test('pourEncaissementCreance espèces crée T2 530 D (tiers) / 411 C (tiers) + 
     $ligne530T2 = $t2->lignes->firstWhere('compte_id', $compte530->id);
     expect($ligne530T2)->not->toBeNull('Ligne 530 attendue dans T2 pour espèces');
     expect((float) $ligne530T2->debit)->toBe(80.00);
-    expect((int) $ligne530T2->tiers_id)->toBe((int) $tiers->id);
+    expect($ligne530T2->tiers_id)->toBeNull('Ligne 530 D ne porte pas de tiers — FEC-conformité');
 
     $ligne411T2 = $t2->lignes->firstWhere('compte_id', $compte411->id);
     expect((float) $ligne411T2->credit)->toBe(80.00);
@@ -204,9 +189,9 @@ test('pourEncaissementCreance espèces crée T2 530 D (tiers) / 411 C (tiers) + 
 });
 
 // ---------------------------------------------------------------------------
-// Cas 3 : Encaissement virement → T2 : 512BNP D (tiers) / 411 C (tiers) + auto-lettrage
+// Cas 3 : Encaissement virement → T2 : 512BNP D (sans tiers) / 411 C (avec tiers) + auto-lettrage
 // ---------------------------------------------------------------------------
-test('pourEncaissementCreance virement crée T2 512BNP D (tiers) / 411 C (tiers) + auto-lettrage', function () {
+test('pourEncaissementCreance virement crée T2 512BNP D (sans tiers) / 411 C (avec tiers) + auto-lettrage', function () {
     $transactionCreance = creerCreance(200.00, 'CC');
 
     $compte411 = compteSystemeEnc('411');
@@ -227,10 +212,11 @@ test('pourEncaissementCreance virement crée T2 512BNP D (tiers) / 411 C (tiers)
     $lignePortageT2 = $t2->lignes->firstWhere('compte_id', $compteBnp->id);
     expect($lignePortageT2)->not->toBeNull('Ligne 512BNP attendue dans T2 pour virement');
     expect((float) $lignePortageT2->debit)->toBe(200.00);
-    expect((int) $lignePortageT2->tiers_id)->toBe((int) $tiers->id);
+    expect($lignePortageT2->tiers_id)->toBeNull('Ligne 512X ne porte pas de tiers — FEC-conformité');
 
     $ligne411T2 = $t2->lignes->firstWhere('compte_id', $compte411->id);
     expect((float) $ligne411T2->credit)->toBe(200.00);
+    expect((int) $ligne411T2->tiers_id)->toBe((int) $tiers->id);
 
     // Auto-lettrage
     $ligne411T1Rechargee = $ligne411T1->fresh();
@@ -238,9 +224,9 @@ test('pourEncaissementCreance virement crée T2 512BNP D (tiers) / 411 C (tiers)
 });
 
 // ---------------------------------------------------------------------------
-// Cas 4 : Encaissement CB → T2 : 512 D (tiers) / 411 C (tiers) + auto-lettrage
+// Cas 4 : Encaissement CB → T2 : 512 D (sans tiers) / 411 C (avec tiers) + auto-lettrage
 // ---------------------------------------------------------------------------
-test('pourEncaissementCreance CB crée T2 512 D (tiers) / 411 C (tiers) + auto-lettrage', function () {
+test('pourEncaissementCreance CB crée T2 512 D (sans tiers) / 411 C (avec tiers) + auto-lettrage', function () {
     $transactionCreance = creerCreance(300.00, 'CD');
 
     $compte411 = compteSystemeEnc('411');
@@ -262,10 +248,11 @@ test('pourEncaissementCreance CB crée T2 512 D (tiers) / 411 C (tiers) + auto-l
     $lignePortageT2 = $t2->lignes->firstWhere('compte_id', $compteCB->id);
     expect($lignePortageT2)->not->toBeNull('Ligne 512CB1 attendue dans T2 pour CB');
     expect((float) $lignePortageT2->debit)->toBe(300.00);
-    expect((int) $lignePortageT2->tiers_id)->toBe((int) $tiers->id);
+    expect($lignePortageT2->tiers_id)->toBeNull();
 
     $ligne411T2 = $t2->lignes->firstWhere('compte_id', $compte411->id);
     expect((float) $ligne411T2->credit)->toBe(300.00);
+    expect((int) $ligne411T2->tiers_id)->toBe((int) $tiers->id);
 
     // Auto-lettrage
     expect($ligne411T1->fresh()->lettrage_code)->toBe($ligne411T2->fresh()->lettrage_code);
@@ -283,7 +270,6 @@ test('pourEncaissementCreance : solde ouvert 411 du tiers = 0 après encaissemen
     $ligne411T1 = $transactionCreance->lignes->firstWhere('compte_id', $compte411->id);
     $tiers = Tiers::find($ligne411T1->tiers_id);
 
-    // Avant encaissement : solde = 175 (débit ouvert)
     $soldeAvant = TransactionLigne::where('compte_id', $compte411->id)
         ->where('tiers_id', $tiers->id)
         ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS solde')
@@ -299,7 +285,6 @@ test('pourEncaissementCreance : solde ouvert 411 du tiers = 0 après encaissemen
         datePaiement: new DateTimeImmutable('2026-05-25'),
     );
 
-    // Après encaissement : solde = 0
     $soldeApres = TransactionLigne::where('compte_id', $compte411->id)
         ->where('tiers_id', $tiers->id)
         ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS solde')
@@ -308,7 +293,7 @@ test('pourEncaissementCreance : solde ouvert 411 du tiers = 0 après encaissemen
 });
 
 // ---------------------------------------------------------------------------
-// Cas 6 : Audit lettrage créé (action='lettre', snapshot des 2 IDs 411)
+// Cas 6 : Audit lettrage créé
 // ---------------------------------------------------------------------------
 test('pourEncaissementCreance crée une ligne lettrage_audit action=lettre avec les 2 IDs 411', function () {
     $transactionCreance = creerCreance(120.00, 'CF');
@@ -358,7 +343,6 @@ test('pourEncaissementCreance lève LettrageDejaPresentException si créance dé
 
     $ligne411T1 = $transactionCreance->lignes->firstWhere('compte_id', $compte411->id);
 
-    // Lettrage manuel de la ligne 411 source (simuler une double-saisie)
     TransactionLigne::where('id', $ligne411T1->id)->update(['lettrage_code' => 'CODE_DEJA_PRESENT_XXX']);
 
     $transactionsBefore = Transaction::count();
@@ -372,28 +356,24 @@ test('pourEncaissementCreance lève LettrageDejaPresentException si créance dé
         datePaiement: new DateTimeImmutable('2026-05-25'),
     ))->toThrow(LettrageDejaPresentException::class);
 
-    // Aucune transaction T2 créée
     expect(Transaction::count())->toBe($transactionsBefore);
 });
 
 // ---------------------------------------------------------------------------
-// Cas 8 : Créance cross-tenant → la résolution échoue (TenantScope fail-closed)
+// Cas 8 : Créance cross-tenant → exception de frontière tenant
 // ---------------------------------------------------------------------------
 test('pourEncaissementCreance avec créance cross-tenant → TenantBoundaryException ou ModelNotFoundException', function () {
     $associationA = TenantContext::current();
     $associationB = Association::factory()->create();
 
-    // Créer T1 (créance) dans le tenant B
     TenantContext::boot($associationB);
     SystemeSeeder::seed();
     $transactionCreanceB = creerCreance(100.00, 'CX');
-    TenantContext::boot($associationA); // revenir au tenant A
+    TenantContext::boot($associationA);
 
     $compteTresorerieA = compte512Enc('BNP7');
 
-    // Bypass scope pour récupérer la transaction B depuis A
     $transactionCreanceBBypass = Transaction::withoutGlobalScopes()->find($transactionCreanceB->id);
-    // Recharger les lignes sans scope
     $transactionCreanceBBypass->setRelation(
         'lignes',
         TransactionLigne::withoutGlobalScopes()
@@ -405,14 +385,6 @@ test('pourEncaissementCreance avec créance cross-tenant → TenantBoundaryExcep
 
     $generator = app(EcritureGenerator::class);
 
-    // On s'attend à une violation de frontière tenant ou une exception de résolution.
-    //
-    // Comportement documenté (TenantScope fail-closed) :
-    //   - La requête DB `TransactionLigne::where('transaction_id', ...)->where('compte_id', $compte411A->id)`
-    //     ne trouve pas de ligne pour T1-B (le compte411 résolu est celui du tenant A).
-    //   - Résultat : \InvalidArgumentException "T1 ne contient pas de ligne 411 valide".
-    //   - Alternative : si les lignes sont trouvées (bypass) → TenantBoundaryException via LettrageService.
-    //   Dans tous les cas, aucune T2 ne doit être créée.
     $threw = false;
     try {
         $generator->pourEncaissementCreance(
@@ -426,8 +398,6 @@ test('pourEncaissementCreance avec créance cross-tenant → TenantBoundaryExcep
     } catch (ModelNotFoundException $e) {
         $threw = true;
     } catch (InvalidArgumentException $e) {
-        // Le TenantScope fail-closed empêche de trouver la ligne 411 du tenant B
-        // depuis le contexte tenant A → InvalidArgumentException "pas de ligne 411 valide".
         $threw = true;
     }
 
@@ -465,9 +435,10 @@ test('pourEncaissementCreance produit T2 equilibree=TRUE, type_ecriture=normale,
 });
 
 // ---------------------------------------------------------------------------
-// Cas 10 : Tiers porté sur les 2 lignes de T2 (411 ET portage)
+// Cas 10 (révisé) : Tiers UNIQUEMENT sur la ligne 411 C de T2 (FEC-conformité)
+// La ligne 5xx D ne porte plus de tiers dans l'école 411 systématique
 // ---------------------------------------------------------------------------
-test('pourEncaissementCreance : tiers porté sur les 2 lignes de T2 (portage et 411)', function () {
+test('pourEncaissementCreance : tiers porté sur la ligne 411 C seulement, pas sur 5xx', function () {
     $transactionCreance = creerCreance(130.00, 'CI');
 
     $compte411 = compteSystemeEnc('411');
@@ -486,11 +457,38 @@ test('pourEncaissementCreance : tiers porté sur les 2 lignes de T2 (portage et 
         datePaiement: new DateTimeImmutable('2026-05-25'),
     );
 
-    // Ligne portage (5112) : tiers_id non null
+    // Ligne portage (5112) : tiers_id NULL (FEC-conformité)
     $lignePortage = $t2->lignes->firstWhere('compte_id', $compte5112->id);
-    expect((int) $lignePortage->tiers_id)->toBe((int) $tiers->id, 'Le tiers doit être porté sur la ligne 5112');
+    expect($lignePortage->tiers_id)->toBeNull('Le tiers NE DOIT PAS être sur la ligne 5112 (FEC)');
 
-    // Ligne 411 : tiers_id non null
+    // Ligne 411 C : tiers_id non null
     $ligne411 = $t2->lignes->firstWhere('compte_id', $compte411->id);
-    expect((int) $ligne411->tiers_id)->toBe((int) $tiers->id, 'Le tiers doit être porté sur la ligne 411');
+    expect((int) $ligne411->tiers_id)->toBe((int) $tiers->id, 'Le tiers doit être sur la ligne 411 C');
+});
+
+// ---------------------------------------------------------------------------
+// Cas 11 : assertPasDeTiersSurClasse5 — vérification globale sur T2
+// ---------------------------------------------------------------------------
+test('pourEncaissementCreance : aucune ligne classe 5 de T2 ne porte de tiers', function () {
+    $transactionCreance = creerCreance(60.00, 'CJ');
+
+    $compteTresorerie = compte512Enc('BNP10');
+
+    $generator = app(EcritureGenerator::class);
+
+    $t2 = $generator->pourEncaissementCreance(
+        transactionCreance: $transactionCreance,
+        mode: ModePaiement::Cheque,
+        compteTresorerie: $compteTresorerie,
+        datePaiement: new DateTimeImmutable('2026-05-25'),
+    );
+
+    foreach ($t2->lignes as $ligne) {
+        $compte = Compte::find($ligne->compte_id);
+        if ($compte->classe === 5) {
+            expect($ligne->tiers_id)->toBeNull(
+                "Ligne {$compte->numero_pcg} (classe 5) ne doit pas porter de tiers"
+            );
+        }
+    }
 });

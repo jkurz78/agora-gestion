@@ -822,13 +822,14 @@ final class EcritureGenerator
                 modePaiement: $mode,
             );
 
-            // Ligne 1 : débit portage (5112 / 530 / 512X) avec tiers
+            // Ligne 1 : débit portage (5112 / 530 / 512X) SANS tiers — FEC-conformité
+            // Le tiers vit exclusivement sur les comptes 411/401 (école 411 systématique).
             $lignePortage = TransactionLigne::create([
                 'transaction_id' => $t2->id,
                 'compte_id' => $comptePortage->id,
                 'debit' => $montant,
                 'credit' => 0,
-                'tiers_id' => $tiers->id,
+                'tiers_id' => null,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
                 'sous_categorie_id' => null,
@@ -852,6 +853,7 @@ final class EcritureGenerator
             $lignes = collect([$lignePortage, $ligne411Encaissement]);
             $this->assertEquilibre($lignes);
             $this->assertTiersObligatoire411($lignes);
+            $this->assertPasDeTiersSurClasse5($lignes);
 
             // --- Auto-lettrage paire 411 : T1-ligne411 ↔ T2-ligne411 ---
             $this->lettrageService->lettrer(
