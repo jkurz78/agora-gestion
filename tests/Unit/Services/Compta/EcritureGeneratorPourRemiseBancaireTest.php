@@ -84,8 +84,8 @@ function creerCompteBancaireAvec512(): array
 }
 
 /**
- * Crée une ligne 5112 source (T1 chèque) via pourRecetteComptant.
- * Retourne la ligne 5112 débit de T1.
+ * Crée une ligne 5112 source (T1 chèque) via pourRecetteComptant (signature multi-ventilation).
+ * Retourne la ligne 5112 débit de T1 (sans tiers — école 411 systématique).
  */
 function creerLigne5112Source(Tiers $tiers, float $montant, Compte $compteBancaire512): TransactionLigne
 {
@@ -94,22 +94,21 @@ function creerLigne5112Source(Tiers $tiers, float $montant, Compte $compteBancai
 
     $t1 = $generator->pourRecetteComptant(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: $montant,
+        ventilations: [['compte' => $compteProduit, 'montant' => $montant]],
         mode: ModePaiement::Cheque,
         compteTresorerie: $compteBancaire512,
         date: new DateTimeImmutable('2026-05-20'),
         libelle: 'Recette chèque test',
     );
 
-    // La ligne 5112 débit est la ligne portage (débit avec tiers)
     $compte5112 = compteSystemeRem('5112');
 
     return $t1->lignes->firstWhere('compte_id', $compte5112->id);
 }
 
 /**
- * Crée une ligne 530 source (T1 espèces) via pourRecetteComptant.
+ * Crée une ligne 530 source (T1 espèces) via pourRecetteComptant (signature multi-ventilation).
+ * Retourne la ligne 530 débit de T1 (sans tiers — école 411 systématique).
  */
 function creerLigne530Source(Tiers $tiers, float $montant, Compte $compteBancaire512): TransactionLigne
 {
@@ -118,8 +117,7 @@ function creerLigne530Source(Tiers $tiers, float $montant, Compte $compteBancair
 
     $t1 = $generator->pourRecetteComptant(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: $montant,
+        ventilations: [['compte' => $compteProduit, 'montant' => $montant]],
         mode: ModePaiement::Especes,
         compteTresorerie: $compteBancaire512,
         date: new DateTimeImmutable('2026-05-20'),
@@ -173,7 +171,7 @@ beforeEach(function () {
 // ---------------------------------------------------------------------------
 // Cas 1 : Scénario plan — remise 3 chèques (Pierre 50, Paul 30, Jeanne 20) sur 512BNP
 // ---------------------------------------------------------------------------
-test('pourRemiseBancaire crée T4 avec 4 lignes (1 D 512 + 3 C 5112 par tiers) + auto-lettrage', function () {
+test('pourRemiseBancaire crée T4 avec 4 lignes (1 D 512 + 3 C 5112 sans tiers) + auto-lettrage 1↔1', function () {
     [$compteBancaire, $compte512] = creerCompteBancaireAvec512();
     $remise = creerRemise($compteBancaire, ModePaiement::Cheque);
 
@@ -197,7 +195,7 @@ test('pourRemiseBancaire crée T4 avec 4 lignes (1 D 512 + 3 C 5112 par tiers) +
     expect($t4)->toBeInstanceOf(Transaction::class);
     expect($t4->lignes)->toHaveCount(4);
 
-    // Ligne 512 D 100 sans tiers
+    // Ligne 512 D 100 sans tiers, non lettrée (rappro bancaire à venir)
     $ligne512 = $t4->lignes->firstWhere('compte_id', $compte512->id);
     expect($ligne512)->not->toBeNull('Ligne 512 D attendue');
     expect((float) $ligne512->debit)->toBe(100.00);
@@ -205,46 +203,36 @@ test('pourRemiseBancaire crée T4 avec 4 lignes (1 D 512 + 3 C 5112 par tiers) +
     expect($ligne512->tiers_id)->toBeNull('Ligne 512 ne doit pas porter de tiers');
     expect($ligne512->lettrage_code)->toBeNull('Ligne 512 ne doit pas être lettrée');
 
-    // 3 lignes 5112 C (une par tiers)
+    // 3 lignes 5112 C (une par ligne source, 1↔1) — école 411 systématique : pas de tiers sur 5112
     $lignes5112T4 = $t4->lignes->where('compte_id', $compte5112->id);
     expect($lignes5112T4)->toHaveCount(3);
 
-    // Vérifier que chaque tiers a sa ligne avec le bon montant
-    $lPierreT4 = $lignes5112T4->firstWhere('tiers_id', $pierre->id);
-    $lPaulT4 = $lignes5112T4->firstWhere('tiers_id', $paul->id);
-    $lJeanneT4 = $lignes5112T4->firstWhere('tiers_id', $jeanne->id);
+    foreach ($lignes5112T4 as $ligne) {
+        expect($ligne->tiers_id)->toBeNull('Ligne 5112 C ne doit pas porter de tiers (école 411 systématique)');
+        expect($ligne->lettrage_code)->not->toBeNull('Ligne 5112 C doit être lettrée');
+    }
 
-    expect($lPierreT4)->not->toBeNull();
-    expect((float) $lPierreT4->credit)->toBe(50.00);
-    expect($lPierreT4->lettrage_code)->not->toBeNull('Ligne 5112 Pierre T4 doit être lettrée');
+    // Les 3 lignes T4 ont 3 codes distincts
+    $codes = $lignes5112T4->pluck('lettrage_code')->unique();
+    expect($codes->count())->toBe(3, '3 codes lettrage distincts (1 par paire)');
 
-    expect($lPaulT4)->not->toBeNull();
-    expect((float) $lPaulT4->credit)->toBe(30.00);
-    expect($lPaulT4->lettrage_code)->not->toBeNull('Ligne 5112 Paul T4 doit être lettrée');
-
-    expect($lJeanneT4)->not->toBeNull();
-    expect((float) $lJeanneT4->credit)->toBe(20.00);
-    expect($lJeanneT4->lettrage_code)->not->toBeNull('Ligne 5112 Jeanne T4 doit être lettrée');
-
-    // Les codes des 3 tiers sont distincts
-    expect($lPierreT4->lettrage_code)->not->toBe($lPaulT4->lettrage_code);
-    expect($lPierreT4->lettrage_code)->not->toBe($lJeanneT4->lettrage_code);
-    expect($lPaulT4->lettrage_code)->not->toBe($lJeanneT4->lettrage_code);
-
-    // Les lignes sources entrantes partagent le même code que leur ligne T4 respective
+    // Chaque ligne source partage son code avec exactement une ligne T4 de même montant
     $lignePierre->refresh();
     $lignePaul->refresh();
     $ligneJeanne->refresh();
 
-    expect($lignePierre->lettrage_code)->toBe($lPierreT4->lettrage_code);
-    expect($lignePaul->lettrage_code)->toBe($lPaulT4->lettrage_code);
-    expect($ligneJeanne->lettrage_code)->toBe($lJeanneT4->lettrage_code);
+    foreach ([[$lignePierre, 50.00], [$lignePaul, 30.00], [$ligneJeanne, 20.00]] as [$source, $montant]) {
+        expect($source->lettrage_code)->not->toBeNull("Ligne source #{$source->id} doit être lettrée");
+        $ligneT4 = $lignes5112T4->firstWhere('lettrage_code', $source->lettrage_code);
+        expect($ligneT4)->not->toBeNull("Code {$source->lettrage_code} attendu sur une ligne T4");
+        expect((float) $ligneT4->credit)->toBe($montant, "Ligne T4 lettrée à #{$source->id} doit avoir le même montant");
+    }
 });
 
 // ---------------------------------------------------------------------------
-// Cas 2 : Plusieurs chèques du même tiers → regroupés sous un même code
+// Cas 2 : Plusieurs chèques du même tiers → 1 ligne T4 par source (école 411), codes distincts
 // ---------------------------------------------------------------------------
-test('pourRemiseBancaire groupe les cheques du meme tiers sous un code commun', function () {
+test('pourRemiseBancaire : plusieurs chèques même tiers → 1 ligne T4 par chèque, codes distincts (école 411 systématique)', function () {
     [$compteBancaire, $compte512] = creerCompteBancaireAvec512();
     $remise = creerRemise($compteBancaire, ModePaiement::Cheque);
 
@@ -264,37 +252,40 @@ test('pourRemiseBancaire groupe les cheques du meme tiers sous un code commun', 
         collect([$lignePierre1, $lignePierre2, $lignePaul])
     );
 
-    // T4 doit avoir 3 lignes : 1 D 512 + 2 C 5112 (1 par tiers groupé)
-    expect($t4->lignes)->toHaveCount(3);
+    // T4 doit avoir 4 lignes : 1 D 512 + 3 C 5112 (1 par chèque source, pas de groupement)
+    expect($t4->lignes)->toHaveCount(4);
 
     $lignes5112T4 = $t4->lignes->where('compte_id', $compte5112->id);
-    expect($lignes5112T4)->toHaveCount(2, '1 ligne 5112 par tiers groupé');
+    expect($lignes5112T4)->toHaveCount(3, '1 ligne 5112 par ligne source (pas de groupement par tiers)');
 
-    // Ligne Pierre T4 = sous-total 80
-    $lPierreT4 = $lignes5112T4->firstWhere('tiers_id', $pierre->id);
-    expect((float) $lPierreT4->credit)->toBe(80.00);
+    // Aucune ligne 5112 ne porte de tiers
+    foreach ($lignes5112T4 as $ligne) {
+        expect($ligne->tiers_id)->toBeNull('Ligne 5112 C ne doit pas porter de tiers');
+    }
 
-    // Ligne Paul T4 = 20
-    $lPaulT4 = $lignes5112T4->firstWhere('tiers_id', $paul->id);
-    expect((float) $lPaulT4->credit)->toBe(20.00);
+    // Les 3 lignes T4 ont 3 codes distincts (même les 2 chèques de Pierre)
+    $codes = $lignes5112T4->pluck('lettrage_code')->unique();
+    expect($codes->count())->toBe(3, '3 codes distincts pour 3 sources (école 411 systématique)');
 
-    // Les 2 lignes Pierre entrantes + 1 sortante T4 partagent le même code
+    // Chaque source partage son code avec exactement une ligne T4 de même montant
     $lignePierre1->refresh();
     $lignePierre2->refresh();
     $lignePaul->refresh();
 
     expect($lignePierre1->lettrage_code)->not->toBeNull();
-    expect($lignePierre1->lettrage_code)->toBe($lignePierre2->lettrage_code);
-    expect($lignePierre1->lettrage_code)->toBe($lPierreT4->lettrage_code);
+    expect($lignePierre2->lettrage_code)->not->toBeNull();
+    expect($lignePaul->lettrage_code)->not->toBeNull();
 
-    expect($lignePaul->lettrage_code)->toBe($lPaulT4->lettrage_code);
+    // Les 3 sources ont 3 codes distincts (1↔1 strict)
+    expect($lignePierre1->lettrage_code)->not->toBe($lignePierre2->lettrage_code);
     expect($lignePierre1->lettrage_code)->not->toBe($lignePaul->lettrage_code);
+    expect($lignePierre2->lettrage_code)->not->toBe($lignePaul->lettrage_code);
 });
 
 // ---------------------------------------------------------------------------
-// Cas 3 : Solde ouvert 5112 par tiers = 0 après remise
+// Cas 3 : Solde ouvert 5112 = 0 après remise (école 411 systématique : pas de tiers sur 5112)
 // ---------------------------------------------------------------------------
-test('pourRemiseBancaire : solde ouvert 5112 par tiers = 0 après remise', function () {
+test('pourRemiseBancaire : solde ouvert 5112 = 0 après remise (lettrage par paire 1↔1)', function () {
     [$compteBancaire, $compte512] = creerCompteBancaireAvec512();
     $remise = creerRemise($compteBancaire, ModePaiement::Cheque);
 
@@ -306,12 +297,11 @@ test('pourRemiseBancaire : solde ouvert 5112 par tiers = 0 après remise', funct
     $lignePierre = creerLigne5112Source($pierre, 75.00, $compte512);
     $lignePaul = creerLigne5112Source($paul, 25.00, $compte512);
 
-    // Avant remise : solde 5112 Pierre = 75 (débit ouvert)
-    $soldePierreAvant = TransactionLigne::where('compte_id', $compte5112->id)
-        ->where('tiers_id', $pierre->id)
+    // Avant remise : solde 5112 global = 100 (les 2 chèques en attente)
+    $soldeAvant = TransactionLigne::where('compte_id', $compte5112->id)
         ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS solde')
         ->value('solde');
-    expect((float) $soldePierreAvant)->toBe(75.00);
+    expect((float) $soldeAvant)->toBe(100.00);
 
     $generator = app(EcritureGenerator::class);
 
@@ -320,19 +310,18 @@ test('pourRemiseBancaire : solde ouvert 5112 par tiers = 0 après remise', funct
         collect([$lignePierre, $lignePaul])
     );
 
-    // Après remise : solde 5112 Pierre = 0
-    $soldePierreApres = TransactionLigne::where('compte_id', $compte5112->id)
-        ->where('tiers_id', $pierre->id)
+    // Après remise : solde 5112 global = 0 (toutes les paires lettrées)
+    $soldeApres = TransactionLigne::where('compte_id', $compte5112->id)
         ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS solde')
         ->value('solde');
-    expect((float) $soldePierreApres)->toBe(0.00);
+    expect((float) $soldeApres)->toBe(0.00);
 
-    // Solde 5112 Paul = 0 aussi
-    $soldePaulApres = TransactionLigne::where('compte_id', $compte5112->id)
-        ->where('tiers_id', $paul->id)
+    // Solde ouvert 5112 (lignes non lettrées seulement) = 0
+    $soldeOuvert = TransactionLigne::where('compte_id', $compte5112->id)
+        ->whereNull('lettrage_code')
         ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS solde')
         ->value('solde');
-    expect((float) $soldePaulApres)->toBe(0.00);
+    expect((float) $soldeOuvert)->toBe(0.00);
 });
 
 // ---------------------------------------------------------------------------
@@ -421,7 +410,7 @@ test('pourRemiseBancaire produit T4 equilibree=TRUE, type_ecriture=normale, mode
 // ---------------------------------------------------------------------------
 // Cas 6 : Remise espèces — portage 530, compte cible 512X
 // ---------------------------------------------------------------------------
-test('pourRemiseBancaire espèces : portage 530, cible 512X', function () {
+test('pourRemiseBancaire espèces : portage 530, cible 512X, lignes 530 C sans tiers', function () {
     [$compteBancaire, $compte512] = creerCompteBancaireAvec512();
     $remise = creerRemise($compteBancaire, ModePaiement::Especes);
 
@@ -441,7 +430,7 @@ test('pourRemiseBancaire espèces : portage 530, cible 512X', function () {
     );
 
     expect($t4)->toBeInstanceOf(Transaction::class);
-    // 3 lignes : 1 D 512 + 2 C 530
+    // 3 lignes : 1 D 512 + 2 C 530 (1 par source)
     expect($t4->lignes)->toHaveCount(3);
 
     // Ligne 512 D 100, sans tiers
@@ -449,17 +438,17 @@ test('pourRemiseBancaire espèces : portage 530, cible 512X', function () {
     expect((float) $ligne512->debit)->toBe(100.00);
     expect($ligne512->tiers_id)->toBeNull();
 
-    // Lignes 530 C (une par tiers) avec tiers
+    // Lignes 530 C (une par ligne source) sans tiers (école 411 systématique)
     $lignes530T4 = $t4->lignes->where('compte_id', $compte530->id);
     expect($lignes530T4)->toHaveCount(2);
 
-    $lPierreT4 = $lignes530T4->firstWhere('tiers_id', $pierre->id);
-    expect((float) $lPierreT4->credit)->toBe(40.00);
-    expect($lPierreT4->lettrage_code)->not->toBeNull();
+    foreach ($lignes530T4 as $ligne) {
+        expect($ligne->tiers_id)->toBeNull('Ligne 530 C ne doit pas porter de tiers (école 411 systématique)');
+        expect($ligne->lettrage_code)->not->toBeNull('Ligne 530 C doit être lettrée');
+    }
 
-    $lPaulT4 = $lignes530T4->firstWhere('tiers_id', $paul->id);
-    expect((float) $lPaulT4->credit)->toBe(60.00);
-    expect($lPaulT4->lettrage_code)->not->toBeNull();
+    $montants = $lignes530T4->pluck('credit')->map(fn ($c) => (float) $c)->sort()->values()->all();
+    expect($montants)->toBe([40.00, 60.00], 'Montants des 2 lignes 530 C correspondent aux sources');
 
     expect($t4->mode_paiement)->toBe(ModePaiement::Especes);
 });
@@ -519,44 +508,9 @@ test('pourRemiseBancaire lève InvalidArgumentException si lignes sources vides'
 });
 
 // ---------------------------------------------------------------------------
-// Cas 9 : Une ligne source sans tiers_id → \InvalidArgumentException
+// Cas 9 supprimé 2026-05-22 : en école 411 systématique, les lignes 5112 sources
+// n'ont plus de tiers — la validation « tiers obligatoire sur source » a disparu.
 // ---------------------------------------------------------------------------
-test('pourRemiseBancaire lève InvalidArgumentException si une ligne source est sans tiers_id', function () {
-    [$compteBancaire, $compte512] = creerCompteBancaireAvec512();
-    $remise = creerRemise($compteBancaire, ModePaiement::Cheque);
-
-    $pierre = tiersRem();
-    $compte5112 = compteSystemeRem('5112');
-
-    $lignePierre = creerLigne5112Source($pierre, 50.00, $compte512);
-
-    // Ligne 5112 SANS tiers_id
-    $ligneAnon = TransactionLigne::create([
-        'transaction_id' => Transaction::create([
-            'association_id' => TenantContext::currentId(),
-            'type' => TypeTransaction::Recette,
-            'date' => '2026-05-20',
-            'libelle' => 'Anon',
-            'montant_total' => 30,
-            'equilibree' => false,
-            'type_ecriture' => 'normale',
-        ])->id,
-        'compte_id' => $compte5112->id,
-        'debit' => 30,
-        'credit' => 0,
-        'tiers_id' => null,
-        'libelle' => 'Anon',
-        'montant' => 0,
-        'sous_categorie_id' => null,
-    ]);
-
-    $generator = app(EcritureGenerator::class);
-
-    expect(fn () => $generator->pourRemiseBancaire(
-        $remise,
-        collect([$lignePierre, $ligneAnon])
-    ))->toThrow(InvalidArgumentException::class);
-});
 
 // ---------------------------------------------------------------------------
 // Cas 10 : Lignes sources sur comptes différents → \InvalidArgumentException

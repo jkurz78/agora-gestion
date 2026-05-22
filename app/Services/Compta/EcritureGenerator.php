@@ -1223,14 +1223,18 @@ final class EcritureGenerator
      *   Especes → portage = 530  (Caisse)
      *   Autres  → \InvalidArgumentException
      *
+     * Révisée 2026-05-22 (école 411 systématique) : ni les lignes sources 5112/530
+     * ni les lignes de remise ne portent de tiers (cf. §4.2 invariant 5 amendé). Le
+     * splittage par tiers (Variante 2a) est abandonné — on crée 1 ligne 5112/530 C
+     * par ligne source (1↔1, lettrage par paire). La traçabilité par tiers passe
+     * en amont par la transaction T1 source qui contient une ligne 411 avec tiers.
+     *
      * @param  RemiseBancaire  $remise  La remise bancaire source (mode_paiement + compte_cible_id).
      * @param  Collection<int, TransactionLigne>  $lignes5112Sources  Lignes sur 5112 ou 530,
-     *                                                                toutes avec tiers_id non null,
-     *                                                                non lettrées.
+     *                                                                sans tiers, non lettrées.
      * @return Transaction T4 créée avec N+1 lignes équilibrées.
      *
      * @throws \InvalidArgumentException Si $lignes5112Sources est vide,
-     *                                   ou si une ligne source est sans tiers_id,
      *                                   ou si les lignes sources sont sur des comptes différents,
      *                                   ou si le mode de la remise n'est pas Cheque/Especes.
      * @throws CompteIncorrectException Si le compte cible résolu n'est pas un 512X bancaire physique.
@@ -1247,15 +1251,6 @@ final class EcritureGenerator
             throw new \InvalidArgumentException(
                 'La collection de lignes sources pour la remise bancaire ne peut pas être vide.'
             );
-        }
-
-        // --- Validation : toutes les lignes sources ont un tiers_id ---
-        foreach ($lignes5112Sources as $ligne) {
-            if ($ligne->tiers_id === null) {
-                throw new \InvalidArgumentException(
-                    "La ligne #{$ligne->id} n'a pas de tiers_id — une remise bancaire ne peut pas avoir de lignes anonymes."
-                );
-            }
         }
 
         // --- Validation : toutes les lignes sources sont sur le même compte ---
@@ -1312,20 +1307,16 @@ final class EcritureGenerator
         $this->assertTenantCoherence($lignes5112Sources);
 
         // --- Recharger les lignes sources depuis la DB pour avoir lettrage_code à jour ---
-        // Les objets passés peuvent être stale si leur lettrage_code a été modifié entre
-        // leur création et cet appel. LettrageService::assertPasDeRelettrage vérifie
-        // l'objet PHP → on garantit l'état frais en rechargeant depuis la DB.
         $ids = $lignes5112Sources->pluck('id')->all();
         $lignesSourcesFraiches = TransactionLigne::whereIn('id', $ids)->get();
 
-        // --- Calcul du total et groupement par tiers (sur les lignes fraîches) ---
+        // --- Calcul du total ---
         $total = (float) $lignesSourcesFraiches->sum(fn (TransactionLigne $l): float => (float) $l->debit);
-        $groupesParTiers = $this->regrouperParTiers($lignesSourcesFraiches);
 
         // --- Création dans une transaction DB ---
         return DB::transaction(function () use (
             $remise, $comptePortage, $compteCible512,
-            $total, $groupesParTiers, $mode
+            $total, $lignesSourcesFraiches, $mode
         ): Transaction {
             $libelle = $remise->libelle ?? "Remise bancaire #{$remise->id}";
 
@@ -1352,33 +1343,29 @@ final class EcritureGenerator
             ]);
             $ligne512->setRelation('compte', $compteCible512);
 
-            // --- N lignes portage crédit (une par tiers groupé), AVEC tiers ---
+            // --- N lignes portage crédit (une par ligne source, 1↔1, SANS tiers) ---
             $idsLignesT4 = [$ligne512->id];
 
-            foreach ($groupesParTiers as $groupe) {
-                $tiersId = $groupe['tiers_id'];
-                $sousTotal = $groupe['sousTotal'];
-                $lignesSourcesTiers = $groupe['lignes'];
+            foreach ($lignesSourcesFraiches as $ligneSource) {
+                $montantSource = (float) $ligneSource->debit;
 
-                $lignePortageTiers = TransactionLigne::create([
+                $lignePortage = TransactionLigne::create([
                     'transaction_id' => $t4->id,
                     'compte_id' => $comptePortage->id,
                     'debit' => 0,
-                    'credit' => $sousTotal,
-                    'tiers_id' => $tiersId,
+                    'credit' => $montantSource,
+                    'tiers_id' => null,
                     'libelle' => $libelle,
                     'montant' => 0,
                     'sous_categorie_id' => null,
                 ]);
-                $idsLignesT4[] = $lignePortageTiers->id;
+                $idsLignesT4[] = $lignePortage->id;
 
-                // --- Auto-lettrage par groupe-tiers ---
-                // Lettrer : lignes sources fraîches du tiers + ligne T4 crédit du tiers
-                // lignesSourcesTiers->push() crée une nouvelle collection (immutable-like)
+                // --- Auto-lettrage paire : ligne source ↔ ligne T4 (1↔1) ---
                 $this->lettrageService->lettrer(
-                    $lignesSourcesTiers->values()->push($lignePortageTiers),
+                    collect([$ligneSource, $lignePortage]),
                     null,
-                    "Auto-lettrage remise bancaire #{$remise->id} pour tiers #{$tiersId}"
+                    "Auto-lettrage remise bancaire #{$remise->id} ligne source #{$ligneSource->id}"
                 );
             }
 
@@ -1394,13 +1381,7 @@ final class EcritureGenerator
 
             // --- Vérifications post-création (paranoïa) ---
             $this->assertEquilibre($lignesT4);
-
-            // assertPasDeTiersSurClasse5 : exercé sur la ligne 512 D (sans tiers, voulu).
-            // NB : à la révision Step 20 (école 411 systématique amendée 2026-05-22),
-            // les lignes 5112 C de remise n'auront plus de tiers non plus, et l'invariant
-            // pourra être exercé sur l'ensemble des lignes T4.
-            $ligne512Rechargee = $lignesT4->firstWhere('compte_id', $compteCible512->id);
-            $this->assertPasDeTiersSurClasse5(collect([$ligne512Rechargee]));
+            $this->assertPasDeTiersSurClasse5($lignesT4);
 
             $t4->setRelation('lignes', $lignesT4);
 
@@ -1418,31 +1399,5 @@ final class EcritureGenerator
     public function generateLettrageCode(): string
     {
         return Str::random(20);
-    }
-
-    // =========================================================================
-    // Helpers privés — Remise bancaire
-    // =========================================================================
-
-    /**
-     * Regroupe les lignes de portage sources par tiers_id et calcule le sous-total.
-     *
-     * @param  Collection<int, TransactionLigne>  $lignes
-     * @return Collection<int, array{tiers_id: int, lignes: Collection<int, TransactionLigne>, sousTotal: float}>
-     */
-    private function regrouperParTiers(Collection $lignes): Collection
-    {
-        return $lignes
-            ->groupBy(fn (TransactionLigne $l): int => (int) $l->tiers_id)
-            ->map(function (Collection $group, int $tiersId): array {
-                $sousTotal = (float) $group->sum(fn (TransactionLigne $l): float => (float) $l->debit);
-
-                return [
-                    'tiers_id' => $tiersId,
-                    'lignes' => $group,
-                    'sousTotal' => $sousTotal,
-                ];
-            })
-            ->values();
     }
 }
