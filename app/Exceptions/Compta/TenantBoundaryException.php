@@ -12,4 +12,11 @@ final class TenantBoundaryException extends \RuntimeException
             "La ligne #{$ligneId} appartient au tenant #{$ligneAssociationId} mais le contexte courant est le tenant #{$currentTenantId}."
         );
     }
+
+    public static function crossTenantTiers(int $tiersId, int $tiersAssociationId, int $currentTenantId): self
+    {
+        return new self(
+            "Le tiers #{$tiersId} appartient au tenant #{$tiersAssociationId} mais le contexte courant est le tenant #{$currentTenantId}."
+        );
+    }
 }
