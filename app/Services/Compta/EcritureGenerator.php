@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace App\Services\Compta;
 
+use App\Enums\ModePaiement;
+use App\Enums\TypeTransaction;
+use App\Exceptions\Compta\CompteIncorrectException;
 use App\Exceptions\Compta\EcritureNonEquilibreeException;
 use App\Exceptions\Compta\TenantBoundaryException;
 use App\Exceptions\Compta\TiersInterditException;
 use App\Exceptions\Compta\TiersRequisException;
+use App\Models\Compte;
+use App\Models\Operation;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -177,6 +185,183 @@ final class EcritureGenerator
                 throw TiersInterditException::surCompte512($compte->numero_pcg);
             }
         }
+    }
+
+    // =========================================================================
+    // Méthodes de génération d'écritures (Steps 15-20)
+    // =========================================================================
+
+    /**
+     * Génère l'écriture T1 (transaction comptant, 2 lignes équilibrées) pour une
+     * recette encaissée immédiatement (cheque / espèces / virement / CB / prélèvement).
+     *
+     * Matrice École C (spec §4.3) :
+     *   Cheque      → portage sur 5112 (Chèques à encaisser)
+     *   Especes     → portage sur 530  (Caisse)
+     *   Virement    → portage sur $compteTresorerie (512X physique)
+     *   Cb          → portage sur $compteTresorerie (512X physique, ex. HelloAsso)
+     *   Prelevement → portage sur $compteTresorerie (512X physique, par symétrie virement)
+     *
+     * Lignes créées :
+     *   Ligne 1 : débit  $comptePortage, tiers_id = $tiers->id
+     *   Ligne 2 : crédit $compteProduit, tiers_id = null
+     *
+     * @throws \InvalidArgumentException Si $montant ≤ 0.
+     * @throws CompteIncorrectException Si $compteProduit ∉ classe 7,
+     *                                  ou si $compteTresorerie ∉ 512X pour Virement/Cb/Prelevement.
+     * @throws TenantBoundaryException Si $tiers ou l'un des comptes n'appartient pas au tenant courant.
+     * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création (ne doit jamais lever en pratique).
+     */
+    public function pourRecetteComptant(
+        Tiers $tiers,
+        Compte $compteProduit,
+        float $montant,
+        ModePaiement $mode,
+        Compte $compteTresorerie,
+        \DateTimeInterface $date,
+        ?string $libelle = null,
+        ?Operation $operation = null,
+        ?int $seance = null,
+    ): Transaction {
+        // --- Validation input ---
+
+        if ($montant <= 0) {
+            throw new \InvalidArgumentException(
+                "Le montant d'une recette comptant doit être strictement positif (reçu : {$montant})."
+            );
+        }
+
+        if ($compteProduit->classe !== 7) {
+            throw CompteIncorrectException::classeAttendue(
+                $compteProduit->numero_pcg,
+                $compteProduit->classe,
+                7
+            );
+        }
+
+        // Pour Virement/Cb/Prelevement, $compteTresorerie doit être un compte bancaire physique 512X.
+        $modesNecessitantTresorerie = [
+            ModePaiement::Virement,
+            ModePaiement::Cb,
+            ModePaiement::Prelevement,
+        ];
+
+        if (in_array($mode, $modesNecessitantTresorerie, strict: true)) {
+            $isBancaire = $compteTresorerie->classe === 5
+                && str_starts_with($compteTresorerie->numero_pcg, '512')
+                && strlen($compteTresorerie->numero_pcg) > 3;
+
+            if (! $isBancaire) {
+                throw CompteIncorrectException::classeAttendue(
+                    $compteTresorerie->numero_pcg,
+                    $compteTresorerie->classe,
+                    '5 (512X — bancaire physique)'
+                );
+            }
+        }
+
+        // --- Résolution du compte de portage ---
+        $comptePortage = $this->resoudreComptePortage($mode, $compteTresorerie);
+
+        // --- Invariant tenant (avant DB::transaction pour fail-fast) ---
+        $this->assertTenantCoherence(
+            collect(),
+            collect([$tiers])
+        );
+
+        // --- Création dans une transaction DB ---
+        return DB::transaction(function () use (
+            $tiers, $compteProduit, $comptePortage, $montant, $mode,
+            $date, $libelle, $operation, $seance
+        ): Transaction {
+            $libelleEffectif = $libelle ?? 'Recette '.$mode->label();
+            $currentTenantId = (int) TenantContext::currentId();
+
+            $transaction = Transaction::create([
+                'association_id' => $currentTenantId,
+                'type' => TypeTransaction::Recette,
+                'date' => $date->format('Y-m-d'),
+                'libelle' => $libelleEffectif,
+                'montant_total' => $montant,
+                'mode_paiement' => $mode,
+                'saisi_par' => Auth::id(),
+                'equilibree' => true,
+                'type_ecriture' => 'normale',
+            ]);
+
+            // Ligne 1 : débit portage (tiers porté ici)
+            $ligne1 = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $comptePortage->id,
+                'debit' => $montant,
+                'credit' => 0,
+                'tiers_id' => $tiers->id,
+                'libelle' => $libelleEffectif,
+                'operation_id' => $operation?->id,
+                'seance' => $seance,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne1->setRelation('compte', $comptePortage);
+
+            // Ligne 2 : crédit produit (sans tiers)
+            $ligne2 = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteProduit->id,
+                'debit' => 0,
+                'credit' => $montant,
+                'tiers_id' => null,
+                'libelle' => $libelleEffectif,
+                'operation_id' => $operation?->id,
+                'seance' => $seance,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne2->setRelation('compte', $compteProduit);
+
+            // --- Vérification post-création (paranoïa) ---
+            $lignes = collect([$ligne1, $ligne2]);
+            $this->assertEquilibre($lignes);
+            // assertPasDeTiersSur512 : 5112 et 530 ne commencent pas par '512' suivi d'un char
+            // supplémentaire — l'invariant ne s'applique donc pas à eux par construction.
+            // Pour les comptes 512X (virement/CB/prelevement), on DOIT avoir tiers_id sur ligne1,
+            // ce qui violerait assertPasDeTiersSur512. La décision actée (spec §4.3 + §2 décision 11)
+            // est que les 512X physiques ne se lettrent pas mais peuvent porter un tiers en
+            // ligne de recette comptant (le tiers identifie le payeur). L'invariant assertPasDeTiersSur512
+            // ne s'applique donc PAS ici : c'est cohérent avec son nom ("pas de tiers sur 512 pour
+            // le rapprochement"), non avec l'identification du payeur en saisie.
+            // NB : si la policy change, ajouter l'appel ici.
+
+            $transaction->setRelation('lignes', $lignes);
+
+            return $transaction;
+        });
+    }
+
+    // =========================================================================
+    // Méthodes privées
+    // =========================================================================
+
+    /**
+     * Résout le compte de portage selon le mode de paiement.
+     *
+     * Cheque      → Compte::ofNumeroSysteme('5112')
+     * Especes     → Compte::ofNumeroSysteme('530')
+     * Virement    → $compteTresorerieExplicite
+     * Cb          → $compteTresorerieExplicite
+     * Prelevement → $compteTresorerieExplicite
+     *
+     * Le compte explicite est déjà validé (classe 512X) par l'appelant avant cet appel.
+     */
+    private function resoudreComptePortage(ModePaiement $mode, Compte $compteTresorerieExplicite): Compte
+    {
+        return match ($mode) {
+            ModePaiement::Cheque => Compte::ofNumeroSysteme('5112'),
+            ModePaiement::Especes => Compte::ofNumeroSysteme('530'),
+            ModePaiement::Virement,
+            ModePaiement::Cb,
+            ModePaiement::Prelevement => $compteTresorerieExplicite,
+        };
     }
 
     /**

@@ -47,6 +47,9 @@ final class Transaction extends TenantModel
         'helloasso_form_slug',
         'statut_reglement',
         'extournee_at',
+        // Partie double — ajoutés Step 15
+        'equilibree',
+        'type_ecriture',
     ];
 
     protected function casts(): array
@@ -67,6 +70,8 @@ final class Transaction extends TenantModel
             'helloasso_cashout_id' => 'integer',
             'helloasso_payment_id' => 'integer',
             'extournee_at' => 'datetime',
+            // Partie double — ajoutés Step 15
+            'equilibree' => 'boolean',
         ];
     }
 
