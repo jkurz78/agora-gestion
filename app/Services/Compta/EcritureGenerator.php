@@ -1090,13 +1090,14 @@ final class EcritureGenerator
             ]);
             $ligne401Reglement->setRelation('compte', $compte401);
 
-            // Ligne 2 : crédit trésorerie (tiers — décaissement effectif)
+            // Ligne 2 : crédit trésorerie (sans tiers — école 411 systématique,
+            // amendement 2026-05-22 : aucune ligne classe 5 ne porte de tiers, FEC)
             $lignePortage = TransactionLigne::create([
                 'transaction_id' => $t2->id,
                 'compte_id' => $comptePortage->id,
                 'debit' => 0,
                 'credit' => $montant,
-                'tiers_id' => $tiers->id,
+                'tiers_id' => null,
                 'libelle' => $libelleEffectif,
                 'montant' => 0,
                 'sous_categorie_id' => null,
@@ -1107,6 +1108,7 @@ final class EcritureGenerator
             $lignes = collect([$ligne401Reglement, $lignePortage]);
             $this->assertEquilibre($lignes);
             $this->assertTiersObligatoire411($lignes);
+            $this->assertPasDeTiersSurClasse5($lignes);
 
             // --- Auto-lettrage paire 401 : T1-ligne401 ↔ T2-ligne401 ---
             $this->lettrageService->lettrer(
