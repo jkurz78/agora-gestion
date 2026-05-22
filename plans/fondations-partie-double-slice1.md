@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b livrée en **première version 2026-05-22 (école directe)** mais **EN RÉVISION 2026-05-22** suite à amendement spec 411 systématique (cf. spec §amendement et § « Amendement 2026-05-22 — Révision Phase D » plus bas).
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 (1ʳᵉ version école directe + révision école 411 systématique le même jour, 8 commits de révision, suite 11 446 / 0 failed). Prêt pour reprise Step 21 (1c).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -63,7 +63,7 @@ Issus de la spec §10. Référence vers la spec pour le détail.
 | Sous-slice | Steps | Phases | Critère de complétude | Durée estimée |
 |---|---|---|---|---|
 | **1a — Data layer** ✅ | 1-11 | A + B + C | Toutes migrations passées, modèles `Compte` / `TransactionLigne` enrichi en place, suite Pest verte | ~3-4 jours |
-| **1b — Services partie double** ⚠ EN RÉVISION | 12-20 | D | `LettrageService` ✅ + `EcritureGenerator` à réviser suite amendement spec 2026-05-22 (école 411 systématique). Voir « Amendement 2026-05-22 — Révision Phase D » plus bas. | révision ~1-2 jours |
+| **1b — Services partie double** ✅ (révisée 2026-05-22) | 12-20 | D | `LettrageService` + `EcritureGenerator` complets école 411 systématique (FEC-conforme). Matrice École 411 testée. Suite Pest 11 446 / 0 failed. | ~6-9 jours réels (1ʳᵉ version + révision même jour) |
 | **1c — Branchements + rapports** | 21-31 | E + F + G | Tous écrans de saisie + rapports rebranchés sur le nouveau moteur, tests non-régression CR + rappro verts, suite Pest verte | ~5-7 jours |
 | **1d — Backfill + renommage + ops** | 32-44 | H + I + (J) + K | Backfill idempotent fonctionnel, codebase renommé, scripts ops finalisés, recette préprod jouée — **prêt cutover prod** | ~5-7 jours |
 
