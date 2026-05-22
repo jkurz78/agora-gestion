@@ -275,19 +275,13 @@ final class EcritureGenerator
             $date, $libelle, $operation, $seance
         ): Transaction {
             $libelleEffectif = $libelle ?? 'Recette '.$mode->label();
-            $currentTenantId = (int) TenantContext::currentId();
 
-            $transaction = Transaction::create([
-                'association_id' => $currentTenantId,
-                'type' => TypeTransaction::Recette,
-                'date' => $date->format('Y-m-d'),
-                'libelle' => $libelleEffectif,
-                'montant_total' => $montant,
-                'mode_paiement' => $mode,
-                'saisi_par' => Auth::id(),
-                'equilibree' => true,
-                'type_ecriture' => 'normale',
-            ]);
+            $transaction = $this->createTransactionHeader(
+                date: $date,
+                libelle: $libelleEffectif,
+                montant: $montant,
+                modePaiement: $mode,
+            );
 
             // Ligne 1 : débit portage (tiers porté ici)
             $ligne1 = TransactionLigne::create([
@@ -338,6 +332,110 @@ final class EcritureGenerator
         });
     }
 
+    /**
+     * Génère l'écriture T1 (créance ouverte) pour une recette constatée à crédit.
+     *
+     * Matrice École C (spec §4.3) — Recette à crédit :
+     *   T1 : 411 D X (tiers) / $compteProduit C X
+     *
+     * Pas de T2 ici : le règlement (encaissement) sera enregistré séparément
+     * via pourEncaissementCreance() (Step 17), qui créera T2 et lettra les
+     * lignes 411 de T1 et T2.
+     *
+     * mode_paiement est laissé à null : aucun paiement n'a encore eu lieu,
+     * la colonne est nullable depuis la migration 2026_04_05_100001.
+     *
+     * @throws \InvalidArgumentException Si $montant ≤ 0.
+     * @throws CompteIncorrectException Si $compteProduit ∉ classe 7.
+     * @throws TenantBoundaryException Si $tiers ou l'un des comptes n'appartient pas au tenant courant.
+     * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
+     */
+    public function pourRecetteACredit(
+        Tiers $tiers,
+        Compte $compteProduit,
+        float $montant,
+        \DateTimeInterface $dateConstatation,
+        ?string $libelle = null,
+        ?Operation $operation = null,
+    ): Transaction {
+        // --- Validation input ---
+
+        if ($montant <= 0) {
+            throw new \InvalidArgumentException(
+                "Le montant d'une recette à crédit doit être strictement positif (reçu : {$montant})."
+            );
+        }
+
+        if ($compteProduit->classe !== 7) {
+            throw CompteIncorrectException::classeAttendue(
+                $compteProduit->numero_pcg,
+                $compteProduit->classe,
+                7
+            );
+        }
+
+        // --- Résolution compte 411 (tenant-scopé automatiquement) ---
+        $compte411 = Compte::ofNumeroSysteme('411');
+
+        // --- Invariant tenant (fail-fast avant DB::transaction) ---
+        $this->assertTenantCoherence(
+            collect(),
+            collect([$tiers])
+        );
+
+        // --- Création dans une transaction DB ---
+        return DB::transaction(function () use (
+            $tiers, $compteProduit, $compte411, $montant,
+            $dateConstatation, $libelle, $operation
+        ): Transaction {
+            $libelleEffectif = $libelle ?? 'Recette à crédit';
+
+            $transaction = $this->createTransactionHeader(
+                date: $dateConstatation,
+                libelle: $libelleEffectif,
+                montant: $montant,
+                modePaiement: null,
+            );
+
+            // Ligne 1 : débit 411 (tiers porté ici — créance ouverte)
+            $ligne1 = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compte411->id,
+                'debit' => $montant,
+                'credit' => 0,
+                'tiers_id' => $tiers->id,
+                'libelle' => $libelleEffectif,
+                'operation_id' => $operation?->id,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne1->setRelation('compte', $compte411);
+
+            // Ligne 2 : crédit produit (sans tiers)
+            $ligne2 = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteProduit->id,
+                'debit' => 0,
+                'credit' => $montant,
+                'tiers_id' => null,
+                'libelle' => $libelleEffectif,
+                'operation_id' => $operation?->id,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne2->setRelation('compte', $compteProduit);
+
+            // --- Vérifications post-création (paranoïa) ---
+            $lignes = collect([$ligne1, $ligne2]);
+            $this->assertEquilibre($lignes);
+            $this->assertTiersObligatoire411($lignes); // doit passer par construction
+
+            $transaction->setRelation('lignes', $lignes);
+
+            return $transaction;
+        });
+    }
+
     // =========================================================================
     // Méthodes privées
     // =========================================================================
@@ -362,6 +460,31 @@ final class EcritureGenerator
             ModePaiement::Cb,
             ModePaiement::Prelevement => $compteTresorerieExplicite,
         };
+    }
+
+    /**
+     * Crée le header Transaction (sans lignes) partagé par les méthodes pour*().
+     *
+     * Centralise les champs invariants : association_id, type=Recette, equilibree=true,
+     * type_ecriture='normale', saisi_par. mode_paiement peut être null (recette à crédit).
+     */
+    private function createTransactionHeader(
+        \DateTimeInterface $date,
+        string $libelle,
+        float $montant,
+        ?ModePaiement $modePaiement,
+    ): Transaction {
+        return Transaction::create([
+            'association_id' => (int) TenantContext::currentId(),
+            'type' => TypeTransaction::Recette,
+            'date' => $date->format('Y-m-d'),
+            'libelle' => $libelle,
+            'montant_total' => $montant,
+            'mode_paiement' => $modePaiement,
+            'saisi_par' => Auth::id(),
+            'equilibree' => true,
+            'type_ecriture' => 'normale',
+        ]);
     }
 
     /**
