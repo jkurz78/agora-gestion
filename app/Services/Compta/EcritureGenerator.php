@@ -8,6 +8,7 @@ use App\Enums\ModePaiement;
 use App\Enums\TypeTransaction;
 use App\Exceptions\Compta\CompteIncorrectException;
 use App\Exceptions\Compta\EcritureNonEquilibreeException;
+use App\Exceptions\Compta\LettrageDejaPresentException;
 use App\Exceptions\Compta\TenantBoundaryException;
 use App\Exceptions\Compta\TiersInterditException;
 use App\Exceptions\Compta\TiersRequisException;
@@ -433,6 +434,125 @@ final class EcritureGenerator
             $transaction->setRelation('lignes', $lignes);
 
             return $transaction;
+        });
+    }
+
+    /**
+     * Génère l'écriture T2 (encaissement créance) pour une créance client ouverte.
+     *
+     * Matrice École C (spec §4.3) — Encaissement créance :
+     *   T2 : 5112 ou 530 ou 512X D (tiers) / 411 C (tiers)
+     *   + auto-lettrage de la paire 411 (ligne T1 + ligne T2)
+     *
+     * Prérequis : $transactionCreance est une T1 créée par pourRecetteACredit().
+     * Elle doit contenir une ligne 411 avec tiers_id non null et non lettrée.
+     *
+     * @throws \InvalidArgumentException Si T1 ne contient pas de ligne 411 valide.
+     * @throws LettrageDejaPresentException Si la ligne 411 source est déjà lettrée.
+     * @throws TenantBoundaryException Si les comptes/tiers n'appartiennent pas au tenant courant.
+     * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
+     */
+    public function pourEncaissementCreance(
+        Transaction $transactionCreance,
+        ModePaiement $mode,
+        Compte $compteTresorerie,
+        \DateTimeInterface $datePaiement,
+        ?string $libelle = null,
+    ): Transaction {
+        // --- Résolution compte 411 (tenant-scopé automatiquement) ---
+        $compte411 = Compte::ofNumeroSysteme('411');
+
+        // --- Résolution ligne 411 source dans T1 (toujours depuis la DB pour avoir l'état frais) ---
+        // On requête directement la DB pour garantir que lettrage_code est à jour
+        // (la relation en mémoire sur $transactionCreance peut être stale si mise à jour depuis l'extérieur).
+        $ligne411Source = TransactionLigne::where('transaction_id', $transactionCreance->id)
+            ->where('compte_id', $compte411->id)
+            ->first();
+
+        if ($ligne411Source === null || $ligne411Source->tiers_id === null) {
+            throw new \InvalidArgumentException(
+                "La transaction #{$transactionCreance->id} ne contient pas de ligne 411 avec un tiers — ce n'est pas une créance valide."
+            );
+        }
+
+        // --- Refus si ligne 411 source déjà lettrée (créance déjà encaissée) ---
+        if ($ligne411Source->lettrage_code !== null) {
+            throw LettrageDejaPresentException::forLigne(
+                (int) $ligne411Source->id,
+                $ligne411Source->lettrage_code
+            );
+        }
+
+        // --- Résolution tiers et compte de portage ---
+        /** @var Tiers $tiers */
+        $tiers = Tiers::findOrFail($ligne411Source->tiers_id);
+
+        $comptePortage = $this->resoudreComptePortage($mode, $compteTresorerie);
+
+        // --- Invariant tenant (fail-fast avant DB::transaction) ---
+        $this->assertTenantCoherence(
+            collect(),
+            collect([$tiers])
+        );
+
+        // --- Montant = débit de la ligne 411 source (créance ouverte) ---
+        $montant = (float) $ligne411Source->debit;
+
+        // --- Création dans une transaction DB ---
+        return DB::transaction(function () use (
+            $transactionCreance, $tiers, $compte411, $comptePortage, $montant,
+            $mode, $datePaiement, $libelle, $ligne411Source
+        ): Transaction {
+            $libelleEffectif = $libelle ?? "Encaissement créance #{$transactionCreance->id}";
+
+            $t2 = $this->createTransactionHeader(
+                date: $datePaiement,
+                libelle: $libelleEffectif,
+                montant: $montant,
+                modePaiement: $mode,
+            );
+
+            // Ligne 1 : débit portage (5112 / 530 / 512X) avec tiers
+            $lignePortage = TransactionLigne::create([
+                'transaction_id' => $t2->id,
+                'compte_id' => $comptePortage->id,
+                'debit' => $montant,
+                'credit' => 0,
+                'tiers_id' => $tiers->id,
+                'libelle' => $libelleEffectif,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $lignePortage->setRelation('compte', $comptePortage);
+
+            // Ligne 2 : crédit 411 avec tiers
+            $ligne411Encaissement = TransactionLigne::create([
+                'transaction_id' => $t2->id,
+                'compte_id' => $compte411->id,
+                'debit' => 0,
+                'credit' => $montant,
+                'tiers_id' => $tiers->id,
+                'libelle' => $libelleEffectif,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne411Encaissement->setRelation('compte', $compte411);
+
+            // --- Vérifications post-création (paranoïa) ---
+            $lignes = collect([$lignePortage, $ligne411Encaissement]);
+            $this->assertEquilibre($lignes);
+            $this->assertTiersObligatoire411($lignes);
+
+            // --- Auto-lettrage paire 411 : T1-ligne411 ↔ T2-ligne411 ---
+            $this->lettrageService->lettrer(
+                collect([$ligne411Source, $ligne411Encaissement]),
+                null,
+                "Auto-lettrage encaissement créance T1#{$transactionCreance->id} → T2#{$t2->id}"
+            );
+
+            $t2->setRelation('lignes', $lignes);
+
+            return $t2;
         });
     }
 
