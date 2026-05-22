@@ -224,41 +224,82 @@ test('assertTiersObligatoire411 accepte ligne 401 avec tiers (idem 411)', functi
 });
 
 // ---------------------------------------------------------------------------
-// Tests 11-13 : assertPasDeTiersSur512
+// Tests 11-16 : assertPasDeTiersSurClasse5
+// (amendé 2026-05-22 — école 411 systématique, conformité FEC : aucune ligne
+// classe 5 ne porte de tiers, qu'il s'agisse de 512X, 5112 ou 530)
 // ---------------------------------------------------------------------------
-test('assertPasDeTiersSur512 rejette ligne 512BNP avec tiers_id non null → TiersInterditException', function () {
+test('assertPasDeTiersSurClasse5 rejette ligne 512BNP avec tiers → TiersInterditException', function () {
     $generator = app(EcritureGenerator::class);
 
-    $compte = new Compte(['numero_pcg' => '5121']);
+    $compte = new Compte(['numero_pcg' => '5121', 'classe' => 5]);
     $ligne = makeLigneStub(['tiers_id' => 5, 'debit' => '100.00', 'credit' => '0.00']);
     $ligne->setRelation('compte', $compte);
 
-    expect(fn () => $generator->assertPasDeTiersSur512(collect([$ligne])))
+    expect(fn () => $generator->assertPasDeTiersSurClasse5(collect([$ligne])))
         ->toThrow(TiersInterditException::class);
 });
 
-test('assertPasDeTiersSur512 accepte ligne 5121 sans tiers', function () {
+test('assertPasDeTiersSurClasse5 rejette ligne 5112 avec tiers (amendement 2026-05-22)', function () {
+    // École 411 systématique : les chèques à encaisser ne portent plus de tiers.
+    // La traçabilité par tiers passe par la ligne 411 contrepassée dans la même
+    // transaction (recette comptant : 411 D / 706 C / 5112 D / 411 C).
     $generator = app(EcritureGenerator::class);
 
-    $compte = new Compte(['numero_pcg' => '5121']);
+    $compte = new Compte(['numero_pcg' => '5112', 'classe' => 5]);
+    $ligne = makeLigneStub(['tiers_id' => 3, 'debit' => '50.00', 'credit' => '0.00']);
+    $ligne->setRelation('compte', $compte);
+
+    expect(fn () => $generator->assertPasDeTiersSurClasse5(collect([$ligne])))
+        ->toThrow(TiersInterditException::class);
+});
+
+test('assertPasDeTiersSurClasse5 rejette ligne 530 (Caisse) avec tiers', function () {
+    $generator = app(EcritureGenerator::class);
+
+    $compte = new Compte(['numero_pcg' => '530', 'classe' => 5]);
+    $ligne = makeLigneStub(['tiers_id' => 7, 'debit' => '20.00', 'credit' => '0.00']);
+    $ligne->setRelation('compte', $compte);
+
+    expect(fn () => $generator->assertPasDeTiersSurClasse5(collect([$ligne])))
+        ->toThrow(TiersInterditException::class);
+});
+
+test('assertPasDeTiersSurClasse5 accepte ligne 5121 sans tiers', function () {
+    $generator = app(EcritureGenerator::class);
+
+    $compte = new Compte(['numero_pcg' => '5121', 'classe' => 5]);
     $ligne = makeLigneStub(['tiers_id' => null, 'debit' => '100.00', 'credit' => '0.00']);
     $ligne->setRelation('compte', $compte);
 
-    $generator->assertPasDeTiersSur512(collect([$ligne]));
+    $generator->assertPasDeTiersSurClasse5(collect([$ligne]));
 
     expect(true)->toBeTrue();
 });
 
-test('assertPasDeTiersSur512 accepte ligne 5112 avec tiers (5112 ≠ 512X — chèques à encaisser)', function () {
-    // 5112 commence par '511', pas '512' — le scope bancaires() filtre '512_%'
-    // donc 5112 est un compte de portage lettrable, pas un compte bancaire 512X.
+test('assertPasDeTiersSurClasse5 accepte ligne 411 avec tiers (classe 4 hors périmètre invariant)', function () {
+    // L'invariant ne concerne QUE la classe 5. Les lignes 411/401 doivent au contraire
+    // porter un tiers (cf. assertTiersObligatoire411).
     $generator = app(EcritureGenerator::class);
 
-    $compte = new Compte(['numero_pcg' => '5112']);
-    $ligne = makeLigneStub(['tiers_id' => 3, 'debit' => '50.00', 'credit' => '0.00']);
+    $compte = new Compte(['numero_pcg' => '411', 'classe' => 4]);
+    $ligne = makeLigneStub(['tiers_id' => 10, 'debit' => '100.00', 'credit' => '0.00']);
     $ligne->setRelation('compte', $compte);
 
-    $generator->assertPasDeTiersSur512(collect([$ligne]));
+    $generator->assertPasDeTiersSurClasse5(collect([$ligne]));
+
+    expect(true)->toBeTrue();
+});
+
+test('assertPasDeTiersSurClasse5 accepte ligne 706 avec tiers (classe 7 hors périmètre invariant)', function () {
+    // L'invariant ne concerne QUE la classe 5. Les lignes 6x/7x peuvent porter un tiers
+    // (optionnel — cas dons identifiés, ajustements).
+    $generator = app(EcritureGenerator::class);
+
+    $compte = new Compte(['numero_pcg' => '706', 'classe' => 7]);
+    $ligne = makeLigneStub(['tiers_id' => 10, 'debit' => '0.00', 'credit' => '50.00']);
+    $ligne->setRelation('compte', $compte);
+
+    $generator->assertPasDeTiersSurClasse5(collect([$ligne]));
 
     expect(true)->toBeTrue();
 });

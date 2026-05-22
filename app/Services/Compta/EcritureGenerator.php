@@ -158,18 +158,20 @@ final class EcritureGenerator
     }
 
     /**
-     * Vérifie qu'aucune ligne dont le compte a numero_pcg commençant par '512'
-     * (comptes bancaires physiques 5121, 5122, etc.) ne porte un tiers_id.
+     * Vérifie qu'aucune ligne sur un compte de classe 5 (trésorerie : 512X, 5112, 530…)
+     * ne porte de tiers_id. Spec §4.2 invariant 5 amendé 2026-05-22 : école 411
+     * systématique, conformité FEC (CompAuxNum réservé classe 4).
      *
-     * Note : 5112 (Chèques à encaisser) commence par '511', pas '512' — il est
-     * donc exclu de cet invariant et peut porter un tiers_id (comportement voulu).
-     * Le scope bancaires() filtre '512_%' (un caractère obligatoire après '512').
+     * Le tiers vit exclusivement sur les comptes auxiliaires 411 et 401. La traçabilité
+     * par tiers des mouvements de trésorerie passe par les lignes 411/401 contrepassées
+     * dans la même transaction (recette/dépense comptant) ou par lettrage 411 ↔ 411
+     * entre constatation et encaissement (recette à crédit).
      *
      * @param  Collection<int, TransactionLigne>  $lignes
      *
      * @throws TiersInterditException
      */
-    public function assertPasDeTiersSur512(Collection $lignes): void
+    public function assertPasDeTiersSurClasse5(Collection $lignes): void
     {
         foreach ($lignes as $ligne) {
             $compte = $ligne->relationLoaded('compte') ? $ligne->compte : null;
@@ -178,13 +180,8 @@ final class EcritureGenerator
                 continue;
             }
 
-            // '512_' = 512 suivi d'au moins 1 caractère — cohérent avec scopeBancaires()
-            if (
-                str_starts_with($compte->numero_pcg, '512')
-                && strlen($compte->numero_pcg) > 3
-                && $ligne->tiers_id !== null
-            ) {
-                throw TiersInterditException::surCompte512($compte->numero_pcg);
+            if ($compte->classe === 5 && $ligne->tiers_id !== null) {
+                throw TiersInterditException::surCompteClasse5($compte->numero_pcg);
             }
         }
     }
@@ -1202,10 +1199,12 @@ final class EcritureGenerator
             // --- Vérifications post-création (paranoïa) ---
             $this->assertEquilibre($lignesT4);
 
-            // assertPasDeTiersSur512 : exercé ici — la ligne 512 D n'a pas de tiers (null),
-            // les lignes 5112/530 crédit portent des tiers (voulu, exclu de cet invariant).
+            // assertPasDeTiersSurClasse5 : exercé sur la ligne 512 D (sans tiers, voulu).
+            // NB : à la révision Step 20 (école 411 systématique amendée 2026-05-22),
+            // les lignes 5112 C de remise n'auront plus de tiers non plus, et l'invariant
+            // pourra être exercé sur l'ensemble des lignes T4.
             $ligne512Rechargee = $lignesT4->firstWhere('compte_id', $compteCible512->id);
-            $this->assertPasDeTiersSur512(collect([$ligne512Rechargee]));
+            $this->assertPasDeTiersSurClasse5(collect([$ligne512Rechargee]));
 
             $t4->setRelation('lignes', $lignesT4);
 
