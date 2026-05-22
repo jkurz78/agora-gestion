@@ -407,44 +407,57 @@ final class EcritureGenerator
     }
 
     /**
-     * Génère l'écriture T1 (créance ouverte) pour une recette constatée à crédit.
+     * Génère l'écriture T1 (créance ouverte) à (N+1) lignes — école 411 systématique.
      *
-     * Matrice École C (spec §4.3) — Recette à crédit :
-     *   T1 : 411 D X (tiers) / $compteProduit C X
+     * Amendée 2026-05-22 : signature multi-ventilation.
+     * Schéma : 411 D total tiers / [7x C × N]
+     * Pas de lettrage à ce stade (créance ouverte). Le lettrage est appliqué
+     * lors de l'encaissement via pourEncaissementCreance().
      *
-     * Pas de T2 ici : le règlement (encaissement) sera enregistré séparément
-     * via pourEncaissementCreance() (Step 17), qui créera T2 et lettra les
-     * lignes 411 de T1 et T2.
+     * mode_paiement est null : aucun paiement n'a encore eu lieu.
      *
-     * mode_paiement est laissé à null : aucun paiement n'a encore eu lieu,
-     * la colonne est nullable depuis la migration 2026_04_05_100001.
+     * @param  iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}>  $ventilations
      *
-     * @throws \InvalidArgumentException Si $montant ≤ 0.
-     * @throws CompteIncorrectException Si $compteProduit ∉ classe 7.
-     * @throws TenantBoundaryException Si $tiers ou l'un des comptes n'appartient pas au tenant courant.
+     * @throws \InvalidArgumentException Si total ≤ 0 ou ventilations vides.
+     * @throws CompteIncorrectException Si un compte ventilé ∉ classe 7.
+     * @throws TenantBoundaryException Si $tiers n'appartient pas au tenant courant.
      * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
      */
     public function pourRecetteACredit(
         Tiers $tiers,
-        Compte $compteProduit,
-        float $montant,
+        iterable $ventilations,
         \DateTimeInterface $dateConstatation,
         ?string $libelle = null,
-        ?Operation $operation = null,
     ): Transaction {
-        // --- Validation input ---
+        // --- Normalisation ventilations ---
+        $ventilationsNorm = collect($ventilations);
 
-        if ($montant <= 0) {
+        if ($ventilationsNorm->isEmpty()) {
             throw new \InvalidArgumentException(
-                "Le montant d'une recette à crédit doit être strictement positif (reçu : {$montant})."
+                'Les ventilations ne peuvent pas être vides pour une recette à crédit.'
             );
         }
 
-        if ($compteProduit->classe !== 7) {
-            throw CompteIncorrectException::classeAttendue(
-                $compteProduit->numero_pcg,
-                $compteProduit->classe,
-                7
+        // --- Validation : chaque compte ventilé est classe 7 ---
+        foreach ($ventilationsNorm as $v) {
+            /** @var Compte $compteVent */
+            $compteVent = $v['compte'];
+
+            if ($compteVent->classe !== 7) {
+                throw CompteIncorrectException::classeAttendue(
+                    $compteVent->numero_pcg,
+                    $compteVent->classe,
+                    7
+                );
+            }
+        }
+
+        // --- Calcul du total ---
+        $total = (float) $ventilationsNorm->sum(fn (array $v): float => (float) $v['montant']);
+
+        if ($total <= 0) {
+            throw new \InvalidArgumentException(
+                "Le montant total d'une recette à crédit doit être strictement positif (reçu : {$total})."
             );
         }
 
@@ -459,8 +472,8 @@ final class EcritureGenerator
 
         // --- Création dans une transaction DB ---
         return DB::transaction(function () use (
-            $tiers, $compteProduit, $compte411, $montant,
-            $dateConstatation, $libelle, $operation
+            $tiers, $ventilationsNorm, $compte411, $total,
+            $dateConstatation, $libelle
         ): Transaction {
             $libelleEffectif = $libelle ?? 'Recette à crédit';
 
@@ -468,44 +481,54 @@ final class EcritureGenerator
                 type: TypeTransaction::Recette,
                 date: $dateConstatation,
                 libelle: $libelleEffectif,
-                montant: $montant,
+                montant: $total,
                 modePaiement: null,
             );
 
-            // Ligne 1 : débit 411 (tiers porté ici — créance ouverte)
-            $ligne1 = TransactionLigne::create([
+            $lignes = [];
+
+            // Ligne 411 D total — tiers (créance ouverte)
+            $ligne411 = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
                 'compte_id' => $compte411->id,
-                'debit' => $montant,
+                'debit' => $total,
                 'credit' => 0,
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
-                'operation_id' => $operation?->id,
                 'montant' => 0,
                 'sous_categorie_id' => null,
             ]);
-            $ligne1->setRelation('compte', $compte411);
+            $ligne411->setRelation('compte', $compte411);
+            $lignes[] = $ligne411;
 
-            // Ligne 2 : crédit produit (sans tiers)
-            $ligne2 = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteProduit->id,
-                'debit' => 0,
-                'credit' => $montant,
-                'tiers_id' => null,
-                'libelle' => $libelleEffectif,
-                'operation_id' => $operation?->id,
-                'montant' => 0,
-                'sous_categorie_id' => null,
-            ]);
-            $ligne2->setRelation('compte', $compteProduit);
+            // N lignes [7x C × N] — sans tiers
+            foreach ($ventilationsNorm as $v) {
+                /** @var Compte $compteVent */
+                $compteVent = $v['compte'];
+                $montantVent = (float) $v['montant'];
+
+                $ligneVent = TransactionLigne::create([
+                    'transaction_id' => $transaction->id,
+                    'compte_id' => $compteVent->id,
+                    'debit' => 0,
+                    'credit' => $montantVent,
+                    'tiers_id' => null,
+                    'libelle' => $libelleEffectif,
+                    'operation_id' => $v['operation_id'] ?? null,
+                    'seance' => $v['seance'] ?? null,
+                    'montant' => 0,
+                    'sous_categorie_id' => null,
+                ]);
+                $ligneVent->setRelation('compte', $compteVent);
+                $lignes[] = $ligneVent;
+            }
 
             // --- Vérifications post-création (paranoïa) ---
-            $lignes = collect([$ligne1, $ligne2]);
-            $this->assertEquilibre($lignes);
-            $this->assertTiersObligatoire411($lignes); // doit passer par construction
+            $lignesCollection = collect($lignes);
+            $this->assertEquilibre($lignesCollection);
+            $this->assertTiersObligatoire411($lignesCollection);
 
-            $transaction->setRelation('lignes', $lignes);
+            $transaction->setRelation('lignes', $lignesCollection);
 
             return $transaction;
         });

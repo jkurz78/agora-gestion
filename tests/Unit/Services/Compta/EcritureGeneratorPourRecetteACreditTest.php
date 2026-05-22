@@ -18,9 +18,6 @@ use App\Tenant\TenantContext;
 // Helpers locaux
 // ---------------------------------------------------------------------------
 
-/**
- * Récupère le compte système par numero_pcg pour le tenant courant.
- */
 function compteSystemeCredit(string $numeroPcg): Compte
 {
     return Compte::where('numero_pcg', $numeroPcg)
@@ -29,26 +26,20 @@ function compteSystemeCredit(string $numeroPcg): Compte
         ->firstOrFail();
 }
 
-/**
- * Crée un compte produit classe 7 pour le tenant courant.
- */
 function compte706Credit(string $suffix = ''): Compte
 {
     return Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => '706c'.$suffix,
-        'intitule' => 'Cotisations et adhésions (crédit) '.$suffix,
-        'classe' => 7,
-        'lettrable' => false,
-        'actif' => true,
-        'est_systeme' => false,
+        'numero_pcg'     => '706c'.$suffix,
+        'intitule'       => 'Cotisations et adhésions (crédit) '.$suffix,
+        'classe'         => 7,
+        'lettrable'      => false,
+        'actif'          => true,
+        'est_systeme'    => false,
         'pour_inscriptions' => false,
     ]);
 }
 
-/**
- * Crée un tiers pour le tenant courant.
- */
 function tiersCourantCredit(): Tiers
 {
     return Tiers::factory()->create(['association_id' => TenantContext::currentId()]);
@@ -63,7 +54,8 @@ beforeEach(function () {
 });
 
 // ---------------------------------------------------------------------------
-// Cas 1 : Recette à crédit normale → T1 : 411 D X (tiers) / 706 C X
+// Cas 1 : Recette à crédit normale → T1 : 411 D X (tiers) / 706 C X (sans tiers)
+// Schéma N+1 (N=1) — 2 lignes
 // ---------------------------------------------------------------------------
 test('pourRecetteACredit crée T1 ligne 411 débit avec tiers / 706 crédit sans tiers', function () {
     $tiers = tiersCourantCredit();
@@ -74,8 +66,7 @@ test('pourRecetteACredit crée T1 ligne 411 débit avec tiers / 706 crédit sans
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: 120.00,
+        ventilations: [['compte' => $compteProduit, 'montant' => 120.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
         libelle: 'Facture adhésion annuelle',
     );
@@ -89,19 +80,22 @@ test('pourRecetteACredit crée T1 ligne 411 débit avec tiers / 706 crédit sans
     expect($ligne411)->not->toBeNull();
     expect($ligneProduit)->not->toBeNull();
 
-    // 411 est au débit avec le tiers
+    // 411 D avec tiers
     expect((float) $ligne411->debit)->toBe(120.00);
     expect((float) $ligne411->credit)->toBe(0.00);
     expect((int) $ligne411->tiers_id)->toBe((int) $tiers->id);
 
-    // 706 est au crédit sans tiers
+    // 706 C sans tiers
     expect((float) $ligneProduit->debit)->toBe(0.00);
     expect((float) $ligneProduit->credit)->toBe(120.00);
     expect($ligneProduit->tiers_id)->toBeNull();
+
+    // Pas de lettrage (créance ouverte)
+    expect($ligne411->lettrage_code)->toBeNull('Créance ouverte — pas de lettrage à la constatation');
 });
 
 // ---------------------------------------------------------------------------
-// Cas 2 : T1 équilibrée — equilibree = TRUE, ∑D = ∑C = X, type_ecriture = 'normale'
+// Cas 2 : T1 équilibrée — equilibree = TRUE, ∑D = ∑C = total, type_ecriture = 'normale'
 // ---------------------------------------------------------------------------
 test('pourRecetteACredit produit transaction equilibree=TRUE, ∑D=∑C, type_ecriture=normale', function () {
     $tiers = tiersCourantCredit();
@@ -111,8 +105,7 @@ test('pourRecetteACredit produit transaction equilibree=TRUE, ∑D=∑C, type_ec
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: 250.00,
+        ventilations: [['compte' => $compteProduit, 'montant' => 250.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     );
 
@@ -128,9 +121,9 @@ test('pourRecetteACredit produit transaction equilibree=TRUE, ∑D=∑C, type_ec
 });
 
 // ---------------------------------------------------------------------------
-// Cas 3 : Pas de portage — exactement 2 lignes, pas de T2
+// Cas 3 : N+1 lignes — 2 lignes pour N=1, 1 T créée
 // ---------------------------------------------------------------------------
-test('pourRecetteACredit crée exactement 2 lignes (pas de portage, pas de T2)', function () {
+test('pourRecetteACredit crée exactement N+1 lignes (2 pour N=1), 1 transaction', function () {
     $tiers = tiersCourantCredit();
     $compteProduit = compte706Credit('C');
 
@@ -140,20 +133,16 @@ test('pourRecetteACredit crée exactement 2 lignes (pas de portage, pas de T2)',
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: 80.00,
+        ventilations: [['compte' => $compteProduit, 'montant' => 80.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     );
 
-    // Exactement 2 lignes sur la transaction
     expect($transaction->lignes)->toHaveCount(2);
-
-    // Exactement 1 transaction créée (pas de T2)
     expect(Transaction::count())->toBe($transactionsBefore + 1);
 });
 
 // ---------------------------------------------------------------------------
-// Cas 4 : Solde ouvert 411 du tiers = X après création
+// Cas 4 : Solde ouvert 411 du tiers = montant après création
 // ---------------------------------------------------------------------------
 test('pourRecetteACredit laisse un solde ouvert 411 du tiers égal au montant', function () {
     $tiers = tiersCourantCredit();
@@ -164,12 +153,10 @@ test('pourRecetteACredit laisse un solde ouvert 411 du tiers égal au montant', 
 
     $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: 175.00,
+        ventilations: [['compte' => $compteProduit, 'montant' => 175.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     );
 
-    // Solde 411 du tiers = ∑débit - ∑crédit sur les lignes 411 de ce tiers
     $solde411 = TransactionLigne::where('compte_id', $compte411->id)
         ->where('tiers_id', $tiers->id)
         ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS solde')
@@ -185,13 +172,11 @@ test('pourRecetteACredit lève TenantBoundaryException et rollback si tiers autr
     $associationA = TenantContext::current();
     $associationB = Association::factory()->create();
 
-    // Créer un tiers dans le tenant B
     TenantContext::boot($associationB);
-    SystemeSeeder::seed(); // seed les comptes système pour B aussi
+    SystemeSeeder::seed();
     $tiersB = Tiers::factory()->create(['association_id' => $associationB->id]);
-    TenantContext::boot($associationA); // revenir au tenant A
+    TenantContext::boot($associationA);
 
-    // Bypass scope pour accéder au tiers B depuis le contexte A
     $tiersBBypassed = Tiers::withoutGlobalScopes()->find($tiersB->id);
 
     $compteProduit = compte706Credit('E');
@@ -202,30 +187,27 @@ test('pourRecetteACredit lève TenantBoundaryException et rollback si tiers autr
 
     expect(fn () => $generator->pourRecetteACredit(
         tiers: $tiersBBypassed,
-        compteProduit: $compteProduit,
-        montant: 100.00,
+        ventilations: [['compte' => $compteProduit, 'montant' => 100.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     ))->toThrow(TenantBoundaryException::class);
 
-    // Aucune transaction créée (rollback)
     expect(Transaction::count())->toBe($transactionsBefore);
 });
 
 // ---------------------------------------------------------------------------
 // Cas 6 : Compte produit classe ≠ 7 → CompteIncorrectException + rollback
 // ---------------------------------------------------------------------------
-test('pourRecetteACredit lève CompteIncorrectException si compteProduit classe ≠ 7', function () {
+test('pourRecetteACredit lève CompteIncorrectException si compte ventilation classe ≠ 7', function () {
     $tiers = tiersCourantCredit();
 
-    // Compte classe 6
     $compteClasse6 = Compte::create([
         'association_id' => TenantContext::currentId(),
-        'numero_pcg' => '606c',
-        'intitule' => 'Achats (classe 6)',
-        'classe' => 6,
-        'lettrable' => false,
-        'actif' => true,
-        'est_systeme' => false,
+        'numero_pcg'     => '606c',
+        'intitule'       => 'Achats (classe 6)',
+        'classe'         => 6,
+        'lettrable'      => false,
+        'actif'          => true,
+        'est_systeme'    => false,
         'pour_inscriptions' => false,
     ]);
 
@@ -235,8 +217,7 @@ test('pourRecetteACredit lève CompteIncorrectException si compteProduit classe 
 
     expect(fn () => $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteClasse6,
-        montant: 100.00,
+        ventilations: [['compte' => $compteClasse6, 'montant' => 100.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     ))->toThrow(CompteIncorrectException::class);
 
@@ -256,15 +237,13 @@ test('pourRecetteACredit lève InvalidArgumentException si montant ≤ 0', funct
 
     expect(fn () => $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: 0.00,
+        ventilations: [['compte' => $compteProduit, 'montant' => 0.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     ))->toThrow(InvalidArgumentException::class);
 
     expect(fn () => $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: -50.00,
+        ventilations: [['compte' => $compteProduit, 'montant' => -50.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     ))->toThrow(InvalidArgumentException::class);
 
@@ -284,8 +263,7 @@ test('pourRecetteACredit applique dateConstatation sur transaction.date', functi
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: 60.00,
+        ventilations: [['compte' => $compteProduit, 'montant' => 60.00]],
         dateConstatation: $date,
         libelle: 'Constatation mars',
     );
@@ -304,10 +282,64 @@ test('pourRecetteACredit laisse mode_paiement null (créance pas encore payée)'
 
     $transaction = $generator->pourRecetteACredit(
         tiers: $tiers,
-        compteProduit: $compteProduit,
-        montant: 45.00,
+        ventilations: [['compte' => $compteProduit, 'montant' => 45.00]],
         dateConstatation: new DateTimeImmutable('2026-05-20'),
     );
 
     expect($transaction->mode_paiement)->toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// Cas 9 (NOUVEAU) : Multi-ventilation 2 produits — T1 à 3 lignes (N=2)
+// Schéma : 411 D total tiers / 706A C 80 / 706B C 20
+// ---------------------------------------------------------------------------
+test('pourRecetteACredit multi-ventilation crée T1 à 3 lignes (N=2, schéma N+1)', function () {
+    $tiers = tiersCourantCredit();
+    $compte706A = compte706Credit('MA');
+    $compte706B = compte706Credit('MB');
+    $compte411 = compteSystemeCredit('411');
+
+    $generator = app(EcritureGenerator::class);
+
+    $transaction = $generator->pourRecetteACredit(
+        tiers: $tiers,
+        ventilations: [
+            ['compte' => $compte706A, 'montant' => 80.00],
+            ['compte' => $compte706B, 'montant' => 20.00],
+        ],
+        dateConstatation: new DateTimeImmutable('2026-05-21'),
+        libelle: 'Facture multi-produits',
+    );
+
+    // N+1 = 2+1 = 3 lignes
+    expect($transaction->lignes)->toHaveCount(3);
+
+    // 411 D total 100, avec tiers
+    $ligne411 = $transaction->lignes->firstWhere('compte_id', $compte411->id);
+    expect((float) $ligne411->debit)->toBe(100.00);
+    expect((int) $ligne411->tiers_id)->toBe((int) $tiers->id);
+    expect($ligne411->lettrage_code)->toBeNull('Créance ouverte — pas de lettrage');
+
+    // 706A C 80, sans tiers
+    $ligne706A = $transaction->lignes->firstWhere('compte_id', $compte706A->id);
+    expect((float) $ligne706A->credit)->toBe(80.00);
+    expect($ligne706A->tiers_id)->toBeNull();
+
+    // 706B C 20, sans tiers
+    $ligne706B = $transaction->lignes->firstWhere('compte_id', $compte706B->id);
+    expect((float) $ligne706B->credit)->toBe(20.00);
+    expect($ligne706B->tiers_id)->toBeNull();
+
+    // Équilibre ∑D = ∑C = 100
+    $totalDebit = $transaction->lignes->sum(fn ($l) => (float) $l->debit);
+    $totalCredit = $transaction->lignes->sum(fn ($l) => (float) $l->credit);
+    expect($totalDebit)->toBe(100.00);
+    expect($totalCredit)->toBe(100.00);
+
+    // Solde ouvert 411 du tiers = 100 (créance ouverte)
+    $solde411 = TransactionLigne::where('compte_id', $compte411->id)
+        ->where('tiers_id', $tiers->id)
+        ->selectRaw('COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS solde')
+        ->value('solde');
+    expect((float) $solde411)->toBe(100.00);
 });
