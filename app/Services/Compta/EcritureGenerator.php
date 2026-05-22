@@ -867,42 +867,57 @@ final class EcritureGenerator
     }
 
     /**
-     * Génère l'écriture T1 (dette fournisseur) pour une dépense constatée à crédit.
+     * Génère l'écriture T1 (dette fournisseur) à (N+1) lignes — école 411 systématique.
      *
-     * Matrice École C (spec §4.3) — Dépense à crédit :
-     *   T1 : $compteCharge D X (sans tiers) / 401 C X (avec tiers fournisseur)
+     * Amendée 2026-05-22 : signature multi-ventilation.
+     * Schéma : [6x D × N] / 401 C total tiers
+     * Pas de lettrage à ce stade (dette ouverte). Le lettrage est appliqué
+     * lors du règlement via pourReglementFournisseur().
      *
-     * Pas de T2 ici : le règlement sera enregistré séparément via
-     * pourReglementFournisseur() (Step 19), qui créera T2 et lettra la paire 401.
+     * mode_paiement est null : aucun décaissement n'a encore eu lieu.
      *
-     * mode_paiement est laissé à null : aucun décaissement n'a encore eu lieu.
+     * @param  iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}>  $ventilations
      *
-     * @throws \InvalidArgumentException Si $montant ≤ 0.
-     * @throws CompteIncorrectException Si $compteCharge ∉ classe 6.
-     * @throws TenantBoundaryException Si $tiers ou l'un des comptes n'appartient pas au tenant courant.
+     * @throws \InvalidArgumentException Si total ≤ 0 ou ventilations vides.
+     * @throws CompteIncorrectException Si un compte ventilé ∉ classe 6.
+     * @throws TenantBoundaryException Si $tiers n'appartient pas au tenant courant.
      * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
      */
     public function pourDepenseACredit(
         Tiers $tiers,
-        Compte $compteCharge,
-        float $montant,
+        iterable $ventilations,
         \DateTimeInterface $dateConstatation,
         ?string $libelle = null,
-        ?Operation $operation = null,
     ): Transaction {
-        // --- Validation input ---
+        // --- Normalisation ventilations ---
+        $ventilationsNorm = collect($ventilations);
 
-        if ($montant <= 0) {
+        if ($ventilationsNorm->isEmpty()) {
             throw new \InvalidArgumentException(
-                "Le montant d'une dépense à crédit doit être strictement positif (reçu : {$montant})."
+                'Les ventilations ne peuvent pas être vides pour une dépense à crédit.'
             );
         }
 
-        if ($compteCharge->classe !== 6) {
-            throw CompteIncorrectException::classeAttendue(
-                $compteCharge->numero_pcg,
-                $compteCharge->classe,
-                6
+        // --- Validation : chaque compte ventilé est classe 6 ---
+        foreach ($ventilationsNorm as $v) {
+            /** @var Compte $compteVent */
+            $compteVent = $v['compte'];
+
+            if ($compteVent->classe !== 6) {
+                throw CompteIncorrectException::classeAttendue(
+                    $compteVent->numero_pcg,
+                    $compteVent->classe,
+                    6
+                );
+            }
+        }
+
+        // --- Calcul du total ---
+        $total = (float) $ventilationsNorm->sum(fn (array $v): float => (float) $v['montant']);
+
+        if ($total <= 0) {
+            throw new \InvalidArgumentException(
+                "Le montant total d'une dépense à crédit doit être strictement positif (reçu : {$total})."
             );
         }
 
@@ -917,8 +932,8 @@ final class EcritureGenerator
 
         // --- Création dans une transaction DB ---
         return DB::transaction(function () use (
-            $tiers, $compteCharge, $compte401, $montant,
-            $dateConstatation, $libelle, $operation
+            $tiers, $ventilationsNorm, $compte401, $total,
+            $dateConstatation, $libelle
         ): Transaction {
             $libelleEffectif = $libelle ?? 'Dépense à crédit';
 
@@ -926,44 +941,54 @@ final class EcritureGenerator
                 type: TypeTransaction::Depense,
                 date: $dateConstatation,
                 libelle: $libelleEffectif,
-                montant: $montant,
+                montant: $total,
                 modePaiement: null,
             );
 
-            // Ligne 1 : débit charge (sans tiers)
-            $ligne1 = TransactionLigne::create([
-                'transaction_id' => $transaction->id,
-                'compte_id' => $compteCharge->id,
-                'debit' => $montant,
-                'credit' => 0,
-                'tiers_id' => null,
-                'libelle' => $libelleEffectif,
-                'operation_id' => $operation?->id,
-                'montant' => 0,
-                'sous_categorie_id' => null,
-            ]);
-            $ligne1->setRelation('compte', $compteCharge);
+            $lignes = [];
 
-            // Ligne 2 : crédit 401 (tiers fournisseur — dette ouverte)
-            $ligne2 = TransactionLigne::create([
+            // N lignes [6x D × N] — sans tiers
+            foreach ($ventilationsNorm as $v) {
+                /** @var Compte $compteVent */
+                $compteVent = $v['compte'];
+                $montantVent = (float) $v['montant'];
+
+                $ligneVent = TransactionLigne::create([
+                    'transaction_id' => $transaction->id,
+                    'compte_id' => $compteVent->id,
+                    'debit' => $montantVent,
+                    'credit' => 0,
+                    'tiers_id' => null,
+                    'libelle' => $libelleEffectif,
+                    'operation_id' => $v['operation_id'] ?? null,
+                    'seance' => $v['seance'] ?? null,
+                    'montant' => 0,
+                    'sous_categorie_id' => null,
+                ]);
+                $ligneVent->setRelation('compte', $compteVent);
+                $lignes[] = $ligneVent;
+            }
+
+            // Ligne 401 C total — tiers (dette ouverte)
+            $ligne401 = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
                 'compte_id' => $compte401->id,
                 'debit' => 0,
-                'credit' => $montant,
+                'credit' => $total,
                 'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
-                'operation_id' => $operation?->id,
                 'montant' => 0,
                 'sous_categorie_id' => null,
             ]);
-            $ligne2->setRelation('compte', $compte401);
+            $ligne401->setRelation('compte', $compte401);
+            $lignes[] = $ligne401;
 
             // --- Vérifications post-création (paranoïa) ---
-            $lignes = collect([$ligne1, $ligne2]);
-            $this->assertEquilibre($lignes);
-            $this->assertTiersObligatoire411($lignes); // couvre aussi 401
+            $lignesCollection = collect($lignes);
+            $this->assertEquilibre($lignesCollection);
+            $this->assertTiersObligatoire411($lignesCollection);
 
-            $transaction->setRelation('lignes', $lignes);
+            $transaction->setRelation('lignes', $lignesCollection);
 
             return $transaction;
         });
