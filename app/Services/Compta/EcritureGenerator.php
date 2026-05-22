@@ -512,63 +512,66 @@ final class EcritureGenerator
     }
 
     /**
-     * Génère l'écriture T1 (transaction comptant, 2 lignes équilibrées) pour une
-     * dépense réglée immédiatement (chèque émis / CB / espèces / virement / prélèvement).
+     * Génère l'écriture T1 (dépense comptant) à (N+3) lignes — école 411 systématique.
      *
-     * Matrice École C (spec §4.3) — Dépense comptant :
-     *   Cheque      → portage sur $compteTresorerie (512X — PAS de 5112 miroir, décision §4.3 actée)
-     *   Especes     → portage sur 530  (Caisse)
-     *   Virement    → portage sur $compteTresorerie (512X physique)
-     *   Cb          → portage sur $compteTresorerie (512X physique)
-     *   Prelevement → portage sur $compteTresorerie (512X physique, par symétrie virement)
+     * Amendée 2026-05-22 : signature multi-ventilation, schéma N+3.
+     * Matrice école 401 (spec §4.3 amendée) :
+     *   [6x D × N] / 401 C total tiers / 401 D total tiers / 5xx C total (sans tiers)
+     *   + auto-lettrage interne des 2 lignes 401 (C et D, même tiers, mêmes montants).
      *
-     * Asymétrie chèque : pour les recettes, le chèque reçu passe par 5112 (valeur
-     * physique en main). Pour les dépenses, le chèque émis va directement sur 512 —
-     * l'association n'a plus rien en main, l'attente du débit bancaire est gérée
-     * par le statut "non pointé" du rapprochement.
+     * Asymétrie chèque (conservée) : chèque émis → 512X direct (pas de 5112 miroir).
+     * Raison : le 5112 représente les valeurs physiques en main (chèques reçus).
+     * Pour un chèque émis, l'asso n'a plus rien en main.
      *
-     * Lignes créées :
-     *   Ligne 1 (débit charge)  : compte_id = $compteCharge->id, tiers_id = null
-     *   Ligne 2 (crédit tréso)  : compte_id = $comptePortage->id, tiers_id = $tiers->id
+     * @param  iterable<int, array{compte: Compte, montant: float, operation_id?: ?int, seance?: ?int, notes?: ?string}>  $ventilations
      *
-     * Décision portage dépense : helper privé `resoudreComptePortageDepense`
-     * (séparé de `resoudreComptePortage` pour recettes) — les deux mappings sont
-     * suffisamment différents (chèque → 5112 vs chèque → 512) pour justifier
-     * deux helpers distincts plutôt qu'un paramètre bool ambigu.
-     *
-     * @throws \InvalidArgumentException Si $montant ≤ 0.
-     * @throws CompteIncorrectException Si $compteCharge ∉ classe 6,
+     * @throws \InvalidArgumentException Si total des ventilations ≤ 0 ou si ventilations vides.
+     * @throws CompteIncorrectException Si un compte ventilé ∉ classe 6,
      *                                  ou si $compteTresorerie ∉ 512X pour Cheque/Cb/Virement/Prelevement.
      * @throws TenantBoundaryException Si $tiers ou l'un des comptes n'appartient pas au tenant courant.
-     * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création (ne doit jamais lever en pratique).
+     * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
      */
     public function pourDepenseComptant(
         Tiers $tiers,
-        Compte $compteCharge,
-        float $montant,
+        iterable $ventilations,
         ModePaiement $mode,
         Compte $compteTresorerie,
         \DateTimeInterface $date,
         ?string $libelle = null,
-        ?Operation $operation = null,
     ): Transaction {
-        // --- Validation input ---
+        // --- Normalisation ventilations ---
+        $ventilationsNorm = collect($ventilations);
 
-        if ($montant <= 0) {
+        if ($ventilationsNorm->isEmpty()) {
             throw new \InvalidArgumentException(
-                "Le montant d'une dépense comptant doit être strictement positif (reçu : {$montant})."
+                'Les ventilations ne peuvent pas être vides pour une dépense comptant.'
             );
         }
 
-        if ($compteCharge->classe !== 6) {
-            throw CompteIncorrectException::classeAttendue(
-                $compteCharge->numero_pcg,
-                $compteCharge->classe,
-                6
+        // --- Validation : chaque compte ventilé est classe 6 ---
+        foreach ($ventilationsNorm as $v) {
+            /** @var Compte $compteVent */
+            $compteVent = $v['compte'];
+
+            if ($compteVent->classe !== 6) {
+                throw CompteIncorrectException::classeAttendue(
+                    $compteVent->numero_pcg,
+                    $compteVent->classe,
+                    6
+                );
+            }
+        }
+
+        // --- Calcul du total ---
+        $total = (float) $ventilationsNorm->sum(fn (array $v): float => (float) $v['montant']);
+
+        if ($total <= 0) {
+            throw new \InvalidArgumentException(
+                "Le montant total d'une dépense comptant doit être strictement positif (reçu : {$total})."
             );
         }
 
-        // Pour tous les modes sauf Espèces, $compteTresorerie doit être un compte bancaire physique 512X.
+        // --- Validation : modes nécessitant un compte bancaire physique 512X ---
         $modesNecessitantTresorerie = [
             ModePaiement::Cheque,
             ModePaiement::Virement,
@@ -590,8 +593,11 @@ final class EcritureGenerator
             }
         }
 
-        // --- Résolution du compte de portage (helper dédié dépenses) ---
+        // --- Résolution du compte de portage (helper dédié dépenses, asymétrie chèque) ---
         $comptePortage = $this->resoudreComptePortageDepense($mode, $compteTresorerie);
+
+        // --- Résolution compte 401 (tenant-scopé automatiquement) ---
+        $compte401 = Compte::ofNumeroSysteme('401');
 
         // --- Invariant tenant (avant DB::transaction pour fail-fast) ---
         $this->assertTenantCoherence(
@@ -601,8 +607,8 @@ final class EcritureGenerator
 
         // --- Création dans une transaction DB ---
         return DB::transaction(function () use (
-            $tiers, $compteCharge, $comptePortage, $montant, $mode,
-            $date, $libelle, $operation
+            $tiers, $ventilationsNorm, $comptePortage, $compte401, $total, $mode,
+            $date, $libelle
         ): Transaction {
             $libelleEffectif = $libelle ?? 'Dépense '.$mode->label();
 
@@ -610,42 +616,106 @@ final class EcritureGenerator
                 type: TypeTransaction::Depense,
                 date: $date,
                 libelle: $libelleEffectif,
-                montant: $montant,
+                montant: $total,
                 modePaiement: $mode,
             );
 
-            // Ligne 1 : débit charge (sans tiers — le fournisseur est identifié côté trésorerie)
-            $ligne1 = TransactionLigne::create([
+            $toutesLignes = [];
+
+            // N lignes [6x D × N] — sans tiers
+            foreach ($ventilationsNorm as $v) {
+                /** @var Compte $compteVent */
+                $compteVent = $v['compte'];
+                $montantVent = (float) $v['montant'];
+
+                $ligneVent = TransactionLigne::create([
+                    'transaction_id' => $transaction->id,
+                    'compte_id' => $compteVent->id,
+                    'debit' => $montantVent,
+                    'credit' => 0,
+                    'tiers_id' => null,
+                    'libelle' => $libelleEffectif,
+                    'operation_id' => $v['operation_id'] ?? null,
+                    'seance' => $v['seance'] ?? null,
+                    'montant' => 0,
+                    'sous_categorie_id' => null,
+                ]);
+                $ligneVent->setRelation('compte', $compteVent);
+                $toutesLignes[] = $ligneVent;
+            }
+
+            // Ligne 401 C total — tiers (constatation dette immédiate)
+            $ligne401C = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
-                'compte_id' => $compteCharge->id,
-                'debit' => $montant,
-                'credit' => 0,
-                'tiers_id' => null,
+                'compte_id' => $compte401->id,
+                'debit' => 0,
+                'credit' => $total,
+                'tiers_id' => $tiers->id,
                 'libelle' => $libelleEffectif,
-                'operation_id' => $operation?->id,
                 'montant' => 0,
                 'sous_categorie_id' => null,
             ]);
-            $ligne1->setRelation('compte', $compteCharge);
+            $ligne401C->setRelation('compte', $compte401);
+            $toutesLignes[] = $ligne401C;
 
-            // Ligne 2 : crédit trésorerie (tiers porté ici — identifie le fournisseur)
-            $ligne2 = TransactionLigne::create([
+            // Ligne 401 D total — tiers (soldage immédiat de la dette)
+            $ligne401D = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compte401->id,
+                'debit' => $total,
+                'credit' => 0,
+                'tiers_id' => $tiers->id,
+                'libelle' => $libelleEffectif,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne401D->setRelation('compte', $compte401);
+            $toutesLignes[] = $ligne401D;
+
+            // Ligne portage C total — sans tiers (5xx — trésorerie débitée)
+            $lignePortage = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
                 'compte_id' => $comptePortage->id,
                 'debit' => 0,
-                'credit' => $montant,
-                'tiers_id' => $tiers->id,
+                'credit' => $total,
+                'tiers_id' => null,
                 'libelle' => $libelleEffectif,
-                'operation_id' => $operation?->id,
                 'montant' => 0,
                 'sous_categorie_id' => null,
             ]);
-            $ligne2->setRelation('compte', $comptePortage);
+            $lignePortage->setRelation('compte', $comptePortage);
+            $toutesLignes[] = $lignePortage;
 
-            // --- Vérification post-création (paranoïa) ---
-            $lignes = collect([$ligne1, $ligne2]);
+            // --- Auto-lettrage interne des 2 lignes 401 (C et D, même tiers) ---
+            $this->lettrageService->lettrer(
+                collect([$ligne401C, $ligne401D]),
+                null,
+                "Auto-lettrage interne dépense comptant T#{$transaction->id} tiers #{$tiers->id}"
+            );
+
+            // --- Recharger toutes les lignes depuis la DB (lettrage_code à jour) ---
+            $idsLignes = collect($toutesLignes)->pluck('id')->all();
+            $lignes = TransactionLigne::whereIn('id', $idsLignes)->get();
+
+            foreach ($lignes as $l) {
+                if ((int) $l->compte_id === (int) $compte401->id) {
+                    $l->setRelation('compte', $compte401);
+                } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
+                    $l->setRelation('compte', $comptePortage);
+                } else {
+                    foreach ($ventilationsNorm as $v) {
+                        if ((int) $v['compte']->id === (int) $l->compte_id) {
+                            $l->setRelation('compte', $v['compte']);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // --- Vérifications post-création (paranoïa) ---
             $this->assertEquilibre($lignes);
-            // assertTiersObligatoire411 : no-op (aucune ligne 411/401 créée ici)
+            $this->assertTiersObligatoire411($lignes);
+            $this->assertPasDeTiersSurClasse5($lignes);
 
             $transaction->setRelation('lignes', $lignes);
 
