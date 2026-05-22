@@ -6,8 +6,10 @@ namespace App\Services\Compta;
 
 use App\Exceptions\Compta\CompteNonLettrableException;
 use App\Exceptions\Compta\LettrageDejaPresentException;
+use App\Exceptions\Compta\LettrageInexistantException;
 use App\Exceptions\Compta\LettrageMultiComptesException;
 use App\Exceptions\Compta\LettrageNonEquilibreException;
+use App\Exceptions\Compta\LigneNonLettreeException;
 use App\Exceptions\Compta\TenantBoundaryException;
 use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
@@ -61,22 +63,90 @@ final class LettrageService
 
         DB::transaction(function () use ($ids, $compteId, $code, $motif): void {
             // 1. Insérer ligne audit (append-only)
-            DB::table('lettrage_audit')->insert([
-                'association_id' => TenantContext::currentId(),
-                'action' => 'lettre',
-                'lettrage_code' => $code,
-                'compte_id' => $compteId,
-                'transaction_ligne_ids' => json_encode($ids),
-                'user_id' => Auth::id(),
-                'motif' => $motif,
-                'created_at' => now(),
-            ]);
+            $this->writeAudit('lettre', $code, $compteId, $ids, $motif);
 
             // 2. Appliquer le code sur les lignes (atomique)
             TransactionLigne::whereIn('id', $ids)->update(['lettrage_code' => $code]);
         });
 
         return $code;
+    }
+
+    /**
+     * Délettre toutes les lignes portant le code donné.
+     *
+     * Résolution tenant : on charge les lignes via `whereHas('compte')` qui
+     * applique le TenantScope sur `comptes.association_id` (fail-closed).
+     * Cela exclut silencieusement tout code cross-tenant (cryptographiquement
+     * improbable sur 20 chars aléatoires, mais défensif par construction).
+     *
+     * @throws LettrageInexistantException si aucune ligne trouvée pour ce code (et ce tenant).
+     */
+    public function delettrer(string $code, ?string $motif = null): void
+    {
+        // Charge les lignes du code, filtrées au tenant courant via relation compte
+        $lignes = TransactionLigne::where('lettrage_code', $code)
+            ->whereHas('compte')   // TenantScope sur Compte → filtrage tenant fail-closed
+            ->get();
+
+        if ($lignes->isEmpty()) {
+            throw LettrageInexistantException::forCode($code);
+        }
+
+        $ids = $lignes->pluck('id')->all();
+        $compteId = (int) $lignes->first()->compte_id;
+
+        DB::transaction(function () use ($ids, $compteId, $code, $motif): void {
+            // 1. Audit append-only (action='delettre')
+            $this->writeAudit('delettre', $code, $compteId, $ids, $motif);
+
+            // 2. Effacer le lettrage_code sur toutes les lignes du groupe
+            TransactionLigne::whereIn('id', $ids)->update(['lettrage_code' => null]);
+        });
+    }
+
+    /**
+     * Délettre le groupe entier auquel appartient la ligne donnée.
+     *
+     * @throws LigneNonLettreeException si la ligne n'est pas lettrée.
+     */
+    public function delettrerParLigne(TransactionLigne $ligne, ?string $motif = null): void
+    {
+        if ($ligne->lettrage_code === null) {
+            throw LigneNonLettreeException::forLigne($ligne->id);
+        }
+
+        $this->delettrer($ligne->lettrage_code, $motif);
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers privés
+    // -------------------------------------------------------------------------
+
+    /**
+     * Insère une ligne dans `lettrage_audit` (append-only).
+     *
+     * Mutualisé entre lettrer() (action='lettre') et delettrer() (action='delettre').
+     *
+     * @param  array<int>  $ids  Snapshot des transaction_ligne_ids concernés.
+     */
+    private function writeAudit(
+        string $action,
+        string $code,
+        int $compteId,
+        array $ids,
+        ?string $motif
+    ): void {
+        DB::table('lettrage_audit')->insert([
+            'association_id' => TenantContext::currentId(),
+            'action' => $action,
+            'lettrage_code' => $code,
+            'compte_id' => $compteId,
+            'transaction_ligne_ids' => json_encode($ids),
+            'user_id' => Auth::id(),
+            'motif' => $motif,
+            'created_at' => now(),
+        ]);
     }
 
     // -------------------------------------------------------------------------
