@@ -701,6 +701,234 @@ final class EcritureGenerator
         });
     }
 
+    /**
+     * Génère l'écriture T1 (dette fournisseur) pour une dépense constatée à crédit.
+     *
+     * Matrice École C (spec §4.3) — Dépense à crédit :
+     *   T1 : $compteCharge D X (sans tiers) / 401 C X (avec tiers fournisseur)
+     *
+     * Pas de T2 ici : le règlement sera enregistré séparément via
+     * pourReglementFournisseur() (Step 19), qui créera T2 et lettra la paire 401.
+     *
+     * mode_paiement est laissé à null : aucun décaissement n'a encore eu lieu.
+     *
+     * @throws \InvalidArgumentException Si $montant ≤ 0.
+     * @throws CompteIncorrectException Si $compteCharge ∉ classe 6.
+     * @throws TenantBoundaryException Si $tiers ou l'un des comptes n'appartient pas au tenant courant.
+     * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
+     */
+    public function pourDepenseACredit(
+        Tiers $tiers,
+        Compte $compteCharge,
+        float $montant,
+        \DateTimeInterface $dateConstatation,
+        ?string $libelle = null,
+        ?Operation $operation = null,
+    ): Transaction {
+        // --- Validation input ---
+
+        if ($montant <= 0) {
+            throw new \InvalidArgumentException(
+                "Le montant d'une dépense à crédit doit être strictement positif (reçu : {$montant})."
+            );
+        }
+
+        if ($compteCharge->classe !== 6) {
+            throw CompteIncorrectException::classeAttendue(
+                $compteCharge->numero_pcg,
+                $compteCharge->classe,
+                6
+            );
+        }
+
+        // --- Résolution compte 401 (tenant-scopé automatiquement) ---
+        $compte401 = Compte::ofNumeroSysteme('401');
+
+        // --- Invariant tenant (fail-fast avant DB::transaction) ---
+        $this->assertTenantCoherence(
+            collect(),
+            collect([$tiers])
+        );
+
+        // --- Création dans une transaction DB ---
+        return DB::transaction(function () use (
+            $tiers, $compteCharge, $compte401, $montant,
+            $dateConstatation, $libelle, $operation
+        ): Transaction {
+            $libelleEffectif = $libelle ?? 'Dépense à crédit';
+
+            $transaction = $this->createTransactionHeader(
+                type: TypeTransaction::Depense,
+                date: $dateConstatation,
+                libelle: $libelleEffectif,
+                montant: $montant,
+                modePaiement: null,
+            );
+
+            // Ligne 1 : débit charge (sans tiers)
+            $ligne1 = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compteCharge->id,
+                'debit' => $montant,
+                'credit' => 0,
+                'tiers_id' => null,
+                'libelle' => $libelleEffectif,
+                'operation_id' => $operation?->id,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne1->setRelation('compte', $compteCharge);
+
+            // Ligne 2 : crédit 401 (tiers fournisseur — dette ouverte)
+            $ligne2 = TransactionLigne::create([
+                'transaction_id' => $transaction->id,
+                'compte_id' => $compte401->id,
+                'debit' => 0,
+                'credit' => $montant,
+                'tiers_id' => $tiers->id,
+                'libelle' => $libelleEffectif,
+                'operation_id' => $operation?->id,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne2->setRelation('compte', $compte401);
+
+            // --- Vérifications post-création (paranoïa) ---
+            $lignes = collect([$ligne1, $ligne2]);
+            $this->assertEquilibre($lignes);
+            $this->assertTiersObligatoire411($lignes); // couvre aussi 401
+
+            $transaction->setRelation('lignes', $lignes);
+
+            return $transaction;
+        });
+    }
+
+    /**
+     * Génère l'écriture T2 (règlement fournisseur) pour une dette fournisseur ouverte.
+     *
+     * Matrice École C (spec §4.3) — Règlement fournisseur :
+     *   T2 : 401 D X (tiers) / $comptePortage C X (tiers)
+     *   + auto-lettrage de la paire 401 (ligne T1 + ligne T2)
+     *
+     * Mapping mode → compte portage (symétrique à pourDepenseComptant) :
+     *   Cheque      → $compteTresorerie (512X — chèque émis, pas de 5112 miroir)
+     *   Especes     → 530 (Caisse)
+     *   Virement    → $compteTresorerie (512X)
+     *   Cb          → $compteTresorerie (512X)
+     *   Prelevement → $compteTresorerie (512X)
+     *
+     * Prérequis : $transactionDette est une T1 créée par pourDepenseACredit().
+     * Elle doit contenir une ligne 401 avec tiers_id non null et non lettrée.
+     *
+     * @throws \InvalidArgumentException Si T1 ne contient pas de ligne 401 valide.
+     * @throws LettrageDejaPresentException Si la ligne 401 source est déjà lettrée.
+     * @throws TenantBoundaryException Si les comptes/tiers n'appartiennent pas au tenant courant.
+     * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
+     */
+    public function pourReglementFournisseur(
+        Transaction $transactionDette,
+        ModePaiement $mode,
+        Compte $compteTresorerie,
+        \DateTimeInterface $datePaiement,
+        ?string $libelle = null,
+    ): Transaction {
+        // --- Résolution compte 401 (tenant-scopé automatiquement) ---
+        $compte401 = Compte::ofNumeroSysteme('401');
+
+        // --- Résolution ligne 401 source dans T1 (DB fraîche pour lettrage_code à jour) ---
+        $ligne401Source = TransactionLigne::where('transaction_id', $transactionDette->id)
+            ->where('compte_id', $compte401->id)
+            ->first();
+
+        if ($ligne401Source === null || $ligne401Source->tiers_id === null) {
+            throw new \InvalidArgumentException(
+                "La transaction #{$transactionDette->id} ne contient pas de ligne 401 avec un tiers — ce n'est pas une dette fournisseur valide."
+            );
+        }
+
+        // --- Refus si ligne 401 source déjà lettrée (dette déjà réglée) ---
+        if ($ligne401Source->lettrage_code !== null) {
+            throw LettrageDejaPresentException::forLigne(
+                (int) $ligne401Source->id,
+                $ligne401Source->lettrage_code
+            );
+        }
+
+        // --- Résolution tiers et compte de portage ---
+        /** @var Tiers $tiers */
+        $tiers = Tiers::findOrFail($ligne401Source->tiers_id);
+
+        $comptePortage = $this->resoudreComptePortageDepense($mode, $compteTresorerie);
+
+        // --- Invariant tenant (fail-fast avant DB::transaction) ---
+        $this->assertTenantCoherence(
+            collect(),
+            collect([$tiers])
+        );
+
+        // --- Montant = crédit de la ligne 401 source (dette ouverte) ---
+        $montant = (float) $ligne401Source->credit;
+
+        // --- Création dans une transaction DB ---
+        return DB::transaction(function () use (
+            $transactionDette, $tiers, $compte401, $comptePortage, $montant,
+            $mode, $datePaiement, $libelle, $ligne401Source
+        ): Transaction {
+            $libelleEffectif = $libelle ?? "Règlement fournisseur #{$transactionDette->id}";
+
+            $t2 = $this->createTransactionHeader(
+                type: TypeTransaction::Depense,
+                date: $datePaiement,
+                libelle: $libelleEffectif,
+                montant: $montant,
+                modePaiement: $mode,
+            );
+
+            // Ligne 1 : débit 401 (tiers — soldage de la dette)
+            $ligne401Reglement = TransactionLigne::create([
+                'transaction_id' => $t2->id,
+                'compte_id' => $compte401->id,
+                'debit' => $montant,
+                'credit' => 0,
+                'tiers_id' => $tiers->id,
+                'libelle' => $libelleEffectif,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne401Reglement->setRelation('compte', $compte401);
+
+            // Ligne 2 : crédit trésorerie (tiers — décaissement effectif)
+            $lignePortage = TransactionLigne::create([
+                'transaction_id' => $t2->id,
+                'compte_id' => $comptePortage->id,
+                'debit' => 0,
+                'credit' => $montant,
+                'tiers_id' => $tiers->id,
+                'libelle' => $libelleEffectif,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $lignePortage->setRelation('compte', $comptePortage);
+
+            // --- Vérifications post-création (paranoïa) ---
+            $lignes = collect([$ligne401Reglement, $lignePortage]);
+            $this->assertEquilibre($lignes);
+            $this->assertTiersObligatoire411($lignes);
+
+            // --- Auto-lettrage paire 401 : T1-ligne401 ↔ T2-ligne401 ---
+            $this->lettrageService->lettrer(
+                collect([$ligne401Source, $ligne401Reglement]),
+                null,
+                "Auto-lettrage règlement fournisseur dette T#{$transactionDette->id} → T#{$t2->id}"
+            );
+
+            $t2->setRelation('lignes', $lignes);
+
+            return $t2;
+        });
+    }
+
     // =========================================================================
     // Méthodes privées
     // =========================================================================
