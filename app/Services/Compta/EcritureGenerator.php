@@ -14,6 +14,7 @@ use App\Exceptions\Compta\TiersInterditException;
 use App\Exceptions\Compta\TiersRequisException;
 use App\Models\Compte;
 use App\Models\Operation;
+use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
@@ -1013,6 +1014,204 @@ final class EcritureGenerator
     }
 
     /**
+     * Génère l'écriture T4 (remise bancaire, Variante 2a splittée par tiers) pour une remise
+     * groupant plusieurs chèques ou espèces de tiers distincts.
+     *
+     * Matrice École C (spec §4.3 + §4.4) — Remise bancaire :
+     *   T4 : 512X D (total, sans tiers) / N × 5112 (ou 530) C (sous-total tiers, avec tiers)
+     *   + auto-lettrage par groupe-tiers (lignes 5112 sources + ligne 5112 T4 du tiers)
+     *
+     * Variante 2a : splittage par tiers — 1 ligne de portage crédit par tiers groupé.
+     * La ligne 512 débit est unique (total agrégé), sans tiers — c'est exactement l'invariant
+     * assertPasDeTiersSur512 exercé en context réel.
+     *
+     * Mode supporté :
+     *   Cheque  → portage = 5112 (Chèques à encaisser)
+     *   Especes → portage = 530  (Caisse)
+     *   Autres  → \InvalidArgumentException
+     *
+     * @param  RemiseBancaire  $remise  La remise bancaire source (mode_paiement + compte_cible_id).
+     * @param  Collection<int, TransactionLigne>  $lignes5112Sources  Lignes sur 5112 ou 530,
+     *                                                                toutes avec tiers_id non null,
+     *                                                                non lettrées.
+     * @return Transaction T4 créée avec N+1 lignes équilibrées.
+     *
+     * @throws \InvalidArgumentException Si $lignes5112Sources est vide,
+     *                                   ou si une ligne source est sans tiers_id,
+     *                                   ou si les lignes sources sont sur des comptes différents,
+     *                                   ou si le mode de la remise n'est pas Cheque/Especes.
+     * @throws CompteIncorrectException Si le compte cible résolu n'est pas un 512X bancaire physique.
+     * @throws TenantBoundaryException Si une ligne source ou le compte cible n'appartient pas au tenant courant.
+     * @throws LettrageDejaPresentException Si une ligne source est déjà lettrée (levée par LettrageService, rollback).
+     * @throws EcritureNonEquilibreeException Sécurité paranoïaque post-création.
+     */
+    public function pourRemiseBancaire(
+        RemiseBancaire $remise,
+        Collection $lignes5112Sources,
+    ): Transaction {
+        // --- Validation : lignes non vides ---
+        if ($lignes5112Sources->isEmpty()) {
+            throw new \InvalidArgumentException(
+                'La collection de lignes sources pour la remise bancaire ne peut pas être vide.'
+            );
+        }
+
+        // --- Validation : toutes les lignes sources ont un tiers_id ---
+        foreach ($lignes5112Sources as $ligne) {
+            if ($ligne->tiers_id === null) {
+                throw new \InvalidArgumentException(
+                    "La ligne #{$ligne->id} n'a pas de tiers_id — une remise bancaire ne peut pas avoir de lignes anonymes."
+                );
+            }
+        }
+
+        // --- Validation : toutes les lignes sources sont sur le même compte ---
+        $compteIdsSources = $lignes5112Sources->pluck('compte_id')->unique();
+        if ($compteIdsSources->count() > 1) {
+            throw new \InvalidArgumentException(
+                'Les lignes sources de la remise bancaire sont sur des comptes différents ('.
+                $compteIdsSources->implode(', ').') — elles doivent toutes être sur le même compte de portage.'
+            );
+        }
+
+        // --- Validation : mode supporté (Cheque ou Especes) ---
+        $mode = $remise->mode_paiement;
+        if ($mode !== ModePaiement::Cheque && $mode !== ModePaiement::Especes) {
+            throw new \InvalidArgumentException(
+                "Le mode {$mode->value} n'est pas supporté pour une remise bancaire. Modes acceptés : cheque, especes."
+            );
+        }
+
+        // --- Résolution du compte de portage (5112 ou 530) ---
+        $comptePortage = $this->resoudreComptePortage($mode, Compte::ofNumeroSysteme('5112'));
+        // Note : pour Cheque → resoudreComptePortage retourne 5112
+        //        pour Especes → resoudreComptePortage retourne 530
+        // Le 3e argument (compteTresorerieExplicite) n'est jamais utilisé pour ces 2 modes.
+
+        // --- Résolution du compte cible (512X) depuis RemiseBancaire → CompteBancaire → Compte par IBAN ---
+        $compteBancaire = $remise->compteCible;
+        $compteCible512 = Compte::where('iban', $compteBancaire->iban)
+            ->where('association_id', (int) TenantContext::currentId())
+            ->first();
+
+        if ($compteCible512 === null) {
+            throw new \InvalidArgumentException(
+                "Aucun compte 512X trouvé pour le CompteBancaire #{$compteBancaire->id} (IBAN : {$compteBancaire->iban})."
+            );
+        }
+
+        // --- Validation : compte cible doit être un 512X bancaire physique ---
+        $isBancaire512 = $compteCible512->classe === 5
+            && str_starts_with($compteCible512->numero_pcg, '512')
+            && strlen($compteCible512->numero_pcg) > 3;
+
+        if (! $isBancaire512) {
+            throw CompteIncorrectException::classeAttendue(
+                $compteCible512->numero_pcg,
+                $compteCible512->classe,
+                '5 (512X — bancaire physique)'
+            );
+        }
+
+        // --- Invariant tenant (fail-fast avant DB::transaction) ---
+        $this->assertTenantCoherence($lignes5112Sources);
+
+        // --- Recharger les lignes sources depuis la DB pour avoir lettrage_code à jour ---
+        // Les objets passés peuvent être stale si leur lettrage_code a été modifié entre
+        // leur création et cet appel. LettrageService::assertPasDeRelettrage vérifie
+        // l'objet PHP → on garantit l'état frais en rechargeant depuis la DB.
+        $ids = $lignes5112Sources->pluck('id')->all();
+        $lignesSourcesFraiches = TransactionLigne::whereIn('id', $ids)->get();
+
+        // --- Calcul du total et groupement par tiers (sur les lignes fraîches) ---
+        $total = (float) $lignesSourcesFraiches->sum(fn (TransactionLigne $l): float => (float) $l->debit);
+        $groupesParTiers = $this->regrouperParTiers($lignesSourcesFraiches);
+
+        // --- Création dans une transaction DB ---
+        return DB::transaction(function () use (
+            $remise, $comptePortage, $compteCible512,
+            $total, $groupesParTiers, $mode
+        ): Transaction {
+            $libelle = $remise->libelle ?? "Remise bancaire #{$remise->id}";
+
+            $t4 = $this->createTransactionHeader(
+                type: TypeTransaction::Recette,
+                date: $remise->date instanceof \DateTimeInterface
+                    ? $remise->date
+                    : new \DateTimeImmutable((string) $remise->date),
+                libelle: $libelle,
+                montant: $total,
+                modePaiement: $mode,
+            );
+
+            // --- Ligne 512X D total, SANS tiers ---
+            $ligne512 = TransactionLigne::create([
+                'transaction_id' => $t4->id,
+                'compte_id' => $compteCible512->id,
+                'debit' => $total,
+                'credit' => 0,
+                'tiers_id' => null,
+                'libelle' => $libelle,
+                'montant' => 0,
+                'sous_categorie_id' => null,
+            ]);
+            $ligne512->setRelation('compte', $compteCible512);
+
+            // --- N lignes portage crédit (une par tiers groupé), AVEC tiers ---
+            $idsLignesT4 = [$ligne512->id];
+
+            foreach ($groupesParTiers as $groupe) {
+                $tiersId = $groupe['tiers_id'];
+                $sousTotal = $groupe['sousTotal'];
+                $lignesSourcesTiers = $groupe['lignes'];
+
+                $lignePortageTiers = TransactionLigne::create([
+                    'transaction_id' => $t4->id,
+                    'compte_id' => $comptePortage->id,
+                    'debit' => 0,
+                    'credit' => $sousTotal,
+                    'tiers_id' => $tiersId,
+                    'libelle' => $libelle,
+                    'montant' => 0,
+                    'sous_categorie_id' => null,
+                ]);
+                $idsLignesT4[] = $lignePortageTiers->id;
+
+                // --- Auto-lettrage par groupe-tiers ---
+                // Lettrer : lignes sources fraîches du tiers + ligne T4 crédit du tiers
+                // lignesSourcesTiers->push() crée une nouvelle collection (immutable-like)
+                $this->lettrageService->lettrer(
+                    $lignesSourcesTiers->values()->push($lignePortageTiers),
+                    null,
+                    "Auto-lettrage remise bancaire #{$remise->id} pour tiers #{$tiersId}"
+                );
+            }
+
+            // --- Recharger toutes les lignes de T4 depuis la DB (lettrage_code à jour) ---
+            $lignesT4 = TransactionLigne::whereIn('id', $idsLignesT4)->get();
+            foreach ($lignesT4 as $l) {
+                if ((int) $l->compte_id === (int) $compteCible512->id) {
+                    $l->setRelation('compte', $compteCible512);
+                } else {
+                    $l->setRelation('compte', $comptePortage);
+                }
+            }
+
+            // --- Vérifications post-création (paranoïa) ---
+            $this->assertEquilibre($lignesT4);
+
+            // assertPasDeTiersSur512 : exercé ici — la ligne 512 D n'a pas de tiers (null),
+            // les lignes 5112/530 crédit portent des tiers (voulu, exclu de cet invariant).
+            $ligne512Rechargee = $lignesT4->firstWhere('compte_id', $compteCible512->id);
+            $this->assertPasDeTiersSur512(collect([$ligne512Rechargee]));
+
+            $t4->setRelation('lignes', $lignesT4);
+
+            return $t4;
+        });
+    }
+
+    /**
      * Génère un code de lettrage unique (20 caractères aléatoires).
      *
      * Format identique à celui utilisé par LettrageService::lettrer() quand
@@ -1022,5 +1221,31 @@ final class EcritureGenerator
     public function generateLettrageCode(): string
     {
         return Str::random(20);
+    }
+
+    // =========================================================================
+    // Helpers privés — Remise bancaire
+    // =========================================================================
+
+    /**
+     * Regroupe les lignes de portage sources par tiers_id et calcule le sous-total.
+     *
+     * @param  Collection<int, TransactionLigne>  $lignes
+     * @return Collection<int, array{tiers_id: int, lignes: Collection<int, TransactionLigne>, sousTotal: float}>
+     */
+    private function regrouperParTiers(Collection $lignes): Collection
+    {
+        return $lignes
+            ->groupBy(fn (TransactionLigne $l): int => (int) $l->tiers_id)
+            ->map(function (Collection $group, int $tiersId): array {
+                $sousTotal = (float) $group->sum(fn (TransactionLigne $l): float => (float) $l->debit);
+
+                return [
+                    'tiers_id' => $tiersId,
+                    'lignes' => $group,
+                    'sousTotal' => $sousTotal,
+                ];
+            })
+            ->values();
     }
 }
