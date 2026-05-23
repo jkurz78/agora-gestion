@@ -75,9 +75,11 @@ final class ReglementOperationService
             return;
         }
 
-        // Règlements sans transaction existante, avec montant > 0
+        // Règlements sans transaction existante, avec montant > 0.
+        // Guard multi-tenant : Reglement n'a pas de association_id propre → dérivé via Participant.
         $reglements = Reglement::with('participant.tiers')
             ->where('seance_id', (int) $seance->id)
+            ->whereHas('participant', fn ($q) => $q->where('association_id', (int) TenantContext::currentId()))
             ->where('montant_prevu', '>', 0)
             ->whereDoesntHave('transaction')
             ->get();

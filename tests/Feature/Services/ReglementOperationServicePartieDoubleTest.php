@@ -388,3 +388,58 @@ it('[G] marquerRecu skip si Tx déjà pointée (isLockedByRapprochement = statut
     // Pas de T2 créée
     expect(Transaction::count())->toBe(1);
 });
+
+// ---------------------------------------------------------------------------
+// Scénario H : guard multi-tenant — comptabiliserSeance ignore les Reglement cross-tenant
+// ---------------------------------------------------------------------------
+
+it('[H] comptabiliserSeance ignore les Reglement cross-tenant (même seance_id par corruption)', function () {
+    // Association 2 distincte — toutes les FK créées via raw insert pour éviter
+    // les contraintes NOT NULL du factory (sous_categorie_id sur type_operations).
+    $asso2 = Association::factory()->create();
+
+    $operation2Id = DB::table('operations')->insertGetId([
+        'association_id' => $asso2->id,
+        'type_operation_id' => null,
+        'nom' => 'Op asso2',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // Participant cross-tenant (asso2) rattaché à l'opération2
+    $tiersCross = Tiers::factory()->create(['association_id' => $asso2->id]);
+    $participantCross = DB::table('participants')->insertGetId([
+        'association_id' => $asso2->id,
+        'tiers_id' => $tiersCross->id,
+        'operation_id' => $operation2Id,
+        'date_inscription' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // Règlement cross-tenant : participant asso2 mais seance_id = seance asso1 (corruption simulée)
+    DB::table('reglements')->insert([
+        'participant_id' => $participantCross,
+        'seance_id' => (int) $this->seance->id, // même seance_id que asso1 !
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'montant_prevu' => 999.00,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    // Revenir au contexte tenant asso1
+    TenantContext::boot($this->association);
+
+    // Règlement légitime asso1
+    creerParticipantEtReglement($this, ModePaiement::Cheque, 50.00);
+
+    $this->service->comptabiliserSeance($this->seance, (int) $this->compteBancaire->id, $this->date);
+
+    // Seul le règlement asso1 (50.00) doit avoir généré une Transaction
+    $txs = Transaction::all();
+    expect($txs)->toHaveCount(1);
+    expect((float) $txs->first()->montant_total)->toBe(50.0);
+
+    // Le règlement cross-tenant (999.00) n'a pas généré de Transaction
+    expect(Transaction::where('montant_total', 999.00)->count())->toBe(0);
+});
