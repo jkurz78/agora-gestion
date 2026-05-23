@@ -20,17 +20,6 @@ use App\Tenant\TenantContext;
 // ---------------------------------------------------------------------------
 
 /**
- * Crée ou récupère le compte système par numero_pcg pour le tenant courant.
- */
-function compteSysteme(string $numeroPcg): Compte
-{
-    return Compte::where('numero_pcg', $numeroPcg)
-        ->where('association_id', TenantContext::currentId())
-        ->where('est_systeme', true)
-        ->firstOrFail();
-}
-
-/**
  * Crée un compte produit classe 7 pour le tenant courant.
  */
 function compte706(string $suffix = ''): Compte

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Association;
+use App\Models\Compte;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Mail\Mailable;
@@ -82,6 +83,18 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Raccourci global pour récupérer un compte système (411, 401, 5112, 530, etc.)
+ * dans le tenant courant. Utilise firstOrFail() pour échouer clairement si le
+ * compte est absent (ex. SystemeSeeder non appelé dans le beforeEach).
+ */
+function compteSysteme(string $numero): Compte
+{
+    return Compte::where('numero_pcg', $numero)
+        ->where('association_id', TenantContext::currentId())
+        ->firstOrFail();
 }
 
 /**

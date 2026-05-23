@@ -141,22 +141,6 @@ function creerFactureEtT1(
     return [$facture, $t1];
 }
 
-/** Raccourci compte 411 tenant courant. */
-function compte411Enc(): Compte
-{
-    return Compte::where('numero_pcg', '411')
-        ->where('association_id', TenantContext::currentId())
-        ->firstOrFail();
-}
-
-/** Raccourci compte 5112 tenant courant. */
-function compte5112Enc(): Compte
-{
-    return Compte::where('numero_pcg', '5112')
-        ->where('association_id', TenantContext::currentId())
-        ->firstOrFail();
-}
-
 // ---------------------------------------------------------------------------
 // Scénario A : T2 créée avec Chèque — 5112 D / 411 C tiers + auto-lettrage
 // ---------------------------------------------------------------------------
@@ -166,7 +150,7 @@ it('[A] marquerReglementRecu Cheque → T2 créée (5112 D / 411 C tiers), 411 a
 
     // Précondition : 1 transaction (T1) attachée, ligne 411 non lettrée
     expect($facture->transactions()->count())->toBe(1);
-    $compte411 = compte411Enc();
+    $compte411 = compteSysteme('411');
     $ligne411T1 = TransactionLigne::where('transaction_id', $t1->id)
         ->where('compte_id', $compte411->id)
         ->firstOrFail();
@@ -191,7 +175,7 @@ it('[A] marquerReglementRecu Cheque → T2 créée (5112 D / 411 C tiers), 411 a
     $lignesT2 = TransactionLigne::where('transaction_id', $t2->id)->get();
     expect($lignesT2)->toHaveCount(2);
 
-    $compte5112 = compte5112Enc();
+    $compte5112 = compteSysteme('5112');
 
     // Ligne portage : 5112 D (pour Chèque reçu)
     $lignePortage = $lignesT2->firstWhere('compte_id', $compte5112->id);
@@ -237,7 +221,7 @@ it('[B] marquerReglementRecu Virement + IBAN connu → T2 créée (512X D / 411 
     $lignesT2 = TransactionLigne::where('transaction_id', $t2->id)->get();
     expect($lignesT2)->toHaveCount(2);
 
-    $compte411 = compte411Enc();
+    $compte411 = compteSysteme('411');
 
     // Ligne portage : 512X D (résolution IBAN)
     $lignePortage = $lignesT2->firstWhere('compte_id', $this->compte512X->id);
@@ -270,7 +254,7 @@ it('[C] solde ouvert 411 du tiers = 0 après encaissement (lettrage complet)', f
     [$facture, $t1] = creerFactureEtT1($this, ModePaiement::Cheque);
 
     // Avant encaissement : solde ouvert = 200
-    $compte411 = compte411Enc();
+    $compte411 = compteSysteme('411');
     $lignes411AvantEnc = TransactionLigne::where('compte_id', $compte411->id)
         ->where('tiers_id', $this->tiers->id)
         ->whereNull('lettrage_code')
@@ -297,65 +281,70 @@ it('[C] solde ouvert 411 du tiers = 0 après encaissement (lettrage complet)', f
 // ---------------------------------------------------------------------------
 
 it('[D] double encaissement → LettrageDejaPresentException, pas de T3 créée', function () {
-    [$facture, $t1] = creerFactureEtT1($this, ModePaiement::Cheque);
+    // Stratégie : créer une facture avec T1a (générée par valider()) + T1b (factice, EnAttente).
+    // montant_total = 400 pour que isAcquittee() reste false après le 1er encaissement de T1a (200).
+    // Ainsi le 2ème appel marquerReglementRecu([$t1a->id]) atteint encaisserPartieDouble()
+    // et déclenche LettrageDejaPresentException (ligne 411 T1a déjà lettrée au 1er appel).
 
-    // 1er appel : OK
-    $this->service->marquerReglementRecu($facture, [$t1->id]);
-    $facture->refresh();
-    expect($facture->transactions()->count())->toBe(2);
+    // T1a : créée normalement via valider() — porte une ligne 411 PD
+    [$facture, $t1a] = creerFactureEtT1($this, ModePaiement::Cheque);
+    // montant_total initial = 200 (1 ligne MontantManuel de 200)
 
-    // 2ème appel : throw LettrageDejaPresentException (ligne 411 T1 déjà lettrée)
-    // On doit d'abord remettre la facture en état "pas acquittée" pour passer la garde isAcquittee.
-    // Mais la facture EST acquittée après le 1er appel. Il faut créer une 2ème transaction attachée
-    // non-Recu pour que isAcquittee() retourne false, puis tenter de re-encaisser T1.
-    //
-    // Approche alternative : tester directement la garde LettrageDejaPresentException
-    // en appelant EcritureGenerator::pourEncaissementCreance directement — mais c'est un test unitaire.
-    //
-    // Approche réaliste : on ne bypass pas isAcquittee(). On teste le rollback en créant une
-    // 2ème transaction non-Recu pour que la facture ne soit pas acquittée, puis on tente
-    // marquerReglementRecu avec [$t1->id] → ligne 411 T1 déjà lettrée → throw.
-
-    // Crée T3 (non liée au flux PD, juste pour rendre la facture "non acquittée")
-    $txExtra = Transaction::factory()->asRecette()->create([
+    // T1b : transaction en attente factice représentant un 2ème paiement attendu
+    $t1b = Transaction::factory()->asRecette()->create([
         'association_id' => $this->association->id,
         'tiers_id' => $this->tiers->id,
-        'montant_total' => 50.00,
+        'montant_total' => 200.00,
+        'mode_paiement' => ModePaiement::Cheque->value,
     ]);
-    $facture->transactions()->attach($txExtra->id);
-    // Facture n'est plus acquittée car montant_total > montantRegle()
-    // Mais montant_total = 200 et montantRegle() = 200 (t1 statut_reglement=Recu)…
-    // En fait isAcquittee() est basé sur montantRegle() vs montant_total.
-    // On va plutôt vérifier que la 2ème tentative sur t1 (déjà lettré) throw correctement
-    // en créant un nouveau contexte simulant une re-ouverture.
+    $facture->transactions()->attach($t1b->id);
 
-    // Vérifier simplement que la ligne 411 de T1 est bien lettrée → guard dans EcritureGenerator
-    $compte411 = compte411Enc();
-    $ligne411T1 = TransactionLigne::where('transaction_id', $t1->id)
+    // Ajuster montant_total à 400 pour refléter les 2 transactions attendues.
+    // isAcquittee() = montantRegle() >= montant_total.
+    // Après 1er appel (T1a → Recu) : montantRegle = 200 < 400 → pas acquittée → 2ème appel peut passer.
+    $facture->update(['montant_total' => 400.00]);
+    $facture->refresh();
+
+    // 1er appel : OK — T1a lettrée, T2a créée
+    $this->service->marquerReglementRecu($facture, [$t1a->id]);
+    $facture->refresh();
+
+    // T2a créée et attachée (T1a + T1b + T2a = 3 transactions)
+    expect($facture->transactions()->count())->toBe(3);
+
+    // Ligne 411 de T1a bien lettrée
+    $compte411 = compteSysteme('411');
+    $ligne411T1a = TransactionLigne::where('transaction_id', $t1a->id)
         ->where('compte_id', $compte411->id)
         ->firstOrFail();
-    $ligne411T1->refresh();
-    expect($ligne411T1->lettrage_code)->not->toBeNull('ligne 411 T1 doit être lettrée après 1er encaissement');
+    $ligne411T1a->refresh();
+    expect($ligne411T1a->lettrage_code)->not->toBeNull('ligne 411 T1a doit être lettrée après 1er encaissement');
 
-    // La T2 créée par le 1er encaissement ne doit pas être recréée
-    $countT2Avant = $facture->transactions()->count(); // = 3 avec txExtra
+    // T1b reste non lettrée (aucune ligne 411 — transaction factice sans PD)
+    $lignes411T1b = TransactionLigne::where('transaction_id', $t1b->id)
+        ->where('compte_id', $compte411->id)
+        ->get();
+    expect($lignes411T1b)->toBeEmpty('T1b ne doit porter aucune ligne 411');
 
-    // On attend LettrageDejaPresentException en tentant de re-encaisser T1
-    // (on bypasse la garde isAcquittee() car on a ajouté txExtra, montantRegle() reste 200
-    // qui == montant_total 200 → isAcquittee() reste true → la garde bloque).
-    // Ajustons : on augmente montant_total pour que isAcquittee() retourne false.
-    $facture->update(['montant_total' => 250.00]);
+    $countAvant2eAppel = $facture->transactions()->count(); // = 3
+
+    // 2ème appel avec T1a (déjà lettrée) → LettrageDejaPresentException + rollback
+    // isAcquittee() : montantRegle() = 200 (T1a Recu) < 400 → false → passe la garde
     $facture->refresh();
-
-    expect(fn () => $this->service->marquerReglementRecu($facture, [$t1->id]))
+    expect(fn () => $this->service->marquerReglementRecu($facture, [$t1a->id]))
         ->toThrow(LettrageDejaPresentException::class);
 
-    // Rollback → pas de nouvelle T créée (le count reste identique)
+    // Rollback complet : pas de nouvelle transaction créée
     $facture->refresh();
-    expect($facture->transactions()->count())->toBe($countT2Avant);
-    // T1 statut_reglement reste Recu (no-op car il était déjà Recu avant le 2ème appel)
-    $t1->refresh();
-    expect($t1->statut_reglement->value)->toBe(StatutReglement::Recu->value);
+    expect($facture->transactions()->count())->toBe($countAvant2eAppel);
+
+    // T1a reste Recu (statut non régressé par le rollback)
+    $t1a->refresh();
+    expect($t1a->statut_reglement->value)->toBe(StatutReglement::Recu->value);
+
+    // T1b reste EnAttente (intacte, rollback n'affecte que T1a)
+    $t1b->refresh();
+    expect($t1b->statut_reglement->value)->toBe(StatutReglement::EnAttente->value);
 });
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,6 @@ namespace App\Services\Compta;
 use App\Enums\ModePaiement;
 use App\Models\Compte;
 use App\Models\CompteBancaire;
-use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -59,7 +58,6 @@ final class CompteTresorerieResolver
 
             if ($compteBancaire !== null && $compteBancaire->iban !== null) {
                 $compte512X = Compte::where('iban', $compteBancaire->iban)
-                    ->where('association_id', (int) TenantContext::currentId())
                     ->bancaires()
                     ->first();
 

@@ -139,28 +139,6 @@ afterEach(function () {
 // Helpers locaux
 // ---------------------------------------------------------------------------
 
-/** Raccourci pour récupérer le compte système (411, 401, 5112, 530). */
-function compte411(): Compte
-{
-    return Compte::where('numero_pcg', '411')
-        ->where('association_id', TenantContext::currentId())
-        ->firstOrFail();
-}
-
-function compte401(): Compte
-{
-    return Compte::where('numero_pcg', '401')
-        ->where('association_id', TenantContext::currentId())
-        ->firstOrFail();
-}
-
-function compte5112(): Compte
-{
-    return Compte::where('numero_pcg', '5112')
-        ->where('association_id', TenantContext::currentId())
-        ->firstOrFail();
-}
-
 // ---------------------------------------------------------------------------
 // Scénario 1 : Recette comptant chèque
 // ---------------------------------------------------------------------------
@@ -195,8 +173,8 @@ it('recette comptant chèque — crée 4 lignes PD + enrichit la ligne legacy (l
 
     expect($totalLignes)->toBe(4);
 
-    $compte411 = compte411();
-    $compte5112 = compte5112();
+    $compte411 = compteSysteme('411');
+    $compte5112 = compteSysteme('5112');
 
     // 2 lignes sur 411 (D et C)
     $lignes411 = TransactionLigne::where('transaction_id', $transaction->id)
@@ -265,7 +243,7 @@ it('recette à crédit — crée 2 lignes (1 ventilation enrichie + 411 D), pas 
     $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
     expect($totalLignes)->toBe(2);
 
-    $compte411 = compte411();
+    $compte411 = compteSysteme('411');
 
     // 1 ligne 411 D (créance ouverte)
     $ligne411 = TransactionLigne::where('transaction_id', $transaction->id)
@@ -312,7 +290,7 @@ it('dépense comptant virement — crée 4 lignes symétriques (lignes 401 auto-
     $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
     expect($totalLignes)->toBe(4);
 
-    $compte401 = compte401();
+    $compte401 = compteSysteme('401');
 
     // 2 lignes 401 (C puis D — schéma dépense comptant)
     $lignes401 = TransactionLigne::where('transaction_id', $transaction->id)
@@ -380,7 +358,7 @@ it('dépense à crédit — crée 2 lignes symétriques, pas de lettrage', funct
     $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
     expect($totalLignes)->toBe(2);
 
-    $compte401 = compte401();
+    $compte401 = compteSysteme('401');
 
     // 1 ligne 401 C (dette ouverte)
     $ligne401 = TransactionLigne::where('transaction_id', $transaction->id)
@@ -455,7 +433,7 @@ it('multi-ventilation recette comptant chèque — 2 lignes 7x et 1 ligne 411 D 
     $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
     expect($totalLignes)->toBe(5);
 
-    $compte411 = compte411();
+    $compte411 = compteSysteme('411');
 
     // La ligne 411 D porte le montant total agrégé (150)
     $ligne411D = TransactionLigne::where('transaction_id', $transaction->id)
@@ -583,7 +561,7 @@ it('si sous-catégorie sans code_cerfa, la ligne legacy est créée mais pas enr
     expect($ligneVent->compte_id)->toBeNull('Sans code_cerfa, pas d\'enrichissement compte_id');
 
     // Aucune ligne 411 (skip de toute la double écriture car une ventilation manque son compte)
-    $compte411 = compte411();
+    $compte411 = compteSysteme('411');
     $lignes411 = TransactionLigne::where('transaction_id', $transaction->id)
         ->where('compte_id', $compte411->id)
         ->count();
@@ -620,8 +598,8 @@ it('dépense comptant chèque — la ligne portage est sur 512X, PAS sur 5112 (�
     $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
     expect($totalLignes)->toBe(4);
 
-    $compte401 = compte401();
-    $compte5112 = compte5112();
+    $compte401 = compteSysteme('401');
+    $compte5112 = compteSysteme('5112');
 
     // 2 lignes 401 auto-lettrées
     $lignes401 = TransactionLigne::where('transaction_id', $transaction->id)
@@ -777,7 +755,7 @@ it('Fix #4-B — notes propagées sur la ligne de ventilation dans une recette �
     );
 
     // Les lignes techniques (411) ne doivent PAS avoir de notes
-    $compte411 = compte411();
+    $compte411 = compteSysteme('411');
     $ligne411 = TransactionLigne::where('transaction_id', $transaction->id)
         ->where('compte_id', $compte411->id)
         ->first();

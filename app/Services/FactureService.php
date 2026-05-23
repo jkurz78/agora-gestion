@@ -756,7 +756,11 @@ XML;
         // on skip sans exception.
         $compte411 = Compte::ofNumero('411');
         if ($compte411 === null) {
-            // Pas de schéma partie double pour ce tenant — skip silencieux
+            Log::warning('[PartieDouble] Step 24 — skip : compte 411 absent (tenant sans schéma PD)', [
+                'transaction_id' => (int) $transaction->id,
+                'facture_id' => (int) $facture->id,
+            ]);
+
             return;
         }
 
@@ -765,7 +769,11 @@ XML;
             ->first();
 
         if ($ligne411 === null || $ligne411->tiers_id === null) {
-            // T1 legacy sans ligne 411 (recette saisie avant Step 23) — skip silencieux
+            Log::warning('[PartieDouble] Step 24 — skip : T1 legacy sans ligne 411 ou sans tiers', [
+                'transaction_id' => (int) $transaction->id,
+                'facture_id' => (int) $facture->id,
+            ]);
+
             return;
         }
 

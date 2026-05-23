@@ -141,14 +141,6 @@ function creerEtValiderFacture(
     return $facture->fresh();
 }
 
-/** Raccourci compte 411 tenant courant. */
-function compte411PD(): Compte
-{
-    return Compte::where('numero_pcg', '411')
-        ->where('association_id', TenantContext::currentId())
-        ->firstOrFail();
-}
-
 // ---------------------------------------------------------------------------
 // Scénario 1 : Facture avec 1 ligne MontantManuel → 2 lignes PD (706 C + 411 D)
 // ---------------------------------------------------------------------------
@@ -169,7 +161,7 @@ it('facture 1 ligne MontantManuel → Transaction avec 2 lignes PD (706 C + 411 
     $lignes = TransactionLigne::where('transaction_id', $tx->id)->get();
     expect($lignes)->toHaveCount(2);
 
-    $compte411 = compte411PD();
+    $compte411 = compteSysteme('411');
 
     // Ligne 706 C — ventilation enrichie
     $ligne706 = $lignes->firstWhere('compte_id', $this->compte706->id);
@@ -208,7 +200,7 @@ it('facture 2 lignes MontantManuel → 3 lignes PD (2 ventilations + 1 ligne 411
     $lignes = TransactionLigne::where('transaction_id', $tx->id)->get();
     expect($lignes)->toHaveCount(3);
 
-    $compte411 = compte411PD();
+    $compte411 = compteSysteme('411');
 
     // 2 ventilations 7x
     $ligne706 = $lignes->firstWhere('compte_id', $this->compte706->id);
@@ -242,7 +234,7 @@ it('solde ouvert 411 du tiers = montant_total facture (créance non lettrée)', 
         ['sous_categorie_id' => $this->sc706->id, 'montant' => 200.00],
     ]);
 
-    $compte411 = compte411PD();
+    $compte411 = compteSysteme('411');
 
     // Lignes 411 du tiers, non lettrées
     $lignes411 = TransactionLigne::where('compte_id', $compte411->id)
@@ -421,7 +413,7 @@ it('facture ligne MontantManuel avec SC sans code_cerfa — Transaction créée,
     expect((float) $ligneVent->credit)->toBe(0.0, 'Pas de crédit enrichi sans code_cerfa');
 
     // Aucune ligne 411 PD-only (le skip arrête toute la double écriture)
-    $compte411 = compte411PD();
+    $compte411 = compteSysteme('411');
     $count411 = TransactionLigne::where('transaction_id', $tx->id)
         ->where('compte_id', $compte411->id)
         ->count();
