@@ -338,6 +338,9 @@ final class EcritureGenerator
                         'libelle' => $libelleEffectif,
                         'operation_id' => $v['operation_id'] ?? null,
                         'seance' => $v['seance'] ?? null,
+                        // Fix #4 — notes métier propagées sur les lignes de ventilation (7x).
+                        // Les lignes techniques (411, portage) restent sans notes.
+                        'notes' => $v['notes'] ?? null,
                         'montant' => 0,
                         'sous_categorie_id' => null,
                     ]);
@@ -381,48 +384,18 @@ final class EcritureGenerator
                 "Auto-lettrage interne recette comptant T#{$transaction->id} tiers #{$tiers->id}"
             );
 
-            // --- Recharger les lignes PD-only depuis la DB (lettrage_code à jour) ---
+            // --- Recharger les lignes depuis la DB (lettrage_code à jour) ---
             // Quand existingTransaction est fourni, on charge TOUTES les lignes de la Tx
             // (y compris les ventilations enrichies) pour l'assertEquilibre.
             if ($existingTransaction !== null) {
                 $lignes = TransactionLigne::where('transaction_id', $transaction->id)
                     ->whereNotNull('compte_id')
                     ->get();
-
-                foreach ($lignes as $l) {
-                    if ((int) $l->compte_id === (int) $compte411->id) {
-                        $l->setRelation('compte', $compte411);
-                    } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
-                        $l->setRelation('compte', $comptePortage);
-                    } else {
-                        foreach ($ventilationsNorm as $v) {
-                            if ((int) $v['compte']->id === (int) $l->compte_id) {
-                                $l->setRelation('compte', $v['compte']);
-                                break;
-                            }
-                        }
-                    }
-                }
+                $this->reattacherComptesAuxLignes($lignes, $compte411, $comptePortage, $ventilationsNorm);
             } else {
                 $idsLignes = collect($toutesLignes)->pluck('id')->all();
                 $lignes = TransactionLigne::whereIn('id', $idsLignes)->get();
-
-                // Recharger les relations compte sur chaque ligne rechargée
-                foreach ($lignes as $l) {
-                    if ((int) $l->compte_id === (int) $compte411->id) {
-                        $l->setRelation('compte', $compte411);
-                    } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
-                        $l->setRelation('compte', $comptePortage);
-                    } else {
-                        // Compte de ventilation (7x) — chercher dans la collection normalisée
-                        foreach ($ventilationsNorm as $v) {
-                            if ((int) $v['compte']->id === (int) $l->compte_id) {
-                                $l->setRelation('compte', $v['compte']);
-                                break;
-                            }
-                        }
-                    }
-                }
+                $this->reattacherComptesAuxLignes($lignes, $compte411, $comptePortage, $ventilationsNorm);
             }
 
             // --- Vérifications post-création (paranoïa) ---
@@ -549,6 +522,8 @@ final class EcritureGenerator
                         'libelle' => $libelleEffectif,
                         'operation_id' => $v['operation_id'] ?? null,
                         'seance' => $v['seance'] ?? null,
+                        // Fix #4 — notes métier propagées sur les lignes de ventilation (7x).
+                        'notes' => $v['notes'] ?? null,
                         'montant' => 0,
                         'sous_categorie_id' => null,
                     ]);
@@ -563,18 +538,7 @@ final class EcritureGenerator
                 $lignesCollection = TransactionLigne::where('transaction_id', $transaction->id)
                     ->whereNotNull('compte_id')
                     ->get();
-                foreach ($lignesCollection as $l) {
-                    if ((int) $l->compte_id === (int) $compte411->id) {
-                        $l->setRelation('compte', $compte411);
-                    } else {
-                        foreach ($ventilationsNorm as $v) {
-                            if ((int) $v['compte']->id === (int) $l->compte_id) {
-                                $l->setRelation('compte', $v['compte']);
-                                break;
-                            }
-                        }
-                    }
-                }
+                $this->reattacherComptesAuxLignes($lignesCollection, $compte411, null, $ventilationsNorm);
             } else {
                 $lignesCollection = collect($lignes);
             }
@@ -716,6 +680,8 @@ final class EcritureGenerator
                         'libelle' => $libelleEffectif,
                         'operation_id' => $v['operation_id'] ?? null,
                         'seance' => $v['seance'] ?? null,
+                        // Fix #4 — notes métier propagées sur les lignes de ventilation (6x).
+                        'notes' => $v['notes'] ?? null,
                         'montant' => 0,
                         'sous_categorie_id' => null,
                     ]);
@@ -779,39 +745,11 @@ final class EcritureGenerator
                 $lignes = TransactionLigne::where('transaction_id', $transaction->id)
                     ->whereNotNull('compte_id')
                     ->get();
-
-                foreach ($lignes as $l) {
-                    if ((int) $l->compte_id === (int) $compte401->id) {
-                        $l->setRelation('compte', $compte401);
-                    } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
-                        $l->setRelation('compte', $comptePortage);
-                    } else {
-                        foreach ($ventilationsNorm as $v) {
-                            if ((int) $v['compte']->id === (int) $l->compte_id) {
-                                $l->setRelation('compte', $v['compte']);
-                                break;
-                            }
-                        }
-                    }
-                }
+                $this->reattacherComptesAuxLignes($lignes, $compte401, $comptePortage, $ventilationsNorm);
             } else {
                 $idsLignes = collect($toutesLignes)->pluck('id')->all();
                 $lignes = TransactionLigne::whereIn('id', $idsLignes)->get();
-
-                foreach ($lignes as $l) {
-                    if ((int) $l->compte_id === (int) $compte401->id) {
-                        $l->setRelation('compte', $compte401);
-                    } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
-                        $l->setRelation('compte', $comptePortage);
-                    } else {
-                        foreach ($ventilationsNorm as $v) {
-                            if ((int) $v['compte']->id === (int) $l->compte_id) {
-                                $l->setRelation('compte', $v['compte']);
-                                break;
-                            }
-                        }
-                    }
-                }
+                $this->reattacherComptesAuxLignes($lignes, $compte401, $comptePortage, $ventilationsNorm);
             }
 
             // --- Vérifications post-création (paranoïa) ---
@@ -1046,6 +984,8 @@ final class EcritureGenerator
                         'libelle' => $libelleEffectif,
                         'operation_id' => $v['operation_id'] ?? null,
                         'seance' => $v['seance'] ?? null,
+                        // Fix #4 — notes métier propagées sur les lignes de ventilation (6x).
+                        'notes' => $v['notes'] ?? null,
                         'montant' => 0,
                         'sous_categorie_id' => null,
                     ]);
@@ -1074,18 +1014,7 @@ final class EcritureGenerator
                 $lignesCollection = TransactionLigne::where('transaction_id', $transaction->id)
                     ->whereNotNull('compte_id')
                     ->get();
-                foreach ($lignesCollection as $l) {
-                    if ((int) $l->compte_id === (int) $compte401->id) {
-                        $l->setRelation('compte', $compte401);
-                    } else {
-                        foreach ($ventilationsNorm as $v) {
-                            if ((int) $v['compte']->id === (int) $l->compte_id) {
-                                $l->setRelation('compte', $v['compte']);
-                                break;
-                            }
-                        }
-                    }
-                }
+                $this->reattacherComptesAuxLignes($lignesCollection, $compte401, null, $ventilationsNorm);
             } else {
                 $lignesCollection = collect($lignes);
             }
@@ -1228,6 +1157,42 @@ final class EcritureGenerator
     // =========================================================================
     // Méthodes privées
     // =========================================================================
+
+    /**
+     * Re-bind les relations compte sur une collection de lignes après rechargement DB.
+     *
+     * Évite les requêtes N+1 sur compte() en court-circuitant le lazy loading :
+     * les comptes sont déjà en mémoire (compte411/401, comptePortage, ventilations).
+     *
+     * Fix #2 — ce bloc était répliqué 4 fois (pourRecetteComptant, pourRecetteACredit,
+     * pourDepenseComptant, pourDepenseACredit). Extraction en méthode privée partagée.
+     *
+     * @param  Collection<int, TransactionLigne>  $lignes  Lignes rechargées depuis la DB.
+     * @param  Compte  $compteTiers  Compte 411 (recettes) ou 401 (dépenses).
+     * @param  Compte|null  $comptePortage  Null pour les méthodes à crédit (pas de portage).
+     * @param  Collection<int, array{compte: Compte, montant: float}>  $ventilationsNorm  Ventilations normalisées.
+     */
+    private function reattacherComptesAuxLignes(
+        Collection $lignes,
+        Compte $compteTiers,
+        ?Compte $comptePortage,
+        Collection $ventilationsNorm,
+    ): void {
+        foreach ($lignes as $l) {
+            if ((int) $l->compte_id === (int) $compteTiers->id) {
+                $l->setRelation('compte', $compteTiers);
+            } elseif ($comptePortage !== null && (int) $l->compte_id === (int) $comptePortage->id) {
+                $l->setRelation('compte', $comptePortage);
+            } else {
+                foreach ($ventilationsNorm as $v) {
+                    if ((int) $v['compte']->id === (int) $l->compte_id) {
+                        $l->setRelation('compte', $v['compte']);
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Résout le compte de portage selon le mode de paiement.

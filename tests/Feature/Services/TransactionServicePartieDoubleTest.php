@@ -10,8 +10,10 @@ use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
 use App\Models\Tiers;
+use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\User;
+use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
@@ -692,4 +694,93 @@ it('dépense comptant virement avec compte_id null — skip gracieux sans TypeEr
     // Seulement 1 ligne legacy (pas de PD-only car 512X introuvable)
     $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
     expect($totalLignes)->toBe(1, 'Skip gracieux : seulement la ligne legacy sans double écriture');
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 11 — Fix #1 : garde-fou XOR observer via chemin Eloquent
+// Vérifie que l'enrichissement legacy déclenche bien l'observer saving()
+// et que debit > 0 ET credit > 0 simultanément lève une InvalidArgumentException.
+// ---------------------------------------------------------------------------
+
+it('Fix #1 — enrichissement legacy déclenche observer XOR : debit ET credit > 0 lève une exception', function () {
+    // On crée directement une TransactionLigne avec compte_id = null (ligne legacy),
+    // puis on tente de l'enrichir via fill/save avec debit ET credit > 0.
+    // L'observer TransactionLigneObserver::saving() doit intercepter la violation XOR.
+
+    $transaction = Transaction::create([
+        'association_id' => $this->association->id,
+        'type' => TypeTransaction::Recette,
+        'date' => '2025-10-15',
+        'libelle' => 'Recette test XOR',
+        'montant_total' => 100.00,
+        'mode_paiement' => ModePaiement::Cheque,
+        'saisi_par' => $this->user->id,
+        'equilibree' => false,
+        'type_ecriture' => 'normale',
+    ]);
+
+    // Ligne legacy : compte_id null — l'observer l'ignore lors de la création
+    $ligne = $transaction->lignes()->create([
+        'sous_categorie_id' => $this->scRecette->id,
+        'montant' => 100.0,
+    ]);
+    expect($ligne->compte_id)->toBeNull('Ligne legacy créée sans compte_id — observer ne vérifie pas encore');
+
+    // Tentative d'enrichissement avec debit > 0 ET credit > 0 (violation XOR)
+    // L'observer saving() doit lever une InvalidArgumentException
+    expect(fn () => $ligne->fill([
+        'compte_id' => $this->compte706->id,
+        'debit' => 100.0,
+        'credit' => 50.0,  // ← violation XOR : les deux > 0
+    ])->save())->toThrow(
+        InvalidArgumentException::class,
+        "viole l'invariant partie double"
+    );
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 12 — Fix #4-B : notes propagées sur les lignes de ventilation PD-only
+// Vérifie que notes saisies sur la ligne legacy (path TransactionService)
+// est bien copiée sur la ligne de ventilation lors d'une recette via EcritureGenerator.
+// ---------------------------------------------------------------------------
+
+it('Fix #4-B — notes propagées sur la ligne de ventilation dans une recette à crédit via EcritureGenerator', function () {
+    // On appelle directement EcritureGenerator (chemin PD-only sans existingTransaction)
+    // pour vérifier que notes est transmis depuis la ventilation vers la ligne créée.
+
+    $generator = app(EcritureGenerator::class);
+
+    $ventilations = [[
+        'compte' => $this->compte706,
+        'montant' => 80.0,
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => 'Remboursement frais déplacement participant',
+    ]];
+
+    $transaction = $generator->pourRecetteACredit(
+        tiers: $this->tiers,
+        ventilations: $ventilations,
+        dateConstatation: new DateTimeImmutable('2025-11-01'),
+        libelle: 'Recette test notes',
+    );
+
+    // La ligne de ventilation (706 C) doit avoir notes renseignée
+    $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $this->compte706->id)
+        ->first();
+
+    expect($ligneVent)->not()->toBeNull('La ligne de ventilation 706 doit exister');
+    expect($ligneVent->notes)->toBe(
+        'Remboursement frais déplacement participant',
+        'Fix #4-B : notes propagées sur la ligne de ventilation PD-only'
+    );
+
+    // Les lignes techniques (411) ne doivent PAS avoir de notes
+    $compte411 = compte411();
+    $ligne411 = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $compte411->id)
+        ->first();
+    expect($ligne411)->not()->toBeNull();
+    expect($ligne411->notes)->toBeNull('Les lignes techniques 411 ne portent pas de notes métier');
 });

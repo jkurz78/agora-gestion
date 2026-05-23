@@ -100,15 +100,11 @@ final class TransactionService
         }
 
         /** @var Tiers $tiers */
-        $tiers = Tiers::find($transaction->tiers_id);
-        if ($tiers === null) {
-            Log::warning('[PartieDouble] Step 21 — skip : tiers introuvable', [
-                'transaction_id' => $transaction->id,
-                'tiers_id' => $transaction->tiers_id,
-            ]);
-
-            return;
-        }
+        // Fix #3 — tiers_id est une FK validée par contrainte DB : si null check précède et
+        // si on arrive ici c'est que tiers_id est non-null. Un findOrFail garantit que la
+        // stack trace est utile (corruption tenant ou bug logique) et laisse le DB::transaction
+        // englobant rollback proprement.
+        $tiers = Tiers::findOrFail($transaction->tiers_id);
 
         // --- Résolution des ventilations (sous_categorie → Compte) ---
         $classeAttendue = $transaction->type === TypeTransaction::Recette ? 7 : 6;
@@ -169,11 +165,14 @@ final class TransactionService
             $debit = $transaction->type === TypeTransaction::Depense ? $montant : 0.0;
             $credit = $transaction->type === TypeTransaction::Recette ? $montant : 0.0;
 
-            TransactionLigne::where('id', $ligne->id)->update([
+            // Fix #1 — passer par le chemin Eloquent (fill + save) pour déclencher
+            // l'observer 'saving' et activer l'invariant XOR de TransactionLigneObserver.
+            // update() Query Builder bypasse silencieusement les observers Eloquent.
+            $ligne->fill([
                 'compte_id' => $compte->id,
                 'debit' => $debit,
                 'credit' => $credit,
-            ]);
+            ])->save();
 
             $ventilations[] = [
                 'compte' => $compte,
