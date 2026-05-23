@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Steps 21+23+24 livrés** (suite 11 649 / 0 failed). Prochain : Step 25 (`RemiseBancaireService::comptabiliser`).
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Steps 21+23+24+25 livrés** (suite 11 741 / 0 failed). Prochain : Step 26 (`ReglementService` onglet règlements).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -580,18 +580,32 @@ Sous-slice 1b livrée sur `feat/compta-v5` — 9 commits (Steps 12-20), 76 nouve
 **Files**: `app/Services/Compta/CompteTresorerieResolver.php` (créé, 97 lignes), `app/Services/FactureService.php` (+89 lignes), `app/Services/TransactionService.php` (-40 lignes inline → appel resolver), `tests/Feature/Services/FactureServicePartieDoubleEncaissementTest.php` (créé, 6 scénarios), `tests/Unit/Services/Compta/CompteTresorerieResolverTest.php` (créé, 8 cas), `tests/Pest.php` (+13 lignes helper), `tests/Feature/Services/TransactionServicePartieDoubleTest.php` + `FactureServicePartieDoubleTest.php` + `EcritureGeneratorPourRecetteComptantTest.php` (refacto helpers)
 **Commits**: `4153b9b9` + `2ceb599a`
 
-#### Step 25 : `RemiseBancaireService::comptabiliser` branché sur `pourRemiseBancaire`
+#### Step 25 : `RemiseBancaireService::comptabiliser` branché sur `pourRemiseBancaire` ✅
 
-**Complexity**: complex
-**RED**: Tests Pest :
-- Création remise avec 3 chèques → T4 splittée par tiers conforme scénario §11
-- Test existant `RemiseBancaireServiceTest` reste vert
-**GREEN**:
-- `RemiseBancaireService::comptabiliser` délègue à `EcritureGenerator::pourRemiseBancaire`
-- Conservation totale UI préparation remise
-**REFACTOR**: Vérifier que `RemiseBancaireService::supprimer` délette correctement (Step 31 traitera l'extourne mais la suppression de remise est un cas particulier — à confirmer en build)
-**Files**: `app/Services/RemiseBancaireService.php`, tests
-**Commit**: `feat(v5): RemiseBancaireService::comptabiliser délègue à EcritureGenerator + variante 2a`
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `3291033e` (feat) + `53f1becf` (quality fixes Important-1 à Minor-3). Suite Pest 11 741 / 0 failed (+92 vs Step 24).
+**Méthode cible** : `comptabiliser(RemiseBancaire, array $transactionIds)`. Couvre aussi `modifier()` et `supprimer()` (cycle complet T4).
+**Décisions implémentation** :
+- T4 = nouvelle Transaction créée par `pourRemiseBancaire` (pas d'enrichissement). Lien remise→T4 via `transactions.remise_id = $remise->id` posé après création (option a, cohérent §2.4 legacy).
+- Modes supportés : Cheque (portage 5112) + Especes (portage 530). Autres → InvalidArgumentException (déjà couvert par EcritureGenerator).
+- **Auto-lettrage 5112↔5112 par paire 1↔1** (spec §4.4 amendée 2026-05-22, helper `regrouperParTiers` SUPPRIMÉ). Vérifié dans test A : 3 paires distinctes, codes lettrage uniques par paire.
+- Critère discriminant T4 : `(remise_id, reference IS NULL, equilibree = true)` formalisé en méthode privée `queryT4(int $remiseId): Builder<Transaction>` avec docblock documentant l'invariant (T1 sources ont TOUJOURS reference != null après comptabiliser/modifier).
+- `comptabiliser()` idempotente : garde explicite `if (queryT4()->exists()) throw "déjà comptabilisée"`. L'UI Livewire (`RemiseBancaireValidation`) route déjà vers `modifier()` si reference existe → aucune régression UI.
+- `modifier()` : delete+recreate T4 via `supprimerT4SiExiste() + recreerT4()` dans la même DB::transaction. Bug index numérotation corrigé (T4 ne doit pas être comptée).
+- `supprimer()` : `supprimerT4SiExiste()` (délettre paires 5112↔5112, forceDelete lignes + T4) puis `$remise->delete()`.
+- Gardes skip avec Log::warning : tx legacy sans ligne portage 5112/530 (skip cette tx mais continue traitement legacy), mode non supporté, compte portage introuvable. Si aucune source résolue → pas de T4, log warning.
+- **CompteTresorerieResolver NON utilisé ici** : `pourRemiseBancaire` résout 512X par IBAN inline (force-resolve sans fallback). Asymétrie acceptée — pas 3ᵉ caller resolver.
+
+**Tests** : 11 scénarios dans `tests/Feature/Services/RemiseBancaireServicePartieDoubleTest.php` (~91 assertions). Couvre : A (chèque 3 sources), B (espèces 2 sources), C (solde 5112=0), D (supprimer + délettrer + delete T4), E (modifier ajout + index correct), F (modifier retrait + délettrage source), G (legacy skip), G2 (mix PD+legacy), H (verrouillée throw), I (invariant queryT4 unique), J (idempotence comptabiliser throw).
+
+**Dette technique notée pour Steps 26+** :
+- **N+1 latent dans `recreerT4()`** : boucle sur transactionsRemise → 1 SELECT ligne portage par tx. Hoistable via `whereIn`. Acceptable car N petit.
+- **Helpers privés `supprimerT4SiExiste()` + `recreerT4()` + `queryT4()`** : RemiseBancaireService grossit à ~360 lignes. Extraction `App\Services\Compta\RemiseT4Manager` envisageable si T4 acquiert plus d'autonomie (extournes Step 31 par ex).
+- **Step 26 ReglementService** : appliquera le même pattern (critère discriminant T3 = `equilibree = true AND reference IS NULL` probablement). Le pattern `queryT4()` formalisé en Step 25 sera réplicable.
+- **Step 29 RapprochementBancaireService** : la T4 a `remise_id` et une ligne 512X. Le rappro lira `transaction_lignes` classe 5 → ligne 512X T4 sera pointable comme unique ligne de la remise (spec §7).
+- **Step 31 TransactionExtourneService** : pattern `supprimerT4SiExiste()` peut servir de référence pour extourner une T4 (délettrer paires 5112↔5112 avant extourne).
+
+**Files**: `app/Services/RemiseBancaireService.php` (+218 lignes), `tests/Feature/Services/RemiseBancaireServicePartieDoubleTest.php` (créé, 11 scénarios)
+**Commits**: `3291033e` + `53f1becf`
 
 #### Step 26 : `ReglementService` (comptabilisation onglet règlements) branché
 
