@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Step 21 livré (`5ad4645d`+`b725c6e2`+`0a7dad79`) + Step 23 livré (`84615294`)** — suite 11 578 / 0 failed. Prochain : Step 24 (`FactureService::encaisser`).
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Step 21 livré (`5ad4645d`+`b725c6e2`+`0a7dad79`) + Step 23 livré (`84615294`+`67674dd8`)** — suite 11 592 / 0 failed. Prochain : Step 24 (`FactureService::encaisser`).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -527,10 +527,27 @@ Sous-slice 1b livrée sur `feat/compta-v5` — 9 commits (Steps 12-20), 76 nouve
 
 #### Step 23 : `FactureService::valider` branché sur `pourRecetteACredit` ✅
 
-**Complexity**: standard
-**Commit**: `84615294` (2026-05-23)
-**Tests**: 7 scénarios dans `tests/Feature/Services/FactureServicePartieDoubleTest.php` — 0 failed
-**Option**: A (inline) — résolution SC→Compte inline dans `resoudreCompteVentilationRecette` (helper privé), refactor dette notée pour Step ultérieur
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `84615294` (feat) + `67674dd8` (quality fixes I2 + note dette). Suite Pest 11 592 / 0 failed (+14 vs Step 21).
+**Option choisie**: A (inline) — résolution SC→Compte inline dans `resoudreCompteVentilationRecette` (helper privé) + appel direct `EcritureGenerator::pourRecetteACredit(existingTransaction:)`. Pas d'extraction de helper partagé avec Step 21 (rule of three — attendre Step 25).
+**Décisions implémentation** :
+- Toujours `pourRecetteACredit` (facture validée = créance, même si `mode_paiement_prevu` renseigné). Pas de branche comptant.
+- Lignes legacy enrichies via `$ligne->fill([...])->save()` (observer XOR actif, pattern Step 21).
+- Boucle skip **sans break** (asymétrie vs Step 21 documentée inline) : la boucle sert AUSSI à créer les TransactionLignes legacy pour TOUTES les FactureLignes (chaque FactureLigne doit avoir sa `transaction_ligne_id`). Le `break` Step 21 ne s'applique pas ici. Sémantique à réconcilier au Step 25+ lors de l'extraction du helper partagé.
+- 4 gardes skip avec `Log::warning` : sous_cat null (mort en pratique grâce à `assertGuardsLignesManuelles`), code_cerfa null, Compte introuvable, classe ≠ 7.
+- `Tiers::findOrFail` (FK NOT NULL en base).
+- Lignes Montant (ref TX existante), Texte, et factures sans MontantManuel inchangées.
+
+**Tests** : 8 scénarios dans `tests/Feature/Services/FactureServicePartieDoubleTest.php` (~55 assertions) : happy path 1+2 ventilations, solde ouvert 411 = montant_total, conservation legacy, facture sans MontantManuel, FEC-conformité, pas de lettrage auto, SC sans code_cerfa (skip gracieux + Log::warning + facture toujours Validee).
+
+**Dette technique notée pour Steps 24+** :
+- **DRY M1** : `resoudreCompteVentilationRecette` (~55 lignes) quasi-identique au bloc résolution Step 21. Extraction `App\Services\Compta\PartieDoubleEnricher` ou similaire à faire **au Step 25** (3ᵉ caller fera émerger le pattern net).
+- **SRP** : `genererTransactionDepuisLignesManuelles` est passée de ~30 à ~92 lignes (4 responsabilités initiales + 3 nouvelles). À surveiller — extraction à faire en même temps que M1.
+- **M2** : `Tiers::findOrFail((int) $facture->tiers_id)` génère 1 requête DB en plus. Pourrait être `$facture->tiers` (relation chargée). À fixer post-cutover.
+- **M5 helpers test** : `compte411PD()` dupliqué de `compte411()` (Step 21) à cause de collision globale Pest. Factoriser dans `tests/Pest.php` au Step 24.
+- **M6 messages log** : `'[PartieDouble] Step 23 — …'` — remplacer par `'[PartieDouble][FactureService] …'` post-cutover.
+
+**Files**: `app/Services/FactureService.php` (+116 lignes), `tests/Feature/Services/FactureServicePartieDoubleTest.php` (créé, 436 lignes)
+**Commits**: `84615294` + `67674dd8`
 
 #### Step 24 : `FactureService::encaisser` branché sur `pourEncaissementCreance`
 
