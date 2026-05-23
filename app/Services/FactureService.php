@@ -10,12 +10,15 @@ use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
 use App\Models\Association;
+use App\Models\Compte;
 use App\Models\Facture;
 use App\Models\FactureLigne;
 use App\Models\Seance;
+use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\EcritureGenerator;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
 use App\Tenant\TenantContext;
@@ -33,6 +36,7 @@ final class FactureService
         private readonly ExerciceService $exerciceService,
         private readonly TransactionExtourneService $extourneService,
         private readonly NumeroPieceService $numeroPiece,
+        private readonly EcritureGenerator $ecritureGenerator,
     ) {}
 
     /**
@@ -919,7 +923,11 @@ XML;
             'numero_piece' => $this->numeroPiece->assign($dateTransaction),
         ]);
 
-        // 2. Crée les TransactionLignes + 3. set facture_lignes.transaction_ligne_id
+        // 2. Crée les TransactionLignes legacy + 3. set facture_lignes.transaction_ligne_id
+        //    + 4. Enrichit chaque ligne avec compte_id/debit/credit (partie double)
+        $ventilations = [];
+        $skipPartieDouble = false;
+
         foreach ($lignesManuelles as $factureLigne) {
             $transactionLigne = TransactionLigne::create([
                 'transaction_id' => $transaction->id,
@@ -932,10 +940,51 @@ XML;
 
             // 3. Lie la FactureLigne à sa TransactionLigne
             $factureLigne->update(['transaction_ligne_id' => $transactionLigne->id]);
+
+            // 4. Résolution sous_categorie → Compte (classe 7 attendue pour recette)
+            if (! $skipPartieDouble) {
+                $compte = $this->resoudreCompteVentilationRecette(
+                    $transactionLigne,
+                    (int) $transaction->id
+                );
+
+                if ($compte !== null) {
+                    // Enrichir la ligne legacy avec les colonnes partie double (recette → C credit)
+                    // Passe par fill+save pour déclencher l'observer XOR (même pattern que Step 21).
+                    $transactionLigne->fill([
+                        'compte_id' => $compte->id,
+                        'debit' => 0.0,
+                        'credit' => (float) $factureLigne->montant,
+                    ])->save();
+
+                    $ventilations[] = [
+                        'compte' => $compte,
+                        'montant' => (float) $factureLigne->montant,
+                        'operation_id' => $factureLigne->operation_id,
+                        'seance' => $factureLigne->seance,
+                        'notes' => $factureLigne->libelle,
+                    ];
+                } else {
+                    $skipPartieDouble = true;
+                }
+            }
         }
 
-        // 4. Attache la Transaction au pivot facture_transaction
+        // 5. Attache la Transaction au pivot facture_transaction
         $facture->transactions()->attach($transaction->id);
+
+        // 6. Ajoute la ligne 411 D tiers (créance ouverte) via EcritureGenerator
+        if (! $skipPartieDouble && ! empty($ventilations)) {
+            $tiers = Tiers::findOrFail((int) $facture->tiers_id);
+
+            $this->ecritureGenerator->pourRecetteACredit(
+                tiers: $tiers,
+                ventilations: $ventilations,
+                dateConstatation: $dateTransaction,
+                libelle: $transaction->libelle,
+                existingTransaction: $transaction,
+            );
+        }
 
         return $transaction;
     }
@@ -1009,5 +1058,59 @@ XML;
         }
 
         return implode(' — ', $parts);
+    }
+
+    /**
+     * Résout le Compte de ventilation (classe 7) depuis la SousCategorie d'une ligne legacy.
+     * Retourne null et log un warning si l'une des gardes échoue — le caller skip la partie double.
+     */
+    private function resoudreCompteVentilationRecette(TransactionLigne $ligne, int $transactionId): ?Compte
+    {
+        $sousCatId = $ligne->sous_categorie_id;
+
+        if ($sousCatId === null) {
+            Log::warning('[PartieDouble] Step 23 — skip : ligne sans sous_categorie_id', [
+                'transaction_id' => $transactionId,
+                'transaction_ligne_id' => $ligne->id,
+            ]);
+
+            return null;
+        }
+
+        /** @var SousCategorie|null $sousCat */
+        $sousCat = SousCategorie::find($sousCatId);
+
+        if ($sousCat === null || $sousCat->code_cerfa === null) {
+            Log::warning('[PartieDouble] Step 23 — skip : sous-catégorie sans code_cerfa', [
+                'transaction_id' => $transactionId,
+                'sous_categorie_id' => $sousCatId,
+            ]);
+
+            return null;
+        }
+
+        /** @var Compte|null $compte */
+        $compte = Compte::ofNumero($sousCat->code_cerfa);
+
+        if ($compte === null) {
+            Log::warning('[PartieDouble] Step 23 — skip : compte introuvable pour code_cerfa', [
+                'transaction_id' => $transactionId,
+                'code_cerfa' => $sousCat->code_cerfa,
+            ]);
+
+            return null;
+        }
+
+        if ((int) $compte->classe !== 7) {
+            Log::warning('[PartieDouble] Step 23 — skip : classe compte ≠ 7 (recette attendue)', [
+                'transaction_id' => $transactionId,
+                'numero_pcg' => $compte->numero_pcg,
+                'classe' => $compte->classe,
+            ]);
+
+            return null;
+        }
+
+        return $compte;
     }
 }
