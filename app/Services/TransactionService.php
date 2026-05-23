@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\ModePaiement;
+use App\Enums\TypeTransaction;
 use App\Enums\UsageComptable;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
 use App\Models\SousCategorie;
+use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\EcritureGenerator;
+use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 final class TransactionService
@@ -24,6 +32,7 @@ final class TransactionService
 
     public function __construct(
         private readonly ExerciceService $exerciceService,
+        private readonly EcritureGenerator $ecritureGenerator,
     ) {}
 
     public function create(array $data, array $lignes): Transaction
@@ -38,12 +47,239 @@ final class TransactionService
             $data['saisi_par'] = auth()->id();
             $data['numero_piece'] = app(NumeroPieceService::class)->assign(Carbon::parse($data['date']));
             $transaction = Transaction::create($data);
+
+            // Créer les lignes legacy et les enrichir avec les colonnes partie double
+            $lignesCreees = [];
             foreach ($lignes as $ligne) {
-                $transaction->lignes()->create($ligne);
+                $ligneCreee = $transaction->lignes()->create($ligne);
+                $lignesCreees[] = $ligneCreee;
             }
+
+            // Enrichissement partie double : double écriture vers EcritureGenerator
+            // Step 21 — branchement systématique (pas de feature flag)
+            $this->enrichirPartieDouble($transaction, $lignesCreees);
 
             return $transaction;
         });
+    }
+
+    /**
+     * Enrichit une transaction créée via le formulaire legacy en générant les écritures
+     * partie double (école 411 systématique, spec §4.3 amendée 2026-05-22).
+     *
+     * Stratégie de coexistence (Step 21) :
+     * - Les lignes legacy (sous_categorie_id + montant) sont conservées et enrichies
+     *   en place avec compte_id / debit / credit correspondants.
+     * - Les lignes PD-only (411/401 D, portage, 411/401 C) sont ajoutées sur la même Tx.
+     * - Les rapports existants (CompteResultatBuilder, RapprochementBancaireService) lisent
+     *   toujours sous_categorie_id + montant — ils basculeront sur compte_id au Step 27.
+     *
+     * Skip silencieux si :
+     * - tiers_id est null sur la Tx (saisie libre sans tiers)
+     * - une ventilation n'a pas de code_cerfa (sous-catégorie mal configurée)
+     * - le compte résolu n'a pas la bonne classe (6 ou 7 selon le type de Tx)
+     *
+     * Cas hors périmètre Step 21 (DONE_WITH_CONCERNS) :
+     * - Transactions liées à une facture validée → Step 23
+     * - Transactions liées à une remise bancaire → Step 25
+     * - update() → Step ultérieur
+     *
+     * @param  Transaction  $transaction  Transaction créée (header + lignes legacy déjà en base)
+     * @param  TransactionLigne[]  $lignesCreees  Lignes legacy fraîchement créées
+     */
+    private function enrichirPartieDouble(Transaction $transaction, array $lignesCreees): void
+    {
+        // --- Skip si tiers_id absent ---
+        if ($transaction->tiers_id === null) {
+            Log::info('[PartieDouble] Step 21 — skip : tiers_id null', [
+                'transaction_id' => $transaction->id,
+                'association_id' => TenantContext::currentId(),
+            ]);
+
+            return;
+        }
+
+        /** @var Tiers $tiers */
+        $tiers = Tiers::find($transaction->tiers_id);
+        if ($tiers === null) {
+            Log::warning('[PartieDouble] Step 21 — skip : tiers introuvable', [
+                'transaction_id' => $transaction->id,
+                'tiers_id' => $transaction->tiers_id,
+            ]);
+
+            return;
+        }
+
+        // --- Résolution des ventilations (sous_categorie → Compte) ---
+        $classeAttendue = $transaction->type === TypeTransaction::Recette ? 7 : 6;
+        $ventilations = [];
+        $skipDoubleEcriture = false;
+
+        foreach ($lignesCreees as $ligne) {
+            $sousCatId = $ligne->sous_categorie_id;
+
+            if ($sousCatId === null) {
+                // Ligne sans sous-catégorie (ex. ajout manuel) — skip total
+                Log::info('[PartieDouble] Step 21 — skip : ligne sans sous_categorie_id', [
+                    'transaction_id' => $transaction->id,
+                    'transaction_ligne_id' => $ligne->id,
+                ]);
+                $skipDoubleEcriture = true;
+                break;
+            }
+
+            /** @var SousCategorie|null $sousCat */
+            $sousCat = SousCategorie::find($sousCatId);
+
+            if ($sousCat === null || $sousCat->code_cerfa === null) {
+                Log::info('[PartieDouble] Step 21 — skip : sous-catégorie sans code_cerfa', [
+                    'transaction_id' => $transaction->id,
+                    'sous_categorie_id' => $sousCatId,
+                ]);
+                $skipDoubleEcriture = true;
+                break;
+            }
+
+            // Résolution du Compte via numero_pcg = code_cerfa
+            /** @var Compte|null $compte */
+            $compte = Compte::ofNumero($sousCat->code_cerfa);
+
+            if ($compte === null) {
+                Log::warning('[PartieDouble] Step 21 — skip : compte introuvable pour code_cerfa', [
+                    'transaction_id' => $transaction->id,
+                    'code_cerfa' => $sousCat->code_cerfa,
+                ]);
+                $skipDoubleEcriture = true;
+                break;
+            }
+
+            if ((int) $compte->classe !== $classeAttendue) {
+                Log::warning('[PartieDouble] Step 21 — skip : classe compte inattendue', [
+                    'transaction_id' => $transaction->id,
+                    'numero_pcg' => $compte->numero_pcg,
+                    'classe' => $compte->classe,
+                    'attendue' => $classeAttendue,
+                ]);
+                $skipDoubleEcriture = true;
+                break;
+            }
+
+            // Enrichir la ligne legacy avec compte_id + debit/credit partie double
+            $montant = (float) $ligne->montant;
+            $debit = $transaction->type === TypeTransaction::Depense ? $montant : 0.0;
+            $credit = $transaction->type === TypeTransaction::Recette ? $montant : 0.0;
+
+            TransactionLigne::where('id', $ligne->id)->update([
+                'compte_id' => $compte->id,
+                'debit' => $debit,
+                'credit' => $credit,
+            ]);
+
+            $ventilations[] = [
+                'compte' => $compte,
+                'montant' => $montant,
+                'operation_id' => $ligne->operation_id,
+                'seance' => $ligne->seance,
+                'notes' => $ligne->notes,
+            ];
+        }
+
+        if ($skipDoubleEcriture || empty($ventilations)) {
+            return;
+        }
+
+        // --- Résolution du compte de trésorerie (CompteBancaire → Compte 512X via IBAN) ---
+        $modePaiement = $transaction->mode_paiement;  // ModePaiement|null (castée)
+
+        // Mode comptant (paiement présent) → on a besoin d'un compteTresorerie
+        $compteTresorerie = null;
+        if ($modePaiement !== null && $transaction->compte_id !== null) {
+            /** @var CompteBancaire|null $compteBancaire */
+            $compteBancaire = CompteBancaire::find($transaction->compte_id);
+
+            if ($compteBancaire !== null && $compteBancaire->iban !== null) {
+                $compteTresorerie = Compte::where('iban', $compteBancaire->iban)
+                    ->where('association_id', (int) TenantContext::currentId())
+                    ->first();
+            }
+
+            if ($compteTresorerie === null) {
+                // Pour chèque : 5112 ne requiert pas de 512X explicite
+                // Pour espèces : 530 ne requiert pas de 512X explicite
+                // Pour virement/CB/prélèvement : on a besoin du 512X → si manquant, skip
+                $modesNecessitant512X = [
+                    ModePaiement::Virement,
+                    ModePaiement::Cb,
+                    ModePaiement::Prelevement,
+                ];
+
+                if (in_array($modePaiement, $modesNecessitant512X, strict: true)) {
+                    Log::warning('[PartieDouble] Step 21 — skip : compte 512X introuvable pour IBAN', [
+                        'transaction_id' => $transaction->id,
+                        'compte_bancaire_id' => $transaction->compte_id,
+                    ]);
+
+                    return;
+                }
+
+                // Pour chèque/espèces, EcritureGenerator résout 5112/530 automatiquement
+                // On peut passer n'importe quel Compte comme placeholder — il ne sera pas utilisé
+                $compteTresorerie = Compte::ofNumeroSysteme('5112');
+            }
+        }
+
+        // --- Date de la transaction ---
+        $date = $transaction->date instanceof \DateTimeInterface
+            ? $transaction->date
+            : new \DateTimeImmutable((string) $transaction->date);
+
+        // --- Appel EcritureGenerator avec la Transaction existante ---
+        if ($transaction->type === TypeTransaction::Recette) {
+            if ($modePaiement !== null) {
+                // Recette comptant
+                $this->ecritureGenerator->pourRecetteComptant(
+                    tiers: $tiers,
+                    ventilations: $ventilations,
+                    mode: $modePaiement,
+                    compteTresorerie: $compteTresorerie,
+                    date: $date,
+                    libelle: $transaction->libelle,
+                    existingTransaction: $transaction,
+                );
+            } else {
+                // Recette à crédit
+                $this->ecritureGenerator->pourRecetteACredit(
+                    tiers: $tiers,
+                    ventilations: $ventilations,
+                    dateConstatation: $date,
+                    libelle: $transaction->libelle,
+                    existingTransaction: $transaction,
+                );
+            }
+        } else {
+            // TypeTransaction::Depense
+            if ($modePaiement !== null) {
+                // Dépense comptant
+                $this->ecritureGenerator->pourDepenseComptant(
+                    tiers: $tiers,
+                    ventilations: $ventilations,
+                    mode: $modePaiement,
+                    compteTresorerie: $compteTresorerie,
+                    date: $date,
+                    libelle: $transaction->libelle,
+                    existingTransaction: $transaction,
+                );
+            } else {
+                // Dépense à crédit
+                $this->ecritureGenerator->pourDepenseACredit(
+                    tiers: $tiers,
+                    ventilations: $ventilations,
+                    dateConstatation: $date,
+                    libelle: $transaction->libelle,
+                    existingTransaction: $transaction,
+                );
+            }
+        }
     }
 
     public function update(Transaction $transaction, array $data, array $lignes): Transaction

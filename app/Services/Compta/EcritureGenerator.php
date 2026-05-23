@@ -13,7 +13,6 @@ use App\Exceptions\Compta\TenantBoundaryException;
 use App\Exceptions\Compta\TiersInterditException;
 use App\Exceptions\Compta\TiersRequisException;
 use App\Models\Compte;
-use App\Models\Operation;
 use App\Models\RemiseBancaire;
 use App\Models\Tiers;
 use App\Models\Transaction;
@@ -220,6 +219,7 @@ final class EcritureGenerator
         Compte $compteTresorerie,
         \DateTimeInterface $date,
         ?string $libelle = null,
+        ?Transaction $existingTransaction = null,
     ): Transaction {
         // --- Normalisation ventilations ---
         $ventilationsNorm = collect($ventilations);
@@ -289,11 +289,15 @@ final class EcritureGenerator
         // --- Création dans une transaction DB ---
         return DB::transaction(function () use (
             $tiers, $ventilationsNorm, $comptePortage, $compte411, $total, $mode,
-            $date, $libelle
+            $date, $libelle, $existingTransaction
         ): Transaction {
             $libelleEffectif = $libelle ?? 'Recette '.$mode->label();
 
-            $transaction = $this->createTransactionHeader(
+            // Si une Transaction existante est fournie (branchement depuis TransactionService),
+            // on l'utilise directement et on ne recrée PAS les lignes de ventilation (7x) —
+            // elles sont déjà en base (enrichies en place par TransactionService::enrichirPartieDouble).
+            // On ajoute seulement les 3 lignes PD-only : 411 D, portage D, 411 C.
+            $transaction = $existingTransaction ?? $this->createTransactionHeader(
                 type: TypeTransaction::Recette,
                 date: $date,
                 libelle: $libelleEffectif,
@@ -318,25 +322,28 @@ final class EcritureGenerator
             $toutesLignes[] = $ligne411D;
 
             // N lignes [7x C × N] — sans tiers
-            foreach ($ventilationsNorm as $v) {
-                /** @var Compte $compteVent */
-                $compteVent = $v['compte'];
-                $montantVent = (float) $v['montant'];
+            // Skippées si existingTransaction fourni : les lignes de ventilation sont déjà en base.
+            if ($existingTransaction === null) {
+                foreach ($ventilationsNorm as $v) {
+                    /** @var Compte $compteVent */
+                    $compteVent = $v['compte'];
+                    $montantVent = (float) $v['montant'];
 
-                $ligneVent = TransactionLigne::create([
-                    'transaction_id' => $transaction->id,
-                    'compte_id' => $compteVent->id,
-                    'debit' => 0,
-                    'credit' => $montantVent,
-                    'tiers_id' => null,
-                    'libelle' => $libelleEffectif,
-                    'operation_id' => $v['operation_id'] ?? null,
-                    'seance' => $v['seance'] ?? null,
-                    'montant' => 0,
-                    'sous_categorie_id' => null,
-                ]);
-                $ligneVent->setRelation('compte', $compteVent);
-                $toutesLignes[] = $ligneVent;
+                    $ligneVent = TransactionLigne::create([
+                        'transaction_id' => $transaction->id,
+                        'compte_id' => $compteVent->id,
+                        'debit' => 0,
+                        'credit' => $montantVent,
+                        'tiers_id' => null,
+                        'libelle' => $libelleEffectif,
+                        'operation_id' => $v['operation_id'] ?? null,
+                        'seance' => $v['seance'] ?? null,
+                        'montant' => 0,
+                        'sous_categorie_id' => null,
+                    ]);
+                    $ligneVent->setRelation('compte', $compteVent);
+                    $toutesLignes[] = $ligneVent;
+                }
             }
 
             // Ligne portage D total — sans tiers (5112 / 530 / 512X)
@@ -374,22 +381,45 @@ final class EcritureGenerator
                 "Auto-lettrage interne recette comptant T#{$transaction->id} tiers #{$tiers->id}"
             );
 
-            // --- Recharger toutes les lignes de T depuis la DB (lettrage_code à jour) ---
-            $idsLignes = collect($toutesLignes)->pluck('id')->all();
-            $lignes = TransactionLigne::whereIn('id', $idsLignes)->get();
+            // --- Recharger les lignes PD-only depuis la DB (lettrage_code à jour) ---
+            // Quand existingTransaction est fourni, on charge TOUTES les lignes de la Tx
+            // (y compris les ventilations enrichies) pour l'assertEquilibre.
+            if ($existingTransaction !== null) {
+                $lignes = TransactionLigne::where('transaction_id', $transaction->id)
+                    ->whereNotNull('compte_id')
+                    ->get();
 
-            // Recharger les relations compte sur chaque ligne rechargée
-            foreach ($lignes as $l) {
-                if ((int) $l->compte_id === (int) $compte411->id) {
-                    $l->setRelation('compte', $compte411);
-                } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
-                    $l->setRelation('compte', $comptePortage);
-                } else {
-                    // Compte de ventilation (7x) — chercher dans la collection normalisée
-                    foreach ($ventilationsNorm as $v) {
-                        if ((int) $v['compte']->id === (int) $l->compte_id) {
-                            $l->setRelation('compte', $v['compte']);
-                            break;
+                foreach ($lignes as $l) {
+                    if ((int) $l->compte_id === (int) $compte411->id) {
+                        $l->setRelation('compte', $compte411);
+                    } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
+                        $l->setRelation('compte', $comptePortage);
+                    } else {
+                        foreach ($ventilationsNorm as $v) {
+                            if ((int) $v['compte']->id === (int) $l->compte_id) {
+                                $l->setRelation('compte', $v['compte']);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                $idsLignes = collect($toutesLignes)->pluck('id')->all();
+                $lignes = TransactionLigne::whereIn('id', $idsLignes)->get();
+
+                // Recharger les relations compte sur chaque ligne rechargée
+                foreach ($lignes as $l) {
+                    if ((int) $l->compte_id === (int) $compte411->id) {
+                        $l->setRelation('compte', $compte411);
+                    } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
+                        $l->setRelation('compte', $comptePortage);
+                    } else {
+                        // Compte de ventilation (7x) — chercher dans la collection normalisée
+                        foreach ($ventilationsNorm as $v) {
+                            if ((int) $v['compte']->id === (int) $l->compte_id) {
+                                $l->setRelation('compte', $v['compte']);
+                                break;
+                            }
                         }
                     }
                 }
@@ -428,6 +458,7 @@ final class EcritureGenerator
         iterable $ventilations,
         \DateTimeInterface $dateConstatation,
         ?string $libelle = null,
+        ?Transaction $existingTransaction = null,
     ): Transaction {
         // --- Normalisation ventilations ---
         $ventilationsNorm = collect($ventilations);
@@ -473,11 +504,11 @@ final class EcritureGenerator
         // --- Création dans une transaction DB ---
         return DB::transaction(function () use (
             $tiers, $ventilationsNorm, $compte411, $total,
-            $dateConstatation, $libelle
+            $dateConstatation, $libelle, $existingTransaction
         ): Transaction {
             $libelleEffectif = $libelle ?? 'Recette à crédit';
 
-            $transaction = $this->createTransactionHeader(
+            $transaction = $existingTransaction ?? $this->createTransactionHeader(
                 type: TypeTransaction::Recette,
                 date: $dateConstatation,
                 libelle: $libelleEffectif,
@@ -502,29 +533,51 @@ final class EcritureGenerator
             $lignes[] = $ligne411;
 
             // N lignes [7x C × N] — sans tiers
-            foreach ($ventilationsNorm as $v) {
-                /** @var Compte $compteVent */
-                $compteVent = $v['compte'];
-                $montantVent = (float) $v['montant'];
+            // Skippées si existingTransaction fourni : les ventilations sont déjà en base (enrichies).
+            if ($existingTransaction === null) {
+                foreach ($ventilationsNorm as $v) {
+                    /** @var Compte $compteVent */
+                    $compteVent = $v['compte'];
+                    $montantVent = (float) $v['montant'];
 
-                $ligneVent = TransactionLigne::create([
-                    'transaction_id' => $transaction->id,
-                    'compte_id' => $compteVent->id,
-                    'debit' => 0,
-                    'credit' => $montantVent,
-                    'tiers_id' => null,
-                    'libelle' => $libelleEffectif,
-                    'operation_id' => $v['operation_id'] ?? null,
-                    'seance' => $v['seance'] ?? null,
-                    'montant' => 0,
-                    'sous_categorie_id' => null,
-                ]);
-                $ligneVent->setRelation('compte', $compteVent);
-                $lignes[] = $ligneVent;
+                    $ligneVent = TransactionLigne::create([
+                        'transaction_id' => $transaction->id,
+                        'compte_id' => $compteVent->id,
+                        'debit' => 0,
+                        'credit' => $montantVent,
+                        'tiers_id' => null,
+                        'libelle' => $libelleEffectif,
+                        'operation_id' => $v['operation_id'] ?? null,
+                        'seance' => $v['seance'] ?? null,
+                        'montant' => 0,
+                        'sous_categorie_id' => null,
+                    ]);
+                    $ligneVent->setRelation('compte', $compteVent);
+                    $lignes[] = $ligneVent;
+                }
             }
 
             // --- Vérifications post-création (paranoïa) ---
-            $lignesCollection = collect($lignes);
+            // Si existingTransaction fourni, on charge toutes les lignes avec compte_id pour assertEquilibre.
+            if ($existingTransaction !== null) {
+                $lignesCollection = TransactionLigne::where('transaction_id', $transaction->id)
+                    ->whereNotNull('compte_id')
+                    ->get();
+                foreach ($lignesCollection as $l) {
+                    if ((int) $l->compte_id === (int) $compte411->id) {
+                        $l->setRelation('compte', $compte411);
+                    } else {
+                        foreach ($ventilationsNorm as $v) {
+                            if ((int) $v['compte']->id === (int) $l->compte_id) {
+                                $l->setRelation('compte', $v['compte']);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                $lignesCollection = collect($lignes);
+            }
             $this->assertEquilibre($lignesCollection);
             $this->assertTiersObligatoire411($lignesCollection);
 
@@ -561,6 +614,7 @@ final class EcritureGenerator
         Compte $compteTresorerie,
         \DateTimeInterface $date,
         ?string $libelle = null,
+        ?Transaction $existingTransaction = null,
     ): Transaction {
         // --- Normalisation ventilations ---
         $ventilationsNorm = collect($ventilations);
@@ -631,11 +685,11 @@ final class EcritureGenerator
         // --- Création dans une transaction DB ---
         return DB::transaction(function () use (
             $tiers, $ventilationsNorm, $comptePortage, $compte401, $total, $mode,
-            $date, $libelle
+            $date, $libelle, $existingTransaction
         ): Transaction {
             $libelleEffectif = $libelle ?? 'Dépense '.$mode->label();
 
-            $transaction = $this->createTransactionHeader(
+            $transaction = $existingTransaction ?? $this->createTransactionHeader(
                 type: TypeTransaction::Depense,
                 date: $date,
                 libelle: $libelleEffectif,
@@ -646,25 +700,28 @@ final class EcritureGenerator
             $toutesLignes = [];
 
             // N lignes [6x D × N] — sans tiers
-            foreach ($ventilationsNorm as $v) {
-                /** @var Compte $compteVent */
-                $compteVent = $v['compte'];
-                $montantVent = (float) $v['montant'];
+            // Skippées si existingTransaction fourni : les ventilations sont déjà en base (enrichies).
+            if ($existingTransaction === null) {
+                foreach ($ventilationsNorm as $v) {
+                    /** @var Compte $compteVent */
+                    $compteVent = $v['compte'];
+                    $montantVent = (float) $v['montant'];
 
-                $ligneVent = TransactionLigne::create([
-                    'transaction_id' => $transaction->id,
-                    'compte_id' => $compteVent->id,
-                    'debit' => $montantVent,
-                    'credit' => 0,
-                    'tiers_id' => null,
-                    'libelle' => $libelleEffectif,
-                    'operation_id' => $v['operation_id'] ?? null,
-                    'seance' => $v['seance'] ?? null,
-                    'montant' => 0,
-                    'sous_categorie_id' => null,
-                ]);
-                $ligneVent->setRelation('compte', $compteVent);
-                $toutesLignes[] = $ligneVent;
+                    $ligneVent = TransactionLigne::create([
+                        'transaction_id' => $transaction->id,
+                        'compte_id' => $compteVent->id,
+                        'debit' => $montantVent,
+                        'credit' => 0,
+                        'tiers_id' => null,
+                        'libelle' => $libelleEffectif,
+                        'operation_id' => $v['operation_id'] ?? null,
+                        'seance' => $v['seance'] ?? null,
+                        'montant' => 0,
+                        'sous_categorie_id' => null,
+                    ]);
+                    $ligneVent->setRelation('compte', $compteVent);
+                    $toutesLignes[] = $ligneVent;
+                }
             }
 
             // Ligne 401 C total — tiers (constatation dette immédiate)
@@ -716,20 +773,42 @@ final class EcritureGenerator
                 "Auto-lettrage interne dépense comptant T#{$transaction->id} tiers #{$tiers->id}"
             );
 
-            // --- Recharger toutes les lignes depuis la DB (lettrage_code à jour) ---
-            $idsLignes = collect($toutesLignes)->pluck('id')->all();
-            $lignes = TransactionLigne::whereIn('id', $idsLignes)->get();
+            // --- Recharger les lignes depuis la DB (lettrage_code à jour) ---
+            // Si existingTransaction fourni : charger toutes les lignes avec compte_id (y compris ventilations).
+            if ($existingTransaction !== null) {
+                $lignes = TransactionLigne::where('transaction_id', $transaction->id)
+                    ->whereNotNull('compte_id')
+                    ->get();
 
-            foreach ($lignes as $l) {
-                if ((int) $l->compte_id === (int) $compte401->id) {
-                    $l->setRelation('compte', $compte401);
-                } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
-                    $l->setRelation('compte', $comptePortage);
-                } else {
-                    foreach ($ventilationsNorm as $v) {
-                        if ((int) $v['compte']->id === (int) $l->compte_id) {
-                            $l->setRelation('compte', $v['compte']);
-                            break;
+                foreach ($lignes as $l) {
+                    if ((int) $l->compte_id === (int) $compte401->id) {
+                        $l->setRelation('compte', $compte401);
+                    } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
+                        $l->setRelation('compte', $comptePortage);
+                    } else {
+                        foreach ($ventilationsNorm as $v) {
+                            if ((int) $v['compte']->id === (int) $l->compte_id) {
+                                $l->setRelation('compte', $v['compte']);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                $idsLignes = collect($toutesLignes)->pluck('id')->all();
+                $lignes = TransactionLigne::whereIn('id', $idsLignes)->get();
+
+                foreach ($lignes as $l) {
+                    if ((int) $l->compte_id === (int) $compte401->id) {
+                        $l->setRelation('compte', $compte401);
+                    } elseif ((int) $l->compte_id === (int) $comptePortage->id) {
+                        $l->setRelation('compte', $comptePortage);
+                    } else {
+                        foreach ($ventilationsNorm as $v) {
+                            if ((int) $v['compte']->id === (int) $l->compte_id) {
+                                $l->setRelation('compte', $v['compte']);
+                                break;
+                            }
                         }
                     }
                 }
@@ -890,6 +969,7 @@ final class EcritureGenerator
         iterable $ventilations,
         \DateTimeInterface $dateConstatation,
         ?string $libelle = null,
+        ?Transaction $existingTransaction = null,
     ): Transaction {
         // --- Normalisation ventilations ---
         $ventilationsNorm = collect($ventilations);
@@ -935,11 +1015,11 @@ final class EcritureGenerator
         // --- Création dans une transaction DB ---
         return DB::transaction(function () use (
             $tiers, $ventilationsNorm, $compte401, $total,
-            $dateConstatation, $libelle
+            $dateConstatation, $libelle, $existingTransaction
         ): Transaction {
             $libelleEffectif = $libelle ?? 'Dépense à crédit';
 
-            $transaction = $this->createTransactionHeader(
+            $transaction = $existingTransaction ?? $this->createTransactionHeader(
                 type: TypeTransaction::Depense,
                 date: $dateConstatation,
                 libelle: $libelleEffectif,
@@ -950,25 +1030,28 @@ final class EcritureGenerator
             $lignes = [];
 
             // N lignes [6x D × N] — sans tiers
-            foreach ($ventilationsNorm as $v) {
-                /** @var Compte $compteVent */
-                $compteVent = $v['compte'];
-                $montantVent = (float) $v['montant'];
+            // Skippées si existingTransaction fourni : les ventilations sont déjà en base (enrichies).
+            if ($existingTransaction === null) {
+                foreach ($ventilationsNorm as $v) {
+                    /** @var Compte $compteVent */
+                    $compteVent = $v['compte'];
+                    $montantVent = (float) $v['montant'];
 
-                $ligneVent = TransactionLigne::create([
-                    'transaction_id' => $transaction->id,
-                    'compte_id' => $compteVent->id,
-                    'debit' => $montantVent,
-                    'credit' => 0,
-                    'tiers_id' => null,
-                    'libelle' => $libelleEffectif,
-                    'operation_id' => $v['operation_id'] ?? null,
-                    'seance' => $v['seance'] ?? null,
-                    'montant' => 0,
-                    'sous_categorie_id' => null,
-                ]);
-                $ligneVent->setRelation('compte', $compteVent);
-                $lignes[] = $ligneVent;
+                    $ligneVent = TransactionLigne::create([
+                        'transaction_id' => $transaction->id,
+                        'compte_id' => $compteVent->id,
+                        'debit' => $montantVent,
+                        'credit' => 0,
+                        'tiers_id' => null,
+                        'libelle' => $libelleEffectif,
+                        'operation_id' => $v['operation_id'] ?? null,
+                        'seance' => $v['seance'] ?? null,
+                        'montant' => 0,
+                        'sous_categorie_id' => null,
+                    ]);
+                    $ligneVent->setRelation('compte', $compteVent);
+                    $lignes[] = $ligneVent;
+                }
             }
 
             // Ligne 401 C total — tiers (dette ouverte)
@@ -986,7 +1069,26 @@ final class EcritureGenerator
             $lignes[] = $ligne401;
 
             // --- Vérifications post-création (paranoïa) ---
-            $lignesCollection = collect($lignes);
+            // Si existingTransaction fourni : charger toutes les lignes avec compte_id pour assertEquilibre.
+            if ($existingTransaction !== null) {
+                $lignesCollection = TransactionLigne::where('transaction_id', $transaction->id)
+                    ->whereNotNull('compte_id')
+                    ->get();
+                foreach ($lignesCollection as $l) {
+                    if ((int) $l->compte_id === (int) $compte401->id) {
+                        $l->setRelation('compte', $compte401);
+                    } else {
+                        foreach ($ventilationsNorm as $v) {
+                            if ((int) $v['compte']->id === (int) $l->compte_id) {
+                                $l->setRelation('compte', $v['compte']);
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else {
+                $lignesCollection = collect($lignes);
+            }
             $this->assertEquilibre($lignesCollection);
             $this->assertTiersObligatoire411($lignesCollection);
 
