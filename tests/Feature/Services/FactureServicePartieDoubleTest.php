@@ -21,6 +21,7 @@ use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\FactureService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -382,4 +383,54 @@ it('aucun lettrage auto créé lors de la validation (la créance reste ouverte)
     foreach ($lignes as $ligne) {
         expect($ligne->lettrage_code)->toBeNull();
     }
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 8 : Skip silencieux si sous-catégorie sans code_cerfa (I2 couverture)
+// ---------------------------------------------------------------------------
+
+it('facture ligne MontantManuel avec SC sans code_cerfa — Transaction créée, skip gracieux, pas de ligne 411', function () {
+    Log::spy();
+
+    // SC sans code_cerfa (skip attendu)
+    $scSansCode = SousCategorie::create([
+        'association_id' => $this->association->id,
+        'categorie_id' => Categorie::where('association_id', $this->association->id)->first()->id,
+        'nom' => 'Divers sans code cerfa',
+        'code_cerfa' => null,
+    ]);
+
+    $facture = creerEtValiderFacture($this, [
+        ['sous_categorie_id' => $scSansCode->id, 'montant' => 60.00, 'libelle' => 'Ligne sans code cerfa'],
+    ]);
+
+    // La facture passe bien en statut Validee (skip gracieux)
+    expect($facture->statut)->toBe(StatutFacture::Validee);
+
+    // Une Transaction a bien été générée
+    expect($facture->transactions()->count())->toBe(1);
+    $tx = $facture->transactions()->first();
+    expect($tx)->not->toBeNull();
+
+    // La ligne legacy est créée avec sous_categorie_id et montant intacts
+    $ligneVent = TransactionLigne::where('transaction_id', $tx->id)
+        ->where('sous_categorie_id', $scSansCode->id)
+        ->first();
+    expect($ligneVent)->not->toBeNull();
+    expect($ligneVent->compte_id)->toBeNull('Pas d\'enrichissement compte_id sans code_cerfa');
+    expect((float) $ligneVent->credit)->toBe(0.0, 'Pas de crédit enrichi sans code_cerfa');
+
+    // Aucune ligne 411 PD-only (le skip arrête toute la double écriture)
+    $compte411 = compte411PD();
+    $count411 = TransactionLigne::where('transaction_id', $tx->id)
+        ->where('compte_id', $compte411->id)
+        ->count();
+    expect($count411)->toBe(0, 'Aucune ligne 411 si résolution compte échoue');
+
+    // Le Log::warning a été émis (comportement documenté du skip)
+    Log::shouldHaveReceived('warning')
+        ->once()
+        ->withArgs(function (string $message): bool {
+            return str_contains($message, 'Step 23') && str_contains($message, 'code_cerfa');
+        });
 });

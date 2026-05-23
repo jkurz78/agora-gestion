@@ -965,6 +965,11 @@ XML;
                         'notes' => $factureLigne->libelle,
                     ];
                 } else {
+                    // Une résolution a échoué : on abandonne toute la partie double (Skip PD).
+                    // Note : on ne fait PAS break ici (contrairement à Step 21) car la boucle sert
+                    // aussi à créer les TransactionLignes legacy pour toutes les FactureLignes.
+                    // TODO DRY Step 25+ : réconcilier avec TransactionService quand le helper
+                    // partagé sera extrait — la sémantique du break sera unifiée.
                     $skipPartieDouble = true;
                 }
             }
@@ -1063,6 +1068,10 @@ XML;
     /**
      * Résout le Compte de ventilation (classe 7) depuis la SousCategorie d'une ligne legacy.
      * Retourne null et log un warning si l'une des gardes échoue — le caller skip la partie double.
+     */
+    /**
+     * TODO DRY : logique identique à TransactionService::resoudreCompteVentilationRecette.
+     * À extraire dans un helper partagé lors du Step 25+ (refactoring EcritureGenerator caller).
      */
     private function resoudreCompteVentilationRecette(TransactionLigne $ligne, int $transactionId): ?Compte
     {
