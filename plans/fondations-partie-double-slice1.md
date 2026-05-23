@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 (1ʳᵉ version école directe + révision école 411 systématique le même jour, 8 commits de révision, suite 11 446 / 0 failed). Prêt pour reprise Step 21 (1c).
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c démarrée 2026-05-23 : Step 21 (unifié recette+dépense, fusion Step 22) livré** — commits `5ad4645d` + `b725c6e2` + `0a7dad79`, suite 11 537 / 0 failed. Prochain : Step 23 (`FactureService::valider`).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -498,28 +498,32 @@ Sous-slice 1b livrée sur `feat/compta-v5` — 9 commits (Steps 12-20), 76 nouve
 
 ### Phase E — Branchements UI (steps 21-26) — Sous-slice 1c
 
-#### Step 21 : Livewire Recette branché sur `EcritureGenerator`
+#### Step 21 : `TransactionService` branché sur `EcritureGenerator` (recette + dépense unifié) ✅
 
-**Complexity**: complex
-**RED**: Tests Pest Livewire :
-- Saisie recette chèque via composant → écritures partie double créées
-- Saisie recette à crédit → ligne 411 créée + créance visible fiche tiers
-- Suite tests existants `RecetteForm*` reste verte
-**GREEN**:
-- `App\Livewire\Recettes\RecetteForm` (ou équivalent) appelle `EcritureGenerator::pourRecetteComptant` ou `pourRecetteACredit` selon le mode
-- Conservation totale de l'UI existante
-**REFACTOR**: Extraire la logique de submit en `RecetteFormHandler` testable unitairement
-**Files**: composants Livewire concernés, tests
-**Commit**: `feat(v5): branche saisie recette Livewire sur EcritureGenerator`
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `5ad4645d` (feat) + `b725c6e2` (fix gardes mode comptant) + `0a7dad79` (refactor qualité). Suite Pest 11 537 / 0 failed. **Steps 21 + 22 fusionnés** : `app/Livewire/TransactionForm.php` gère unifié recettes + dépenses, donc branchement dans `TransactionService::create()` (1 commit feat + 2 commits suite reviews spec + qualité).
 
-#### Step 22 : Livewire Dépense branché
+**Décisions actées** (cf. brainstorming avec PO le 2026-05-23) :
+- **Point d'injection** : `TransactionService::create()` (PAS `TransactionForm`). UI inchangée. EcritureGenerator étendu d'un paramètre `?Transaction $existingTransaction = null` sur ses 4 méthodes `pourXXX` (option A — préserve l'API publique pour les 113 tests unit).
+- **Modèle DB** : 1 seule Transaction. Les N lignes ventilation legacy sont enrichies en place via `$ligne->fill([compte_id, debit, credit])->save()` (chemin Eloquent → observer XOR actif). Les 3 lignes techniques PD-only (411/401 D tiers, 5xx D/C portage, 411/401 C tiers) sont ajoutées sur la MÊME Transaction par EcritureGenerator (qui skippe la création de ses propres lignes de ventilation si `$existingTransaction` fourni).
+- **Double écriture systématique** : pas de feature flag. Les lignes legacy (sous_categorie_id + montant) sont conservées intactes pour les rapports.
+- **Asymétrie chèque** : pour dépense `Cheque`, `EcritureGenerator::resoudreComptePortageDepense` retourne `$compteTresorerieExplicite` (512X direct, pas 5112 miroir). TransactionService doit donc skip si IBAN→512X échoue pour dépense chèque (sinon écriture incorrecte sur 5112).
+- **Gardes skip avec log** : tiers_id null, sous_categorie sans code_cerfa, compte introuvable, classe inattendue, compte_id null + mode nécessitant 512X → skip + Log::warning (préserve la création legacy).
 
-**Complexity**: standard
-**RED**: Symétrique au step 21 pour les dépenses
-**GREEN**: Appel `pourDepenseComptant` ou `pourDepenseACredit`
-**REFACTOR**: Cohérence avec Step 21
-**Files**: composants Livewire Dépenses
-**Commit**: `feat(v5): branche saisie dépense Livewire sur EcritureGenerator`
+**Tests ajoutés** : `tests/Feature/Services/TransactionServicePartieDoubleTest.php` — 12 scenarios (89 assertions) : 4 cas canoniques, multi-ventilation, conservation legacy, 4 cas de skip, dépense chèque (révèle bug placeholder 5112), compte_id null sur mode comptant, garde-fou XOR observer, propagation notes ventilation.
+
+**Refactor inclus** : helper privé `EcritureGenerator::reattacherComptesAuxLignes(Collection, Compte, ?Compte, Collection)` extrait — élimine ~80 lignes dupliquées sur les 4 méthodes `pourXXX`.
+
+**Dette technique notée pour Steps 22+** :
+- **N+1 latent** dans `TransactionService::enrichirPartieDouble` : N × `SousCategorie::find` + N × `Compte::ofNumero` dans la boucle. Préfetch à faire si HelloAsso (N≤10) pose problème en pratique. Non bloquant N≤3.
+- **SRP enrichirPartieDouble (~215 lignes)** : 4 responsabilités identifiables (résolution tiers, ventilations+enrichissement legacy, trésorerie 512X, dispatch 4 chemins). Extraction en 3 méthodes privées recommandée au Step 22 ou Step 23 quand la méthode regrossit (sinon re-divergence assurée).
+- **`TransactionService::update`** : NON couvert au Step 21. La logique `forceDelete` + recréation des lignes détruirait les lignes PD-only sans les recréer. Step dédié à prévoir (ex. Step 26b ou au cutover 1d).
+- **Helpers test globaux `compte411()` / `compte401()` / `compte5112()`** : à factoriser dans un trait `WithCompteResolvers` ou `tests/Pest.php` quand Step 23 en aura besoin.
+- **Setup test dupliqué (~65 lignes beforeEach)** : à factoriser en trait `CreatesPartieDoublContext` au Step 23.
+
+**Files**: `app/Services/TransactionService.php`, `app/Services/Compta/EcritureGenerator.php`, `tests/Feature/Services/TransactionServicePartieDoubleTest.php`
+**Commits**: `5ad4645d` + `b725c6e2` + `0a7dad79`
+
+#### Step 22 : Livewire Dépense branché — **FUSIONNÉ dans Step 21** ✅
 
 #### Step 23 : `FactureService::valider` branché sur `pourRecetteACredit`
 
