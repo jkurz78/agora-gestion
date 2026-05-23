@@ -193,37 +193,58 @@ final class TransactionService
 
         // Mode comptant (paiement présent) → on a besoin d'un compteTresorerie
         $compteTresorerie = null;
-        if ($modePaiement !== null && $transaction->compte_id !== null) {
-            /** @var CompteBancaire|null $compteBancaire */
-            $compteBancaire = CompteBancaire::find($transaction->compte_id);
+        if ($modePaiement !== null) {
+            // Asymétrie chèque : côté dépense, chèque émis requiert un 512X explicite
+            // (pas de 5112 miroir — 5112 = chèques reçus). Côté recette, chèque reçu
+            // passe par 5112 automatiquement → placeholder acceptable.
+            $isDepense = $transaction->type === TypeTransaction::Depense;
 
-            if ($compteBancaire !== null && $compteBancaire->iban !== null) {
-                $compteTresorerie = Compte::where('iban', $compteBancaire->iban)
-                    ->where('association_id', (int) TenantContext::currentId())
-                    ->first();
-            }
+            $modesNecessitant512X = $isDepense
+                ? [ModePaiement::Cheque, ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement]
+                : [ModePaiement::Virement, ModePaiement::Cb, ModePaiement::Prelevement];
 
-            if ($compteTresorerie === null) {
-                // Pour chèque : 5112 ne requiert pas de 512X explicite
-                // Pour espèces : 530 ne requiert pas de 512X explicite
-                // Pour virement/CB/prélèvement : on a besoin du 512X → si manquant, skip
-                $modesNecessitant512X = [
-                    ModePaiement::Virement,
-                    ModePaiement::Cb,
-                    ModePaiement::Prelevement,
-                ];
+            if ($transaction->compte_id !== null) {
+                /** @var CompteBancaire|null $compteBancaire */
+                $compteBancaire = CompteBancaire::find($transaction->compte_id);
 
+                if ($compteBancaire !== null && $compteBancaire->iban !== null) {
+                    $compteTresorerie = Compte::where('iban', $compteBancaire->iban)
+                        ->where('association_id', (int) TenantContext::currentId())
+                        ->first();
+                }
+
+                if ($compteTresorerie === null) {
+                    // 512X introuvable via IBAN
+                    if (in_array($modePaiement, $modesNecessitant512X, strict: true)) {
+                        Log::warning('[PartieDouble] Step 21 — skip : compte 512X introuvable pour IBAN', [
+                            'transaction_id' => $transaction->id,
+                            'compte_bancaire_id' => $transaction->compte_id,
+                            'mode_paiement' => $modePaiement->value,
+                            'type' => $transaction->type->value,
+                        ]);
+
+                        return;
+                    }
+
+                    // Espèces ou chèque reçu (recette) : EcritureGenerator résout 530/5112 seul.
+                    // Placeholder uniquement utilisé comme paramètre formel — jamais écrit en DB.
+                    $compteTresorerie = Compte::ofNumeroSysteme('5112');
+                }
+            } else {
+                // compte_id null avec mode comptant
                 if (in_array($modePaiement, $modesNecessitant512X, strict: true)) {
-                    Log::warning('[PartieDouble] Step 21 — skip : compte 512X introuvable pour IBAN', [
+                    // Virement/CB/Prélèvement (et Chèque dépense) sans compte bancaire → skip
+                    Log::warning('[PartieDouble] Step 21 — skip : compte_id null pour mode nécessitant 512X', [
                         'transaction_id' => $transaction->id,
-                        'compte_bancaire_id' => $transaction->compte_id,
+                        'mode_paiement' => $modePaiement->value,
+                        'type' => $transaction->type->value,
                     ]);
 
                     return;
                 }
 
-                // Pour chèque/espèces, EcritureGenerator résout 5112/530 automatiquement
-                // On peut passer n'importe quel Compte comme placeholder — il ne sera pas utilisé
+                // Espèces ou chèque reçu (recette) sans compte_id : acceptable
+                // (EcritureGenerator utilisera 530 ou 5112 selon le mode)
                 $compteTresorerie = Compte::ofNumeroSysteme('5112');
             }
         }

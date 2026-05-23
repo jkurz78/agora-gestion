@@ -587,3 +587,109 @@ it('si sous-catégorie sans code_cerfa, la ligne legacy est créée mais pas enr
         ->count();
     expect($lignes411)->toBe(0, 'Pas de ligne 411 si une ventilation ne peut pas être résolue');
 });
+
+// ---------------------------------------------------------------------------
+// Scénario 9 : Dépense comptant chèque — portage sur 512X (pas 5112)
+// Révèle l'issue #1 : avant fix, la ligne portage était écrite sur 5112 (faux).
+// ---------------------------------------------------------------------------
+
+it('dépense comptant chèque — la ligne portage est sur 512X, PAS sur 5112 (école 411 systématique)', function () {
+    // Le compteBancaire et le compte512 (IBAN-matched 5121) sont créés dans beforeEach.
+    $data = [
+        'type' => TypeTransaction::Depense->value,
+        'date' => '2025-10-28',
+        'libelle' => 'Achat fournitures par chèque',
+        'montant_total' => '80.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,  // IBAN → compte5121
+    ];
+    $lignes = [[
+        'sous_categorie_id' => $this->scDepense->id,
+        'montant' => '80.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]];
+
+    $transaction = $this->service->create($data, $lignes);
+
+    // La Tx doit avoir 4 lignes : 1 ventilation enrichie (606 D) + 401 C tiers + 401 D tiers + 512X C
+    $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
+    expect($totalLignes)->toBe(4);
+
+    $compte401 = compte401();
+    $compte5112 = compte5112();
+
+    // 2 lignes 401 auto-lettrées
+    $lignes401 = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $compte401->id)
+        ->get();
+    expect($lignes401)->toHaveCount(2);
+
+    $ligne401C = $lignes401->firstWhere(fn ($l) => (float) $l->credit > 0);
+    $ligne401D = $lignes401->firstWhere(fn ($l) => (float) $l->debit > 0);
+    expect($ligne401C)->not()->toBeNull();
+    expect($ligne401D)->not()->toBeNull();
+
+    // Auto-lettrage 401 actif
+    expect($ligne401C->lettrage_code)->not()->toBeNull();
+    expect($ligne401D->lettrage_code)->not()->toBeNull();
+    expect($ligne401C->lettrage_code)->toBe($ligne401D->lettrage_code);
+
+    // tiers_id sur les 2 lignes 401
+    expect((int) $ligne401C->tiers_id)->toBe((int) $this->tiers->id);
+    expect((int) $ligne401D->tiers_id)->toBe((int) $this->tiers->id);
+
+    // Ligne portage : DOIT être sur 5121 (512X IBAN-matched), PAS sur 5112
+    $ligne512 = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $this->compte512->id)
+        ->first();
+    expect($ligne512)->not()->toBeNull('La ligne portage doit exister sur le compte 512X IBAN-matched');
+    expect((float) $ligne512->credit)->toBe(80.0);
+    expect($ligne512->tiers_id)->toBeNull('Invariant FEC : classe 5 sans tiers');
+
+    // Aucune ligne sur 5112 (serait sémantiquement faux pour un chèque émis)
+    $lignes5112 = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $compte5112->id)
+        ->count();
+    expect($lignes5112)->toBe(0, 'Chèque émis → 512X direct, jamais 5112 (chèques reçus)');
+
+    // Ligne ventilation 606 D enrichie
+    $ligneVent = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('sous_categorie_id', $this->scDepense->id)
+        ->first();
+    expect($ligneVent)->not()->toBeNull();
+    expect($ligneVent->compte_id)->toBe($this->compte606->id);
+    expect((float) $ligneVent->debit)->toBe(80.0);
+});
+
+// ---------------------------------------------------------------------------
+// Scénario 10 (bonus issue #2) : mode comptant + compte_id null → skip gracieux
+// ---------------------------------------------------------------------------
+
+it('dépense comptant virement avec compte_id null — skip gracieux sans TypeError', function () {
+    $data = [
+        'type' => TypeTransaction::Depense->value,
+        'date' => '2025-11-15',
+        'libelle' => 'Virement sans compte renseigné',
+        'montant_total' => '50.00',
+        'mode_paiement' => ModePaiement::Virement->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => null,  // ← compte_id null avec mode comptant
+    ];
+    $lignes = [[
+        'sous_categorie_id' => $this->scDepense->id,
+        'montant' => '50.00',
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]];
+
+    // Ne doit pas lever de TypeError ni d'exception — skip gracieux
+    $transaction = $this->service->create($data, $lignes);
+
+    // Seulement 1 ligne legacy (pas de PD-only car 512X introuvable)
+    $totalLignes = TransactionLigne::where('transaction_id', $transaction->id)->count();
+    expect($totalLignes)->toBe(1, 'Skip gracieux : seulement la ligne legacy sans double écriture');
+});
