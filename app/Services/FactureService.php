@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\DataTransferObjects\ExtournePayload;
+use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
 use App\Enums\TypeLigneFacture;
 use App\Enums\TypeTransaction;
+use App\Exceptions\Compta\LettrageDejaPresentException;
 use App\Models\Association;
 use App\Models\Compte;
 use App\Models\Facture;
@@ -18,6 +20,7 @@ use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Support\CurrentAssociation;
 use App\Support\PdfFooterRenderer;
@@ -669,6 +672,19 @@ XML;
      * Mark selected transactions as "payment received" (statut_reglement = recu).
      * Does not move transactions — used for chèques/espèces awaiting deposit.
      *
+     * Step 24 : pour chaque Transaction T1 marquée Recu, si T1 porte une ligne 411 non lettrée,
+     * délègue à EcritureGenerator::pourEncaissementCreance pour créer T2 (encaissement) et
+     * lettrer automatiquement la paire 411 (T1 créance ↔ T2 encaissement).
+     * T2 est attachée au pivot facture_transaction pour traçabilité.
+     *
+     * Skip silencieux (Log::warning + continue) si :
+     * — mode_paiement null sur T1
+     * — mode nécessitant 512X (Virement/CB/Prélèvement) et compte_id null ou IBAN non matché
+     * — T1 ne porte pas de ligne 411 (Transaction legacy sans double écriture)
+     *
+     * LettrageDejaPresentException propagée telle quelle si la ligne 411 est déjà lettrée
+     * (double encaissement = bug) → rollback DB::transaction englobante.
+     *
      * @param  array<int>  $transactionIds
      */
     public function marquerReglementRecu(
@@ -690,8 +706,81 @@ XML;
                 $transaction->update([
                     'statut_reglement' => StatutReglement::Recu->value,
                 ]);
+
+                // --- Partie double : génère T2 (encaissement) si T1 porte une ligne 411 valide ---
+                $this->encaisserPartieDouble($facture, $transaction);
             }
         });
+    }
+
+    /**
+     * Génère la T2 (encaissement créance) via EcritureGenerator::pourEncaissementCreance
+     * et l'attache au pivot facture_transaction.
+     *
+     * Skip silencieux si les prérequis partie double ne sont pas satisfaits
+     * (mode null, compte 512X introuvable pour Virement/CB/Prélèvement, pas de ligne 411).
+     *
+     * @throws LettrageDejaPresentException Si ligne 411 déjà lettrée.
+     */
+    private function encaisserPartieDouble(Facture $facture, Transaction $transaction): void
+    {
+        // --- 1. Résolution mode de paiement ---
+        /** @var ModePaiement|null $mode */
+        $mode = $transaction->mode_paiement;
+
+        if ($mode === null) {
+            Log::warning('[PartieDouble] Step 24 — skip : mode_paiement null sur T1', [
+                'transaction_id' => (int) $transaction->id,
+                'facture_id' => (int) $facture->id,
+            ]);
+
+            return;
+        }
+
+        // --- 2. Résolution compte de trésorerie (CompteBancaire → 512X via IBAN, ou placeholder 5112) ---
+        $compteTresorerie = CompteTresorerieResolver::resoudre(
+            compteBancaireId: $transaction->compte_id !== null ? (int) $transaction->compte_id : null,
+            mode: $mode,
+            contextLog: 'Step 24',
+            isDepense: false, // encaissement créance = côté recette (chèque reçu → 5112 OK)
+        );
+
+        if ($compteTresorerie === null) {
+            // Skip silencieux déjà loggué par CompteTresorerieResolver
+            return;
+        }
+
+        // --- 3. Vérifie que T1 porte une ligne 411 (transaction issue de la double écriture) ---
+        // On utilise ofNumero() (nullable) plutôt que ofNumeroSysteme() (throw) car ce skip
+        // est défensif : si le compte 411 n'existe pas (tenant sans double écriture activée),
+        // on skip sans exception.
+        $compte411 = Compte::ofNumero('411');
+        if ($compte411 === null) {
+            // Pas de schéma partie double pour ce tenant — skip silencieux
+            return;
+        }
+
+        $ligne411 = TransactionLigne::where('transaction_id', $transaction->id)
+            ->where('compte_id', $compte411->id)
+            ->first();
+
+        if ($ligne411 === null || $ligne411->tiers_id === null) {
+            // T1 legacy sans ligne 411 (recette saisie avant Step 23) — skip silencieux
+            return;
+        }
+
+        // --- 4. Délègue à EcritureGenerator (crée T2 + auto-lettre la paire 411) ---
+        // LettrageDejaPresentException propagée telle quelle → rollback DB::transaction englobante.
+        $t2 = $this->ecritureGenerator->pourEncaissementCreance(
+            transactionCreance: $transaction,
+            mode: $mode,
+            compteTresorerie: $compteTresorerie,
+            datePaiement: now(),
+            libelle: "Encaissement facture {$facture->numero}",
+        );
+
+        // --- 5. Attache T2 au pivot facture_transaction (traçabilité : facture voit T1 + T2) ---
+        $facture->transactions()->attach($t2->id);
     }
 
     /**
