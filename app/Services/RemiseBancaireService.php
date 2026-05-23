@@ -7,12 +7,23 @@ namespace App\Services;
 use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\StatutReglement;
+use App\Models\Compte;
 use App\Models\RemiseBancaire;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\LettrageService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 final class RemiseBancaireService
 {
+    public function __construct(
+        private readonly EcritureGenerator $ecritureGenerator,
+        private readonly LettrageService $lettrageService,
+    ) {}
+
     public function creer(array $data): RemiseBancaire
     {
         return DB::transaction(function () use ($data): RemiseBancaire {
@@ -94,6 +105,9 @@ final class RemiseBancaireService
                     'reference' => $reference,
                 ]);
             }
+
+            // --- Partie double : générer la T4 de remise ---
+            $this->recreerT4($remise, $transactionIds);
         });
     }
 
@@ -113,8 +127,11 @@ final class RemiseBancaireService
         }
 
         DB::transaction(function () use ($remise, $transactionIds): void {
+            // Exclude T4 (which has reference=null) from the transactions to remove.
+            // After comptabiliser(), all T1 sources have a non-null reference, only T4 has null.
             $aRetirer = Transaction::where('remise_id', $remise->id)
                 ->whereNotIn('id', $transactionIds)
+                ->whereNotNull('reference')
                 ->get();
 
             foreach ($aRetirer as $tx) {
@@ -148,6 +165,10 @@ final class RemiseBancaireService
                     ),
                 ]);
             }
+
+            // --- Partie double : supprimer l'ancienne T4 et en recréer une nouvelle ---
+            $this->supprimerT4SiExiste($remise);
+            $this->recreerT4($remise, $transactionIds);
         });
     }
 
@@ -164,6 +185,10 @@ final class RemiseBancaireService
         }
 
         DB::transaction(function () use ($remise): void {
+            // --- Partie double : supprimer T4 + délettrer sources ---
+            $this->supprimerT4SiExiste($remise);
+
+            // --- Legacy : réinitialiser les tx sources ---
             Transaction::where('remise_id', $remise->id)->update([
                 'remise_id' => null,
                 'statut_reglement' => StatutReglement::EnAttente->value,
@@ -171,5 +196,150 @@ final class RemiseBancaireService
             ]);
             $remise->delete();
         });
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers privés — T4 lifecycle
+    // -------------------------------------------------------------------------
+
+    /**
+     * Supprime la T4 de remise si elle existe : délettre les paires 5112/530
+     * des lignes sources, supprime les lignes de T4, puis supprime T4.
+     *
+     * Utilisé par comptabiliser() (delete before recreate), modifier() (idem)
+     * et supprimer() (delete only, sans recreate).
+     *
+     * Appelé à l'intérieur d'une DB::transaction() englobante.
+     */
+    private function supprimerT4SiExiste(RemiseBancaire $remise): void
+    {
+        // La T4 est identifiée par la conjonction de 3 critères :
+        // — remise_id = $remise->id (liée à la remise)
+        // — reference IS NULL (elle n'a pas de référence legacy)
+        // — equilibree = true (créée par EcritureGenerator, toujours équilibrée)
+        // Les T1 sources après comptabiliser() ont reference != null.
+        // Les brouillons (avant comptabiliser) ont equilibree NULL (pas de double écriture).
+        $t4 = Transaction::where('remise_id', $remise->id)
+            ->whereNull('reference')
+            ->where('equilibree', true)
+            ->first();
+
+        if ($t4 === null) {
+            return;
+        }
+
+        // Délettrer toutes les lignes portage (5112/530) de T4 qui sont lettrées
+        $lignesPortageT4 = TransactionLigne::where('transaction_id', $t4->id)
+            ->whereNotNull('lettrage_code')
+            ->get();
+
+        foreach ($lignesPortageT4 as $ligne) {
+            $this->lettrageService->delettrerParLigne(
+                $ligne->fresh(), // Recharger pour avoir lettrage_code à jour
+                "Suppression remise bancaire #{$remise->id} — délettrage T4 ligne #{$ligne->id}"
+            );
+        }
+
+        // Supprimer les lignes de T4
+        TransactionLigne::where('transaction_id', $t4->id)->forceDelete();
+
+        // Supprimer T4 (soft-delete suffisant — Transaction::find() retournera null)
+        $t4->forceDelete();
+    }
+
+    /**
+     * Collecte les lignes 5112/530 sources des transactions et appelle
+     * EcritureGenerator::pourRemiseBancaire pour créer la T4.
+     * Pose ensuite remise_id = $remise->id sur la T4.
+     *
+     * Si aucune source valide n'est trouvée (toutes legacy), log error et ne crée pas de T4.
+     * Si certaines sources sont legacy, skip silencieux + Log::warning pour chacune.
+     *
+     * Appelé à l'intérieur d'une DB::transaction() englobante.
+     *
+     * @param  array<int>  $transactionIds
+     */
+    private function recreerT4(RemiseBancaire $remise, array $transactionIds): void
+    {
+        $mode = $remise->mode_paiement;
+
+        // Résoudre le compte de portage attendu (5112 pour Chèque, 530 pour Espèces)
+        $numeroComptePortage = match ($mode) {
+            ModePaiement::Cheque => '5112',
+            ModePaiement::Especes => '530',
+            default => null,
+        };
+
+        if ($numeroComptePortage === null) {
+            // Mode non supporté pour la remise partie double (Virement, CB, Prélèvement)
+            // EcritureGenerator::pourRemiseBancaire lèvera une exception si on tente —
+            // on skip silencieusement ici (cohérence avec la garde dans EcritureGenerator)
+            Log::warning('[PartieDouble] Step 25 — skip : mode non supporté pour remise partie double', [
+                'remise_id' => $remise->id,
+                'mode_paiement' => $mode->value,
+            ]);
+
+            return;
+        }
+
+        // Résoudre le compte portage (nullable : tenant sans schéma PD)
+        $comptePortage = Compte::ofNumero($numeroComptePortage);
+
+        if ($comptePortage === null) {
+            Log::warning('[PartieDouble] Step 25 — skip : compte portage introuvable (tenant sans schéma PD)', [
+                'remise_id' => $remise->id,
+                'numero_compte_portage' => $numeroComptePortage,
+            ]);
+
+            return;
+        }
+
+        // Collecter les lignes portage sources valides
+        /** @var Collection<int, TransactionLigne> $lignesSources */
+        $lignesSources = collect();
+
+        foreach ($transactionIds as $txId) {
+            $tx = Transaction::find($txId);
+
+            if ($tx === null) {
+                continue;
+            }
+
+            // Chercher la ligne portage (5112 ou 530) sur cette transaction
+            $lignePortage = TransactionLigne::where('transaction_id', $tx->id)
+                ->where('compte_id', $comptePortage->id)
+                ->whereNull('lettrage_code') // Non encore lettrée
+                ->whereNull('tiers_id')      // École 411 systématique : sans tiers sur 5x
+                ->where('debit', '>', 0)     // Ligne débit (le portage reçoit en débit)
+                ->first();
+
+            if ($lignePortage === null) {
+                Log::warning('[PartieDouble] Step 25 — skip source : aucune ligne portage '.$numeroComptePortage.' trouvée sur transaction', [
+                    'remise_id' => $remise->id,
+                    'transaction_id' => $txId,
+                    'compte_portage' => $numeroComptePortage,
+                    'note' => 'Transaction legacy ou non issue du branchement EcritureGenerator Step 21',
+                ]);
+
+                continue;
+            }
+
+            $lignesSources->push($lignePortage);
+        }
+
+        if ($lignesSources->isEmpty()) {
+            Log::warning('[PartieDouble] Step 25 — aucune source valide : pas de T4 créée', [
+                'remise_id' => $remise->id,
+                'transaction_ids' => $transactionIds,
+            ]);
+
+            return;
+        }
+
+        // Créer la T4 via EcritureGenerator
+        $t4 = $this->ecritureGenerator->pourRemiseBancaire($remise, $lignesSources);
+
+        // Lier la T4 à la remise (traçabilité : remise_id posé sur T4, sans reference)
+        $t4->update(['remise_id' => $remise->id]);
     }
 }
