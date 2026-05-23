@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Step 21 livré (`5ad4645d`+`b725c6e2`+`0a7dad79`) + Step 23 livré (`84615294`+`67674dd8`)** — suite 11 592 / 0 failed. Prochain : Step 24 (`FactureService::encaisser`).
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Steps 21+23+24 livrés** (suite 11 649 / 0 failed). Prochain : Step 25 (`RemiseBancaireService::comptabiliser`).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -549,17 +549,36 @@ Sous-slice 1b livrée sur `feat/compta-v5` — 9 commits (Steps 12-20), 76 nouve
 **Files**: `app/Services/FactureService.php` (+116 lignes), `tests/Feature/Services/FactureServicePartieDoubleTest.php` (créé, 436 lignes)
 **Commits**: `84615294` + `67674dd8`
 
-#### Step 24 : `FactureService::encaisser` branché sur `pourEncaissementCreance`
+#### Step 24 : `FactureService::marquerReglementRecu` branché sur `pourEncaissementCreance` ✅
 
-**Complexity**: standard
-**RED**: Tests Pest :
-- Encaissement facture → auto-lettrage 411
-- Solde ouvert 411 = 0
-**GREEN**:
-- `FactureService::encaisser` délègue à `EcritureGenerator::pourEncaissementCreance`
-**REFACTOR**: None needed
-**Files**: tests
-**Commit**: `feat(v5): FactureService::encaisser délègue à EcritureGenerator + auto-lettrage`
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `4153b9b9` (feat) + `2ceb599a` (quality fixes I-1 à I-4 + M-4). Suite Pest 11 649 / 0 failed (+57 vs Step 23).
+**Méthode cible** : `marquerReglementRecu(Facture, array $transactionIds)` (et non `encaisser` comme nommé dans le plan d'origine).
+**Différence vs Steps 21+23** : T2 = **nouvelle Transaction physique** créée par `pourEncaissementCreance` (pas d'enrichissement de la T1). La paire 411 (T1-ligne + T2-ligne) est auto-lettrée. T2 attachée au pivot `facture_transaction`.
+**Décisions implémentation** :
+- Mode + compteTresorerie résolus depuis T1 (`$t1->mode_paiement` copié de `mode_paiement_prevu` au Step 23, `$t1->compte_id` CompteBancaire).
+- 5 gardes skip avec `Log::warning` : transaction sans tiers/411 introuvable (legacy), compte 411 absent (tenant sans schéma PD), mode_paiement null, IBAN no-match pour modes nécessitant 512X, ligne 411 déjà lettrée → throw `LettrageDejaPresentException` rollback complet.
+- Pas de paramètre `$existingTransaction` car `pourEncaissementCreance` crée toujours une T2 nouvelle (matrice spec §4.3 à 2 transactions distinctes).
+- Préservation flag legacy : si skip PD, `statut_reglement = Recu` quand même (le PD est best-effort).
+
+**Refactor inclus — Option B (extraction helper `CompteTresorerieResolver`)** :
+- Nouveau `App\Services\Compta\CompteTresorerieResolver::resoudre(?int $compteBancaireId, ModePaiement $mode, string $contextLog, bool $isDepense): ?Compte`
+- Factorise la résolution `CompteBancaire IBAN → Compte 512X` + fallback placeholder utilisée par TransactionService (Step 21) ET FactureService (Step 24).
+- 3ᵉ caller à venir : RemiseBancaireService Step 25.
+- 8 cas couverts en test unit dédié (`tests/Unit/Services/Compta/CompteTresorerieResolverTest.php`, 201 assertions).
+
+**Refactor inclus — helper test global** :
+- `compteSysteme(string $numero): Compte` extrait dans `tests/Pest.php` — remplace les 6 helpers locaux dupliqués (`compte411()` / `compte5112()` / `compte411PD()` / `compte411Enc()` / etc.) dans 4 fichiers test. -125 lignes au total.
+
+**Tests** : 6 scénarios dans `tests/Feature/Services/FactureServicePartieDoubleEncaissementTest.php` (~42 assertions) + 8 cas dans test unit resolver. Couvre : Cheque (5112), Virement (512X IBAN), solde ouvert 411 = 0 après encaissement, double encaissement (LettrageDejaPresentException + rollback complet via 2-T1 cohérentes), mode + compte_id null (skip + Log::warning), T1 legacy sans 411 (skip gracieux).
+
+**Dette technique notée pour Steps 25+** :
+- **N+1 latent** dans `marquerReglementRecu` : pour chaque tx ~5-6 SELECT/insert. `Compte::ofNumero('411')` hoistable hors boucle. Acceptable car N ≤ 3-5 en pratique.
+- **Param `$isDepense: bool`** dans CompteTresorerieResolver : enum `Sens { Recette, Depense }` plus parlant. Post-cutover.
+- **`TransactionService::update`** : toujours pas couvert (idem note Step 21).
+- **Convention messages log `[PartieDouble] Step XX`** : préfixe historique fragile (cf. M-6 Step 23). À refactorer en `[PartieDouble][ServiceName]` post-cutover.
+
+**Files**: `app/Services/Compta/CompteTresorerieResolver.php` (créé, 97 lignes), `app/Services/FactureService.php` (+89 lignes), `app/Services/TransactionService.php` (-40 lignes inline → appel resolver), `tests/Feature/Services/FactureServicePartieDoubleEncaissementTest.php` (créé, 6 scénarios), `tests/Unit/Services/Compta/CompteTresorerieResolverTest.php` (créé, 8 cas), `tests/Pest.php` (+13 lignes helper), `tests/Feature/Services/TransactionServicePartieDoubleTest.php` + `FactureServicePartieDoubleTest.php` + `EcritureGeneratorPourRecetteComptantTest.php` (refacto helpers)
+**Commits**: `4153b9b9` + `2ceb599a`
 
 #### Step 25 : `RemiseBancaireService::comptabiliser` branché sur `pourRemiseBancaire`
 
