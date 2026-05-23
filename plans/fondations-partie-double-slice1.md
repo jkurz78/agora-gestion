@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c démarrée 2026-05-23 : Step 21 (unifié recette+dépense, fusion Step 22) livré** — commits `5ad4645d` + `b725c6e2` + `0a7dad79`, suite 11 537 / 0 failed. Prochain : Step 23 (`FactureService::valider`).
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Step 21 livré (`5ad4645d`+`b725c6e2`+`0a7dad79`) + Step 23 livré (`84615294`)** — suite 11 578 / 0 failed. Prochain : Step 24 (`FactureService::encaisser`).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -525,18 +525,12 @@ Sous-slice 1b livrée sur `feat/compta-v5` — 9 commits (Steps 12-20), 76 nouve
 
 #### Step 22 : Livewire Dépense branché — **FUSIONNÉ dans Step 21** ✅
 
-#### Step 23 : `FactureService::valider` branché sur `pourRecetteACredit`
+#### Step 23 : `FactureService::valider` branché sur `pourRecetteACredit` ✅
 
 **Complexity**: standard
-**RED**: Tests Pest :
-- `FactureService::valider($facture)` génère une transaction `411/706` (ou multiple lignes 706 si plusieurs produits)
-- Solde ouvert 411 = montant TTC facture
-- Test existant `FactureServiceTest` reste vert
-**GREEN**:
-- `FactureService::valider` délègue à `EcritureGenerator::pourRecetteACredit` (potentiellement boucle sur lignes facture pour multi-produits)
-**REFACTOR**: None needed
-**Files**: `app/Services/FactureService.php`, tests
-**Commit**: `feat(v5): FactureService::valider délègue à EcritureGenerator::pourRecetteACredit`
+**Commit**: `84615294` (2026-05-23)
+**Tests**: 7 scénarios dans `tests/Feature/Services/FactureServicePartieDoubleTest.php` — 0 failed
+**Option**: A (inline) — résolution SC→Compte inline dans `resoudreCompteVentilationRecette` (helper privé), refactor dette notée pour Step ultérieur
 
 #### Step 24 : `FactureService::encaisser` branché sur `pourEncaissementCreance`
 
