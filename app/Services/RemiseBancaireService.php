@@ -13,6 +13,7 @@ use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\EcritureGenerator;
 use App\Services\Compta\LettrageService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -75,6 +76,13 @@ final class RemiseBancaireService
     {
         if ($remise->isVerrouillee()) {
             throw new \RuntimeException('Cette remise est verrouillée par un rapprochement bancaire.');
+        }
+
+        // Garde idempotence : si T4 déjà créée, l'utilisateur doit passer par modifier()
+        if ($this->queryT4($remise->id)->exists()) {
+            throw new \RuntimeException(
+                'Cette remise est déjà comptabilisée. Utilisez modifier() pour ajuster la sélection.'
+            );
         }
 
         DB::transaction(function () use ($remise, $transactionIds): void {
@@ -150,7 +158,11 @@ final class RemiseBancaireService
 
             $prefix = $remise->referencePrefix();
             $numeroPadded = str_pad((string) $remise->numero, 5, '0', STR_PAD_LEFT);
-            $index = Transaction::where('remise_id', $remise->id)->count();
+            // Fix Important-1 : exclure la T4 (reference IS NULL) du count pour éviter
+            // un décalage d'index. Les T1 sources ont toutes une reference non-null après
+            // comptabiliser() ; la T4 a reference = null et sera supprimée par
+            // supprimerT4SiExiste() ligne ~170.
+            $index = Transaction::where('remise_id', $remise->id)->whereNotNull('reference')->count();
 
             foreach (Transaction::whereIn('id', $transactionIds)->whereNull('reference')->get() as $tx) {
                 $index++;
@@ -199,7 +211,28 @@ final class RemiseBancaireService
     }
 
     // -------------------------------------------------------------------------
-    // Helpers privés — T4 lifecycle
+    // Helpers privés — Identification T4
+    // -------------------------------------------------------------------------
+
+    /**
+     * Identifie la T4 (transaction de dépôt partie double) d'une remise.
+     *
+     * Critère : (remise_id = X, reference IS NULL, equilibree = true).
+     * Repose sur l'invariant que les T1 sources ont TOUJOURS une `reference` non-null
+     * après assignation par comptabiliser() ou modifier(). La T4 elle, n'a pas de
+     * reference (numérotation legacy non applicable aux écritures partie double).
+     *
+     * @return Builder<Transaction>
+     */
+    private function queryT4(int $remiseId): Builder
+    {
+        return Transaction::where('remise_id', $remiseId)
+            ->whereNull('reference')
+            ->where('equilibree', true);
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers privés — T4 lifecycle (créer / supprimer)
     // -------------------------------------------------------------------------
 
     /**
@@ -213,16 +246,7 @@ final class RemiseBancaireService
      */
     private function supprimerT4SiExiste(RemiseBancaire $remise): void
     {
-        // La T4 est identifiée par la conjonction de 3 critères :
-        // — remise_id = $remise->id (liée à la remise)
-        // — reference IS NULL (elle n'a pas de référence legacy)
-        // — equilibree = true (créée par EcritureGenerator, toujours équilibrée)
-        // Les T1 sources après comptabiliser() ont reference != null.
-        // Les brouillons (avant comptabiliser) ont equilibree NULL (pas de double écriture).
-        $t4 = Transaction::where('remise_id', $remise->id)
-            ->whereNull('reference')
-            ->where('equilibree', true)
-            ->first();
+        $t4 = $this->queryT4($remise->id)->first();
 
         if ($t4 === null) {
             return;

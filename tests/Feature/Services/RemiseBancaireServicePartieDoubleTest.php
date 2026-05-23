@@ -469,6 +469,11 @@ it('[E] modifier remise (ajout tx) → T4 recréée avec le nouveau périmètre'
     $tx3->refresh();
     expect($tx3->remise_id)->toBe($remise->id);
     expect($tx3->statut_reglement)->toBe(StatutReglement::Recu);
+
+    // Fix Important-1 : vérifier que la nouvelle tx3 reçoit le bon numéro de référence.
+    // Avec 2 T1 existantes, le count doit ignorer la T4 (reference IS NULL), donc tx3 → -003 et non -004.
+    $numeroPadded = str_pad((string) $remise->numero, 5, '0', STR_PAD_LEFT);
+    expect($tx3->reference)->toEndWith("-{$numeroPadded}-003", 'tx3 doit recevoir -003, pas -004 (T4 exclue du count)');
 });
 
 // ---------------------------------------------------------------------------
@@ -612,3 +617,68 @@ it('[H] comptabiliser une remise verrouillée lève RuntimeException (garde pré
 
     $this->service->comptabiliser($remise->fresh(), [$txSource->id]);
 })->throws(RuntimeException::class);
+
+// ---------------------------------------------------------------------------
+// Scénario I — queryT4() identifie exactement 1 T4 après comptabiliser() — invariant critère
+// ---------------------------------------------------------------------------
+
+it('[I] queryT4() identifie unique T4 après comptabiliser() — invariant critère', function () {
+    $remise = t25creerRemise($this, ModePaiement::Cheque);
+
+    $ligne1 = t25creerLigne5112($this, 60.00);
+    $ligne2 = t25creerLigne5112($this, 40.00);
+
+    $tx1 = Transaction::findOrFail($ligne1->transaction_id);
+    $tx2 = Transaction::findOrFail($ligne2->transaction_id);
+
+    $this->service->comptabiliser($remise, [$tx1->id, $tx2->id]);
+
+    // Le critère queryT4() doit retourner exactement 1 résultat
+    $countT4 = Transaction::where('remise_id', $remise->id)
+        ->whereNull('reference')
+        ->where('equilibree', true)
+        ->count();
+
+    expect($countT4)->toBe(1, 'Exactement 1 T4 doit correspondre au critère queryT4()');
+
+    // La T4 unique correspond bien à la transaction créée par EcritureGenerator (equilibree = true)
+    $t4 = Transaction::where('remise_id', $remise->id)
+        ->whereNull('reference')
+        ->where('equilibree', true)
+        ->firstOrFail();
+
+    // Elle n'est pas l'une des T1 sources
+    expect((int) $t4->id)->not->toBe((int) $tx1->id);
+    expect((int) $t4->id)->not->toBe((int) $tx2->id);
+
+    // Elle a bien les lignes T4 (1 × 512X + 2 × 5112)
+    $lignesT4 = TransactionLigne::where('transaction_id', $t4->id)->get();
+    expect($lignesT4)->toHaveCount(3, 'T4 doit avoir 3 lignes pour 2 sources');
+
+    // Les T1 sources ont toutes reference != null (invariant)
+    $tx1->refresh();
+    $tx2->refresh();
+    expect($tx1->reference)->not->toBeNull('T1 source 1 doit avoir reference non-null (invariant queryT4)');
+    expect($tx2->reference)->not->toBeNull('T1 source 2 doit avoir reference non-null (invariant queryT4)');
+});
+
+// ---------------------------------------------------------------------------
+// Scénario J — comptabiliser() appelé 2× → throw "déjà comptabilisée"
+// ---------------------------------------------------------------------------
+
+it('[J] comptabiliser() 2× sur la même remise → throw RuntimeException "déjà comptabilisée"', function () {
+    $remise = t25creerRemise($this, ModePaiement::Cheque);
+
+    $ligne1 = t25creerLigne5112($this, 50.00);
+    $tx1 = Transaction::findOrFail($ligne1->transaction_id);
+
+    // Premier appel : doit réussir
+    $this->service->comptabiliser($remise, [$tx1->id]);
+
+    // Créer une 2ème tx pour simuler un 2ème appel qui fournirait de nouvelles ids
+    $ligne2 = t25creerLigne5112($this, 30.00);
+    $tx2 = Transaction::findOrFail($ligne2->transaction_id);
+
+    // Deuxième appel sur la même remise : doit lever une exception "déjà comptabilisée"
+    $this->service->comptabiliser($remise->fresh(), [$tx2->id]);
+})->throws(RuntimeException::class, 'déjà comptabilisée');
