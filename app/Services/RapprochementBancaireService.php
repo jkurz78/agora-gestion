@@ -12,10 +12,10 @@ use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
-use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -152,6 +152,12 @@ final class RapprochementBancaireService
                     ->value('net');
 
                 $solde += $mouvement;
+            } else {
+                Log::warning('[PartieDouble] Step 29 — skip solde : compte 512X introuvable pour IBAN', [
+                    'iban' => $rapprochement->compte->iban,
+                    'compte_bancaire_id' => (int) $rapprochement->compte_id,
+                    'rapprochement_id' => (int) $rapprochement->id,
+                ]);
             }
             // Si compte 512X introuvable (tenant sans schéma PD), solde = ouverture seul.
         } else {
@@ -439,8 +445,7 @@ final class RapprochementBancaireService
         }
 
         return Compte::where('iban', $compteBancaire->iban)
-            ->where('association_id', (int) TenantContext::currentId())
-            ->where('classe', 5)
+            ->bancaires()
             ->first();
     }
 }

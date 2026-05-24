@@ -542,3 +542,123 @@ test('[PD-F2] verrouiller échoue si solde PD ≠ solde_fin', function () {
     expect(fn () => $this->service->verrouiller($rapprochement->fresh()))
         ->toThrow(RuntimeException::class);
 });
+
+// ===========================================================================
+// G — Toggle remise en mode PD : seule la T4 contribue au solde 512X
+// ===========================================================================
+
+test('[PD-G] toggle remise pointée en mode PD : solde = ouverture + total remise (T4 seule, pas les T1 sources)', function () {
+    // Créer 3 transactions chèque avec lignes 5112 (portage) — source T1a, T1b, T1c
+    $compte5112 = compteSysteme('5112');
+    $compte411 = compteSysteme('411');
+    $montants = [100.00, 150.00, 200.00]; // total = 450.00
+    $txIds = [];
+
+    foreach ($montants as $montant) {
+        $tx = Transaction::factory()->create([
+            'association_id' => TenantContext::currentId(),
+            'type' => TypeTransaction::Recette,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => $montant,
+            'compte_id' => $this->compteBancaire->id,
+            'statut_reglement' => StatutReglement::EnAttente->value,
+            'equilibree' => true,
+            'type_ecriture' => 'normale',
+        ]);
+
+        // Lignes PD : 411D / 706C / 5112D / 411C (pas de ligne 512X sur les sources chèque)
+        TransactionLigne::create([
+            'transaction_id' => $tx->id, 'compte_id' => $compte411->id,
+            'debit' => $montant, 'credit' => 0, 'tiers_id' => $this->tiers->id,
+            'libelle' => 'Chèque source', 'montant' => 0, 'sous_categorie_id' => null,
+        ]);
+        TransactionLigne::create([
+            'transaction_id' => $tx->id, 'compte_id' => $this->compte706->id,
+            'debit' => 0, 'credit' => $montant, 'tiers_id' => null,
+            'libelle' => 'Chèque source', 'montant' => 0, 'sous_categorie_id' => null,
+        ]);
+        TransactionLigne::create([
+            'transaction_id' => $tx->id, 'compte_id' => $compte5112->id,
+            'debit' => $montant, 'credit' => 0, 'tiers_id' => null,
+            'libelle' => 'Chèque source', 'montant' => 0, 'sous_categorie_id' => null,
+        ]);
+        TransactionLigne::create([
+            'transaction_id' => $tx->id, 'compte_id' => $compte411->id,
+            'debit' => 0, 'credit' => $montant, 'tiers_id' => $this->tiers->id,
+            'libelle' => 'Chèque source', 'montant' => 0, 'sous_categorie_id' => null,
+        ]);
+
+        $txIds[] = $tx->id;
+    }
+
+    // Comptabiliser la remise → crée la T4 (512X D 450.00, 5112 C 450.00)
+    $remiseService = app(RemiseBancaireService::class);
+    $remise = $remiseService->creer([
+        'date' => '2025-10-15',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'compte_cible_id' => $this->compteBancaire->id,
+    ]);
+    $remiseService->comptabiliser($remise, $txIds);
+
+    // Créer le rapprochement (solde_fin = 1450 = ouverture 1000 + remise 450)
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1450.00);
+
+    // Pointer la remise via toggleTransaction (pointe T1 sources + T4)
+    $this->service->toggleTransaction($rapprochement, 'remise', $remise->id);
+
+    $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+
+    // Seule la T4 a une ligne 512X D (450.00). Les T1 sources ont 5112, pas 512X.
+    // Solde attendu = 1000 (ouverture) + 450 (T4 ligne 512X D) = 1450.00
+    expect($solde)->toBe(1450.00);
+});
+
+// ===========================================================================
+// H — CompteBancaire sans IBAN : skip silencieux, pas d'exception
+// ===========================================================================
+
+test('[PD-H] calculerSoldePointage retourne solde_ouverture quand CompteBancaire sans IBAN (skip silencieux)', function () {
+    // Créer un compte bancaire sans IBAN
+    $compteSansIban = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'iban' => null,
+        'solde_initial' => 500.00,
+        'date_solde_initial' => '2025-09-01',
+    ]);
+
+    // Rapprochement sur ce compte sans IBAN
+    $rapprochement = $this->service->create($compteSansIban, '2025-10-31', 700.00);
+
+    // Aucune transaction pointée — vérifier que calculerSoldePointage ne lève pas d'exception
+    // et retourne simplement solde_ouverture (500.00)
+    $solde = null;
+    $exception = null;
+
+    try {
+        $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+    } catch (Throwable $e) {
+        $exception = $e;
+    }
+
+    expect($exception)->toBeNull('calculerSoldePointage ne doit pas lever d\'exception si IBAN null')
+        ->and($solde)->toBe(500.00, 'Le solde doit être égal à solde_ouverture quand le compte 512X est introuvable');
+});
+
+test('[PD-H2] calculerSoldePointage avec IBAN mais sans compte 512X correspondant : retourne solde_ouverture', function () {
+    // Compte bancaire avec IBAN mais sans Compte PCG 512X associé (tenant sans schéma PD)
+    $ibanSansPcg = 'FR7600000000000000000000001';
+    $compteSansPcg = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'iban' => $ibanSansPcg,
+        'solde_initial' => 800.00,
+        'date_solde_initial' => '2025-09-01',
+    ]);
+    // NE PAS appeler BancairesSeeder::seed() → pas de Compte PCG créé pour cet IBAN
+
+    $rapprochement = $this->service->create($compteSansPcg, '2025-10-31', 900.00);
+
+    $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+
+    // Pas de compte 512X trouvé → skip silencieux, retourne solde_ouverture seul
+    expect($solde)->toBe(800.00);
+});
