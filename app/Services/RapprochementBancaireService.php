@@ -161,8 +161,20 @@ final class RapprochementBancaireService
             }
             // Si compte 512X introuvable (tenant sans schéma PD), solde = ouverture seul.
         } else {
-            // Mode legacy : type + montant_total à l'entête Transaction
+            // Mode legacy : type + montant_total à l'entête Transaction.
+            //
+            // Step 31 — exclure les T1 sources de remise (remise_id IS NOT NULL AND reference IS NOT NULL).
+            // Depuis Step 25 PD, toggleRemise() pointe à la fois les T1 sources ET la T4 consolidée
+            // (equilibree=true, reference IS NULL). Les T1 sources sont des chèques individuels ; la T4
+            // est le dépôt bancaire qui les représente tous. En compter les deux = double-comptage.
+            // Décision : compter T4 seule (identique au comportement PD via ligne 512X de la T4).
+            // Les T1 sources sont identifiées par : remise_id IS NOT NULL AND reference IS NOT NULL.
             $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
+                ->where(function ($q) {
+                    // Exclure les T1 sources de remise (chèques individuels dont la T4 consolide le montant)
+                    $q->whereNull('remise_id')
+                        ->orWhereNull('reference');
+                })
                 ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
                 ->value('total');
         }
