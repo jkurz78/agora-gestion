@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Steps 21+23+24+25+26+27+28 livrés** (suite 11 886 / 0 failed). Prochain : Step 29 (RapprochementBancaireService rebranché sur lignes classe 5).
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-24 : Steps 21+23+24+25+26+27+28+29 livrés** (suite 11 901 / 0 failed). Prochain : Step 30 (test non-régression rappro) ou Step 31 (TransactionExtourneService).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
