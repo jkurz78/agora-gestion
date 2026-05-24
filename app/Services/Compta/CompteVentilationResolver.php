@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Log;
  * Mapping : SousCategorie.code_cerfa = Compte.numero_pcg (posé en migration 2026_05_20_000001).
  *
  * Gardes (retour null + Log::warning si échec) :
- *   G1 — sousCategorieId null  → retourne null silencieusement (appelant gère le log si besoin)
+ *   G1 — sousCategorieId null  → Log::info + retourne null (cas normal/attendu)
  *   G2 — SousCategorie inexistante ou sans code_cerfa → Log::warning + null
  *   G3 — Compte introuvable pour code_cerfa → Log::warning + null
  *   G4 — Compte trouvé mais classe ≠ classeAttendue → Log::warning + null
@@ -36,7 +36,7 @@ final class CompteVentilationResolver
      * @param  int  $classeAttendue  6 (dépense) ou 7 (recette) — vérifié sur le Compte résolu.
      * @param  string  $contextLog  Préfixe pour les messages Log::warning (ex. 'Step 27').
      * @param  array<string, mixed>  $contextLogData  Données de contexte ajoutées aux warnings.
-     * @return Compte|null  null = skip la double écriture ; non-null = Compte à utiliser.
+     * @return Compte|null null = skip la double écriture ; non-null = Compte à utiliser.
      */
     public static function resoudre(
         ?int $sousCategorieId,
@@ -44,8 +44,13 @@ final class CompteVentilationResolver
         string $contextLog,
         array $contextLogData = [],
     ): ?Compte {
-        // G1 — sousCategorieId null
+        // G1 — sousCategorieId null (cas normal : ligne sans sous-catégorie)
         if ($sousCategorieId === null) {
+            Log::info(
+                sprintf('[PartieDouble] %s — skip : sous_categorie_id null', $contextLog),
+                $contextLogData,
+            );
+
             return null;
         }
 

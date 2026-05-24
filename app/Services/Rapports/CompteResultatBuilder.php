@@ -7,8 +7,8 @@ namespace App\Services\Rapports;
 use App\Tenant\TenantContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 
 final class CompteResultatBuilder
 {
@@ -976,8 +976,16 @@ final class CompteResultatBuilder
      * - Classe 7 (recettes) : SUM(credit) - SUM(debit)
      * - Classe 6 (dépenses) : SUM(debit) - SUM(credit)
      *
+     * NOTE — Affectations partielles (transaction_ligne_affectations) :
+     *   Ce path PD lit tl.debit / tl.credit, c'est-à-dire le montant total de chaque ligne,
+     *   indépendamment du découpage éventuel dans transaction_ligne_affectations.
+     *   Pour compteDeResultat (sans filtre opération) :
+     *     - Affectations complètes (SUM(tla.montant) = tl.montant) → total identique au mode legacy ✓
+     *     - Affectations partielles (cas rare aujourd'hui) → PD peut surcompter vs legacy.
+     *   Ce scénario sera couvert par PartieDoubleEquivalenceTest au Step 28.
+     *
      * @param  array<int>|null  $operationIds  null = pas de filtre opération
-     * @return Collection<int, object>  Colonnes : categorie_id, categorie_nom, sous_categorie_id, sous_categorie_nom, montant
+     * @return Collection<int, object> Colonnes : categorie_id, categorie_nom, sous_categorie_id, sous_categorie_nom, montant
      */
     private function fetchClasseRowsPD(string $start, string $end, int $classe, ?array $operationIds = null): Collection
     {
