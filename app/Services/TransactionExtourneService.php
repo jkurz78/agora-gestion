@@ -14,6 +14,7 @@ use App\Models\Extourne;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
+use App\Services\Compta\LettrageService;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -22,7 +23,10 @@ use RuntimeException;
 
 final class TransactionExtourneService
 {
-    public function __construct(private readonly NumeroPieceService $numeroPiece) {}
+    public function __construct(
+        private readonly NumeroPieceService $numeroPiece,
+        private readonly LettrageService $lettrageService,
+    ) {}
 
     /**
      * Extourne (annulation) d'une transaction recette.
@@ -37,6 +41,11 @@ final class TransactionExtourneService
         $this->assertExtournable($origine);
 
         return DB::transaction(function () use ($origine, $payload): Extourne {
+            // Auto-délettrage des lignes lettrées de l'origine AVANT création du miroir.
+            // Si le délettrage échoue (LettrageService throw), pas de miroir créé —
+            // le DB::transaction parent rollback tout.
+            $this->autoDelettrerLignes($origine);
+
             $miroir = $this->creerTransactionMiroir($origine, $payload);
             $this->copierLignesInversees($origine, $miroir);
 
@@ -182,6 +191,45 @@ final class TransactionExtourneService
             throw new RuntimeException(
                 "Cette transaction est portée par la facture {$factureValidee->numero}. Annulez la facture pour la libérer."
             );
+        }
+    }
+
+    /**
+     * Délettre toutes les lignes de l'origine qui portent un lettrage_code non null.
+     *
+     * Appelé AVANT la création du miroir dans extourner(). Si une ligne lettrée est
+     * détectée, on déléttre l'ensemble du groupe (via LettrageService::delettrerParLigne).
+     * Les codes déjà traités sont mémorisés pour éviter un double appel sur le même groupe.
+     *
+     * Cas de non-action : si aucune ligne ne porte de lettrage_code (Tx legacy pure ou
+     * créance ouverte non encaissée), la méthode retourne sans rien faire.
+     */
+    private function autoDelettrerLignes(Transaction $origine): void
+    {
+        // Charger les lignes de l'origine qui portent un lettrage_code
+        $lignesLettrées = $origine->lignes()
+            ->whereNotNull('lettrage_code')
+            ->get();
+
+        if ($lignesLettrées->isEmpty()) {
+            return;
+        }
+
+        // Mémoriser les codes déjà traités pour éviter un double délettrage si
+        // plusieurs lignes de la même origine appartiennent au même groupe.
+        $codesTraités = [];
+
+        foreach ($lignesLettrées as $ligne) {
+            $code = $ligne->lettrage_code;
+
+            if (in_array($code, $codesTraités, strict: true)) {
+                continue;
+            }
+
+            $motif = "Auto-délettrage suite à extourne de TX#{$origine->id}";
+            $this->lettrageService->delettrerParLigne($ligne, $motif);
+
+            $codesTraités[] = $code;
         }
     }
 
