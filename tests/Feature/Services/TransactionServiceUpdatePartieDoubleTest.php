@@ -439,6 +439,83 @@ it('[D] update Facture-locked — modifier notes uniquement → aucune ligne PD 
 });
 
 // ---------------------------------------------------------------------------
+// [F] Update libre d'une recette comptant lettrée 411 (paire interne) :
+//     auto-délettrage avant forceDelete, nouvelles lignes 411 non lettrées,
+//     audit lettrage_audit avec action='delettre' et motif Auto-délettrage.
+// ---------------------------------------------------------------------------
+
+it('[F] update libre sur recette lettrée 411 (paire interne) — auto-délettrage + audit avant forceDelete', function () {
+    // Créer une recette chèque PD (4 lignes : 1 ventilation 706, 2 lignes 411 lettrées, 1 portage 5112)
+    $transaction = creerRecetteChequePD($this, 100.0);
+    $transaction->refresh();
+    $transaction->load('lignes');
+
+    // Vérifier que les 2 lignes 411 sont bien lettrées (paire interne créée par EcritureGenerator)
+    $compte411 = Compte::where('association_id', $this->association->id)->where('numero_pcg', '411')->first();
+    $lignes411Avant = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $compte411->id)
+        ->get();
+    expect($lignes411Avant)->toHaveCount(2, 'Précondition : 2 lignes 411 présentes');
+
+    $lettrageCodeAvant = $lignes411Avant->first()->lettrage_code;
+    expect($lettrageCodeAvant)->not()->toBeNull('Précondition : lignes 411 sont lettrées (paire interne)');
+
+    // Aucune entrée delettre en audit avant l'update
+    $auditAvant = \Illuminate\Support\Facades\DB::table('lettrage_audit')
+        ->where('association_id', $this->association->id)
+        ->where('action', 'delettre')
+        ->count();
+    expect($auditAvant)->toBe(0, 'Précondition : aucune entrée delettre en audit');
+
+    // Update libre : changer le montant d'une ventilation → force re-enrichissement PD
+    $transaction = $this->service->update($transaction, [
+        'type' => TypeTransaction::Recette->value,
+        'date' => '2025-10-15',
+        'libelle' => 'Cotisation initiale',
+        'montant_total' => '120.00',  // ← montant changé
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => $this->tiers->id,
+        'compte_id' => $this->compteBancaire->id,
+    ], [[
+        'id' => null,
+        'sous_categorie_id' => $this->scRecette->id,
+        'montant' => '120.00',  // ← montant changé
+        'operation_id' => null,
+        'seance' => null,
+        'notes' => null,
+    ]]);
+
+    // 1. Auto-délettrage : une entrée action='delettre' dans lettrage_audit avec motif auto-délettrage
+    $auditAprès = \Illuminate\Support\Facades\DB::table('lettrage_audit')
+        ->where('association_id', $this->association->id)
+        ->where('action', 'delettre')
+        ->first();
+    expect($auditAprès)->not()->toBeNull('Un audit delettre doit être créé lors de l\'update');
+    expect($auditAprès->lettrage_code)->toBe($lettrageCodeAvant, 'Le code lettrage audité est celui des 411 originales');
+    expect($auditAprès->motif)->toContain('Auto-délettrage suite à update de TX#');
+
+    // 2. Les nouvelles lignes 411 existent avec un NOUVEAU code de lettrage (différent de l'ancien)
+    // Note : EcritureGenerator re-lettre automatiquement la paire interne 411D+411C à la création.
+    // Ce qui compte, c'est que l'ancien code a disparu et qu'un nouveau code a été généré.
+    $lignes411Après = TransactionLigne::where('transaction_id', $transaction->id)
+        ->where('compte_id', $compte411->id)
+        ->get();
+    expect($lignes411Après)->toHaveCount(2, '2 nouvelles lignes 411 recréées');
+
+    foreach ($lignes411Après as $l) {
+        expect($l->lettrage_code)->not()->toBe($lettrageCodeAvant, 'Les nouvelles lignes 411 portent un NOUVEAU code (l\'ancien a été déletté)');
+    }
+
+    // 3. 4 lignes PD recréées au total
+    $total = TransactionLigne::where('transaction_id', $transaction->id)->count();
+    expect($total)->toBe(4, '4 lignes PD recréées après update sur montant changé');
+
+    // 4. Montant total cohérent
+    $transaction->refresh();
+    expect((float) $transaction->montant_total)->toBe(120.0, 'Montant total mis à jour à 120');
+});
+
+// ---------------------------------------------------------------------------
 // [E] Non-régression — update libre sans tiers : skip enrichissement PD (silencieux)
 // ---------------------------------------------------------------------------
 

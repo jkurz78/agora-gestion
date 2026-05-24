@@ -15,6 +15,7 @@ use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
 use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
+use App\Services\Compta\LettrageService;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -34,6 +35,7 @@ final class TransactionService
     public function __construct(
         private readonly ExerciceService $exerciceService,
         private readonly EcritureGenerator $ecritureGenerator,
+        private readonly LettrageService $lettrageService,
     ) {}
 
     public function create(array $data, array $lignes): Transaction
@@ -317,6 +319,13 @@ final class TransactionService
                         }
                     }
                 }
+                // Auto-délettrage des lignes lettrées AVANT forceDelete (pattern Step 31 extourne).
+                // forceDelete() détruirait silencieusement toutes les lignes — y compris les 411
+                // lettrées — laissant le code de lettrage orphelin sur la ligne paire d'une autre
+                // transaction (cross-tx) ou corrompant l'audit (paire interne).
+                // delettrerParLigne() délettre le GROUPE ENTIER portant le même code.
+                $this->autoDelettrerLignesAvantUpdate($transaction);
+
                 $transaction->lignes()->forceDelete();
                 $lignesCreees = [];
                 foreach ($lignes as $ligneData) {
@@ -582,6 +591,49 @@ final class TransactionService
             if ((int) round((float) $existing->montant * 100) !== (int) round((float) $ligneData['montant'] * 100)) {
                 throw new \RuntimeException('Le montant d\'une ligne ne peut pas être modifié sur une transaction rapprochée.');
             }
+        }
+    }
+
+    /**
+     * Auto-délettrage des lignes lettrées AVANT forceDelete() dans la branche libre de update().
+     *
+     * Pattern identique à TransactionExtourneService::autoDelettrerLignes() (Step 31 extourne).
+     *
+     * Cas d'usage :
+     * - Paire interne 411D + 411C (recette chèque lettrage auto) : les deux lignes portent
+     *   le même code → un seul appel delettrerParLigne suffit pour déléttrer le groupe entier.
+     * - Cross-tx (encaissement) : la ligne 411 de cette Tx et la ligne 411 de la Tx de
+     *   règlement partagent un code → delettrerParLigne délettre les deux côtés.
+     *
+     * Non-action : si aucune ligne ne porte de lettrage_code, retour immédiat.
+     * Cette méthode NE concerne PAS les branches Rappro-locked ni Facture-locked :
+     * celles-ci font un patch ciblé (montants gelés) sans jamais toucher au lettrage.
+     */
+    private function autoDelettrerLignesAvantUpdate(Transaction $transaction): void
+    {
+        $lignesLettrées = $transaction->lignes()
+            ->whereNotNull('lettrage_code')
+            ->get();
+
+        if ($lignesLettrées->isEmpty()) {
+            return;
+        }
+
+        // Mémoriser les codes déjà traités pour éviter un double appel sur le même groupe
+        // (par exemple paire interne 411D + 411C portent le même code).
+        $codesTraités = [];
+
+        foreach ($lignesLettrées as $ligne) {
+            $code = $ligne->lettrage_code;
+
+            if (in_array($code, $codesTraités, strict: true)) {
+                continue;
+            }
+
+            $motif = "Auto-délettrage suite à update de TX#{$transaction->id}";
+            $this->lettrageService->delettrerParLigne($ligne, $motif);
+
+            $codesTraités[] = $code;
         }
     }
 
