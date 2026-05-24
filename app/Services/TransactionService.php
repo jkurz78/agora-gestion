@@ -13,6 +13,7 @@ use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
+use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
@@ -124,38 +125,15 @@ final class TransactionService
                 break;
             }
 
-            /** @var SousCategorie|null $sousCat */
-            $sousCat = SousCategorie::find($sousCatId);
-
-            if ($sousCat === null || $sousCat->code_cerfa === null) {
-                Log::info('[PartieDouble] Step 21 — skip : sous-catégorie sans code_cerfa', [
-                    'transaction_id' => $transaction->id,
-                    'sous_categorie_id' => $sousCatId,
-                ]);
-                $skipDoubleEcriture = true;
-                break;
-            }
-
-            // Résolution du Compte via numero_pcg = code_cerfa
-            /** @var Compte|null $compte */
-            $compte = Compte::ofNumero($sousCat->code_cerfa);
+            // Résolution sous_categorie → Compte (classe 6 ou 7) via CompteVentilationResolver.
+            $compte = CompteVentilationResolver::resoudre(
+                sousCategorieId: (int) $sousCatId,
+                classeAttendue: $classeAttendue,
+                contextLog: 'Step 21',
+                contextLogData: ['transaction_id' => $transaction->id],
+            );
 
             if ($compte === null) {
-                Log::warning('[PartieDouble] Step 21 — skip : compte introuvable pour code_cerfa', [
-                    'transaction_id' => $transaction->id,
-                    'code_cerfa' => $sousCat->code_cerfa,
-                ]);
-                $skipDoubleEcriture = true;
-                break;
-            }
-
-            if ((int) $compte->classe !== $classeAttendue) {
-                Log::warning('[PartieDouble] Step 21 — skip : classe compte inattendue', [
-                    'transaction_id' => $transaction->id,
-                    'numero_pcg' => $compte->numero_pcg,
-                    'classe' => $compte->classe,
-                    'attendue' => $classeAttendue,
-                ]);
                 $skipDoubleEcriture = true;
                 break;
             }

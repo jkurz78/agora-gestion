@@ -13,11 +13,11 @@ use App\Models\CompteBancaire;
 use App\Models\Operation;
 use App\Models\Reglement;
 use App\Models\Seance;
-use App\Models\SousCategorie;
 use App\Models\Tiers;
 use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Services\Compta\CompteTresorerieResolver;
+use App\Services\Compta\CompteVentilationResolver;
 use App\Services\Compta\EcritureGenerator;
 use App\Tenant\TenantContext;
 use Carbon\Carbon;
@@ -176,10 +176,15 @@ final class ReglementOperationService
         int $sousCategorieId,
     ): void {
         // --- Résolution SousCategorie → Compte classe 7 ---
-        $compte = $this->resoudreCompteVentilationRecette($ligne, (int) $tx->id, $sousCategorieId);
+        $compte = CompteVentilationResolver::resoudre(
+            sousCategorieId: $sousCategorieId,
+            classeAttendue: 7,
+            contextLog: 'Step 26',
+            contextLogData: ['transaction_id' => (int) $tx->id],
+        );
 
         if ($compte === null) {
-            // Garde loggée dans resoudreCompteVentilationRecette
+            // Garde loggée dans CompteVentilationResolver::resoudre
             return;
         }
 
@@ -283,51 +288,4 @@ final class ReglementOperationService
         );
     }
 
-    /**
-     * Résout le Compte de ventilation (classe 7) depuis la SousCategorie d'une ligne legacy.
-     *
-     * TODO DRY : logique identique à FactureService::resoudreCompteVentilationRecette
-     * et TransactionService::enrichirPartieDouble. À extraire en helper partagé post-Step 27.
-     */
-    private function resoudreCompteVentilationRecette(
-        TransactionLigne $ligne,
-        int $transactionId,
-        int $sousCategorieId,
-    ): ?Compte {
-        /** @var SousCategorie|null $sousCat */
-        $sousCat = SousCategorie::find($sousCategorieId);
-
-        if ($sousCat === null || $sousCat->code_cerfa === null) {
-            Log::warning('[PartieDouble] Step 26 — skip : sous-catégorie sans code_cerfa', [
-                'transaction_id' => $transactionId,
-                'sous_categorie_id' => $sousCategorieId,
-            ]);
-
-            return null;
-        }
-
-        /** @var Compte|null $compte */
-        $compte = Compte::ofNumero($sousCat->code_cerfa);
-
-        if ($compte === null) {
-            Log::warning('[PartieDouble] Step 26 — skip : compte introuvable pour code_cerfa', [
-                'transaction_id' => $transactionId,
-                'code_cerfa' => $sousCat->code_cerfa,
-            ]);
-
-            return null;
-        }
-
-        if ((int) $compte->classe !== 7) {
-            Log::warning('[PartieDouble] Step 26 — skip : classe compte ≠ 7 (recette attendue)', [
-                'transaction_id' => $transactionId,
-                'numero_pcg' => $compte->numero_pcg,
-                'classe' => $compte->classe,
-            ]);
-
-            return null;
-        }
-
-        return $compte;
-    }
 }
