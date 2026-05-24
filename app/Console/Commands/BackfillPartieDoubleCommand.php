@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\Association;
-use App\Models\SousCategorie;
 use App\Models\Transaction;
 use App\Services\Compta\BackfillAuditor;
+use App\Services\Compta\TransactionConverter;
 use App\Services\ExerciceService;
 use App\Tenant\TenantContext;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Commande artisan de backfill partie double (spec §4.3, sous-slice 1d).
@@ -42,6 +44,7 @@ final class BackfillPartieDoubleCommand extends Command
     public function __construct(
         private readonly ExerciceService $exerciceService,
         private readonly BackfillAuditor $auditor,
+        private readonly TransactionConverter $converter,
     ) {
         parent::__construct();
     }
@@ -152,12 +155,69 @@ final class BackfillPartieDoubleCommand extends Command
     }
 
     // =========================================================================
-    // Conversion réelle (Steps 33+)
+    // Conversion réelle (Step 33)
     // =========================================================================
 
     private function runConversion(int $annee, bool $isForce): void
     {
-        // Step 33 : implémenté dans la prochaine itération
-        $this->info('Conversion non encore implémentée (Step 33).');
+        $assoId = (int) TenantContext::currentId();
+        $dateDebut = "{$annee}-09-01";
+        $dateFin = ($annee + 1).'-08-31';
+
+        $this->info("Backfill exercice {$annee} — association #{$assoId}");
+
+        // Charger les transactions à convertir
+        $query = Transaction::whereBetween('date', [$dateDebut, $dateFin]);
+
+        if (! $isForce) {
+            // Idempotence : skip si equilibree=TRUE
+            $query->where(function ($q) {
+                $q->where('equilibree', false)->orWhereNull('equilibree');
+            });
+        }
+
+        $transactions = $query->get();
+        $total = $transactions->count();
+
+        if ($total === 0) {
+            $this->info("X already up to date, 0 converted.");
+
+            return;
+        }
+
+        $this->info("{$total} transaction(s) à convertir...");
+
+        $converted = 0;
+        $skipped = 0;
+        $errors = 0;
+
+        foreach ($transactions as $tx) {
+            try {
+                DB::transaction(function () use ($tx, &$converted, &$skipped) {
+                    $result = $this->converter->convertir($tx);
+
+                    if ($result) {
+                        $converted++;
+                        Log::info('[Backfill] Transaction convertie', ['transaction_id' => $tx->id]);
+                    } else {
+                        $skipped++;
+                        Log::info('[Backfill] Transaction skippée (sans tiers ou SC sans code)', ['transaction_id' => $tx->id]);
+                    }
+                });
+            } catch (\Throwable $e) {
+                $errors++;
+                Log::error('[Backfill] Erreur lors de la conversion', [
+                    'transaction_id' => $tx->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->warn("  Erreur Tx #{$tx->id} : {$e->getMessage()}");
+            }
+        }
+
+        $this->info("Backfill terminé : {$converted} convertie(s), {$skipped} skippée(s), {$errors} erreur(s).");
+
+        if ($errors > 0) {
+            $this->warn("Des erreurs sont survenues. Consulter les logs pour les détails.");
+        }
     }
 }
