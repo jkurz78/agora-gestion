@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Steps 21+23+24+25 livrés** (suite 11 741 / 0 failed). Prochain : Step 26 (`ReglementService` onglet règlements).
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-23 : Steps 21+23+24+25+26 livrés** (suite 11 806 / 0 failed). Prochain : Step 27 (`CompteResultatBuilder` rebranché compte_id + classe via feature flag).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -607,17 +607,19 @@ Sous-slice 1b livrée sur `feat/compta-v5` — 9 commits (Steps 12-20), 76 nouve
 **Files**: `app/Services/RemiseBancaireService.php` (+218 lignes), `tests/Feature/Services/RemiseBancaireServicePartieDoubleTest.php` (créé, 11 scénarios)
 **Commits**: `3291033e` + `53f1becf`
 
-#### Step 26 : `ReglementService` (comptabilisation onglet règlements) branché
+#### Step 26 : `ReglementOperationService` (onglet règlements opération) branché ✅
 
-**Complexity**: standard
-**RED**: Tests Pest :
-- Marquer un règlement comme reçu depuis l'onglet règlements d'une opération → écritures partie double générées
-- Test existant `ReglementServiceTest` reste vert
-**GREEN**:
-- `ReglementService` (ou équivalent) délègue à `EcritureGenerator`
-**REFACTOR**: None needed
-**Files**: services règlements, tests
-**Commit**: `feat(v5): ReglementService délègue à EcritureGenerator pour comptabilisation`
+**Status**: ✅ TERMINÉ 2026-05-23 — commits `946156c0` (feat) + `848ad31b` (fix tenant scope Reglement). Suite Pest 11 806 / 0 failed (+65 vs Step 25).
+**Service nouveau** : `App\Services\ReglementOperationService` (créé, ~280 lignes) — option B retenue (nouveau service dédié, cohérent pattern FactureService).
+**2 méthodes publiques** :
+- `comptabiliserSeance(Seance, array $data)` : crée N Transactions de règlement créance (statut_reglement=EnAttente) + enrichit lignes legacy + appelle `pourRecetteACredit(existingTransaction)` pour chaque. **TOUJOURS pourRecetteACredit** même si mode_paiement renseigné (statut EnAttente = créance, mode est prospective).
+- `marquerRecu(Transaction)` : toggle statut_reglement=Recu + appelle `pourEncaissementCreance` pour T2 + auto-lettrage 411 (pattern Step 24). **Pas d'attache pivot** (pas de facture).
+**Refactor Livewire** : `ReglementTable` devient thin wrapper, -32 lignes inline.
+**Guard multi-tenant ajouté** (fix `848ad31b`) : `Reglement::where('seance_id')` enrichi de `whereHas('participant', fn → where('association_id', currentId))`. Reglement n'a pas de colonne association_id directe — la chaîne tenant passe par participant.association_id.
+**Tests** : 8 scénarios (~60 assertions) dans `tests/Feature/Services/ReglementOperationServicePartieDoubleTest.php`. Couvre : créance créée, marquerRecu (T2 + lettrage), solde 411 = 0, multi-seances, Virement+IBAN, garde locks, mode_paiement prospective, tenant cross-isolation [H].
+**Dette technique** : **3ème occurrence `resoudreCompteVentilationRecette`** (TransactionService + FactureService + ReglementOperationService). À extraire en `App\Services\Compta\CompteVentilationResolver` **au début du Step 27** (avant le code CompteResultatBuilder) pour éviter divergence sur correction future.
+**Files**: `app/Services/ReglementOperationService.php` (créé), `app/Livewire/ReglementTable.php` (-32 lignes), `tests/Feature/Services/ReglementOperationServicePartieDoubleTest.php` (créé, 8 scénarios)
+**Commits**: `946156c0` + `848ad31b`
 
 ---
 
