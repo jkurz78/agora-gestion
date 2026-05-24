@@ -443,6 +443,76 @@ test('[H] invariant pas-tiers-sur-512X — toute ligne classe 5 a tiers_id IS NU
     expect($lignesAvecTiers)->toBe(0, 'Des lignes classe 5 avec tiers_id ont été trouvées.');
 })->group('backfill');
 
+// ---------------------------------------------------------------------------
+// Tests Step 34 — [J], [K]
+// ---------------------------------------------------------------------------
+
+test('[J] --force re-convertit même si equilibree=TRUE', function () {
+    setupBackfillFixtureStep33Legacy($this);
+
+    // 1er run : convertir
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // Snapshot après 1er run
+    $txIds = \App\Models\Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->whereBetween('date', ['2025-09-01', '2026-08-31'])
+        ->pluck('id')
+        ->all();
+
+    $nbLignesApres1 = DB::table('transaction_lignes')
+        ->whereIn('transaction_id', $txIds)
+        ->whereNull('deleted_at')
+        ->count();
+
+    // Toutes les Tx doivent être equilibree=TRUE après le 1er run
+    $txEquilibrees = \App\Models\Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->whereBetween('date', ['2025-09-01', '2026-08-31'])
+        ->where('equilibree', true)
+        ->count();
+    expect($txEquilibrees)->toBeGreaterThan(0);
+
+    // 2ème run avec --force : doit re-convertir même si equilibree=TRUE
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--force' => true,
+        '--asso' => $this->association->id,
+    ])->assertSuccessful();
+
+    // Après --force, toutes les Tx doivent toujours être equilibree=TRUE
+    $txEquilibrees2 = \App\Models\Transaction::query()
+        ->where('association_id', $this->association->id)
+        ->whereBetween('date', ['2025-09-01', '2026-08-31'])
+        ->where('equilibree', true)
+        ->count();
+    expect($txEquilibrees2)->toBe($txEquilibrees);
+})->group('backfill');
+
+test('[K] --force en production → exit 1 + message erreur', function () {
+    setupBackfillFixtureStep32($this);
+
+    // Forcer l'environnement à 'production' via le container Laravel
+    $originalEnv = app()->environment();
+    app()->detectEnvironment(fn () => 'production');
+
+    try {
+        $this->artisan('compta:backfill-partie-double', [
+            '--exercice' => '2025',
+            '--force' => true,
+            '--asso' => $this->association->id,
+        ])
+            ->expectsOutputToContain('interdit en production')
+            ->assertFailed();
+    } finally {
+        // Restaurer l'environnement testing
+        app()->detectEnvironment(fn () => $originalEnv);
+    }
+})->group('backfill');
+
 test('[I] rollback — si la conversion lève une exception, état initial restauré', function () {
     setupBackfillFixtureStep33Legacy($this);
 

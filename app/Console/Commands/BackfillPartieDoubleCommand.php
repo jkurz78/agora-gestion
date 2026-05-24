@@ -158,6 +158,63 @@ final class BackfillPartieDoubleCommand extends Command
     // Conversion réelle (Step 33)
     // =========================================================================
 
+    /**
+     * Remet à zéro les lignes PD-only et le flag equilibree pour l'exercice.
+     *
+     * Utilisé par --force pour permettre la re-conversion totale.
+     *
+     * Actions :
+     *   1. Supprimer les lignes PD-only (sous_categorie_id null, compte_id non null) des Tx de l'exercice.
+     *   2. Reset les colonnes PD (compte_id, debit, credit, tiers_id, lettrage_code) sur les lignes de ventilation.
+     *   3. Marquer toutes les Tx de l'exercice equilibree=FALSE.
+     *   4. Supprimer les entrées lettrage_audit avec motif='backfill' pour l'exercice.
+     */
+    private function resetExercice(int $annee): void
+    {
+        $dateDebut = "{$annee}-09-01";
+        $dateFin = ($annee + 1).'-08-31';
+
+        DB::transaction(function () use ($dateDebut, $dateFin) {
+            // Récupérer les IDs des transactions de l'exercice pour ce tenant
+            $txIds = \App\Models\Transaction::query()
+                ->whereBetween('date', [$dateDebut, $dateFin])
+                ->pluck('id')
+                ->all();
+
+            if (empty($txIds)) {
+                return;
+            }
+
+            // 1. Supprimer les lignes PD-only (sous_categorie_id null + compte_id non null)
+            \App\Models\TransactionLigne::whereIn('transaction_id', $txIds)
+                ->whereNull('sous_categorie_id')
+                ->whereNotNull('compte_id')
+                ->forceDelete();
+
+            // 2. Reset colonnes PD sur les lignes de ventilation restantes
+            \App\Models\TransactionLigne::whereIn('transaction_id', $txIds)
+                ->update([
+                    'compte_id' => null,
+                    'debit' => 0,
+                    'credit' => 0,
+                    'tiers_id' => null,
+                    'lettrage_code' => null,
+                ]);
+
+            // 3. Marquer toutes les Tx equilibree=FALSE
+            \App\Models\Transaction::query()
+                ->whereIn('id', $txIds)
+                ->update(['equilibree' => false]);
+
+            // 4. Supprimer les entrées lettrage_audit avec motif='backfill'
+            DB::table('lettrage_audit')
+                ->where('motif', 'backfill')
+                ->delete();
+
+            Log::info('[Backfill] Reset exercice terminé', ['nb_transactions' => count($txIds)]);
+        });
+    }
+
     private function runConversion(int $annee, bool $isForce): void
     {
         $assoId = (int) TenantContext::currentId();
@@ -166,7 +223,14 @@ final class BackfillPartieDoubleCommand extends Command
 
         $this->info("Backfill exercice {$annee} — association #{$assoId}");
 
+        // --force : reset les lignes PD existantes avant re-conversion
+        if ($isForce) {
+            $this->info('--force : reset des lignes PD existantes...');
+            $this->resetExercice($annee);
+        }
+
         // Charger les transactions à convertir
+        // Après reset (--force), toutes les Tx sont equilibree=FALSE → query sans filtre supplémentaire
         $query = Transaction::whereBetween('date', [$dateDebut, $dateFin]);
 
         if (! $isForce) {
