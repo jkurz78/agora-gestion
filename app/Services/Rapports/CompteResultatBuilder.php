@@ -8,6 +8,7 @@ use App\Tenant\TenantContext;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Config;
 
 final class CompteResultatBuilder
 {
@@ -148,6 +149,10 @@ final class CompteResultatBuilder
      */
     private function fetchDepenseRows(string $start, string $end, ?array $operationIds = null): Collection
     {
+        if (Config::get('compta.use_partie_double', false)) {
+            return $this->fetchDepenseRowsPD($start, $end, $operationIds);
+        }
+
         $map = [];
         $this->accumulerDepensesResolues($start, $end, $operationIds, $map);
 
@@ -235,6 +240,10 @@ final class CompteResultatBuilder
      */
     private function fetchProduitsRows(string $start, string $end, int $exercice, ?array $operationIds = null): Collection
     {
+        if (Config::get('compta.use_partie_double', false)) {
+            return $this->fetchProduitsRowsPD($start, $end, $operationIds);
+        }
+
         $map = [];
         $this->accumulerRecettesResolues($start, $end, $operationIds, $map);
 
@@ -249,6 +258,10 @@ final class CompteResultatBuilder
      */
     private function fetchDepenseSeancesRows(string $start, string $end, array $operationIds): Collection
     {
+        if (Config::get('compta.use_partie_double', false)) {
+            return $this->fetchDepenseSeancesRowsPD($start, $end, $operationIds);
+        }
+
         $map = [];
         $this->accumulerDepensesSeancesResolues($start, $end, $operationIds, $map);
         $flat = [];
@@ -439,6 +452,10 @@ final class CompteResultatBuilder
      */
     private function fetchProduitsSeancesRows(string $start, string $end, array $operationIds): Collection
     {
+        if (Config::get('compta.use_partie_double', false)) {
+            return $this->fetchProduitsSeancesRowsPD($start, $end, $operationIds);
+        }
+
         $map = [];
         $this->accumulerRecettesSeancesResolues($start, $end, $operationIds, $map);
 
@@ -555,6 +572,10 @@ final class CompteResultatBuilder
         bool $withSeance,
         bool $withTiers,
     ): array {
+        if (Config::get('compta.use_partie_double', false)) {
+            return $this->fetchOperationRowsPD($type, $start, $end, $operationIds, $withSeance, $withTiers);
+        }
+
         [$q1, $q2] = $this->buildOperationQueries($type, $start, $end, $operationIds, $withSeance, $withTiers);
 
         $map = [];
@@ -940,6 +961,284 @@ final class CompteResultatBuilder
         }
 
         return array_values($categories);
+    }
+
+    // ── Path partie double (feature flag compta.use_partie_double = true) ────
+
+    /**
+     * Construit la requête DB pour les lignes PD d'une classe PCG donnée (6 ou 7).
+     *
+     * Lecture : transaction_lignes JOIN comptes (classe = $classe) + JOIN categories via comptes.categorie_id.
+     * Filtre exercice via transactions.date (entre $start et $end).
+     * Multi-tenant : filtre sur comptes.association_id (le JOIN garantit l'isolation).
+     *
+     * Agrégation :
+     * - Classe 7 (recettes) : SUM(credit) - SUM(debit)
+     * - Classe 6 (dépenses) : SUM(debit) - SUM(credit)
+     *
+     * @param  array<int>|null  $operationIds  null = pas de filtre opération
+     * @return Collection<int, object>  Colonnes : categorie_id, categorie_nom, sous_categorie_id, sous_categorie_nom, montant
+     */
+    private function fetchClasseRowsPD(string $start, string $end, int $classe, ?array $operationIds = null): Collection
+    {
+        $isSigne7 = $classe === 7;
+        $montantExpr = $isSigne7
+            ? DB::raw('SUM(tl.credit) - SUM(tl.debit) as montant')
+            : DB::raw('SUM(tl.debit) - SUM(tl.credit) as montant');
+
+        $q = DB::table('transaction_lignes as tl')
+            ->join('comptes as c', 'tl.compte_id', '=', 'c.id')
+            ->join('transactions as t', 'tl.transaction_id', '=', 't.id')
+            ->leftJoin('categories as cat', 'c.categorie_id', '=', 'cat.id')
+            ->where('c.classe', $classe)
+            ->whereNotNull('tl.compte_id')
+            ->whereNull('tl.deleted_at')
+            ->whereNull('t.deleted_at')
+            ->whereBetween('t.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
+            ->select([
+                DB::raw('COALESCE(cat.id, 0) as categorie_id'),
+                DB::raw("COALESCE(cat.nom, '(sans catégorie)') as categorie_nom"),
+                // En mode PD, sous_categorie_id = compte_id (mapping transparent pour les builders hiérarchie)
+                DB::raw('c.id as sous_categorie_id'),
+                DB::raw('c.intitule as sous_categorie_nom'),
+                $montantExpr,
+            ])
+            ->groupBy('c.id', 'c.intitule', 'cat.id', 'cat.nom');
+
+        if ($operationIds !== null) {
+            $q->whereIn('tl.operation_id', $operationIds);
+        }
+
+        return $q->get();
+    }
+
+    /**
+     * Path PD pour fetchDepenseRows (classe 6).
+     *
+     * @param  array<int>|null  $operationIds
+     * @return Collection<int, object>
+     */
+    private function fetchDepenseRowsPD(string $start, string $end, ?array $operationIds): Collection
+    {
+        return $this->fetchClasseRowsPD($start, $end, 6, $operationIds);
+    }
+
+    /**
+     * Path PD pour fetchProduitsRows (classe 7).
+     *
+     * @param  array<int>|null  $operationIds
+     * @return Collection<int, object>
+     */
+    private function fetchProduitsRowsPD(string $start, string $end, ?array $operationIds): Collection
+    {
+        return $this->fetchClasseRowsPD($start, $end, 7, $operationIds);
+    }
+
+    /**
+     * Path PD pour fetchDepenseSeancesRows (classe 6, avec séance).
+     *
+     * @param  array<int>  $operationIds
+     * @return Collection<int, object>
+     */
+    private function fetchDepenseSeancesRowsPD(string $start, string $end, array $operationIds): Collection
+    {
+        return $this->fetchClasseSeancesRowsPD($start, $end, 6, $operationIds);
+    }
+
+    /**
+     * Path PD pour fetchProduitsSeancesRows (classe 7, avec séance).
+     *
+     * @param  array<int>  $operationIds
+     * @return Collection<int, object>
+     */
+    private function fetchProduitsSeancesRowsPD(string $start, string $end, array $operationIds): Collection
+    {
+        return $this->fetchClasseSeancesRowsPD($start, $end, 7, $operationIds);
+    }
+
+    /**
+     * Construit la requête PD pour les lignes d'une classe PCG avec ventilation par séance.
+     *
+     * La colonne `tl.seance` (entier, NULL → 0 = "Hors séance") est préservée telle quelle —
+     * elle est agnostique du mode PD/legacy (colonne métier existant dans les 2 modes).
+     *
+     * @param  array<int>  $operationIds
+     * @return Collection<int, object>
+     */
+    private function fetchClasseSeancesRowsPD(string $start, string $end, int $classe, array $operationIds): Collection
+    {
+        $isSigne7 = $classe === 7;
+        $montantExpr = $isSigne7
+            ? DB::raw('SUM(tl.credit) - SUM(tl.debit) as montant')
+            : DB::raw('SUM(tl.debit) - SUM(tl.credit) as montant');
+
+        return DB::table('transaction_lignes as tl')
+            ->join('comptes as c', 'tl.compte_id', '=', 'c.id')
+            ->join('transactions as t', 'tl.transaction_id', '=', 't.id')
+            ->leftJoin('categories as cat', 'c.categorie_id', '=', 'cat.id')
+            ->where('c.classe', $classe)
+            ->whereNotNull('tl.compte_id')
+            ->whereNull('tl.deleted_at')
+            ->whereNull('t.deleted_at')
+            ->whereBetween('t.date', [$start, $end])
+            ->whereIn('tl.operation_id', $operationIds)
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
+            ->select([
+                DB::raw('COALESCE(cat.id, 0) as categorie_id'),
+                DB::raw("COALESCE(cat.nom, '(sans catégorie)') as categorie_nom"),
+                DB::raw('c.id as sous_categorie_id'),
+                DB::raw('c.intitule as sous_categorie_nom'),
+                DB::raw('COALESCE(tl.seance, 0) as seance'),
+                $montantExpr,
+            ])
+            ->groupBy('c.id', 'c.intitule', 'cat.id', 'cat.nom', DB::raw('COALESCE(tl.seance, 0)'))
+            ->get();
+    }
+
+    /**
+     * Path PD pour fetchOperationRows (avec séances et/ou tiers optionnels).
+     *
+     * Note sur les affectations (transaction_ligne_affectations) :
+     * En mode PD, les affectations portent le montant sous-découpé + operation_id métier.
+     * La table affectations n'a PAS de colonne compte_id — le compte est sur la ligne parente.
+     * Si une ligne PD porte des affectations, on utilise affectation.montant (répartition
+     * des montants) mais le compte reste celui de la ligne parente.
+     * Pour simplifier, on lit les lignes PD sans affectations + les lignes avec affectations
+     * en récupérant le compte de la ligne parente. Le total est cohérent car
+     * SUM(affectations.montant) = ligne.montant pour une ligne complètement affectée.
+     *
+     * @param  array<int>  $operationIds
+     * @return array<string, array>
+     */
+    private function fetchOperationRowsPD(
+        string $type,
+        string $start,
+        string $end,
+        array $operationIds,
+        bool $withSeance,
+        bool $withTiers,
+    ): array {
+        $classe = $type === 'recette' ? 7 : 6;
+        $isSigne7 = $classe === 7;
+
+        $baseCols = [
+            DB::raw('COALESCE(cat.id, 0) as categorie_id'),
+            DB::raw("COALESCE(cat.nom, '(sans catégorie)') as categorie_nom"),
+            DB::raw('c.id as sous_categorie_id'),
+            DB::raw('c.intitule as sous_categorie_nom'),
+        ];
+        $baseGroup = ['c.id', 'c.intitule', 'cat.id', 'cat.nom'];
+
+        if ($withTiers) {
+            $baseCols = array_merge($baseCols, [
+                DB::raw('COALESCE(tx.tiers_id, 0) as tiers_id'),
+                DB::raw("COALESCE(trs.type, '') as tiers_type"),
+                DB::raw("COALESCE(trs.nom, '') as tiers_nom"),
+                DB::raw("COALESCE(trs.prenom, '') as tiers_prenom"),
+                DB::raw("COALESCE(trs.entreprise, '') as tiers_entreprise"),
+            ]);
+            $baseGroup = array_merge($baseGroup, ['tx.tiers_id', 'trs.type', 'trs.nom', 'trs.prenom', 'trs.entreprise']);
+        }
+
+        // Q1 : lignes PD sans affectations
+        $q1Cols = $baseCols;
+        $q1Group = $baseGroup;
+        if ($withSeance) {
+            $q1Cols[] = DB::raw('COALESCE(tl.seance, 0) as seance');
+            $q1Group[] = DB::raw('COALESCE(tl.seance, 0)');
+        }
+        $montantQ1 = $isSigne7
+            ? DB::raw('SUM(tl.credit) - SUM(tl.debit) as montant')
+            : DB::raw('SUM(tl.debit) - SUM(tl.credit) as montant');
+        $q1Cols[] = $montantQ1;
+
+        $q1 = DB::table('transaction_lignes as tl')
+            ->join('comptes as c', 'tl.compte_id', '=', 'c.id')
+            ->join('transactions as tx', 'tl.transaction_id', '=', 'tx.id')
+            ->leftJoin('categories as cat', 'c.categorie_id', '=', 'cat.id')
+            ->leftJoin('transaction_ligne_affectations as tla', 'tla.transaction_ligne_id', '=', 'tl.id')
+            ->where('c.classe', $classe)
+            ->whereNotNull('tl.compte_id')
+            ->whereNull('tl.deleted_at')
+            ->whereNull('tx.deleted_at')
+            ->whereNull('tla.id')  // Lignes sans affectations
+            ->whereIn('tl.operation_id', $operationIds)
+            ->whereBetween('tx.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
+            ->select($q1Cols)
+            ->groupBy($q1Group);
+
+        if ($withTiers) {
+            $q1->leftJoin('tiers as trs', 'trs.id', '=', 'tx.tiers_id');
+        }
+
+        // Q2 : lignes PD avec affectations (montant = affectation.montant, operation = affectation.operation_id)
+        // Le compte vient de la ligne parente — la table affectations est agnostique PD.
+        $q2Cols = $baseCols;
+        $q2Group = $baseGroup;
+        if ($withSeance) {
+            $q2Cols[] = DB::raw('COALESCE(tla2.seance, 0) as seance');
+            $q2Group[] = DB::raw('COALESCE(tla2.seance, 0)');
+        }
+        $q2Cols[] = DB::raw('SUM(tla2.montant) as montant');
+
+        $q2 = DB::table('transaction_ligne_affectations as tla2')
+            ->join('transaction_lignes as tl', 'tl.id', '=', 'tla2.transaction_ligne_id')
+            ->join('comptes as c', 'tl.compte_id', '=', 'c.id')
+            ->join('transactions as tx', 'tl.transaction_id', '=', 'tx.id')
+            ->leftJoin('categories as cat', 'c.categorie_id', '=', 'cat.id')
+            ->where('c.classe', $classe)
+            ->whereNotNull('tl.compte_id')
+            ->whereNull('tl.deleted_at')
+            ->whereNull('tx.deleted_at')
+            ->whereIn('tla2.operation_id', $operationIds)
+            ->whereBetween('tx.date', [$start, $end])
+            ->when(TenantContext::hasBooted(), fn ($q) => $q->where('c.association_id', TenantContext::currentId()))
+            ->select($q2Cols)
+            ->groupBy($q2Group);
+
+        if ($withTiers) {
+            $q2->leftJoin('tiers as trs', 'trs.id', '=', 'tx.tiers_id');
+        }
+
+        $map = [];
+        foreach ([$q1->get(), $q2->get()] as $rows) {
+            foreach ($rows as $row) {
+                $key = (string) $row->sous_categorie_id;
+                if ($withTiers) {
+                    $key .= '_'.$row->tiers_id;
+                }
+                if ($withSeance) {
+                    $key .= '_'.$row->seance;
+                }
+
+                if (isset($map[$key])) {
+                    $map[$key]['montant'] += (float) $row->montant;
+                } else {
+                    $entry = [
+                        'categorie_id' => (int) $row->categorie_id,
+                        'categorie_nom' => $row->categorie_nom,
+                        'sous_categorie_id' => (int) $row->sous_categorie_id,
+                        'sous_categorie_nom' => $row->sous_categorie_nom,
+                        'montant' => (float) $row->montant,
+                    ];
+                    if ($withSeance) {
+                        $entry['seance'] = (int) $row->seance;
+                    }
+                    if ($withTiers) {
+                        $entry['tiers_id'] = (int) $row->tiers_id;
+                        $entry['tiers_type'] = $row->tiers_type !== '' ? $row->tiers_type : null;
+                        $entry['tiers_nom'] = $row->tiers_nom !== '' ? $row->tiers_nom : null;
+                        $entry['tiers_prenom'] = $row->tiers_prenom !== '' ? $row->tiers_prenom : null;
+                        $entry['tiers_entreprise'] = $row->tiers_entreprise !== '' ? $row->tiers_entreprise : null;
+                    }
+                    $map[$key] = $entry;
+                }
+            }
+        }
+
+        return $map;
     }
 
     // ── Prévisionnel ──────────────────────────────────────────────────────────
