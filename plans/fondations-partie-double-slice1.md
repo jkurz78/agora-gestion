@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c en cours 2026-05-24 : Steps 21+23+24+25+26+27+28+29+30 livrés** (suite 11 957 / 0 failed). Prochain : Step 31 (TransactionExtourneService auto-délettrage + fix calculerSoldePointage legacy remise).
+**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c TERMINÉE 2026-05-24 : Steps 21+23+24+25+26+27+28+29+30+31 livrés** (suite 11 995 / 0 failed). Prochain : Sous-slice 1d (Steps 32-35 — backfill + renommage + ops).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -703,6 +703,9 @@ Sous-slice 1b livrée sur `feat/compta-v5` — 9 commits (Steps 12-20), 76 nouve
 **REFACTOR**: None needed
 **Files**: `app/Services/TransactionExtourneService.php`, tests
 **Commit**: `feat(v5): TransactionExtourneService auto-délettre les lignes lettrées`
+**Status**: ✅ TERMINÉ 2026-05-24 — commit `341b9b2e`. Suite **11 995 / 0 failed** (+38 vs Step 30).
+API : `LettrageService::delettrerParLigne($ligne, $motif)`. Helper privé `autoDelettrerLignes(Transaction)`.
+5 scénarios : [A] recette comptant auto-lettrée, [B] créance encaissée T1-T2, [C] legacy pure, [D] créance ouverte, [E] audit trace. Non-régression : 141 tests extourne/annulation verts.
 
 ---
 
