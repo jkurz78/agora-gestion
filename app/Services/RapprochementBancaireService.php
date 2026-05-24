@@ -170,10 +170,12 @@ final class RapprochementBancaireService
             // Décision : compter T4 seule (identique au comportement PD via ligne 512X de la T4).
             // Les T1 sources sont identifiées par : remise_id IS NOT NULL AND reference IS NOT NULL.
             $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
-                ->where(function ($q) {
-                    // Exclure les T1 sources de remise (chèques individuels dont la T4 consolide le montant)
-                    $q->whereNull('remise_id')
-                        ->orWhereNull('reference');
+                ->whereNot(function ($q) {
+                    // T1 source de remise = remise_id IS NOT NULL AND reference IS NOT NULL.
+                    // Réécriture explicite (whereNot) plutôt que De Morgan inversé pour rester
+                    // robuste à une future Tx qui aurait (remise_id NOT NULL, reference NOT NULL)
+                    // pour une raison hors remise (ex. virement externe référencé).
+                    $q->whereNotNull('remise_id')->whereNotNull('reference');
                 })
                 ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
                 ->value('total');
