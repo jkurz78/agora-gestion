@@ -1,0 +1,544 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\ModePaiement;
+use App\Enums\StatutRapprochement;
+use App\Enums\StatutReglement;
+use App\Enums\TypeTransaction;
+use App\Models\Association;
+use App\Models\Categorie;
+use App\Models\Compte;
+use App\Models\CompteBancaire;
+use App\Models\SousCategorie;
+use App\Models\Tiers;
+use App\Models\Transaction;
+use App\Models\TransactionLigne;
+use App\Models\User;
+use App\Services\Compta\Migrations\BancairesSeeder;
+use App\Services\Compta\Migrations\SystemeSeeder;
+use App\Services\RapprochementBancaireService;
+use App\Services\RemiseBancaireService;
+use App\Tenant\TenantContext;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
+
+uses(RefreshDatabase::class);
+
+// ---------------------------------------------------------------------------
+// Setup partagé : tenant + comptes système + compte bancaire 512X
+// ---------------------------------------------------------------------------
+
+beforeEach(function () {
+    $this->association = Association::factory()->create();
+    $this->user = User::factory()->create();
+    $this->user->associations()->attach($this->association->id, ['role' => 'admin', 'joined_at' => now()]);
+
+    TenantContext::boot($this->association);
+    session(['current_association_id' => $this->association->id]);
+    $this->actingAs($this->user);
+
+    // Activer le mode partie double
+    Config::set('compta.use_partie_double', true);
+
+    // Comptes système : 411, 401, 5112
+    SystemeSeeder::seed();
+
+    // 530 (Caisse — espèces)
+    $tenantId = (int) TenantContext::currentId();
+    $isSqlite = DB::getDriverName() === 'sqlite';
+    $insertClause = $isSqlite ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+    DB::statement(<<<SQL
+        {$insertClause} INTO comptes
+            (association_id, numero_pcg, intitule, classe, actif, est_systeme, pour_inscriptions, lettrable, created_at, updated_at)
+        VALUES
+            ({$tenantId}, '530', 'Caisse (espèces)', 5, 1, 1, 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    SQL);
+
+    // CompteBancaire + Compte 512X correspondant (via IBAN)
+    $this->iban = 'FR7612345000012345678901234';
+    $this->compteBancaire = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'iban' => $this->iban,
+        'solde_initial' => 1000.00,
+        'date_solde_initial' => '2025-09-01',
+    ]);
+    BancairesSeeder::seed();
+    $this->compte512X = Compte::where('iban', $this->iban)
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    // Compte 706 (classe 7) pour les ventilations
+    $categorie = Categorie::factory()->recette()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Prestations',
+    ]);
+    $this->sc706 = SousCategorie::create([
+        'association_id' => $this->association->id,
+        'categorie_id' => $categorie->id,
+        'nom' => 'Cotisations',
+        'code_cerfa' => '706',
+    ]);
+    $this->compte706 = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '706'],
+        [
+            'intitule' => 'Cotisations et adhésions',
+            'classe' => 7,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    // Compte 601 (classe 6) pour les dépenses
+    $categorieDep = Categorie::factory()->depense()->create([
+        'association_id' => $this->association->id,
+        'nom' => 'Charges',
+    ]);
+    $this->sc601 = SousCategorie::create([
+        'association_id' => $this->association->id,
+        'categorie_id' => $categorieDep->id,
+        'nom' => 'Fournitures',
+        'code_cerfa' => '601',
+    ]);
+    $this->compte601 = Compte::firstOrCreate(
+        ['association_id' => $this->association->id, 'numero_pcg' => '601'],
+        [
+            'intitule' => 'Fournitures',
+            'classe' => 6,
+            'lettrable' => false,
+            'actif' => true,
+            'est_systeme' => false,
+            'pour_inscriptions' => false,
+        ]
+    );
+
+    $this->tiers = Tiers::factory()->create(['association_id' => $this->association->id]);
+    $this->service = app(RapprochementBancaireService::class);
+});
+
+afterEach(function () {
+    TenantContext::clear();
+});
+
+// ---------------------------------------------------------------------------
+// Helpers locaux : créer des transactions enrichies PD
+// ---------------------------------------------------------------------------
+
+/**
+ * Crée une transaction recette virement enrichie PD : 4 lignes (411D/706C/512XD/411C).
+ *
+ * Note : transactions.compte_id est une FK vers comptes_bancaires.
+ * On passe le CompteBancaire pour l'entête, et le Compte 512X pour les lignes PD.
+ */
+function pdRecette(
+    CompteBancaire $compteBancaire,
+    Compte $compte512X,
+    float $montant,
+    Compte $compte706,
+    Compte $compte411,
+    Tiers $tiers,
+    StatutReglement $statut = StatutReglement::EnAttente,
+): Transaction {
+    $tx = Transaction::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'type' => TypeTransaction::Recette,
+        'mode_paiement' => ModePaiement::Virement,
+        'montant_total' => $montant,
+        'compte_id' => $compteBancaire->id,
+        'statut_reglement' => $statut->value,
+        'equilibree' => true,
+        'type_ecriture' => 'normale',
+    ]);
+
+    // 411 D tiers
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte411->id,
+        'debit' => $montant,
+        'credit' => 0,
+        'tiers_id' => $tiers->id,
+        'libelle' => 'Recette virement PD',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    // 706 C
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte706->id,
+        'debit' => 0,
+        'credit' => $montant,
+        'tiers_id' => null,
+        'libelle' => 'Recette virement PD',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    // 512X D (mouvement de trésorerie)
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte512X->id,
+        'debit' => $montant,
+        'credit' => 0,
+        'tiers_id' => null,
+        'libelle' => 'Recette virement PD',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    // 411 C tiers (contrepassation)
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte411->id,
+        'debit' => 0,
+        'credit' => $montant,
+        'tiers_id' => $tiers->id,
+        'libelle' => 'Recette virement PD',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+
+    return $tx;
+}
+
+/**
+ * Crée une transaction dépense virement enrichie PD : 4 lignes (601D/401C/401D/512XC).
+ */
+function pdDepense(
+    CompteBancaire $compteBancaire,
+    Compte $compte512X,
+    float $montant,
+    Compte $compte601,
+    Compte $compte401,
+    Tiers $tiers,
+    StatutReglement $statut = StatutReglement::EnAttente,
+): Transaction {
+    $tx = Transaction::factory()->create([
+        'association_id' => TenantContext::currentId(),
+        'type' => TypeTransaction::Depense,
+        'mode_paiement' => ModePaiement::Virement,
+        'montant_total' => $montant,
+        'compte_id' => $compteBancaire->id,
+        'statut_reglement' => $statut->value,
+        'equilibree' => true,
+        'type_ecriture' => 'normale',
+    ]);
+
+    // 601 D
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte601->id,
+        'debit' => $montant,
+        'credit' => 0,
+        'tiers_id' => null,
+        'libelle' => 'Dépense virement PD',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    // 401 C tiers
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte401->id,
+        'debit' => 0,
+        'credit' => $montant,
+        'tiers_id' => $tiers->id,
+        'libelle' => 'Dépense virement PD',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    // 401 D tiers (soldage immédiat)
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte401->id,
+        'debit' => $montant,
+        'credit' => 0,
+        'tiers_id' => $tiers->id,
+        'libelle' => 'Dépense virement PD',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+    // 512X C (décaissement)
+    TransactionLigne::create([
+        'transaction_id' => $tx->id,
+        'compte_id' => $compte512X->id,
+        'debit' => 0,
+        'credit' => $montant,
+        'tiers_id' => null,
+        'libelle' => 'Dépense virement PD',
+        'montant' => 0,
+        'sous_categorie_id' => null,
+    ]);
+
+    return $tx;
+}
+
+// ===========================================================================
+// A — calculerSoldePointage en mode PD
+// ===========================================================================
+
+test('[PD-A1] calculerSoldePointage retourne solde_ouverture si aucune transaction pointée', function () {
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1200.00);
+
+    // Transaction PD existante mais non pointée
+    $compte411 = compteSysteme('411');
+    pdRecette($this->compteBancaire, $this->compte512X, 300.00, $this->compte706, $compte411, $this->tiers);
+
+    $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+
+    // Solde = solde_ouverture (1000) car aucune transaction pointée
+    expect($solde)->toBe(1000.00);
+});
+
+test('[PD-A2] calculerSoldePointage additionne les débits 512X pointés (recette virement)', function () {
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1300.00);
+
+    $compte411 = compteSysteme('411');
+    $tx = pdRecette($this->compteBancaire, $this->compte512X, 300.00, $this->compte706, $compte411, $this->tiers);
+    $tx->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => StatutReglement::Pointe->value]);
+
+    $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+
+    // 1000 (ouverture) + 300 (512X débit) = 1300
+    expect($solde)->toBe(1300.00);
+});
+
+test('[PD-A3] calculerSoldePointage soustrait les crédits 512X pointés (dépense virement)', function () {
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 800.00);
+
+    $compte401 = compteSysteme('401');
+    $tx = pdDepense($this->compteBancaire, $this->compte512X, 200.00, $this->compte601, $compte401, $this->tiers);
+    $tx->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => StatutReglement::Pointe->value]);
+
+    $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+
+    // 1000 (ouverture) - 200 (512X crédit) = 800
+    expect($solde)->toBe(800.00);
+});
+
+test('[PD-A4] calculerSoldePointage combine recettes et dépenses pointées', function () {
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1100.00);
+
+    $compte411 = compteSysteme('411');
+    $compte401 = compteSysteme('401');
+
+    $recette = pdRecette($this->compteBancaire, $this->compte512X, 500.00, $this->compte706, $compte411, $this->tiers);
+    $depense = pdDepense($this->compteBancaire, $this->compte512X, 400.00, $this->compte601, $compte401, $this->tiers);
+
+    $recette->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => StatutReglement::Pointe->value]);
+    $depense->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => StatutReglement::Pointe->value]);
+
+    $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+
+    // 1000 + 500 - 400 = 1100
+    expect($solde)->toBe(1100.00);
+});
+
+// ===========================================================================
+// B — Cross-compte : lignes 512X d'un autre compte ne polluent pas
+// ===========================================================================
+
+test('[PD-B] calculerSoldePointage ignore les lignes 512X d\'un autre compte bancaire', function () {
+    // Créer un deuxième compte bancaire avec son propre 512X
+    $ibanBnp = 'FR7699999000099999999901234';
+    $compteBancaireBnp = CompteBancaire::factory()->create([
+        'association_id' => $this->association->id,
+        'iban' => $ibanBnp,
+    ]);
+    BancairesSeeder::seed();
+    $compte512Bnp = Compte::where('iban', $ibanBnp)
+        ->where('association_id', $this->association->id)
+        ->firstOrFail();
+
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1100.00);
+
+    $compte411 = compteSysteme('411');
+
+    // Transaction sur compte BNP, pointée sur ce rapprochement
+    $txBnp = pdRecette($compteBancaireBnp, $compte512Bnp, 999.00, $this->compte706, $compte411, $this->tiers);
+    $txBnp->update(['rapprochement_id' => $rapprochement->id]);
+
+    // Transaction normale sur le compte CL
+    $txCl = pdRecette($this->compteBancaire, $this->compte512X, 100.00, $this->compte706, $compte411, $this->tiers);
+    $txCl->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => StatutReglement::Pointe->value]);
+
+    $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+
+    // Seule la ligne 512X du compte CL est prise : 1000 + 100 = 1100
+    // Les lignes BNP (compte 512X différent) sont ignorées
+    expect($solde)->toBe(1100.00);
+});
+
+// ===========================================================================
+// C — toggleTransaction en mode PD
+// ===========================================================================
+
+test('[PD-C1] toggleTransaction pointe une recette PD (rapprochement_id défini)', function () {
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1300.00);
+
+    $compte411 = compteSysteme('411');
+    $tx = pdRecette($this->compteBancaire, $this->compte512X, 300.00, $this->compte706, $compte411, $this->tiers);
+
+    $this->service->toggleTransaction($rapprochement, 'recette', $tx->id);
+
+    $txFresh = $tx->fresh();
+    expect((int) $txFresh->rapprochement_id)->toBe($rapprochement->id)
+        ->and($txFresh->statut_reglement)->toBe(StatutReglement::Pointe);
+});
+
+test('[PD-C2] toggleTransaction dépointe une recette PD déjà pointée', function () {
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1300.00);
+
+    $compte411 = compteSysteme('411');
+    $tx = pdRecette($this->compteBancaire, $this->compte512X, 300.00, $this->compte706, $compte411, $this->tiers);
+    $tx->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => StatutReglement::Pointe->value]);
+
+    $this->service->toggleTransaction($rapprochement, 'recette', $tx->id);
+
+    $txFresh = $tx->fresh();
+    expect($txFresh->rapprochement_id)->toBeNull()
+        ->and($txFresh->statut_reglement)->toBe(StatutReglement::EnAttente);
+});
+
+test('[PD-C3] toggleTransaction pointe une dépense PD', function () {
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 800.00);
+
+    $compte401 = compteSysteme('401');
+    $tx = pdDepense($this->compteBancaire, $this->compte512X, 200.00, $this->compte601, $compte401, $this->tiers);
+
+    $this->service->toggleTransaction($rapprochement, 'depense', $tx->id);
+
+    $txFresh = $tx->fresh();
+    expect((int) $txFresh->rapprochement_id)->toBe($rapprochement->id)
+        ->and($txFresh->statut_reglement)->toBe(StatutReglement::Pointe);
+});
+
+// ===========================================================================
+// D — Remise = 1 transaction T4 unique au rappro (pas de GROUP BY)
+// ===========================================================================
+
+test('[PD-D] remise comptabilisée via RemiseBancaireService = 1 ligne 512X au rappro', function () {
+    // Créer 3 transactions chèque enrichies PD (avec ligne 5112)
+    $compte5112 = compteSysteme('5112');
+    $compte411 = compteSysteme('411');
+
+    $montants = [100.00, 150.00, 200.00]; // total = 450.00
+    $txIds = [];
+
+    foreach ($montants as $montant) {
+        $tx = Transaction::factory()->create([
+            'association_id' => TenantContext::currentId(),
+            'type' => TypeTransaction::Recette,
+            'mode_paiement' => ModePaiement::Cheque,
+            'montant_total' => $montant,
+            'compte_id' => $this->compteBancaire->id,
+            'statut_reglement' => StatutReglement::EnAttente->value,
+            'equilibree' => true,
+            'type_ecriture' => 'normale',
+        ]);
+
+        // 411 D / 706 C / 5112 D / 411 C
+        TransactionLigne::create([
+            'transaction_id' => $tx->id, 'compte_id' => $compte411->id,
+            'debit' => $montant, 'credit' => 0, 'tiers_id' => $this->tiers->id,
+            'libelle' => 'Recette chèque', 'montant' => 0, 'sous_categorie_id' => null,
+        ]);
+        TransactionLigne::create([
+            'transaction_id' => $tx->id, 'compte_id' => $this->compte706->id,
+            'debit' => 0, 'credit' => $montant, 'tiers_id' => null,
+            'libelle' => 'Recette chèque', 'montant' => 0, 'sous_categorie_id' => null,
+        ]);
+        TransactionLigne::create([
+            'transaction_id' => $tx->id, 'compte_id' => $compte5112->id,
+            'debit' => $montant, 'credit' => 0, 'tiers_id' => null,
+            'libelle' => 'Recette chèque', 'montant' => 0, 'sous_categorie_id' => null,
+        ]);
+        TransactionLigne::create([
+            'transaction_id' => $tx->id, 'compte_id' => $compte411->id,
+            'debit' => 0, 'credit' => $montant, 'tiers_id' => $this->tiers->id,
+            'libelle' => 'Recette chèque', 'montant' => 0, 'sous_categorie_id' => null,
+        ]);
+
+        $txIds[] = $tx->id;
+    }
+
+    // Comptabiliser la remise via RemiseBancaireService (génère la T4)
+    $remiseService = app(RemiseBancaireService::class);
+    $remise = $remiseService->creer([
+        'date' => '2025-10-15',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'compte_cible_id' => $this->compteBancaire->id,
+    ]);
+
+    $remiseService->comptabiliser($remise, $txIds);
+
+    // Récupérer la T4 créée
+    $t4 = Transaction::where('remise_id', $remise->id)
+        ->where('equilibree', true)
+        ->whereNull('reference')
+        ->first();
+
+    expect($t4)->not->toBeNull('La T4 de remise doit exister après comptabiliser()');
+
+    // La T4 doit avoir EXACTEMENT 1 ligne sur le compte 512X (débit total)
+    $lignes512X = TransactionLigne::where('transaction_id', $t4->id)
+        ->where('compte_id', $this->compte512X->id)
+        ->get();
+
+    expect($lignes512X)->toHaveCount(1, 'La T4 doit avoir 1 seule ligne 512X — pas de GROUP BY')
+        ->and((float) $lignes512X->first()->debit)->toBe(450.00, 'La ligne 512X doit totaliser 450.00 (100+150+200)');
+});
+
+// ===========================================================================
+// E — Transactions legacy sans lignes 512X : invisibles en mode PD
+// ===========================================================================
+
+test('[PD-E] transactions legacy (sans lignes 512X) sont invisibles au calcul PD du solde', function () {
+    // En mode mixte, les transactions non enrichies (pas de lignes 512X) ne contribuent pas.
+    // Ce comportement est documenté (Step 29) : mode mixte legacy/PD.
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1000.00);
+
+    // Transaction legacy : rapprochement_id défini MAIS sans lignes 512X
+    $txLegacy = Transaction::factory()->asRecette()->create([
+        'compte_id' => $this->compteBancaire->id,
+        'montant_total' => 500.00,
+        'rapprochement_id' => $rapprochement->id,
+        'statut_reglement' => StatutReglement::Pointe->value,
+    ]);
+    // Aucune TransactionLigne avec compte_id = 512X pour cette transaction
+
+    $solde = $this->service->calculerSoldePointage($rapprochement->fresh());
+
+    // En mode PD : transaction legacy invisible → solde = ouverture seule (1000)
+    expect($solde)->toBe(1000.00);
+});
+
+// ===========================================================================
+// F — Verrouillage avec solde PD équilibré
+// ===========================================================================
+
+test('[PD-F] verrouiller réussit quand solde PD = solde_fin (écart = 0)', function () {
+    // solde_ouverture = 1000 (solde_initial du compteBancaire), solde_fin = 1300
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1300.00);
+
+    $compte411 = compteSysteme('411');
+    $tx = pdRecette($this->compteBancaire, $this->compte512X, 300.00, $this->compte706, $compte411, $this->tiers);
+    $tx->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => StatutReglement::Pointe->value]);
+
+    // Solde PD = 1000 + 300 = 1300 = solde_fin → écart = 0
+    $this->service->verrouiller($rapprochement->fresh());
+
+    expect($rapprochement->fresh()->statut)->toBe(StatutRapprochement::Verrouille);
+});
+
+test('[PD-F2] verrouiller échoue si solde PD ≠ solde_fin', function () {
+    // solde_ouverture = 1000, solde_fin = 1500 (écart de 200)
+    $rapprochement = $this->service->create($this->compteBancaire, '2025-10-31', 1500.00);
+
+    $compte411 = compteSysteme('411');
+    $tx = pdRecette($this->compteBancaire, $this->compte512X, 300.00, $this->compte706, $compte411, $this->tiers);
+    $tx->update(['rapprochement_id' => $rapprochement->id, 'statut_reglement' => StatutReglement::Pointe->value]);
+
+    // Solde PD = 1000 + 300 = 1300 ≠ 1500 → écart = -200 → exception
+    expect(fn () => $this->service->verrouiller($rapprochement->fresh()))
+        ->toThrow(RuntimeException::class);
+});

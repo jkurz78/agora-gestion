@@ -6,10 +6,13 @@ namespace App\Services;
 
 use App\Enums\StatutRapprochement;
 use App\Enums\StatutReglement;
+use App\Models\Compte;
 use App\Models\CompteBancaire;
 use App\Models\RapprochementBancaire;
 use App\Models\Transaction;
+use App\Models\TransactionLigne;
 use App\Models\VirementInterne;
+use App\Tenant\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -119,14 +122,45 @@ final class RapprochementBancaireService
     /**
      * Calcule le solde pointé courant :
      * solde_ouverture + entrées pointées − sorties pointées.
+     *
+     * Mode legacy : Transaction.rapprochement_id → SUM(CASE type THEN ±montant_total).
+     * Mode PD     : transaction_lignes.compte_id IN (512X du compte) jointure sur
+     *               transactions.rapprochement_id → SUM(debit) - SUM(credit).
+     *
+     * Dans les deux modes, les virements internes restent calculés via
+     * VirementInterne.rapprochement_source_id / rapprochement_destination_id
+     * (ils n'ont pas de transaction_lignes PD dans slice 1).
+     *
+     * Comportement mixte (mode PD, transactions non enrichies) : les transactions
+     * sans ligne 512X enrichie sont invisibles au calcul PD. C'est documenté et
+     * attendu — le backfill (slice 1d) les rendra visibles.
      */
     public function calculerSoldePointage(RapprochementBancaire $rapprochement): float
     {
         $solde = (float) $rapprochement->solde_ouverture;
 
-        $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
-            ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
-            ->value('total');
+        if (config('compta.use_partie_double')) {
+            // Mode PD : lire les lignes 512X du compte bancaire de ce rapprochement,
+            // liées aux transactions pointées (rapprochement_id = ce rapprochement).
+            $compte512X = $this->resoudreCompte512X($rapprochement->compte);
+
+            if ($compte512X !== null) {
+                $mouvement = (float) TransactionLigne::where('transaction_lignes.compte_id', $compte512X->id)
+                    ->join('transactions', 'transactions.id', '=', 'transaction_lignes.transaction_id')
+                    ->where('transactions.rapprochement_id', $rapprochement->id)
+                    ->selectRaw('SUM(transaction_lignes.debit) - SUM(transaction_lignes.credit) as net')
+                    ->value('net');
+
+                $solde += $mouvement;
+            }
+            // Si compte 512X introuvable (tenant sans schéma PD), solde = ouverture seul.
+        } else {
+            // Mode legacy : type + montant_total à l'entête Transaction
+            $solde += (float) Transaction::where('rapprochement_id', $rapprochement->id)
+                ->selectRaw("SUM(CASE WHEN type = 'depense' THEN -montant_total ELSE montant_total END) as total")
+                ->value('total');
+        }
+
         $solde += (float) VirementInterne::where('rapprochement_destination_id', $rapprochement->id)->sum('montant');
         $solde -= (float) VirementInterne::where('rapprochement_source_id', $rapprochement->id)->sum('montant');
 
@@ -381,5 +415,32 @@ final class RapprochementBancaireService
             'piece_jointe_nom' => null,
             'piece_jointe_mime' => null,
         ]);
+    }
+
+    // =========================================================================
+    // Helpers partie double (Step 29)
+    // =========================================================================
+
+    /**
+     * Résout le compte PCG classe 5 (512X) correspondant au CompteBancaire du rapprochement.
+     *
+     * Le lien est établi via l'IBAN : BancairesSeeder crée un Compte avec le même IBAN
+     * que le CompteBancaire (numéro PCG 5121, 5122, etc.). Ce compte est le « compte de
+     * trésorerie » des écritures partie double.
+     *
+     * Retourne null si le tenant n'a pas encore de schéma PD (compte 512X manquant).
+     * Dans ce cas, calculerSoldePointage retourne solde_ouverture seul (comportement
+     * documenté mode mixte legacy/PD pendant la transition — Step 29).
+     */
+    private function resoudreCompte512X(CompteBancaire $compteBancaire): ?Compte
+    {
+        if ($compteBancaire->iban === null) {
+            return null;
+        }
+
+        return Compte::where('iban', $compteBancaire->iban)
+            ->where('association_id', (int) TenantContext::currentId())
+            ->where('classe', 5)
+            ->first();
     }
 }
