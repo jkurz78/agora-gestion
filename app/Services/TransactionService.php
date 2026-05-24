@@ -282,6 +282,12 @@ final class TransactionService
                         'notes' => $ligneData['notes'],
                     ]);
                 }
+
+                // Step 31 — Patch ciblé : si sous_categorie_id a changé sur une ligne de ventilation
+                // (identifiée par sous_categorie_id non null ET compte_id de classe 6 ou 7),
+                // recalculer le compte_id PD correspondant.
+                // Les lignes PD-only (411/401, 512X) sont intactes — montant gelé sur pièce rappro.
+                $this->patcherComptesVentilationRapproLocked($transaction, $lignes);
             } else {
                 $affectationsSnapshot = [];
                 $helloAssoItemIds = [];
@@ -312,18 +318,28 @@ final class TransactionService
                     }
                 }
                 $transaction->lignes()->forceDelete();
+                $lignesCreees = [];
                 foreach ($lignes as $ligneData) {
                     $oldId = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
                     if ($oldId !== null && isset($helloAssoItemIds[$oldId])) {
                         $ligneData['helloasso_item_id'] = $helloAssoItemIds[$oldId];
                     }
                     $newLigne = $transaction->lignes()->create($ligneData);
+                    $lignesCreees[] = $newLigne;
                     if ($oldId !== null && isset($affectationsSnapshot[$oldId])) {
                         foreach ($affectationsSnapshot[$oldId] as $affData) {
                             $newLigne->affectations()->create($affData);
                         }
                     }
                 }
+
+                // Step 31 — Re-enrichissement partie double après recréation des lignes legacy.
+                // forceDelete() ci-dessus détruit TOUTES les lignes (legacy + PD-only).
+                // On doit re-générer les écritures PD sur la transaction fraîche.
+                // enrichirPartieDouble() est idempotent sur la transaction si les lignes legacy
+                // viennent d'être créées et que les PD-only n'existent pas encore.
+                $transaction->refresh();
+                $this->enrichirPartieDouble($transaction, $lignesCreees);
             }
 
             return $transaction->fresh();
@@ -565,6 +581,62 @@ final class TransactionService
             $existing = $existingLignes->get($id);
             if ((int) round((float) $existing->montant * 100) !== (int) round((float) $ligneData['montant'] * 100)) {
                 throw new \RuntimeException('Le montant d\'une ligne ne peut pas être modifié sur une transaction rapprochée.');
+            }
+        }
+    }
+
+    /**
+     * Step 31 — Patch ciblé compte_id sur les lignes de ventilation (classe 6 ou 7)
+     * d'une transaction Rappro-locked.
+     *
+     * Après le foreach de mise à jour (sous_categorie_id, operation_id, seance, notes),
+     * les lignes de ventilation ont leur sous_categorie_id à jour en base mais leur
+     * compte_id PD n'a pas été recalculé. Ce patch résout le nouveau sous_categorie_id
+     * vers le compte correspondant et met à jour compte_id.
+     *
+     * Les lignes PD-only (411/401 lettrées, 512X) sont intentionnellement laissées
+     * intactes : montants gelés sur pièce rapprochée, dé-lettrage non souhaité ici.
+     * Les lignes de ventilation sont identifiées par sous_categorie_id IS NOT NULL.
+     *
+     * Skip silencieux si le compte ne peut pas être résolu (sous-catégorie sans code_cerfa,
+     * compte introuvable, classe inattendue) — cohérent avec enrichirPartieDouble.
+     */
+    private function patcherComptesVentilationRapproLocked(Transaction $transaction, array $lignes): void
+    {
+        $classeAttendue = $transaction->type === TypeTransaction::Recette ? 7 : 6;
+
+        foreach ($lignes as $ligneData) {
+            $id = isset($ligneData['id']) && $ligneData['id'] !== null ? (int) $ligneData['id'] : null;
+            if ($id === null) {
+                continue;
+            }
+
+            // sous_categorie_id dans $lignesData = valeur mise à jour (déjà en base)
+            $sousCatId = isset($ligneData['sous_categorie_id']) && $ligneData['sous_categorie_id'] !== null
+                ? (int) $ligneData['sous_categorie_id']
+                : null;
+
+            if ($sousCatId === null) {
+                continue;
+            }
+
+            // Recharger la ligne depuis la DB (après la mise à jour du foreach précédent)
+            $ligne = $transaction->lignes()->where('id', $id)->first();
+            if ($ligne === null || $ligne->sous_categorie_id === null) {
+                continue;
+            }
+
+            // Ligne de ventilation identifiée par sous_categorie_id non null.
+            // Toujours recalculer compte_id (idempotent, même si sous-cat inchangée).
+            $compte = CompteVentilationResolver::resoudre(
+                sousCategorieId: $sousCatId,
+                classeAttendue: $classeAttendue,
+                contextLog: 'Step 31 — patcherComptesVentilationRapproLocked',
+                contextLogData: ['transaction_id' => $transaction->id, 'ligne_id' => $id],
+            );
+
+            if ($compte !== null) {
+                $ligne->fill(['compte_id' => $compte->id])->save();
             }
         }
     }
