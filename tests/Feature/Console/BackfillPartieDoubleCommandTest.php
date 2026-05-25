@@ -513,6 +513,112 @@ test('[K] --force en production → exit 1 + message erreur', function () {
     }
 })->group('backfill');
 
+// ---------------------------------------------------------------------------
+// Test Step 34-bis — [M] Sécurité multi-tenant DELETE lettrage_audit
+// ---------------------------------------------------------------------------
+
+/**
+ * Test [M] : --force sur l'asso A ne purge pas les entrées lettrage_audit de l'asso B.
+ *
+ * Garantit que resetExercice() scope le DELETE lettrage_audit au tenant courant
+ * (association_id = A) et à l'exercice cible.
+ *
+ * Stratégie : insertion directe via DB::table (bypass LettrageService) pour simuler
+ * des entrées backfill pré-existantes sur les 2 associations.
+ */
+test('[M] --force sur asso A ne purge pas les entrées lettrage_audit de asso B', function () {
+    // --- Préparer asso A (tenant courant) ---
+    setupBackfillFixtureStep33Legacy($this);
+    $assoA = $this->association;
+
+    // --- Préparer asso B (tenant isolé) ---
+    $assoB = Association::factory()->create();
+    $userB = \App\Models\User::factory()->create();
+    $userB->associations()->attach($assoB->id, ['role' => 'admin', 'joined_at' => now()]);
+
+    TenantContext::clear();
+    TenantContext::boot($assoB);
+    SystemeSeeder::seed();
+    BancairesSeeder::seed();
+
+    // Compte systéme minimal pour asso B (besoin d'un compte_id valide)
+    $compteBForAudit = Compte::where('association_id', $assoB->id)->first();
+
+    TenantContext::clear();
+    TenantContext::boot($assoA);
+
+    // Compte systéme pour asso A (pour les entrées d'audit)
+    $compteAForAudit = Compte::where('association_id', $assoA->id)->first();
+
+    // --- Insérer directement des entrées lettrage_audit motif='backfill' ---
+    // Pour asso A (exercice 2025) : doit être supprimée par --force
+    DB::table('lettrage_audit')->insert([
+        'association_id' => $assoA->id,
+        'action' => 'lettre',
+        'lettrage_code' => 'BACKFILL-TEST-ASSO-A',
+        'compte_id' => $compteAForAudit->id,
+        'transaction_ligne_ids' => '[]',
+        'user_id' => null,
+        'motif' => 'backfill',
+        'created_at' => now(),
+    ]);
+
+    // Pour asso B : NE DOIT PAS être supprimée
+    if ($compteBForAudit !== null) {
+        DB::table('lettrage_audit')->insert([
+            'association_id' => $assoB->id,
+            'action' => 'lettre',
+            'lettrage_code' => 'BACKFILL-TEST-ASSO-B',
+            'compte_id' => $compteBForAudit->id,
+            'transaction_ligne_ids' => '[]',
+            'user_id' => null,
+            'motif' => 'backfill',
+            'created_at' => now(),
+        ]);
+    }
+
+    $nbAuditBAvant = DB::table('lettrage_audit')
+        ->where('association_id', $assoB->id)
+        ->where('motif', 'backfill')
+        ->count();
+
+    $nbAuditAAvant = DB::table('lettrage_audit')
+        ->where('association_id', $assoA->id)
+        ->where('motif', 'backfill')
+        ->count();
+
+    expect($nbAuditAAvant)->toBeGreaterThan(0, 'Asso A doit avoir des entrées lettrage_audit motif=backfill avant le --force');
+
+    // --- Run --force sur asso A uniquement ---
+    $this->artisan('compta:backfill-partie-double', [
+        '--exercice' => '2025',
+        '--force' => true,
+        '--asso' => $assoA->id,
+    ])->assertSuccessful();
+
+    // --- Assertions ---
+    // Les entrées de asso A doivent être purgées
+    $nbAuditAApres = DB::table('lettrage_audit')
+        ->where('association_id', $assoA->id)
+        ->where('motif', 'backfill')
+        ->count();
+
+    expect($nbAuditAApres)->toBe(0, 'Les entrées lettrage_audit motif=backfill de asso A doivent être purgées par --force');
+
+    // Les entrées de asso B doivent être intactes
+    if ($compteBForAudit !== null) {
+        $nbAuditBApres = DB::table('lettrage_audit')
+            ->where('association_id', $assoB->id)
+            ->where('motif', 'backfill')
+            ->count();
+
+        expect($nbAuditBApres)->toBe(
+            $nbAuditBAvant,
+            "Les entrées lettrage_audit de asso B ({$nbAuditBAvant}) doivent rester intactes après --force sur asso A"
+        );
+    }
+})->group('backfill');
+
 test('[I] rollback — si la conversion lève une exception, état initial restauré', function () {
     setupBackfillFixtureStep33Legacy($this);
 
