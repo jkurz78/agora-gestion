@@ -29,6 +29,7 @@ declare(strict_types=1);
  *   Un PostBackfillValidator autonome serait sur-ingénierie pour 1 seul caller.
  */
 
+use App\DataTransferObjects\ExtournePayload;
 use App\Enums\ModePaiement;
 use App\Enums\StatutFacture;
 use App\Enums\TypeLigneFacture;
@@ -48,6 +49,7 @@ use App\Services\Compta\Migrations\SystemeSeeder;
 use App\Services\FactureService;
 use App\Services\Rapports\CompteResultatBuilder;
 use App\Services\RemiseBancaireService;
+use App\Services\TransactionExtourneService;
 use App\Services\TransactionService;
 use App\Tenant\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -387,6 +389,56 @@ function creerFixtureE2E(object $ctx): array
         }
     }
 
+    // RCB : Recette comptant CB — 706 (60€)
+    // Cas §8.3 HelloAsso CB : mode CB → portage direct 512X (pas 5112).
+    // Sans helloasso_order_id (Tx locale CB ordinaire).
+    $txRCB = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-11-25',
+        'libelle' => 'Paiement CB adhésion',
+        'montant_total' => '60.00',
+        'mode_paiement' => ModePaiement::Cb->value,
+        'tiers_id' => $ctx->tiersA->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '60.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txRCB->id;
+    $ctx->txRCB = $txRCB;
+
+    // TX_EXT + TX_EXT_MIROIR : Transaction origine recette comptant chèque + extourne.
+    // Cas §8.3 extourne : T1 (origine) + T2' (miroir) — pas d'auto-lettrage entre eux.
+    // L'origine est créée AVEC PD enrichi (equilibree=TRUE), puis extournée via le service.
+    $txExtOrigine = $ctx->txService->create([
+        'type' => 'recette',
+        'date' => '2025-12-10',
+        'libelle' => 'Adhésion annulée',
+        'montant_total' => '90.00',
+        'mode_paiement' => ModePaiement::Cheque->value,
+        'tiers_id' => $ctx->tiersB->id,
+        'compte_id' => $ctx->compteBancaire->id,
+    ], [
+        ['sous_categorie_id' => $ctx->sc706->id, 'montant' => '90.00', 'operation_id' => null, 'seance' => null, 'notes' => null],
+    ]);
+    $txIds[] = $txExtOrigine->id;
+    $ctx->txExtOrigine = $txExtOrigine;
+
+    // Extourner la transaction origine → crée T2' miroir (montant négatif)
+    // Note : T2' n'est PAS ajoutée à $txIds car c'est une Tx avec montant négatif (miroir)
+    // que le backfill ne convertit pas (le TransactionConverter refuse les montants <= 0).
+    // T2' est stockée dans $ctx->txExtMiroir pour les assertions spécifiques sur le lettrage.
+    $extourneService = app(TransactionExtourneService::class);
+    $payload = ExtournePayload::fromOrigine($txExtOrigine, [
+        'date' => '2025-12-15',
+        'libelle' => 'Annulation adhésion remboursée',
+    ]);
+    $extourne = $extourneService->extourner($txExtOrigine, $payload);
+    $txExtMiroir = Transaction::find($extourne->transaction_extourne_id);
+    if ($txExtMiroir !== null) {
+        // Ne pas ajouter T2' à $txIds (miroir extourne, montant < 0, non backfillable)
+        $ctx->txExtMiroir = $txExtMiroir;
+    }
+
     return array_values(array_unique($txIds));
 }
 
@@ -394,21 +446,21 @@ function creerFixtureE2E(object $ctx): array
  * Simule l'état legacy : supprime les lignes PD-only et reset equilibree=FALSE.
  * Reproduit setupBackfillFixtureStep33Legacy mais en bulk sur un array de txIds.
  *
- * Important : les T4 de remise bancaire (remise_id IS NOT NULL, reference IS NULL) sont
- * exclues de la simulation legacy car elles sont des transactions PD-pure (pas de lignes
- * de ventilation legacy). En production, elles ne se trouvent jamais dans un état legacy.
+ * Important : les Tx suivantes sont exclues de la simulation legacy car elles sont
+ * des transactions PD-pures (créées nativement par les services PD, jamais en état legacy) :
+ *   - T4 de remise bancaire (remise_id non null, reference null)
+ *   - T2 d'encaissement facture / créance (créées par pourEncaissementCreance / marquerReglementRecu)
+ *   - T2 de règlement fournisseur (créées par pourReglementFournisseur)
+ *   - T2' miroir d'extourne (créées par TransactionExtourneService::copierLignesInversees
+ *     avec montants négatifs — le backfill ne gère pas les montants négatifs dans cette version)
+ * En production, ces Tx sont toujours equilibree=TRUE dès leur création.
  *
  * @param  list<int>  $txIds
  */
 function simulerEtatLegacyE2E(array $txIds): void
 {
-    // Identifier les transactions PD-pures (aucune ligne avec sous_categorie_id non null).
-    // Ces transactions n'ont jamais eu d'état legacy :
-    //   - T4 de remise bancaire (remise_id non null, reference null)
-    //   - T2 d'encaissement facture / créance (créées par pourEncaissementCreance / marquerReglementRecu)
-    //   - T2 de règlement fournisseur (créées par pourReglementFournisseur)
-    // En production, ces Tx sont toujours equilibree=TRUE dès leur création.
-    // Le backfill ne doit pas les traiter.
+    // Identifier les transactions PD-pures (aucune ligne avec sous_categorie_id non null)
+    // OU les miroirs d'extourne (montant_total < 0 avec extournePour relation active).
     $txPDPures = [];
     foreach ($txIds as $txId) {
         $hasLegacyLines = DB::table('transaction_lignes')
@@ -417,6 +469,14 @@ function simulerEtatLegacyE2E(array $txIds): void
             ->whereNull('deleted_at')
             ->exists();
         if (! $hasLegacyLines) {
+            $txPDPures[] = $txId;
+            continue;
+        }
+        // T2' miroir d'extourne : montant_total < 0 ET appartient à une extourne comme miroir
+        $isMiroirExtourne = DB::table('extournes')
+            ->where('transaction_extourne_id', $txId)
+            ->exists();
+        if ($isMiroirExtourne) {
             $txPDPures[] = $txId;
         }
     }
@@ -570,6 +630,79 @@ test('[L] backfill end-to-end exercice complet — toutes Tx equilibree=TRUE, CR
             ->whereNull('deleted_at')
             ->count();
         expect($lignesAvecTiers)->toBe(0, 'Des lignes classe 5 avec tiers_id ont été trouvées.');
+    }
+
+    // --- Assertions spécifiques : cas HelloAsso CB ---
+    // RCB : recette mode CB → portage 512X direct (pas 5112).
+    // Après backfill : la ligne 512X doit exister et ne pas porter de tiers_id.
+    if (isset($this->txRCB)) {
+        $txRCBEquilibree = Transaction::find($this->txRCB->id);
+        expect((bool) $txRCBEquilibree->equilibree)->toBeTrue(
+            "La recette CB #{$this->txRCB->id} doit être equilibree=TRUE après backfill"
+        );
+
+        // Vérifier qu'il n'y a pas de ligne 5112 (chèques en attente) sur une Tx CB
+        $compte5112 = Compte::where('numero_pcg', '5112')
+            ->where('association_id', $this->association->id)
+            ->first();
+        if ($compte5112 !== null) {
+            $ligne5112SurCB = DB::table('transaction_lignes')
+                ->where('transaction_id', $this->txRCB->id)
+                ->where('compte_id', $compte5112->id)
+                ->whereNull('deleted_at')
+                ->exists();
+            expect($ligne5112SurCB)->toBeFalse(
+                "Recette CB ne doit PAS porter de ligne 5112 (chèques en attente)"
+            );
+        }
+
+        // La ligne 512X (bancaire physique) doit exister pour la recette CB
+        $ligne512XSurCB = DB::table('transaction_lignes')
+            ->where('transaction_id', $this->txRCB->id)
+            ->where('compte_id', $this->compte512X->id)
+            ->whereNull('deleted_at')
+            ->exists();
+        expect($ligne512XSurCB)->toBeTrue(
+            "Recette CB doit porter une ligne sur le compte 512X physique (portage direct)"
+        );
+    }
+
+    // --- Assertions spécifiques : paire extourne ---
+    // TX_EXT + TX_EXT_MIROIR : les lignes classe 7 de T1 et T2' ne doivent PAS être lettrées
+    // entre elles (l'extourne n'auto-lettre pas les lignes de produits — spec §8.3).
+    if (isset($this->txExtOrigine) && isset($this->txExtMiroir)) {
+        $compte7Ids = Compte::where('classe', 7)
+            ->where('association_id', $this->association->id)
+            ->pluck('id')
+            ->all();
+
+        if (! empty($compte7Ids)) {
+            $lignesClasse7TxOrigine = DB::table('transaction_lignes')
+                ->where('transaction_id', $this->txExtOrigine->id)
+                ->whereIn('compte_id', $compte7Ids)
+                ->whereNull('deleted_at')
+                ->pluck('lettrage_code')
+                ->filter()
+                ->values();
+
+            $lignesClasse7TxMiroir = DB::table('transaction_lignes')
+                ->where('transaction_id', $this->txExtMiroir->id)
+                ->whereIn('compte_id', $compte7Ids)
+                ->whereNull('deleted_at')
+                ->pluck('lettrage_code')
+                ->filter()
+                ->values();
+
+            // Aucune ligne classe 7 de T1 ne doit être lettrée (pas d'auto-lettrage produits)
+            expect($lignesClasse7TxOrigine->isEmpty())->toBeTrue(
+                "Les lignes classe 7 de la Tx origine extournée ne doivent pas être lettrées"
+            );
+
+            // Aucune ligne classe 7 de T2' ne doit être lettrée
+            expect($lignesClasse7TxMiroir->isEmpty())->toBeTrue(
+                "Les lignes classe 7 du miroir extourne ne doivent pas être lettrées"
+            );
+        }
     }
 
     // Étape 7 : Comparer CR pré/post backfill (tolérance 0,00€)
