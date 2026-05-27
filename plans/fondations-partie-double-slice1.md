@@ -786,43 +786,39 @@ API : `LettrageService::delettrerParLigne($ligne, $motif)`. Helper privé `autoD
 **Files**: migration + tests
 **Commit**: `feat(v5): backfill transaction_lignes.compte_id depuis sous_categorie_id`
 
-#### Step 37 : Renommage code base (search/replace assisté)
+#### Step 37 : Renommage code base (search/replace assisté) ✅ DOCUMENTÉ (no-op code)
 
-**Complexity**: complex
-**RED**: Suite tests entière reste verte après le renommage
-**GREEN**:
-- Search/replace : `sous_categorie` → `compte` dans tout `app/`, `resources/views/`, `tests/`, `database/seeders/`, `routes/`
-- Attention au cas où `sous_categorie` apparaît dans des données métier (chaînes utilisateur) → ne PAS renommer
-- Cas particulier : `$ligne->sous_categorie_id` → `$ligne->compte_id` (avec backfill auto via Step 36)
-**REFACTOR**: None needed (refacto en bloc)
-**Files**: ~50 fichiers attendus
-**Commit**: `refactor(v5): rename sous_categorie → compte across codebase`
+> **Décision de scope (2026-05-27)** : rename complet `SousCategorie → Compte` PARQUÉ post-cutover v5.0.
+> 6 tables (`budget_lines`, `formules_adhesion`, `facture_lignes`, `note_de_frais_lignes`,
+> `devis_lignes`, `usages_sous_categorie`) ont une FK `sous_categorie_id` → `sous_categories.id`.
+> Migrer ces FK nécessite 6 migrations supplémentaires hors scope slice 1d.
+> Le modèle `SousCategorie` coexiste avec `App\Models\Compte` — docblock ajouté.
+> Voir `memory/project_compta_v5_sous_slice_1d.md` section « Phase I — partielle ».
 
-#### Step 38 : Renommage UI + routes + redirects 301
+**Complexity**: no-op (décision documentée)
+**Commit**: `docs(v5): Step 37 — décision de scope, rename SousCategorie reporté post-cutover`
+
+#### Step 38 : Renommage UI + routes + redirects 301 ✅ TERMINÉ
 
 **Complexity**: standard
-**RED**: Tests Pest UI :
-- Écran « Paramètres > Sous-catégories » devient « Paramètres > Comptes »
-- Route `/parametres/comptes` répond 200, `/parametres/sous-categories` redirige 301
-- Tests Livewire passent
 **GREEN**:
-- Refonte des vues Blade (labels, titres)
-- Mise à jour routes + redirects
-- Sidebar mise à jour
-**REFACTOR**: None needed
-**Files**: vues + routes
-**Commit**: `feat(v5): UI rename sous-catégorie → compte + redirects 301`
+- Route `/parametres/comptes` créée (nouveau contrôleur `CompteParametreController`)
+- Vue `parametres/comptes/index.blade.php` avec labels « Comptes »
+- Redirect 301 `/parametres/sous-categories` → `/parametres/comptes`
+- Sidebar label « Sous-catégories » → « Comptes » (route `parametres.comptes.index`)
+- Tests [D] route 200 + [E] redirect 301
+**Files**: contrôleur + vues + routes + sidebar + tests
+**Commit**: `feat(v5): Step 38 — UI rename Parametres > Comptes + redirect 301`
 
-#### Step 39 : Suppression alias deprecated `SousCategorie`
+#### Step 39 : Suppression alias deprecated `SousCategorie` 🅿️ PARQUÉ post-cutover
 
-**Complexity**: trivial
-**RED**: Suite tests verte sans `SousCategorie`
-**GREEN**:
-- Drop `app/Models/SousCategorie.php`
-- Grep final pour s'assurer aucun usage résiduel
-**REFACTOR**: None needed
-**Files**: model deleted + tests
-**Commit**: `chore(v5): remove deprecated SousCategorie alias`
+> **PARQUÉ** : reporté à un programme dédié post-prod v5.0.
+> Dépend de la migration des 6 FK `sous_categorie_id` (budget_lines, formules_adhesion,
+> facture_lignes, note_de_frais_lignes, devis_lignes, usages_sous_categorie) vers `compte_id`.
+> Estimé 6 migrations + refactoring callers → programme autonome.
+
+**Statut**: 🅿️ PARQUÉ
+**Commit**: N/A (reporté)
 
 ---
 

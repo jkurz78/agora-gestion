@@ -10,6 +10,20 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * NOTE : modèle conservé temporairement post Step 37 (slice 1d).
+ *
+ * Le rename SousCategorie → Compte est PARQUÉ post-cutover v5.0 :
+ * - 6 tables (budget_lines, formules_adhesion, facture_lignes, note_de_frais_lignes,
+ *   devis_lignes, usages_sous_categorie) ont une FK `sous_categorie_id` qui pointe
+ *   vers `sous_categories.id`.
+ * - Migrer ces FK sur `compte_id` nécessite 6 migrations supplémentaires hors scope
+ *   du Step 36 (qui ne traite que transaction_lignes).
+ * - Drop de SousCategorie (Step 39 du plan) reporté à un programme dédié post-prod.
+ *
+ * Cette classe coexiste avec `App\Models\Compte` (le nouveau modèle PCG du slice 1).
+ * Voir : memory/project_compta_v5_sous_slice_1d.md section « Phase I — partielle ».
+ */
 final class SousCategorie extends TenantModel
 {
     use HasFactory;
