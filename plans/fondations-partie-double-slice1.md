@@ -3,7 +3,7 @@
 **Created**: 2026-05-20
 **Spec**: `docs/specs/2026-05-19-fondations-partie-double-slice1.md` (3 commits, 938 lignes)
 **Branch**: `feat/compta-v5` (à créer en Step 1)
-**Status**: sous-slice 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + **1c TERMINÉE 2026-05-24 : Steps 21+23+24+25+26+27+28+29+30+31 livrés** (suite 11 995 / 0 failed). Prochain : Sous-slice 1d (Steps 32-35 — backfill + renommage + ops).
+**Status**: ✅ PRÊT CUTOVER — 1a TERMINÉE (11/11 — 2026-05-21) + 1b TERMINÉE 2026-05-22 + 1c TERMINÉE 2026-05-24 + **1d TERMINÉE 2026-05-27 : Steps 32-44 livrés** (suite 12 171 / 0 failed). Step 39+40 DIFFÉRÉS (programme dédié post-cutover).
 **Découpage build** : 4 sous-slices avec `/clear` intermédiaires (voir « Découpage en sous-slices »)
 
 ## Goal
@@ -841,7 +841,7 @@ API : `LettrageService::delettrerParLigne($ligne, $motif)`. Helper privé `autoD
 
 ---
 
-### Phase K — Documentation + Ops finalisés (steps 41-44) — Sous-slice 1d *(fin → recette préprod + cutover prod)*
+### Phase K — Documentation + Ops finalisés (steps 41-44) — Sous-slice 1d ✅ TERMINÉE — **PRÊT CUTOVER** (Step 39+40 différés)
 
 #### Step 41 : Documentation interne `docs/compta-partie-double.md`
 
@@ -867,33 +867,24 @@ API : `LettrageService::delettrerParLigne($ligne, $motif)`. Helper privé `autoD
 **Files**: ADR
 **Commit**: `docs(v5): ADR-002 révision cash basis → partie double uniforme`
 
-#### Step 43 : Scripts ops finalisés
+#### Step 43 : Scripts ops finalisés ✅
 
+**SHA**: `ccd3a8cb`
 **Complexity**: standard
-**RED**: Tests scripts :
-- `scripts/clone-prod-to-preprod.sh` testable en dry-run (audit des étapes sans exécution réelle)
-- `scripts/deploy-preprod-v5.sh` testable similairement
-- Commande artisan `compta:smoke-test-v5` qui exécute CR + rappro + assertion équilibre sur exercice courant
-**GREEN**:
-- Implémentation complète des 3 scripts (vu §16.4 et §16.5 de la spec)
-- Commande smoke
-**REFACTOR**: None needed
-**Files**: scripts, command
-**Commit**: `feat(v5): ops scripts finalisés (clone-prod, deploy-preprod, smoke-test)`
+**Livrables** :
+- `scripts/clone-prod-to-preprod.sh` — clone DB prod→preprod, anonymisation, migrate, smoke ; --dry-run safe
+- `scripts/deploy-preprod-v5.sh` — séquence 6 étapes, --dry-run propagé
+- `app/Console/Commands/SmokeTestV5Command.php` — `compta:smoke-test-v5` (CR delta + rappro delta + invariant équilibre)
+- `tests/Feature/Console/SmokeTestV5CommandTest.php` — [A][B][C]
+- `tests/Feature/Scripts/OpsScriptsDryRunTest.php` — [D][E]
 
-#### Step 44 : Commande `v5:sync-from-main` helper
+#### Step 44 : Commande `v5:sync-from-main` helper ✅
 
+**SHA**: `541a253f`
 **Complexity**: standard
-**RED**: Test Pest :
-- Lance fetch + dry-run merge + dry-run backfill
-- Échec dry-run backfill = exit code non-zéro + message clair
-**GREEN**:
-- `App\Console\Commands\V5SyncFromMainCommand`
-- Wraps `git fetch + git merge main + php artisan test --filter=Backfill + php artisan compta:backfill-partie-double --dry-run`
-- Rapport synthétique
-**REFACTOR**: None needed
-**Files**: command, test
-**Commit**: `feat(v5): v5:sync-from-main helper pour sync hebdo + validation`
+**Livrables** :
+- `app/Console/Commands/V5SyncFromMainCommand.php` — git fetch → git merge → test Backfill → backfill dry-run ; rapport tableau
+- `tests/Feature/Console/V5SyncFromMainCommandTest.php` — [A][B][C] via Process::fake
 
 ---
 
