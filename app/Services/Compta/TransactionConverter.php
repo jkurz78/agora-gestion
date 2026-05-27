@@ -33,9 +33,8 @@ use Illuminate\Support\Facades\Log;
  *
  * Le caller (BackfillPartieDoubleCommand) enveloppe chaque conversion dans DB::transaction.
  *
- * Note dette Vague 3b (3ème caller autoDelettrerLignes) : BackfillPartieDoubleCommand est
- * le 3ème endroit qui appelle une logique de pre-conversion similaire à TransactionExtourneService.
- * Extraction d'un helper `autoDelettrerLignes()` mutualisé à planifier en Vague 3b.
+ * Note : le pre-nettoyage auto-délettrage avant conversion est géré via
+ * LettrageService::autoDelettrerLignesDe (mutualisé en Vague 3b — rule-of-three).
  */
 final class TransactionConverter
 {

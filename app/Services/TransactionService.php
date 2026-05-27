@@ -597,44 +597,14 @@ final class TransactionService
     /**
      * Auto-délettrage des lignes lettrées AVANT forceDelete() dans la branche libre de update().
      *
-     * Pattern identique à TransactionExtourneService::autoDelettrerLignes() (Step 31 extourne).
-     *
-     * Cas d'usage :
-     * - Paire interne 411D + 411C (recette chèque lettrage auto) : les deux lignes portent
-     *   le même code → un seul appel delettrerParLigne suffit pour déléttrer le groupe entier.
-     * - Cross-tx (encaissement) : la ligne 411 de cette Tx et la ligne 411 de la Tx de
-     *   règlement partagent un code → delettrerParLigne délettre les deux côtés.
-     *
-     * Non-action : si aucune ligne ne porte de lettrage_code, retour immédiat.
+     * Délègue à LettrageService::autoDelettrerLignesDe (rule-of-three — Vague 3b).
      * Cette méthode NE concerne PAS les branches Rappro-locked ni Facture-locked :
      * celles-ci font un patch ciblé (montants gelés) sans jamais toucher au lettrage.
      */
     private function autoDelettrerLignesAvantUpdate(Transaction $transaction): void
     {
-        $lignesLettrées = $transaction->lignes()
-            ->whereNotNull('lettrage_code')
-            ->get();
-
-        if ($lignesLettrées->isEmpty()) {
-            return;
-        }
-
-        // Mémoriser les codes déjà traités pour éviter un double appel sur le même groupe
-        // (par exemple paire interne 411D + 411C portent le même code).
-        $codesTraités = [];
-
-        foreach ($lignesLettrées as $ligne) {
-            $code = $ligne->lettrage_code;
-
-            if (in_array($code, $codesTraités, strict: true)) {
-                continue;
-            }
-
-            $motif = "Auto-délettrage suite à update de TX#{$transaction->id}";
-            $this->lettrageService->delettrerParLigne($ligne, $motif);
-
-            $codesTraités[] = $code;
-        }
+        $motif = "Auto-délettrage suite à update de TX#{$transaction->id}";
+        $this->lettrageService->autoDelettrerLignesDe($transaction, $motif);
     }
 
     /**

@@ -197,40 +197,14 @@ final class TransactionExtourneService
     /**
      * Délettre toutes les lignes de l'origine qui portent un lettrage_code non null.
      *
-     * Appelé AVANT la création du miroir dans extourner(). Si une ligne lettrée est
-     * détectée, on déléttre l'ensemble du groupe (via LettrageService::delettrerParLigne).
-     * Les codes déjà traités sont mémorisés pour éviter un double appel sur le même groupe.
-     *
+     * Délègue à LettrageService::autoDelettrerLignesDe (rule-of-three — Vague 3b).
      * Cas de non-action : si aucune ligne ne porte de lettrage_code (Tx legacy pure ou
-     * créance ouverte non encaissée), la méthode retourne sans rien faire.
+     * créance ouverte non encaissée), retourne sans rien faire.
      */
     private function autoDelettrerLignes(Transaction $origine): void
     {
-        // Charger les lignes de l'origine qui portent un lettrage_code
-        $lignesLettrées = $origine->lignes()
-            ->whereNotNull('lettrage_code')
-            ->get();
-
-        if ($lignesLettrées->isEmpty()) {
-            return;
-        }
-
-        // Mémoriser les codes déjà traités pour éviter un double délettrage si
-        // plusieurs lignes de la même origine appartiennent au même groupe.
-        $codesTraités = [];
-
-        foreach ($lignesLettrées as $ligne) {
-            $code = $ligne->lettrage_code;
-
-            if (in_array($code, $codesTraités, strict: true)) {
-                continue;
-            }
-
-            $motif = "Auto-délettrage suite à extourne de TX#{$origine->id}";
-            $this->lettrageService->delettrerParLigne($ligne, $motif);
-
-            $codesTraités[] = $code;
-        }
+        $motif = "Auto-délettrage suite à extourne de TX#{$origine->id}";
+        $this->lettrageService->autoDelettrerLignesDe($origine, $motif);
     }
 
     /**

@@ -12,6 +12,7 @@ use App\Exceptions\Compta\LettrageNonEquilibreException;
 use App\Exceptions\Compta\LettrageTiersIncoherentException;
 use App\Exceptions\Compta\LigneNonLettreeException;
 use App\Exceptions\Compta\TenantBoundaryException;
+use App\Models\Transaction;
 use App\Models\TransactionLigne;
 use App\Tenant\TenantContext;
 use Illuminate\Support\Collection;
@@ -73,6 +74,42 @@ final class LettrageService
         });
 
         return $code;
+    }
+
+    /**
+     * Délettre automatiquement toutes les lignes lettrées d'une transaction.
+     *
+     * Pattern mutualisé (rule-of-three callers : TransactionExtourneService,
+     * TransactionService, TransactionConverter). Charge les lignes portant un
+     * lettrage_code non null sur la transaction donnée, déduplique les codes,
+     * et appelle delettrerParLigne pour chaque groupe distinct.
+     *
+     * @return int Nombre de codes délettés (utile pour logging).
+     */
+    public function autoDelettrerLignesDe(Transaction $tx, string $motif): int
+    {
+        $lignesLettrees = $tx->lignes()
+            ->whereNotNull('lettrage_code')
+            ->get();
+
+        if ($lignesLettrees->isEmpty()) {
+            return 0;
+        }
+
+        $codesTraites = [];
+
+        foreach ($lignesLettrees as $ligne) {
+            $code = $ligne->lettrage_code;
+
+            if (in_array($code, $codesTraites, strict: true)) {
+                continue;
+            }
+
+            $this->delettrerParLigne($ligne, $motif);
+            $codesTraites[] = $code;
+        }
+
+        return count($codesTraites);
     }
 
     /**
