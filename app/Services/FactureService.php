@@ -699,7 +699,10 @@ XML;
             throw new \RuntimeException('Cette facture est déjà intégralement réglée.');
         }
 
-        DB::transaction(function () use ($facture, $transactionIds): void {
+        // Preload Compte 411 hors boucle (N+1 fix — Vague 3b Item C)
+        $compte411 = Compte::ofNumero('411');
+
+        DB::transaction(function () use ($facture, $transactionIds, $compte411): void {
             foreach ($transactionIds as $transactionId) {
                 $transaction = $facture->transactions()->findOrFail($transactionId);
 
@@ -708,7 +711,7 @@ XML;
                 ]);
 
                 // --- Partie double : génère T2 (encaissement) si T1 porte une ligne 411 valide ---
-                $this->encaisserPartieDouble($facture, $transaction);
+                $this->encaisserPartieDouble($facture, $transaction, $compte411);
             }
         });
     }
@@ -722,7 +725,7 @@ XML;
      *
      * @throws LettrageDejaPresentException Si ligne 411 déjà lettrée.
      */
-    private function encaisserPartieDouble(Facture $facture, Transaction $transaction): void
+    private function encaisserPartieDouble(Facture $facture, Transaction $transaction, ?Compte $compte411 = null): void
     {
         // --- 1. Résolution mode de paiement ---
         /** @var ModePaiement|null $mode */
@@ -751,10 +754,11 @@ XML;
         }
 
         // --- 3. Vérifie que T1 porte une ligne 411 (transaction issue de la double écriture) ---
+        // Compte 411 préchargé par le caller (N+1 fix — Vague 3b Item C).
         // On utilise ofNumero() (nullable) plutôt que ofNumeroSysteme() (throw) car ce skip
         // est défensif : si le compte 411 n'existe pas (tenant sans double écriture activée),
         // on skip sans exception.
-        $compte411 = Compte::ofNumero('411');
+        $compte411 ??= Compte::ofNumero('411');
         if ($compte411 === null) {
             Log::warning('[PartieDouble] Step 24 — skip : compte 411 absent (tenant sans schéma PD)', [
                 'transaction_id' => (int) $transaction->id,

@@ -148,12 +148,15 @@ final class ReglementOperationService
             return;
         }
 
-        DB::transaction(function () use ($transaction): void {
+        // Preload Compte 411 hors transaction (N+1 fix — Vague 3b Item C)
+        $compte411 = Compte::ofNumero('411');
+
+        DB::transaction(function () use ($transaction, $compte411): void {
             // 1. Toggle statut (legacy — préservé dans tous les cas)
             $transaction->update(['statut_reglement' => StatutReglement::Recu->value]);
 
             // 2. Partie double : génère T2 si T1 porte une ligne 411 valide
-            $this->encaisserPartieDouble($transaction);
+            $this->encaisserPartieDouble($transaction, $compte411);
         });
     }
 
@@ -228,7 +231,7 @@ final class ReglementOperationService
      *
      * @throws LettrageDejaPresentException Si ligne 411 déjà lettrée.
      */
-    private function encaisserPartieDouble(Transaction $transaction): void
+    private function encaisserPartieDouble(Transaction $transaction, ?Compte $compte411 = null): void
     {
         // --- 1. Résolution mode de paiement ---
         /** @var ModePaiement|null $mode */
@@ -256,7 +259,8 @@ final class ReglementOperationService
         }
 
         // --- 3. Vérifie que T1 porte une ligne 411 ---
-        $compte411 = Compte::ofNumero('411');
+        // Compte 411 préchargé par le caller (N+1 fix — Vague 3b Item C).
+        $compte411 ??= Compte::ofNumero('411');
         if ($compte411 === null) {
             Log::warning('[PartieDouble] Step 26 — skip : compte 411 absent (tenant sans schéma PD)', [
                 'transaction_id' => (int) $transaction->id,
